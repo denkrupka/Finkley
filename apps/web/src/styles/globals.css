@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Источник правды для палитры — `Design/project/tokens.jsx`
+ * (см. ADR-007 в decisions/007-design-tokens.md).
+ *
+ * shadcn-токены ниже подобраны так, чтобы дефолтные shadcn-компоненты
+ * читались как фирменные Finkley. Для прямого доступа к фирменным
+ * цветам — utility-классы `bg-brand-navy`, `text-brand-sage` и т.п.
+ */
+
+@layer base {
+  :root {
+    /* shadcn aliases (mapped to Finkley palette) */
+    --background: 60 17% 98%; /* #FAFAF8 — bg */
+    --foreground: 0 0% 10%; /* #1A1A1A — text */
+
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 240 28% 14%; /* navy #1A1A2E */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 197 64% 33%; /* teal #1E6B8A */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 48 11% 91%; /* border #ECECE7 */
+    --muted-foreground: 0 0% 40%; /* textMuted #666 */
+
+    --accent: 197 33% 93%; /* tealSoft #E5F0F4 */
+    --accent-foreground: 199 70% 26%; /* tealDeep #155571 */
+
+    --destructive: 6 63% 46%; /* red #C0392B */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 48 11% 91%; /* #ECECE7 */
+    --input: 48 11% 91%;
+    --ring: 240 28% 14%; /* navy */
+
+    --radius: 0.625rem; /* rMd 10px — дефолт для кнопок/инпутов */
+
+    /* Доменные акценты */
+    --profit: 153 55% 40%; /* sage */
+    --loss: 6 63% 46%; /* red */
+
+    /* Finkley brand palette — прямой доступ к токенам Design/ */
+    --brand-navy: 240 28% 14%;
+    --brand-navy-soft: 240 30% 20%;
+    --brand-navy-deep: 240 39% 12%;
+    --brand-teal: 197 64% 33%;
+    --brand-teal-soft: 197 33% 93%;
+    --brand-teal-deep: 199 70% 26%;
+    --brand-sage: 153 55% 40%;
+    --brand-sage-soft: 144 35% 93%;
+    --brand-red: 6 63% 46%;
+    --brand-red-soft: 9 67% 93%;
+    --brand-yellow: 54 100% 88%;
+    --brand-yellow-deep: 53 87% 69%;
+    --brand-gold: 41 51% 54%;
+    --brand-text-faint: 0 0% 60%;
+    --brand-border-strong: 48 9% 84%;
+  }
+
+  /* Dark mode пока не используем — стадия 1 light-only.
+     Tokens подобраны позже при первой задаче с тёмной темой. */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-display;
+    font-feature-settings:
+      'cv11',
+      'ss01';
+  }
+  /* Числа дашборда: моно-шрифт + tabular figures (Finkley convention). */
+  .num {
+    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    font-feature-settings:
+      'tnum' 1,
+      'lnum' 1;
+    letter-spacing: -0.01em;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

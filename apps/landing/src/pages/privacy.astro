@@ -1,0 +1,143 @@
+---
+import Layout from '../layouts/Layout.astro'
+
+// ⚠ TEMPLATE: эти тексты — заглушки для review юристом перед публичным запуском.
+// См. docs/legal/PRIVACY_POLICY_RU.md (источник в /docs/) и docs/06_SECURITY_PRIVACY.md.
+
+const UPDATED = '6 мая 2026'
+---
+
+<Layout
+  title="Privacy Policy — Finkley"
+  description="Как мы обрабатываем твои данные. GDPR-compliance."
+  active="privacy"
+>
+  <article class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
+    <p class="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">
+      Privacy Policy · обновлено {UPDATED}
+    </p>
+    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl">
+      Политика приватности
+    </h1>
+    <p class="mt-4 text-base text-brand-text-muted">
+      Этот документ описывает, какие данные Finkley собирает, зачем и как ты можешь ими управлять.
+      Документ соответствует требованиям GDPR.
+    </p>
+
+    <div class="prose-fs mt-12 space-y-10 text-brand-text">
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">1. Кто мы</h2>
+        <p class="mt-3">
+          Finkley — продукт <strong>[Юрлицо PL]</strong>, NIP <strong>[X]</strong>, адрес
+          <strong>[Y]</strong>. Контакт по вопросам приватности —
+          <a href="mailto:privacy@finkley.eu" class="text-brand-teal underline">privacy@finkley.eu</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">2. Какие данные мы собираем</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>Регистрация: email, пароль (хешированный), имя</li>
+          <li>Профиль салона: имя, страна, валюта, тип, опционально логотип</li>
+          <li>Рабочие данные: визиты, расходы, мастера, клиенты салона (которых ты вводишь сама)</li>
+          <li>Интеграции: токены Booksy/wFirma — зашифрованы, доступ только с серверного ключа</li>
+          <li>Технические: IP, user agent, временные метки запросов (для безопасности)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">3. Зачем собираем</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>Предоставление услуги учёта — основная цель</li>
+          <li>Биллинг через Stripe</li>
+          <li>Транзакционные email через Postmark (welcome, billing, weekly digest)</li>
+          <li>Анонимная аналитика продукта через Plausible (без cookies)</li>
+          <li>Юридические требования (хранение фактур согласно местному закону)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">4. Где хранится</h2>
+        <p class="mt-3">
+          Все основные данные — в Supabase, регион Frankfurt (eu-central-1), Германия. Encryption
+          at-rest AES-256. TLS 1.2+ в транзите.
+        </p>
+        <p class="mt-3">
+          Список подпроцессоров: Supabase (Frankfurt EU), GitHub (хостинг кода и Pages, EU edge),
+          Stripe (биллинг, EU/US), Postmark (email, US), Anthropic (OCR — стадия 3, US), Sentry
+          (ошибки, EU), Plausible (аналитика, EU), Cloudflare (DNS, global edge). Со всеми
+          подписаны DPA.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">5. Кому передаём</h2>
+        <p class="mt-3">
+          Только подпроцессорам по DPA — для целей, описанных выше. Налоговым органам —
+          только по официальному запросу. Третьим лицам в маркетинговых целях —
+          <strong>никогда</strong>.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">6. Сколько храним</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>Активный аккаунт — пока работает подписка</li>
+          <li>Cancelled подписка — read-only 12 месяцев</li>
+          <li>Удалённый аккаунт — 30 дней grace period, потом hard delete</li>
+          <li>Резервные копии Supabase — 30 дней retention</li>
+          <li>Логи ошибок Sentry — 90 дней</li>
+          <li>Email логи Postmark — 45 дней</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">7. Твои права (GDPR Art. 15–22)</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>
+            <strong>Доступ к данным</strong> — Настройки → Экспорт данных (CSV) — стадия 2
+          </li>
+          <li><strong>Исправление</strong> — UI приложения, всегда</li>
+          <li>
+            <strong>Удаление</strong> — кнопка «Удалить салон» в Настройках, 30 дней grace
+          </li>
+          <li><strong>Портабельность</strong> — экспорт в CSV/JSON</li>
+          <li>
+            <strong>Ограничение / возражение</strong> — email на
+            <a href="mailto:privacy@finkley.eu" class="text-brand-teal underline">privacy@finkley.eu</a>
+          </li>
+          <li>
+            <strong>Автоматизированные решения</strong> — не применимо. AI-инсайты (стадия 4) —
+            рекомендательные, никогда не действуют автоматически
+          </li>
+        </ul>
+        <p class="mt-3">
+          Срок ответа на запросы — 30 дней.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">8. Cookies</h2>
+        <p class="mt-3">
+          В стадии 1 — только функциональные cookies для авторизации (Supabase auth state).
+          Маркетинговых cookies нет — поэтому cookie banner не нужен. Аналитика через Plausible
+          работает без cookies.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Изменения политики</h2>
+        <p class="mt-3">
+          О существенных изменениях уведомим по email за 14 дней до вступления в силу. Текущая
+          версия всегда на этой странице.
+        </p>
+      </section>
+
+      <p class="border-t border-brand-border pt-6 text-sm italic text-brand-text-muted">
+        ⚠ Этот документ — рабочий шаблон для review юристом. Перед публичным запуском
+        замените заглушки [Юрлицо PL] / [NIP] / [адрес] и пропустите через юридическую проверку
+        в вашей юрисдикции.
+      </p>
+    </div>
+  </article>
+</Layout>

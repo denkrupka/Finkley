@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>FinSalon — Print</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #EDEDE9; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .page {
+    width: 1440px;
+    background: #FAFAF8;
+    margin: 24px auto;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    overflow: hidden;
+    position: relative;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+  .page.mobile { width: 1440px; height: 980px; display: grid; place-items: center; background: linear-gradient(180deg,#F4F2EE 0%,#E8E5DF 100%); }
+  .page-label {
+    position: absolute; top: 14px; left: 22px; z-index: 200;
+    font: 600 11px/1 -apple-system,BlinkMacSystemFont,"Plus Jakarta Sans",sans-serif;
+    color: rgba(20,20,40,0.55); letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(255,255,255,0.85); padding: 4px 9px; border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .stage {
+    width: 1440px; height: 980px; position: relative; overflow: hidden;
+  }
+  .stage.narrow { width: 1280px; }
+
+  @page { size: 1500px 1040px; margin: 0; }
+  @media print {
+    html, body { background: #fff; }
+    .page { margin: 0; box-shadow: none; }
+    .page-label { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="chrome.jsx"></script>
+<script type="text/babel" src="screen-dashboard.jsx"></script>
+<script type="text/babel" src="screens-2-3.jsx"></script>
+<script type="text/babel" src="screens-4-5-mobile.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+function AppShell({ active, children }) {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", background: window.TOKENS.bg, overflow: "hidden", position: "relative" }}>
+      <window.Sidebar active={active} />
+      {children}
+    </div>
+  );
+}
+
+function Dash() {
+  return <AppShell active="home"><window.Dashboard period="month" onPeriod={()=>{}} onAddVisit={()=>{}} /></AppShell>;
+}
+function DashModal() {
+  return (
+    <AppShell active="home">
+      <window.Dashboard period="month" onPeriod={()=>{}} onAddVisit={()=>{}} />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(20,20,40,0.45)", display: "grid", placeItems: "center", zIndex: 100, backdropFilter: "blur(4px)" }}>
+        <window.QuickEntryModal open={true} embedded={true} />
+      </div>
+    </AppShell>
+  );
+}
+function Exp() {
+  return <AppShell active="expenses"><window.ExpensesScreen period="month" onPeriod={()=>{}} onAddVisit={()=>{}} /></AppShell>;
+}
+function AI() {
+  return <AppShell active="ai"><window.AIScreen period="month" onPeriod={()=>{}} /></AppShell>;
+}
+function Onb() {
+  return <div style={{ width: "100%", height: "100%", background: window.TOKENS.bg, overflow: "hidden" }}><window.OnboardingScreen /></div>;
+}
+
+const PAGES = [
+  { label: "01 — Дашборд", C: Dash, narrow: false },
+  { label: "02 — Quick Entry — модал «Новый визит»", C: DashModal, narrow: false },
+  { label: "03 — Расходы", C: Exp, narrow: false },
+  { label: "04 — AI-помощник", C: AI, narrow: false },
+  { label: "05 — Онбординг — шаг 2 из 5", C: Onb, narrow: true },
+];
+
+function App() {
+  return (
+    <>
+      {PAGES.map((p, i) => {
+        const C = p.C;
+        return (
+          <div key={i} className="page">
+            <div className="page-label">{p.label}</div>
+            <div className={"stage" + (p.narrow ? " narrow" : "")}><C /></div>
+          </div>
+        );
+      })}
+      <div className="page mobile">
+        <div className="page-label" style={{ background: "rgba(255,255,255,0.95)" }}>06 — Дашборд (мобильный)</div>
+        <window.MobileDashboard />
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+// Auto-print after fonts + render settle
+(async () => {
+  try { await document.fonts.ready; } catch(e) {}
+  setTimeout(() => { window.print(); }, 1200);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+{
+  "app": {
+    "title": "Finkley",
+    "placeholder": "Скелет приложения готов. См. docs/04_BACKLOG.md для следующих шагов."
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отменить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "close": "Закрыть",
+    "back": "Назад",
+    "next": "Далее",
+    "loading": "Загрузка...",
+    "error_generic": "Что-то пошло не так. Попробуй ещё раз.",
+    "yes": "Да",
+    "no": "Нет",
+    "confirm": "Подтвердить",
+    "sign_out": "Выйти"
+  },
+  "auth": {
+    "or": "или",
+    "login": {
+      "title": "Войти в Finkley",
+      "email_label": "Email",
+      "password_label": "Пароль",
+      "submit": "Войти",
+      "forgot_password": "Забыл пароль?",
+      "no_account": "Ещё нет аккаунта?",
+      "signup_link": "Зарегистрироваться",
+      "google_button": "Войти через Google",
+      "telegram_button": "Войти через Telegram"
+    },
+    "signup": {
+      "title": "Регистрация",
+      "subtitle": "Бесплатные 14 дней. Без карты на старте.",
+      "submit": "Создать аккаунт",
+      "have_account": "Уже есть аккаунт?",
+      "login_link": "Войти",
+      "password_hint": "Минимум 8 символов",
+      "password_confirm_label": "Пароль ещё раз",
+      "confirm_title": "Проверь почту",
+      "confirm_subtitle": "Мы отправили ссылку для подтверждения на {{email}}.",
+      "confirm_hint": "Перейди по ссылке, чтобы активировать аккаунт. Письмо может прийти в спам.",
+      "confirm_back_to_login": "Вернуться к входу"
+    },
+    "forgot": {
+      "title": "Сброс пароля",
+      "subtitle": "Пришлём ссылку на email — по ней зададите новый пароль.",
+      "submit": "Отправить ссылку",
+      "sent_title": "Ссылка отправлена",
+      "sent_subtitle": "Проверь почту {{email}} — там будет ссылка для сброса пароля.",
+      "back": "← Назад ко входу"
+    },
+    "reset": {
+      "title": "Новый пароль",
+      "subtitle": "Введи новый пароль для своего аккаунта.",
+      "new_password_label": "Новый пароль",
+      "submit": "Сохранить пароль",
+      "invalid_title": "Ссылка устарела",
+      "invalid_subtitle": "Ссылка для сброса пароля больше не действительна. Запроси новую.",
+      "request_new": "Запросить новую ссылку"
+    },
+    "callback": {
+      "title": "Подтверждаем вход",
+      "subtitle": "Сейчас перенаправим тебя в приложение."
+    },
+    "errors": {
+      "invalid_credentials": "Неверный email или пароль",
+      "email_required": "Email обязателен",
+      "password_required": "Пароль обязателен",
+      "password_too_short": "Пароль должен быть не менее 8 символов",
+      "password_confirm_required": "Подтвердите пароль",
+      "passwords_do_not_match": "Пароли не совпадают",
+      "email_invalid": "Неверный формат email"
+    }
+  },
+  "onboarding": {
+    "exit": "Выйти",
+    "eta": "≈ 2 минуты",
+    "step_of": "Шаг {{current}} из {{total}}",
+    "skip": "Пропустить — добавлю потом",
+    "open_dashboard": "Открыть дашборд",
+    "steps": {
+      "salon": "Салон",
+      "staff": "Мастера",
+      "services": "Услуги",
+      "expenses": "Расходы",
+      "done": "Готово"
+    },
+    "step1": {
+      "title": "Расскажи о салоне",
+      "subtitle": "Без этого никак — нужно знать, в какой стране и в какой валюте ты работаешь.",
+      "name_label": "Имя салона",
+      "name_placeholder": "Например: Студия Анны",
+      "country_label": "Страна",
+      "type_label": "Тип салона"
+    },
+    "step2": {
+      "title": "Добавь своих мастеров",
+      "subtitle": "Это займёт 2 минуты. Потом можно дополнить и поменять.",
+      "name_placeholder": "Имя мастера",
+      "percent_label": "% от выручки",
+      "add": "Добавить мастера"
+    },
+    "step3": {
+      "title": "Что вы делаете",
+      "subtitle": "Подкинули список по умолчанию. Поправьте цены и добавьте свои услуги.",
+      "category": "Категория",
+      "category_placeholder": "Стрижки",
+      "service": "Услуга",
+      "service_placeholder": "Женская стрижка",
+      "price": "Цена",
+      "add": "Добавить услугу",
+      "reset_seed": "Сбросить к шаблону"
+    },
+    "step4": {
+      "title": "Категории расходов",
+      "subtitle": "Это твои основные «ведёрки» куда уходят деньги. Можно дополнить позже.",
+      "placeholder": "Название категории",
+      "add": "Добавить категорию"
+    },
+    "step5": {
+      "title": "Готово, {{name}}!",
+      "subtitle": "Дашборд на месте. Сейчас он пустой — добавь первый визит, и появятся цифры.",
+      "staff": "мастеров",
+      "services": "услуг",
+      "expenses": "категорий расходов"
+    }
+  },
+  "nav": {
+    "dashboard": "Главная",
+    "visits": "Визиты",
+    "clients": "Клиенты",
+    "expenses": "Расходы",
+    "staff": "Мастера",
+    "reports": "Отчёты",
+    "ai": "AI-помощник",
+    "settings": "Настройки",
+    "more": "Ещё",
+    "drawer_title": "Меню навигации"
+  },
+  "salon_switcher": {
+    "title": "Переключить салон"
+  },
+  "plan": {
+    "pro_label": "Pro план",
+    "pro_until": "пробный период"
+  },
+  "coming_soon": {
+    "subtitle": "Эта секция будет доступна в стадии {{stage}}. Пока её нет — но она в плане.",
+    "badge": "Скоро · Стадия {{stage}}"
+  },
+  "dashboard": {
+    "title": "Дашборд",
+    "greeting": "Привет, {{name}}",
+    "greeting_subtitle_day": "Вот как идут дела сегодня.",
+    "greeting_subtitle_week": "Вот как идут дела на этой неделе.",
+    "greeting_subtitle_month": "Вот как идут дела в этом месяце.",
+    "greeting_subtitle_custom": "Вот как идут дела за период.",
+    "kpi": {
+      "revenue_label": "Выручка",
+      "expense_label": "Расходы",
+      "profit_label": "Прибыль",
+      "profit_sublabel": "чистыми в кармане"
+    },
+    "period": {
+      "day": "День",
+      "week": "Неделя",
+      "month": "Месяц",
+      "custom": "Период"
+    },
+    "empty": {
+      "title": "Здесь появится твой дашборд прибыли",
+      "subtitle": "Добавь первый визит — и увидишь магию.",
+      "cta": "+ Добавить визит"
+    },
+    "master_bars": {
+      "title": "Выручка по мастерам",
+      "active_count": "{{count}} мастеров активны",
+      "empty": "Пока нет визитов в этом периоде"
+    },
+    "payment_donut": {
+      "title": "Тип оплаты",
+      "total": "Всего",
+      "empty": "Нет данных для графика — добавь визиты."
+    },
+    "top_services": {
+      "title": "Топ услуг",
+      "see_all": "Все услуги",
+      "share": "{{pct}}% от лидера",
+      "visits": "{{count}} визитов",
+      "empty": "Пока нет услуг с продажами"
+    },
+    "recent_visits": {
+      "title": "Последние записи",
+      "show_all": "Показать все",
+      "empty": "Нет визитов в этом периоде"
+    },
+    "top_staff": "Топ мастера"
+  },
+  "visits": {
+    "title": "Визиты",
+    "fab_label": "Визит",
+    "subtitle_total": "{{count}} визитов · {{revenue}}",
+    "form": {
+      "title_new": "Новый визит",
+      "title_edit": "Редактировать визит",
+      "subtitle": "Запишется в книгу за пару секунд",
+      "date_label": "Дата",
+      "today_pill": "сегодня",
+      "staff_label": "Мастер",
+      "staff_placeholder": "Кто принимал?",
+      "service_label": "Услуга",
+      "service_placeholder": "Выбери услугу",
+      "amount_label": "Сумма",
+      "tip_label": "Чаевые",
+      "discount_label": "Скидка",
+      "payment_method_label": "Оплата",
+      "comment_label": "Комментарий (необязательно)",
+      "comment_placeholder": "Например: новая клиентка, по рекомендации",
+      "submit": "Сохранить визит",
+      "submit_and_continue": "Сохранить и добавить ещё",
+      "continue_hint": "Можешь сразу вводить следующий — мастер и оплата сохранены."
+    },
+    "toast_added": "Визит добавлен",
+    "toast_updated": "Визит обновлён",
+    "toast_deleted": "Визит удалён",
+    "toast_undo": "Откатить",
+    "toast_undone": "Визит удалён",
+    "toast_restore": "Восстановить",
+    "toast_error": "Не получилось сохранить",
+    "empty": "Пока нет визитов",
+    "empty_hint": "Нажми «+ Визит», чтобы записать первый.",
+    "no_staff": "—",
+    "confirm_delete": "Удалить этот визит?",
+    "filters": {
+      "all_staff": "Все мастера",
+      "all_payments": "Все типы оплаты"
+    },
+    "errors": {
+      "staff_required": "Выбери мастера",
+      "amount_required": "Укажи сумму",
+      "amount_positive": "Сумма должна быть больше нуля"
+    }
+  },
+  "billing": {
+    "checkout_button": "Оформить подписку",
+    "portal_button": "Управление подпиской",
+    "checkout_error": "Не удалось открыть оплату",
+    "portal_error": "Не удалось открыть портал биллинга",
+    "banner": {
+      "trial_ending_one": "Триал заканчивается завтра",
+      "trial_ending_other": "Триал заканчивается через {{count}} дней",
+      "expired_title": "Подписка не активна. Можно смотреть данные, но новые записи временно отключены.",
+      "cta_subscribe": "Оформить за €15/мес",
+      "cta_upgrade": "Оплатить"
+    }
+  },
+  "settings": {
+    "title": "Настройки",
+    "subtitle": "Профиль салона, экспорт данных, удаление.",
+    "toast_saved": "Настройки сохранены",
+    "profile": {
+      "title": "Профиль салона",
+      "name_label": "Имя салона",
+      "country_label": "Страна",
+      "country_hint": "При смене страны автоматически меняются валюта и часовой пояс.",
+      "type_label": "Тип салона",
+      "logo_label": "Логотип (URL картинки)",
+      "logo_hint": "Пока вставляй ссылку. Загрузка из галереи появится позже."
+    },
+    "export": {
+      "title": "Экспорт данных",
+      "subtitle": "Все визиты, расходы и мастера в CSV — для бухгалтерии или резервной копии.",
+      "button": "Скачать данные",
+      "coming_soon": "Появится в стадии 2 — TASK-26"
+    },
+    "delete": {
+      "title": "Удалить салон",
+      "subtitle": "Все данные будут удалены через 30 дней. Восстановить после этого нельзя.",
+      "button": "Удалить салон",
+      "modal_title": "Удалить салон навсегда",
+      "modal_subtitle": "Это действие нельзя отменить через 30 дней grace-периода.",
+      "confirm_prompt": "Чтобы подтвердить, введи имя салона: «{{name}}»",
+      "confirm_mismatch": "Имя не совпадает",
+      "confirm_button": "Удалить навсегда",
+      "toast_deleted": "Салон удалён"
+    },
+    "errors": {
+      "name_too_short": "Имя должно быть не менее 2 символов"
+    },
+    "billing": {
+      "title": "Подписка",
+      "no_subscription": "Подписка не оформлена. После 14 дней бесплатного триала аккаунт перейдёт в режим только для чтения.",
+      "status_trialing": "Триал — €15/мес после окончания",
+      "status_active": "Активна — €15/мес",
+      "status_past_due": "Платёж не прошёл. Обнови карту в портале биллинга.",
+      "status_canceled": "Отменена. Доступ до конца оплаченного периода.",
+      "status_unpaid": "Неоплачена. Оформи подписку, чтобы продолжить.",
+      "status_paused": "На паузе.",
+      "status_incomplete": "Оформление не завершено."
+    }
+  },
+  "staff": {
+    "title": "Мастера",
+    "subtitle": "Имя, процент с выручки. Мастера остаются в истории визитов даже после архивирования.",
+    "add_title": "Добавить мастера",
+    "name_label": "Имя",
+    "name_placeholder": "Например, Аня",
+    "percent_label": "% от выручки",
+    "add_button": "Добавить",
+    "active": "Активные · {{count}}",
+    "archived": "В архиве · {{count}}",
+    "empty_active": "Пока нет мастеров. Добавь первого выше.",
+    "archive": "Архивировать",
+    "unarchive": "Вернуть",
+    "confirm_archive": "Перенести в архив? Можно вернуть позже.",
+    "toast_added": "Мастер добавлен",
+    "toast_saved": "Сохранено",
+    "toast_archived": "Перенесён в архив",
+    "toast_unarchived": "Возвращён из архива",
+    "errors": {
+      "name_too_short": "Имя должно быть не менее 2 символов",
+      "percent_invalid": "Процент должен быть от 0 до 100"
+    }
+  },
+  "expenses": {
+    "title": "Расходы",
+    "subtitle_total": "Всего за период:",
+    "add": "Добавить расход",
+    "list_title": "Все расходы",
+    "structure_title": "Структура расходов",
+    "structure_empty": "Нет расходов в этом периоде",
+    "records": "записей",
+    "no_category": "Без категории",
+    "confirm_delete": "Удалить этот расход?",
+    "form": {
+      "title_new": "Новый расход",
+      "date_label": "Дата",
+      "category_label": "Категория",
+      "category_placeholder": "Выбери категорию",
+      "amount_label": "Сумма",
+      "comment_label": "Комментарий (необязательно)",
+      "comment_placeholder": "Например: краска Wella, чек №123",
+      "submit": "Сохранить расход"
+    },
+    "errors": {
+      "category_required": "Выбери категорию",
+      "amount_required": "Укажи сумму",
+      "amount_positive": "Сумма должна быть больше нуля"
+    },
+    "toast_added": "Расход добавлен",
+    "toast_deleted": "Расход удалён",
+    "toast_error": "Не получилось сохранить",
+    "empty": "Пока нет расходов"
+  },
+  "payment_methods": {
+    "cash": "Нал",
+    "card": "Карта",
+    "transfer": "Перевод",
+    "online": "Онлайн",
+    "mixed": "Смешанная"
+  }
+}

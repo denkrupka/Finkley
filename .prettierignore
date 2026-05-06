@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+coverage
+playwright-report
+test-results
+.husky/_
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+apps/web/src/types/supabase.ts
+docs/email-templates/*.html
+# Hi-fi прототип от Claude Design — внешний артефакт, не трогаем
+Design/

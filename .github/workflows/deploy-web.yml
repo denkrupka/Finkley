@@ -1,0 +1,76 @@
+name: Deploy Web (Production)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'apps/landing/**'
+      - '.github/workflows/deploy-web.yml'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+  workflow_dispatch:
+
+# Только один деплой в один момент времени
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build (web + landing) and deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build SPA (apps/web)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_PROD }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PK_LIVE }}
+          VITE_STRIPE_PRICE_ID: ${{ secrets.VITE_STRIPE_PRICE_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_PLAUSIBLE_DOMAIN: finkley.eu
+          VITE_TELEGRAM_BOT_USERNAME: ${{ secrets.VITE_TELEGRAM_BOT_USERNAME }}
+          VITE_APP_URL: https://finkley.eu/app/
+        # Vite base должен быть /app/ т.к. SPA живёт в подпапке.
+        # base пробрасывается через env (см. apps/web/vite.config.ts).
+        run: VITE_BASE=/app/ pnpm --filter web build
+
+      - name: Build landing (apps/landing)
+        run: pnpm --filter landing build
+
+      - name: Merge into single gh-pages directory
+        run: |
+          mkdir -p public
+          cp -r apps/landing/dist/* public/
+          mkdir -p public/app
+          cp -r apps/web/dist/* public/app/
+          # CNAME для GitHub Pages custom domain
+          echo "finkley.eu" > public/CNAME
+          # SPA fallback — копируем 404.html SPA в корень для путей вида /app/...
+          # (GitHub Pages 404 fallback ловит любой неизвестный URL)
+          cp apps/web/dist/404.html public/404.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          cname: finkley.eu

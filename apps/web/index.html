@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#1A1A2E" />
+    <meta name="description" content="Finkley — управленческий учёт для салонов красоты. Видишь свою прибыль, а не записи клиентов." />
+
+    <!-- GitHub Pages SPA fallback: восстанавливаем путь после редиректа из 404.html -->
+    <script>
+      (function () {
+        var p = new URLSearchParams(window.location.search).get('p')
+        if (p) {
+          window.history.replaceState(null, '', '/' + p + window.location.hash)
+        }
+      })()
+    </script>
+
+    <title>Finkley</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

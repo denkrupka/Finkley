@@ -1,0 +1,31 @@
+import { useTranslation } from 'react-i18next'
+
+import { ComingSoon } from './ComingSoon'
+import { NAV_ITEMS } from './nav-config'
+
+/**
+ * Плейсхолдеры salon-scoped роутов на стадии 0->1.
+ * Реальные страницы заменят их в TASK-11..18.
+ *
+ * Структура: один компонент на каждый пункт sidebar. Каждый показывает
+ * <ComingSoon> до того, как соответствующий TASK его перепишет.
+ */
+
+function pageFor(id: string) {
+  const item = NAV_ITEMS.find((n) => n.id === id)!
+  return function Page() {
+    const { t } = useTranslation()
+    return <ComingSoon icon={item.icon} title={t(item.i18nKey)} stage={item.stage} />
+  }
+}
+
+// Замещены реальными страницами в TASK-11..14:
+// - DashboardPage (TASK-14) → routes/dashboard/DashboardPage.tsx
+// - VisitsPage    (TASK-11) → routes/visits/VisitsPage.tsx
+// - ExpensesPage  (TASK-13) → routes/expenses/ExpensesPage.tsx
+// - StaffPage     (TASK-12) → routes/staff/StaffPage.tsx
+//
+// Остальные пока ComingSoon до своих стадий.
+export const ClientsPage = pageFor('clients')
+export const ReportsPage = pageFor('reports')
+export const AIPage = pageFor('ai')

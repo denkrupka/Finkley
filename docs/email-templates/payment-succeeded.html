@@ -1,0 +1,71 @@
+<!--
+  Postmark template alias: payment-succeeded
+  Subject: Спасибо за оплату · Finkley
+
+  Variables:
+  - {{full_name}}
+  - {{amount}} (форматированная сумма с валютой и VAT)
+  - {{period_end_date}}
+  - {{invoice_url}} (ссылка на Stripe-инвойс)
+  - {{owner_name}}
+-->
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оплата прошла</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Спасибо, {{full_name}}!
+</h1>
+
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Оплата прошла успешно. Finkley работает на полную мощность.
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td>
+<p style="margin:0 0 4px 0; font-size:14px; color:#047857;">Оплачено</p>
+<p style="margin:0 0 8px 0; font-size:24px; font-weight:600; color:#065f46;">{{amount}}</p>
+<p style="margin:0; font-size:14px; color:#065f46;">Следующее списание: {{period_end_date}}</p>
+</td></tr>
+</table>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
+<a href="{{invoice_url}}" style="color:#0f172a; text-decoration:none; font-weight:500; font-size:14px;">
+📄 Скачать фактуру
+</a>
+</td></tr>
+</table>
+
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Управлять подпиской, сменить карту или отменить можно в разделе Billing внутри приложения.
+</p>
+
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}
+</p>
+
+</td></tr>
+</table>
+
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
+</p>
+
+</td></tr>
+</table>
+
+</body>
+</html>

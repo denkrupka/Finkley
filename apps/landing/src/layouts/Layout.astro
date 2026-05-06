@@ -1,0 +1,111 @@
+---
+import '../styles/global.css'
+
+interface Props {
+  title: string
+  description?: string
+  /** Активный пункт топ-меню для подсветки */
+  active?: 'home' | 'pricing' | 'privacy' | 'terms'
+}
+
+const {
+  title,
+  description = 'Finkley — управленческий учёт для малых салонов красоты. Видишь свою прибыль, а не записи клиентов.',
+  active = 'home',
+} = Astro.props
+
+// URL приложения (SPA в подпапке /app/ на том же gh-pages)
+const APP_URL = '/app/'
+---
+
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-brand-bg font-display text-brand-text antialiased">
+    <header class="border-b border-brand-border bg-white">
+      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        <a href="/" class="flex items-center gap-2.5" aria-label="Finkley">
+          <div
+            class="grid size-8 place-items-center rounded-md bg-brand-navy text-sm font-extrabold tracking-tighter text-white"
+            aria-hidden="true"
+          >
+            F
+          </div>
+          <span class="text-base font-bold tracking-tight text-brand-navy">Finkley</span>
+        </a>
+
+        <nav class="hidden items-center gap-7 md:flex">
+          <a
+            href="/"
+            class={`text-sm font-medium ${active === 'home' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+          >
+            О продукте
+          </a>
+          <a
+            href="/pricing"
+            class={`text-sm font-medium ${active === 'pricing' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+          >
+            Цены
+          </a>
+        </nav>
+
+        <div class="flex items-center gap-3">
+          <a
+            href={APP_URL + 'login'}
+            class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text sm:inline"
+          >
+            Войти
+          </a>
+          <a
+            href={APP_URL + 'signup'}
+            class="inline-flex h-10 items-center rounded-md bg-brand-navy px-4 text-sm font-semibold text-white hover:bg-brand-navy-soft"
+          >
+            Начать бесплатно
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="border-t border-brand-border bg-white">
+      <div
+        class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-4 py-8 text-sm text-brand-text-muted sm:flex-row sm:items-center sm:px-6"
+      >
+        <div class="flex items-center gap-2.5">
+          <div
+            class="grid size-6 place-items-center rounded-md bg-brand-navy text-[11px] font-extrabold tracking-tighter text-white"
+          >
+            F
+          </div>
+          <span class="font-semibold text-brand-navy">Finkley</span>
+          <span class="text-brand-text-faint">© 2026</span>
+        </div>
+        <nav class="flex flex-wrap gap-5">
+          <a href="/privacy" class={active === 'privacy' ? 'text-brand-navy' : 'hover:text-brand-text'}>
+            Privacy
+          </a>
+          <a href="/terms" class={active === 'terms' ? 'text-brand-navy' : 'hover:text-brand-text'}>
+            Terms
+          </a>
+          <a href="mailto:hello@finkley.eu" class="hover:text-brand-text">hello@finkley.eu</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

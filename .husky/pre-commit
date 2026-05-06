@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Pre-commit hook: запускает lint-staged на изменённых файлах.
+# Установка хуков: pnpm install (husky подхватит автоматом через scripts.prepare)
+
+pnpm exec lint-staged

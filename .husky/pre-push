@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Pre-push hook: typecheck + unit tests перед push.
+# Чтобы не пушить заведомо красное.
+
+set -e
+
+echo "→ Running typecheck..."
+pnpm typecheck
+
+echo "→ Running unit tests..."
+pnpm test
+
+echo "✓ Pre-push checks passed"

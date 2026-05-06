@@ -1,0 +1,76 @@
+<!--
+  Postmark template alias: welcome
+  Subject: Привет от Finkley 👋
+
+  Variables:
+  - {{full_name}}
+  - {{salon_name}}
+  - {{app_url}}
+  - {{owner_name}}
+-->
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Добро пожаловать в Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Привет, {{full_name}}!
+</h1>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Спасибо, что присоединился к Finkley. Я рад, что ты с нами.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Finkley поможет тебе видеть реальную прибыль твоего салона <strong>{{salon_name}}</strong> — после всех расходов, без таблиц и калькулятора.
+</p>
+
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Чтобы начать, добавь свой первый визит. Это займёт меньше минуты:
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Открыть Finkley
+</a>
+</td></tr>
+</table>
+
+<p style="margin:32px 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+У тебя есть <strong>14 дней бесплатного пробного периода</strong>. Без карты, без подвохов. Если что-то не понравится — просто не оплачивай.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Если будут вопросы или что-то будет работать не так — пиши мне напрямую на <a href="mailto:support@finkley.eu" style="color:#10b981; text-decoration:none;">support@finkley.eu</a>. Отвечаю лично.
+</p>
+
+<p style="margin:0 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+
+</td></tr>
+</table>
+
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
+Это транзакционное письмо. Если у тебя есть вопросы по обработке данных — privacy@finkley.eu
+</p>
+
+</td></tr>
+</table>
+
+</body>
+</html>

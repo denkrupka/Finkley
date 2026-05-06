@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FinSalon — Hi-fi Prototype</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; background: #EDEDE9; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="chrome.jsx"></script>
+<script type="text/babel" src="screen-dashboard.jsx"></script>
+<script type="text/babel" src="screens-2-3.jsx"></script>
+<script type="text/babel" src="screens-4-5-mobile.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+
+// Wrapper for full-app screens (sidebar + content)
+function AppShell({ active, children }) {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", background: window.TOKENS.bg, overflow: "hidden", position: "relative" }}>
+      <window.Sidebar active={active} />
+      {children}
+    </div>
+  );
+}
+
+function DashboardArtboard() {
+  const [period, setPeriod] = React.useState("month");
+  return (
+    <AppShell active="home">
+      <window.Dashboard period={period} onPeriod={setPeriod} onAddVisit={() => {}} />
+    </AppShell>
+  );
+}
+
+function DashboardWithModalArtboard() {
+  const [period, setPeriod] = React.useState("month");
+  return (
+    <AppShell active="home">
+      <window.Dashboard period={period} onPeriod={setPeriod} onAddVisit={() => {}} />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(20,20,40,0.45)", display: "grid", placeItems: "center", zIndex: 100, backdropFilter: "blur(4px)" }}>
+        <window.QuickEntryModal open={true} embedded={true} />
+      </div>
+    </AppShell>
+  );
+}
+
+function ExpensesArtboard() {
+  const [period, setPeriod] = React.useState("month");
+  return (
+    <AppShell active="expenses">
+      <window.ExpensesScreen period={period} onPeriod={setPeriod} onAddVisit={() => {}} />
+    </AppShell>
+  );
+}
+
+function AIArtboard() {
+  const [period, setPeriod] = React.useState("month");
+  return (
+    <AppShell active="ai">
+      <window.AIScreen period={period} onPeriod={setPeriod} />
+    </AppShell>
+  );
+}
+
+function OnboardingArtboard() {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", background: window.TOKENS.bg, overflow: "hidden" }}>
+      <window.OnboardingScreen />
+    </div>
+  );
+}
+
+function MobileArtboard() {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: "linear-gradient(180deg, #F4F2EE 0%, #E8E5DF 100%)" }}>
+      <window.MobileDashboard />
+    </div>
+  );
+}
+
+const SECTIONS = [
+  {
+    id: "core",
+    title: "Core flows",
+    artboards: [
+      { id: "dash",  label: "01 — Дашборд (главный экран)", w: 1440, h: 980, C: DashboardArtboard },
+      { id: "modal", label: "02 — Quick Entry — модал «Новый визит»", w: 1440, h: 980, C: DashboardWithModalArtboard },
+      { id: "exp",   label: "03 — Расходы", w: 1440, h: 980, C: ExpensesArtboard },
+    ],
+  },
+  {
+    id: "smart",
+    title: "Smart layer",
+    artboards: [
+      { id: "ai",   label: "04 — AI-помощник", w: 1440, h: 980, C: AIArtboard },
+      { id: "onb",  label: "05 — Онбординг — шаг 2 из 5", w: 1280, h: 980, C: OnboardingArtboard },
+    ],
+  },
+  {
+    id: "mobile",
+    title: "Mobile",
+    artboards: [
+      { id: "mob",  label: "06 — Дашборд (мобильный)", w: 460, h: 920, C: MobileArtboard },
+    ],
+  },
+];
+
+function App() {
+  return (
+    <DesignCanvas
+      title="FinSalon"
+      subtitle="High-fidelity prototype · «Booksy показывает клиентов. Мы показываем твою прибыль.»"
+    >
+      {SECTIONS.map((s) => (
+        <DCSection key={s.id} id={s.id} title={s.title}>
+          {s.artboards.map((a) => {
+            const C = a.C;
+            return (
+              <DCArtboard key={a.id} id={a.id} label={a.label} width={a.w} height={a.h}>
+                <C />
+              </DCArtboard>
+            );
+          })}
+        </DCSection>
+      ))}
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

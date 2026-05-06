@@ -1,0 +1,58 @@
+name: Deploy Supabase (Migrations + Functions)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-supabase.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Apply migrations and deploy edge functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+
+      - name: Apply migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PROD_DB_PASSWORD }}
+        run: supabase db push --linked
+
+      - name: Deploy edge functions
+        if: hashFiles('supabase/functions/**') != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          # Деплоим все функции, для webhook'ов нужен --no-verify-jwt
+          # Список функций требующих --no-verify-jwt прописан явно для безопасности
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth"
+          for fn in supabase/functions/*/; do
+            name=$(basename "$fn")
+            if [ "$name" = "_shared" ]; then continue; fi
+            if echo "$NO_JWT_FUNCTIONS" | grep -qw "$name"; then
+              echo "Deploying $name (no JWT verification)"
+              supabase functions deploy "$name" --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+            else
+              echo "Deploying $name (with JWT verification)"
+              supabase functions deploy "$name" --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+            fi
+          done
