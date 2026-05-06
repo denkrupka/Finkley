@@ -11,19 +11,16 @@ on:
       - 'package.json'
   workflow_dispatch:
 
-# Только один деплой в один момент времени
+# Только один деплой Pages в один момент времени
 concurrency:
-  group: deploy-web
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Build (web + landing) and deploy to GitHub Pages
+  build:
+    name: Build (web + landing)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -47,28 +44,44 @@ jobs:
           VITE_PLAUSIBLE_DOMAIN: finkley.eu
           VITE_TELEGRAM_BOT_USERNAME: ${{ secrets.VITE_TELEGRAM_BOT_USERNAME }}
           VITE_APP_URL: https://finkley.eu/app/
-        # Vite base должен быть /app/ т.к. SPA живёт в подпапке.
-        # base пробрасывается через env (см. apps/web/vite.config.ts).
-        run: VITE_BASE=/app/ pnpm --filter web build
+          # Vite base должен быть /app/ — SPA живёт в подпапке рядом с лендингом.
+          VITE_BASE: /app/
+        run: pnpm --filter web build
 
       - name: Build landing (apps/landing)
         run: pnpm --filter landing build
 
-      - name: Merge into single gh-pages directory
+      - name: Merge into single Pages directory
         run: |
           mkdir -p public
-          cp -r apps/landing/dist/* public/
+          cp -r apps/landing/dist/. public/
           mkdir -p public/app
-          cp -r apps/web/dist/* public/app/
+          cp -r apps/web/dist/. public/app/
           # CNAME для GitHub Pages custom domain
           echo "finkley.eu" > public/CNAME
-          # SPA fallback — копируем 404.html SPA в корень для путей вида /app/...
-          # (GitHub Pages 404 fallback ловит любой неизвестный URL)
+          # SPA fallback — копируем 404.html SPA в корень
           cp apps/web/dist/404.html public/404.html
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          cname: finkley.eu
+          path: ./public
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
