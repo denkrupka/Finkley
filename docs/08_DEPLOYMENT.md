@@ -14,18 +14,18 @@
 | Окружение    | URL                                            | Supabase                         | Когда деплоится                       |
 | ------------ | ---------------------------------------------- | -------------------------------- | ------------------------------------- |
 | `local`      | localhost:5173 (app), localhost:4321 (landing) | локальный через `supabase start` | При `pnpm dev`                        |
-| `staging`    | `staging.finkley.eu`                           | `finkley-staging`                | На каждый PR + push в `staging` ветку |
-| `production` | `app.finkley.eu` + `finkley.eu`                | `finkley-prod`                   | На push в `main`                      |
+| `staging`    | `staging.finkley.app`                           | `finkley-staging`                | На каждый PR + push в `staging` ветку |
+| `production` | `app.finkley.app` + `finkley.app`                | `finkley-prod`                   | На push в `main`                      |
 
 ## DNS-схема (Cloudflare)
 
 ```
-finkley.eu               → CNAME → username.github.io  (proxied)
+finkley.app               → CNAME → username.github.io  (proxied)
                             └─ путь: /                    (Astro landing)
-www.finkley.eu           → CNAME → finkley.eu           (proxied)
-app.finkley.eu           → CNAME → username.github.io    (proxied)
+www.finkley.app           → CNAME → finkley.app           (proxied)
+app.finkley.app           → CNAME → username.github.io    (proxied)
                             └─ путь: /app/                (Vite SPA)
-staging.finkley.eu       → CNAME → username.github.io    (proxied)
+staging.finkley.app       → CNAME → username.github.io    (proxied)
                             └─ путь: /app-staging/        (Vite SPA preview)
 ```
 
@@ -60,8 +60,8 @@ gh-pages/
 
 **Custom domains:**
 
-- В настройках GitHub репо → Pages → Custom domain: `finkley.eu`
-- В корне `gh-pages` → файл `CNAME` с содержимым `finkley.eu`
+- В настройках GitHub репо → Pages → Custom domain: `finkley.app`
+- В корне `gh-pages` → файл `CNAME` с содержимым `finkley.app`
 - GitHub автоматически выдаст SSL через Let's Encrypt (но мы используем Cloudflare proxy, поэтому Cloudflare даёт SSL)
 
 ## SPA Routing на GitHub Pages
@@ -180,7 +180,7 @@ jobs:
           mkdir -p .deploy/app
           cp -r landing/dist/* .deploy/
           cp -r app/dist/* .deploy/app/
-          echo "finkley.eu" > .deploy/CNAME
+          echo "finkley.app" > .deploy/CNAME
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
@@ -241,7 +241,7 @@ SUPABASE_ANON_KEY_STAGING      # eyJ...
 SUPABASE_ACCESS_TOKEN          # personal access token для CLI
 SUPABASE_PROJECT_REF_PROD      # xxx
 SUPABASE_PROJECT_REF_STAGING   # yyy
-PLAUSIBLE_DOMAIN               # finkley.eu
+PLAUSIBLE_DOMAIN               # finkley.app
 SENTRY_DSN                     # https://...@sentry.io/...
 ```
 
@@ -355,11 +355,11 @@ Edge Function-ы не имеют состояния, rollback мгновенны
 
 ### Health checks
 
-- `app.finkley.eu` — UptimeRobot (free tier, 5 минут интервал)
-- `finkley.eu` — UptimeRobot
+- `app.finkley.app` — UptimeRobot (free tier, 5 минут интервал)
+- `finkley.app` — UptimeRobot
 - Supabase: дашборд показывает uptime
 - Stripe: `https://status.stripe.com/`
-- Анонимный health-check endpoint: `app.finkley.eu/health.json` (статика)
+- Анонимный health-check endpoint: `app.finkley.app/health.json` (статика)
 
 ### Алерты
 

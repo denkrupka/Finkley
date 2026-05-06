@@ -128,7 +128,7 @@ test('user A cannot read user B salon', async () => {
 | Rectification      | UI для редактирования, всегда                     |
 | Erasure            | Кнопка "Удалить салон" + 30 дней grace            |
 | Portability        | CSV/JSON экспорт                                  |
-| Restriction        | Email на `privacy@finkley.eu`                     |
+| Restriction        | Email на `privacy@finkley.app`                     |
 | Objection          | Аналогично                                        |
 | Automated decision | Не применимо (AI — рекомендательные)              |
 
@@ -146,7 +146,7 @@ test('user A cannot read user B salon', async () => {
 ```
 1. Кто мы
    Finkley — продукт <Юрлицо PL>, NIP <X>, адрес <Y>.
-   Контакт: privacy@finkley.eu
+   Контакт: privacy@finkley.app
 
 2. Какие данные собираем
    - Регистрация: email, пароль (хеш), имя
@@ -176,7 +176,7 @@ test('user A cannot read user B salon', async () => {
 
 7. Ваши права
    - См. раздел "Права пользователя"
-   - privacy@finkley.eu, ответ в 30 дней
+   - privacy@finkley.app, ответ в 30 дней
 
 8. Cookies
    - Только функциональные (auth)
@@ -252,6 +252,6 @@ Sentry.init({
 - [ ] Email DKIM/SPF/DMARC для домена настроены через Postmark
 - [ ] Privacy Policy и Terms of Service опубликованы
 - [ ] DPA подписаны со всеми подпроцессорами
-- [ ] Контакт `privacy@finkley.eu` принимает почту
+- [ ] Контакт `privacy@finkley.app` принимает почту
 - [ ] Backup Supabase verified (восстановление протестировано)
 - [ ] gitleaks pre-commit hook установлен

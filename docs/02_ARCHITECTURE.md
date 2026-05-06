@@ -17,7 +17,7 @@
 │  Браузер (desktop / mobile) — PWA в стадии 4                     │
 └──────────────┬─────────────────────────┬─────────────────────────┘
                │                         │
-               │ landing.finkley.eu     │ app.finkley.eu
+               │ landing.finkley.app     │ app.finkley.app
                │ (Astro static)          │ (Vite SPA)
                ▼                         ▼
         ┌────────────────────────────────────────────┐
@@ -209,8 +209,8 @@ ADR: [`decisions/007-design-tokens.md`](../decisions/007-design-tokens.md)
 | Окружение    | Где живёт фронт                         | Какой Supabase               | Когда используется        |
 | ------------ | --------------------------------------- | ---------------------------- | ------------------------- |
 | `local`      | `pnpm dev` на localhost:5173            | локальный Supabase через CLI | Разработка                |
-| `staging`    | branch `staging` → `staging.finkley.eu` | `finkley-staging`            | Превью PR + тест миграций |
-| `production` | branch `main` → `app.finkley.eu`        | `finkley-prod`               | Прод                      |
+| `staging`    | branch `staging` → `staging.finkley.app` | `finkley-staging`            | Превью PR + тест миграций |
+| `production` | branch `main` → `app.finkley.app`        | `finkley-prod`               | Прод                      |
 
 **Переменные окружения:**
 
@@ -242,8 +242,8 @@ GitHub Pages обновляется через 30-60 секунд
    │
    ▼
 Cloudflare DNS:
-   landing.finkley.eu → gh-pages /landing/
-   app.finkley.eu     → gh-pages /app/
+   landing.finkley.app → gh-pages /landing/
+   app.finkley.app     → gh-pages /app/
 ```
 
 ### Backend (Supabase migrations + Edge Functions)

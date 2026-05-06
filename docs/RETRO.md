@@ -68,7 +68,7 @@
   - Включить Stripe Tax в Dashboard, привязать tax-jurisdictions для PL/EU.
   - Зарегистрировать webhook URL `https://<project>.supabase.co/functions/v1/stripe-webhook` в Stripe Dashboard.
 - **Реальные email-уведомления** — функция готова, но требует:
-  - Создать Postmark Server, активировать sender signature на `hello@finkley.eu` (DKIM/SPF/DMARC в DNS).
+  - Создать Postmark Server, активировать sender signature на `hello@finkley.app` (DKIM/SPF/DMARC в DNS).
   - Создать 5 шаблонов в Postmark Dashboard (`welcome`, `trial_ending`, `payment_succeeded`, `payment_failed`, `subscription_canceled`).
   - Добавить `POSTMARK_SERVER_TOKEN` в Supabase secrets.
   - Hook вызова `welcome` после signup пока не подключён — добавим вместе с настройкой Postmark.

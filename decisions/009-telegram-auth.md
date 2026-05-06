@@ -28,7 +28,7 @@ Telegram Login — это однокликовая аутентификация 
    - Валидирует HMAC-подпись по `bot_token`
    - Проверяет, что `auth_date` не старше 5 минут
    - Ищет существующий profile по `telegram_id`
-   - Если нет — создаёт через `supabase.auth.admin.createUser()` с fake email (`tg_{tg_id}@telegram.finkley.eu`)
+   - Если нет — создаёт через `supabase.auth.admin.createUser()` с fake email (`tg_{tg_id}@telegram.finkley.app`)
    - Сохраняет `telegram_id` в `profiles`
    - Через `supabase.auth.admin.generateLink({type: 'magiclink'})` получает session
    - Возвращает session клиенту, тот делает `supabase.auth.setSession()`
@@ -51,7 +51,7 @@ Telegram Login — это однокликовая аутентификация 
 
 ### Отрицательные
 
-- Fake email (`tg_*@telegram.finkley.eu`). **Проблема:** не можем отправить welcome письмо. **Митигация:** в onboarding-визарде шаг "укажите рабочий email" (опц.) с обещанием "пришлём важные уведомления и инвойсы".
+- Fake email (`tg_*@telegram.finkley.app`). **Проблема:** не можем отправить welcome письмо. **Митигация:** в onboarding-визарде шаг "укажите рабочий email" (опц.) с обещанием "пришлём важные уведомления и инвойсы".
 - Custom код вместо стандартного Supabase Auth. **Митигация:** покрыть тестами edge function.
 - Зависимость от Telegram (если их API меняется — мы ломаемся). **Митигация:** API stable годами, и если что — просто отключаем кнопку, остальные методы login работают.
 

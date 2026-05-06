@@ -13,7 +13,7 @@
  *
  * ENV:
  *   POSTMARK_SERVER_TOKEN
- *   POSTMARK_FROM (опц., default 'hello@finkley.eu')
+ *   POSTMARK_FROM (опц., default 'hello@finkley.app')
  *
  * Auth: verify-jwt: true. Юзер дёргает только для своего аккаунта.
  * Также может вызываться со service-role-key из других edge functions
@@ -26,7 +26,7 @@ import { corsHeaders, preflight } from '../_shared/cors.ts'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const POSTMARK_TOKEN = Deno.env.get('POSTMARK_SERVER_TOKEN') ?? ''
-const POSTMARK_FROM = Deno.env.get('POSTMARK_FROM') ?? 'hello@finkley.eu'
+const POSTMARK_FROM = Deno.env.get('POSTMARK_FROM') ?? 'hello@finkley.app'
 
 const ALLOWED_TEMPLATES = new Set([
   'welcome',

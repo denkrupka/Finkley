@@ -93,7 +93,7 @@ ADR: `decisions/006-stripe-integration.md`
 
 1. Server "Finkley Production" в Postmark
 2. Verify domain: DKIM, SPF, DMARC
-3. Sender Signature: `noreply@finkley.eu`
+3. Sender Signature: `noreply@finkley.app`
 4. Templates: welcome, email-confirmation, password-reset, trial-ending, payment-succeeded, payment-failed, subscription-canceled, weekly-digest
 
 ### Supabase Auth с Postmark SMTP
@@ -103,7 +103,7 @@ Settings → Authentication → SMTP:
 - Host: `smtp.postmarkapp.com`
 - Port: 587
 - Username/Password: API token Postmark
-- Sender: `noreply@finkley.eu`
+- Sender: `noreply@finkley.app`
 
 ### Edge function `send-email`
 
@@ -113,7 +113,7 @@ const postmark = new ServerClient(Deno.env.get('POSTMARK_SERVER_TOKEN')!)
 
 export async function sendTemplatedEmail({ to, templateAlias, templateModel }) {
   return await postmark.sendEmailWithTemplate({
-    From: 'Finkley <noreply@finkley.eu>',
+    From: 'Finkley <noreply@finkley.app>',
     To: to,
     TemplateAlias: templateAlias,
     TemplateModel: templateModel,
@@ -284,7 +284,7 @@ wFirma уже отправляет в KSeF от имени юзера. Мы сл
 ### Настройка
 
 1. @BotFather → `/newbot` → токен
-2. `/setdomain` → `finkley.eu`
+2. `/setdomain` → `finkley.app`
 3. Виджет на `/login`:
 
 ```html
@@ -293,7 +293,7 @@ wFirma уже отправляет в KSeF от имени юзера. Мы сл
   src="https://telegram.org/js/telegram-widget.js?22"
   data-telegram-login="<bot_username>"
   data-size="large"
-  data-auth-url="https://finkley.eu/auth/telegram/callback"
+  data-auth-url="https://finkley.app/auth/telegram/callback"
   data-request-access="write"
 ></script>
 ```
@@ -335,7 +335,7 @@ export async function handler(req: Request) {
     userId = existing.id
   } else {
     const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-      email: `tg_${tgId}@telegram.finkley.eu`,
+      email: `tg_${tgId}@telegram.finkley.app`,
       email_confirm: true,
       user_metadata: { full_name: `${params.first_name} ${params.last_name || ''}`.trim() },
     })
@@ -345,7 +345,7 @@ export async function handler(req: Request) {
 
   const { data: session } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink',
-    email: `tg_${tgId}@telegram.finkley.eu`,
+    email: `tg_${tgId}@telegram.finkley.app`,
   })
   return new Response(JSON.stringify({ redirect: session.properties.action_link }))
 }

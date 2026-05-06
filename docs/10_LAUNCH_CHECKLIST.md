@@ -22,7 +22,7 @@
 
 - [ ] Лендинг (минимум: hero, features, FAQ, CTA, footer)
 - [ ] Privacy Policy и Terms опубликованы
-- [ ] `support@finkley.eu`, `privacy@finkley.eu` принимают почту
+- [ ] `support@finkley.app`, `privacy@finkley.app` принимают почту
 - [ ] PL JDG активно, NIP получен
 - [ ] DPA подписаны: Supabase, Postmark, Anthropic, Sentry, Stripe
 

@@ -3,7 +3,7 @@
  *
  * Принимает payload от Telegram Login Widget, валидирует HMAC-подпись,
  * создаёт (или находит) Supabase auth-user с fake email
- * `tg_<telegram_id>@telegram.finkley.eu` и возвращает access/refresh tokens.
+ * `tg_<telegram_id>@telegram.finkley.app` и возвращает access/refresh tokens.
  *
  * Клиент (TelegramLoginWidget.tsx) делает `supabase.auth.setSession(...)`
  * и пользователь оказывается залогинен.
@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const tgId = Number(payload.id)
-  const fakeEmail = `tg_${tgId}@telegram.finkley.eu`
+  const fakeEmail = `tg_${tgId}@telegram.finkley.app`
   const fullName = [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {

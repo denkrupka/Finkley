@@ -22,7 +22,7 @@
 
 ### Диагностика
 
-1. Открыть `https://finkley.eu` в incognito браузере. Что видишь?
+1. Открыть `https://finkley.app` в incognito браузере. Что видишь?
    - **404** — проблема с GitHub Pages или CNAME
    - **DNS error** — DNS не резолвится
    - **500** — ошибка приложения (но это маловероятно для статики)
@@ -35,14 +35,14 @@
    - Если workflow упал — открыть логи, починить, перезапустить
 2. Проверить `Settings → Pages`:
    - Source: должен быть `gh-pages` branch
-   - Custom domain: `finkley.eu`
+   - Custom domain: `finkley.app`
    - Enforce HTTPS: включён
-3. Проверить `apps/web/public/CNAME` — содержит ли `finkley.eu`
-4. Если всё ок, но 404 — попробовать `https://finkley.eu/?p=dashboard` (SPA fallback). Если работает — проблема в `404.html`.
+3. Проверить `apps/web/public/CNAME` — содержит ли `finkley.app`
+4. Если всё ок, но 404 — попробовать `https://finkley.app/?p=dashboard` (SPA fallback). Если работает — проблема в `404.html`.
 
 ### Если DNS error
 
-1. `dig finkley.eu` или https://dnschecker.org — что возвращается?
+1. `dig finkley.app` или https://dnschecker.org — что возвращается?
 2. Должно вести на GitHub Pages IP (`185.199.108.153` и т.п.) или CNAME на `<username>.github.io`
 3. Если нет — открыть DNS-провайдера, проверить записи
 4. DNS пропагация может занять до 48 часов — если только что менял, подожди

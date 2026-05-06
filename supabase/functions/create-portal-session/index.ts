@@ -13,7 +13,7 @@ import { createPortalSession } from '../_shared/stripe.ts'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.eu/app/'
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

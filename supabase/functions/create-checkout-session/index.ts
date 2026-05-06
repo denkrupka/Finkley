@@ -7,7 +7,7 @@
  * ENV:
  *   STRIPE_SECRET_KEY
  *   STRIPE_PRICE_ID  (price_… из Stripe Dashboard, используем live или test версию)
- *   APP_URL          (https://finkley.eu/app/) для success/cancel redirect'ов
+ *   APP_URL          (https://finkley.app/app/) для success/cancel redirect'ов
  *
  * Тестирование локально:
  *   supabase functions serve --env-file ./supabase/.env
@@ -26,7 +26,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
 const STRIPE_PRICE_ID = Deno.env.get('STRIPE_PRICE_ID') ?? ''
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.eu/app/'
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

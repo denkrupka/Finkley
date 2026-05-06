@@ -41,9 +41,9 @@ jobs:
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PK_LIVE }}
           VITE_STRIPE_PRICE_ID: ${{ secrets.VITE_STRIPE_PRICE_ID }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-          VITE_PLAUSIBLE_DOMAIN: finkley.eu
+          VITE_PLAUSIBLE_DOMAIN: finkley.app
           VITE_TELEGRAM_BOT_USERNAME: ${{ secrets.VITE_TELEGRAM_BOT_USERNAME }}
-          VITE_APP_URL: https://finkley.eu/app/
+          VITE_APP_URL: https://finkley.app/app/
           # Vite base должен быть /app/ — SPA живёт в подпапке рядом с лендингом.
           VITE_BASE: /app/
         run: pnpm --filter web build
@@ -58,7 +58,7 @@ jobs:
           mkdir -p public/app
           cp -r apps/web/dist/. public/app/
           # CNAME для GitHub Pages custom domain
-          echo "finkley.eu" > public/CNAME
+          echo "finkley.app" > public/CNAME
           # SPA fallback — копируем 404.html SPA в корень
           cp apps/web/dist/404.html public/404.html
 

@@ -27,8 +27,8 @@
 
 - `{{full_name}}` — имя пользователя из profiles
 - `{{salon_name}}` — название салона (если в контексте салона)
-- `{{app_url}}` — `https://finkley.eu`
-- `{{support_email}}` — `support@finkley.eu`
+- `{{app_url}}` — `https://finkley.app`
+- `{{support_email}}` — `support@finkley.app`
 - `{{owner_name}}` — твоё имя (для подписи)
 
 ## Шаблоны

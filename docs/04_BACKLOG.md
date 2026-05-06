@@ -44,7 +44,7 @@
 - [ ] Anthropic API key (для будущего OCR)
 - [ ] Sentry проект `finkley-web`
 - [ ] Plausible: cloud trial или self-hosted позже
-- [ ] Домен куплен (`finkley.eu` или альтернатива), CNAME настроен на `username.github.io`
+- [ ] Домен куплен (`finkley.app` или альтернатива), CNAME настроен на `username.github.io`
 - [ ] `.env.example` со всеми ключами без значений
 - [ ] `.env.local` с заполненными значениями (gitignored)
 
@@ -108,7 +108,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./apps/web/dist
-          cname: finkley.eu
+          cname: finkley.app
 ```
 
 `apps/web/public/404.html`:
@@ -397,11 +397,11 @@ ADR `decisions/006-stripe-integration.md`
 
 - [ ] `apps/landing` — Astro
 - [ ] Страницы: `/` (hero + UTP + features + FAQ), `/pricing`, `/privacy`, `/terms`
-- [ ] Деплой на тот же GitHub Pages (например, `landing.finkley.eu` через CNAME поддомен) или интегрировано на `/` основного домена
+- [ ] Деплой на тот же GitHub Pages (например, `landing.finkley.app` через CNAME поддомен) или интегрировано на `/` основного домена
 - [ ] Plausible script
 - [ ] Mobile-адаптация
 - [ ] Все на RU
-- [ ] CTA "Начать бесплатно" → `app.finkley.eu/signup` (или `/signup` на главном домене если общий)
+- [ ] CTA "Начать бесплатно" → `app.finkley.app/signup` (или `/signup` на главном домене если общий)
 
 ADR `decisions/008-landing-stack.md`
 
