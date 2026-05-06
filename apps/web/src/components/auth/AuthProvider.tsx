@@ -4,6 +4,17 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 
+/**
+ * Строит абсолютный URL внутри SPA с учётом base-path (`/app/` в проде, `/` в dev).
+ * Используется для всех redirectTo / emailRedirectTo — они обязаны попадать
+ * в SPA-роуты, не в landing-роуты.
+ */
+function absoluteAppUrl(path: string): string {
+  const base = import.meta.env.BASE_URL || '/' // '/app/' в проде, '/' локально
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path
+  return `${window.location.origin}${base}${cleanPath}`
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       async signUpWithPassword(email, password, options) {
-        const redirectTo = `${window.location.origin}/auth/callback`
+        const redirectTo = absoluteAppUrl('auth/callback')
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -55,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       async signInWithOAuth(provider) {
-        const redirectTo = `${window.location.origin}/auth/callback`
+        const redirectTo = absoluteAppUrl('auth/callback')
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: { redirectTo },
@@ -64,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       async resetPasswordForEmail(email) {
-        const redirectTo = `${window.location.origin}/reset-password`
+        const redirectTo = absoluteAppUrl('reset-password')
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
         return { error }
       },
