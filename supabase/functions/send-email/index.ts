@@ -13,7 +13,7 @@
  *
  * ENV:
  *   RESEND_API_KEY — send-only ключ (re_...)
- *   RESEND_FROM    — From-адрес (default 'Finkley <hello@finkley.app>')
+ *   RESEND_FROM    — From-адрес (default 'Finkley <info@finkley.app>')
  *   FUNCTION_INTERNAL_SECRET — shared secret для server-to-server вызовов
  *
  * Auth: deploy --no-verify-jwt, проверка через X-Finkley-Secret заголовок.
@@ -30,7 +30,7 @@ import {
 } from './templates.ts'
 
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Finkley <hello@finkley.app>'
+const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Finkley <info@finkley.app>'
 const FUNCTION_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
 
 type SendInput = {
