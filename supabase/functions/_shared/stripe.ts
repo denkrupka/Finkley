@@ -76,7 +76,6 @@ export async function createCheckoutSession(
     'metadata[salon_id]': input.salonId,
     'subscription_data[metadata][salon_id]': input.salonId,
     automatic_tax: { enabled: 'true' },
-    customer_update: { address: 'auto', name: 'auto' },
     billing_address_collection: 'auto',
     'tax_id_collection[enabled]': 'true',
   }
@@ -84,8 +83,13 @@ export async function createCheckoutSession(
     body['subscription_data[trial_period_days]'] = input.trialDays
   }
   if (input.customerId) {
+    // Существующий customer — Stripe позволит обновить его address/name
+    // данными из чекаута (нужно для automatic_tax: VAT-логика по адресу).
     body.customer = input.customerId
+    body.customer_update = { address: 'auto', name: 'auto' }
   } else {
+    // Новый customer — Stripe создаст его сам из email + введённых данных,
+    // customer_update тут запрещён ("can only be used with customer").
     body.customer_email = input.customerEmail
   }
   return call<StripeCheckoutSession>('/checkout/sessions', secret, body)
