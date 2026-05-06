@@ -7,6 +7,11 @@
     <meta name="theme-color" content="#1A1A2E" />
     <meta name="description" content="Finkley — управленческий учёт для салонов красоты. Видишь свою прибыль, а не записи клиентов." />
 
+    <!-- Google Identity Services: используется в GoogleButton для signInWithIdToken,
+         чтобы Google показывал «Sign in to Finkley» вместо <ref>.supabase.co.
+         Грузим async, чтобы не блокировал рендер. -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <!-- GitHub Pages SPA fallback: восстанавливаем путь после редиректа из 404.html.
          SPA живёт в /app/ (см. vite.config.ts → base), поэтому добавляем base
          к восстанавливаемому пути. BrowserRouter с basename отрежет /app/ обратно. -->

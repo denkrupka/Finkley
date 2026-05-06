@@ -43,6 +43,7 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_PLAUSIBLE_DOMAIN: finkley.app
           VITE_TELEGRAM_BOT_USERNAME: ${{ secrets.VITE_TELEGRAM_BOT_USERNAME }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_APP_URL: https://finkley.app/app/
           # Vite base должен быть /app/ — SPA живёт в подпапке рядом с лендингом.
           VITE_BASE: /app/
