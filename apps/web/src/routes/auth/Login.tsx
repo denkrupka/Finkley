@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
+import { AppleButton } from './AppleButton'
 import { AuthLayout } from './AuthLayout'
+import { FacebookButton } from './FacebookButton'
 import { GoogleButton } from './GoogleButton'
 import { TelegramLoginWidget } from './TelegramLoginWidget'
 
@@ -134,6 +136,8 @@ export function LoginPage() {
         </div>
 
         <GoogleButton />
+        <AppleButton />
+        <FacebookButton />
         <TelegramLoginWidget />
       </form>
     </AuthLayout>

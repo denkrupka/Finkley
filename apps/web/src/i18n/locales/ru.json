@@ -29,6 +29,8 @@
       "no_account": "Ещё нет аккаунта?",
       "signup_link": "Зарегистрироваться",
       "google_button": "Войти через Google",
+      "facebook_button": "Войти через Facebook",
+      "apple_button": "Sign in with Apple",
       "telegram_button": "Войти через Telegram"
     },
     "signup": {
