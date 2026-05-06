@@ -59,11 +59,36 @@ jobs:
           cp -r apps/web/dist/. public/app/
           # CNAME для GitHub Pages custom domain
           echo "finkley.app" > public/CNAME
-          # SPA-fallback 404.html уже скопирован в /app/ (apps/web/public/404.html
-          # → apps/web/dist/404.html → public/app/404.html). Дополнительный
-          # 404.html в корне НЕ нужен: лендинг — статика Astro, неизвестные пути
-          # на нём отдают встроенный Astro 404 (или редирект Astro). Главное
-          # — чтобы /app/<unknown> ловил наш SPA-fallback.
+          # GitHub Pages читает ТОЛЬКО корневой /404.html для любых 404 на сайте,
+          # подпапочные ignored. Поэтому единый смартный fallback в корне:
+          # — пути под /app/ → SPA-fallback с сохранением остатка
+          # — все прочие → редирект на лендинг /
+          cat > public/404.html <<'HTML'
+          <!doctype html>
+          <html lang="ru">
+            <head>
+              <meta charset="UTF-8" />
+              <title>Finkley</title>
+              <script>
+                ;(function () {
+                  var l = window.location
+                  var APP = '/app/'
+                  if (l.pathname === APP || l.pathname.indexOf(APP) === 0) {
+                    var rest = l.pathname.slice(APP.length)
+                    l.replace(
+                      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+                        APP + '?p=' + encodeURIComponent(rest + l.search) + l.hash
+                    )
+                  } else {
+                    // Лендинг — на главную
+                    l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') + '/')
+                  }
+                })()
+              </script>
+            </head>
+            <body></body>
+          </html>
+          HTML
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
