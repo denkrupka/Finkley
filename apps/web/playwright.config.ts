@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
+import { config as loadEnv } from 'dotenv'
+
+// Загружаем .env.local чтобы Playwright-тесты видели VITE_SUPABASE_* и
+// SUPABASE_SERVICE_ROLE_KEY (для admin API в beforeEach/afterEach).
+// Vite уже читает .env.local в dev-сервере, но Node-процесс Playwright нет.
+loadEnv({ path: '.env.local' })
 
 export default defineConfig({
   testDir: './tests/e2e',
