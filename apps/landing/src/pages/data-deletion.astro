@@ -1,0 +1,106 @@
+---
+import Layout from '../layouts/Layout.astro'
+
+// Эта страница нужна для Facebook App Review (Data Deletion Instructions URL).
+// Также удовлетворяет требованию Apple Sign In и общему GDPR Right to Erasure.
+// URL: https://finkley.app/data-deletion/
+
+const UPDATED = '7 мая 2026'
+---
+
+<Layout
+  title="Удаление данных — Finkley"
+  description="Как запросить удаление своих данных в Finkley."
+  active="privacy"
+>
+  <article class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
+    <p class="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">
+      Удаление данных · обновлено {UPDATED}
+    </p>
+    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl">
+      Удаление данных пользователя
+    </h1>
+    <p class="mt-4 text-base text-brand-text-muted">
+      В соответствии с GDPR (ст. 17 «Право на забвение») ты можешь запросить удаление всех данных,
+      связанных с твоим аккаунтом в Finkley. Это касается данных, полученных при регистрации
+      через email/пароль, а также через сторонних провайдеров (Google, Facebook, Apple, Telegram).
+    </p>
+
+    <div class="prose-fs mt-12 space-y-10 text-brand-text">
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">1. Самостоятельное удаление</h2>
+        <p class="mt-3">
+          Самый быстрый способ — удалить аккаунт прямо в приложении:
+        </p>
+        <ol class="mt-3 list-decimal space-y-2 pl-6">
+          <li>
+            Зайди в{' '}
+            <a href="/app/" class="text-brand-teal underline">приложение Finkley</a>
+            {' '}под своим аккаунтом.
+          </li>
+          <li>Открой <strong>Настройки</strong> → <strong>Аккаунт</strong>.</li>
+          <li>Нажми <strong>«Удалить аккаунт»</strong> и подтверди действие.</li>
+        </ol>
+        <p class="mt-3">
+          Все данные аккаунта (профиль, салоны, визиты, расходы, клиенты, чеки) будут удалены
+          в течение 30 дней. Резервные копии перезаписываются в течение 90 дней.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">2. Запрос по email</h2>
+        <p class="mt-3">
+          Если зайти в приложение не получается — отправь запрос на{' '}
+          <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">
+            privacy@finkley.app
+          </a>{' '}
+          с темой <strong>«Удаление аккаунта»</strong> и в письме укажи:
+        </p>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>Email, на который зарегистрирован аккаунт</li>
+          <li>Способ входа (email/пароль, Google, Facebook, Apple, Telegram)</li>
+          <li>Имя пользователя, если оно отличается от email</li>
+        </ul>
+        <p class="mt-3">
+          Мы ответим в течение 5 рабочих дней и удалим данные в течение 30 календарных дней
+          с момента подтверждения личности (мы можем попросить подтвердить право на аккаунт,
+          чтобы предотвратить удаление чужих данных).
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">3. Что удаляется</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>Учётная запись и данные профиля (имя, email, аватар)</li>
+          <li>Привязки к Google / Facebook / Apple / Telegram</li>
+          <li>Все салоны, где ты единственный владелец</li>
+          <li>Визиты, расходы, клиенты, сотрудники, фото чеков</li>
+          <li>Подписка Stripe (отменяется автоматически в конце оплаченного периода)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">4. Что мы вынуждены сохранить</h2>
+        <p class="mt-3">
+          По требованию налогового и бухгалтерского законодательства Польши (Ustawa o rachunkowości,
+          Ordynacja podatkowa) мы обязаны хранить документы оплаты и счета-фактуры в течение 5 лет.
+          В этих документах останется минимальный набор данных (имя, NIP, сумма) — без доступа
+          к содержимому твоего аккаунта.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">5. Связанные документы</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>
+            <a href="/privacy/" class="text-brand-teal underline">Политика приватности</a> —
+            подробно о сборе, хранении и обработке данных
+          </li>
+          <li>
+            <a href="/terms/" class="text-brand-teal underline">Условия использования</a>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </article>
+</Layout>
