@@ -14,8 +14,8 @@
 | Окружение    | URL                                            | Supabase                         | Когда деплоится                       |
 | ------------ | ---------------------------------------------- | -------------------------------- | ------------------------------------- |
 | `local`      | localhost:5173 (app), localhost:4321 (landing) | локальный через `supabase start` | При `pnpm dev`                        |
-| `staging`    | `staging.finkley.app`                           | `finkley-staging`                | На каждый PR + push в `staging` ветку |
-| `production` | `app.finkley.app` + `finkley.app`                | `finkley-prod`                   | На push в `main`                      |
+| `staging`    | `staging.finkley.app`                          | `finkley-staging`                | На каждый PR + push в `staging` ветку |
+| `production` | `app.finkley.app` + `finkley.app`              | `finkley-prod`                   | На push в `main`                      |
 
 ## DNS-схема (Cloudflare)
 

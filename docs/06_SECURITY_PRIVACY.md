@@ -128,7 +128,7 @@ test('user A cannot read user B salon', async () => {
 | Rectification      | UI для редактирования, всегда                     |
 | Erasure            | Кнопка "Удалить салон" + 30 дней grace            |
 | Portability        | CSV/JSON экспорт                                  |
-| Restriction        | Email на `privacy@finkley.app`                     |
+| Restriction        | Email на `privacy@finkley.app`                    |
 | Objection          | Аналогично                                        |
 | Automated decision | Не применимо (AI — рекомендательные)              |
 

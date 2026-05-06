@@ -123,7 +123,29 @@ export function OnboardingPage() {
     // отрендериться раньше и редиректнуть «нет салона» → /. Поэтому
     // awaiting refetch прямо здесь, до navigate.
     await queryClient.refetchQueries({ queryKey: ['salons'] })
+    // Welcome-письмо в фоне — не блокирует navigate, ошибка email не должна
+    // ломать UX онбординга (Postmark может тупить, sender signature пропасть).
+    void triggerWelcomeEmail(newSalonId, state.name.trim())
     navigate(`/${newSalonId}/dashboard`, { replace: true })
+  }
+
+  async function triggerWelcomeEmail(salonId: string, salonName: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) return
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+      await fetch(`${SUPABASE_URL}/functions/v1/notify-welcome`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ salon_id: salonId, salon_name: salonName }),
+      })
+    } catch (err) {
+      console.warn('welcome email trigger failed', err)
+    }
   }
 
   // Валидация перехода. Step5 — терминальный, переход = submit.

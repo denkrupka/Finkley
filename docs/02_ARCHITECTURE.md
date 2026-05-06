@@ -206,9 +206,9 @@ ADR: [`decisions/007-design-tokens.md`](../decisions/007-design-tokens.md)
 
 ## Окружения
 
-| Окружение    | Где живёт фронт                         | Какой Supabase               | Когда используется        |
-| ------------ | --------------------------------------- | ---------------------------- | ------------------------- |
-| `local`      | `pnpm dev` на localhost:5173            | локальный Supabase через CLI | Разработка                |
+| Окружение    | Где живёт фронт                          | Какой Supabase               | Когда используется        |
+| ------------ | ---------------------------------------- | ---------------------------- | ------------------------- |
+| `local`      | `pnpm dev` на localhost:5173             | локальный Supabase через CLI | Разработка                |
 | `staging`    | branch `staging` → `staging.finkley.app` | `finkley-staging`            | Превью PR + тест миграций |
 | `production` | branch `main` → `app.finkley.app`        | `finkley-prod`               | Прод                      |
 
