@@ -84,8 +84,9 @@ export function TelegramLoginWidget() {
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
     script.async = true
     script.setAttribute('data-telegram-login', BOT_USERNAME)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-radius', '10')
+    script.setAttribute('data-size', 'medium')
+    script.setAttribute('data-radius', '6')
+    script.setAttribute('data-userpic', 'false')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     script.setAttribute('data-request-access', 'write')
     containerRef.current.appendChild(script)

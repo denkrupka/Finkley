@@ -15,7 +15,7 @@ export type AuthContextValue = {
     password: string,
     options?: { fullName?: string },
   ) => Promise<{ error: Error | null; needsEmailConfirmation: boolean }>
-  signInWithOAuth: (provider: 'google' | 'facebook' | 'apple') => Promise<{ error: Error | null }>
+  signInWithOAuth: (provider: 'google' | 'facebook') => Promise<{ error: Error | null }>
   resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>

@@ -37,7 +37,7 @@ export function FacebookButton() {
     <Button
       type="button"
       variant="outline"
-      size="lg"
+      size="md"
       onClick={onClick}
       disabled={loading}
       data-testid="facebook-signin"
