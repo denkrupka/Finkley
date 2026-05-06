@@ -59,8 +59,11 @@ jobs:
           cp -r apps/web/dist/. public/app/
           # CNAME для GitHub Pages custom domain
           echo "finkley.app" > public/CNAME
-          # SPA fallback — копируем 404.html SPA в корень
-          cp apps/web/dist/404.html public/404.html
+          # SPA-fallback 404.html уже скопирован в /app/ (apps/web/public/404.html
+          # → apps/web/dist/404.html → public/app/404.html). Дополнительный
+          # 404.html в корне НЕ нужен: лендинг — статика Astro, неизвестные пути
+          # на нём отдают встроенный Astro 404 (или редирект Astro). Главное
+          # — чтобы /app/<unknown> ловил наш SPA-fallback.
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

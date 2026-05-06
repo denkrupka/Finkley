@@ -4,16 +4,22 @@
     <meta charset="UTF-8" />
     <title>Finkley</title>
     <script>
-      // GitHub Pages SPA fallback (rafgraph/spa-github-pages technique)
-      // Перенаправляем на / с сохранением пути в query
+      // GitHub Pages SPA fallback (rafgraph/spa-github-pages technique).
+      // SPA живёт в подпапке /app/ — после промаха надо восстановить путь
+      // относительно базы и перейти на /app/?p=<encoded>.
+      // index.html (см. <head>) затем уберёт ?p и replaceState'ом вернёт
+      // правильный URL — React Router это поймёт.
       var l = window.location
+      var BASE = '/app/'
+      var pathAfterBase = l.pathname.indexOf(BASE) === 0 ? l.pathname.slice(BASE.length) : ''
       l.replace(
         l.protocol +
           '//' +
           l.hostname +
           (l.port ? ':' + l.port : '') +
-          '/?p=' +
-          encodeURIComponent(l.pathname.slice(1) + l.search) +
+          BASE +
+          '?p=' +
+          encodeURIComponent(pathAfterBase + l.search) +
           l.hash,
       )
     </script>

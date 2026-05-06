@@ -7,12 +7,15 @@
     <meta name="theme-color" content="#1A1A2E" />
     <meta name="description" content="Finkley — управленческий учёт для салонов красоты. Видишь свою прибыль, а не записи клиентов." />
 
-    <!-- GitHub Pages SPA fallback: восстанавливаем путь после редиректа из 404.html -->
+    <!-- GitHub Pages SPA fallback: восстанавливаем путь после редиректа из 404.html.
+         SPA живёт в /app/ (см. vite.config.ts → base), поэтому добавляем base
+         к восстанавливаемому пути. BrowserRouter с basename отрежет /app/ обратно. -->
     <script>
-      (function () {
+      ;(function () {
         var p = new URLSearchParams(window.location.search).get('p')
         if (p) {
-          window.history.replaceState(null, '', '/' + p + window.location.hash)
+          var BASE = '/app/'
+          window.history.replaceState(null, '', BASE + p + window.location.hash)
         }
       })()
     </script>
