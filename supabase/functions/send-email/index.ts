@@ -27,6 +27,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const POSTMARK_TOKEN = Deno.env.get('POSTMARK_SERVER_TOKEN') ?? ''
 const POSTMARK_FROM = Deno.env.get('POSTMARK_FROM') ?? 'hello@finkley.app'
+// Стрим Postmark. Default `outbound` для дефолтного стрима транзакционных
+// серверов; если на проекте стрим называется иначе (например, `finklay` —
+// известная опечатка, см. setup-доку) — переопределяется через env.
+const POSTMARK_STREAM = Deno.env.get('POSTMARK_MESSAGE_STREAM') ?? 'outbound'
 
 const ALLOWED_TEMPLATES = new Set([
   'welcome',
@@ -91,7 +95,7 @@ Deno.serve(async (req: Request) => {
       To: body.to,
       TemplateAlias: body.template,
       TemplateModel: body.vars ?? {},
-      MessageStream: 'outbound',
+      MessageStream: POSTMARK_STREAM,
     }),
   })
 
