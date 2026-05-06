@@ -20,17 +20,18 @@
  * (stripe-webhook → payment_succeeded, например).
  */
 
-import { getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const POSTMARK_TOKEN = Deno.env.get('POSTMARK_SERVER_TOKEN') ?? ''
 const POSTMARK_FROM = Deno.env.get('POSTMARK_FROM') ?? 'hello@finkley.app'
 // Стрим Postmark. Default `outbound` для дефолтного стрима транзакционных
 // серверов; если на проекте стрим называется иначе (например, `finklay` —
 // известная опечатка, см. setup-доку) — переопределяется через env.
 const POSTMARK_STREAM = Deno.env.get('POSTMARK_MESSAGE_STREAM') ?? 'outbound'
+// Shared secret для server-to-server вызовов. Деплоится --no-verify-jwt,
+// поэтому собственная проверка обязательна. Любой вызывающий (stripe-webhook,
+// scheduled cron-job) должен прислать `X-Finkley-Secret` с тем же значением.
+const FUNCTION_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
 
 const ALLOWED_TEMPLATES = new Set([
   'welcome',
@@ -57,16 +58,21 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return preflight()
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-  if (!POSTMARK_TOKEN) {
+  if (!POSTMARK_TOKEN || !FUNCTION_SECRET) {
     return jsonResponse({ error: 'function_not_configured' }, 500)
   }
 
-  // Auth: либо service-role-key (вызов из другой функции), либо user JWT.
-  const auth = req.headers.get('authorization') || req.headers.get('Authorization') || ''
-  const isServiceRole = auth.includes(SERVICE_ROLE)
-  if (!isServiceRole) {
-    const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
-    if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
+  // Auth: shared secret в заголовке X-Finkley-Secret. Constant-time-ish сравнение.
+  const got = req.headers.get('x-finkley-secret') || req.headers.get('X-Finkley-Secret') || ''
+  if (got.length !== FUNCTION_SECRET.length) {
+    return jsonResponse({ error: 'unauthorized' }, 401)
+  }
+  let diff = 0
+  for (let i = 0; i < got.length; i++) {
+    diff |= got.charCodeAt(i) ^ FUNCTION_SECRET.charCodeAt(i)
+  }
+  if (diff !== 0) {
+    return jsonResponse({ error: 'unauthorized' }, 401)
   }
 
   let body: SendInput

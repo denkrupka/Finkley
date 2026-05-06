@@ -44,7 +44,10 @@ jobs:
         run: |
           # Деплоим все функции, для webhook'ов нужен --no-verify-jwt
           # Список функций требующих --no-verify-jwt прописан явно для безопасности
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth"
+          # send-email вызывается из других функций (server-to-server), поэтому
+          # не требует verify-jwt от платформы — внутри функции проверяется
+          # совпадение Authorization-bearer с SUPABASE_SERVICE_ROLE_KEY.
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
