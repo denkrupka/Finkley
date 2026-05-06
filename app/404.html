@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Finkley</title>
+    <script>
+      // GitHub Pages SPA fallback (rafgraph/spa-github-pages technique)
+      // Перенаправляем на / с сохранением пути в query
+      var l = window.location
+      l.replace(
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          '/?p=' +
+          encodeURIComponent(l.pathname.slice(1) + l.search) +
+          l.hash,
+      )
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="ru"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Как мы обрабатываем твои данные. GDPR-compliance."><meta property="og:title" content="Privacy Policy — Finkley"><meta property="og:description" content="Как мы обрабатываем твои данные. GDPR-compliance."><meta property="og:type" content="website"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><title>Privacy Policy — Finkley</title><link rel="stylesheet" href="/_astro/index.BBSs8-my.css"></head> <body class="min-h-screen bg-brand-bg font-display text-brand-text antialiased"> <header class="border-b border-brand-border bg-white"> <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6"> <a href="/" class="flex items-center gap-2.5" aria-label="Finkley"> <div class="grid size-8 place-items-center rounded-md bg-brand-navy text-sm font-extrabold tracking-tighter text-white" aria-hidden="true">
+F
+</div> <span class="text-base font-bold tracking-tight text-brand-navy">Finkley</span> </a> <nav class="hidden items-center gap-7 md:flex"> <a href="/" class="text-sm font-medium text-brand-text-muted hover:text-brand-text">
+О продукте
+</a> <a href="/pricing" class="text-sm font-medium text-brand-text-muted hover:text-brand-text">
+Цены
+</a> </nav> <div class="flex items-center gap-3"> <a href="/app/login" class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text sm:inline">
+Войти
+</a> <a href="/app/signup" class="inline-flex h-10 items-center rounded-md bg-brand-navy px-4 text-sm font-semibold text-white hover:bg-brand-navy-soft">
+Начать бесплатно
+</a> </div> </div> </header> <main>  <article class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20"> <p class="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">
+Privacy Policy · обновлено 6 мая 2026 </p> <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl">
+Политика приватности
+</h1> <p class="mt-4 text-base text-brand-text-muted">
+Этот документ описывает, какие данные Finkley собирает, зачем и как ты можешь ими управлять.
+      Документ соответствует требованиям GDPR.
+</p> <div class="prose-fs mt-12 space-y-10 text-brand-text"> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">1. Кто мы</h2> <p class="mt-3">
+Finkley — продукт <strong>[Юрлицо PL]</strong>, NIP <strong>[X]</strong>, адрес
+<strong>[Y]</strong>. Контакт по вопросам приватности —
+<a href="mailto:privacy@finkley.eu" class="text-brand-teal underline">privacy@finkley.eu</a>.
+</p> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">2. Какие данные мы собираем</h2> <ul class="mt-3 list-disc space-y-2 pl-6"> <li>Регистрация: email, пароль (хешированный), имя</li> <li>Профиль салона: имя, страна, валюта, тип, опционально логотип</li> <li>Рабочие данные: визиты, расходы, мастера, клиенты салона (которых ты вводишь сама)</li> <li>Интеграции: токены Booksy/wFirma — зашифрованы, доступ только с серверного ключа</li> <li>Технические: IP, user agent, временные метки запросов (для безопасности)</li> </ul> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">3. Зачем собираем</h2> <ul class="mt-3 list-disc space-y-2 pl-6"> <li>Предоставление услуги учёта — основная цель</li> <li>Биллинг через Stripe</li> <li>Транзакционные email через Postmark (welcome, billing, weekly digest)</li> <li>Анонимная аналитика продукта через Plausible (без cookies)</li> <li>Юридические требования (хранение фактур согласно местному закону)</li> </ul> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">4. Где хранится</h2> <p class="mt-3">
+Все основные данные — в Supabase, регион Frankfurt (eu-central-1), Германия. Encryption
+          at-rest AES-256. TLS 1.2+ в транзите.
+</p> <p class="mt-3">
+Список подпроцессоров: Supabase (Frankfurt EU), GitHub (хостинг кода и Pages, EU edge),
+          Stripe (биллинг, EU/US), Postmark (email, US), Anthropic (OCR — стадия 3, US), Sentry
+          (ошибки, EU), Plausible (аналитика, EU), Cloudflare (DNS, global edge). Со всеми
+          подписаны DPA.
+</p> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">5. Кому передаём</h2> <p class="mt-3">
+Только подпроцессорам по DPA — для целей, описанных выше. Налоговым органам —
+          только по официальному запросу. Третьим лицам в маркетинговых целях —
+<strong>никогда</strong>.
+</p> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">6. Сколько храним</h2> <ul class="mt-3 list-disc space-y-2 pl-6"> <li>Активный аккаунт — пока работает подписка</li> <li>Cancelled подписка — read-only 12 месяцев</li> <li>Удалённый аккаунт — 30 дней grace period, потом hard delete</li> <li>Резервные копии Supabase — 30 дней retention</li> <li>Логи ошибок Sentry — 90 дней</li> <li>Email логи Postmark — 45 дней</li> </ul> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">7. Твои права (GDPR Art. 15–22)</h2> <ul class="mt-3 list-disc space-y-2 pl-6"> <li> <strong>Доступ к данным</strong> — Настройки → Экспорт данных (CSV) — стадия 2
+</li> <li><strong>Исправление</strong> — UI приложения, всегда</li> <li> <strong>Удаление</strong> — кнопка «Удалить салон» в Настройках, 30 дней grace
+</li> <li><strong>Портабельность</strong> — экспорт в CSV/JSON</li> <li> <strong>Ограничение / возражение</strong> — email на
+<a href="mailto:privacy@finkley.eu" class="text-brand-teal underline">privacy@finkley.eu</a> </li> <li> <strong>Автоматизированные решения</strong> — не применимо. AI-инсайты (стадия 4) —
+            рекомендательные, никогда не действуют автоматически
+</li> </ul> <p class="mt-3">
+Срок ответа на запросы — 30 дней.
+</p> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">8. Cookies</h2> <p class="mt-3">
+В стадии 1 — только функциональные cookies для авторизации (Supabase auth state).
+          Маркетинговых cookies нет — поэтому cookie banner не нужен. Аналитика через Plausible
+          работает без cookies.
+</p> </section> <section> <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Изменения политики</h2> <p class="mt-3">
+О существенных изменениях уведомим по email за 14 дней до вступления в силу. Текущая
+          версия всегда на этой странице.
+</p> </section> <p class="border-t border-brand-border pt-6 text-sm italic text-brand-text-muted">
+⚠ Этот документ — рабочий шаблон для review юристом. Перед публичным запуском
+        замените заглушки [Юрлицо PL] / [NIP] / [адрес] и пропустите через юридическую проверку
+        в вашей юрисдикции.
+</p> </div> </article>  </main> <footer class="border-t border-brand-border bg-white"> <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-4 py-8 text-sm text-brand-text-muted sm:flex-row sm:items-center sm:px-6"> <div class="flex items-center gap-2.5"> <div class="grid size-6 place-items-center rounded-md bg-brand-navy text-[11px] font-extrabold tracking-tighter text-white">
+F
+</div> <span class="font-semibold text-brand-navy">Finkley</span> <span class="text-brand-text-faint">© 2026</span> </div> <nav class="flex flex-wrap gap-5"> <a href="/privacy" class="text-brand-navy">
+Privacy
+</a> <a href="/terms" class="hover:text-brand-text">
+Terms
+</a> <a href="mailto:hello@finkley.eu" class="hover:text-brand-text">hello@finkley.eu</a> </nav> </div> </footer> </body></html>
