@@ -405,7 +405,18 @@
       "amount_label": "Сумма",
       "comment_label": "Комментарий (необязательно)",
       "comment_placeholder": "Например: краска Wella, чек №123",
-      "submit": "Сохранить расход"
+      "submit": "Сохранить расход",
+      "receipt_label": "Чек (фото или PDF)",
+      "receipt_placeholder": "Прикрепить чек — JPG, PNG, PDF (до 10 МБ)",
+      "receipt_remove": "Открепить чек",
+      "receipt_too_big": "Файл слишком большой. Максимум — 10 МБ.",
+      "recurrence_label": "Повторение",
+      "recurrence": {
+        "none": "Не повторять",
+        "weekly": "Каждую неделю",
+        "monthly": "Каждый месяц"
+      },
+      "recurrence_hint": "Будем создавать такой же расход автоматически каждый период."
     },
     "errors": {
       "category_required": "Выбери категорию",
@@ -415,7 +426,11 @@
     "toast_added": "Расход добавлен",
     "toast_deleted": "Расход удалён",
     "toast_error": "Не получилось сохранить",
-    "empty": "Пока нет расходов"
+    "toast_upload_failed": "Не получилось загрузить чек",
+    "empty": "Пока нет расходов",
+    "receipt_open": "Открыть чек",
+    "receipt_title": "Чек",
+    "receipt_subtitle": "Закрой это окно, чтобы вернуться к списку расходов."
   },
   "payment_methods": {
     "cash": "Нал",

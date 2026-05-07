@@ -200,8 +200,12 @@ export type Database = {
           id: string
           invoice_number: string | null
           is_recurring: boolean
+          next_occurrence_at: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           receipt_storage_path: string | null
+          receipt_url: string | null
+          recurrence: Database["public"]["Enums"]["expense_recurrence"]
+          recurrence_parent_id: string | null
           recurring_period: string | null
           salon_id: string
           source: string
@@ -220,8 +224,12 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_recurring?: boolean
+          next_occurrence_at?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           receipt_storage_path?: string | null
+          receipt_url?: string | null
+          recurrence?: Database["public"]["Enums"]["expense_recurrence"]
+          recurrence_parent_id?: string | null
           recurring_period?: string | null
           salon_id: string
           source?: string
@@ -240,8 +248,12 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_recurring?: boolean
+          next_occurrence_at?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           receipt_storage_path?: string | null
+          receipt_url?: string | null
+          recurrence?: Database["public"]["Enums"]["expense_recurrence"]
+          recurrence_parent_id?: string | null
           recurring_period?: string | null
           salon_id?: string
           source?: string
@@ -253,6 +265,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
             referencedColumns: ["id"]
           },
           {
@@ -826,6 +845,27 @@ export type Database = {
           },
         ]
       }
+      stripe_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          payload: Json | null
+          received_at: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          payload?: Json | null
+          received_at?: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          payload?: Json | null
+          received_at?: string
+        }
+        Relationships: []
+      }
       visits: {
         Row: {
           amount_cents: number
@@ -1039,6 +1079,7 @@ export type Database = {
       user_admin_salon_ids: { Args: never; Returns: string[] }
     }
     Enums: {
+      expense_recurrence: "none" | "weekly" | "monthly"
       insight_severity: "info" | "warning" | "critical"
       integration_provider: "booksy" | "wfirma" | "google_calendar"
       payment_method: "cash" | "card" | "transfer" | "online" | "mixed"
@@ -1640,6 +1681,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      expense_recurrence: ["none", "weekly", "monthly"],
       insight_severity: ["info", "warning", "critical"],
       integration_provider: ["booksy", "wfirma", "google_calendar"],
       payment_method: ["cash", "card", "transfer", "online", "mixed"],
@@ -1671,3 +1713,4 @@ export const Constants = {
     },
   },
 } as const
+

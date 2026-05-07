@@ -1,5 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
+import { addMonths, addWeeks, format } from 'date-fns'
+import { Paperclip, X } from 'lucide-react'
+import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -23,9 +25,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  uploadReceipt,
   useCreateExpense,
   useExpenseCategories,
   type ExpenseCategoryRow,
+  type ExpenseRecurrence,
 } from '@/hooks/useExpenses'
 import type { PaymentMethod } from '@/hooks/useVisits'
 
@@ -37,6 +41,7 @@ type FormValues = {
   amount: string
   payment_method: PaymentMethod | ''
   comment: string
+  recurrence: ExpenseRecurrence
 }
 
 const schema = z.object({
@@ -48,7 +53,17 @@ const schema = z.object({
     .refine((v) => Number(v.replace(',', '.')) > 0, 'expenses.errors.amount_positive'),
   payment_method: z.enum(['cash', 'card', 'transfer', '']).optional().default(''),
   comment: z.string().max(500).optional().default(''),
+  recurrence: z.enum(['none', 'weekly', 'monthly']).default('none'),
 })
+
+/** Считает дату следующего повторения от исходной даты расхода. */
+function nextOccurrence(expenseAt: string, recurrence: ExpenseRecurrence): string | null {
+  if (recurrence === 'none') return null
+  const base = new Date(expenseAt)
+  if (Number.isNaN(base.getTime())) return null
+  const next = recurrence === 'weekly' ? addWeeks(base, 1) : addMonths(base, 1)
+  return format(next, 'yyyy-MM-dd')
+}
 
 type Props = {
   open: boolean
@@ -72,6 +87,9 @@ export function ExpenseFormModal({
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -80,11 +98,29 @@ export function ExpenseFormModal({
       amount: '',
       payment_method: '',
       comment: '',
+      recurrence: 'none',
     },
   })
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+
+    let receiptUrl: string | null = null
+    if (receiptFile) {
+      try {
+        setUploading(true)
+        receiptUrl = await uploadReceipt(salonId, receiptFile)
+      } catch (err) {
+        setUploading(false)
+        toast.error(t('expenses.toast_upload_failed'), {
+          description: err instanceof Error ? err.message : String(err),
+        })
+        return
+      } finally {
+        setUploading(false)
+      }
+    }
+
     createExpense.mutate(
       {
         salon_id: salonId,
@@ -93,6 +129,9 @@ export function ExpenseFormModal({
         amount_cents: amountCents,
         payment_method: values.payment_method || null,
         comment: values.comment || null,
+        receipt_url: receiptUrl,
+        recurrence: values.recurrence,
+        next_occurrence_at: nextOccurrence(values.expense_at, values.recurrence),
       },
       {
         onSuccess: () => {
@@ -103,7 +142,9 @@ export function ExpenseFormModal({
             amount: '',
             payment_method: '',
             comment: '',
+            recurrence: 'none',
           })
+          setReceiptFile(null)
           onOpenChange(false)
         },
         onError: (err) => {
@@ -218,6 +259,76 @@ export function ExpenseFormModal({
               {...form.register('comment')}
             />
           </div>
+
+          {/* Фото чека (опционально) */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
+            {receiptFile ? (
+              <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                <span className="flex items-center gap-2 truncate">
+                  <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
+                  <span className="truncate">{receiptFile.name}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setReceiptFile(null)}
+                  className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
+                  aria-label={t('expenses.form.receipt_remove')}
+                >
+                  <X className="size-4" strokeWidth={1.7} />
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="exp-receipt"
+                className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
+              >
+                <Paperclip className="size-4" strokeWidth={1.7} />
+                <span>{t('expenses.form.receipt_placeholder')}</span>
+              </label>
+            )}
+            <input
+              id="exp-receipt"
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              data-testid="exp-receipt"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                if (file && file.size > 10 * 1024 * 1024) {
+                  toast.error(t('expenses.form.receipt_too_big'))
+                  return
+                }
+                setReceiptFile(file)
+              }}
+            />
+          </div>
+
+          {/* Повторение */}
+          <Controller
+            name="recurrence"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="exp-recurrence">{t('expenses.form.recurrence_label')}</Label>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="exp-recurrence" data-testid="exp-recurrence">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t('expenses.form.recurrence.none')}</SelectItem>
+                    <SelectItem value="weekly">{t('expenses.form.recurrence.weekly')}</SelectItem>
+                    <SelectItem value="monthly">{t('expenses.form.recurrence.monthly')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {field.value !== 'none' ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t('expenses.form.recurrence_hint')}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          />
         </form>
 
         <DialogFooter>
@@ -225,10 +336,10 @@ export function ExpenseFormModal({
             type="button"
             size="lg"
             onClick={form.handleSubmit(onSubmit)}
-            disabled={createExpense.isPending}
+            disabled={createExpense.isPending || uploading}
             data-testid="exp-submit"
           >
-            {createExpense.isPending ? t('common.loading') : t('expenses.form.submit')}
+            {createExpense.isPending || uploading ? t('common.loading') : t('expenses.form.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

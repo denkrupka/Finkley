@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -6,6 +6,14 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  getReceiptSignedUrl,
   useDeleteExpense,
   useExpenseCategories,
   useExpenses,
@@ -41,6 +49,19 @@ export function ExpensesPage() {
   const deleteExpense = useDeleteExpense(salonId)
 
   const [formOpen, setFormOpen] = useState(false)
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [receiptError, setReceiptError] = useState<string | null>(null)
+
+  async function openReceipt(path: string) {
+    setReceiptError(null)
+    try {
+      const url = await getReceiptSignedUrl(path)
+      setReceiptUrl(url)
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : String(err))
+      setReceiptUrl('error')
+    }
+  }
 
   if (!salon || !salonId) return null
   const currency = salon.currency
@@ -153,8 +174,28 @@ export function ExpensesPage() {
                       {formatExpenseDate(e.expense_at)}
                     </span>
                     <span className="min-w-0">
-                      <span className="text-foreground block truncate text-sm font-semibold">
-                        {e.comment || cat?.name || t('expenses.no_category')}
+                      <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                        <span className="truncate">
+                          {e.comment || cat?.name || t('expenses.no_category')}
+                        </span>
+                        {e.recurrence && e.recurrence !== 'none' ? (
+                          <Repeat
+                            className="text-brand-teal size-3 shrink-0"
+                            strokeWidth={2}
+                            aria-label={t(`expenses.form.recurrence.${e.recurrence}`)}
+                          />
+                        ) : null}
+                        {e.receipt_url ? (
+                          <button
+                            type="button"
+                            onClick={() => openReceipt(e.receipt_url!)}
+                            className="text-brand-teal hover:bg-muted/40 grid size-5 shrink-0 place-items-center rounded-md"
+                            aria-label={t('expenses.receipt_open')}
+                            data-testid="expense-receipt"
+                          >
+                            <Paperclip className="size-3.5" strokeWidth={1.7} />
+                          </button>
+                        ) : null}
                       </span>
                       {cat ? (
                         <span className="text-brand-text-faint block text-[11px]">{cat.name}</span>
@@ -227,6 +268,44 @@ export function ExpensesPage() {
         salonId={salonId}
         currency={currency}
       />
+
+      {/* Просмотр чека */}
+      <Dialog
+        open={!!receiptUrl}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReceiptUrl(null)
+            setReceiptError(null)
+          }
+        }}
+      >
+        <DialogContent className="w-[640px] max-w-[calc(100vw-2rem)]">
+          <DialogHeader>
+            <DialogTitle>{t('expenses.receipt_title')}</DialogTitle>
+            <DialogDescription>{t('expenses.receipt_subtitle')}</DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted/30 flex max-h-[70vh] items-center justify-center overflow-auto p-3">
+            {receiptError ? (
+              <p className="text-destructive p-6 text-sm">{receiptError}</p>
+            ) : receiptUrl && receiptUrl !== 'error' ? (
+              receiptUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={receiptUrl}
+                  title={t('expenses.receipt_title')}
+                  className="h-[70vh] w-full"
+                />
+              ) : (
+                <img
+                  src={receiptUrl}
+                  alt={t('expenses.receipt_title')}
+                  className="max-h-[70vh] max-w-full object-contain"
+                  data-testid="receipt-image"
+                />
+              )
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
