@@ -44,13 +44,11 @@ if (!shortId) {
 
 const env = readEnv()
 const url = env.VITE_SUPABASE_URL
-const secretKey = env.SUPABASE_SECRET_KEY // new sb_secret_* format
-const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY // legacy JWT
 const functionSecret = env.FUNCTION_INTERNAL_SECRET
 
 if (!url) throw new Error('VITE_SUPABASE_URL missing in .env.local')
-if (!secretKey && !functionSecret && !serviceKey) {
-  throw new Error('Need SUPABASE_SECRET_KEY, FUNCTION_INTERNAL_SECRET, or SUPABASE_SERVICE_ROLE_KEY')
+if (!functionSecret) {
+  throw new Error('FUNCTION_INTERNAL_SECRET missing in .env.local — see .env.example')
 }
 
 let commitSha = commitArg
@@ -63,19 +61,13 @@ if (!commitSha) {
 }
 
 const endpoint = `${url}/functions/v1/telegram-bug-collector/announce-fix`
-const authHeaders = secretKey
-  ? { Authorization: `Bearer ${secretKey}` }
-  : functionSecret
-    ? { 'X-Finkley-Secret': functionSecret }
-    : { Authorization: `Bearer ${serviceKey}` }
-
+// Secret в body, не в headers — Supabase Edge Runtime режет custom headers
+// (X-Finkley-Secret до функции не доходит).
 const res = await fetch(endpoint, {
   method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    ...authHeaders,
-  },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
+    secret: functionSecret,
     short_id: shortId,
     fix_description: description ?? '',
     commit_sha: commitSha,

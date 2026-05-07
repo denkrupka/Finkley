@@ -413,7 +413,8 @@ async function cmdDone(
   const { data: existing, error: findErr } = await admin
     .from('bug_reports')
     .select('id, message_text, ai_summary, attachments, notes, status')
-    .like('id', `${shortIdArg}%`)
+    .gte('id', `${shortIdArg}-0000-0000-0000-000000000000`)
+    .lte('id', `${shortIdArg}-ffff-ffff-ffff-ffffffffffff`)
     .limit(2)
 
   if (findErr) {
@@ -493,7 +494,8 @@ async function handleCorrection(
   const { data: bug, error: findErr } = await admin
     .from('bug_reports')
     .select('id, message_text, ai_summary, attachments, sender_first_name, notes, status')
-    .like('id', `${shortIdVal}%`)
+    .gte('id', `${shortIdVal}-0000-0000-0000-000000000000`)
+    .lte('id', `${shortIdVal}-ffff-ffff-ffff-ffffffffffff`)
     .limit(2)
   if (findErr || !bug || bug.length === 0) {
     await tgSend(msg.chat.id, `Не нашёл \`${shortIdVal}\` в БД`, { threadId })
@@ -578,7 +580,8 @@ async function cmdNote(
   const { data: existing } = await admin
     .from('bug_reports')
     .select('id, notes')
-    .like('id', `${shortIdArg}%`)
+    .gte('id', `${shortIdArg}-0000-0000-0000-000000000000`)
+    .lte('id', `${shortIdArg}-ffff-ffff-ffff-ffffffffffff`)
     .limit(2)
   if (!existing || existing.length === 0) {
     await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``, { threadId })
@@ -742,21 +745,26 @@ const FUNCTION_INTERNAL_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
  * Body: { short_id, fix_description?, commit_sha? }
  */
 async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createClient>) {
-  // Auth: либо X-Finkley-Secret (server-to-server между функциями, тот же
-  // FUNCTION_INTERNAL_SECRET что используют все internal вызовы), либо
-  // Authorization: Bearer <service_role_key>.
-  const internalSecret = req.headers.get('x-finkley-secret') ?? ''
-  const authBearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
-  const internalOk =
-    !!FUNCTION_INTERNAL_SECRET && timingSafeEqual(internalSecret, FUNCTION_INTERNAL_SECRET)
-  const bearerOk = !!SERVICE_KEY && timingSafeEqual(authBearer, SERVICE_KEY)
-  if (!internalOk && !bearerOk) return jsonResponse({ error: 'unauthorized' }, 401)
-  let body: { short_id?: string; fix_description?: string; commit_sha?: string }
+  // Auth через body.secret (в JSON), потому что Supabase Edge Runtime режет
+  // custom headers вроде X-Finkley-Secret. Authorization тоже не подходит —
+  // платформа подменяет Bearer на свой anon JWT.
+  let body: {
+    short_id?: string
+    fix_description?: string
+    commit_sha?: string
+    secret?: string
+  }
   try {
     body = await req.json()
   } catch {
     return jsonResponse({ error: 'bad_request' }, 400)
   }
+
+  const providedSecret = body.secret ?? ''
+  if (!FUNCTION_INTERNAL_SECRET || !timingSafeEqual(providedSecret, FUNCTION_INTERNAL_SECRET)) {
+    return jsonResponse({ error: 'unauthorized' }, 401)
+  }
+
   if (!body.short_id) return jsonResponse({ error: 'short_id_required' }, 400)
 
   const { data: rows, error: findErr } = await admin
@@ -764,7 +772,8 @@ async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createCl
     .select(
       'id, telegram_chat_id, telegram_thread_id, message_text, ai_summary, attachments, notes, status',
     )
-    .like('id', `${body.short_id}%`)
+    .gte('id', `${body.short_id}-0000-0000-0000-000000000000`)
+    .lte('id', `${body.short_id}-ffff-ffff-ffff-ffffffffffff`)
     .limit(2)
 
   if (findErr) return jsonResponse({ error: findErr.message }, 500)
