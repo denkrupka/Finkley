@@ -70,3 +70,6 @@ supabase/.temp/
 # Local bug-snapshot scratchpad (PII)
 .bugs-snapshot.json
 .bugs-snapshot.md
+
+# Local bug-screens scratchpad (PII)
+.bug-screens/
