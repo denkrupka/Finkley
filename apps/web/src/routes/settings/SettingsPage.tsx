@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,45 @@ export function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [confirmName, setConfirmName] = useState('')
+  const [exportPending, setExportPending] = useState(false)
+
+  async function handleExport() {
+    setExportPending(true)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) throw new Error('not_authenticated')
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const res = await fetch(`${supabaseUrl}/functions/v1/generate-export`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        download_url?: string
+        cached?: boolean
+        error?: string
+        message?: string
+      }
+      if (!res.ok || !json.ok || !json.download_url) {
+        throw new Error(json.message || json.error || `HTTP ${res.status}`)
+      }
+      // Авто-открытие ссылки в новой вкладке + тоаст. Письмо ушло в любом случае.
+      window.open(json.download_url, '_blank', 'noopener')
+      toast.success(
+        json.cached ? t('settings.export.toast_cached') : t('settings.export.toast_ready'),
+      )
+    } catch (err) {
+      toast.error(t('settings.export.toast_failed'), {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setExportPending(false)
+    }
+  }
 
   useEffect(() => {
     if (!salon) return
@@ -222,11 +262,12 @@ export function SettingsPage() {
           <Button
             variant="outline"
             size="md"
-            onClick={() => toast(t('settings.export.coming_soon'))}
+            onClick={handleExport}
+            disabled={exportPending}
             data-testid="settings-export"
           >
             <Download className="size-4" strokeWidth={1.7} />
-            {t('settings.export.button')}
+            {exportPending ? t('common.loading') : t('settings.export.button')}
           </Button>
         </div>
       </section>

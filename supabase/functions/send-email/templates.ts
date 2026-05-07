@@ -15,6 +15,7 @@ export type TemplateAlias =
   | 'payment_succeeded'
   | 'payment_failed'
   | 'subscription_canceled'
+  | 'gdpr_export'
 
 export type EmailTemplate = {
   subject: string
@@ -293,6 +294,42 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 </html>`,
   },
 
+  gdpr_export: {
+    subject: 'Твой архив данных Finkley готов',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Архив данных Finkley</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY</p>
+<h1 style="margin:0 0 16px 0;font-size:22px;line-height:30px;color:#0f172a;">Архив готов</h1>
+<p style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#334155;">
+Привет, {{full_name}}. Мы собрали все твои данные в Finkley в один ZIP-архив.
+</p>
+<p style="margin:0 0 24px 0;font-size:16px;line-height:24px;color:#334155;">
+Ссылка действительна 24 часа. После — нужно будет запросить новый экспорт.
+</p>
+<p style="margin:0 0 24px 0;">
+<a href="{{download_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Скачать архив</a>
+</p>
+<p style="margin:24px 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+Внутри — CSV с твоими визитами, расходами, клиентами, мастерами, услугами и категориями. README.txt объясняет каждую колонку.
+</p>
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+Если хочешь удалить аккаунт после скачивания — напиши на info@finkley.app, ответим в течение 5 рабочих дней.
+</p>
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Управленческий учёт для салонов красоты<br>Вопросы — info@finkley.app</p>
+</div>
+</body>
+</html>`,
+  },
+
   subscription_canceled: {
     subject: 'Подписка Finkley отменена',
     html: `<!DOCTYPE html>
@@ -370,9 +407,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
   },
 }
 
-export const ALLOWED_TEMPLATES = new Set<TemplateAlias>(
-  Object.keys(TEMPLATES) as TemplateAlias[],
-)
+export const ALLOWED_TEMPLATES = new Set<TemplateAlias>(Object.keys(TEMPLATES) as TemplateAlias[])
 
 /**
  * Простая `{{var}}` подстановка. Незаданные ключи заменяются пустой строкой.
