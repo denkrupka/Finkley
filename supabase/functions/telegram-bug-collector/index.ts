@@ -203,6 +203,57 @@ async function analyzeScreenshot(bytes: Uint8Array, mime: string): Promise<strin
   }
 }
 
+async function generateFixAnnouncement(
+  original: string,
+  prevSummary: string,
+  visionContext: string,
+  fixDescription: string,
+): Promise<string | null> {
+  if (!ANTHROPIC_KEY) return null
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 350,
+        system: `Ты пишешь короткое сообщение о ЗАКРЫТИИ бага в Finkley (учёт салонов).
+
+Формат — 1-2 коротких предложения, ПО-ЧЕЛОВЕЧЕСКИ (без жаргона: render, state, types и т.п.).
+
+Структура: «Исправлен баг с <тем что было сломано>. Проблема была <в чём суть>.»
+
+Если описание фикса конкретное (например: "заменил тип файлов в БД") — упомяни это в человеческой формулировке.
+Если описания фикса нет — просто опиши что было сломано и закрыто.
+
+Возвращай ТОЛЬКО текст сообщения, без JSON и кавычек.`,
+        messages: [
+          {
+            role: 'user',
+            content:
+              `Оригинальный баг:\n${original || '(только скриншот)'}\n\n` +
+              (visionContext ? `Что было на скриншоте:\n${visionContext}\n\n` : '') +
+              `Прежнее моё понимание:\n${prevSummary || '(не было)'}\n\n` +
+              `Описание фикса от разработчика:\n${fixDescription || '(не указано)'}`,
+          },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const block = data.content?.[0]
+    if (block?.type !== 'text') return null
+    return (block.text as string).trim()
+  } catch (e) {
+    console.warn('generateFixAnnouncement', e)
+    return null
+  }
+}
+
 async function recategorizeWithCorrection(
   original: string,
   prevSummary: string,
@@ -345,32 +396,75 @@ async function cmdDone(
   admin: ReturnType<typeof createClient>,
   chatId: number,
   shortIdArg: string,
+  fixDescription: string,
   threadId?: number,
 ) {
   if (!shortIdArg) {
-    await tgSend(chatId, 'Использование: `/done <short_id>` (первые 8 символов)', { threadId })
+    await tgSend(chatId, 'Использование: `/done <short_id> [описание фикса]`', { threadId })
     return
   }
-  const { data, error } = await admin
+
+  // Сначала достаём контекст бага (для последующего announce-сообщения)
+  const { data: existing, error: findErr } = await admin
     .from('bug_reports')
-    .update({ status: 'fixed', fixed_at: new Date().toISOString() })
+    .select('id, message_text, ai_summary, attachments, notes, status')
     .like('id', `${shortIdArg}%`)
-    .select('id')
-  if (error) {
-    await tgSend(chatId, `❌ ${error.message}`, { threadId })
+    .limit(2)
+
+  if (findErr) {
+    await tgSend(chatId, `❌ ${findErr.message}`, { threadId })
     return
   }
-  if (!data || data.length === 0) {
+  if (!existing || existing.length === 0) {
     await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``, { threadId })
     return
   }
-  if (data.length > 1) {
-    await tgSend(chatId, `Найдено несколько (${data.length}) — уточни длиннее short_id`, {
+  if (existing.length > 1) {
+    await tgSend(chatId, `Найдено несколько (${existing.length}) — уточни длиннее short_id`, {
       threadId,
     })
     return
   }
-  await tgSend(chatId, `✅ Закрыл \`${shortId(data[0]!.id)}\``, { threadId })
+
+  const row = existing[0]! as {
+    id: string
+    message_text: string | null
+    ai_summary: string | null
+    attachments: Array<{ vision_summary?: string }>
+    notes: string | null
+    status: string
+  }
+
+  const updates: Record<string, unknown> = {
+    status: 'fixed',
+    fixed_at: new Date().toISOString(),
+  }
+  if (fixDescription) {
+    const fixNote = `Исправление (${new Date().toISOString().slice(0, 10)}): ${fixDescription}`
+    updates.notes = row.notes ? `${row.notes}\n---\n${fixNote}` : fixNote
+  }
+  const { error: updErr } = await admin.from('bug_reports').update(updates).eq('id', row.id)
+  if (updErr) {
+    await tgSend(chatId, `❌ ${updErr.message}`, { threadId })
+    return
+  }
+
+  // Генерируем человекопонятный announce с учётом фикса (если описан)
+  const visionContext = (row.attachments ?? [])
+    .map((a) => a.vision_summary)
+    .filter(Boolean)
+    .join('\n')
+  const announce = await generateFixAnnouncement(
+    row.message_text || '',
+    row.ai_summary || '',
+    visionContext,
+    fixDescription,
+  )
+
+  const ack = announce
+    ? `✅ \`${shortId(row.id)}\`\n\n${announce}`
+    : `✅ \`${shortId(row.id)}\` — закрыт`
+  await tgSend(chatId, ack, { threadId })
 }
 
 /**
@@ -527,7 +621,10 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     const [cmdRaw, ...rest] = text.split(/\s+/)
     const cmd = cmdRaw!.split('@')[0]!.toLowerCase() // /list@finklay_dev_bot → /list
     if (cmd === '/list') return cmdList(admin, msg.chat.id, threadId)
-    if (cmd === '/done') return cmdDone(admin, msg.chat.id, rest[0] ?? '', threadId)
+    if (cmd === '/done') {
+      const [doneId, ...descParts] = rest
+      return cmdDone(admin, msg.chat.id, doneId ?? '', descParts.join(' '), threadId)
+    }
     if (cmd === '/note') {
       const [id, ...textParts] = rest
       return cmdNote(admin, msg.chat.id, id ?? '', textParts.join(' '), threadId)
@@ -535,7 +632,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     if (cmd === '/start' || cmd === '/help') {
       return tgSend(
         msg.chat.id,
-        `*Finkley bug-collector* 🐛\n\nПросто пиши/скидывай скрин — занесу в багтрекер.\n\n*Команды:*\n\`/list\` — открытые баги\n\`/done <id>\` — закрыть\n\`/note <id> <текст>\` — добавить заметку`,
+        `*Finkley bug-collector* 🐛\n\nПросто пиши/скидывай скрин — занесу в багтрекер.\n\n*Команды:*\n\`/list\` — открытые баги\n\`/done <id> [описание]\` — закрыть (опц. что починил)\n\`/note <id> <текст>\` — добавить заметку\n\n*Reply на ответ бота:*\n— любой текст коррекции → бот пересчитает понимание бага`,
         { threadId },
       )
     }
@@ -574,6 +671,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     .insert({
       telegram_chat_id: msg.chat.id,
       telegram_message_id: msg.message_id,
+      telegram_thread_id: msg.message_thread_id ?? null,
       sender_id: msg.from?.id ?? 0,
       sender_username: msg.from?.username ?? null,
       sender_first_name: msg.from?.first_name ?? null,
@@ -610,6 +708,87 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
 // Webhook handler
 // =============================================================================
 
+const FUNCTION_INTERNAL_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
+
+/**
+ * /announce-fix endpoint — вызывается мной (Claude) после `git push` фикса.
+ * Атомарно: помечает баг как fixed, генерит AI-объявление и постит в топик.
+ *
+ * Auth: X-Finkley-Secret = FUNCTION_INTERNAL_SECRET (тот же, что у других
+ * server-to-server вызовов).
+ *
+ * Body: { short_id, fix_description?, commit_sha? }
+ */
+async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createClient>) {
+  // Auth: либо X-Finkley-Secret (server-to-server между функциями), либо
+  // Authorization: Bearer <service_role_key> (CLI вызовы от меня после фикса).
+  const internalSecret = req.headers.get('x-finkley-secret') ?? ''
+  const authBearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
+  const ok =
+    (FUNCTION_INTERNAL_SECRET && timingSafeEqual(internalSecret, FUNCTION_INTERNAL_SECRET)) ||
+    (SERVICE_KEY && timingSafeEqual(authBearer, SERVICE_KEY))
+  if (!ok) return jsonResponse({ error: 'unauthorized' }, 401)
+  let body: { short_id?: string; fix_description?: string; commit_sha?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return jsonResponse({ error: 'bad_request' }, 400)
+  }
+  if (!body.short_id) return jsonResponse({ error: 'short_id_required' }, 400)
+
+  const { data: rows, error: findErr } = await admin
+    .from('bug_reports')
+    .select(
+      'id, telegram_chat_id, telegram_thread_id, message_text, ai_summary, attachments, notes, status',
+    )
+    .like('id', `${body.short_id}%`)
+    .limit(2)
+
+  if (findErr) return jsonResponse({ error: findErr.message }, 500)
+  if (!rows || rows.length === 0) return jsonResponse({ error: 'not_found' }, 404)
+  if (rows.length > 1) return jsonResponse({ error: 'ambiguous_id' }, 409)
+
+  const row = rows[0]! as {
+    id: string
+    telegram_chat_id: number
+    telegram_thread_id: number | null
+    message_text: string | null
+    ai_summary: string | null
+    attachments: Array<{ vision_summary?: string }>
+    notes: string | null
+    status: string
+  }
+
+  const fixNote = `Фикс${body.commit_sha ? ` (${body.commit_sha.slice(0, 7)})` : ''}: ${body.fix_description || '(без описания)'}`
+  const updates: Record<string, unknown> = {
+    status: 'fixed',
+    fixed_at: new Date().toISOString(),
+    fixed_in_commit: body.commit_sha ?? null,
+    notes: row.notes ? `${row.notes}\n---\n${fixNote}` : fixNote,
+  }
+  await admin.from('bug_reports').update(updates).eq('id', row.id)
+
+  const visionContext = (row.attachments ?? [])
+    .map((a) => a.vision_summary)
+    .filter(Boolean)
+    .join('\n')
+  const announce = await generateFixAnnouncement(
+    row.message_text || '',
+    row.ai_summary || '',
+    visionContext,
+    body.fix_description ?? '',
+  )
+
+  const ack = announce
+    ? `✅ \`${shortId(row.id)}\`\n\n${announce}`
+    : `✅ \`${shortId(row.id)}\` — закрыт`
+  await tgSend(row.telegram_chat_id, ack, {
+    threadId: row.telegram_thread_id ?? undefined,
+  })
+
+  return jsonResponse({ ok: true, id: row.id, announced: !!announce })
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
@@ -617,6 +796,17 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'function_not_configured' }, 500)
   }
 
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  // Routing: /announce-fix → server-to-server endpoint
+  const url = new URL(req.url)
+  if (url.pathname.endsWith('/announce-fix')) {
+    return handleAnnounceFix(req, admin)
+  }
+
+  // Иначе — Telegram webhook
   // Telegram secret_token (опционально, но если задан — проверяем строго)
   if (WEBHOOK_SECRET) {
     const got = req.headers.get('x-telegram-bot-api-secret-token') ?? ''
@@ -632,10 +822,6 @@ Deno.serve(async (req: Request) => {
   } catch {
     return jsonResponse({ error: 'bad_request' }, 400)
   }
-
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   const msg = update.message ?? update.edited_message
   if (msg) {
