@@ -36,6 +36,9 @@ const ExpensesPage = lazy(() =>
 const StaffPage = lazy(() =>
   import('@/routes/staff/StaffPage').then((m) => ({ default: m.StaffPage })),
 )
+const PayoutsPage = lazy(() =>
+  import('@/routes/payouts/PayoutsPage').then((m) => ({ default: m.PayoutsPage })),
+)
 const SettingsPage = lazy(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
@@ -119,6 +122,7 @@ function App() {
         <Route path="clients" element={lazyRoute(<ClientsPage />)} />
         <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
+        <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="ai" element={<AIPage />} />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />

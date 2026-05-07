@@ -7,6 +7,7 @@ import {
   Scissors,
   Settings,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -29,6 +30,7 @@ export type NavItemId =
   | 'clients'
   | 'expenses'
   | 'staff'
+  | 'payouts'
   | 'reports'
   | 'ai'
   | 'settings'
@@ -83,6 +85,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Scissors,
     stage: 1,
     implemented: false, // станет true в TASK-12
+    inBottomNav: false,
+  },
+  {
+    id: 'payouts',
+    i18nKey: 'nav.payouts',
+    icon: Wallet,
+    stage: 2,
+    implemented: true,
     inBottomNav: false,
   },
   {
