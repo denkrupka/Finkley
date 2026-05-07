@@ -161,7 +161,10 @@ async function syncBooksyData(
 ): Promise<SyncStats> {
   const stats: SyncStats = { staff_synced: 0, services_synced: 0, visits_synced: 0 }
 
-  // 1) Staff (resources)
+  // 1) Staff (resources) — идемпотентно по external_id (resource_id из Booksy).
+  //    Имя обновляем при изменении (Booksy может переименовать). Старые
+  //    by-name записи (созданные до этого фикса) переживём — те пишутся
+  //    параллельно и без external_id, юзер сольёт руками если надо.
   type ResourcesResp = { resources?: { id: number; name: string; is_active?: boolean }[] }
   const resourcesRes = await booksyGet<ResourcesResp>(
     `/me/businesses/${businessId}/resources`,
@@ -169,26 +172,52 @@ async function syncBooksyData(
   )
   if (!resourcesRes.ok) throw new Error(`resources_${resourcesRes.reason}`)
   for (const r of resourcesRes.data.resources ?? []) {
-    const { data: existing } = await admin
+    const extId = String(r.id)
+    let { data: existing } = await admin
       .from('staff')
       .select('id')
       .eq('salon_id', salonId)
-      .eq('full_name', r.name)
-      .is('deleted_at', null)
+      .eq('external_source', 'booksy')
+      .eq('external_id', extId)
       .maybeSingle()
+    // Fallback by-name (для записей, синканутых до введения external_id)
     if (!existing) {
+      const { data: byName } = await admin
+        .from('staff')
+        .select('id')
+        .eq('salon_id', salonId)
+        .eq('full_name', r.name)
+        .is('deleted_at', null)
+        .is('external_id', null)
+        .maybeSingle()
+      if (byName) {
+        await admin
+          .from('staff')
+          .update({ external_source: 'booksy', external_id: extId })
+          .eq('id', byName.id)
+        existing = byName
+      }
+    }
+    if (existing) {
+      await admin
+        .from('staff')
+        .update({ full_name: r.name, is_active: r.is_active !== false })
+        .eq('id', existing.id)
+    } else {
       await admin.from('staff').insert({
         salon_id: salonId,
         full_name: r.name,
         payout_scheme: 'percent_revenue',
         payout_percent: 40,
         is_active: r.is_active !== false,
+        external_source: 'booksy',
+        external_id: extId,
       })
       stats.staff_synced++
     }
   }
 
-  // 2) Services
+  // 2) Services — то же самое: lookup по external_id, апдейт цены/длительности.
   type SvcResp = {
     service_categories?: {
       id: number
@@ -203,29 +232,229 @@ async function syncBooksyData(
   if (!svcRes.ok) throw new Error(`service_categories_${svcRes.reason}`)
   for (const cat of svcRes.data.service_categories ?? []) {
     for (const s of cat.services ?? []) {
-      const { data: existing } = await admin
+      const extId = String(s.id)
+      const priceCents = Math.round((s.price?.amount ?? 0) * 100)
+      let { data: existing } = await admin
         .from('services')
         .select('id')
         .eq('salon_id', salonId)
-        .eq('name', s.name)
-        .eq('is_archived', false)
+        .eq('external_source', 'booksy')
+        .eq('external_id', extId)
         .maybeSingle()
       if (!existing) {
+        const { data: byName } = await admin
+          .from('services')
+          .select('id')
+          .eq('salon_id', salonId)
+          .eq('name', s.name)
+          .eq('is_archived', false)
+          .is('external_id', null)
+          .maybeSingle()
+        if (byName) {
+          await admin
+            .from('services')
+            .update({ external_source: 'booksy', external_id: extId })
+            .eq('id', byName.id)
+          existing = byName
+        }
+      }
+      if (existing) {
+        await admin
+          .from('services')
+          .update({
+            name: s.name,
+            default_price_cents: priceCents,
+            default_duration_min: s.duration ?? null,
+          })
+          .eq('id', existing.id)
+      } else {
         await admin.from('services').insert({
           salon_id: salonId,
           name: s.name,
-          default_price_cents: Math.round((s.price?.amount ?? 0) * 100),
+          default_price_cents: priceCents,
           default_duration_min: s.duration ?? null,
+          external_source: 'booksy',
+          external_id: extId,
         })
         stats.services_synced++
       }
     }
   }
 
-  // 3) Visits — TODO: формат calendar endpoint выясняем отдельным HAR с открытым календарём.
-  //    Без этого не рискуем неверным форматом (прод данные).
+  // 3) Visits — последние 30 дней + 7 вперёд через GET /calendar.
+  //    Booksy возвращает один subbooking = одно "booking" в calendar response.
+  //    Цены в calendar нет — берём из synced services по имени (если 0 — visit
+  //    создаём с amount=0, юзер дозаполнит). Только status='F' (finished).
+  await syncVisits(admin, salonId, accessToken, businessId, stats)
 
   return stats
+}
+
+type CalendarBooking = {
+  id: number
+  appointment_uid: number
+  booked_from: string // "2026-05-07T10:00"
+  booked_till: string
+  status: string // 'F' = finished, 'A' = active, 'X' = cancelled, etc.
+  type: string
+  resources?: { id: number }[]
+  service?: { id: number; name: string }
+  customer?: { id: number; name?: string; phone?: string }
+}
+
+type CalendarResp = {
+  bookings?: Record<string, CalendarBooking>
+}
+
+/**
+ * Caches для резолва Booksy ID → наш UUID, чтобы не бить БД на каждый
+ * booking при синке визитов. Все три таблицы — staff/services/clients —
+ * имеют external_id (booksy: resource.id / service.id / customer.id).
+ */
+type Caches = {
+  staffByExtId: Map<string, string>
+  serviceByExtId: Map<string, { id: string; price: number }>
+  clientByExtId: Map<string, string>
+}
+
+async function buildCaches(admin: SupabaseClient, salonId: string): Promise<Caches> {
+  const caches: Caches = {
+    staffByExtId: new Map(),
+    serviceByExtId: new Map(),
+    clientByExtId: new Map(),
+  }
+  const { data: staff } = await admin
+    .from('staff')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .not('external_id', 'is', null)
+  for (const s of staff ?? []) {
+    if (s.external_id) caches.staffByExtId.set(s.external_id, s.id)
+  }
+
+  const { data: services } = await admin
+    .from('services')
+    .select('id, external_id, default_price_cents')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .not('external_id', 'is', null)
+  for (const s of services ?? []) {
+    if (s.external_id) {
+      caches.serviceByExtId.set(s.external_id, {
+        id: s.id,
+        price: s.default_price_cents ?? 0,
+      })
+    }
+  }
+
+  const { data: clients } = await admin
+    .from('clients')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .not('external_id', 'is', null)
+  for (const c of clients ?? []) {
+    if (c.external_id) caches.clientByExtId.set(c.external_id, c.id)
+  }
+  return caches
+}
+
+async function syncVisits(
+  admin: SupabaseClient,
+  salonId: string,
+  accessToken: string,
+  businessId: number,
+  stats: SyncStats,
+): Promise<void> {
+  const caches = await buildCaches(admin, salonId)
+
+  // Период: 30 дней назад .. 7 дней вперёд (для предстоящих)
+  const now = new Date()
+  const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
+
+  // Resources — Booksy ставит в URL `start_date` сегодняшнего дня и идёт
+  // вперёд страницами. Чтобы хапнуть месяц, итерируем по неделям.
+  const seenIds = new Set<number>()
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 7)) {
+    const periodStart = fmtDate(cursor)
+    const weekEnd = new Date(cursor)
+    weekEnd.setDate(weekEnd.getDate() + 6)
+    if (weekEnd > end) weekEnd.setTime(end.getTime())
+    const periodEnd = fmtDate(weekEnd)
+
+    const url =
+      `/me/businesses/${businessId}/calendar` +
+      `?start_date=${periodStart}&end_date=${periodEnd}` +
+      `&include_unconfirmed=true&version=3&resources_per_page=100`
+    const calRes = await booksyGet<CalendarResp>(url, accessToken)
+    if (!calRes.ok) throw new Error(`calendar_${calRes.reason}`)
+
+    const bookings = Object.values(calRes.data.bookings ?? {})
+    for (const b of bookings) {
+      if (seenIds.has(b.id)) continue
+      seenIds.add(b.id)
+      // Только завершённые визиты для KPI; будущие/отменённые пропускаем
+      if (b.status !== 'F') continue
+      if (!b.service?.name || !b.customer?.id) continue
+
+      // Resolve staff: первый resource_id → external_id lookup
+      let staffId: string | null = null
+      const firstResId = b.resources?.[0]?.id
+      if (firstResId) {
+        staffId = caches.staffByExtId.get(String(firstResId)) ?? null
+      }
+
+      // Resolve service по service.id (НЕ по имени — устойчивее к переименованию)
+      const svc = b.service.id ? caches.serviceByExtId.get(String(b.service.id)) : undefined
+      const serviceId = svc?.id ?? null
+      const amountCents = svc?.price ?? 0
+
+      // Find or create client
+      const clientExtId = String(b.customer.id)
+      let clientId = caches.clientByExtId.get(clientExtId) ?? null
+      if (!clientId) {
+        const { data: newClient } = await admin
+          .from('clients')
+          .insert({
+            salon_id: salonId,
+            full_name: b.customer.name ?? 'Booksy client',
+            phone: b.customer.phone || null,
+            external_source: 'booksy',
+            external_id: clientExtId,
+          })
+          .select('id')
+          .single()
+        if (newClient) {
+          clientId = newClient.id
+          caches.clientByExtId.set(clientExtId, clientId)
+        }
+      }
+
+      // visit_at в Booksy без TZ — трактуем как Europe/Warsaw
+      const visitAt = new Date(b.booked_from + ':00+02:00').toISOString()
+
+      const { error } = await admin.from('visits').upsert(
+        {
+          salon_id: salonId,
+          staff_id: staffId,
+          client_id: clientId,
+          service_id: serviceId,
+          service_name_snapshot: b.service.name,
+          visit_at: visitAt,
+          amount_cents: amountCents,
+          payment_method: 'cash',
+          status: 'paid',
+          source: 'booksy',
+          external_id: String(b.id),
+        },
+        { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
+      )
+      if (!error) stats.visits_synced++
+    }
+  }
 }
 
 // =============================================================================
