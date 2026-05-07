@@ -31,8 +31,10 @@ export function PayoutsPage() {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
-  // Месяц-курсор. По умолчанию — прошлый месяц (его уже можно закрывать).
-  const [cursor, setCursor] = useState(() => addMonths(startOfMonth(new Date()), -1))
+  // Месяц-курсор. По умолчанию — ТЕКУЩИЙ месяц (синхронно с дашбордом и
+  // отчётами: юзер ожидает увидеть свежие визиты сразу). Закрыть период
+  // нельзя пока он не закончился — кнопка ниже сама дизейблится.
+  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
   const periodStart = format(startOfMonth(cursor), 'yyyy-MM-dd')
   const periodEnd = format(endOfMonth(cursor), 'yyyy-MM-dd')
 
@@ -184,25 +186,35 @@ export function PayoutsPage() {
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end print:hidden">
-        <Button variant="outline" onClick={() => window.print()} disabled={rows.length === 0}>
-          <Printer className="size-4" strokeWidth={2} />
-          {t('payouts.print')}
-        </Button>
-        <Button
-          onClick={onClose}
-          disabled={close.isPending || isClosed || !isPeriodFinished || rows.length === 0}
-          title={
-            isClosed
-              ? t('payouts.errors.already_closed')
-              : !isPeriodFinished
-                ? t('payouts.errors.not_finished')
-                : undefined
-          }
-        >
-          <Lock className="size-4" strokeWidth={2} />
-          {isClosed ? t('payouts.closed_label') : t('payouts.close_button')}
-        </Button>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+        {/* Подсказка о статусе периода — чтобы юзер понимал почему кнопка disabled */}
+        <p className="text-muted-foreground text-xs">
+          {isClosed
+            ? t('payouts.status_closed')
+            : !isPeriodFinished
+              ? t('payouts.status_active')
+              : t('payouts.status_ready')}
+        </p>
+        <div className="flex gap-2 sm:justify-end">
+          <Button variant="outline" onClick={() => window.print()} disabled={rows.length === 0}>
+            <Printer className="size-4" strokeWidth={2} />
+            {t('payouts.print')}
+          </Button>
+          <Button
+            onClick={onClose}
+            disabled={close.isPending || isClosed || !isPeriodFinished || rows.length === 0}
+            title={
+              isClosed
+                ? t('payouts.errors.already_closed')
+                : !isPeriodFinished
+                  ? t('payouts.errors.not_finished')
+                  : undefined
+            }
+          >
+            <Lock className="size-4" strokeWidth={2} />
+            {isClosed ? t('payouts.closed_label') : t('payouts.close_button')}
+          </Button>
+        </div>
       </div>
 
       {history.length > 0 ? (
