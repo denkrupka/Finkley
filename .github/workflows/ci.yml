@@ -82,6 +82,11 @@ jobs:
         run: pnpm --filter web exec playwright test --project=chromium
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:5173
+          # Эти тесты используют staging Supabase для создания test-юзеров.
+          # Без секретов они автоматически skip — workflow остаётся «зелёным».
+          VITE_SUPABASE_URL_TEST: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          VITE_SUPABASE_ANON_KEY_TEST: ${{ secrets.VITE_SUPABASE_ANON_KEY_TEST }}
+          SUPABASE_SERVICE_ROLE_KEY_TEST: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_TEST }}
 
       - name: Upload Playwright report
         if: always()

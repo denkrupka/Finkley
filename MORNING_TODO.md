@@ -23,6 +23,18 @@
 - `d3a85bc` — **TASK-34 lite** weekly digest (manual trigger из Settings + opt-out toggle; auto-cron — отдельная задача, требует Vault setup)
 - `4923529` — **perf**: bundle 679→440 KB raw / 204→135 KB gzip (libphonenumber/min + lazy QuickEntry + lazy Sentry init)
 - `3395151` — **perf**: lazy Signup/Onboarding/AuthCallback → 440→416 KB raw / 130 KB gzip
+- `5d94060` — **tests**: интеграционные тесты для payouts/recurring/digest RPC (19 тестов, skip без supabase)
+- `46da6c4` — **tests**: integration tests for analytics RPCs (4 теста)
+
+## Чтобы интеграционные тесты гонялись в CI (опционально)
+
+Создал новый workflow `.github/workflows/integration-tests.yml` (cron 04:00 UTC + manual). Для активации добавь в **Repo Settings → Secrets** три значения от **staging** Supabase (НЕ от prod):
+
+- `VITE_SUPABASE_URL_TEST` — URL staging-проекта
+- `VITE_SUPABASE_ANON_KEY_TEST` — anon key staging
+- `SUPABASE_SERVICE_ROLE_KEY_TEST` — service-role staging
+
+Эти же секреты используются в Playwright (E2E) джобе. Без них тесты автоматически skip — workflow «зелёный», ничего не падает.
 
 Подробный разбор — `docs/RETRO.md` секция «Овернайт-сессия · 7 мая 2026».
 

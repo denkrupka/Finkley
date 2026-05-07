@@ -1,0 +1,45 @@
+name: Integration Tests (RPC + RLS)
+
+# Эти тесты создают мусорных юзеров и данные в staging Supabase.
+# Запускаем раз в сутки + по запросу — не на каждый PR (чтобы не засорять).
+#
+# Чтобы они реально гонялись, владельцу нужно добавить в repo secrets:
+#   - VITE_SUPABASE_URL_TEST          (URL staging-проекта Supabase)
+#   - VITE_SUPABASE_ANON_KEY_TEST     (anon-ключ staging)
+#   - SUPABASE_SERVICE_ROLE_KEY_TEST  (service-role-ключ staging — НЕ prod!)
+#
+# Без секретов тесты автоматом skip, workflow проходит «зелёным».
+on:
+  schedule:
+    - cron: '0 4 * * *' # каждый день 04:00 UTC, после Supabase deploy
+  workflow_dispatch:
+
+concurrency:
+  group: integration-tests
+  cancel-in-progress: false
+
+jobs:
+  rpc-rls:
+    name: RPC + RLS integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run integration tests
+        env:
+          VITE_SUPABASE_URL_TEST: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          VITE_SUPABASE_ANON_KEY_TEST: ${{ secrets.VITE_SUPABASE_ANON_KEY_TEST }}
+          SUPABASE_SERVICE_ROLE_KEY_TEST: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_TEST }}
+        run: pnpm test
