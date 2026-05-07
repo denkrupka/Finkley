@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import {
   useBooksySync,
+  useClearBooksyVisits,
   useDisconnectIntegration,
   useSalonIntegrations,
   type IntegrationProvider,
@@ -90,6 +91,7 @@ function IntegrationCard({
   const Icon = provider.icon
   const sync = useBooksySync(salonId)
   const disconnect = useDisconnectIntegration(salonId)
+  const clearVisits = useClearBooksyVisits(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
 
@@ -185,6 +187,23 @@ function IntegrationCard({
               )}
               {t('integrations.sync_now')}
             </button>
+            {provider.id === 'booksy' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirm(t('integrations.confirm_clear_visits'))) return
+                  clearVisits.mutate(undefined, {
+                    onSuccess: (n) => toast.success(t('integrations.toast_visits_cleared', { n })),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                disabled={clearVisits.isPending}
+                className="text-muted-foreground hover:text-destructive text-xs underline disabled:opacity-50"
+                title={t('integrations.clear_visits')}
+              >
+                {t('integrations.clear_visits')}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {

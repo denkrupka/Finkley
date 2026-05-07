@@ -157,6 +157,27 @@ export function useBooksySync(salonId: string | undefined) {
   })
 }
 
+/** Очистить все импортированные визиты (для re-sync с новым форматом). */
+export function useClearBooksyVisits(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: { action: 'clear_visits', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as { ok?: boolean; deleted?: number; message?: string; error?: string }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'clear_failed')
+      return json.deleted ?? 0
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
+  })
+}
+
 /** Отключить интеграцию (удалить credentials). */
 export function useDisconnectIntegration(salonId: string | undefined) {
   const qc = useQueryClient()

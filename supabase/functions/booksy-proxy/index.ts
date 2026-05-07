@@ -360,6 +360,115 @@ async function buildCaches(admin: SupabaseClient, salonId: string): Promise<Cach
   return caches
 }
 
+/**
+ * Маппинг Booksy payment_type_code → наш payment_method enum.
+ * Booksy: cash, credit_card, tap_to_pay, split, egift_card, blik, transfer.
+ * Наш enum: 'cash', 'card', 'transfer', 'online', 'mixed'.
+ */
+function mapPaymentMethod(code?: string | null): 'cash' | 'card' | 'transfer' | 'online' | 'mixed' {
+  switch (code) {
+    case 'cash':
+      return 'cash'
+    case 'credit_card':
+    case 'tap_to_pay':
+      return 'card'
+    case 'split':
+      return 'mixed'
+    case 'egift_card':
+    case 'blik':
+      return 'online'
+    case 'transfer':
+      return 'transfer'
+    default:
+      return 'cash'
+  }
+}
+
+type AppointmentDetail = {
+  appointment: {
+    appointment_id: number
+    appointment_uid: number
+    booked_from: string
+    booked_till: string
+    status: string
+    total_value?: number
+    total_discount_amount?: number
+    basket_id?: string | null
+    payment_info?: {
+      transaction_info?: {
+        payment_type_code?: string
+        total?: string
+      } | null
+    }
+    subbookings?: {
+      id: number
+      booked_from: string
+      staffer_id?: number | null
+      service?: { name?: string }
+    }[]
+    customer: { id: number; mode?: string }
+  }
+  customer?: {
+    customer_profile?: { full_name?: string; cell_phone?: string; email?: string }
+    business_customer?: { full_name?: string; cell_phone?: string; first_name?: string }
+  }
+}
+
+type BasketResponse = {
+  result?: {
+    total_elements?: { type: string; amount: { amount: number } }[]
+    payments_summary?: { payment_type?: { code?: string } }
+  }
+}
+
+/**
+ * POST /pos/transactions с dry_run=true возвращает rows с item_price даже
+ * для услуг с публично скрытой ценой ("Nie pokazuj"). Используем для:
+ *   - получения реальной цены будущих/неоплаченных визитов (серый учёт)
+ *   - обновления default_price_cents в наших services
+ *
+ * Booksy позволяет dry_run только для существующих booking_id (subbooking).
+ */
+type DryRunResp = {
+  transaction?: {
+    rows?: {
+      booking_id?: number | null
+      product_id?: number | null
+      service_variant_id?: number | null
+      item_price?: number
+      total?: number
+      commission_staffer_id?: number | null
+    }[]
+  }
+}
+
+async function dryRunForBookings(
+  accessToken: string,
+  businessId: number,
+  bookingIds: number[],
+): Promise<DryRunResp | null> {
+  const res = await fetch(`${BOOKSY_API}/me/businesses/${businessId}/pos/transactions`, {
+    method: 'POST',
+    headers: booksyHeaders(accessToken),
+    body: JSON.stringify({
+      transaction_type: 'P',
+      customer_card_id: null,
+      payment_rows: [{ mode: 'C' }],
+      bookings: bookingIds.map((id) => ({ booking_id: id })),
+      travel_fee: null,
+      vouchers: [],
+      addons: [],
+      products: [],
+      force_customer: false,
+      dry_run: true,
+      selected_register_id: null,
+      compatibilities: { stripe_terminal: true, square: true, split: true },
+    }),
+  })
+  if (!res.ok) return null
+  return (await res.json()) as DryRunResp
+}
+
 async function syncVisits(
   admin: SupabaseClient,
   salonId: string,
@@ -369,15 +478,15 @@ async function syncVisits(
 ): Promise<void> {
   const caches = await buildCaches(admin, salonId)
 
-  // Период: 30 дней назад .. 7 дней вперёд (для предстоящих)
+  // Период: 60 дней назад .. 60 дней вперёд (для прогноза)
   const now = new Date()
-  const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const start = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+  const end = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
   const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
 
-  // Resources — Booksy ставит в URL `start_date` сегодняшнего дня и идёт
-  // вперёд страницами. Чтобы хапнуть месяц, итерируем по неделям.
-  const seenIds = new Set<number>()
+  // 1) Собираем bookings по неделям. Импортируем все статусы кроме отменённых.
+  //    Booksy статусы: F=finished, A=active, C=confirmed, X=cancelled, N=no-show.
+  const apptUidToBookings = new Map<number, CalendarBooking[]>()
   for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 7)) {
     const periodStart = fmtDate(cursor)
     const weekEnd = new Date(cursor)
@@ -392,68 +501,153 @@ async function syncVisits(
     const calRes = await booksyGet<CalendarResp>(url, accessToken)
     if (!calRes.ok) throw new Error(`calendar_${calRes.reason}`)
 
-    const bookings = Object.values(calRes.data.bookings ?? {})
-    for (const b of bookings) {
-      if (seenIds.has(b.id)) continue
-      seenIds.add(b.id)
-      // Только завершённые визиты для KPI; будущие/отменённые пропускаем
-      if (b.status !== 'F') continue
-      if (!b.service?.name || !b.customer?.id) continue
+    for (const b of Object.values(calRes.data.bookings ?? {})) {
+      if (b.status === 'X' || b.status === 'N') continue // отменённые/no-show
+      if (!b.appointment_uid) continue
+      const arr = apptUidToBookings.get(b.appointment_uid) ?? []
+      arr.push(b)
+      apptUidToBookings.set(b.appointment_uid, arr)
+    }
+  }
 
-      // Resolve staff: первый resource_id → external_id lookup
-      let staffId: string | null = null
-      const firstResId = b.resources?.[0]?.id
-      if (firstResId) {
-        staffId = caches.staffByExtId.get(String(firstResId)) ?? null
+  // 2) Для каждого уникального appointment_uid: GET detail → один visit
+  const nowTs = now.getTime()
+  for (const [apptUid, bookings] of apptUidToBookings) {
+    const externalId = `appt:${apptUid}`
+    const { data: existing } = await admin
+      .from('visits')
+      .select('id')
+      .eq('salon_id', salonId)
+      .eq('source', 'booksy')
+      .eq('external_id', externalId)
+      .maybeSingle()
+    if (existing) continue
+
+    const detailRes = await booksyGet<AppointmentDetail>(
+      `/me/businesses/${businessId}/appointments/${apptUid}/`,
+      accessToken,
+    )
+    if (!detailRes.ok) {
+      console.warn(`appointment ${apptUid} fetch failed:`, detailRes.reason)
+      continue
+    }
+    const a = detailRes.data.appointment
+    const customer = bookings[0].customer
+    if (!customer?.id) continue
+
+    const isPaid = a.status === 'F' && a.basket_id
+    const visitAtTs = new Date(a.booked_from + ':00+02:00').getTime()
+    const isFuture = visitAtTs > nowTs
+
+    // Резолвим staff
+    let staffId: string | null = null
+    const stafferId = a.subbookings?.[0]?.staffer_id ?? bookings[0].resources?.[0]?.id ?? null
+    if (stafferId) staffId = caches.staffByExtId.get(String(stafferId)) ?? null
+
+    const subbookings = a.subbookings ?? []
+    const serviceNames = subbookings.length
+      ? subbookings.map((s) => s.service?.name ?? 'Service').filter(Boolean)
+      : [bookings[0].service?.name ?? 'Service']
+    const primaryServiceId = bookings[0].service?.id
+    const svc = primaryServiceId ? caches.serviceByExtId.get(String(primaryServiceId)) : undefined
+    const serviceId = svc?.id ?? null
+
+    // Find or create client
+    const clientExtId = String(customer.id)
+    let clientId = caches.clientByExtId.get(clientExtId) ?? null
+    if (!clientId) {
+      const profile = detailRes.data.customer?.customer_profile
+      const fullName = profile?.full_name?.trim() || customer.name || 'Booksy client'
+      const phone = profile?.cell_phone?.trim() || customer.phone || null
+      const email = profile?.email?.trim() || null
+      const { data: newClient } = await admin
+        .from('clients')
+        .insert({
+          salon_id: salonId,
+          full_name: fullName,
+          phone,
+          email,
+          external_source: 'booksy',
+          external_id: clientExtId,
+        })
+        .select('id')
+        .single()
+      if (newClient) {
+        clientId = newClient.id
+        caches.clientByExtId.set(clientExtId, clientId)
       }
+    }
 
-      // Resolve service по service.id (НЕ по имени — устойчивее к переименованию)
-      const svc = b.service.id ? caches.serviceByExtId.get(String(b.service.id)) : undefined
-      const serviceId = svc?.id ?? null
-      const amountCents = svc?.price ?? 0
+    // Цена: для оплаченных — реальный total_value, иначе сумма default цен.
+    // Если default цены 0 (Booksy "Nie pokazuj") — пробуем dry_run чтобы хапнуть.
+    let amountCents: number
+    let paymentMethod: 'cash' | 'card' | 'transfer' | 'online' | 'mixed' = 'cash'
+    let discountCents = 0
+    let tipCents = 0
 
-      // Find or create client
-      const clientExtId = String(b.customer.id)
-      let clientId = caches.clientByExtId.get(clientExtId) ?? null
-      if (!clientId) {
-        const { data: newClient } = await admin
-          .from('clients')
-          .insert({
-            salon_id: salonId,
-            full_name: b.customer.name ?? 'Booksy client',
-            phone: b.customer.phone || null,
-            external_source: 'booksy',
-            external_id: clientExtId,
-          })
-          .select('id')
-          .single()
-        if (newClient) {
-          clientId = newClient.id
-          caches.clientByExtId.set(clientExtId, clientId)
+    if (isPaid && typeof a.total_value === 'number' && a.total_value > 0) {
+      amountCents = Math.round(a.total_value * 100)
+      discountCents = Math.round((a.total_discount_amount ?? 0) * 100)
+      paymentMethod = mapPaymentMethod(a.payment_info?.transaction_info?.payment_type_code)
+      // Чаевые из basket
+      if (a.basket_id) {
+        const basketRes = await booksyGet<BasketResponse>(
+          `/me/businesses/${businessId}/payments/baskets/${a.basket_id}`,
+          accessToken,
+        )
+        if (basketRes.ok) {
+          const tips = basketRes.data.result?.total_elements?.find((e) => e.type === 'tips')
+          if (tips?.amount?.amount) tipCents = tips.amount.amount
         }
       }
-
-      // visit_at в Booksy без TZ — трактуем как Europe/Warsaw
-      const visitAt = new Date(b.booked_from + ':00+02:00').toISOString()
-
-      const { error } = await admin.from('visits').upsert(
-        {
-          salon_id: salonId,
-          staff_id: staffId,
-          client_id: clientId,
-          service_id: serviceId,
-          service_name_snapshot: b.service.name,
-          visit_at: visitAt,
-          amount_cents: amountCents,
-          payment_method: 'cash',
-          status: 'paid',
-          source: 'booksy',
-          external_id: String(b.id),
-        },
-        { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
-      )
-      if (!error) stats.visits_synced++
+    } else {
+      // Не оплачен в Booksy — fallback на default цены услуг
+      const subbkIds = subbookings.map((s) => s.id).filter((id): id is number => !!id)
+      let sumCents = subbookings.reduce((acc, s) => {
+        const sId = (s as { service?: { id?: number } }).service?.id
+        const cached = sId ? caches.serviceByExtId.get(String(sId)) : undefined
+        return acc + (cached?.price ?? 0)
+      }, 0)
+      // Если default цены 0 — спрашиваем у Booksy через dry_run
+      if (sumCents === 0 && subbkIds.length > 0) {
+        const dr = await dryRunForBookings(accessToken, businessId, subbkIds)
+        if (dr?.transaction?.rows) {
+          for (const row of dr.transaction.rows) {
+            if (typeof row.total === 'number') {
+              sumCents += Math.round(row.total * 100)
+            }
+          }
+        }
+      }
+      amountCents = sumCents > 0 ? sumCents : (svc?.price ?? 0)
     }
+
+    const visitAt = new Date(visitAtTs).toISOString()
+    const serviceNameSnapshot = serviceNames.join(', ')
+    const visitStatus: 'paid' | 'pending' | 'cancelled' = isFuture ? 'pending' : 'paid'
+    const comment =
+      subbookings.length > 1 ? `Booksy: ${subbookings.length} услуг в одной записи` : null
+
+    const { error } = await admin.from('visits').upsert(
+      {
+        salon_id: salonId,
+        staff_id: staffId,
+        client_id: clientId,
+        service_id: serviceId,
+        service_name_snapshot: serviceNameSnapshot,
+        visit_at: visitAt,
+        amount_cents: amountCents,
+        tip_cents: tipCents,
+        discount_cents: discountCents,
+        payment_method: paymentMethod,
+        status: visitStatus,
+        source: 'booksy',
+        external_id: externalId,
+        comment,
+      },
+      { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
+    )
+    if (!error) stats.visits_synced++
   }
 }
 
@@ -601,6 +795,28 @@ async function handleLoginWithToken(
   })
 }
 
+/**
+ * Удаляет все визиты с source='booksy' для очистки данных перед свежим синком.
+ * Используется при миграции на новый формат external_id или для re-import.
+ * НЕ удаляет staff/services/clients — они полезны и без визитов.
+ */
+async function handleClearVisits(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const { error, count } = await admin
+    .from('visits')
+    .delete({ count: 'exact' })
+    .eq('salon_id', salonId)
+    .eq('source', 'booksy')
+  if (error) return jsonResponse({ ok: false, error: 'delete_failed', message: error.message }, 500)
+  return jsonResponse({ ok: true, deleted: count ?? 0 })
+}
+
 async function handleSync(
   admin: SupabaseClient,
   userId: string,
@@ -714,6 +930,8 @@ Deno.serve(async (req: Request) => {
       return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
     case 'sync':
       return handleSync(admin, userId, body.salon_id)
+    case 'clear_visits':
+      return handleClearVisits(admin, userId, body.salon_id)
     default:
       return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
   }
