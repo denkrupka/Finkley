@@ -398,6 +398,17 @@ function GroupRow({
   const methods = new Set(visits.map((v) => v.payment_method))
   const sharedPay = methods.size === 1 ? PAY_LABEL[primary.payment_method] : null
 
+  // Уникальные мастера группы — рендерим их аватары + имена (как в обычной строке)
+  const uniqueStaff: { id: string | null; name: string }[] = []
+  const seenStaffIds = new Set<string>()
+  for (const v of visits) {
+    const key = v.staff_id ?? '__none__'
+    if (seenStaffIds.has(key)) continue
+    seenStaffIds.add(key)
+    const member = staff.find((s) => s.id === v.staff_id)
+    uniqueStaff.push({ id: v.staff_id, name: member?.full_name ?? t('visits.no_staff') })
+  }
+
   return (
     <>
       <li
@@ -416,13 +427,21 @@ function GroupRow({
           )}
           {visitTimeStr(primary.visit_at)}
         </span>
-        <span className="flex items-center gap-2.5">
-          <span className="border-secondary/50 text-secondary grid size-6 place-items-center rounded-full border-2 text-[10px] font-bold">
-            {visits.length}
-          </span>
-          <span className="text-foreground truncate text-sm font-semibold">
-            {t('visits.group_label', { count: visits.length })}
-          </span>
+        <span className="flex min-w-0 items-center gap-2">
+          {uniqueStaff.map((s, i) => (
+            <span key={s.id ?? `none-${i}`} className="flex min-w-0 items-center gap-1.5">
+              <span
+                className="text-brand-navy grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                style={{ background: staffColor(s.id, staff) }}
+              >
+                {s.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="text-foreground truncate text-sm font-medium">{s.name}</span>
+              {i < uniqueStaff.length - 1 ? (
+                <span className="text-muted-foreground text-sm">+</span>
+              ) : null}
+            </span>
+          ))}
         </span>
         <span className="text-foreground hidden truncate text-sm sm:inline">
           {visits
