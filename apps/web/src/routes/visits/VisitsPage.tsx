@@ -24,7 +24,7 @@ import { useServices } from '@/hooks/useServices'
 import { getPeriodRange, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatVisitDayHeading, formatVisitDate, groupByDay } from '@/lib/utils/format-date'
+import { formatVisitDayHeading, groupByDay } from '@/lib/utils/format-date'
 
 const STAFF_PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#FBE5C0']
 
@@ -184,13 +184,10 @@ export function VisitsPage() {
                   return (
                     <li
                       key={v.id}
-                      className="border-border grid grid-cols-[64px_1fr_auto_72px] items-center gap-3 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[90px_1.2fr_1.6fr_1.4fr_110px_100px_72px]"
+                      className="border-border grid grid-cols-[56px_1fr_auto_72px] items-center gap-3 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[64px_1.2fr_1.5fr_1.3fr_110px_100px_72px]"
                       data-testid="visit-row"
                     >
-                      <span className="num text-muted-foreground flex flex-col text-xs leading-tight">
-                        <span>{formatVisitDate(v.visit_at)}</span>
-                        <span className="text-foreground/70">{visitTime}</span>
-                      </span>
+                      <span className="num text-muted-foreground text-xs">{visitTime}</span>
                       <span className="flex items-center gap-2.5">
                         <span
                           className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
