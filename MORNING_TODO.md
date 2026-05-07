@@ -12,11 +12,15 @@
 
 ## Утреннее продолжение (7 мая 2026, после возвращения)
 
-- `8f9163c` — cron migration + Vault + добавил `process-recurring-expenses` в `NO_JWT_FUNCTIONS`
+- `8f9163c` — cron migration v1 + добавил `process-recurring-expenses` в `NO_JWT_FUNCTIONS` (superseded by `07e2b52`)
 - `7868d4d` — **TASK-21** schemes UI (5 схем + per-service overrides в drawer)
 - `384d054` — **TASK-22** payouts page + RPC + close-period (auto-expense в категории «Зарплаты»)
 - `a874e70` — **TASK-23** reports page (P&L + bar-list мастеров/оплат + heatmap день×час)
 - `87ca833` — **TASK-32** CSV-импорт visits (wizard в `/settings/import`)
+- `07e2b52` — **cron fix**: переписал recurring-expenses в чистый SQL → секрет в Vault не нужен ✅
+- `6214487` — **TASK-35a** PWA install (manifest + SW + 3 SVG icons + iOS meta)
+- `55031bc` — PWA install button в Settings (ловит beforeinstallprompt)
+- `d3a85bc` — **TASK-34 lite** weekly digest (manual trigger из Settings + opt-out toggle; auto-cron — отдельная задача, требует Vault setup)
 
 Подробный разбор — `docs/RETRO.md` секция «Овернайт-сессия · 7 мая 2026».
 

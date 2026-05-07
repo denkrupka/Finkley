@@ -527,15 +527,19 @@ ADR `decisions/008-landing-stack.md`
 **Стадия:** 4 · **Оценка:** XL
 **AC:** Edge function `generate-insights` weekly cron, простые правила (убыточная услуга, низкая загрузка мастера, аномалия), запись в `insights`, виджет на дашборде. LLM-polish через Claude Haiku — формулировка естественным RU.
 
-### TASK-34: Weekly digest email
+### TASK-34: Weekly digest email 🟡 PARTIAL (7 мая 2026)
 
 **Стадия:** 4 · **Оценка:** M · **Зависит от:** TASK-33
 **AC:** Cron понедельник 9:00, 3 главные цифры + 1 инсайт, opt-out в settings.
 
-### TASK-35: PWA + push-уведомления
+**Что в проде:** Settings → «Еженедельный дайджест» с opt-out тогглом и кнопкой «Отправить сейчас». Edge function `send-weekly-digest` (verify-jwt) проверяет membership через user-client RLS, зовёт RPC `weekly_digest_kpis` (миграция 20260507000008) — собирает revenue/expense/profit прошлой полной ISO-недели в локальной TZ салона + дельту к предыдущей неделе + топ-мастер + топ-услугу. Шаблон `weekly_digest` в Resend через `_shared/notify.sendEmail`. Колонка `salons.weekly_digest_enabled boolean default true`. **НЕ сделано:** AI-инсайт (ждёт TASK-33); auto-cron по понедельникам — требует разовой настройки service_role JWT в Vault (как раньше для recurring-expenses, но тут SQL-only переписать нельзя — нужен HTTP к Resend).
+
+### TASK-35: PWA + push-уведомления 🟡 PARTIAL (7 мая 2026)
 
 **Стадия:** 4 · **Оценка:** L
 **AC:** manifest.json, service worker, иконки, "добавить на главный экран", Web Push API, подписка в settings.
+
+**Что в проде:** PWA install criteria: `manifest.webmanifest` (scope=/app/, theme #1A1A2E), 3 SVG-иконки (192/512/512 maskable) с буквой F на брендовом navy, `sw.js` с network-first для навигаций + cache-first для /assets/\* (offline fallback на app-shell). `<link rel=manifest>` + apple-touch-icon + iOS standalone meta в index.html. Регистрация SW в `main.tsx` только в PROD. Кнопка «Установить приложение» в Settings (`InstallAppButton.tsx`) ловит `beforeinstallprompt`, обрабатывает iOS Safari (инструкция вместо API), уже-installed (standalone display-mode). **НЕ сделано:** Web Push API (требует VAPID keys + edge function для push delivery + ADR на dependency `web-push` или собственный JWT-signer; вынес в TASK-35b).
 
 ### TASK-36: Бенчмарки
 
