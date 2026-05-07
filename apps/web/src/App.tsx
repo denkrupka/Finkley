@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
@@ -8,19 +9,51 @@ import { ResetPasswordPage } from '@/routes/auth/ResetPassword'
 import { SignupPage } from '@/routes/auth/Signup'
 import { OnboardingPage } from '@/routes/onboarding/OnboardingPage'
 import { RootRedirect } from '@/routes/RootRedirect'
-import { SalonLayout } from '@/routes/salon/SalonLayout'
-import { DashboardPage } from '@/routes/dashboard/DashboardPage'
-import { ClientsPage } from '@/routes/clients/ClientsPage'
-import { ExpensesPage } from '@/routes/expenses/ExpensesPage'
 import { AIPage, ReportsPage } from '@/routes/salon/pages'
-import { SettingsPage } from '@/routes/settings/SettingsPage'
-import { StaffPage } from '@/routes/staff/StaffPage'
-import { VisitsPage } from '@/routes/visits/VisitsPage'
+import { SalonLayout } from '@/routes/salon/SalonLayout'
 
 /**
  * Корневой компонент. Auth-роуты — публичные (с RequireGuest),
  * остальные — под RequireAuth.
+ *
+ * Salon-scoped pages лениво кодсплитятся (React.lazy) — каждая в свой
+ * chunk. Auth/onboarding-страницы остаются в основном bundle, потому что
+ * они на критическом пути первого захода и грузить их отложенно не имеет
+ * смысла.
  */
+const DashboardPage = lazy(() =>
+  import('@/routes/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+)
+const VisitsPage = lazy(() =>
+  import('@/routes/visits/VisitsPage').then((m) => ({ default: m.VisitsPage })),
+)
+const ClientsPage = lazy(() =>
+  import('@/routes/clients/ClientsPage').then((m) => ({ default: m.ClientsPage })),
+)
+const ExpensesPage = lazy(() =>
+  import('@/routes/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })),
+)
+const StaffPage = lazy(() =>
+  import('@/routes/staff/StaffPage').then((m) => ({ default: m.StaffPage })),
+)
+const SettingsPage = lazy(() =>
+  import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+)
+
+/** Скелетон для Suspense-fallback. Простой, не привлекающий внимания. */
+function PageFallback() {
+  return (
+    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8" aria-busy="true">
+      <div className="bg-muted/50 mb-5 h-8 w-1/3 animate-pulse rounded-md" />
+      <div className="bg-muted/40 h-64 animate-pulse rounded-lg" />
+    </div>
+  )
+}
+
+function lazyRoute(node: React.ReactNode) {
+  return <Suspense fallback={<PageFallback />}>{node}</Suspense>
+}
+
 function App() {
   return (
     <Routes>
@@ -81,14 +114,14 @@ function App() {
         }
       >
         <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="visits" element={<VisitsPage />} />
-        <Route path="clients" element={<ClientsPage />} />
-        <Route path="expenses" element={<ExpensesPage />} />
-        <Route path="staff" element={<StaffPage />} />
+        <Route path="dashboard" element={lazyRoute(<DashboardPage />)} />
+        <Route path="visits" element={lazyRoute(<VisitsPage />)} />
+        <Route path="clients" element={lazyRoute(<ClientsPage />)} />
+        <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
+        <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="ai" element={<AIPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
 
