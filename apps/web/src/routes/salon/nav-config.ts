@@ -108,7 +108,7 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.ai',
     icon: Bot,
     stage: 4,
-    implemented: false,
+    implemented: true,
     inBottomNav: true,
   },
   {
@@ -116,7 +116,7 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.settings',
     icon: Settings,
     stage: 1,
-    implemented: false, // частично будет в TASK-12/18
+    implemented: true,
     inBottomNav: false,
   },
 ]
