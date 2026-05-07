@@ -5,8 +5,11 @@ import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LoginPage } from '@/routes/auth/Login'
 import { RootRedirect } from '@/routes/RootRedirect'
-import { AIPage } from '@/routes/salon/pages'
 import { SalonLayout } from '@/routes/salon/SalonLayout'
+
+const AIPage = lazyWithRetry(() =>
+  import('@/routes/ai/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })),
+)
 
 /**
  * Корневой компонент. Auth-роуты — публичные (с RequireGuest),
