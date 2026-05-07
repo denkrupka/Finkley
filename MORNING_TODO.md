@@ -18,37 +18,30 @@ E2E suite: 10/10 chromium tests зелёные.
 
 ## ⚠️ Действия от владельца — приоритет 1
 
-### 1. Зарегистрировать cron для повторяющихся расходов (5 минут)
+### 1. Положить FUNCTION_INTERNAL_SECRET в Vault (1 минута) — ЕДИНСТВЕННОЕ что нужно
 
-Edge function `process-recurring-expenses` задеплоена и идемпотентна. Нужно её запускать раз в сутки.
+Регистрацию cron-job я перенёс в миграцию `20260507000004_recurring_expenses_cron.sql` — она применится автоматически следующим деплоем. Ещё в `deploy-supabase.yml` добавил `process-recurring-expenses` в `NO_JWT_FUNCTIONS`, иначе платформа Supabase резала бы вызовы из cron до самой функции.
 
-В Supabase Dashboard → SQL Editor выполни (один раз):
+Что ОСТАЛОСЬ сделать тебе (один раз, после деплоя): открой Supabase Dashboard → SQL Editor и выполни:
 
 ```sql
--- Сохранить FUNCTION_INTERNAL_SECRET в database setting
--- (значение можно увидеть в Project Settings → Edge Functions → Secrets)
-alter database postgres set "app.function_secret" to '<вставь_FUNCTION_INTERNAL_SECRET>';
-
--- Зарегистрировать ежедневный запуск 03:00 UTC (5:00 Варшава зимой)
-select cron.schedule(
-  'process-recurring-expenses',
-  '0 3 * * *',
-  $$
-  select net.http_post(
-    url := 'https://zjihgyaukpxtplzeubog.functions.supabase.co/process-recurring-expenses',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'X-Finkley-Secret', current_setting('app.function_secret', true)
-    ),
-    body := '{}'::jsonb
-  )
-  $$
+select vault.create_secret(
+  '<значение FUNCTION_INTERNAL_SECRET из Dashboard → Edge Functions → Secrets>',
+  'function_internal_secret'
 );
 ```
 
-Проверить: `select * from cron.job;` → должна появиться строка с `jobname='process-recurring-expenses'`.
+Где взять значение: Dashboard → Project Settings → Edge Functions → Secrets → `FUNCTION_INTERNAL_SECRET` → Reveal.
 
-### 2. Прокликать новые фичи руками (15 минут)
+Проверить что cron зарегистрирован:
+
+```sql
+select jobname, schedule from cron.job where jobname = 'process-recurring-expenses';
+```
+
+Должна быть строка со `schedule = '0 3 * * *'`. До того как секрет появится в Vault, cron будет стартовать но получать 401 от функции — это ОК, никаких side-effects.
+
+### 2. Прокликать новые фичи руками (15 минут) — ОТЛОЖЕНО
 
 Запусти приложение в инкогнито или новой сессии (`https://finkley.app/app/login`), залогинься, и пройди:
 
