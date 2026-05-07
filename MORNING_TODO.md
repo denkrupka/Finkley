@@ -21,6 +21,8 @@
 - `6214487` — **TASK-35a** PWA install (manifest + SW + 3 SVG icons + iOS meta)
 - `55031bc` — PWA install button в Settings (ловит beforeinstallprompt)
 - `d3a85bc` — **TASK-34 lite** weekly digest (manual trigger из Settings + opt-out toggle; auto-cron — отдельная задача, требует Vault setup)
+- `4923529` — **perf**: bundle 679→440 KB raw / 204→135 KB gzip (libphonenumber/min + lazy QuickEntry + lazy Sentry init)
+- `3395151` — **perf**: lazy Signup/Onboarding/AuthCallback → 440→416 KB raw / 130 KB gzip
 
 Подробный разбор — `docs/RETRO.md` секция «Овернайт-сессия · 7 мая 2026».
 
