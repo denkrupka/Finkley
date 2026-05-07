@@ -1,7 +1,16 @@
-import { ArrowLeft, Check, ChevronRight, Lock } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import {
+  useBooksySync,
+  useDisconnectIntegration,
+  useSalonIntegrations,
+  type IntegrationProvider,
+  type SalonIntegrationPublic,
+} from '@/hooks/useIntegrations'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { INTEGRATIONS, type IntegrationDef } from './integrations-config'
@@ -15,8 +24,13 @@ export function IntegrationsPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
+  const { data: connected = [] } = useSalonIntegrations(salonId)
 
   if (!salonId) return null
+
+  const connectedMap = new Map<IntegrationProvider, SalonIntegrationPublic>(
+    connected.map((c) => [c.provider, c]),
+  )
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
@@ -36,7 +50,13 @@ export function IntegrationsPage() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {INTEGRATIONS.map((p) => (
-          <IntegrationCard key={p.id} provider={p} onConnect={() => setConnecting(p)} />
+          <IntegrationCard
+            key={p.id}
+            provider={p}
+            connection={connectedMap.get(p.id) ?? null}
+            salonId={salonId}
+            onConnect={() => setConnecting(p)}
+          />
         ))}
       </div>
 
@@ -49,23 +69,28 @@ export function IntegrationsPage() {
 
 function IntegrationCard({
   provider,
+  connection,
+  salonId,
   onConnect,
 }: {
   provider: IntegrationDef
+  connection: SalonIntegrationPublic | null
+  salonId: string
   onConnect: () => void
 }) {
   const { t } = useTranslation()
   const Icon = provider.icon
+  const sync = useBooksySync(salonId)
+  const disconnect = useDisconnectIntegration(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
+  const isConnected = !!connection && connection.status !== 'disconnected'
 
   return (
-    <button
-      type="button"
-      onClick={isLocked ? undefined : onConnect}
-      disabled={isLocked}
+    <div
       className={[
-        'border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5 text-left transition-colors',
-        isLocked ? 'cursor-not-allowed opacity-60' : 'hover:border-secondary cursor-pointer',
+        'border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5',
+        isLocked ? 'opacity-60' : '',
+        isConnected ? 'border-brand-sage/40' : '',
       ].join(' ')}
     >
       <div className="flex items-start gap-3">
@@ -78,26 +103,107 @@ function IntegrationCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-brand-navy text-base font-bold">{provider.name}</h2>
-            <StatusPill status={provider.status} />
+            {isConnected ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                <Check className="size-3" strokeWidth={2.5} />
+                {t('integrations.status.connected')}
+              </span>
+            ) : (
+              <StatusPill status={provider.status} />
+            )}
           </div>
           <p className="text-muted-foreground mt-0.5 text-xs">{provider.region}</p>
         </div>
       </div>
-      <p className="text-foreground/80 text-sm leading-snug">{t(provider.description_key)}</p>
-      <div className="mt-auto flex items-center justify-between">
-        <span className="text-muted-foreground text-xs">
-          {isLocked ? null : t('integrations.not_connected')}
-        </span>
+
+      {isConnected && connection ? (
+        <div className="border-border bg-muted/30 rounded-md border p-2.5 text-xs">
+          {connection.last_sync_at ? (
+            <p className="text-muted-foreground">
+              {t('integrations.last_sync_at', {
+                date: new Date(connection.last_sync_at).toLocaleString('ru-RU'),
+              })}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">{t('integrations.never_synced')}</p>
+          )}
+          {connection.last_sync_stats ? (
+            <p className="text-foreground mt-1 font-semibold">
+              {t('integrations.last_sync_stats', {
+                staff: connection.last_sync_stats.staff_synced ?? 0,
+                services: connection.last_sync_stats.services_synced ?? 0,
+                visits: connection.last_sync_stats.visits_synced ?? 0,
+              })}
+            </p>
+          ) : null}
+          {connection.last_error ? (
+            <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-foreground/80 text-sm leading-snug">{t(provider.description_key)}</p>
+      )}
+
+      <div className="mt-auto flex items-center justify-between gap-2">
         {isLocked ? (
-          <Lock className="text-muted-foreground size-4" strokeWidth={1.7} />
+          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+            <Lock className="size-3.5" strokeWidth={1.7} />
+            {t('integrations.locked_hint')}
+          </span>
+        ) : isConnected ? (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                sync.mutate(undefined, {
+                  onSuccess: (stats) =>
+                    toast.success(
+                      t('integrations.toast_synced', {
+                        staff: stats.staff_synced,
+                        services: stats.services_synced,
+                        visits: stats.visits_synced,
+                      }),
+                    ),
+                  onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                })
+              }
+              disabled={sync.isPending}
+              className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline disabled:opacity-50"
+            >
+              {sync.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+              ) : (
+                <RefreshCw className="size-3.5" strokeWidth={2} />
+              )}
+              {t('integrations.sync_now')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm(t('integrations.confirm_disconnect'))) return
+                disconnect.mutate(provider.id, {
+                  onSuccess: () => toast.success(t('integrations.toast_disconnected')),
+                })
+              }}
+              className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+              aria-label={t('integrations.disconnect')}
+              title={t('integrations.disconnect')}
+            >
+              <Trash2 className="size-3.5" strokeWidth={1.7} />
+            </button>
+          </>
         ) : (
-          <span className="text-secondary inline-flex items-center gap-1 text-sm font-semibold">
+          <button
+            type="button"
+            onClick={onConnect}
+            className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+          >
             {t('integrations.connect')}
             <ChevronRight className="size-3.5" strokeWidth={2} />
-          </span>
+          </button>
         )}
       </div>
-    </button>
+    </div>
   )
 }
 

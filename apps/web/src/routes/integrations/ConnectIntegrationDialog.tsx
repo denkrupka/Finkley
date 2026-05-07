@@ -1,6 +1,7 @@
-import { Lock } from 'lucide-react'
+import { Loader2, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useBooksyLogin } from '@/hooks/useIntegrations'
 
 import type { IntegrationDef } from './integrations-config'
 
@@ -30,12 +32,16 @@ export function ConnectIntegrationDialog({
   onClose: () => void
 }) {
   const { t } = useTranslation()
+  const { salonId } = useParams<{ salonId: string }>()
   const [values, setValues] = useState<Record<string, string>>({})
+  const booksyLogin = useBooksyLogin(salonId)
 
   // Сбрасываем поля при смене провайдера
   useEffect(() => {
     setValues({})
   }, [provider?.id])
+
+  const isPending = booksyLogin.isPending
 
   function handleSubmit() {
     if (!provider) return
@@ -46,7 +52,26 @@ export function ConnectIntegrationDialog({
       toast.error(t('integrations.errors.fields_required'))
       return
     }
-    // Заглушка — реальный connect делается в TASK-28
+
+    if (provider.id === 'booksy') {
+      booksyLogin.mutate(
+        { email: values.login ?? '', password: values.password ?? '' },
+        {
+          onSuccess: (res) => {
+            toast.success(
+              t('integrations.toast_connected', { name: res.business?.name ?? 'Booksy' }),
+            )
+            onClose()
+          },
+          onError: (err) => {
+            toast.error(err instanceof Error ? err.message : String(err))
+          },
+        },
+      )
+      return
+    }
+
+    // Other providers — пока stub
     toast.success(t('integrations.toast_saved_stub'))
     onClose()
   }
@@ -92,11 +117,18 @@ export function ConnectIntegrationDialog({
         </form>
 
         <DialogFooter className="px-5">
-          <Button variant="outline" type="button" onClick={onClose}>
+          <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
             {t('common.cancel')}
           </Button>
-          <Button type="button" onClick={handleSubmit}>
-            {t('integrations.save')}
+          <Button type="button" onClick={handleSubmit} disabled={isPending}>
+            {isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                {t('integrations.connecting')}
+              </>
+            ) : (
+              t('integrations.save')
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

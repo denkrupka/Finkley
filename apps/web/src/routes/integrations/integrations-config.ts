@@ -54,7 +54,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'in_research',
+    status: 'available',
   },
   {
     id: 'fresha',

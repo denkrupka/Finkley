@@ -55,6 +55,7 @@ jobs:
         run: |
           # _shared/ — не отдельная функция, скрипт сам подтянет если функция импортит
           NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights"
+          # booksy-proxy НЕ в списке — он использует JWT юзера для membership check
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
