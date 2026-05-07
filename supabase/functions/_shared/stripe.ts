@@ -78,6 +78,10 @@ export async function createCheckoutSession(
     automatic_tax: { enabled: 'true' },
     billing_address_collection: 'auto',
     'tax_id_collection[enabled]': 'true',
+    // Включаем встроенный «Add promotion code» на Stripe Checkout странице.
+    // Юзер вводит BETA3M (или другой активный promo) — Stripe сам валидирует
+    // и применяет скидку. Свой UI не нужен.
+    allow_promotion_codes: 'true',
   }
   if (input.trialDays && input.trialDays > 0) {
     body['subscription_data[trial_period_days]'] = input.trialDays
