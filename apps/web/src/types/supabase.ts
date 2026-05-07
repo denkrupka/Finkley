@@ -636,6 +636,7 @@ export type Database = {
           salon_type: string
           timezone: string
           updated_at: string
+          weekly_digest_enabled: boolean
         }
         Insert: {
           country_code: string
@@ -650,6 +651,7 @@ export type Database = {
           salon_type: string
           timezone?: string
           updated_at?: string
+          weekly_digest_enabled?: boolean
         }
         Update: {
           country_code?: string
@@ -664,6 +666,7 @@ export type Database = {
           salon_type?: string
           timezone?: string
           updated_at?: string
+          weekly_digest_enabled?: boolean
         }
         Relationships: []
       }

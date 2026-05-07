@@ -1,4 +1,4 @@
-import { Download, Upload } from 'lucide-react'
+import { Download, Mail, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -26,6 +26,7 @@ import {
 import { useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
@@ -52,6 +53,8 @@ export function SettingsPage() {
   const update = useUpdateSalon()
   const remove = useDeleteSalon()
   const { data: subscription } = useSubscription(salonId)
+  const sendDigest = useSendWeeklyDigest(salonId)
+  const toggleDigest = useToggleWeeklyDigest(salonId)
 
   const [name, setName] = useState('')
   const [country, setCountry] = useState<CountryCode>('PL')
@@ -261,6 +264,57 @@ export function SettingsPage() {
             </p>
           </div>
           <BillingButtons salonId={salonId} subscription={subscription ?? null} />
+        </div>
+      </section>
+
+      {/* Еженедельный дайджест */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1">
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.digest.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.digest.subtitle')}</p>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={salon.weekly_digest_enabled}
+                onChange={(e) =>
+                  toggleDigest.mutate(e.target.checked, {
+                    onSuccess: () =>
+                      toast.success(
+                        e.target.checked
+                          ? t('settings.digest.toast_enabled')
+                          : t('settings.digest.toast_disabled'),
+                      ),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }
+                className="size-4 cursor-pointer"
+              />
+              <span className="text-foreground">
+                {salon.weekly_digest_enabled
+                  ? t('settings.digest.enabled')
+                  : t('settings.digest.disabled')}
+              </span>
+            </label>
+          </div>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => {
+              sendDigest.mutate(undefined, {
+                onSuccess: (data) =>
+                  toast.success(t('settings.digest.toast_sent', { email: data?.sent_to ?? '' })),
+                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+              })
+            }}
+            disabled={sendDigest.isPending || !salon.weekly_digest_enabled}
+            data-testid="settings-digest-send"
+          >
+            <Mail className="size-4" strokeWidth={1.7} />
+            {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
+          </Button>
         </div>
       </section>
 

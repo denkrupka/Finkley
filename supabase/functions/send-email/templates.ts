@@ -16,6 +16,7 @@ export type TemplateAlias =
   | 'payment_failed'
   | 'subscription_canceled'
   | 'gdpr_export'
+  | 'weekly_digest'
 
 export type EmailTemplate = {
   subject: string
@@ -325,6 +326,67 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 </p>
 </div>
 <p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Управленческий учёт для салонов красоты<br>Вопросы — info@finkley.app</p>
+</div>
+</body>
+</html>`,
+  },
+
+  weekly_digest: {
+    subject: 'Finkley · итоги недели для {{salon_name}}',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Итоги недели · Finkley</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY · ИТОГИ НЕДЕЛИ</p>
+
+<h1 style="margin:0 0 8px 0;font-size:22px;line-height:30px;color:#0f172a;">{{salon_name}}</h1>
+<p style="margin:0 0 24px 0;font-size:14px;color:#64748b;">{{period_start}} — {{period_end}}</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+<tr>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Выручка</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{revenue}}</p>
+<p style="margin:4px 0 0 0;font-size:12px;color:{{revenue_delta_color}};">{{revenue_delta}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Расходы</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{expense}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#ecfdf5;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#047857;">Прибыль</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#065f46;">{{profit}}</p>
+</td>
+</tr>
+</table>
+
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#334155;">
+За неделю: <strong>{{visits_count}}</strong> визитов.
+</p>
+
+{{top_block}}
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+<tr><td align="center" style="background:#1A1A2E;border-radius:6px;padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">Открыть отчёты</a>
+</td></tr>
+</table>
+
+<p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+Не хочешь больше получать дайджесты? Открой Settings и выключи «Еженедельный дайджест».
+</p>
+
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Управленческий учёт для салонов красоты<br>info@finkley.app</p>
 </div>
 </body>
 </html>`,

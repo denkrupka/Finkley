@@ -16,6 +16,7 @@ export type EmailTemplate =
   | 'payment_succeeded'
   | 'payment_failed'
   | 'subscription_canceled'
+  | 'weekly_digest'
 
 export async function sendEmail(
   template: EmailTemplate,
