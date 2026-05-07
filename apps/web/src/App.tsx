@@ -2,12 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
-import { AuthCallbackPage } from '@/routes/auth/AuthCallback'
-import { ForgotPasswordPage } from '@/routes/auth/ForgotPassword'
 import { LoginPage } from '@/routes/auth/Login'
-import { ResetPasswordPage } from '@/routes/auth/ResetPassword'
-import { SignupPage } from '@/routes/auth/Signup'
-import { OnboardingPage } from '@/routes/onboarding/OnboardingPage'
 import { RootRedirect } from '@/routes/RootRedirect'
 import { AIPage } from '@/routes/salon/pages'
 import { SalonLayout } from '@/routes/salon/SalonLayout'
@@ -16,11 +11,30 @@ import { SalonLayout } from '@/routes/salon/SalonLayout'
  * Корневой компонент. Auth-роуты — публичные (с RequireGuest),
  * остальные — под RequireAuth.
  *
- * Salon-scoped pages лениво кодсплитятся (React.lazy) — каждая в свой
- * chunk. Auth/onboarding-страницы остаются в основном bundle, потому что
- * они на критическом пути первого захода и грузить их отложенно не имеет
- * смысла.
+ * Eager: только Login (точка входа на возврате), SalonLayout,
+ * RootRedirect — критический путь.
+ *
+ * Lazy (по своему chunk):
+ * - Все salon-scoped страницы (юзер их по одной открывает)
+ * - Signup/Forgot/Reset/Callback — посещаются 1 раз за время использования
+ * - Onboarding — посещается ровно 1 раз в жизни юзера
  */
+const SignupPage = lazy(() =>
+  import('@/routes/auth/Signup').then((m) => ({ default: m.SignupPage })),
+)
+const ForgotPasswordPage = lazy(() =>
+  import('@/routes/auth/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })),
+)
+const ResetPasswordPage = lazy(() =>
+  import('@/routes/auth/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })),
+)
+const AuthCallbackPage = lazy(() =>
+  import('@/routes/auth/AuthCallback').then((m) => ({ default: m.AuthCallbackPage })),
+)
+const OnboardingPage = lazy(() =>
+  import('@/routes/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })),
+)
+
 const DashboardPage = lazy(() =>
   import('@/routes/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 )
@@ -75,25 +89,14 @@ function App() {
           </RequireGuest>
         }
       />
-      <Route
-        path="/signup"
-        element={
-          <RequireGuest>
-            <SignupPage />
-          </RequireGuest>
-        }
-      />
+      <Route path="/signup" element={<RequireGuest>{lazyRoute(<SignupPage />)}</RequireGuest>} />
       <Route
         path="/forgot-password"
-        element={
-          <RequireGuest>
-            <ForgotPasswordPage />
-          </RequireGuest>
-        }
+        element={<RequireGuest>{lazyRoute(<ForgotPasswordPage />)}</RequireGuest>}
       />
       {/* /reset-password требует временную сессию из ссылки — без RequireGuest */}
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/reset-password" element={lazyRoute(<ResetPasswordPage />)} />
+      <Route path="/auth/callback" element={lazyRoute(<AuthCallbackPage />)} />
 
       {/* Приватные */}
       <Route
@@ -106,11 +109,7 @@ function App() {
       />
       <Route
         path="/onboarding"
-        element={
-          <RequireAuth>
-            <OnboardingPage />
-          </RequireAuth>
-        }
+        element={<RequireAuth>{lazyRoute(<OnboardingPage />)}</RequireAuth>}
       />
 
       {/* Salon-scoped */}
