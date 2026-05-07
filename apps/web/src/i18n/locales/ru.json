@@ -166,6 +166,10 @@
       "profit_label": "Прибыль",
       "profit_sublabel": "чистыми в кармане"
     },
+    "insights": {
+      "title": "AI-помощник видит",
+      "dismiss": "Скрыть"
+    },
     "period": {
       "day": "День",
       "week": "Неделя",

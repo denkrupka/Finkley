@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
 import { useSalon } from '@/hooks/useSalons'
+import { InsightsWidget } from './InsightsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
 import { useVisits, type PaymentMethod } from '@/hooks/useVisits'
@@ -93,6 +94,9 @@ export function DashboardPage() {
       </header>
 
       {isEmpty ? <DashboardEmpty /> : null}
+
+      {/* AI-инсайты — до 3-х актуальных, генерируются weekly cron'ом */}
+      <InsightsWidget salonId={salonId} />
 
       {/* KPI row */}
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
