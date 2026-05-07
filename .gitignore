@@ -66,3 +66,7 @@ supabase/.temp/
 # Husky
 # Husky файлы (.husky/_/) генерятся автоматом при pnpm install
 .husky/_/
+
+# Local bug-snapshot scratchpad (PII)
+.bugs-snapshot.json
+.bugs-snapshot.md
