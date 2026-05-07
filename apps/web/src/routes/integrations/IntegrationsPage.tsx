@@ -12,6 +12,7 @@ import {
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
 
+import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { INTEGRATIONS, type IntegrationDef } from './integrations-config'
 
@@ -24,6 +25,7 @@ export function IntegrationsPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
+  const [booksyOpen, setBooksyOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
 
   if (!salonId) return null
@@ -31,6 +33,11 @@ export function IntegrationsPage() {
   const connectedMap = new Map<IntegrationProvider, SalonIntegrationPublic>(
     connected.map((c) => [c.provider, c]),
   )
+
+  function handleConnect(p: IntegrationDef) {
+    if (p.id === 'booksy') setBooksyOpen(true)
+    else setConnecting(p)
+  }
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
@@ -55,7 +62,7 @@ export function IntegrationsPage() {
             provider={p}
             connection={connectedMap.get(p.id) ?? null}
             salonId={salonId}
-            onConnect={() => setConnecting(p)}
+            onConnect={() => handleConnect(p)}
           />
         ))}
       </div>
@@ -63,6 +70,7 @@ export function IntegrationsPage() {
       <p className="text-muted-foreground mt-6 text-xs">{t('integrations.privacy_note')}</p>
 
       <ConnectIntegrationDialog provider={connecting} onClose={() => setConnecting(null)} />
+      <BooksyConnectDialog open={booksyOpen} onClose={() => setBooksyOpen(false)} />
     </div>
   )
 }

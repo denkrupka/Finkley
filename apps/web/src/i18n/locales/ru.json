@@ -591,13 +591,29 @@
       "password": "Пароль"
     },
     "errors": {
-      "fields_required": "Заполни все обязательные поля"
+      "fields_required": "Заполни все обязательные поля",
+      "captcha_not_ready": "Капча ещё не загрузилась — подожди секунду",
+      "captcha_load_failed": "Не удалось загрузить капчу",
+      "captcha_solve_failed": "Капча не прошла. Попробуй ещё раз.",
+      "booksy_invalid_credentials": "Неверный email или пароль. Проверь данные в Booksy Pro.",
+      "booksy_request_blocked": "Booksy заблокировал прямой логин. Используй вкладку «Токен» — это занимает 30 секунд.",
+      "booksy_rate_limited": "Слишком много попыток. Подожди 5 минут и попробуй снова.",
+      "booksy_no_business": "В аккаунте нет ни одного бизнеса. Войди в Booksy Pro и создай salon-профиль."
     },
     "status": {
       "available": "Готово",
       "connected": "Подключено",
       "in_research": "Скоро",
       "coming_soon": "В разработке"
+    },
+    "booksy": {
+      "tab_password": "Email и пароль",
+      "tab_token": "У меня есть токен",
+      "token_help": "Если прямой логин не сработал, можно вытащить токен сессии из браузера за 30 секунд:",
+      "token_step1": "Открой booksy.com/pro и войди в свой аккаунт обычным способом",
+      "token_step2": "Нажми F12 → вкладка Network → найди любой запрос к pl.booksy.com → скопируй значение заголовка x-access-token",
+      "token_step3": "Вставь токен сюда — мы проверим и сохраним",
+      "token_label": "Access token (x-access-token)"
     },
     "providers": {
       "booksy": {
