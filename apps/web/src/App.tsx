@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
+import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LoginPage } from '@/routes/auth/Login'
 import { RootRedirect } from '@/routes/RootRedirect'
 import { AIPage } from '@/routes/salon/pages'
@@ -19,50 +20,50 @@ import { SalonLayout } from '@/routes/salon/SalonLayout'
  * - Signup/Forgot/Reset/Callback — посещаются 1 раз за время использования
  * - Onboarding — посещается ровно 1 раз в жизни юзера
  */
-const SignupPage = lazy(() =>
+const SignupPage = lazyWithRetry(() =>
   import('@/routes/auth/Signup').then((m) => ({ default: m.SignupPage })),
 )
-const ForgotPasswordPage = lazy(() =>
+const ForgotPasswordPage = lazyWithRetry(() =>
   import('@/routes/auth/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })),
 )
-const ResetPasswordPage = lazy(() =>
+const ResetPasswordPage = lazyWithRetry(() =>
   import('@/routes/auth/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })),
 )
-const AuthCallbackPage = lazy(() =>
+const AuthCallbackPage = lazyWithRetry(() =>
   import('@/routes/auth/AuthCallback').then((m) => ({ default: m.AuthCallbackPage })),
 )
-const OnboardingPage = lazy(() =>
+const OnboardingPage = lazyWithRetry(() =>
   import('@/routes/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })),
 )
 
-const DashboardPage = lazy(() =>
+const DashboardPage = lazyWithRetry(() =>
   import('@/routes/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 )
-const VisitsPage = lazy(() =>
+const VisitsPage = lazyWithRetry(() =>
   import('@/routes/visits/VisitsPage').then((m) => ({ default: m.VisitsPage })),
 )
-const ClientsPage = lazy(() =>
+const ClientsPage = lazyWithRetry(() =>
   import('@/routes/clients/ClientsPage').then((m) => ({ default: m.ClientsPage })),
 )
-const ExpensesPage = lazy(() =>
+const ExpensesPage = lazyWithRetry(() =>
   import('@/routes/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })),
 )
-const StaffPage = lazy(() =>
+const StaffPage = lazyWithRetry(() =>
   import('@/routes/staff/StaffPage').then((m) => ({ default: m.StaffPage })),
 )
-const PayoutsPage = lazy(() =>
+const PayoutsPage = lazyWithRetry(() =>
   import('@/routes/payouts/PayoutsPage').then((m) => ({ default: m.PayoutsPage })),
 )
-const ReportsPage = lazy(() =>
+const ReportsPage = lazyWithRetry(() =>
   import('@/routes/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 )
-const ImportPage = lazy(() =>
+const ImportPage = lazyWithRetry(() =>
   import('@/routes/settings/import/ImportPage').then((m) => ({ default: m.ImportPage })),
 )
-const IntegrationsPage = lazy(() =>
+const IntegrationsPage = lazyWithRetry(() =>
   import('@/routes/integrations/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage })),
 )
-const SettingsPage = lazy(() =>
+const SettingsPage = lazyWithRetry(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
 

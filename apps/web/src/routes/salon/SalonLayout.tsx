@@ -1,7 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+
+import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useParams } from 'react-router-dom'
 
@@ -17,7 +19,7 @@ import { TopBar } from './TopBar'
 
 // QuickEntryModal лениво — он тащит ClientPicker → libphonenumber-js (~80KB).
 // Юзеру нужен только когда он жмёт FAB; до этого момента грузить ни к чему.
-const QuickEntryModal = lazy(() =>
+const QuickEntryModal = lazyWithRetry(() =>
   import('@/routes/visits/QuickEntryModal').then((m) => ({ default: m.QuickEntryModal })),
 )
 
