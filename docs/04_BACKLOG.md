@@ -433,10 +433,12 @@ ADR `decisions/008-landing-stack.md`
 
 **Релиз:** публичный запуск.
 
-### TASK-20: Реестр клиентов
+### TASK-20: Реестр клиентов ✅ DONE (овернайт 7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** L
 **AC:** CRUD клиента, список с поиском/фильтрами, drawer с историей визитов, привязка визитов через typeahead, денормализованные счётчики.
+
+**Что в проде:** `routes/clients/*` (Page, FormModal, Drawer, Picker), `hooks/useClients.ts`, `lib/utils/format-phone.ts` (libphonenumber-js E.164 нормализация PL/UA/RU), Sheet UI-компонент. Поиск по name/phone/email, сортировка по last_visit/name/revenue. ClientPicker в QuickEntryModal с inline-create. Денорм-триггер на `visits` уже был (миграция 4). E2E `clients-flow.spec.ts` зелёный.
 
 ### TASK-21: Расширенные схемы оплаты мастерам
 
@@ -453,20 +455,26 @@ ADR `decisions/008-landing-stack.md`
 **Стадия:** 2 · **Оценка:** XL
 **AC:** P&L отчёт, выручка по мастерам/услугам, типу оплаты, загрузка по дням/часам (heatmap), маржа по услугам, сравнение периодов, экспорт PDF/Excel.
 
-### TASK-24: Группированный ввод и доп.поля визита
+### TASK-24: Группированный ввод и доп.поля визита 🟡 PARTIAL (овернайт 7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** M
 **AC:** Multi-row форма, чаевые, скидки, повторяющиеся шаблоны.
 
-### TASK-25: Расходы — расширения
+**Что в проде:** Поля `tip_cents` / `discount_cents` подключены в QuickEntryModal (два side-by-side инпута). Миграция 20260507000003 переписала 4 RPC дашборда: `revenue = sum(amount - discount + tip)`. **НЕ сделано:** multi-row grid (текущий «Сохранить и добавить ещё» покрывает serial entry — full grid отложен до фидбека). Повторяющиеся **шаблоны визитов** не сделаны (повторение есть только у расходов — TASK-25).
+
+### TASK-25: Расходы — расширения 🟡 PARTIAL (овернайт 7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** M
 **AC:** Фото чека (Storage), повторяющиеся расходы, бюджет vs факт, остаток нала в кассе.
 
-### TASK-26: Экспорт данных (GDPR)
+**Что в проде:** Storage bucket `receipts` (private, 10 MB, image/\* + PDF) с RLS scoped по `salon_id`. UI upload + signed-URL viewer (img или iframe для PDF). `recurrence` enum (none/weekly/monthly), `next_occurrence_at`, edge function `process-recurring-expenses` (идемпотентный cron, готов, расписание pg_cron — в MORNING_TODO). **НЕ сделано:** бюджет vs факт, остаток нала в кассе — отложили до фидбека (нужно решить, что показывать на главной/в отчётах).
+
+### TASK-26: Экспорт данных (GDPR) ✅ DONE (овернайт 7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** M
 **AC:** Edge function generate-export → ZIP с CSV всех таблиц + PDF summary, signed URL TTL 24h, email со ссылкой.
+
+**Что в проде:** Миграция 20260507000002 (таблица `export_requests` + Storage bucket `exports` 100 MB private). Edge function `generate-export` (verify-jwt) собирает 10 таблиц через service-role, упаковывает JSZip, signed URL 24h. Rate-limit 1/24h: повторный запрос отдаёт ту же ссылку. Шаблон `gdpr_export` в Resend, ссылка автоматом уходит на email юзера. Settings → «Экспорт данных» теперь работает (раньше был placeholder). **PDF summary** не сделан — был optional, ZIP с CSV + README.txt полностью покрывает GDPR Art. 20.
 
 ---
 

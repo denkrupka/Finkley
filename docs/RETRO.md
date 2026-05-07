@@ -114,3 +114,78 @@
 - TASK-26 — экспорт данных (CSV + PDF) для GDPR-доступа
 
 Перед стартом стадии 2 — фидбек от 5–10 бета-тестеров. Возможно, перетасуем приоритет (например, если «не могу найти повторяющиеся расходы» окажется частой жалобой → TASK-25 раньше TASK-20).
+
+---
+
+## Овернайт-сессия · 7 мая 2026
+
+Однопроходная автономная сессия после первого фидбека: владелец передал доверие на ночь, попросил пилить дальше по бэклогу. Дошли до **TASK-20, 24, 25, 26** — фактически закрыли половину Стадии 2.
+
+### Что сделано
+
+**Phase 1 — E2E safety net (10 ms-units zelyonyi):**
+
+- Подняли Playwright (`pnpm dlx playwright install chromium`), `playwright.config.ts` теперь грузит `.env.local` через `dotenv` — иначе все admin-spec'и игнорировались.
+- Существующие 7 e2e (smoke, auth UI, onboarding, visit-flow) → 9 (+ expense-flow + billing-flow). Billing-flow стабит вызов `create-checkout-session` через `page.route()` — нет реальных Stripe-сессий.
+- Добавлен новый clients-flow → 10 в сумме.
+- Поймали и пофиксили pre-existing race в `QuickEntryModal`: `staff_id` оставался пустым, если `useStaff()` ещё не отдал данные к моменту открытия модалки. Добавлен второй useEffect, синхронизирующий выбор по приходу `staff`.
+
+**Phase 2 — TASK-20 Клиенты:**
+
+- Таблица `clients` была в схеме с дня 1 (миграция 4 уже включала триггер `recalc_client_stats` на `visits.INSERT/DELETE`). UI-слой полностью пилили этой ночью.
+- `libphonenumber-js` для E.164 нормализации (PL/UA/RU).
+- Хуки: `useClients`, `useClient`, `useClientVisits`, `useCreateClient`, `useUpdateClient`, `useDeleteClient` (soft).
+- Sheet-компонент (right-anchored Radix Dialog) — наш первый side-drawer.
+- `ClientsPage` (поиск по name/phone/email + сортировка last_visit/name/revenue + 3 KPI), `ClientFormModal` (CRUD), `ClientDrawer` (контакты, заметка, история визитов, edit + delete).
+- `ClientPicker` combobox в QuickEntryModal — поиск + inline `+ Создать «query»`.
+- `nav-config.clients.implemented = true`, удалён `ComingSoon` для clients.
+- E2E `clients-flow.spec.ts`: создание → drawer empty → Quick Entry с picker → drawer history populated.
+
+**Phase 3 — TASK-25 Расходы:**
+
+- Миграция 20260507000001: enum `expense_recurrence`, столбцы `next_occurrence_at`, `recurrence_parent_id`, `receipt_url` на `expenses`. Storage bucket `receipts` (private, 10 MB cap, image+pdf only) с RLS scoped по first-folder.
+- В форме расхода — file picker (paperclip drop-zone) + Select повторений. В списке — иконка скрепки рядом с расходом, клик открывает превью через signed URL (img или iframe для PDF). Иконка `Repeat` для повторяющихся.
+- `useExpenses`: `uploadReceipt`, `getReceiptSignedUrl` хелперы. `CreateExpenseInput` принимает receipt_url + recurrence + next_occurrence_at.
+- Edge function `process-recurring-expenses` (no-verify-jwt + shared secret): идемпотентный, безопасно гонять много раз в день. Регистрация pg_cron расписания отложена в MORNING_TODO (не хочу хардкодить FUNCTION_INTERNAL_SECRET в миграции).
+
+**Phase 4 — TASK-26 GDPR-экспорт:**
+
+- Миграция 20260507000002: таблица `export_requests` + Storage bucket `exports` (private, 100 MB) с RLS по first-folder = user_id.
+- Edge function `generate-export` (verify-jwt YES). Через user JWT тянет список салонов (RLS), потом через service-role читает 10 таблиц, собирает CSV, кладёт в `JSZip` (esm.sh), uploadит в Storage как `<user_id>/<request_id>.zip`, возвращает signed URL TTL 24h.
+- Rate-limit: если уже есть `done`-экспорт за последние 24h — возвращаем тот же URL без перегенерации.
+- Шаблон `gdpr_export` добавлен в send-email/templates.ts.
+- В Settings → «Экспорт данных» кнопка теперь по-настоящему работает: open в новой вкладке + tост (different copy для cached vs fresh).
+
+**Phase 5 — TASK-24 Чаевые + скидки:**
+
+- Поля `tip_cents` / `discount_cents` уже существовали в схеме (миграция 4). UI и aggregations не использовали.
+- В QuickEntryModal — два side-by-side numeric инпута под основной суммой (`+€ tip`, `−€ discount`). zod refine на не-отрицательность. Reset на «Сохранить и добавить ещё».
+- Миграция 20260507000003 переписала 4 RPC: `dashboard_kpis`, `top_staff_by_revenue`, `top_services_by_revenue`, `revenue_by_day`. Revenue теперь = `sum(amount - discount + tip)`.
+- Multi-row форма scoped out — текущий «Сохранить и добавить ещё» уже покрывает serial entry; полная grid-форма — отдельная задача с фидбеком от пользователей.
+
+### Метрики качества на конец сессии
+
+- `pnpm typecheck` — зелёный
+- `pnpm lint` — зелёный (max-warnings 0)
+- `pnpm build` — собирается, bundle index 726 KB (+200 KB) — добавилось libphonenumber-js + Sheet + клиенты. Code-splitting для крупных страниц всё ещё в долгу (TASK для стадии 2 финализации).
+- `pnpm test:e2e` — **10/10** Playwright тестов (chromium project): smoke (2), auth UI (3), onboarding, visit-flow, expense-flow, billing-flow, clients-flow.
+
+### Бонус-фиксы по дороге
+
+- `lint-staged` глобал-pattern `*.{ts,tsx}` запускал eslint на root `.ts` файлах, у которых нет конфига — pre-commit падал с «ESLint couldn't find an eslint.config.(js|mjs|cjs) file». Сузили pattern до `apps/web/**/*.{ts,tsx}`, остальные .ts только под prettier.
+- `pnpm dlx supabase gen types` иногда добавляет в начало строку «Initialising login role...» и в конец `<claude-code-hint>` — оба раза правил руками; стоит заменить на pinned `pnpm exec` в скрипте.
+
+### Что НЕ взято на ночь и почему
+
+- **TASK-21/22 (payout schemes + ведомость)** — продуктовое решение по тому, какие схемы поддержать в MVP. Лучше с фидбеком от первых бетеров.
+- **TASK-23 (полная аналитика P&L + heatmap)** — XL, требует обсуждения какие именно срезы показывать. Базовая агрегация (revenue с tips) сделана как побочный продукт TASK-24.
+- **Apple Sign In** — нет аккаунта Apple Developer ($99/год), отложили.
+- **Stripe coupon для бетеров** + **юр-доки** — владелец явно сказал отложить (#1 и #2 в утреннем плане).
+
+### Что в долге для утра — см. `MORNING_TODO.md`
+
+Главное:
+
+1. Зарегистрировать pg_cron schedule для `process-recurring-expenses` (нужен `FUNCTION_INTERNAL_SECRET` в database setting).
+2. Прокликать руками: фото чека (полный путь — upload + просмотр в новой сессии), GDPR-экспорт (открыть ZIP, проверить CSV), tip/discount в визите → дашборд.
+3. Закрыть #1 (Stripe coupon) и #2 (юр-доки) когда будут силы.
