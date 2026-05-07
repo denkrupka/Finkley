@@ -21,7 +21,7 @@ import {
 } from '@/hooks/useExpenses'
 import { BudgetsCard } from './BudgetsCard'
 import { useSalon } from '@/hooks/useSalons'
-import { getDatePeriodRange, type PeriodKey } from '@/lib/period'
+import { getDatePeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { ExpenseFormModal } from './ExpenseFormModal'
@@ -42,7 +42,7 @@ export function ExpensesPage() {
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
   const period = (params.get('period') ?? 'month') as PeriodKey
-  const range = getDatePeriodRange(period)
+  const range = getDatePeriodRange(period, new Date(), readCustomFromParams(params))
 
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)

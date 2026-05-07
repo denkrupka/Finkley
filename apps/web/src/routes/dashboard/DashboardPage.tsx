@@ -11,7 +11,7 @@ import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
 import { useVisits, type PaymentMethod } from '@/hooks/useVisits'
-import { getPeriodRange, type PeriodKey } from '@/lib/period'
+import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDate } from '@/lib/utils/format-date'
@@ -31,7 +31,7 @@ export function DashboardPage() {
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
   const period = (params.get('period') ?? 'month') as PeriodKey
-  const range = getPeriodRange(period)
+  const range = getPeriodRange(period, new Date(), readCustomFromParams(params))
 
   const { user } = useAuth()
   const { data: salon } = useSalon(salonId)

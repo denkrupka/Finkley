@@ -37,11 +37,11 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Mobile: на полную ширину viewport минус 1rem полей. От sm и больше —
-        // фиксированные 420px. Раньше `w-[420px] max-w-[calc(100vw-2rem)]` иногда
-        // распирал контейнер за viewport на узких мобильных Safari (известная
-        // проблема с calc + scrollbar), приводя к обрезанию форм.
-        'bg-card shadow-finxl fixed left-1/2 top-1/2 z-50 grid w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl sm:w-[420px]',
+        // Mobile: full viewport minus 1rem padding. От sm и больше — 420px.
+        // max-h-100dvh + grid-rows-[auto_minmax(0,1fr)_auto] чтобы form
+        // в середине прокручивался вертикально, не выпирая за viewport.
+        // overflow-x-hidden чтобы внутренние inputs/grids не распирали диалог.
+        'bg-card shadow-finxl fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden overflow-y-hidden rounded-xl sm:max-h-[calc(100dvh-2rem)] sm:w-[420px] sm:max-w-[420px]',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
         className,
       )}

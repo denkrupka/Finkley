@@ -1,12 +1,9 @@
-import { Calculator, ChevronDown, ChevronRight, Layers, Pencil, Trash2 } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button'
-
-import { BulkVisitsDialog } from './BulkVisitsDialog'
 import { EditVisitModal } from './EditVisitModal'
 
 import {
@@ -21,7 +18,7 @@ import { useDeleteVisit, useVisits, type PaymentMethod, type VisitRow } from '@/
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
-import { getPeriodRange, type PeriodKey } from '@/lib/period'
+import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDayHeading, groupByDay } from '@/lib/utils/format-date'
@@ -48,7 +45,7 @@ export function VisitsPage() {
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
 
-  const range = getPeriodRange(period)
+  const range = getPeriodRange(period, new Date(), readCustomFromParams(params))
   const { data: salon } = useSalon(salonId)
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
@@ -62,7 +59,6 @@ export function VisitsPage() {
     paymentMethod: paymentFilter || null,
   })
   const deleteVisit = useDeleteVisit(salonId)
-  const [bulkOpen, setBulkOpen] = useState(false)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
@@ -91,28 +87,15 @@ export function VisitsPage() {
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       {/* Header */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div>
-          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t('visits.subtitle_total', {
-              count: visits.length,
-              revenue: formatCurrency(totalRevenue, currency),
-            })}
-          </p>
-        </div>
-        <Button variant="outline" size="md" onClick={() => setBulkOpen(true)}>
-          <Layers className="size-4" strokeWidth={1.7} />
-          {t('visits.bulk_button')}
-        </Button>
+      <div className="mb-5">
+        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t('visits.subtitle_total', {
+            count: visits.length,
+            revenue: formatCurrency(totalRevenue, currency),
+          })}
+        </p>
       </div>
-
-      <BulkVisitsDialog
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-        salonId={salonId}
-        currency={currency}
-      />
 
       <EditVisitModal
         visit={editingVisit}
@@ -507,18 +490,17 @@ function GroupRow({
                   </span>
                 </span>
                 <span className="text-foreground/80 hidden truncate text-sm sm:inline">
-                  {svc?.name ?? v.service_name_snapshot ?? '—'} —{' '}
-                  <span className="num text-brand-sage font-semibold">
-                    {formatCurrency(v.amount_cents, currency)}
-                  </span>
+                  {svc?.name ?? v.service_name_snapshot ?? '—'}
                 </span>
                 <span className="hidden sm:inline" />
                 <span
                   className={cn(
-                    'num text-foreground/70 hidden text-right text-sm sm:inline',
+                    'num text-brand-sage text-right text-sm font-semibold',
                     'col-start-3 sm:col-auto',
                   )}
-                />
+                >
+                  +{formatCurrency(v.amount_cents, currency)}
+                </span>
                 {v.status === 'pending' ? (
                   <span className="hidden rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 sm:inline-flex">
                     {t('visits.status_pending')}

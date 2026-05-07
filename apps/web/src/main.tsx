@@ -58,6 +58,21 @@ const queryClient = new QueryClient({
   },
 })
 
+// SPA fallback unwrap: если попали через 404.html → /app/?p=<encoded>,
+// разворачиваем обратно в нормальный URL до того как BrowserRouter
+// прочитает location. Без этого юзер видит корень вместо целевого роута.
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search)
+  const p = params.get('p')
+  if (p) {
+    params.delete('p')
+    const rest = params.toString()
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const newUrl = `${base}/${p}${rest ? '?' + rest : ''}${window.location.hash}`
+    window.history.replaceState(null, '', newUrl)
+  }
+}
+
 // PWA service worker. Регистрация только в проде — в dev SW мешает HMR.
 // Скоп = base path (`/app/`), путь до sw.js — относительно корня.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
