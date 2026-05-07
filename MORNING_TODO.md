@@ -26,28 +26,16 @@ E2E suite: 10/10 chromium tests зелёные.
 
 ## ⚠️ Действия от владельца — приоритет 1
 
-### 1. Положить FUNCTION_INTERNAL_SECRET в Vault (1 минута) — ЕДИНСТВЕННОЕ что нужно
+### 1. Cron повторяющихся расходов — СДЕЛАНО ПОЛНОСТЬЮ ✅
 
-Регистрацию cron-job я перенёс в миграцию `20260507000004_recurring_expenses_cron.sql` — она применится автоматически следующим деплоем. Ещё в `deploy-supabase.yml` добавил `process-recurring-expenses` в `NO_JWT_FUNCTIONS`, иначе платформа Supabase резала бы вызовы из cron до самой функции.
+Логика переписана из edge-function в чистый SQL (миграция `20260507000007_recurring_expenses_native_sql.sql`). Cron теперь зовёт `public.process_recurring_expenses()` напрямую через `cron.schedule` — никаких HTTP-вызовов, никаких секретов. Edge-function `/process-recurring-expenses` оставлена как ручной trigger для отладки, но больше не на критическом пути.
 
-Что ОСТАЛОСЬ сделать тебе (один раз, после деплоя): открой Supabase Dashboard → SQL Editor и выполни:
-
-```sql
-select vault.create_secret(
-  '<значение FUNCTION_INTERNAL_SECRET из Dashboard → Edge Functions → Secrets>',
-  'function_internal_secret'
-);
-```
-
-Где взять значение: Dashboard → Project Settings → Edge Functions → Secrets → `FUNCTION_INTERNAL_SECRET` → Reveal.
-
-Проверить что cron зарегистрирован:
+Проверка после следующего деплоя (опционально):
 
 ```sql
-select jobname, schedule from cron.job where jobname = 'process-recurring-expenses';
+select jobname, schedule, command from cron.job where jobname = 'process-recurring-expenses';
+-- Должно быть: schedule='0 3 * * *', command='select public.process_recurring_expenses();'
 ```
-
-Должна быть строка со `schedule = '0 3 * * *'`. До того как секрет появится в Vault, cron будет стартовать но получать 401 от функции — это ОК, никаких side-effects.
 
 ### 2. Прокликать новые фичи руками (15 минут) — ОТЛОЖЕНО
 
