@@ -33,6 +33,7 @@ const ALLOWED_CHAT_ID = Deno.env.get('TELEGRAM_BUG_CHAT_ID') ?? ''
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
 
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
+const BOT_ID = BOT_TOKEN.split(':')[0] // первая часть токена = numeric id бота
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -202,6 +203,54 @@ async function analyzeScreenshot(bytes: Uint8Array, mime: string): Promise<strin
   }
 }
 
+async function recategorizeWithCorrection(
+  original: string,
+  prevSummary: string,
+  correction: string,
+): Promise<{ severity?: string; area?: string; summary?: string; steps?: string } | null> {
+  if (!ANTHROPIC_KEY) return null
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        system: `Ты помогаешь разработчику разбирать баг-репорты в Finkley (учёт салонов).
+Юзер поправил твоё прежнее понимание бага. Перевыдай summary с учётом коррекции.
+
+Возвращай ТОЛЬКО JSON:
+{
+  "severity": "low|medium|high|critical",
+  "area": "visits|expenses|payouts|reports|auth|clients|staff|onboarding|billing|settings|import|other",
+  "summary": "<2-3 коротких предложения, по-человечески, для НЕтехнического человека: что не работает + что чинить. Учти коррекцию юзера.>",
+  "steps": ""
+}`,
+        messages: [
+          {
+            role: 'user',
+            content: `Оригинальный баг-репорт:\n${original}\n\nМоё прежнее понимание (которое юзер исправил):\n${prevSummary}\n\nКоррекция от юзера:\n${correction}\n\nДай новый summary с учётом коррекции.`,
+          },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const block = data.content?.[0]
+    if (block?.type !== 'text') return null
+    const match = (block.text as string).match(/\{[\s\S]*\}/)
+    if (!match) return null
+    return JSON.parse(match[0])
+  } catch (e) {
+    console.warn('recategorizeWithCorrection', e)
+    return null
+  }
+}
+
 async function categorizeText(
   text: string,
 ): Promise<{ severity?: string; area?: string; summary?: string; steps?: string }> {
@@ -216,9 +265,16 @@ async function categorizeText(
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        system:
-          'Категоризатор баг-репортов в Finkley (учёт салонов). Возвращай ТОЛЬКО JSON: {"severity":"low|medium|high|critical","area":"visits|expenses|payouts|reports|auth|clients|staff|onboarding|billing|settings|import|other","summary":"<1-2 предл>","steps":"<шаги если упомянуты>"}',
+        max_tokens: 500,
+        system: `Ты помогаешь разработчику разбирать баг-репорты в Finkley (web-приложение учёта салонов).
+
+Возвращай ТОЛЬКО JSON со структурой:
+{
+  "severity": "low" | "medium" | "high" | "critical",
+  "area": "visits" | "expenses" | "payouts" | "reports" | "auth" | "clients" | "staff" | "onboarding" | "billing" | "settings" | "import" | "other",
+  "summary": "<2-3 коротких предложения, естественным разговорным языком, для НЕтехнического человека: что увидел юзер + что я думаю надо починить. Без жаргона, без 'event handler', без 'render', без 'state'. Просто на русском. Пример: 'Юзер не может добавить визит — кнопка не работает. Похоже, форма не реагирует на нажатие. Надо проверить почему сабмит не срабатывает.'>",
+  "steps": "<если упомянуты шаги воспроизведения — короткий список через ; иначе пусто>"
+}`,
         messages: [{ role: 'user', content: text }],
       }),
     })
@@ -317,6 +373,81 @@ async function cmdDone(
   await tgSend(chatId, `✅ Закрыл \`${shortId(data[0]!.id)}\``, { threadId })
 }
 
+/**
+ * Юзер ответил на сообщение бота (например, на ack «🐛 Записал …»). Парсим
+ * short_id из бот-сообщения, считаем что юзер поправляет/уточняет понимание
+ * бага. Вызываем AI пересчитать summary с учётом коррекции и обновляем БД.
+ */
+async function handleCorrection(
+  admin: ReturnType<typeof createClient>,
+  msg: TgMessage,
+  correctionText: string,
+  threadId?: number,
+): Promise<boolean> {
+  const botText = msg.reply_to_message?.text ?? ''
+  // Бот в ack использует `<short_id>` в backticks — парсим
+  const idMatch = botText.match(/`([0-9a-f]{8})`/i)
+  if (!idMatch) return false // не consumed → handleMessage продолжит обычный flow
+  const shortIdVal = idMatch[1]!.toLowerCase()
+
+  const { data: bug, error: findErr } = await admin
+    .from('bug_reports')
+    .select('id, message_text, ai_summary, attachments, sender_first_name, notes')
+    .like('id', `${shortIdVal}%`)
+    .limit(2)
+  if (findErr || !bug || bug.length === 0) {
+    await tgSend(msg.chat.id, `Не нашёл \`${shortIdVal}\` в БД`, { threadId })
+    return true
+  }
+  if (bug.length > 1) {
+    await tgSend(msg.chat.id, `Несколько багов с id \`${shortIdVal}\` — уточни длиннее`, {
+      threadId,
+    })
+    return true
+  }
+  const row = bug[0]! as {
+    id: string
+    message_text: string | null
+    ai_summary: string | null
+    attachments: Array<{ vision_summary?: string }>
+    sender_first_name: string | null
+    notes: string | null
+  }
+
+  // Собираем оригинальный контекст для AI
+  const visionSummaries = (row.attachments ?? [])
+    .map((a) => a.vision_summary)
+    .filter(Boolean)
+    .join('\n')
+  const original = [row.message_text, visionSummaries].filter(Boolean).join('\n\n')
+
+  const recat = await recategorizeWithCorrection(
+    original || '(без оригинального текста, только скриншот)',
+    row.ai_summary || '(пустое)',
+    correctionText,
+  )
+
+  // Аппендим коррекцию в notes для истории
+  const correctionNote = `Коррекция (${msg.from?.first_name ?? '?'}): ${correctionText}`
+  const newNotes = row.notes ? `${row.notes}\n---\n${correctionNote}` : correctionNote
+
+  const updates: Record<string, unknown> = { notes: newNotes }
+  if (recat) {
+    if (recat.summary) updates.ai_summary = recat.summary
+    if (recat.severity) updates.severity = recat.severity
+    if (recat.area) updates.area = recat.area
+    updates.ai_categorized_at = new Date().toISOString()
+  }
+
+  await admin.from('bug_reports').update(updates).eq('id', row.id)
+
+  const ackText = recat?.summary
+    ? `🔄 \`${shortId(row.id)}\`\n\n${recat.summary}`
+    : `📝 \`${shortId(row.id)}\` — коррекция учтена`
+  await tgSend(msg.chat.id, ackText, { replyTo: msg.message_id, threadId })
+  return true
+}
+
 async function cmdNote(
   admin: ReturnType<typeof createClient>,
   chatId: number,
@@ -377,6 +508,19 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
 
   const text = (msg.text ?? msg.caption ?? '').trim()
   const threadId = msg.message_thread_id
+
+  // Реплай на сообщение бота? Это либо коррекция понимания (если в боте есть
+  // short_id в backticks), либо обычный новый баг (если реплай на /help, /list).
+  if (
+    msg.reply_to_message &&
+    msg.reply_to_message.from?.id === Number(BOT_ID) &&
+    text &&
+    !text.startsWith('/')
+  ) {
+    const consumed = await handleCorrection(admin, msg, text, threadId)
+    if (consumed) return
+    // не нашли short_id в боте → продолжаем как новый баг
+  }
 
   // Команды
   if (text.startsWith('/')) {
@@ -455,15 +599,10 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     return
   }
 
-  // Подтверждаем reply'ем в том же топике
-  const ack = [
-    `🐛 Записал \`${shortId(data!.id)}\``,
-    cat.severity ? `*Severity:* ${cat.severity}` : null,
-    cat.area ? `*Area:* ${cat.area}` : null,
-    visionSummary ? `📸 ${visionSummary}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n')
+  // Подтверждаем reply'ем в том же топике. Главное — человекопонятная сводка:
+  // что я понял + что починить. Severity/area идут в /list и БД, в ack не лезут.
+  const humanSummary = cat.summary || visionSummary || null
+  const ack = [`🐛 \`${shortId(data!.id)}\``, humanSummary].filter(Boolean).join('\n\n')
   await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
 }
 
