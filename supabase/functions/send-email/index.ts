@@ -22,12 +22,7 @@
  */
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import {
-  ALLOWED_TEMPLATES,
-  render,
-  TEMPLATES,
-  type TemplateAlias,
-} from './templates.ts'
+import { ALLOWED_TEMPLATES, render, TEMPLATES, type TemplateAlias } from './templates.ts'
 
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Finkley <info@finkley.app>'

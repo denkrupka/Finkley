@@ -27,9 +27,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
       // Чистим старые версии кэша
-      caches.keys().then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
-      ),
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
+        ),
       self.clients.claim(),
     ]),
   )
@@ -52,7 +54,10 @@ self.addEventListener('fetch', (event) => {
           // Обновляем кэш shell на лету
           if (response.ok) {
             const copy = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL, copy)).catch(() => undefined)
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(APP_SHELL, copy))
+              .catch(() => undefined)
           }
           return response
         })
@@ -69,7 +74,10 @@ self.addEventListener('fetch', (event) => {
         return fetch(req).then((response) => {
           if (response.ok) {
             const copy = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => undefined)
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(req, copy))
+              .catch(() => undefined)
           }
           return response
         })
