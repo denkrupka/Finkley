@@ -490,6 +490,24 @@ async function syncVisits(
 ): Promise<void> {
   const caches = await buildCaches(admin, salonId)
 
+  // Bulk-load уже импортированных visits.external_id → можно пропустить
+  // тяжёлый GET /appointments/{uid} если ВСЕ subbookings уже в БД.
+  const { data: existingVisits } = await admin
+    .from('visits')
+    .select('external_id')
+    .eq('salon_id', salonId)
+    .eq('source', 'booksy')
+    .is('deleted_at', null)
+  const existingExternalIds = new Set<string>()
+  for (const r of existingVisits ?? []) {
+    if (r.external_id) existingExternalIds.add(r.external_id)
+  }
+
+  // Timeout-safe budget: edge function умирает через 60s, режемся пораньше.
+  // Если не уложились — следующий cron-tick (через 2-60 мин) добъёт остаток.
+  const startTs = Date.now()
+  const BUDGET_MS = 45_000
+
   // Период: 60 дней назад .. 60 дней вперёд (для прогноза)
   const now = new Date()
   const start = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -526,6 +544,16 @@ async function syncVisits(
   //    Так выручка по услугам считается корректно, а multi-service записи видны
   //    в списке как несколько строк (мастер/услуга/сумма у каждой свои).
   for (const [apptUid, bookings] of apptUidToBookings) {
+    if (Date.now() - startTs > BUDGET_MS) {
+      console.warn(`sync budget reached, deferring rest to next tick`)
+      break
+    }
+
+    // Если ВСЕ booking.id (= subbooking.id) этого appointment уже в БД —
+    // пропускаем тяжёлый detail-fetch. Огромный выигрыш на повторном синке.
+    const allKnown = bookings.every((b) => existingExternalIds.has(`subbk:${b.id}`))
+    if (allKnown) continue
+
     const detailRes = await booksyGet<AppointmentDetail>(
       `/me/businesses/${businessId}/appointments/${apptUid}/`,
       accessToken,
@@ -629,15 +657,10 @@ async function syncVisits(
     // Создаём visit per subbooking
     for (let i = 0; i < list.length; i++) {
       const sub = list[i]
+      if (!sub) continue
       const externalId = `subbk:${sub.id}`
-      const { data: existing } = await admin
-        .from('visits')
-        .select('id')
-        .eq('salon_id', salonId)
-        .eq('source', 'booksy')
-        .eq('external_id', externalId)
-        .maybeSingle()
-      if (existing) continue
+      // Используем bulk-loaded set вместо отдельного запроса в БД (быстрее)
+      if (existingExternalIds.has(externalId)) continue
 
       const stafferId = sub.staffer_id ?? bookings[0].resources?.[0]?.id ?? null
       const staffId = stafferId ? (caches.staffByExtId.get(String(stafferId)) ?? null) : null
@@ -687,7 +710,10 @@ async function syncVisits(
         },
         { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
       )
-      if (!error) stats.visits_synced++
+      if (!error) {
+        existingExternalIds.add(externalId)
+        stats.visits_synced++
+      }
     }
   }
 }
