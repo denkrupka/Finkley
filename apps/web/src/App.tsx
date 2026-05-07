@@ -59,6 +59,9 @@ const ReportsPage = lazy(() =>
 const ImportPage = lazy(() =>
   import('@/routes/settings/import/ImportPage').then((m) => ({ default: m.ImportPage })),
 )
+const IntegrationsPage = lazy(() =>
+  import('@/routes/integrations/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage })),
+)
 const SettingsPage = lazy(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
@@ -132,6 +135,7 @@ function App() {
         <Route path="ai" element={<AIPage />} />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
+        <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
 

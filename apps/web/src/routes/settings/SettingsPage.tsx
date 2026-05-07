@@ -1,4 +1,4 @@
-import { Download, Mail, Upload } from 'lucide-react'
+import { Download, Mail, Plug, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -314,6 +314,29 @@ export function SettingsPage() {
           >
             <Mail className="size-4" strokeWidth={1.7} />
             {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
+          </Button>
+        </div>
+      </section>
+
+      {/* Интеграции */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.integrations.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {t('settings.integrations.subtitle')}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => navigate(`/${salonId}/settings/integrations`)}
+            data-testid="settings-integrations"
+          >
+            <Plug className="size-4" strokeWidth={1.7} />
+            {t('settings.integrations.button')}
           </Button>
         </div>
       </section>
