@@ -362,7 +362,11 @@ async function buildCaches(admin: SupabaseClient, salonId: string): Promise<Cach
 
 /**
  * Маппинг Booksy payment_type_code → наш payment_method enum.
- * Booksy: cash, credit_card, tap_to_pay, split, egift_card, blik, transfer.
+ * Booksy реально отдаёт: cash, credit_card, tap_to_pay, split, egift_card,
+ * blik, terminal_card, prepayment. 'transfer' Booksy НЕ использует —
+ * банковские переводы там не пробивают. Поэтому мы 'transfer' не выставляем
+ * автоматически из Booksy: всё нераспознанное → 'cash' (default для PL).
+ *
  * Наш enum: 'cash', 'card', 'transfer', 'online', 'mixed'.
  */
 function mapPaymentMethod(code?: string | null): 'cash' | 'card' | 'transfer' | 'online' | 'mixed' {
@@ -371,15 +375,16 @@ function mapPaymentMethod(code?: string | null): 'cash' | 'card' | 'transfer' | 
       return 'cash'
     case 'credit_card':
     case 'tap_to_pay':
+    case 'terminal_card':
       return 'card'
     case 'split':
       return 'mixed'
     case 'egift_card':
     case 'blik':
+    case 'prepayment':
       return 'online'
-    case 'transfer':
-      return 'transfer'
     default:
+      if (code) console.warn(`unknown booksy payment_type_code: ${code}, falling back to cash`)
       return 'cash'
   }
 }
@@ -557,21 +562,25 @@ async function syncVisits(
     let clientId = caches.clientByExtId.get(clientExtId) ?? null
     if (!clientId) {
       const profile = detailRes.data.customer?.customer_profile
-      const fullName = profile?.full_name?.trim() || customer.name || 'Booksy client'
+      const name = profile?.full_name?.trim() || customer.name || 'Booksy client'
       const phone = profile?.cell_phone?.trim() || customer.phone || null
       const email = profile?.email?.trim() || null
-      const { data: newClient } = await admin
+      const { data: newClient, error: insErr } = await admin
         .from('clients')
         .insert({
           salon_id: salonId,
-          full_name: fullName,
+          name,
           phone,
           email,
+          source: 'booksy',
           external_source: 'booksy',
           external_id: clientExtId,
         })
         .select('id')
         .single()
+      if (insErr) {
+        console.warn(`client insert failed for ext=${clientExtId}:`, insErr.message)
+      }
       if (newClient) {
         clientId = newClient.id
         caches.clientByExtId.set(clientExtId, clientId)

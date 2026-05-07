@@ -1,4 +1,4 @@
-import { Layers, Trash2 } from 'lucide-react'
+import { Layers, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
 import { BulkVisitsDialog } from './BulkVisitsDialog'
+import { EditVisitModal } from './EditVisitModal'
 
 import {
   Select,
@@ -15,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useDeleteVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
+import { useClients } from '@/hooks/useClients'
+import { useDeleteVisit, useVisits, type PaymentMethod, type VisitRow } from '@/hooks/useVisits'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
@@ -50,6 +52,7 @@ export function VisitsPage() {
   const { data: salon } = useSalon(salonId)
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
+  const { data: clients = [] } = useClients(salonId)
   const {
     data: visits = [],
     isLoading,
@@ -60,6 +63,7 @@ export function VisitsPage() {
   })
   const deleteVisit = useDeleteVisit(salonId)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
 
   function setFilter(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -96,6 +100,13 @@ export function VisitsPage() {
       <BulkVisitsDialog
         open={bulkOpen}
         onOpenChange={setBulkOpen}
+        salonId={salonId}
+        currency={currency}
+      />
+
+      <EditVisitModal
+        visit={editingVisit}
+        onClose={() => setEditingVisit(null)}
         salonId={salonId}
         currency={currency}
       />
@@ -162,17 +173,23 @@ export function VisitsPage() {
                 {items.map((v) => {
                   const staffMember = staff.find((s) => s.id === v.staff_id)
                   const svc = services.find((s) => s.id === v.service_id)
+                  const client = clients.find((c) => c.id === v.client_id)
                   const idx = staff.findIndex((s) => s.id === v.staff_id)
                   const color = idx >= 0 ? STAFF_PALETTE[idx % STAFF_PALETTE.length]! : '#E8E5DF'
                   const pay = PAY_LABEL[v.payment_method]
+                  const visitTime = new Date(v.visit_at).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
                   return (
                     <li
                       key={v.id}
-                      className="border-border grid grid-cols-[60px_1fr_auto_36px] items-center gap-3 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[80px_1.4fr_2fr_120px_120px_36px]"
+                      className="border-border grid grid-cols-[64px_1fr_auto_72px] items-center gap-3 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[90px_1.2fr_1.6fr_1.4fr_110px_100px_72px]"
                       data-testid="visit-row"
                     >
-                      <span className="num text-muted-foreground text-xs">
-                        {formatVisitDate(v.visit_at)}
+                      <span className="num text-muted-foreground flex flex-col text-xs leading-tight">
+                        <span>{formatVisitDate(v.visit_at)}</span>
+                        <span className="text-foreground/70">{visitTime}</span>
                       </span>
                       <span className="flex items-center gap-2.5">
                         <span
@@ -188,6 +205,9 @@ export function VisitsPage() {
                       <span className="text-foreground hidden truncate text-sm sm:inline">
                         {svc?.name ?? v.service_name_snapshot ?? '—'}
                       </span>
+                      <span className="text-muted-foreground hidden truncate text-sm sm:inline">
+                        {client?.name ?? '—'}
+                      </span>
                       <span
                         className={cn(
                           'num text-brand-sage text-right text-sm font-bold',
@@ -202,19 +222,30 @@ export function VisitsPage() {
                       >
                         {t(`payment_methods.${pay.label}`)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!confirm(t('visits.confirm_delete'))) return
-                          deleteVisit.mutate(v.id, {
-                            onSuccess: () => toast.success(t('visits.toast_deleted')),
-                          })
-                        }}
-                        className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                        aria-label="delete"
-                      >
-                        <Trash2 className="size-4" strokeWidth={1.7} />
-                      </button>
+                      <span className="flex items-center justify-end gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingVisit(v)}
+                          className="text-muted-foreground hover:text-secondary grid size-8 place-items-center rounded-md"
+                          aria-label={t('visits.edit_aria')}
+                          title={t('visits.edit_aria')}
+                        >
+                          <Pencil className="size-4" strokeWidth={1.7} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm(t('visits.confirm_delete'))) return
+                            deleteVisit.mutate(v.id, {
+                              onSuccess: () => toast.success(t('visits.toast_deleted')),
+                            })
+                          }}
+                          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+                          aria-label="delete"
+                        >
+                          <Trash2 className="size-4" strokeWidth={1.7} />
+                        </button>
+                      </span>
                     </li>
                   )
                 })}

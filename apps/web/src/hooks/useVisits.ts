@@ -137,6 +137,41 @@ export function useCreateVisit(salonId: string | undefined) {
   })
 }
 
+export type UpdateVisitInput = {
+  id: string
+  staff_id?: string | null
+  client_id?: string | null
+  service_id?: string | null
+  service_name_snapshot?: string | null
+  visit_at?: string
+  amount_cents?: number
+  tip_cents?: number
+  discount_cents?: number
+  payment_method?: PaymentMethod
+  comment?: string | null
+}
+
+export function useUpdateVisit(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: UpdateVisitInput) => {
+      const { id, ...patch } = input
+      const { data, error } = await supabase
+        .from('visits')
+        .update(patch)
+        .eq('id', id)
+        .select('*')
+        .single()
+      if (error) throw error
+      return data as VisitRow
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: visitsKeys(salonId) })
+      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    },
+  })
+}
+
 export function useDeleteVisit(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

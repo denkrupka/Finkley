@@ -251,6 +251,19 @@
       "toast_failed": "Не сохранилось: {{count}}"
     },
     "subtitle_total": "{{count}} визитов · {{revenue}}",
+    "edit_aria": "Редактировать визит",
+    "toast_updated": "Визит обновлён",
+    "edit": {
+      "title": "Редактировать визит",
+      "subtitle": "Поправь сумму, метод оплаты или комментарий — изменения применятся сразу.",
+      "amount_label": "Сумма ({{currency}})",
+      "payment_label": "Метод оплаты",
+      "tip_label": "Чаевые",
+      "discount_label": "Скидка",
+      "comment_label": "Комментарий",
+      "save": "Сохранить",
+      "saving": "Сохраняю…"
+    },
     "form": {
       "title_new": "Новый визит",
       "title_edit": "Редактировать визит",
