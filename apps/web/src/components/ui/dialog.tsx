@@ -37,7 +37,11 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'bg-card shadow-finxl fixed left-1/2 top-1/2 z-50 grid w-[420px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl',
+        // Mobile: на полную ширину viewport минус 1rem полей. От sm и больше —
+        // фиксированные 420px. Раньше `w-[420px] max-w-[calc(100vw-2rem)]` иногда
+        // распирал контейнер за viewport на узких мобильных Safari (известная
+        // проблема с calc + scrollbar), приводя к обрезанию форм.
+        'bg-card shadow-finxl fixed left-1/2 top-1/2 z-50 grid w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl sm:w-[420px]',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
         className,
       )}

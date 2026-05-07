@@ -10,10 +10,12 @@
 //
 // Env (читаются из apps/web/.env.local):
 //   VITE_SUPABASE_URL
-//   FUNCTION_INTERNAL_SECRET (preferred) — копия из Supabase Edge Function
-//                            secrets, используется как X-Finkley-Secret
-//   SUPABASE_SERVICE_ROLE_KEY (fallback) — нужен NEW формат (sb_secret_*),
-//                            старый legacy JWT не сработает
+// Auth (по приоритету):
+//   1) SUPABASE_SECRET_KEY (sb_secret_*) — новый формат, Supabase инжектит
+//      его же в env Edge Function как SUPABASE_SERVICE_ROLE_KEY
+//   2) FUNCTION_INTERNAL_SECRET — server-to-server секрет
+//   3) SUPABASE_SERVICE_ROLE_KEY (legacy JWT eyJ...) — fallback, может не
+//      работать после миграции на новый формат API keys
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,12 +44,13 @@ if (!shortId) {
 
 const env = readEnv()
 const url = env.VITE_SUPABASE_URL
-const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
+const secretKey = env.SUPABASE_SECRET_KEY // new sb_secret_* format
+const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY // legacy JWT
 const functionSecret = env.FUNCTION_INTERNAL_SECRET
 
 if (!url) throw new Error('VITE_SUPABASE_URL missing in .env.local')
-if (!functionSecret && !serviceKey) {
-  throw new Error('Need either FUNCTION_INTERNAL_SECRET or SUPABASE_SERVICE_ROLE_KEY')
+if (!secretKey && !functionSecret && !serviceKey) {
+  throw new Error('Need SUPABASE_SECRET_KEY, FUNCTION_INTERNAL_SECRET, or SUPABASE_SERVICE_ROLE_KEY')
 }
 
 let commitSha = commitArg
@@ -60,9 +63,11 @@ if (!commitSha) {
 }
 
 const endpoint = `${url}/functions/v1/telegram-bug-collector/announce-fix`
-const authHeaders = functionSecret
-  ? { 'X-Finkley-Secret': functionSecret }
-  : { Authorization: `Bearer ${serviceKey}` }
+const authHeaders = secretKey
+  ? { Authorization: `Bearer ${secretKey}` }
+  : functionSecret
+    ? { 'X-Finkley-Secret': functionSecret }
+    : { Authorization: `Bearer ${serviceKey}` }
 
 const res = await fetch(endpoint, {
   method: 'POST',
