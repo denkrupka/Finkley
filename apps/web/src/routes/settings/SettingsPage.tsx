@@ -26,6 +26,7 @@ import {
 import { useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
+import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
   COUNTRY_OPTIONS,
@@ -228,6 +229,19 @@ export function SettingsPage() {
               {update.isPending ? t('common.loading') : t('common.save')}
             </Button>
           </div>
+        </div>
+      </section>
+
+      {/* Установка приложения (PWA) */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.install.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.install.subtitle')}</p>
+          </div>
+          <InstallAppButton />
         </div>
       </section>
 
