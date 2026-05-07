@@ -1,11 +1,15 @@
-// Применяет supabase/migrations/*.sql на staging-проект через Management API.
-// Используется как обходной путь, если supabase CLI не понимает sbp_v0_ токен.
+// Применяет supabase/migrations/*.sql на prod ИЛИ staging через Management
+// API. Используется как обходной путь, если supabase CLI не понимает новый
+// формат токена sbp_v0_*.
 //
-// Run: node scripts/apply-migrations-staging.mjs
+// Run:
+//   node scripts/apply-migrations-staging.mjs            # → staging (default)
+//   node scripts/apply-migrations-staging.mjs prod       # → prod
 //
 // Required env (читаются из apps/web/.env.local):
 //   SUPABASE_ACCESS_TOKEN
-//   STAGING_PROJECT_REF (или вычисляется из VITE_SUPABASE_URL_TEST)
+//   VITE_SUPABASE_URL       (для prod)
+//   VITE_SUPABASE_URL_TEST  (для staging)
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,11 +31,13 @@ const env = readEnv()
 const TOKEN = env.SUPABASE_ACCESS_TOKEN
 if (!TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN missing in .env.local')
 
-const refMatch = (env.VITE_SUPABASE_URL_TEST ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)
-const REF = env.STAGING_PROJECT_REF ?? refMatch?.[1]
-if (!REF) throw new Error('Cannot resolve staging project ref')
+const target = (process.argv[2] ?? 'staging').toLowerCase()
+const urlVar = target === 'prod' ? 'VITE_SUPABASE_URL' : 'VITE_SUPABASE_URL_TEST'
+const refMatch = (env[urlVar] ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)
+const REF = refMatch?.[1]
+if (!REF) throw new Error(`Cannot resolve project ref from ${urlVar}`)
 
-console.log(`Target staging: ${REF}`)
+console.log(`Target ${target}: ${REF}`)
 
 async function exec(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {

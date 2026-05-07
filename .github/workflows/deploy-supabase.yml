@@ -19,43 +19,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # Деплоим через Supabase Management API напрямую — supabase CLI 2.98.2
+    # пока не понимает новый формат personal access token (sbp_v0_*).
+    # Когда CLI догонит — можно вернуть `supabase link` + `db push` + functions deploy.
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: 20
+          cache: pnpm
 
-      - name: Link project
+      - name: Apply migrations (Management API)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+          # Скрипт читает VITE_SUPABASE_URL из apps/web/.env.local; в CI задаём
+          # через временный env-файл по тому же пути для совместимости.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+        run: |
+          mkdir -p apps/web
+          {
+            echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
+            echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          } > apps/web/.env.local
+          node scripts/apply-migrations-staging.mjs prod
 
-      - name: Apply migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PROD_DB_PASSWORD }}
-        run: supabase db push --linked
-
-      - name: Deploy edge functions
+      - name: Deploy edge functions (Management API)
         if: hashFiles('supabase/functions/**') != ''
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
         run: |
-          # Деплоим все функции, для webhook'ов нужен --no-verify-jwt
-          # Список функций требующих --no-verify-jwt прописан явно для безопасности
-          # send-email вызывается из других функций (server-to-server), поэтому
-          # не требует verify-jwt от платформы — внутри функции проверяется
-          # совпадение Authorization-bearer с SUPABASE_SERVICE_ROLE_KEY.
+          # _shared/ — не отдельная функция, скрипт сам подтянет если функция импортит
           NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
             if echo "$NO_JWT_FUNCTIONS" | grep -qw "$name"; then
               echo "Deploying $name (no JWT verification)"
-              supabase functions deploy "$name" --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+              node scripts/deploy-edge-function.mjs "$name" --no-verify-jwt
             else
               echo "Deploying $name (with JWT verification)"
-              supabase functions deploy "$name" --project-ref ${{ secrets.SUPABASE_PROD_PROJECT_REF }}
+              node scripts/deploy-edge-function.mjs "$name"
             fi
           done
