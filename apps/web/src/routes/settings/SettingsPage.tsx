@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -247,6 +247,27 @@ export function SettingsPage() {
             </p>
           </div>
           <BillingButtons salonId={salonId} subscription={subscription ?? null} />
+        </div>
+      </section>
+
+      {/* Импорт данных */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.import.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.import.subtitle')}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => navigate(`/${salonId}/settings/import`)}
+            data-testid="settings-import"
+          >
+            <Upload className="size-4" strokeWidth={1.7} />
+            {t('settings.import.button')}
+          </Button>
         </div>
       </section>
 
