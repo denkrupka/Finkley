@@ -5,10 +5,12 @@ import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
+  BOOKSY_SYNC_INTERVAL_OPTIONS,
   useBooksySync,
   useClearBooksyVisits,
   useDisconnectIntegration,
   useSalonIntegrations,
+  useUpdateBooksyInterval,
   type IntegrationProvider,
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
@@ -92,6 +94,7 @@ function IntegrationCard({
   const sync = useBooksySync(salonId)
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
+  const updateInterval = useUpdateBooksyInterval(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
 
@@ -148,6 +151,35 @@ function IntegrationCard({
           ) : null}
           {connection.last_error ? (
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
+          ) : null}
+          {provider.id === 'booksy' ? (
+            <div className="border-border mt-2 flex items-center justify-between gap-2 border-t pt-2">
+              <label
+                htmlFor={`int-${provider.id}-interval`}
+                className="text-muted-foreground text-xs"
+              >
+                {t('integrations.auto_sync_every')}
+              </label>
+              <select
+                id={`int-${provider.id}-interval`}
+                value={connection.sync_interval_minutes}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  updateInterval.mutate(v, {
+                    onSuccess: () => toast.success(t('integrations.toast_interval_updated')),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                disabled={updateInterval.isPending}
+                className="border-input bg-background h-7 rounded-md border px-2 text-xs disabled:opacity-50"
+              >
+                {BOOKSY_SYNC_INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {t(opt.label_key)}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : null}
         </div>
       ) : (

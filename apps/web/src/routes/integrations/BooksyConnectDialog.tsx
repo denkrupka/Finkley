@@ -15,7 +15,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useBooksyLogin } from '@/hooks/useIntegrations'
+import {
+  BOOKSY_SYNC_INTERVAL_OPTIONS,
+  useBooksyLogin,
+  useUpdateBooksyInterval,
+} from '@/hooks/useIntegrations'
 import { BOOKSY_HCAPTCHA_SITEKEY, loadHCaptcha } from '@/lib/hcaptcha'
 
 /**
@@ -32,12 +36,14 @@ export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose:
   const { salonId } = useParams<{ salonId: string }>()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [interval, setInterval] = useState<number>(60)
   const [captchaReady, setCaptchaReady] = useState(false)
   const [captchaError, setCaptchaError] = useState<string | null>(null)
   const captchaContainerRef = useRef<HTMLDivElement | null>(null)
   const widgetIdRef = useRef<string | number | null>(null)
 
   const booksyLogin = useBooksyLogin(salonId)
+  const updateInterval = useUpdateBooksyInterval(salonId)
   const isPending = booksyLogin.isPending
 
   // Сброс полей при открытии/закрытии
@@ -45,6 +51,7 @@ export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose:
     if (!open) {
       setEmail('')
       setPassword('')
+      setInterval(60)
       setCaptchaError(null)
     }
   }, [open])
@@ -129,6 +136,8 @@ export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose:
       { email: email.trim(), password, captchaToken },
       {
         onSuccess: (res) => {
+          // После успешного login проставляем выбранный интервал
+          updateInterval.mutate(interval)
           toast.success(t('integrations.toast_connected', { name: res.business?.name ?? 'Booksy' }))
           onClose()
         },
@@ -183,6 +192,23 @@ export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose:
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="booksy-interval">{t('integrations.sync_interval_label')}</Label>
+            <select
+              id="booksy-interval"
+              value={interval}
+              onChange={(e) => setInterval(Number(e.target.value))}
+              className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+            >
+              {BOOKSY_SYNC_INTERVAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(opt.label_key)}
+                </option>
+              ))}
+            </select>
+            <p className="text-muted-foreground text-xs">{t('integrations.sync_interval_hint')}</p>
           </div>
 
           {/* Контейнер для invisible hCaptcha */}

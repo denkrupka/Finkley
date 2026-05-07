@@ -817,22 +817,18 @@ async function handleClearVisits(
   return jsonResponse({ ok: true, deleted: count ?? 0 })
 }
 
-async function handleSync(
+/** Общая логика синка (используется и для user-trigger, и для cron). */
+async function runSyncForSalon(
   admin: SupabaseClient,
-  userId: string,
   salonId: string,
-): Promise<Response> {
-  if (!(await ensureMember(admin, userId, salonId))) {
-    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
-  }
-
+): Promise<{ ok: true; stats: SyncStats } | { ok: false; status: number; message: string }> {
   const { data: integration } = await admin
     .from('salon_integrations')
     .select('credentials')
     .eq('salon_id', salonId)
     .eq('provider', 'booksy')
     .maybeSingle()
-  if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+  if (!integration) return { ok: false, status: 404, message: 'not_connected' }
 
   const creds = integration.credentials as { access_token: string; business_id: number }
 
@@ -846,7 +842,7 @@ async function handleSync(
       .update({ status: 'error', last_error: msg })
       .eq('salon_id', salonId)
       .eq('provider', 'booksy')
-    return jsonResponse({ ok: false, error: 'sync_failed', message: msg }, 502)
+    return { ok: false, status: 502, message: msg }
   }
 
   await admin
@@ -860,7 +856,69 @@ async function handleSync(
     .eq('salon_id', salonId)
     .eq('provider', 'booksy')
 
-  return jsonResponse({ ok: true, stats })
+  return { ok: true, stats }
+}
+
+async function handleSync(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const res = await runSyncForSalon(admin, salonId)
+  if (!res.ok) {
+    return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
+  }
+  return jsonResponse({ ok: true, stats: res.stats })
+}
+
+/** Cron-запуск синка с rendezvous-token (без user JWT). */
+async function handleCronSyncOne(
+  admin: SupabaseClient,
+  salonId: string,
+  token: string,
+): Promise<Response> {
+  // Валидируем + помечаем токен использованным атомарно
+  const { data: trig, error: trigErr } = await admin
+    .from('booksy_sync_triggers')
+    .update({ used_at: new Date().toISOString() })
+    .eq('token', token)
+    .eq('salon_id', salonId)
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('token')
+    .maybeSingle()
+  if (trigErr || !trig) {
+    return jsonResponse({ ok: false, error: 'invalid_or_expired_token' }, 401)
+  }
+  const res = await runSyncForSalon(admin, salonId)
+  if (!res.ok) {
+    return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
+  }
+  return jsonResponse({ ok: true, stats: res.stats })
+}
+
+async function handleUpdateInterval(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+  intervalMinutes: number,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 2 || intervalMinutes > 1440) {
+    return jsonResponse({ ok: false, error: 'invalid_interval' }, 400)
+  }
+  const { error } = await admin
+    .from('salon_integrations')
+    .update({ sync_interval_minutes: intervalMinutes })
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+  if (error) return jsonResponse({ ok: false, error: 'update_failed', message: error.message }, 500)
+  return jsonResponse({ ok: true })
 }
 
 // =============================================================================
@@ -874,6 +932,35 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
   }
 
+  let body: {
+    action?: string
+    salon_id?: string
+    email?: string
+    password?: string
+    captcha_token?: string
+    access_token?: string
+    token?: string
+    interval_minutes?: number
+  }
+  try {
+    body = await req.json()
+  } catch {
+    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+  }
+
+  if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
+
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  // Cron action: проверяем rendezvous-token, без user JWT
+  if (body.action === 'cron_sync_one') {
+    if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
+    return handleCronSyncOne(admin, body.salon_id, body.token)
+  }
+
+  // Все остальные actions требуют user JWT
   const authHeader = req.headers.get('Authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
     return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
@@ -889,26 +976,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
   }
   const userId = userRes.user.id
-
-  let body: {
-    action?: string
-    salon_id?: string
-    email?: string
-    password?: string
-    captcha_token?: string
-    access_token?: string
-  }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
-  }
-
-  if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
-
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   switch (body.action) {
     case 'login':
@@ -932,6 +999,11 @@ Deno.serve(async (req: Request) => {
       return handleSync(admin, userId, body.salon_id)
     case 'clear_visits':
       return handleClearVisits(admin, userId, body.salon_id)
+    case 'update_interval':
+      if (typeof body.interval_minutes !== 'number') {
+        return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
+      }
+      return handleUpdateInterval(admin, userId, body.salon_id, body.interval_minutes)
     default:
       return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
   }

@@ -18,7 +18,21 @@ export type SalonIntegrationPublic = {
   last_error: string | null
   connected_at: string
   updated_at: string
+  sync_interval_minutes: number
 }
+
+/** Доступные интервалы авто-синхронизации Booksy (минуты). */
+export const BOOKSY_SYNC_INTERVAL_OPTIONS: { value: number; label_key: string }[] = [
+  { value: 2, label_key: 'integrations.interval.2min' },
+  { value: 5, label_key: 'integrations.interval.5min' },
+  { value: 10, label_key: 'integrations.interval.10min' },
+  { value: 20, label_key: 'integrations.interval.20min' },
+  { value: 30, label_key: 'integrations.interval.30min' },
+  { value: 60, label_key: 'integrations.interval.1h' },
+  { value: 240, label_key: 'integrations.interval.4h' },
+  { value: 720, label_key: 'integrations.interval.12h' },
+  { value: 1440, label_key: 'integrations.interval.24h' },
+]
 
 type BooksyResponse<T> = {
   ok?: boolean
@@ -153,6 +167,30 @@ export function useBooksySync(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['staff', salonId] })
       qc.invalidateQueries({ queryKey: ['services', salonId] })
       qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
+  })
+}
+
+/** Изменить частоту автосинхронизации Booksy (в минутах). */
+export function useUpdateBooksyInterval(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (intervalMinutes: number) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: {
+          action: 'update_interval',
+          salon_id: salonId,
+          interval_minutes: intervalMinutes,
+        },
+      })
+      if (error) throw error
+      const json = data as { ok?: boolean; error?: string; message?: string }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'update_failed')
+      return intervalMinutes
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
     },
   })
 }
