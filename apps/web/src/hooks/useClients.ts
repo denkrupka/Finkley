@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
-import { normalizeSearchPhone } from '@/lib/utils/format-phone'
+import { normalizeSearchPhone } from '@/lib/utils/phone-search'
 
 export type ClientRow = {
   id: string

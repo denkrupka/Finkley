@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useParams } from 'react-router-dom'
 
@@ -9,12 +9,17 @@ import { useAuth } from '@/hooks/useAuth'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
-import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 import { BottomNav } from './BottomNav'
 import { FAB } from './FAB'
 import { PeriodToggle } from './PeriodToggle'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+
+// QuickEntryModal лениво — он тащит ClientPicker → libphonenumber-js (~80KB).
+// Юзеру нужен только когда он жмёт FAB; до этого момента грузить ни к чему.
+const QuickEntryModal = lazy(() =>
+  import('@/routes/visits/QuickEntryModal').then((m) => ({ default: m.QuickEntryModal })),
+)
 
 /**
  * Layout для всех salon-scoped роутов `/{salonId}/*`.
@@ -122,12 +127,16 @@ export function SalonLayout() {
       <FAB onClick={() => setQuickEntryOpen(true)} />
       <BottomNav salonId={salon.id} />
 
-      <QuickEntryModal
-        open={quickEntryOpen}
-        onOpenChange={setQuickEntryOpen}
-        salonId={salon.id}
-        currency={salon.currency}
-      />
+      {quickEntryOpen ? (
+        <Suspense fallback={null}>
+          <QuickEntryModal
+            open={quickEntryOpen}
+            onOpenChange={setQuickEntryOpen}
+            salonId={salon.id}
+            currency={salon.currency}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
