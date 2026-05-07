@@ -10,7 +10,10 @@
 //
 // Env (читаются из apps/web/.env.local):
 //   VITE_SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY  (используется для авторизации админ-вызова)
+//   FUNCTION_INTERNAL_SECRET (preferred) — копия из Supabase Edge Function
+//                            secrets, используется как X-Finkley-Secret
+//   SUPABASE_SERVICE_ROLE_KEY (fallback) — нужен NEW формат (sb_secret_*),
+//                            старый legacy JWT не сработает
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,9 +43,12 @@ if (!shortId) {
 const env = readEnv()
 const url = env.VITE_SUPABASE_URL
 const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
+const functionSecret = env.FUNCTION_INTERNAL_SECRET
 
 if (!url) throw new Error('VITE_SUPABASE_URL missing in .env.local')
-if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY missing in .env.local')
+if (!functionSecret && !serviceKey) {
+  throw new Error('Need either FUNCTION_INTERNAL_SECRET or SUPABASE_SERVICE_ROLE_KEY')
+}
 
 let commitSha = commitArg
 if (!commitSha) {
@@ -54,11 +60,15 @@ if (!commitSha) {
 }
 
 const endpoint = `${url}/functions/v1/telegram-bug-collector/announce-fix`
+const authHeaders = functionSecret
+  ? { 'X-Finkley-Secret': functionSecret }
+  : { Authorization: `Bearer ${serviceKey}` }
+
 const res = await fetch(endpoint, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${serviceKey}`,
+    ...authHeaders,
   },
   body: JSON.stringify({
     short_id: shortId,

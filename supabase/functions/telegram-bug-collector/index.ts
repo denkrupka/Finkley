@@ -742,14 +742,15 @@ const FUNCTION_INTERNAL_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
  * Body: { short_id, fix_description?, commit_sha? }
  */
 async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createClient>) {
-  // Auth: либо X-Finkley-Secret (server-to-server между функциями), либо
-  // Authorization: Bearer <service_role_key> (CLI вызовы от меня после фикса).
+  // Auth: либо X-Finkley-Secret (server-to-server между функциями, тот же
+  // FUNCTION_INTERNAL_SECRET что используют все internal вызовы), либо
+  // Authorization: Bearer <service_role_key>.
   const internalSecret = req.headers.get('x-finkley-secret') ?? ''
   const authBearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
-  const ok =
-    (FUNCTION_INTERNAL_SECRET && timingSafeEqual(internalSecret, FUNCTION_INTERNAL_SECRET)) ||
-    (SERVICE_KEY && timingSafeEqual(authBearer, SERVICE_KEY))
-  if (!ok) return jsonResponse({ error: 'unauthorized' }, 401)
+  const internalOk =
+    !!FUNCTION_INTERNAL_SECRET && timingSafeEqual(internalSecret, FUNCTION_INTERNAL_SECRET)
+  const bearerOk = !!SERVICE_KEY && timingSafeEqual(authBearer, SERVICE_KEY)
+  if (!internalOk && !bearerOk) return jsonResponse({ error: 'unauthorized' }, 401)
   let body: { short_id?: string; fix_description?: string; commit_sha?: string }
   try {
     body = await req.json()
