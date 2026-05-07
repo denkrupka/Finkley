@@ -623,6 +623,9 @@ async function syncVisits(
       }
     }
 
+    // group_key для multi-service записи — UI свернёт визиты в раскрывашку
+    const groupKey = list.length > 1 ? `booksy:appt:${apptUid}` : null
+
     // Создаём visit per subbooking
     for (let i = 0; i < list.length; i++) {
       const sub = list[i]
@@ -679,6 +682,7 @@ async function syncVisits(
           status: isPaid ? 'paid' : 'pending',
           source: 'booksy',
           external_id: externalId,
+          group_key: groupKey,
           comment: null,
         },
         { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },

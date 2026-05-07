@@ -20,6 +20,7 @@ export type VisitRow = {
   status: VisitStatus
   comment: string | null
   source: string
+  group_key: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -112,6 +113,7 @@ export function useCreateVisit(salonId: string | undefined) {
         status: 'paid',
         comment: input.comment ?? null,
         source: 'manual',
+        group_key: null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

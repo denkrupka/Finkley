@@ -254,6 +254,11 @@
     "edit_aria": "Редактировать визит",
     "charge_aria": "Рассчитать визит",
     "status_pending": "Не рассчитан",
+    "group_label_one": "{{count}} услуга в одной записи",
+    "group_label_few": "{{count}} услуги в одной записи",
+    "group_label_many": "{{count}} услуг в одной записи",
+    "group_label": "{{count}} услуг в одной записи",
+    "mixed_payments": "Разные методы",
     "toast_updated": "Визит обновлён",
     "toast_charged": "Визит рассчитан",
     "edit": {

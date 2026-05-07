@@ -1,4 +1,4 @@
-import { Calculator, Layers, Pencil, Trash2 } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronRight, Layers, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -64,6 +64,16 @@ export function VisitsPage() {
   const deleteVisit = useDeleteVisit(salonId)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   function setFilter(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -110,6 +120,7 @@ export function VisitsPage() {
         salonId={salonId}
         currency={currency}
       />
+      {null /* helpers below */}
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -170,106 +181,376 @@ export function VisitsPage() {
                 {formatVisitDayHeading(day + 'T00:00:00.000Z')}
               </h2>
               <ul className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
-                {items.map((v) => {
-                  const staffMember = staff.find((s) => s.id === v.staff_id)
-                  const svc = services.find((s) => s.id === v.service_id)
-                  const client = clients.find((c) => c.id === v.client_id)
-                  const idx = staff.findIndex((s) => s.id === v.staff_id)
-                  const color = idx >= 0 ? STAFF_PALETTE[idx % STAFF_PALETTE.length]! : '#E8E5DF'
-                  const pay = PAY_LABEL[v.payment_method]
-                  const visitTime = new Date(v.visit_at).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                  return (
-                    <li
-                      key={v.id}
-                      className="border-border grid grid-cols-[56px_1fr_auto_72px] items-center gap-3 border-t px-4 py-3 first:border-t-0 sm:grid-cols-[64px_1.2fr_1.5fr_1.3fr_110px_100px_72px]"
-                      data-testid="visit-row"
-                    >
-                      <span className="num text-muted-foreground text-xs">{visitTime}</span>
-                      <span className="flex items-center gap-2.5">
-                        <span
-                          className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
-                          style={{ background: color }}
-                        >
-                          {(staffMember?.full_name ?? '?').charAt(0).toUpperCase()}
-                        </span>
-                        <span className="text-foreground truncate text-sm font-medium">
-                          {staffMember?.full_name ?? t('visits.no_staff')}
-                        </span>
-                      </span>
-                      <span className="text-foreground hidden truncate text-sm sm:inline">
-                        {svc?.name ?? v.service_name_snapshot ?? '—'}
-                      </span>
-                      <span className="text-muted-foreground hidden truncate text-sm sm:inline">
-                        {client?.name ?? '—'}
-                      </span>
-                      <span
-                        className={cn(
-                          'num text-brand-sage text-right text-sm font-bold',
-                          'col-start-3 sm:col-auto',
-                        )}
-                      >
-                        +{formatCurrency(v.amount_cents, currency)}
-                      </span>
-                      {v.status === 'pending' ? (
-                        <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 sm:inline-flex">
-                          {t('visits.status_pending')}
-                        </span>
-                      ) : (
-                        <span
-                          className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
-                          style={{ background: pay.bg, color: pay.fg }}
-                        >
-                          {t(`payment_methods.${pay.label}`)}
-                        </span>
-                      )}
-                      <span className="flex items-center justify-end gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditingVisit(v)}
-                          className={cn(
-                            'grid size-8 place-items-center rounded-md',
-                            v.status === 'pending'
-                              ? 'text-secondary hover:bg-secondary/10'
-                              : 'text-muted-foreground hover:text-secondary',
-                          )}
-                          aria-label={
-                            v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
-                          }
-                          title={
-                            v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
-                          }
-                        >
-                          {v.status === 'pending' ? (
-                            <Calculator className="size-4" strokeWidth={1.9} />
-                          ) : (
-                            <Pencil className="size-4" strokeWidth={1.7} />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
+                {(() => {
+                  // Группируем визиты по group_key. Уникальные группы рендерятся
+                  // как раскрываемая строка; visits без group_key — обычная строка.
+                  type RenderGroup = { key: string; visits: VisitRow[] }
+                  const seen = new Set<string>()
+                  const rows: (VisitRow | RenderGroup)[] = []
+                  for (const v of items) {
+                    if (v.group_key) {
+                      if (seen.has(v.group_key)) continue
+                      seen.add(v.group_key)
+                      const groupVisits = items.filter((x) => x.group_key === v.group_key)
+                      rows.push({ key: v.group_key, visits: groupVisits })
+                    } else {
+                      rows.push(v)
+                    }
+                  }
+                  return rows.map((row) => {
+                    if ('visits' in row) {
+                      return (
+                        <GroupRow
+                          key={row.key}
+                          group={row}
+                          isExpanded={expandedGroups.has(row.key)}
+                          onToggle={() => toggleGroup(row.key)}
+                          onEdit={(v) => setEditingVisit(v)}
+                          onDelete={(id) => {
                             if (!confirm(t('visits.confirm_delete'))) return
-                            deleteVisit.mutate(v.id, {
+                            deleteVisit.mutate(id, {
                               onSuccess: () => toast.success(t('visits.toast_deleted')),
                             })
                           }}
-                          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                          aria-label="delete"
-                        >
-                          <Trash2 className="size-4" strokeWidth={1.7} />
-                        </button>
-                      </span>
-                    </li>
-                  )
-                })}
+                          staff={staff}
+                          services={services}
+                          clients={clients}
+                          currency={currency}
+                          t={t}
+                        />
+                      )
+                    }
+                    return (
+                      <SingleVisitRow
+                        key={row.id}
+                        visit={row}
+                        onEdit={() => setEditingVisit(row)}
+                        onDelete={() => {
+                          if (!confirm(t('visits.confirm_delete'))) return
+                          deleteVisit.mutate(row.id, {
+                            onSuccess: () => toast.success(t('visits.toast_deleted')),
+                          })
+                        }}
+                        staff={staff}
+                        services={services}
+                        clients={clients}
+                        currency={currency}
+                        t={t}
+                      />
+                    )
+                  })
+                })()}
               </ul>
             </section>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+// =============================================================================
+// Row components
+// =============================================================================
+
+type StaffLite = { id: string; full_name: string }
+type ServiceLite = { id: string; name: string }
+type ClientLite = { id: string; name: string }
+
+const ROW_GRID =
+  'grid grid-cols-[56px_1fr_auto_72px] items-center gap-3 px-4 py-3 sm:grid-cols-[64px_1.2fr_1.5fr_1.3fr_110px_100px_72px]'
+
+function visitTimeStr(visitAt: string): string {
+  return new Date(visitAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+function staffColor(staffId: string | null, staff: StaffLite[]): string {
+  const idx = staff.findIndex((s) => s.id === staffId)
+  return idx >= 0 ? STAFF_PALETTE[idx % STAFF_PALETTE.length]! : '#E8E5DF'
+}
+
+function SingleVisitRow({
+  visit: v,
+  onEdit,
+  onDelete,
+  staff,
+  services,
+  clients,
+  currency,
+  t,
+}: {
+  visit: VisitRow
+  onEdit: () => void
+  onDelete: () => void
+  staff: StaffLite[]
+  services: ServiceLite[]
+  clients: ClientLite[]
+  currency: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const staffMember = staff.find((s) => s.id === v.staff_id)
+  const svc = services.find((s) => s.id === v.service_id)
+  const client = clients.find((c) => c.id === v.client_id)
+  const color = staffColor(v.staff_id, staff)
+  const pay = PAY_LABEL[v.payment_method]
+  return (
+    <li className={cn('border-border border-t first:border-t-0', ROW_GRID)} data-testid="visit-row">
+      <span className="num text-muted-foreground text-xs">{visitTimeStr(v.visit_at)}</span>
+      <span className="flex items-center gap-2.5">
+        <span
+          className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
+          style={{ background: color }}
+        >
+          {(staffMember?.full_name ?? '?').charAt(0).toUpperCase()}
+        </span>
+        <span className="text-foreground truncate text-sm font-medium">
+          {staffMember?.full_name ?? t('visits.no_staff')}
+        </span>
+      </span>
+      <span className="text-foreground hidden truncate text-sm sm:inline">
+        {svc?.name ?? v.service_name_snapshot ?? '—'}
+      </span>
+      <span className="text-muted-foreground hidden truncate text-sm sm:inline">
+        {client?.name ?? '—'}
+      </span>
+      <span
+        className={cn(
+          'num text-brand-sage text-right text-sm font-bold',
+          'col-start-3 sm:col-auto',
+        )}
+      >
+        +{formatCurrency(v.amount_cents, currency)}
+      </span>
+      {v.status === 'pending' ? (
+        <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 sm:inline-flex">
+          {t('visits.status_pending')}
+        </span>
+      ) : (
+        <span
+          className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
+          style={{ background: pay.bg, color: pay.fg }}
+        >
+          {t(`payment_methods.${pay.label}`)}
+        </span>
+      )}
+      <span className="flex items-center justify-end gap-0.5">
+        <button
+          type="button"
+          onClick={onEdit}
+          className={cn(
+            'grid size-8 place-items-center rounded-md',
+            v.status === 'pending'
+              ? 'text-secondary hover:bg-secondary/10'
+              : 'text-muted-foreground hover:text-secondary',
+          )}
+          aria-label={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
+          title={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
+        >
+          {v.status === 'pending' ? (
+            <Calculator className="size-4" strokeWidth={1.9} />
+          ) : (
+            <Pencil className="size-4" strokeWidth={1.7} />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+          aria-label="delete"
+        >
+          <Trash2 className="size-4" strokeWidth={1.7} />
+        </button>
+      </span>
+    </li>
+  )
+}
+
+function GroupRow({
+  group,
+  isExpanded,
+  onToggle,
+  onEdit,
+  onDelete,
+  staff,
+  services,
+  clients,
+  currency,
+  t,
+}: {
+  group: { key: string; visits: VisitRow[] }
+  isExpanded: boolean
+  onToggle: () => void
+  onEdit: (v: VisitRow) => void
+  onDelete: (id: string) => void
+  staff: StaffLite[]
+  services: ServiceLite[]
+  clients: ClientLite[]
+  currency: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const visits = group.visits
+  const primary = visits[0]
+  if (!primary) return null
+  const totalAmount = visits.reduce((acc, v) => acc + v.amount_cents, 0)
+  const client = clients.find((c) => c.id === primary.client_id)
+  const allPaid = visits.every((v) => v.status === 'paid')
+  // Если все одного метода — показываем; иначе "Смешано"
+  const methods = new Set(visits.map((v) => v.payment_method))
+  const sharedPay = methods.size === 1 ? PAY_LABEL[primary.payment_method] : null
+
+  return (
+    <>
+      <li
+        className={cn(
+          'border-border hover:bg-muted/30 cursor-pointer border-t first:border-t-0',
+          ROW_GRID,
+        )}
+        onClick={onToggle}
+        data-testid="visit-group-row"
+      >
+        <span className="num text-muted-foreground flex items-center gap-1 text-xs">
+          {isExpanded ? (
+            <ChevronDown className="size-3.5" strokeWidth={2} />
+          ) : (
+            <ChevronRight className="size-3.5" strokeWidth={2} />
+          )}
+          {visitTimeStr(primary.visit_at)}
+        </span>
+        <span className="flex items-center gap-2.5">
+          <span className="border-secondary/50 text-secondary grid size-6 place-items-center rounded-full border-2 text-[10px] font-bold">
+            {visits.length}
+          </span>
+          <span className="text-foreground truncate text-sm font-semibold">
+            {t('visits.group_label', { count: visits.length })}
+          </span>
+        </span>
+        <span className="text-foreground hidden truncate text-sm sm:inline">
+          {visits
+            .map(
+              (v) =>
+                services.find((s) => s.id === v.service_id)?.name ?? v.service_name_snapshot ?? '—',
+            )
+            .join(' + ')}
+        </span>
+        <span className="text-muted-foreground hidden truncate text-sm sm:inline">
+          {client?.name ?? '—'}
+        </span>
+        <span
+          className={cn(
+            'num text-brand-sage text-right text-sm font-bold',
+            'col-start-3 sm:col-auto',
+          )}
+        >
+          +{formatCurrency(totalAmount, currency)}
+        </span>
+        {!allPaid ? (
+          <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 sm:inline-flex">
+            {t('visits.status_pending')}
+          </span>
+        ) : sharedPay ? (
+          <span
+            className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
+            style={{ background: sharedPay.bg, color: sharedPay.fg }}
+          >
+            {t(`payment_methods.${sharedPay.label}`)}
+          </span>
+        ) : (
+          <span className="bg-muted text-foreground hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex">
+            {t('visits.mixed_payments')}
+          </span>
+        )}
+        <span />
+      </li>
+      {isExpanded
+        ? visits.map((v) => {
+            const staffMember = staff.find((s) => s.id === v.staff_id)
+            const svc = services.find((s) => s.id === v.service_id)
+            const color = staffColor(v.staff_id, staff)
+            const pay = PAY_LABEL[v.payment_method]
+            return (
+              <li
+                key={v.id}
+                className={cn('bg-muted/20 border-border border-t', ROW_GRID, 'pl-10')}
+                data-testid="visit-subitem"
+              >
+                <span className="num text-muted-foreground text-xs">
+                  {visitTimeStr(v.visit_at)}
+                </span>
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
+                    style={{ background: color }}
+                  >
+                    {(staffMember?.full_name ?? '?').charAt(0).toUpperCase()}
+                  </span>
+                  <span className="text-foreground/80 truncate text-sm">
+                    {staffMember?.full_name ?? t('visits.no_staff')}
+                  </span>
+                </span>
+                <span className="text-foreground/80 hidden truncate text-sm sm:inline">
+                  {svc?.name ?? v.service_name_snapshot ?? '—'} —{' '}
+                  <span className="num text-brand-sage font-semibold">
+                    {formatCurrency(v.amount_cents, currency)}
+                  </span>
+                </span>
+                <span className="hidden sm:inline" />
+                <span
+                  className={cn(
+                    'num text-foreground/70 hidden text-right text-sm sm:inline',
+                    'col-start-3 sm:col-auto',
+                  )}
+                />
+                {v.status === 'pending' ? (
+                  <span className="hidden rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 sm:inline-flex">
+                    {t('visits.status_pending')}
+                  </span>
+                ) : (
+                  <span
+                    className="hidden rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline-flex"
+                    style={{ background: pay.bg, color: pay.fg }}
+                  >
+                    {t(`payment_methods.${pay.label}`)}
+                  </span>
+                )}
+                <span className="flex items-center justify-end gap-0.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEdit(v)
+                    }}
+                    className={cn(
+                      'grid size-8 place-items-center rounded-md',
+                      v.status === 'pending'
+                        ? 'text-secondary hover:bg-secondary/10'
+                        : 'text-muted-foreground hover:text-secondary',
+                    )}
+                    aria-label={
+                      v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
+                    }
+                  >
+                    {v.status === 'pending' ? (
+                      <Calculator className="size-4" strokeWidth={1.9} />
+                    ) : (
+                      <Pencil className="size-4" strokeWidth={1.7} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDelete(v.id)
+                    }}
+                    className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+                    aria-label="delete"
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.7} />
+                  </button>
+                </span>
+              </li>
+            )
+          })
+        : null}
+    </>
   )
 }
