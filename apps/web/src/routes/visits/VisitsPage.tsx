@@ -1,4 +1,4 @@
-import { Layers, Pencil, Trash2 } from 'lucide-react'
+import { Calculator, Layers, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -213,21 +213,40 @@ export function VisitsPage() {
                       >
                         +{formatCurrency(v.amount_cents, currency)}
                       </span>
-                      <span
-                        className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
-                        style={{ background: pay.bg, color: pay.fg }}
-                      >
-                        {t(`payment_methods.${pay.label}`)}
-                      </span>
+                      {v.status === 'pending' ? (
+                        <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 sm:inline-flex">
+                          {t('visits.status_pending')}
+                        </span>
+                      ) : (
+                        <span
+                          className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
+                          style={{ background: pay.bg, color: pay.fg }}
+                        >
+                          {t(`payment_methods.${pay.label}`)}
+                        </span>
+                      )}
                       <span className="flex items-center justify-end gap-0.5">
                         <button
                           type="button"
                           onClick={() => setEditingVisit(v)}
-                          className="text-muted-foreground hover:text-secondary grid size-8 place-items-center rounded-md"
-                          aria-label={t('visits.edit_aria')}
-                          title={t('visits.edit_aria')}
+                          className={cn(
+                            'grid size-8 place-items-center rounded-md',
+                            v.status === 'pending'
+                              ? 'text-secondary hover:bg-secondary/10'
+                              : 'text-muted-foreground hover:text-secondary',
+                          )}
+                          aria-label={
+                            v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
+                          }
+                          title={
+                            v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
+                          }
                         >
-                          <Pencil className="size-4" strokeWidth={1.7} />
+                          {v.status === 'pending' ? (
+                            <Calculator className="size-4" strokeWidth={1.9} />
+                          ) : (
+                            <Pencil className="size-4" strokeWidth={1.7} />
+                          )}
                         </button>
                         <button
                           type="button"

@@ -26,9 +26,13 @@ import { useUpdateVisit, type PaymentMethod, type VisitRow } from '@/hooks/useVi
 const PAYMENT_OPTIONS = ['cash', 'card', 'transfer', 'online', 'mixed'] as const
 
 /**
- * Минимальная форма редактирования визита: сумма, метод оплаты, чаевые,
- * скидка, комментарий. Дата/мастер/услуга/клиент — пока read-only;
- * для них юзер удаляет визит и создаёт заново через QuickEntry.
+ * Универсальная форма для двух сценариев:
+ *   - status='pending' — расчёт визита: юзер выбирает сумму+метод+tip,
+ *     при сохранении ставим status='paid' (визит «рассчитан»)
+ *   - status='paid' — редактирование: то же самое, но без смены статуса
+ *
+ * Дата/мастер/услуга/клиент — пока read-only; для них юзер удаляет визит
+ * и создаёт заново через QuickEntry.
  */
 export function EditVisitModal({
   visit,
@@ -66,6 +70,8 @@ export function EditVisitModal({
     return Number.isFinite(n) ? Math.round(n * 100) : 0
   }
 
+  const isPending = visit?.status === 'pending'
+
   function handleSubmit() {
     if (!visit) return
     const amountCents = parseMoney(amount)
@@ -81,10 +87,12 @@ export function EditVisitModal({
         discount_cents: parseMoney(discount),
         payment_method: paymentMethod,
         comment: comment.trim() || null,
+        // При расчёте pending → paid
+        ...(isPending ? { status: 'paid' as const } : {}),
       },
       {
         onSuccess: () => {
-          toast.success(t('visits.toast_updated'))
+          toast.success(isPending ? t('visits.toast_charged') : t('visits.toast_updated'))
           onClose()
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
@@ -96,8 +104,10 @@ export function EditVisitModal({
     <Dialog open={visit !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('visits.edit.title')}</DialogTitle>
-          <DialogDescription>{t('visits.edit.subtitle')}</DialogDescription>
+          <DialogTitle>{isPending ? t('visits.charge.title') : t('visits.edit.title')}</DialogTitle>
+          <DialogDescription>
+            {isPending ? t('visits.charge.subtitle') : t('visits.edit.subtitle')}
+          </DialogDescription>
         </DialogHeader>
 
         <form
@@ -181,6 +191,8 @@ export function EditVisitModal({
                 <Loader2 className="size-4 animate-spin" strokeWidth={2} />
                 {t('visits.edit.saving')}
               </>
+            ) : isPending ? (
+              t('visits.charge.save')
             ) : (
               t('visits.edit.save')
             )}

@@ -409,7 +409,7 @@ type AppointmentDetail = {
       id: number
       booked_from: string
       staffer_id?: number | null
-      service?: { name?: string }
+      service?: { name?: string; id?: number }
     }[]
     customer: { id: number; mode?: string }
   }
@@ -419,10 +419,17 @@ type AppointmentDetail = {
   }
 }
 
+type BasketItem = {
+  id: string
+  name_line_1?: string
+  total?: number // в копейках уже (basket items приходят в копейках!)
+}
+
 type BasketResponse = {
   result?: {
     total_elements?: { type: string; amount: { amount: number } }[]
     payments_summary?: { payment_type?: { code?: string } }
+    items?: BasketItem[]
   }
 }
 
@@ -515,19 +522,10 @@ async function syncVisits(
     }
   }
 
-  // 2) Для каждого уникального appointment_uid: GET detail → один visit
-  const nowTs = now.getTime()
+  // 2) Для каждого appointment: GET detail → создаём ОДИН visit per subbooking.
+  //    Так выручка по услугам считается корректно, а multi-service записи видны
+  //    в списке как несколько строк (мастер/услуга/сумма у каждой свои).
   for (const [apptUid, bookings] of apptUidToBookings) {
-    const externalId = `appt:${apptUid}`
-    const { data: existing } = await admin
-      .from('visits')
-      .select('id')
-      .eq('salon_id', salonId)
-      .eq('source', 'booksy')
-      .eq('external_id', externalId)
-      .maybeSingle()
-    if (existing) continue
-
     const detailRes = await booksyGet<AppointmentDetail>(
       `/me/businesses/${businessId}/appointments/${apptUid}/`,
       accessToken,
@@ -540,24 +538,9 @@ async function syncVisits(
     const customer = bookings[0].customer
     if (!customer?.id) continue
 
-    const isPaid = a.status === 'F' && a.basket_id
-    const visitAtTs = new Date(a.booked_from + ':00+02:00').getTime()
-    const isFuture = visitAtTs > nowTs
+    const isPaid = a.status === 'F' && !!a.basket_id
 
-    // Резолвим staff
-    let staffId: string | null = null
-    const stafferId = a.subbookings?.[0]?.staffer_id ?? bookings[0].resources?.[0]?.id ?? null
-    if (stafferId) staffId = caches.staffByExtId.get(String(stafferId)) ?? null
-
-    const subbookings = a.subbookings ?? []
-    const serviceNames = subbookings.length
-      ? subbookings.map((s) => s.service?.name ?? 'Service').filter(Boolean)
-      : [bookings[0].service?.name ?? 'Service']
-    const primaryServiceId = bookings[0].service?.id
-    const svc = primaryServiceId ? caches.serviceByExtId.get(String(primaryServiceId)) : undefined
-    const serviceId = svc?.id ?? null
-
-    // Find or create client
+    // Find or create client (один на appointment, общий для всех subbookings)
     const clientExtId = String(customer.id)
     let clientId = caches.clientByExtId.get(clientExtId) ?? null
     if (!clientId) {
@@ -587,76 +570,121 @@ async function syncVisits(
       }
     }
 
-    // Цена: для оплаченных — реальный total_value, иначе сумма default цен.
-    // Если default цены 0 (Booksy "Nie pokazuj") — пробуем dry_run чтобы хапнуть.
-    let amountCents: number
+    // Грузим basket (для оплаченных) — там реальные цены per-item, payment_method,
+    // tips. Делаем один раз на appointment, мапим items на subbookings по name.
+    let basketItems: BasketItem[] = []
     let paymentMethod: 'cash' | 'card' | 'transfer' | 'online' | 'mixed' = 'cash'
-    let discountCents = 0
-    let tipCents = 0
-
-    if (isPaid && typeof a.total_value === 'number' && a.total_value > 0) {
-      amountCents = Math.round(a.total_value * 100)
-      discountCents = Math.round((a.total_discount_amount ?? 0) * 100)
+    let totalTipCents = 0
+    let totalDiscountCents = 0
+    if (isPaid && a.basket_id) {
       paymentMethod = mapPaymentMethod(a.payment_info?.transaction_info?.payment_type_code)
-      // Чаевые из basket
-      if (a.basket_id) {
-        const basketRes = await booksyGet<BasketResponse>(
-          `/me/businesses/${businessId}/payments/baskets/${a.basket_id}`,
-          accessToken,
-        )
-        if (basketRes.ok) {
-          const tips = basketRes.data.result?.total_elements?.find((e) => e.type === 'tips')
-          if (tips?.amount?.amount) tipCents = tips.amount.amount
-        }
+      totalDiscountCents = Math.round((a.total_discount_amount ?? 0) * 100)
+      const basketRes = await booksyGet<BasketResponse>(
+        `/me/businesses/${businessId}/payments/baskets/${a.basket_id}`,
+        accessToken,
+      )
+      if (basketRes.ok) {
+        basketItems = basketRes.data.result?.items ?? []
+        const tips = basketRes.data.result?.total_elements?.find((e) => e.type === 'tips')
+        if (tips?.amount?.amount) totalTipCents = tips.amount.amount
       }
-    } else {
-      // Не оплачен в Booksy — fallback на default цены услуг
-      const subbkIds = subbookings.map((s) => s.id).filter((id): id is number => !!id)
-      let sumCents = subbookings.reduce((acc, s) => {
-        const sId = (s as { service?: { id?: number } }).service?.id
-        const cached = sId ? caches.serviceByExtId.get(String(sId)) : undefined
-        return acc + (cached?.price ?? 0)
-      }, 0)
-      // Если default цены 0 — спрашиваем у Booksy через dry_run
-      if (sumCents === 0 && subbkIds.length > 0) {
-        const dr = await dryRunForBookings(accessToken, businessId, subbkIds)
-        if (dr?.transaction?.rows) {
-          for (const row of dr.transaction.rows) {
-            if (typeof row.total === 'number') {
-              sumCents += Math.round(row.total * 100)
+    }
+
+    // Маппим subbookings → calendar bookings (по subbk.id == calendar booking.id)
+    // и → basket items (по имени услуги).
+    const subbookings = a.subbookings ?? []
+    const list = subbookings.length
+      ? subbookings
+      : bookings.map((b) => ({
+          id: b.id,
+          booked_from: b.booked_from,
+          staffer_id: b.resources?.[0]?.id ?? null,
+          service: { name: b.service?.name, id: b.service?.id },
+        }))
+
+    // dry_run для всех bookings разом, если default цены пустые
+    let dryRunByBookingId = new Map<number, number>() // booking_id → cents
+    if (!isPaid) {
+      const needDryRun = list.some((s) => {
+        const svcId = s.service?.id
+        const cached = svcId ? caches.serviceByExtId.get(String(svcId)) : undefined
+        return !cached || cached.price === 0
+      })
+      if (needDryRun) {
+        const ids = list.map((s) => s.id).filter((id): id is number => !!id)
+        if (ids.length > 0) {
+          const dr = await dryRunForBookings(accessToken, businessId, ids)
+          for (const row of dr?.transaction?.rows ?? []) {
+            if (typeof row.booking_id === 'number' && typeof row.total === 'number') {
+              dryRunByBookingId.set(row.booking_id, Math.round(row.total * 100))
             }
           }
         }
       }
-      amountCents = sumCents > 0 ? sumCents : (svc?.price ?? 0)
     }
 
-    const visitAt = new Date(visitAtTs).toISOString()
-    const serviceNameSnapshot = serviceNames.join(', ')
-    const visitStatus: 'paid' | 'pending' | 'cancelled' = isFuture ? 'pending' : 'paid'
-    const comment =
-      subbookings.length > 1 ? `Booksy: ${subbookings.length} услуг в одной записи` : null
+    // Создаём visit per subbooking
+    for (let i = 0; i < list.length; i++) {
+      const sub = list[i]
+      const externalId = `subbk:${sub.id}`
+      const { data: existing } = await admin
+        .from('visits')
+        .select('id')
+        .eq('salon_id', salonId)
+        .eq('source', 'booksy')
+        .eq('external_id', externalId)
+        .maybeSingle()
+      if (existing) continue
 
-    const { error } = await admin.from('visits').upsert(
-      {
-        salon_id: salonId,
-        staff_id: staffId,
-        client_id: clientId,
-        service_id: serviceId,
-        service_name_snapshot: serviceNameSnapshot,
-        visit_at: visitAt,
-        amount_cents: amountCents,
-        tip_cents: tipCents,
-        discount_cents: discountCents,
-        payment_method: paymentMethod,
-        status: visitStatus,
-        source: 'booksy',
-        external_id: externalId,
-        comment,
-      },
-      { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
-    )
-    if (!error) stats.visits_synced++
+      const stafferId = sub.staffer_id ?? bookings[0].resources?.[0]?.id ?? null
+      const staffId = stafferId ? (caches.staffByExtId.get(String(stafferId)) ?? null) : null
+      const svcExtId = sub.service?.id
+      const svcCached = svcExtId ? caches.serviceByExtId.get(String(svcExtId)) : undefined
+      const serviceId = svcCached?.id ?? null
+      const serviceName = sub.service?.name ?? 'Service'
+
+      // Цена: 1) basket item match by name, 2) dry_run, 3) default service price
+      let amountCents = 0
+      if (isPaid && basketItems.length) {
+        const item = basketItems.find((it) =>
+          (it.name_line_1 ?? '').toLowerCase().startsWith(serviceName.toLowerCase()),
+        )
+        if (item?.total) amountCents = item.total
+      }
+      if (amountCents === 0) {
+        amountCents = dryRunByBookingId.get(sub.id) ?? svcCached?.price ?? 0
+      }
+
+      // Time из subbooking (точнее чем appointment.booked_from)
+      const visitAtIso = new Date(sub.booked_from + ':00+02:00').toISOString()
+
+      // Tips/discount пишем только в первый subbooking (агрегатно), чтобы не
+      // дублировать в выручке. KPI считаются по визитам — один раз учтётся.
+      const isPrimary = i === 0
+      const tipForVisit = isPrimary ? totalTipCents : 0
+      const discountForVisit = isPrimary ? totalDiscountCents : 0
+
+      const { error } = await admin.from('visits').upsert(
+        {
+          salon_id: salonId,
+          staff_id: staffId,
+          client_id: clientId,
+          service_id: serviceId,
+          service_name_snapshot: serviceName,
+          visit_at: visitAtIso,
+          amount_cents: amountCents,
+          tip_cents: tipForVisit,
+          discount_cents: discountForVisit,
+          payment_method: paymentMethod, // для pending UI скроет (status-driven)
+          status: isPaid ? 'paid' : 'pending',
+          source: 'booksy',
+          external_id: externalId,
+          comment: null,
+        },
+        { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
+      )
+      if (!error) stats.visits_synced++
+    }
   }
 }
 

@@ -148,6 +148,7 @@ export type UpdateVisitInput = {
   tip_cents?: number
   discount_cents?: number
   payment_method?: PaymentMethod
+  status?: VisitStatus
   comment?: string | null
 }
 
