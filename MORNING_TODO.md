@@ -1,6 +1,6 @@
 # MORNING_TODO — что нужно от владельца после автономной ночи
 
-Дата работы: 7 мая 2026, ночная сессия. Все коммиты на `main`, GitHub Actions деплой гоняется автоматически.
+Дата работы: 7 мая 2026, ночная сессия + утреннее продолжение. Все коммиты на `main`, GitHub Actions деплой гоняется автоматически.
 
 ## Кратко: что за ночь сделано (ссылка на коммиты)
 
@@ -9,6 +9,14 @@
 - `3b94598` — TASK-25 Receipt photos + recurring expenses
 - `f35a966` — TASK-26 GDPR export
 - `b191892` — TASK-24 Tips + discounts in visits
+
+## Утреннее продолжение (7 мая 2026, после возвращения)
+
+- `8f9163c` — cron migration + Vault + добавил `process-recurring-expenses` в `NO_JWT_FUNCTIONS`
+- `7868d4d` — **TASK-21** schemes UI (5 схем + per-service overrides в drawer)
+- `384d054` — **TASK-22** payouts page + RPC + close-period (auto-expense в категории «Зарплаты»)
+- `a874e70` — **TASK-23** reports page (P&L + bar-list мастеров/оплат + heatmap день×час)
+- `87ca833` — **TASK-32** CSV-импорт visits (wizard в `/settings/import`)
 
 Подробный разбор — `docs/RETRO.md` секция «Овернайт-сессия · 7 мая 2026».
 
@@ -102,11 +110,14 @@ select jobname, schedule from cron.job where jobname = 'process-recurring-expens
 
 ## Что в работе для меня (когда вернёшься)
 
-Готов взять следующее по приоритету:
+Стадия 2 закрыта почти полностью (✅ TASK-20..23, TASK-26, TASK-32; 🟡 TASK-24/25 PARTIAL). Осталось:
 
-- **TASK-21 + TASK-22** (схемы оплаты мастерам + расчёт зарплат) — нужны продуктовые решения от тебя по схемам (`fixed`/`%revenue`/`%service`/`chair_rent`/`mixed`)
-- **TASK-23** (полная аналитика P&L) — нужны решения по тому, какие срезы показывать
-- **Stripe coupon + юр-доки** (если готов запускать бету)
-- **Apple Sign In** (если оформишь Apple Dev Program)
+- **Stripe coupon `BETA3M`** (5 минут, как соберёшься запускать бету)
+- **Юр-доки** (privacy/terms placeholders → реальные данные ИП)
+- **TASK-24/25 финал** — multi-row grid + повторяющиеся шаблоны визитов; бюджет vs факт расходов; остаток нала. **Нужны продуктовые решения**, что именно показывать.
+- **TASK-27 Booksy research спайк** — это начало стадии 3, готов делать когда скажешь
+- **TASK-33/34/35/36** — стадия 4 (AI-инсайты, weekly digest, PWA, бенчмарки)
+- **CI Playwright secrets** — настроить GH secrets чтобы E2E гонялся в CI (сейчас только локально)
+- **Apple Sign In** — если оформишь Apple Dev Program
 
 Скажешь — поехали.

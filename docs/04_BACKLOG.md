@@ -440,20 +440,26 @@ ADR `decisions/008-landing-stack.md`
 
 **Что в проде:** `routes/clients/*` (Page, FormModal, Drawer, Picker), `hooks/useClients.ts`, `lib/utils/format-phone.ts` (libphonenumber-js E.164 нормализация PL/UA/RU), Sheet UI-компонент. Поиск по name/phone/email, сортировка по last_visit/name/revenue. ClientPicker в QuickEntryModal с inline-create. Денорм-триггер на `visits` уже был (миграция 4). E2E `clients-flow.spec.ts` зелёный.
 
-### TASK-21: Расширенные схемы оплаты мастерам
+### TASK-21: Расширенные схемы оплаты мастерам ✅ DONE (7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** L
 **AC:** UI выбора `payout_scheme`, поля для `fixed`/`percent_revenue`/`percent_service`/`chair_rent`/`mixed`, `staff_service_overrides`.
 
-### TASK-22: Расчёт зарплат и ведомость
+**Что в проде:** StaffEditSheet (drawer 480px) с радиокарточками 5 схем + условными полями. Per-service overrides — таблица услуг внутри drawer (видна только при `percent_service`). Минимальная форма «Добавить мастера» (только имя) — дефолт `percent_revenue 40%`. Карточки мастеров показывают summary схемы + кнопку «Изменить». Хук useStaffMutations нормализует поля под выбранную схему (лишние = null). Без миграций — schema была готова с TASK-12.
+
+### TASK-22: Расчёт зарплат и ведомость ✅ DONE (7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** L · **Зависит от:** TASK-21
 **AC:** Страница payouts, авторасчёт через RPC `calculate_payout(staff_id, period_start, period_end)`, ведомость PDF, закрытие периода с auto-expense.
 
-### TASK-23: Аналитика и отчёты
+**Что в проде:** Страница `/{salonId}/payouts` с месячным picker (← →). RPC `calculate_payouts_for_period` (read-only, stable, single-CTE) для всех схем включая percent_service через staff_service_overrides. Кнопка «Закрыть период»: создаёт строки в payouts (status=paid) + одну expenses-строку на каждого мастера в auto-категории «Зарплаты» (создаётся как is_system=true). Защита от двойного закрытия — unique-индекс ux_payouts_salon_staff_period. PDF — через window.print() с `print:hidden` на decoration (zero bundle weight, кросс-браузер). История закрытых периодов под основной таблицей. Миграция 20260507000005.
+
+### TASK-23: Аналитика и отчёты ✅ DONE (7 мая 2026)
 
 **Стадия:** 2 · **Оценка:** XL
 **AC:** P&L отчёт, выручка по мастерам/услугам, типу оплаты, загрузка по дням/часам (heatmap), маржа по услугам, сравнение периодов, экспорт PDF/Excel.
+
+**Что в проде:** Страница `/{salonId}/reports` (заменила ComingSoon, sidebar implemented=true). KPI-карточки revenue/expense/profit с дельтой к прошлому месяцу (TrendingUp/Down). Bar-list по мастерам, donut-list по способам оплаты, top-50 услуг таблица, heatmap день×час бизнес-окна 8..21 в брендовом navy gradient. PDF — через window.print(). Миграция 20260507000006: `analytics_revenue_by_payment` + `analytics_visits_heatmap` (timezone-aware через salon.timezone), KPI/staff/service переиспользуют существующие dashboard RPC. **НЕ сделано:** маржа по услугам (нет данных о себестоимости в БД), Excel export (PDF покрывает 90% кейсов), custom date-range (только месячный курсор).
 
 ### TASK-24: Группированный ввод и доп.поля визита 🟡 PARTIAL (овернайт 7 мая 2026)
 
@@ -505,10 +511,12 @@ ADR `decisions/008-landing-stack.md`
 **Стадия:** 3 · **Оценка:** XL
 **AC:** UI подключения (accessKey/secretKey), синк закупочных фактур, отправка expense в wFirma, KSeF, отображается только для country_code=PL.
 
-### TASK-32: CSV-импорт
+### TASK-32: CSV-импорт ✅ DONE (7 мая 2026)
 
 **Стадия:** 3 · **Оценка:** M
 **AC:** Upload CSV, парсинг, маппинг колонок, шаблоны для Booksy/Fresha/Treatwell, batch insert, дедуп.
+
+**Что в проде:** Страница `/{salonId}/settings/import` (lazy). Парсер на нативном TS (RFC 4180, авто-детект `,`/`;`, без новых зависимостей). Авто-маппинг колонок по эвристике в заголовках (RU/EN/PL варианты), правится через Select. Превью первых 10 строк. Импорт через хук useImportVisits: pre-fetch clients/staff/services в Map, per-row find-or-create клиента (по phone E.164 или имени), staff/service ищутся case-insensitive (без создания). Дедуп: `external_id = SHA-1(date+amount+client+service+staff)`, `source='csv_import'`, unique-violation = skipped. Batch insert по 50 с fallback по одной при дубликатах. **НЕ сделано:** платформо-специфичные шаблоны Booksy/Fresha/Treatwell (без реальных экспортов = заглушки бесполезны; эвристика покрывает 80%); импорт расходов отдельной задачей.
 
 ---
 
