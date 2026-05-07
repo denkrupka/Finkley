@@ -1,0 +1,491 @@
+/**
+ * telegram-bug-collector — webhook от @finklay_dev_bot. Принимает сообщения
+ * из общего бэг-чата владельца+партнёра, складывает в public.bug_reports
+ * с AI-категоризацией и анализом скриншотов через Anthropic Claude.
+ *
+ * Команды бота:
+ *   /list                   — открытые баги (newest first), сводка
+ *   /done <short_id>        — отметить как fixed
+ *   /note <short_id> <text> — добавить заметку к багу
+ *   (любое другое сообщение) → новый баг
+ *
+ * Auth:
+ *   - Telegram передаёт `X-Telegram-Bot-Api-Secret-Token` (мы задаём через
+ *     setWebhook). Проверяем timing-safe equal с TELEGRAM_BUG_WEBHOOK_SECRET.
+ *   - deploy --no-verify-jwt: webhook идёт без JWT, защита через secret.
+ *
+ * ENV:
+ *   SUPABASE_URL
+ *   SUPABASE_SERVICE_ROLE_KEY
+ *   TELEGRAM_BUG_BOT_TOKEN          — токен @finklay_dev_bot
+ *   TELEGRAM_BUG_WEBHOOK_SECRET     — secret_token из setWebhook (random hex)
+ *   TELEGRAM_BUG_CHAT_ID            — единственный разрешённый chat_id
+ *   ANTHROPIC_API_KEY               — для AI-категоризации (опционально)
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const BOT_TOKEN = Deno.env.get('TELEGRAM_BUG_BOT_TOKEN') ?? ''
+const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_BUG_WEBHOOK_SECRET') ?? ''
+const ALLOWED_CHAT_ID = Deno.env.get('TELEGRAM_BUG_CHAT_ID') ?? ''
+const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
+
+const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+// =============================================================================
+// Telegram API helpers
+// =============================================================================
+
+async function tgSend(chatId: number, text: string, replyTo?: number): Promise<void> {
+  const body = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'Markdown',
+    reply_to_message_id: replyTo,
+    allow_sending_without_reply: true,
+  }
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch((e) => console.error('tgSend', e))
+}
+
+async function tgGetFile(fileId: string): Promise<{ path: string; size: number } | null> {
+  try {
+    const res = await fetch(`${TELEGRAM_API}/getFile?file_id=${encodeURIComponent(fileId)}`)
+    const data = await res.json()
+    if (!data.ok) {
+      console.warn('tgGetFile failed', data)
+      return null
+    }
+    return { path: data.result.file_path, size: data.result.file_size ?? 0 }
+  } catch (e) {
+    console.error('tgGetFile', e)
+    return null
+  }
+}
+
+async function tgDownload(filePath: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  try {
+    const res = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`)
+    if (!res.ok) return null
+    const buf = await res.arrayBuffer()
+    const mime = res.headers.get('content-type') ?? 'application/octet-stream'
+    return { bytes: new Uint8Array(buf), mime }
+  } catch (e) {
+    console.error('tgDownload', e)
+    return null
+  }
+}
+
+// =============================================================================
+// Photo storage + analysis
+// =============================================================================
+
+type Attachment = {
+  type: 'photo' | 'document' | 'video'
+  file_id: string
+  storage_path: string | null
+  mime: string
+  size: number
+  vision_summary?: string
+}
+
+async function processPhoto(
+  admin: ReturnType<typeof createClient>,
+  fileId: string,
+  bugIdHint: string,
+): Promise<Attachment | null> {
+  const meta = await tgGetFile(fileId)
+  if (!meta) return null
+  const file = await tgDownload(meta.path)
+  if (!file) return null
+
+  const ext = meta.path.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const storagePath = `${bugIdHint}/${fileId}.${ext}`
+
+  const { error: upErr } = await admin.storage
+    .from('bug-attachments')
+    .upload(storagePath, file.bytes, { contentType: file.mime, upsert: true })
+  if (upErr) {
+    console.warn('storage upload failed', upErr)
+    return {
+      type: 'photo',
+      file_id: fileId,
+      storage_path: null,
+      mime: file.mime,
+      size: meta.size,
+    }
+  }
+
+  // AI-описание (опционально, только если есть ключ)
+  let visionSummary: string | undefined
+  if (ANTHROPIC_KEY && file.mime.startsWith('image/')) {
+    visionSummary = (await analyzeScreenshot(file.bytes, file.mime)) ?? undefined
+  }
+
+  return {
+    type: 'photo',
+    file_id: fileId,
+    storage_path: storagePath,
+    mime: file.mime,
+    size: meta.size,
+    vision_summary: visionSummary,
+  }
+}
+
+async function analyzeScreenshot(bytes: Uint8Array, mime: string): Promise<string | null> {
+  try {
+    const base64 = btoa(String.fromCharCode(...bytes.slice(0, 4 * 1024 * 1024))) // safety: до 4 MB
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 250,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mime, data: base64 },
+              },
+              {
+                type: 'text',
+                text: 'Это скриншот бага в SaaS-приложении Finkley (управленческий учёт салона). Опиши кратко (2 предложения): что на экране и какая может быть проблема. Если есть текст ошибки/предупреждения — процитируй. Если ничего необычного — скажи "ничего необычного".',
+              },
+            ],
+          },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.warn('anthropic vision', res.status, await res.text())
+      return null
+    }
+    const data = await res.json()
+    const block = data.content?.[0]
+    if (block?.type === 'text') return block.text as string
+    return null
+  } catch (e) {
+    console.warn('analyzeScreenshot', e)
+    return null
+  }
+}
+
+async function categorizeText(
+  text: string,
+): Promise<{ severity?: string; area?: string; summary?: string; steps?: string }> {
+  if (!ANTHROPIC_KEY || !text.trim()) return {}
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        system:
+          'Категоризатор баг-репортов в Finkley (учёт салонов). Возвращай ТОЛЬКО JSON: {"severity":"low|medium|high|critical","area":"visits|expenses|payouts|reports|auth|clients|staff|onboarding|billing|settings|import|other","summary":"<1-2 предл>","steps":"<шаги если упомянуты>"}',
+        messages: [{ role: 'user', content: text }],
+      }),
+    })
+    if (!res.ok) return {}
+    const data = await res.json()
+    const block = data.content?.[0]
+    if (block?.type !== 'text') return {}
+    const match = (block.text as string).match(/\{[\s\S]*\}/)
+    if (!match) return {}
+    const parsed = JSON.parse(match[0])
+    return {
+      severity: parsed.severity,
+      area: parsed.area,
+      summary: parsed.summary,
+      steps: parsed.steps,
+    }
+  } catch (e) {
+    console.warn('categorizeText', e)
+    return {}
+  }
+}
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+function shortId(uuid: string): string {
+  return uuid.slice(0, 8)
+}
+
+async function cmdList(admin: ReturnType<typeof createClient>, chatId: number) {
+  const { data, error } = await admin
+    .from('bug_reports')
+    .select('id, ai_summary, message_text, severity, area, sender_first_name, reported_at')
+    .eq('status', 'open')
+    .order('reported_at', { ascending: false })
+    .limit(20)
+  if (error) {
+    await tgSend(chatId, `❌ Ошибка чтения: ${error.message}`)
+    return
+  }
+  type Row = {
+    id: string
+    ai_summary: string | null
+    message_text: string | null
+    severity: string | null
+    area: string | null
+    sender_first_name: string | null
+    reported_at: string
+  }
+  const rows = (data ?? []) as Row[]
+  if (rows.length === 0) {
+    await tgSend(chatId, '✅ Открытых багов нет')
+    return
+  }
+  const lines = rows.map((r) => {
+    const sev = r.severity ? `[${r.severity.toUpperCase()}]` : ''
+    const area = r.area ? ` · ${r.area}` : ''
+    const summary = r.ai_summary || (r.message_text || '').slice(0, 100)
+    return `\`${shortId(r.id)}\` ${sev}${area}\n_${r.sender_first_name ?? '?'}_: ${summary}`
+  })
+  await tgSend(chatId, `*Открытых багов: ${rows.length}*\n\n${lines.join('\n\n')}`)
+}
+
+async function cmdDone(admin: ReturnType<typeof createClient>, chatId: number, shortIdArg: string) {
+  if (!shortIdArg) {
+    await tgSend(chatId, 'Использование: `/done <short_id>` (первые 8 символов)')
+    return
+  }
+  const { data, error } = await admin
+    .from('bug_reports')
+    .update({ status: 'fixed', fixed_at: new Date().toISOString() })
+    .like('id', `${shortIdArg}%`)
+    .select('id')
+  if (error) {
+    await tgSend(chatId, `❌ ${error.message}`)
+    return
+  }
+  if (!data || data.length === 0) {
+    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``)
+    return
+  }
+  if (data.length > 1) {
+    await tgSend(chatId, `Найдено несколько (${data.length}) — уточни длиннее short_id`)
+    return
+  }
+  await tgSend(chatId, `✅ Закрыл \`${shortId(data[0]!.id)}\``)
+}
+
+async function cmdNote(
+  admin: ReturnType<typeof createClient>,
+  chatId: number,
+  shortIdArg: string,
+  text: string,
+) {
+  if (!shortIdArg || !text) {
+    await tgSend(chatId, 'Использование: `/note <short_id> <текст>`')
+    return
+  }
+  const { data: existing } = await admin
+    .from('bug_reports')
+    .select('id, notes')
+    .like('id', `${shortIdArg}%`)
+    .limit(2)
+  if (!existing || existing.length === 0) {
+    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``)
+    return
+  }
+  if (existing.length > 1) {
+    await tgSend(chatId, `Найдено несколько — уточни длиннее short_id`)
+    return
+  }
+  const row = existing[0]! as { id: string; notes: string | null }
+  const newNotes = row.notes ? `${row.notes}\n---\n${text}` : text
+  await admin.from('bug_reports').update({ notes: newNotes }).eq('id', row.id)
+  await tgSend(chatId, `📝 Заметка добавлена к \`${shortId(row.id)}\``)
+}
+
+// =============================================================================
+// Update processing
+// =============================================================================
+
+type TgPhotoSize = { file_id: string; width: number; height: number; file_size?: number }
+type TgDocument = { file_id: string; mime_type?: string; file_size?: number }
+type TgUser = { id: number; first_name?: string; username?: string }
+type TgChat = { id: number; type: string }
+type TgMessage = {
+  message_id: number
+  from?: TgUser
+  chat: TgChat
+  date: number
+  text?: string
+  caption?: string
+  photo?: TgPhotoSize[]
+  document?: TgDocument
+  reply_to_message?: TgMessage
+}
+
+async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
+  if (ALLOWED_CHAT_ID && String(msg.chat.id) !== ALLOWED_CHAT_ID) {
+    console.warn('rejected unauthorized chat', msg.chat.id)
+    return
+  }
+
+  const text = (msg.text ?? msg.caption ?? '').trim()
+
+  // Команды
+  if (text.startsWith('/')) {
+    const [cmdRaw, ...rest] = text.split(/\s+/)
+    const cmd = cmdRaw!.split('@')[0]!.toLowerCase() // /list@finklay_dev_bot → /list
+    if (cmd === '/list') return cmdList(admin, msg.chat.id)
+    if (cmd === '/done') return cmdDone(admin, msg.chat.id, rest[0] ?? '')
+    if (cmd === '/note') {
+      const [id, ...textParts] = rest
+      return cmdNote(admin, msg.chat.id, id ?? '', textParts.join(' '))
+    }
+    if (cmd === '/start' || cmd === '/help') {
+      return tgSend(
+        msg.chat.id,
+        `*Finkley bug-collector* 🐛\n\nПросто пиши/скидывай скрин — занесу в багтрекер.\n\n*Команды:*\n\`/list\` — открытые баги\n\`/done <id>\` — закрыть\n\`/note <id> <текст>\` — добавить заметку`,
+      )
+    }
+    return // неизвестная команда — игнорируем
+  }
+
+  // Если это reply на сообщение бота с /list — парсим как duplicate? Skip пока.
+  if (!text && !msg.photo && !msg.document) return
+
+  // Создаём bug_report
+  const bugIdHint = `${msg.chat.id}_${msg.message_id}`
+
+  // Скачиваем attachments параллельно
+  const attachments: Attachment[] = []
+  if (msg.photo && msg.photo.length > 0) {
+    // Берём самый большой размер (последний в массиве)
+    const largest = msg.photo[msg.photo.length - 1]!
+    const att = await processPhoto(admin, largest.file_id, bugIdHint)
+    if (att) attachments.push(att)
+  }
+  if (msg.document) {
+    const att = await processPhoto(admin, msg.document.file_id, bugIdHint)
+    if (att) {
+      att.type = 'document'
+      attachments.push(att)
+    }
+  }
+
+  // AI-разметка
+  const visionSummary = attachments.find((a) => a.vision_summary)?.vision_summary ?? ''
+  const fullText = [text, visionSummary].filter(Boolean).join('\n\n')
+  const cat = await categorizeText(fullText)
+
+  const { data, error } = await admin
+    .from('bug_reports')
+    .insert({
+      telegram_chat_id: msg.chat.id,
+      telegram_message_id: msg.message_id,
+      sender_id: msg.from?.id ?? 0,
+      sender_username: msg.from?.username ?? null,
+      sender_first_name: msg.from?.first_name ?? null,
+      message_text: text || null,
+      attachments,
+      reported_at: new Date(msg.date * 1000).toISOString(),
+      severity: cat.severity ?? null,
+      area: cat.area ?? null,
+      ai_summary: cat.summary ?? null,
+      ai_steps_to_repro: cat.steps ?? null,
+      ai_categorized_at: cat.summary ? new Date().toISOString() : null,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      // Уже видели этот message — silent
+      return
+    }
+    console.error('insert bug_reports', error)
+    await tgSend(msg.chat.id, `⚠️ Не смог сохранить: ${error.message}`)
+    return
+  }
+
+  // Подтверждаем reply'ем
+  const ack = [
+    `🐛 Записал \`${shortId(data!.id)}\``,
+    cat.severity ? `*Severity:* ${cat.severity}` : null,
+    cat.area ? `*Area:* ${cat.area}` : null,
+    visionSummary ? `📸 ${visionSummary}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  await tgSend(msg.chat.id, ack, msg.message_id)
+}
+
+// =============================================================================
+// Webhook handler
+// =============================================================================
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+
+  if (!SUPABASE_URL || !SERVICE_KEY || !BOT_TOKEN) {
+    return jsonResponse({ error: 'function_not_configured' }, 500)
+  }
+
+  // Telegram secret_token (опционально, но если задан — проверяем строго)
+  if (WEBHOOK_SECRET) {
+    const got = req.headers.get('x-telegram-bot-api-secret-token') ?? ''
+    if (!timingSafeEqual(got, WEBHOOK_SECRET)) {
+      console.warn('rejected: bad secret_token')
+      return jsonResponse({ error: 'unauthorized' }, 401)
+    }
+  }
+
+  let update: { message?: TgMessage; edited_message?: TgMessage }
+  try {
+    update = await req.json()
+  } catch {
+    return jsonResponse({ error: 'bad_request' }, 400)
+  }
+
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  const msg = update.message ?? update.edited_message
+  if (msg) {
+    try {
+      await handleMessage(admin, msg)
+    } catch (e) {
+      console.error('handleMessage', e)
+    }
+  }
+
+  // Telegram ждёт 200 OK — иначе будет ретраить
+  return jsonResponse({ ok: true })
+})
