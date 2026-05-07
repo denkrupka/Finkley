@@ -103,6 +103,25 @@ async function sendDigestForSalon(
     topBlock = `<p style="margin:0 0 8px 0;font-size:14px;color:#64748b;font-style:italic;">На этой неделе визитов не было — отдыхаешь?</p>`
   }
 
+  // Топ-инсайт текущей недели (если есть) — добавим под top_block
+  const { data: insight } = await admin
+    .from('insights')
+    .select('title, body, severity')
+    .eq('salon_id', salon.id)
+    .is('dismissed_at', null)
+    .order('severity', { ascending: false }) // critical > warning > info (Postgres enum)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const insightBlock = insight
+    ? `<div style="margin:16px 0;padding:14px 16px;background:#FFF8E7;border-left:3px solid #E5C078;border-radius:6px;">
+         <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9A7A1F;">💡 AI-помощник видит</p>
+         <p style="margin:0 0 4px 0;font-size:14px;font-weight:700;color:#0f172a;">${insight.title}</p>
+         <p style="margin:0;font-size:13px;line-height:20px;color:#334155;">${insight.body}</p>
+       </div>`
+    : ''
+
   await sendEmail('weekly_digest', recipientEmail, {
     full_name: recipientName,
     salon_name: salon.name ?? 'Салон',
@@ -115,6 +134,7 @@ async function sendDigestForSalon(
     revenue_delta: revDelta.text,
     revenue_delta_color: revDelta.color,
     top_block: topBlock,
+    insight_block: insightBlock,
     app_url: `${APP_URL}${salon.id}/reports`,
   })
   return { sent: true }

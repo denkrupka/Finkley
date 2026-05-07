@@ -375,6 +375,8 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 
 {{top_block}}
 
+{{insight_block}}
+
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
 <tr><td align="center" style="background:#1A1A2E;border-radius:6px;padding:14px 32px;">
 <a href="{{app_url}}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">Открыть отчёты</a>
