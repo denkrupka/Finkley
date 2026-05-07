@@ -54,7 +54,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
         run: |
           # _shared/ — не отдельная функция, скрипт сам подтянет если функция импортит
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector"
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
