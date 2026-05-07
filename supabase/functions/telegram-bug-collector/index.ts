@@ -52,14 +52,21 @@ function timingSafeEqual(a: string, b: string): boolean {
 // Telegram API helpers
 // =============================================================================
 
-async function tgSend(chatId: number, text: string, replyTo?: number): Promise<void> {
-  const body = {
+async function tgSend(
+  chatId: number,
+  text: string,
+  opts?: { replyTo?: number; threadId?: number },
+): Promise<void> {
+  const body: Record<string, unknown> = {
     chat_id: chatId,
     text,
     parse_mode: 'Markdown',
-    reply_to_message_id: replyTo,
+    reply_to_message_id: opts?.replyTo,
     allow_sending_without_reply: true,
   }
+  // В forum-supergroup'ах нужно явно указывать топик, иначе ответ улетит
+  // в General. message_thread_id берём из самого сообщения юзера.
+  if (opts?.threadId) body.message_thread_id = opts.threadId
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -242,7 +249,7 @@ function shortId(uuid: string): string {
   return uuid.slice(0, 8)
 }
 
-async function cmdList(admin: ReturnType<typeof createClient>, chatId: number) {
+async function cmdList(admin: ReturnType<typeof createClient>, chatId: number, threadId?: number) {
   const { data, error } = await admin
     .from('bug_reports')
     .select('id, ai_summary, message_text, severity, area, sender_first_name, reported_at')
@@ -250,7 +257,7 @@ async function cmdList(admin: ReturnType<typeof createClient>, chatId: number) {
     .order('reported_at', { ascending: false })
     .limit(20)
   if (error) {
-    await tgSend(chatId, `❌ Ошибка чтения: ${error.message}`)
+    await tgSend(chatId, `❌ Ошибка чтения: ${error.message}`, { threadId })
     return
   }
   type Row = {
@@ -264,7 +271,7 @@ async function cmdList(admin: ReturnType<typeof createClient>, chatId: number) {
   }
   const rows = (data ?? []) as Row[]
   if (rows.length === 0) {
-    await tgSend(chatId, '✅ Открытых багов нет')
+    await tgSend(chatId, '✅ Открытых багов нет', { threadId })
     return
   }
   const lines = rows.map((r) => {
@@ -273,12 +280,19 @@ async function cmdList(admin: ReturnType<typeof createClient>, chatId: number) {
     const summary = r.ai_summary || (r.message_text || '').slice(0, 100)
     return `\`${shortId(r.id)}\` ${sev}${area}\n_${r.sender_first_name ?? '?'}_: ${summary}`
   })
-  await tgSend(chatId, `*Открытых багов: ${rows.length}*\n\n${lines.join('\n\n')}`)
+  await tgSend(chatId, `*Открытых багов: ${rows.length}*\n\n${lines.join('\n\n')}`, {
+    threadId,
+  })
 }
 
-async function cmdDone(admin: ReturnType<typeof createClient>, chatId: number, shortIdArg: string) {
+async function cmdDone(
+  admin: ReturnType<typeof createClient>,
+  chatId: number,
+  shortIdArg: string,
+  threadId?: number,
+) {
   if (!shortIdArg) {
-    await tgSend(chatId, 'Использование: `/done <short_id>` (первые 8 символов)')
+    await tgSend(chatId, 'Использование: `/done <short_id>` (первые 8 символов)', { threadId })
     return
   }
   const { data, error } = await admin
@@ -287,18 +301,20 @@ async function cmdDone(admin: ReturnType<typeof createClient>, chatId: number, s
     .like('id', `${shortIdArg}%`)
     .select('id')
   if (error) {
-    await tgSend(chatId, `❌ ${error.message}`)
+    await tgSend(chatId, `❌ ${error.message}`, { threadId })
     return
   }
   if (!data || data.length === 0) {
-    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``)
+    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``, { threadId })
     return
   }
   if (data.length > 1) {
-    await tgSend(chatId, `Найдено несколько (${data.length}) — уточни длиннее short_id`)
+    await tgSend(chatId, `Найдено несколько (${data.length}) — уточни длиннее short_id`, {
+      threadId,
+    })
     return
   }
-  await tgSend(chatId, `✅ Закрыл \`${shortId(data[0]!.id)}\``)
+  await tgSend(chatId, `✅ Закрыл \`${shortId(data[0]!.id)}\``, { threadId })
 }
 
 async function cmdNote(
@@ -306,9 +322,10 @@ async function cmdNote(
   chatId: number,
   shortIdArg: string,
   text: string,
+  threadId?: number,
 ) {
   if (!shortIdArg || !text) {
-    await tgSend(chatId, 'Использование: `/note <short_id> <текст>`')
+    await tgSend(chatId, 'Использование: `/note <short_id> <текст>`', { threadId })
     return
   }
   const { data: existing } = await admin
@@ -317,17 +334,17 @@ async function cmdNote(
     .like('id', `${shortIdArg}%`)
     .limit(2)
   if (!existing || existing.length === 0) {
-    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``)
+    await tgSend(chatId, `Не нашёл баг с id \`${shortIdArg}\``, { threadId })
     return
   }
   if (existing.length > 1) {
-    await tgSend(chatId, `Найдено несколько — уточни длиннее short_id`)
+    await tgSend(chatId, `Найдено несколько — уточни длиннее short_id`, { threadId })
     return
   }
   const row = existing[0]! as { id: string; notes: string | null }
   const newNotes = row.notes ? `${row.notes}\n---\n${text}` : text
   await admin.from('bug_reports').update({ notes: newNotes }).eq('id', row.id)
-  await tgSend(chatId, `📝 Заметка добавлена к \`${shortId(row.id)}\``)
+  await tgSend(chatId, `📝 Заметка добавлена к \`${shortId(row.id)}\``, { threadId })
 }
 
 // =============================================================================
@@ -340,6 +357,7 @@ type TgUser = { id: number; first_name?: string; username?: string }
 type TgChat = { id: number; type: string }
 type TgMessage = {
   message_id: number
+  message_thread_id?: number
   from?: TgUser
   chat: TgChat
   date: number
@@ -348,6 +366,7 @@ type TgMessage = {
   photo?: TgPhotoSize[]
   document?: TgDocument
   reply_to_message?: TgMessage
+  is_topic_message?: boolean
 }
 
 async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
@@ -357,21 +376,23 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   }
 
   const text = (msg.text ?? msg.caption ?? '').trim()
+  const threadId = msg.message_thread_id
 
   // Команды
   if (text.startsWith('/')) {
     const [cmdRaw, ...rest] = text.split(/\s+/)
     const cmd = cmdRaw!.split('@')[0]!.toLowerCase() // /list@finklay_dev_bot → /list
-    if (cmd === '/list') return cmdList(admin, msg.chat.id)
-    if (cmd === '/done') return cmdDone(admin, msg.chat.id, rest[0] ?? '')
+    if (cmd === '/list') return cmdList(admin, msg.chat.id, threadId)
+    if (cmd === '/done') return cmdDone(admin, msg.chat.id, rest[0] ?? '', threadId)
     if (cmd === '/note') {
       const [id, ...textParts] = rest
-      return cmdNote(admin, msg.chat.id, id ?? '', textParts.join(' '))
+      return cmdNote(admin, msg.chat.id, id ?? '', textParts.join(' '), threadId)
     }
     if (cmd === '/start' || cmd === '/help') {
       return tgSend(
         msg.chat.id,
         `*Finkley bug-collector* 🐛\n\nПросто пиши/скидывай скрин — занесу в багтрекер.\n\n*Команды:*\n\`/list\` — открытые баги\n\`/done <id>\` — закрыть\n\`/note <id> <текст>\` — добавить заметку`,
+        { threadId },
       )
     }
     return // неизвестная команда — игнорируем
@@ -430,11 +451,11 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       return
     }
     console.error('insert bug_reports', error)
-    await tgSend(msg.chat.id, `⚠️ Не смог сохранить: ${error.message}`)
+    await tgSend(msg.chat.id, `⚠️ Не смог сохранить: ${error.message}`, { threadId })
     return
   }
 
-  // Подтверждаем reply'ем
+  // Подтверждаем reply'ем в том же топике
   const ack = [
     `🐛 Записал \`${shortId(data!.id)}\``,
     cat.severity ? `*Severity:* ${cat.severity}` : null,
@@ -443,7 +464,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   ]
     .filter(Boolean)
     .join('\n')
-  await tgSend(msg.chat.id, ack, msg.message_id)
+  await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
 }
 
 // =============================================================================
