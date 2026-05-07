@@ -637,6 +637,7 @@ export type Database = {
           timezone: string
           updated_at: string
           weekly_digest_enabled: boolean
+          benchmarks_opt_in: boolean
         }
         Insert: {
           country_code: string
@@ -652,6 +653,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
           weekly_digest_enabled?: boolean
+          benchmarks_opt_in?: boolean
         }
         Update: {
           country_code?: string
@@ -667,6 +669,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
           weekly_digest_enabled?: boolean
+          benchmarks_opt_in?: boolean
         }
         Relationships: []
       }

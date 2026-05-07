@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
 import { useSalon } from '@/hooks/useSalons'
+import { BenchmarksWidget } from './BenchmarksWidget'
 import { InsightsWidget } from './InsightsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
@@ -97,6 +98,9 @@ export function DashboardPage() {
 
       {/* AI-инсайты — до 3-х актуальных, генерируются weekly cron'ом */}
       <InsightsWidget salonId={salonId} />
+
+      {/* Бенчмарки — сравнение с рынком, daily cron, k-anonymity ≥10 */}
+      <BenchmarksWidget salonId={salonId} currency={currency} />
 
       {/* KPI row */}
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">

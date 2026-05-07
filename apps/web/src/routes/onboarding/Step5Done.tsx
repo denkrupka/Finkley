@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { Check, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 type Props = {
@@ -8,9 +8,11 @@ type Props = {
     servicesCount: number
     expensesCount: number
   }
+  benchmarksOptIn: boolean
+  onBenchmarksToggle: (value: boolean) => void
 }
 
-export function Step5Done({ summary }: Props) {
+export function Step5Done({ summary, benchmarksOptIn, onBenchmarksToggle }: Props) {
   const { t } = useTranslation()
 
   return (
@@ -30,6 +32,31 @@ export function Step5Done({ summary }: Props) {
         <Card label={t('onboarding.step5.services')} value={summary.servicesCount} />
         <Card label={t('onboarding.step5.expenses')} value={summary.expensesCount} />
       </ul>
+
+      {/* Бенчмарки opt-in — дружелюбный копирайт, по умолчанию включено */}
+      <label
+        className={`mx-auto mt-8 flex max-w-md cursor-pointer items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+          benchmarksOptIn
+            ? 'border-brand-sage bg-brand-sage-soft/40'
+            : 'border-border bg-card hover:bg-muted/30'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={benchmarksOptIn}
+          onChange={(e) => onBenchmarksToggle(e.target.checked)}
+          className="mt-0.5 size-4 cursor-pointer"
+        />
+        <div className="flex-1">
+          <div className="text-brand-navy flex items-center gap-1.5 text-sm font-bold">
+            <TrendingUp className="text-brand-sage size-4" strokeWidth={2} />
+            {t('onboarding.step5.benchmarks_title')}
+          </div>
+          <p className="text-muted-foreground mt-1 text-xs leading-snug">
+            {t('onboarding.step5.benchmarks_subtitle')}
+          </p>
+        </div>
+      </label>
     </div>
   )
 }

@@ -36,6 +36,8 @@ export type OnboardingState = {
   services: ServiceDraft[]
   // Шаг 4
   expense_categories: string[]
+  // Шаг 5
+  benchmarks_opt_in: boolean
 }
 
 const INITIAL: OnboardingState = {
@@ -45,6 +47,7 @@ const INITIAL: OnboardingState = {
   staff: [],
   services: [],
   expense_categories: [...DEFAULT_EXPENSE_CATEGORIES],
+  benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
 }
 
 export function OnboardingPage() {
@@ -117,6 +120,10 @@ export function OnboardingPage() {
       return
     }
     const newSalonId = data as unknown as string
+    // Если юзер снял галочку «сравнение с рынком» — обновляем (default=true).
+    if (!state.benchmarks_opt_in) {
+      await supabase.from('salons').update({ benchmarks_opt_in: false }).eq('id', newSalonId)
+    }
     rememberLastSalon(newSalonId)
     // Кэш `useMySalons` не знает о только что созданном салоне.
     // invalidateQueries сам по себе не блокирующий — SalonLayout мог бы
@@ -244,6 +251,8 @@ export function OnboardingPage() {
                   servicesCount: state.services.filter((s) => s.name.trim()).length,
                   expensesCount: state.expense_categories.filter((c) => c.trim()).length,
                 }}
+                benchmarksOptIn={state.benchmarks_opt_in}
+                onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
               />
             )}
           </div>

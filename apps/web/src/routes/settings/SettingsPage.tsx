@@ -26,6 +26,7 @@ import {
 import { useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
@@ -55,6 +56,7 @@ export function SettingsPage() {
   const { data: subscription } = useSubscription(salonId)
   const sendDigest = useSendWeeklyDigest(salonId)
   const toggleDigest = useToggleWeeklyDigest(salonId)
+  const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
 
   const [name, setName] = useState('')
   const [country, setCountry] = useState<CountryCode>('PL')
@@ -316,6 +318,37 @@ export function SettingsPage() {
             {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
           </Button>
         </div>
+      </section>
+
+      {/* Сравнение с рынком */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <h2 className="text-brand-navy text-base font-bold tracking-tight">
+          {t('settings.benchmarks.title')}
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">{t('settings.benchmarks.subtitle')}</p>
+        <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={salon.benchmarks_opt_in}
+            onChange={(e) =>
+              toggleBenchmarks.mutate(e.target.checked, {
+                onSuccess: () =>
+                  toast.success(
+                    e.target.checked
+                      ? t('settings.benchmarks.toast_enabled')
+                      : t('settings.benchmarks.toast_disabled'),
+                  ),
+                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+              })
+            }
+            className="size-4 cursor-pointer"
+          />
+          <span className="text-foreground">
+            {salon.benchmarks_opt_in
+              ? t('settings.benchmarks.enabled')
+              : t('settings.benchmarks.disabled')}
+          </span>
+        </label>
       </section>
 
       {/* Интеграции */}
