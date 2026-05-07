@@ -243,7 +243,9 @@
     "errors": {
       "staff_required": "Выбери мастера",
       "amount_required": "Укажи сумму",
-      "amount_positive": "Сумма должна быть больше нуля"
+      "amount_positive": "Сумма должна быть больше нуля",
+      "tip_negative": "Чаевые не могут быть отрицательными",
+      "discount_negative": "Скидка не может быть отрицательной"
     }
   },
   "clients": {

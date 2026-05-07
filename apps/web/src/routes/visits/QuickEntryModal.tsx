@@ -46,6 +46,8 @@ type FormValues = {
   client_id: string | null
   service_id: string
   amount: string // string в input, потом парсим
+  tip: string
+  discount: string
   payment_method: PaymentOption
   comment: string
 }
@@ -58,6 +60,16 @@ const schema = z.object({
     .string()
     .min(1, 'visits.errors.amount_required')
     .refine((v) => Number(v.replace(',', '.')) > 0, 'visits.errors.amount_positive'),
+  tip: z
+    .string()
+    .optional()
+    .default('')
+    .refine((v) => v === '' || Number(v.replace(',', '.')) >= 0, 'visits.errors.tip_negative'),
+  discount: z
+    .string()
+    .optional()
+    .default('')
+    .refine((v) => v === '' || Number(v.replace(',', '.')) >= 0, 'visits.errors.discount_negative'),
   payment_method: z.enum(PAYMENT_OPTIONS),
   comment: z.string().max(500).optional().default(''),
 })
@@ -94,6 +106,8 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       client_id: null,
       service_id: '',
       amount: '',
+      tip: '',
+      discount: '',
       payment_method: initialPayment,
       comment: '',
     },
@@ -108,6 +122,8 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       client_id: null,
       service_id: '',
       amount: '',
+      tip: '',
+      discount: '',
       payment_method: initialPayment,
       comment: '',
     })
@@ -142,6 +158,10 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
 
   function onSubmit(values: FormValues, addAnother = false) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+    const tipCents = values.tip ? Math.round(Number(values.tip.replace(',', '.')) * 100) : 0
+    const discountCents = values.discount
+      ? Math.round(Number(values.discount.replace(',', '.')) * 100)
+      : 0
     const svc = services.find((s) => s.id === values.service_id)
     const stf = staff.find((s) => s.id === values.staff_id)
     const visitAt = today.toISOString()
@@ -155,6 +175,8 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
         service_name_snapshot: svc?.name ?? null,
         visit_at: visitAt,
         amount_cents: amountCents,
+        tip_cents: tipCents,
+        discount_cents: discountCents,
         payment_method: values.payment_method,
         comment: values.comment || null,
       },
@@ -181,12 +203,14 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
             },
           })
           if (addAnother) {
-            // оставляем staff/payment, очищаем service/amount/comment/client
+            // оставляем staff/payment, очищаем service/amount/tip/discount/comment/client
             form.reset({
               staff_id: values.staff_id,
               client_id: null,
               service_id: '',
               amount: '',
+              tip: '',
+              discount: '',
               payment_method: values.payment_method,
               comment: '',
             })
@@ -379,6 +403,44 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
                 </div>
               )}
             />
+          </div>
+
+          {/* Чаевые + скидка (опциональные) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="qe-tip">{t('visits.form.tip_label')}</Label>
+              <div className="border-border bg-card flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
+                <span className="num text-muted-foreground text-sm">+{currencySymbol}</span>
+                <input
+                  id="qe-tip"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  placeholder="0"
+                  {...form.register('tip')}
+                  className="num text-foreground placeholder:text-muted-foreground/50 h-full flex-1 bg-transparent text-base font-semibold outline-none"
+                  data-testid="qe-tip"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="qe-discount">{t('visits.form.discount_label')}</Label>
+              <div className="border-border bg-card flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
+                <span className="num text-muted-foreground text-sm">−{currencySymbol}</span>
+                <input
+                  id="qe-discount"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  placeholder="0"
+                  {...form.register('discount')}
+                  className="num text-foreground placeholder:text-muted-foreground/50 h-full flex-1 bg-transparent text-base font-semibold outline-none"
+                  data-testid="qe-discount"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Комментарий */}

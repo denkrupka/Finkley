@@ -71,6 +71,8 @@ export type CreateVisitInput = {
   service_name_snapshot?: string | null
   visit_at: string
   amount_cents: number
+  tip_cents?: number
+  discount_cents?: number
   payment_method: PaymentMethod
   comment?: string | null
 }
@@ -104,8 +106,8 @@ export function useCreateVisit(salonId: string | undefined) {
         service_name_snapshot: input.service_name_snapshot ?? null,
         visit_at: input.visit_at,
         amount_cents: input.amount_cents,
-        tip_cents: 0,
-        discount_cents: 0,
+        tip_cents: input.tip_cents ?? 0,
+        discount_cents: input.discount_cents ?? 0,
         payment_method: input.payment_method,
         status: 'paid',
         comment: input.comment ?? null,
