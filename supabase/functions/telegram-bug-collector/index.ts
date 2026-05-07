@@ -258,9 +258,15 @@ async function recategorizeWithCorrection(
   original: string,
   prevSummary: string,
   correction: string,
+  wasFixed: boolean,
 ): Promise<{ severity?: string; area?: string; summary?: string; steps?: string } | null> {
   if (!ANTHROPIC_KEY) return null
   try {
+    const systemBase = `Ты помогаешь разработчику разбирать баг-репорты в Finkley (учёт салонов).`
+    const systemContext = wasFixed
+      ? `${systemBase} Я (разработчик) уже отчитался что починил этот баг, но юзер написал что НЕ ПОЧИНЕНО. Перевыдай summary с учётом того, что прошлая попытка фикса не сработала — это поможет мне разобраться повторно.`
+      : `${systemBase} Юзер поправил твоё прежнее понимание бага. Перевыдай summary с учётом коррекции.`
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -271,20 +277,19 @@ async function recategorizeWithCorrection(
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 500,
-        system: `Ты помогаешь разработчику разбирать баг-репорты в Finkley (учёт салонов).
-Юзер поправил твоё прежнее понимание бага. Перевыдай summary с учётом коррекции.
+        system: `${systemContext}
 
 Возвращай ТОЛЬКО JSON:
 {
   "severity": "low|medium|high|critical",
   "area": "visits|expenses|payouts|reports|auth|clients|staff|onboarding|billing|settings|import|other",
-  "summary": "<2-3 коротких предложения, по-человечески, для НЕтехнического человека: что не работает + что чинить. Учти коррекцию юзера.>",
+  "summary": "<2-3 коротких предложения, по-человечески, для НЕтехнического человека: что не работает + что чинить.${wasFixed ? ' Учти что прошлая попытка фикса не сработала — нужен другой подход.' : ' Учти коррекцию юзера.'}>",
   "steps": ""
 }`,
         messages: [
           {
             role: 'user',
-            content: `Оригинальный баг-репорт:\n${original}\n\nМоё прежнее понимание (которое юзер исправил):\n${prevSummary}\n\nКоррекция от юзера:\n${correction}\n\nДай новый summary с учётом коррекции.`,
+            content: `Оригинальный баг-репорт:\n${original}\n\n${wasFixed ? 'Что я (разработчик) думал что починил' : 'Моё прежнее понимание (которое юзер исправил)'}:\n${prevSummary}\n\n${wasFixed ? 'Жалоба юзера что не починено' : 'Коррекция от юзера'}:\n${correction}\n\nДай новый summary.`,
           },
         ],
       }),
@@ -479,14 +484,15 @@ async function handleCorrection(
   threadId?: number,
 ): Promise<boolean> {
   const botText = msg.reply_to_message?.text ?? ''
-  // Бот в ack использует `<short_id>` в backticks — парсим
+  // Бот в ack использует `<short_id>` в backticks — парсим (любой ack:
+  // 🐛 при создании, 🔄 при коррекции, ✅ при фиксе, 🔁 при reopen)
   const idMatch = botText.match(/`([0-9a-f]{8})`/i)
   if (!idMatch) return false // не consumed → handleMessage продолжит обычный flow
   const shortIdVal = idMatch[1]!.toLowerCase()
 
   const { data: bug, error: findErr } = await admin
     .from('bug_reports')
-    .select('id, message_text, ai_summary, attachments, sender_first_name, notes')
+    .select('id, message_text, ai_summary, attachments, sender_first_name, notes, status')
     .like('id', `${shortIdVal}%`)
     .limit(2)
   if (findErr || !bug || bug.length === 0) {
@@ -506,7 +512,9 @@ async function handleCorrection(
     attachments: Array<{ vision_summary?: string }>
     sender_first_name: string | null
     notes: string | null
+    status: string
   }
+  const wasFixed = row.status === 'fixed'
 
   // Собираем оригинальный контекст для AI
   const visionSummaries = (row.attachments ?? [])
@@ -519,10 +527,15 @@ async function handleCorrection(
     original || '(без оригинального текста, только скриншот)',
     row.ai_summary || '(пустое)',
     correctionText,
+    wasFixed,
   )
 
-  // Аппендим коррекцию в notes для истории
-  const correctionNote = `Коррекция (${msg.from?.first_name ?? '?'}): ${correctionText}`
+  // Аппендим коррекцию в notes для истории. Если баг был fixed —
+  // помечаем явно «фикс не сработал», чтобы в будущем было понятно.
+  const noteLabel = wasFixed
+    ? `Reopen — фикс не сработал (${msg.from?.first_name ?? '?'})`
+    : `Коррекция (${msg.from?.first_name ?? '?'})`
+  const correctionNote = `${noteLabel}: ${correctionText}`
   const newNotes = row.notes ? `${row.notes}\n---\n${correctionNote}` : correctionNote
 
   const updates: Record<string, unknown> = { notes: newNotes }
@@ -532,12 +545,21 @@ async function handleCorrection(
     if (recat.area) updates.area = recat.area
     updates.ai_categorized_at = new Date().toISOString()
   }
+  // Если баг был fixed — переоткрываем. fixed_at сбрасываем (иначе он
+  // фильтруется в /list), но fixed_in_commit оставляем — это история
+  // прошлой попытки, полезно для дебага.
+  if (wasFixed) {
+    updates.status = 'open'
+    updates.fixed_at = null
+  }
 
   await admin.from('bug_reports').update(updates).eq('id', row.id)
 
-  const ackText = recat?.summary
-    ? `🔄 \`${shortId(row.id)}\`\n\n${recat.summary}`
-    : `📝 \`${shortId(row.id)}\` — коррекция учтена`
+  const prefix = wasFixed ? '🔁' : '🔄'
+  const header = wasFixed
+    ? `${prefix} \`${shortId(row.id)}\` — переоткрыт, фикс не сработал`
+    : `${prefix} \`${shortId(row.id)}\``
+  const ackText = recat?.summary ? `${header}\n\n${recat.summary}` : header
   await tgSend(msg.chat.id, ackText, { replyTo: msg.message_id, threadId })
   return true
 }
