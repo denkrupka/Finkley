@@ -412,7 +412,7 @@ async function cmdDone(
   // Сначала достаём контекст бага (для последующего announce-сообщения)
   const { data: existing, error: findErr } = await admin
     .from('bug_reports')
-    .select('id, message_text, ai_summary, attachments, notes, status')
+    .select('id, message_text, ai_summary, attachments, notes, status, telegram_message_id')
     .gte('id', `${shortIdArg}-0000-0000-0000-000000000000`)
     .lte('id', `${shortIdArg}-ffff-ffff-ffff-ffffffffffff`)
     .limit(2)
@@ -439,6 +439,7 @@ async function cmdDone(
     attachments: Array<{ vision_summary?: string }>
     notes: string | null
     status: string
+    telegram_message_id: number
   }
 
   const updates: Record<string, unknown> = {
@@ -470,7 +471,8 @@ async function cmdDone(
   const ack = announce
     ? `✅ \`${shortId(row.id)}\`\n\n${announce}`
     : `✅ \`${shortId(row.id)}\` — закрыт`
-  await tgSend(chatId, ack, { threadId })
+  // Постим как REPLY на оригинальное сообщение юзера для трекинга цепочки.
+  await tgSend(chatId, ack, { threadId, replyTo: row.telegram_message_id })
 }
 
 /**
@@ -770,7 +772,7 @@ async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createCl
   const { data: rows, error: findErr } = await admin
     .from('bug_reports')
     .select(
-      'id, telegram_chat_id, telegram_thread_id, message_text, ai_summary, attachments, notes, status',
+      'id, telegram_chat_id, telegram_thread_id, telegram_message_id, message_text, ai_summary, attachments, notes, status',
     )
     .gte('id', `${body.short_id}-0000-0000-0000-000000000000`)
     .lte('id', `${body.short_id}-ffff-ffff-ffff-ffffffffffff`)
@@ -784,6 +786,7 @@ async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createCl
     id: string
     telegram_chat_id: number
     telegram_thread_id: number | null
+    telegram_message_id: number
     message_text: string | null
     ai_summary: string | null
     attachments: Array<{ vision_summary?: string }>
@@ -814,8 +817,12 @@ async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createCl
   const ack = announce
     ? `✅ \`${shortId(row.id)}\`\n\n${announce}`
     : `✅ \`${shortId(row.id)}\` — закрыт`
+  // Постим как REPLY на оригинальное сообщение юзера, в котором он заявил
+  // баг — даёт читаемую цепочку «репорт → 🐛 ack → 🔄/🔁 коррекции → ✅ фикс»
+  // в виде одной reply-нити, видимой при scroll вверх.
   await tgSend(row.telegram_chat_id, ack, {
     threadId: row.telegram_thread_id ?? undefined,
+    replyTo: row.telegram_message_id,
   })
 
   return jsonResponse({ ok: true, id: row.id, announced: !!announce })
