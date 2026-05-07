@@ -19,13 +19,14 @@ function pageFor(id: string) {
   }
 }
 
-// Замещены реальными страницами в TASK-11..14:
+// Замещены реальными страницами:
 // - DashboardPage (TASK-14) → routes/dashboard/DashboardPage.tsx
 // - VisitsPage    (TASK-11) → routes/visits/VisitsPage.tsx
 // - ExpensesPage  (TASK-13) → routes/expenses/ExpensesPage.tsx
 // - StaffPage     (TASK-12) → routes/staff/StaffPage.tsx
 // - ClientsPage   (TASK-20) → routes/clients/ClientsPage.tsx
+// - PayoutsPage   (TASK-22) → routes/payouts/PayoutsPage.tsx
+// - ReportsPage   (TASK-23) → routes/reports/ReportsPage.tsx
 //
-// Остальные пока ComingSoon до своих стадий.
-export const ReportsPage = pageFor('reports')
+// AI остаётся ComingSoon до стадии 4.
 export const AIPage = pageFor('ai')

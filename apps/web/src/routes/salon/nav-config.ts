@@ -100,7 +100,7 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.reports',
     icon: BarChart3,
     stage: 2,
-    implemented: false,
+    implemented: true,
     inBottomNav: false,
   },
   {

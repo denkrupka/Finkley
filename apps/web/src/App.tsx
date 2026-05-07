@@ -9,7 +9,7 @@ import { ResetPasswordPage } from '@/routes/auth/ResetPassword'
 import { SignupPage } from '@/routes/auth/Signup'
 import { OnboardingPage } from '@/routes/onboarding/OnboardingPage'
 import { RootRedirect } from '@/routes/RootRedirect'
-import { AIPage, ReportsPage } from '@/routes/salon/pages'
+import { AIPage } from '@/routes/salon/pages'
 import { SalonLayout } from '@/routes/salon/SalonLayout'
 
 /**
@@ -38,6 +38,9 @@ const StaffPage = lazy(() =>
 )
 const PayoutsPage = lazy(() =>
   import('@/routes/payouts/PayoutsPage').then((m) => ({ default: m.PayoutsPage })),
+)
+const ReportsPage = lazy(() =>
+  import('@/routes/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 )
 const SettingsPage = lazy(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
@@ -123,7 +126,7 @@ function App() {
         <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />
-        <Route path="reports" element={<ReportsPage />} />
+        <Route path="reports" element={lazyRoute(<ReportsPage />)} />
         <Route path="ai" element={<AIPage />} />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
