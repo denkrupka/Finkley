@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { addMonths, addWeeks, format } from 'date-fns'
-import { Paperclip, X } from 'lucide-react'
+import { Camera, Loader2, Paperclip, X } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -31,6 +31,7 @@ import {
   type ExpenseCategoryRow,
   type ExpenseRecurrence,
 } from '@/hooks/useExpenses'
+import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
 
 const PAYMENT_OPTIONS: PaymentMethod[] = ['cash', 'card', 'transfer']
@@ -65,6 +66,29 @@ function nextOccurrence(expenseAt: string, recurrence: ExpenseRecurrence): strin
   return format(next, 'yyyy-MM-dd')
 }
 
+/**
+ * Лёгкий fuzzy match: ищет существующую категорию у которой имя содержит
+ * слова из guess (или наоборот). Возвращает id первой найденной или null.
+ * Не пытается быть умнее — лучше пусто, чем неправильная категория.
+ */
+function findCategoryByGuess(
+  guess: string | null,
+  categories: ExpenseCategoryRow[],
+): string | null {
+  if (!guess) return null
+  const g = guess.toLowerCase().trim()
+  if (!g) return null
+  // Точное совпадение приоритетнее
+  const exact = categories.find((c) => c.name.toLowerCase().trim() === g)
+  if (exact) return exact.id
+  // Содержит слова друг друга
+  const partial = categories.find((c) => {
+    const n = c.name.toLowerCase()
+    return n.includes(g) || g.includes(n)
+  })
+  return partial?.id ?? null
+}
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -84,6 +108,7 @@ export function ExpenseFormModal({
   const { t } = useTranslation()
   const { data: categories = [] } = useExpenseCategories(salonId)
   const createExpense = useCreateExpense(salonId)
+  const ocr = useOcrReceipt()
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -260,14 +285,20 @@ export function ExpenseFormModal({
             />
           </div>
 
-          {/* Фото чека (опционально) */}
+          {/* Фото чека (опционально). Если фото — auto-OCR через Claude Haiku */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
             {receiptFile ? (
               <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
                 <span className="flex items-center gap-2 truncate">
-                  <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
-                  <span className="truncate">{receiptFile.name}</span>
+                  {ocr.isPending ? (
+                    <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
+                  ) : (
+                    <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
+                  )}
+                  <span className="truncate">
+                    {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -283,8 +314,8 @@ export function ExpenseFormModal({
                 htmlFor="exp-receipt"
                 className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
               >
-                <Paperclip className="size-4" strokeWidth={1.7} />
-                <span>{t('expenses.form.receipt_placeholder')}</span>
+                <Camera className="size-4" strokeWidth={1.7} />
+                <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
               </label>
             )}
             <input
@@ -300,6 +331,33 @@ export function ExpenseFormModal({
                   return
                 }
                 setReceiptFile(file)
+                // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
+                if (file && file.type.startsWith('image/')) {
+                  ocr.mutate(file, {
+                    onSuccess: (parsed) => {
+                      // Предзаполняем поля: только если они пусты или дефолтные.
+                      // Юзер редактируемые значения не теряет.
+                      if (parsed.amount && !form.getValues('amount')) {
+                        form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+                      }
+                      if (parsed.expense_at) {
+                        form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
+                      }
+                      const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
+                      if (matchedCat && !form.getValues('category_id')) {
+                        form.setValue('category_id', matchedCat, { shouldDirty: true })
+                      }
+                      if (parsed.vendor && !form.getValues('comment')) {
+                        form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                      }
+                      toast.success(t('expenses.form.ocr_done'))
+                    },
+                    onError: () => {
+                      // Юзер заполнит сам, фото остаётся прикреплённым
+                      toast.error(t('expenses.form.ocr_failed'))
+                    },
+                  })
+                }
               }}
             />
           </div>

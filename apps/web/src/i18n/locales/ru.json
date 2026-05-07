@@ -603,8 +603,12 @@
       "submit": "Сохранить расход",
       "receipt_label": "Чек (фото или PDF)",
       "receipt_placeholder": "Прикрепить чек — JPG, PNG, PDF (до 10 МБ)",
+      "receipt_placeholder_ocr": "📷 Сфоткай чек — заполню форму автоматически",
       "receipt_remove": "Открепить чек",
       "receipt_too_big": "Файл слишком большой. Максимум — 10 МБ.",
+      "ocr_recognizing": "Распознаю чек…",
+      "ocr_done": "Чек распознан, проверь поля и сохрани",
+      "ocr_failed": "Не получилось распознать. Заполни поля вручную.",
       "recurrence_label": "Повторение",
       "recurrence": {
         "none": "Не повторять",
