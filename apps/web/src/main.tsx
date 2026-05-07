@@ -48,6 +48,17 @@ const queryClient = new QueryClient({
   },
 })
 
+// PWA service worker. Регистрация только в проде — в dev SW мешает HMR.
+// Скоп = base path (`/app/`), путь до sw.js — относительно корня.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`
+    navigator.serviceWorker.register(swUrl, { scope: import.meta.env.BASE_URL }).catch((err) => {
+      console.warn('SW registration failed', err)
+    })
+  })
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
