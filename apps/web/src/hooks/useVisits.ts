@@ -66,6 +66,7 @@ export function useVisits(
 export type CreateVisitInput = {
   salon_id: string
   staff_id?: string | null
+  client_id?: string | null
   service_id?: string | null
   service_name_snapshot?: string | null
   visit_at: string
@@ -98,7 +99,7 @@ export function useCreateVisit(salonId: string | undefined) {
         id: tempId,
         salon_id: input.salon_id,
         staff_id: input.staff_id ?? null,
-        client_id: null,
+        client_id: input.client_id ?? null,
         service_id: input.service_id ?? null,
         service_name_snapshot: input.service_name_snapshot ?? null,
         visit_at: input.visit_at,

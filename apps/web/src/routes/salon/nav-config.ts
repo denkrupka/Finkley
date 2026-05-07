@@ -66,7 +66,7 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.clients',
     icon: Users,
     stage: 2,
-    implemented: false,
+    implemented: true,
     inBottomNav: false,
   },
   {

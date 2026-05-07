@@ -31,6 +31,7 @@ import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
+import { ClientPicker } from '@/routes/clients/ClientPicker'
 
 const PAYMENT_OPTIONS = ['cash', 'card', 'transfer'] as const
 type PaymentOption = (typeof PAYMENT_OPTIONS)[number]
@@ -42,6 +43,7 @@ const LAST_STAFF_KEY = 'finkley:last-staff'
 
 type FormValues = {
   staff_id: string
+  client_id: string | null
   service_id: string
   amount: string // string в input, потом парсим
   payment_method: PaymentOption
@@ -50,6 +52,7 @@ type FormValues = {
 
 const schema = z.object({
   staff_id: z.string().min(1, 'visits.errors.staff_required'),
+  client_id: z.string().nullable().optional().default(null),
   service_id: z.string().optional().default(''),
   amount: z
     .string()
@@ -88,6 +91,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
     resolver: zodResolver(schema),
     defaultValues: {
       staff_id: '',
+      client_id: null,
       service_id: '',
       amount: '',
       payment_method: initialPayment,
@@ -101,6 +105,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
     const lastStaffValid = staff.some((s) => s.id === initialStaff)
     form.reset({
       staff_id: lastStaffValid ? initialStaff : (staff[0]?.id ?? ''),
+      client_id: null,
       service_id: '',
       amount: '',
       payment_method: initialPayment,
@@ -108,6 +113,20 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open
   }, [open])
+
+  // Если staff подгрузился ПОСЛЕ открытия модалки (быстрый клик на FAB),
+  // ловим это и выставляем дефолт. Иначе форма требует «Выбери мастера»
+  // и юзер не понимает почему — мастер же есть.
+  useEffect(() => {
+    if (!open) return
+    if (!form.getValues('staff_id') && staff.length > 0) {
+      const lastStaffValid = staff.some((s) => s.id === initialStaff)
+      form.setValue('staff_id', lastStaffValid ? initialStaff : staff[0]!.id, {
+        shouldValidate: false,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, staff])
 
   // При выборе услуги — подкидываем default цену в amount, если пусто
   const watchedServiceId = form.watch('service_id')
@@ -131,6 +150,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       {
         salon_id: salonId,
         staff_id: values.staff_id || null,
+        client_id: values.client_id || null,
         service_id: values.service_id || null,
         service_name_snapshot: svc?.name ?? null,
         visit_at: visitAt,
@@ -161,9 +181,10 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
             },
           })
           if (addAnother) {
-            // оставляем staff/payment, очищаем service/amount/comment
+            // оставляем staff/payment, очищаем service/amount/comment/client
             form.reset({
               staff_id: values.staff_id,
+              client_id: null,
               service_id: '',
               amount: '',
               payment_method: values.payment_method,
@@ -258,6 +279,24 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
                     {t(form.formState.errors.staff_id.message ?? '')}
                   </p>
                 ) : null}
+              </div>
+            )}
+          />
+
+          {/* Клиент (опционально, typeahead) */}
+          <Controller
+            name="client_id"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="qe-client">{t('visits.form.client_label')}</Label>
+                <ClientPicker
+                  salonId={salonId}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder={t('clients.picker.no_client')}
+                  testId="qe-client"
+                />
               </div>
             )}
           />

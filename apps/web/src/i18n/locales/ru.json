@@ -212,6 +212,7 @@
       "today_pill": "сегодня",
       "staff_label": "Мастер",
       "staff_placeholder": "Кто принимал?",
+      "client_label": "Клиент",
       "service_label": "Услуга",
       "service_placeholder": "Выбери услугу",
       "amount_label": "Сумма",
@@ -243,6 +244,66 @@
       "staff_required": "Выбери мастера",
       "amount_required": "Укажи сумму",
       "amount_positive": "Сумма должна быть больше нуля"
+    }
+  },
+  "clients": {
+    "title": "Клиенты",
+    "add": "Добавить клиента",
+    "subtitle_one": "{{count}} клиент",
+    "subtitle_few": "{{count}} клиента",
+    "subtitle_many": "{{count}} клиентов",
+    "subtitle": "Всего: {{count}}",
+    "list_title": "Все клиенты",
+    "records": "записей",
+    "empty": "Пока ни одного клиента. Нажми «Добавить клиента» — и появится первая карточка.",
+    "empty_search": "Никого не нашли. Проверь имя или телефон.",
+    "search_placeholder": "Поиск по имени, телефону, email",
+    "unnamed_with_phone": "Клиент по телефону",
+    "confirm_delete": "Удалить этого клиента? Визиты в книге останутся, просто перестанут привязываться к нему.",
+    "toast_created": "Клиент добавлен",
+    "toast_updated": "Карточка обновлена",
+    "toast_deleted": "Клиент удалён",
+    "toast_error": "Не получилось сохранить",
+    "kpi": {
+      "total": "Всего клиентов",
+      "active": "С визитами",
+      "lifetime_revenue": "Принесли"
+    },
+    "sort": {
+      "last_visit": "По последнему визиту",
+      "name": "По имени",
+      "revenue": "По сумме"
+    },
+    "form": {
+      "title_new": "Новый клиент",
+      "title_edit": "Редактировать клиента",
+      "name_label": "Имя",
+      "name_placeholder": "Например: Анна Ковальская",
+      "phone_label": "Телефон",
+      "phone_hint": "С кодом страны: +48… для PL, +380… для UA, +7… для RU.",
+      "email_label": "Email",
+      "notes_label": "Заметка",
+      "notes_placeholder": "Что важно помнить про этого клиента",
+      "submit_new": "Создать",
+      "submit_edit": "Сохранить"
+    },
+    "drawer": {
+      "visits_count": "визитов",
+      "lifetime": "за всё время",
+      "notes": "Заметка",
+      "history": "История визитов",
+      "history_empty": "Визитов с этим клиентом ещё нет.",
+      "no_service": "Без услуги"
+    },
+    "picker": {
+      "no_client": "Без клиента",
+      "search_placeholder": "Имя или телефон",
+      "create_with": "+ Создать «{{name}}»",
+      "clear": "Очистить выбор"
+    },
+    "errors": {
+      "name_required": "Имя обязательно",
+      "email_invalid": "Неверный формат email"
     }
   },
   "billing": {

@@ -24,8 +24,8 @@ function pageFor(id: string) {
 // - VisitsPage    (TASK-11) → routes/visits/VisitsPage.tsx
 // - ExpensesPage  (TASK-13) → routes/expenses/ExpensesPage.tsx
 // - StaffPage     (TASK-12) → routes/staff/StaffPage.tsx
+// - ClientsPage   (TASK-20) → routes/clients/ClientsPage.tsx
 //
 // Остальные пока ComingSoon до своих стадий.
-export const ClientsPage = pageFor('clients')
 export const ReportsPage = pageFor('reports')
 export const AIPage = pageFor('ai')
