@@ -1,9 +1,10 @@
-import { Bell, Menu } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
 import { useAuth } from '@/hooks/useAuth'
+import { NotificationsBell } from './NotificationsBell'
 import { PeriodToggle } from './PeriodToggle'
 import { SalonSwitcher } from './SalonSwitcher'
 
@@ -48,14 +49,7 @@ export function TopBar({ salonId, salonName, todayLabel, onMenuClick }: Props) {
 
       {/* Bell + locale switcher + sign-out (desktop) / только bell (mobile) */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <button
-          type="button"
-          className="border-border bg-card relative grid size-9 place-items-center rounded-md border"
-          aria-label="notifications"
-        >
-          <Bell className="size-[17px]" strokeWidth={1.7} />
-          <span className="border-card bg-destructive absolute right-2 top-2 size-[7px] rounded-full border-[1.5px]" />
-        </button>
+        <NotificationsBell salonId={salonId} />
 
         <div className="hidden lg:block">
           <LocaleSwitcher />
