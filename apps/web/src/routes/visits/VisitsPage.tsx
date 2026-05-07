@@ -1,7 +1,12 @@
-import { Trash2 } from 'lucide-react'
+import { Layers, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+
+import { BulkVisitsDialog } from './BulkVisitsDialog'
 
 import {
   Select,
@@ -54,6 +59,7 @@ export function VisitsPage() {
     paymentMethod: paymentFilter || null,
   })
   const deleteVisit = useDeleteVisit(salonId)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   function setFilter(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -71,7 +77,7 @@ export function VisitsPage() {
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       {/* Header */}
-      <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -81,7 +87,18 @@ export function VisitsPage() {
             })}
           </p>
         </div>
+        <Button variant="outline" size="md" onClick={() => setBulkOpen(true)}>
+          <Layers className="size-4" strokeWidth={1.7} />
+          {t('visits.bulk_button')}
+        </Button>
       </div>
+
+      <BulkVisitsDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        salonId={salonId}
+        currency={currency}
+      />
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

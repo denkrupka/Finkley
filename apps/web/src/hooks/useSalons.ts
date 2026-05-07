@@ -13,6 +13,7 @@ export type SalonRow = {
   logo_url: string | null
   weekly_digest_enabled: boolean
   benchmarks_opt_in: boolean
+  opening_cash_balance_cents: number
   created_at: string
 }
 
@@ -32,7 +33,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, created_at',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -53,7 +54,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, created_at',
         )
         .eq('id', salonId)
         .maybeSingle()

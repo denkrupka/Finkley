@@ -1,5 +1,7 @@
 import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
+
+import { ClientTemplatesSection } from './ClientTemplatesSection'
 import { Mail, Phone, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -93,6 +95,8 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
                 </div>
               ) : null}
             </div>
+
+            <ClientTemplatesSection salonId={salonId} clientId={client.id} />
 
             <h3 className="text-brand-navy mb-3 text-sm font-bold uppercase tracking-wider">
               {t('clients.drawer.history')}

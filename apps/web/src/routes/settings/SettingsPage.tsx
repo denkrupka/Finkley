@@ -27,6 +27,7 @@ import { useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
+import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
@@ -57,6 +58,8 @@ export function SettingsPage() {
   const sendDigest = useSendWeeklyDigest(salonId)
   const toggleDigest = useToggleWeeklyDigest(salonId)
   const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
+  const updateOpeningCash = useUpdateOpeningCashBalance(salonId)
+  const [openingCashDraft, setOpeningCashDraft] = useState('')
 
   const [name, setName] = useState('')
   const [country, setCountry] = useState<CountryCode>('PL')
@@ -110,6 +113,9 @@ export function SettingsPage() {
     setCountry(salon.country_code as CountryCode)
     setSalonType(salon.salon_type as SalonTypeId)
     setLogoUrl(salon.logo_url ?? '')
+    setOpeningCashDraft(
+      salon.opening_cash_balance_cents > 0 ? String(salon.opening_cash_balance_cents / 100) : '',
+    )
   }, [salon])
 
   if (!salon || !salonId) return null
@@ -316,6 +322,47 @@ export function SettingsPage() {
           >
             <Mail className="size-4" strokeWidth={1.7} />
             {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
+          </Button>
+        </div>
+      </section>
+
+      {/* Касса — opening balance */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <h2 className="text-brand-navy text-base font-bold tracking-tight">
+          {t('settings.cash.title')}
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">{t('settings.cash.subtitle')}</p>
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={openingCashDraft}
+            onChange={(e) => setOpeningCashDraft(e.target.value)}
+            placeholder="0"
+            className="h-11 w-40"
+            data-testid="settings-opening-cash"
+          />
+          <span className="text-muted-foreground text-sm">{salon.currency}</span>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => {
+              const trimmed = openingCashDraft.trim().replace(',', '.')
+              const cents = trimmed === '' ? 0 : Math.round(Number(trimmed) * 100)
+              if (Number.isNaN(cents) || cents < 0) {
+                toast.error(t('settings.cash.invalid'))
+                return
+              }
+              updateOpeningCash.mutate(cents, {
+                onSuccess: () => toast.success(t('settings.cash.toast_saved')),
+                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+              })
+            }}
+            disabled={updateOpeningCash.isPending}
+          >
+            {t('common.save')}
           </Button>
         </div>
       </section>

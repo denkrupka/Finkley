@@ -638,6 +638,7 @@ export type Database = {
           updated_at: string
           weekly_digest_enabled: boolean
           benchmarks_opt_in: boolean
+          opening_cash_balance_cents: number
         }
         Insert: {
           country_code: string
@@ -654,6 +655,7 @@ export type Database = {
           updated_at?: string
           weekly_digest_enabled?: boolean
           benchmarks_opt_in?: boolean
+          opening_cash_balance_cents?: number
         }
         Update: {
           country_code?: string
@@ -670,6 +672,7 @@ export type Database = {
           updated_at?: string
           weekly_digest_enabled?: boolean
           benchmarks_opt_in?: boolean
+          opening_cash_balance_cents?: number
         }
         Relationships: []
       }

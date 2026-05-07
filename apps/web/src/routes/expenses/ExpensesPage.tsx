@@ -19,6 +19,7 @@ import {
   useExpenses,
   type ExpenseRow,
 } from '@/hooks/useExpenses'
+import { BudgetsCard } from './BudgetsCard'
 import { useSalon } from '@/hooks/useSalons'
 import { getDatePeriodRange, type PeriodKey } from '@/lib/period'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -224,8 +225,9 @@ export function ExpensesPage() {
           )}
         </div>
 
-        {/* Structure */}
+        {/* Structure + Budgets */}
         <div className="flex flex-col gap-4">
+          <BudgetsCard salonId={salonId} currency={currency} />
           <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
             <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
               {t('expenses.structure_title')}

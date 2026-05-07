@@ -5,7 +5,9 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
 import { useSalon } from '@/hooks/useSalons'
 import { BenchmarksWidget } from './BenchmarksWidget'
+import { CashBalanceWidget } from './CashBalanceWidget'
 import { InsightsWidget } from './InsightsWidget'
+import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
 import { useVisits, type PaymentMethod } from '@/hooks/useVisits'
@@ -101,6 +103,12 @@ export function DashboardPage() {
 
       {/* Бенчмарки — сравнение с рынком, daily cron, k-anonymity ≥10 */}
       <BenchmarksWidget salonId={salonId} currency={currency} />
+
+      {/* Cash on hand + предстоящие визиты — компактная пара карточек */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <CashBalanceWidget salonId={salonId} currency={currency} />
+        <UpcomingVisitsWidget salonId={salonId} />
+      </div>
 
       {/* KPI row */}
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
