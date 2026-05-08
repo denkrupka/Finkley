@@ -20,6 +20,12 @@ export type TopServiceRow = {
   service_name: string
   revenue_cents: number
   visits_count: number
+  /** Total cost = unit cost × visits_count. NULL если cost не задан в services. */
+  cost_cents: number | null
+  /** revenue − cost. NULL если cost_cents NULL. */
+  margin_cents: number | null
+  /** margin / revenue × 100. NULL если cost не задан. */
+  margin_pct: number | null
 }
 
 export type DashboardPeriod = { start: string; end: string } // ISO
@@ -89,6 +95,9 @@ export function useTopServices(salonId: string | undefined, period: DashboardPer
         service_name: r.service_name,
         revenue_cents: Number(r.revenue_cents ?? 0),
         visits_count: Number(r.visits_count ?? 0),
+        cost_cents: r.cost_cents == null ? null : Number(r.cost_cents),
+        margin_cents: r.margin_cents == null ? null : Number(r.margin_cents),
+        margin_pct: r.margin_pct == null ? null : Number(r.margin_pct),
       }))
     },
     enabled: !!salonId,

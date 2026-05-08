@@ -1,6 +1,13 @@
 import { addMonths, endOfMonth, format, startOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Printer, TrendingDown, TrendingUp } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet,
+  Printer,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -19,6 +26,7 @@ import {
 } from '@/hooks/useAnalytics'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { downloadAsXls, type XlsTable } from './export-xls'
 
 const PAYMENT_METHOD_KEY: Record<PaymentMethodRow['payment_method'], string> = {
   cash: 'reports.payment.cash',
@@ -50,15 +58,31 @@ export function ReportsPage() {
   const currency = salon?.currency ?? 'PLN'
   const timezone = salon?.timezone ?? 'Europe/Warsaw'
 
+  // Mode: 'month' — навигация курсором по месяцам (как было раньше).
+  // 'range' — произвольный диапазон через два date-инпута. RPC принимает
+  // start/end в любом случае.
+  const [mode, setMode] = useState<'month' | 'range'>('month')
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const periodStart = startOfMonth(cursor)
-  const periodEnd = endOfMonth(cursor)
-  const periodStartIso = periodStart.toISOString()
-  // RPC ожидает exclusive верхнюю границу — берём начало следующего месяца
-  const periodEndIso = startOfMonth(addMonths(cursor, 1)).toISOString()
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const monthAgoStr = format(addMonths(new Date(), -1), 'yyyy-MM-dd')
+  const [rangeStart, setRangeStart] = useState<string>(monthAgoStr)
+  const [rangeEnd, setRangeEnd] = useState<string>(todayStr)
 
-  const prevStart = startOfMonth(addMonths(cursor, -1))
-  const prevEnd = startOfMonth(cursor)
+  const periodStart = mode === 'month' ? startOfMonth(cursor) : new Date(`${rangeStart}T00:00:00`)
+  const periodEnd = mode === 'month' ? endOfMonth(cursor) : new Date(`${rangeEnd}T23:59:59`)
+  const periodStartIso = periodStart.toISOString()
+  // RPC ожидает exclusive верхнюю границу
+  const periodEndIso =
+    mode === 'month'
+      ? startOfMonth(addMonths(cursor, 1)).toISOString()
+      : new Date(`${rangeEnd}T23:59:59.999`).toISOString()
+
+  const prevDurationMs = periodEnd.getTime() - periodStart.getTime()
+  const prevStart =
+    mode === 'month'
+      ? startOfMonth(addMonths(cursor, -1))
+      : new Date(periodStart.getTime() - prevDurationMs)
+  const prevEnd = mode === 'month' ? startOfMonth(cursor) : new Date(periodStart)
 
   const kpis = useAnalyticsKpis(salonId, periodStartIso, periodEndIso)
   const prevKpis = useAnalyticsKpis(salonId, prevStart.toISOString(), prevEnd.toISOString())
@@ -69,6 +93,62 @@ export function ReportsPage() {
 
   if (!salonId) return null
 
+  function handleExportXls() {
+    const tables: XlsTable[] = []
+    tables.push({
+      title:
+        t('reports.kpi.revenue') +
+        ' / ' +
+        t('reports.kpi.expense') +
+        ' / ' +
+        t('reports.kpi.profit'),
+      headers: [t('reports.kpi.revenue'), t('reports.kpi.expense'), t('reports.kpi.profit')],
+      rows: [
+        [
+          (kpis.data?.revenue_cents ?? 0) / 100,
+          (kpis.data?.expense_cents ?? 0) / 100,
+          (kpis.data?.profit_cents ?? 0) / 100,
+        ],
+      ],
+    })
+    if ((byStaff.data ?? []).length > 0) {
+      tables.push({
+        title: t('reports.staff.title'),
+        headers: [t('reports.service.name'), t('reports.kpi.revenue')],
+        rows: byStaff.data!.map((r) => [r.full_name, r.revenue_cents / 100]),
+      })
+    }
+    if ((byService.data ?? []).length > 0) {
+      tables.push({
+        title: t('reports.service.title'),
+        headers: [
+          t('reports.service.name'),
+          t('reports.service.visits'),
+          t('reports.service.revenue'),
+          t('reports.service.margin') + ' (%)',
+        ],
+        rows: byService.data!.map((r) => [
+          r.service_name,
+          r.visits_count,
+          r.revenue_cents / 100,
+          r.margin_pct == null ? '' : r.margin_pct,
+        ]),
+      })
+    }
+    if ((byPayment.data ?? []).length > 0) {
+      tables.push({
+        title: t('reports.payment.title'),
+        headers: [t('reports.service.name'), t('reports.kpi.revenue')],
+        rows: byPayment.data!.map((r) => [
+          t(PAYMENT_METHOD_KEY[r.payment_method] ?? 'reports.payment.unknown'),
+          r.revenue_cents / 100,
+        ]),
+      })
+    }
+    const filename = `finkley-report-${format(periodStart, 'yyyy-MM-dd')}_${format(periodEnd, 'yyyy-MM-dd')}`
+    downloadAsXls(tables, filename)
+  }
+
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -78,26 +158,76 @@ export function ReportsPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm print:hidden">{t('reports.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <button
-            type="button"
-            onClick={() => setCursor((c) => addMonths(c, -1))}
-            className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-            aria-label={t('reports.prev_month')}
-          >
-            <ChevronLeft className="size-4" strokeWidth={2} />
-          </button>
-          <div className="border-border bg-card text-brand-navy min-w-[160px] rounded-md border px-3 py-2 text-center text-sm font-semibold capitalize">
-            {format(cursor, 'LLLL yyyy', { locale: ru })}
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          {/* Mode-tabs */}
+          <div className="bg-muted/40 inline-flex rounded-md p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setMode('month')}
+              className={`rounded-sm px-3 py-1 font-semibold transition-colors ${
+                mode === 'month' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              {t('reports.mode_month')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('range')}
+              className={`rounded-sm px-3 py-1 font-semibold transition-colors ${
+                mode === 'range' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              {t('reports.mode_range')}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setCursor((c) => addMonths(c, 1))}
-            className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-            aria-label={t('reports.next_month')}
-          >
-            <ChevronRight className="size-4" strokeWidth={2} />
-          </button>
+
+          {mode === 'month' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setCursor((c) => addMonths(c, -1))}
+                className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
+                aria-label={t('reports.prev_month')}
+              >
+                <ChevronLeft className="size-4" strokeWidth={2} />
+              </button>
+              <div className="border-border bg-card text-brand-navy min-w-[160px] rounded-md border px-3 py-2 text-center text-sm font-semibold capitalize">
+                {format(cursor, 'LLLL yyyy', { locale: ru })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCursor((c) => addMonths(c, 1))}
+                className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
+                aria-label={t('reports.next_month')}
+              >
+                <ChevronRight className="size-4" strokeWidth={2} />
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                type="date"
+                value={rangeStart}
+                max={rangeEnd}
+                onChange={(e) => setRangeStart(e.target.value)}
+                className="border-border bg-card text-foreground rounded-md border px-3 py-2 text-sm"
+              />
+              <span className="text-muted-foreground text-xs">—</span>
+              <input
+                type="date"
+                value={rangeEnd}
+                min={rangeStart}
+                max={todayStr}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                className="border-border bg-card text-foreground rounded-md border px-3 py-2 text-sm"
+              />
+            </>
+          )}
+
+          <Button variant="outline" onClick={handleExportXls}>
+            <FileSpreadsheet className="size-4" strokeWidth={2} />
+            {t('reports.export_xls')}
+          </Button>
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4" strokeWidth={2} />
             {t('reports.print')}
@@ -284,6 +414,7 @@ function RevenueByServiceCard({ rows, currency }: { rows: ServiceRevenueRow[]; c
                 <th className="py-1.5 pr-2">{t('reports.service.name')}</th>
                 <th className="py-1.5 pr-2 text-right">{t('reports.service.visits')}</th>
                 <th className="py-1.5 pr-2 text-right">{t('reports.service.revenue')}</th>
+                <th className="py-1.5 pr-2 text-right">{t('reports.service.margin')}</th>
                 <th className="py-1.5">{t('reports.service.share')}</th>
               </tr>
             </thead>
@@ -296,6 +427,23 @@ function RevenueByServiceCard({ rows, currency }: { rows: ServiceRevenueRow[]; c
                   <td className="num py-2 pr-2 text-right">{r.visits_count}</td>
                   <td className="num py-2 pr-2 text-right">
                     {formatCurrency(r.revenue_cents, currency)}
+                  </td>
+                  <td className="num py-2 pr-2 text-right">
+                    {r.margin_pct == null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <span
+                        className={
+                          r.margin_pct >= 50
+                            ? 'text-brand-sage'
+                            : r.margin_pct >= 35
+                              ? 'text-brand-gold-deep'
+                              : 'text-brand-red'
+                        }
+                      >
+                        {r.margin_pct.toFixed(0)}%
+                      </span>
+                    )}
                   </td>
                   <td className="py-2">
                     <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">

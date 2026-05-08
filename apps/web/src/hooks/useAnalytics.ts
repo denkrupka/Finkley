@@ -77,6 +77,9 @@ export type ServiceRevenueRow = {
   service_name: string
   revenue_cents: number
   visits_count: number
+  cost_cents: number | null
+  margin_cents: number | null
+  margin_pct: number | null
 }
 
 export function useRevenueByService(
@@ -99,6 +102,9 @@ export function useRevenueByService(
         ...r,
         revenue_cents: Number(r.revenue_cents),
         visits_count: Number(r.visits_count),
+        cost_cents: r.cost_cents == null ? null : Number(r.cost_cents),
+        margin_cents: r.margin_cents == null ? null : Number(r.margin_cents),
+        margin_pct: r.margin_pct == null ? null : Number(r.margin_pct),
       }))
     },
     enabled: !!salonId && !!periodStartIso && !!periodEndIso,
