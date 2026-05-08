@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1A1A2E"/>
+      <stop offset="1" stop-color="#2D2D5C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <text x="80" y="180" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="800" font-size="32" fill="#E5C078" letter-spacing="3">FINKLEY</text>
+  <text x="80" y="290" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="800" font-size="76" fill="#FFFFFF">Реальная прибыль</text>
+  <text x="80" y="380" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="800" font-size="76" fill="#FFFFFF">твоего салона</text>
+  <text x="80" y="470" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="500" font-size="32" fill="#A0A0BC">После всех расходов. Без таблиц и калькулятора.</text>
+  <text x="80" y="560" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="700" font-size="24" fill="#5BAA8A">€15 / мес · 14 дней trial</text>
+</svg>

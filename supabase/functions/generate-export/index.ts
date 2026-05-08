@@ -31,6 +31,8 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import JSZip from 'https://esm.sh/jszip@3.10.1'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { captureException } from '../_shared/sentry.ts'
+import { buildSummaryPdf, type SalonSummary } from './pdf-summary.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -197,6 +199,7 @@ Deno.serve(async (req: Request) => {
         `по требованию GDPR (Art. 20 «Право на портативность»).`,
         ``,
         `Файлы внутри:`,
+        `  summary.pdf             — краткая сводка для аудитора (агрегаты по салонам)`,
         `  profile.csv             — твой профиль`,
         `  salons.csv              — салоны, в которых ты участвуешь`,
         `  salon_members.csv       — членство (роли)`,
@@ -225,6 +228,63 @@ Deno.serve(async (req: Request) => {
     zip.file('visits.csv', rowsToCsv(visits))
     zip.file('expense_categories.csv', rowsToCsv(expenseCategories))
     zip.file('expenses.csv', rowsToCsv(expenses))
+
+    // PDF summary — best-effort, не валим экспорт если генерация PDF упадёт
+    try {
+      const salonSummaries: SalonSummary[] = (
+        salons as unknown as Array<{
+          id: string
+          name: string
+          currency: string
+          country_code: string | null
+        }>
+      ).map((s) => {
+        const sVisits = visits.filter((v) => v.salon_id === s.id) as Array<{
+          amount_cents?: number | null
+          tip_cents?: number | null
+          discount_cents?: number | null
+          visit_at?: string | null
+        }>
+        const sExpenses = expenses.filter((e) => e.salon_id === s.id) as Array<{
+          amount_cents?: number | null
+        }>
+        const sClients = clients.filter((c) => c.salon_id === s.id)
+        const sStaff = staff.filter((st) => st.salon_id === s.id)
+        const sServices = services.filter((sv) => sv.salon_id === s.id)
+        const visitDates = sVisits
+          .map((v) => v.visit_at ?? null)
+          .filter((d): d is string => Boolean(d))
+          .sort()
+        const revenueCents = sVisits.reduce(
+          (acc, v) => acc + (v.amount_cents ?? 0) + (v.tip_cents ?? 0) - (v.discount_cents ?? 0),
+          0,
+        )
+        const expensesCents = sExpenses.reduce((acc, e) => acc + (e.amount_cents ?? 0), 0)
+        return {
+          name: s.name,
+          currency: s.currency,
+          country: s.country_code,
+          visitsCount: sVisits.length,
+          revenueCents,
+          expensesCount: sExpenses.length,
+          expensesCents,
+          clientsCount: sClients.length,
+          staffCount: sStaff.length,
+          servicesCount: sServices.length,
+          firstVisitAt: visitDates[0] ?? null,
+          lastVisitAt: visitDates[visitDates.length - 1] ?? null,
+        }
+      })
+
+      const pdfBytes = await buildSummaryPdf({
+        userEmail,
+        generatedAt: new Date().toISOString(),
+        salons: salonSummaries,
+      })
+      zip.file('summary.pdf', pdfBytes)
+    } catch (e) {
+      console.warn('PDF summary generation failed, continuing without it', e)
+    }
 
     const zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
     const storagePath = `${userId}/${requestId}.zip`
@@ -289,7 +349,7 @@ Deno.serve(async (req: Request) => {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('generate-export failed', err)
+    await captureException(err, { fn: 'generate-export', user_id: userId, request_id: requestId })
     await admin
       .from('export_requests')
       .update({ status: 'failed', error_message: message, completed_at: new Date().toISOString() })
