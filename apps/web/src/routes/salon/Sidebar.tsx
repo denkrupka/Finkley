@@ -1,5 +1,6 @@
+import { HelpCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 import { LogoLockup } from '@/components/ui/logo'
 import { cn } from '@/lib/utils/cn'
@@ -92,6 +93,15 @@ export function Sidebar({ salonId, salonName, salonCity, ownerInitials, onNaviga
           ) : null}
         </div>
       </div>
+
+      <Link
+        to={`/${salonId}/help`}
+        onClick={onNavigate}
+        className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1.5 px-1.5 text-[11px] font-medium"
+      >
+        <HelpCircle className="size-3.5" strokeWidth={1.7} />
+        {t('nav.help')}
+      </Link>
     </aside>
   )
 }

@@ -10,6 +10,9 @@ import { SalonLayout } from '@/routes/salon/SalonLayout'
 const AIPage = lazyWithRetry(() =>
   import('@/routes/ai/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })),
 )
+const HelpPage = lazyWithRetry(() =>
+  import('@/routes/help/HelpPage').then((m) => ({ default: m.HelpPage })),
+)
 
 /**
  * Корневой компонент. Auth-роуты — публичные (с RequireGuest),
@@ -104,6 +107,7 @@ function App() {
       {/* /reset-password требует временную сессию из ссылки — без RequireGuest */}
       <Route path="/reset-password" element={lazyRoute(<ResetPasswordPage />)} />
       <Route path="/auth/callback" element={lazyRoute(<AuthCallbackPage />)} />
+      <Route path="/help" element={lazyRoute(<HelpPage />)} />
 
       {/* Приватные */}
       <Route
@@ -140,6 +144,7 @@ function App() {
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
         <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
+        <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
 
