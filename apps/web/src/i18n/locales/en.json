@@ -1,0 +1,143 @@
+{
+  "app": {
+    "title": "Finkley"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error_generic": "Something went wrong. Please try again.",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "sign_out": "Sign out",
+    "back_home": "Back to home"
+  },
+  "auth": {
+    "or": "or",
+    "login": {
+      "title": "Sign in to Finkley",
+      "email_label": "Email",
+      "password_label": "Password",
+      "submit": "Sign in",
+      "forgot_password": "Forgot password?",
+      "no_account": "No account yet?",
+      "signup_link": "Sign up",
+      "google_button": "Continue with Google",
+      "telegram_button": "Continue with Telegram"
+    },
+    "signup": {
+      "title": "Create account",
+      "subtitle": "14 days free. No card up front.",
+      "submit": "Create account",
+      "have_account": "Already have an account?",
+      "login_link": "Sign in",
+      "password_hint": "At least 8 characters",
+      "password_confirm_label": "Confirm password",
+      "confirm_title": "Check your email",
+      "confirm_subtitle": "We sent a confirmation link to {{email}}.",
+      "confirm_hint": "Click the link to activate your account. Check spam if needed.",
+      "confirm_back_to_login": "Back to sign in"
+    },
+    "forgot": {
+      "title": "Reset password",
+      "subtitle": "We'll email you a reset link.",
+      "submit": "Send link",
+      "back_to_login": "Back to sign in"
+    },
+    "reset": {
+      "title": "New password",
+      "submit": "Save password"
+    }
+  },
+  "nav": {
+    "dashboard": "Home",
+    "visits": "Visits",
+    "clients": "Clients",
+    "expenses": "Expenses",
+    "staff": "Staff",
+    "payouts": "Payroll",
+    "reports": "Reports",
+    "ai": "AI assistant",
+    "settings": "Settings",
+    "more": "More",
+    "help": "Help & FAQ"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "period": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "custom": "Period"
+    },
+    "period_picker": {
+      "title": "Pick a period",
+      "subtitle": "Any date range for reports and charts",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply",
+      "last_7": "Last 7 days",
+      "last_30": "Last 30 days",
+      "last_90": "Last 90 days",
+      "last_365": "Last year"
+    }
+  },
+  "payment_methods": {
+    "cash": "Cash",
+    "card": "Card",
+    "transfer": "Transfer",
+    "online": "Online",
+    "mixed": "Mixed"
+  },
+  "settings": {
+    "title": "Settings",
+    "team": {
+      "title": "Team",
+      "subtitle": "Invite an accountant, assistant or staff with different access levels.",
+      "button": "Manage team"
+    },
+    "audit": {
+      "title": "Audit log",
+      "subtitle": "Who changed what — for transparency and compliance.",
+      "button": "Open log"
+    },
+    "api": {
+      "title": "API keys",
+      "subtitle": "Create a key for your own integrations (Zapier, n8n, scripts). Each key is shown only when created."
+    },
+    "referral": {
+      "title": "Invite friends",
+      "subtitle": "Share your code — both of you get a free month on first payment."
+    },
+    "mfa": {
+      "title": "Two-factor authentication",
+      "enable": "Enable 2FA"
+    }
+  },
+  "visits": {
+    "title": "Visits",
+    "tabs": {
+      "single": "Single visit",
+      "bulk": "Multiple visits"
+    }
+  },
+  "ai": {
+    "title": "AI assistant",
+    "subtitle": "Asks about KPIs, compares to last month, suggests what to tweak.",
+    "input_placeholder": "Ask about revenue, staff, services…"
+  },
+  "team": {
+    "role": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "accountant": "Accountant",
+      "staff": "Staff"
+    }
+  }
+}

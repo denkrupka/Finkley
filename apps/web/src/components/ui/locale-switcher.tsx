@@ -10,7 +10,11 @@ import { useTranslation } from 'react-i18next'
  * Хранит выбор в localStorage через i18next-browser-languagedetector
  * (см. i18n/index.ts).
  */
-const LOCALES = [{ code: 'ru', label: 'Русский', flag: '🇷🇺' }] as const
+const LOCALES = [
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { code: 'pl', label: 'Polski', flag: '🇵🇱' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+] as const
 
 export function LocaleSwitcher() {
   const { i18n } = useTranslation()

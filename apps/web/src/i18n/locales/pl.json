@@ -1,0 +1,143 @@
+{
+  "app": {
+    "title": "Finkley"
+  },
+  "common": {
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "edit": "Edytuj",
+    "close": "Zamknij",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "loading": "Ładowanie...",
+    "error_generic": "Coś poszło nie tak. Spróbuj ponownie.",
+    "yes": "Tak",
+    "no": "Nie",
+    "confirm": "Potwierdź",
+    "sign_out": "Wyloguj się",
+    "back_home": "Strona główna"
+  },
+  "auth": {
+    "or": "lub",
+    "login": {
+      "title": "Zaloguj się do Finkley",
+      "email_label": "Email",
+      "password_label": "Hasło",
+      "submit": "Zaloguj",
+      "forgot_password": "Nie pamiętasz hasła?",
+      "no_account": "Nie masz jeszcze konta?",
+      "signup_link": "Zarejestruj się",
+      "google_button": "Kontynuuj przez Google",
+      "telegram_button": "Kontynuuj przez Telegram"
+    },
+    "signup": {
+      "title": "Załóż konto",
+      "subtitle": "14 dni bezpłatnie. Bez karty na start.",
+      "submit": "Załóż konto",
+      "have_account": "Masz już konto?",
+      "login_link": "Zaloguj się",
+      "password_hint": "Minimum 8 znaków",
+      "password_confirm_label": "Powtórz hasło",
+      "confirm_title": "Sprawdź skrzynkę",
+      "confirm_subtitle": "Wysłaliśmy link potwierdzający na {{email}}.",
+      "confirm_hint": "Kliknij w link, by aktywować konto. Sprawdź spam, jeśli list nie przyszedł.",
+      "confirm_back_to_login": "Wróć do logowania"
+    },
+    "forgot": {
+      "title": "Reset hasła",
+      "subtitle": "Wyślemy link na email.",
+      "submit": "Wyślij link",
+      "back_to_login": "Wróć do logowania"
+    },
+    "reset": {
+      "title": "Nowe hasło",
+      "submit": "Zapisz hasło"
+    }
+  },
+  "nav": {
+    "dashboard": "Główna",
+    "visits": "Wizyty",
+    "clients": "Klienci",
+    "expenses": "Wydatki",
+    "staff": "Pracownicy",
+    "payouts": "Wypłaty",
+    "reports": "Raporty",
+    "ai": "AI-asystent",
+    "settings": "Ustawienia",
+    "more": "Więcej",
+    "help": "Pomoc i FAQ"
+  },
+  "dashboard": {
+    "title": "Pulpit",
+    "period": {
+      "day": "Dzień",
+      "week": "Tydzień",
+      "month": "Miesiąc",
+      "custom": "Okres"
+    },
+    "period_picker": {
+      "title": "Wybierz okres",
+      "subtitle": "Dowolny zakres dat dla raportów i wykresów",
+      "from": "Od",
+      "to": "Do",
+      "apply": "Zastosuj",
+      "last_7": "Ostatnie 7 dni",
+      "last_30": "Ostatnie 30 dni",
+      "last_90": "Ostatnie 90 dni",
+      "last_365": "Ostatni rok"
+    }
+  },
+  "payment_methods": {
+    "cash": "Gotówka",
+    "card": "Karta",
+    "transfer": "Przelew",
+    "online": "Online",
+    "mixed": "Mieszane"
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "team": {
+      "title": "Zespół",
+      "subtitle": "Zaproś księgową, asystenta lub pracowników z różnymi poziomami dostępu.",
+      "button": "Zarządzaj zespołem"
+    },
+    "audit": {
+      "title": "Dziennik zdarzeń",
+      "subtitle": "Kto co zmieniał — dla przejrzystości i audytu.",
+      "button": "Otwórz dziennik"
+    },
+    "api": {
+      "title": "Klucze API",
+      "subtitle": "Utwórz klucz dla własnych integracji (Zapier, n8n, skrypty). Każdy klucz pokazujemy tylko raz przy tworzeniu."
+    },
+    "referral": {
+      "title": "Zaproś znajomych",
+      "subtitle": "Udostępnij swój kod — oboje dostaniecie miesiąc gratis przy pierwszej płatności."
+    },
+    "mfa": {
+      "title": "Uwierzytelnianie dwuskładnikowe",
+      "enable": "Włącz 2FA"
+    }
+  },
+  "visits": {
+    "title": "Wizyty",
+    "tabs": {
+      "single": "Jedna wizyta",
+      "bulk": "Wiele wizyt"
+    }
+  },
+  "ai": {
+    "title": "AI-asystent",
+    "subtitle": "Powie o przychodach, porówna z poprzednim miesiącem, podpowie co poprawić.",
+    "input_placeholder": "Zapytaj o przychody, pracowników, usługi…"
+  },
+  "team": {
+    "role": {
+      "owner": "Właściciel",
+      "admin": "Administrator",
+      "accountant": "Księgowa",
+      "staff": "Pracownik"
+    }
+  }
+}

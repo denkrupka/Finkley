@@ -30,7 +30,10 @@ import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
+import { ApiKeysCard } from './ApiKeysCard'
+import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
+import { ReferralCard } from './ReferralCard'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
   COUNTRY_OPTIONS,
@@ -260,6 +263,21 @@ export function SettingsPage() {
       {/* Push-уведомления */}
       <div className="mb-6">
         <PushNotificationsCard />
+      </div>
+
+      {/* 2FA */}
+      <div className="mb-6">
+        <MFACard />
+      </div>
+
+      {/* Referral */}
+      <div className="mb-6">
+        <ReferralCard />
+      </div>
+
+      {/* API keys */}
+      <div className="mb-6">
+        <ApiKeysCard />
       </div>
 
       {/* Подписка */}
