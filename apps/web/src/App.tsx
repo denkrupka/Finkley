@@ -13,6 +13,12 @@ const AIPage = lazyWithRetry(() =>
 const HelpPage = lazyWithRetry(() =>
   import('@/routes/help/HelpPage').then((m) => ({ default: m.HelpPage })),
 )
+const TeamPage = lazyWithRetry(() =>
+  import('@/routes/team/TeamPage').then((m) => ({ default: m.TeamPage })),
+)
+const AcceptInvitePage = lazyWithRetry(() =>
+  import('@/routes/team/AcceptInvitePage').then((m) => ({ default: m.AcceptInvitePage })),
+)
 
 /**
  * Корневой компонент. Auth-роуты — публичные (с RequireGuest),
@@ -108,6 +114,7 @@ function App() {
       <Route path="/reset-password" element={lazyRoute(<ResetPasswordPage />)} />
       <Route path="/auth/callback" element={lazyRoute(<AuthCallbackPage />)} />
       <Route path="/help" element={lazyRoute(<HelpPage />)} />
+      <Route path="/accept-invite" element={lazyRoute(<AcceptInvitePage />)} />
 
       {/* Приватные */}
       <Route
@@ -144,6 +151,7 @@ function App() {
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
         <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
+        <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
