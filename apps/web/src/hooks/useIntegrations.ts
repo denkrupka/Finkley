@@ -11,9 +11,13 @@ export type SalonIntegrationPublic = {
   status: 'connected' | 'error' | 'disconnected'
   last_sync_at: string | null
   last_sync_stats: {
+    // Booksy
     staff_synced?: number
     services_synced?: number
     visits_synced?: number
+    // wFirma
+    expenses_synced?: number
+    expenses_skipped?: number
   } | null
   last_error: string | null
   connected_at: string
@@ -230,6 +234,167 @@ export function useDisconnectIntegration(salonId: string | undefined) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+// =============================================================================
+// wFirma (TASK-31): Hybrid X3 connect — auto-login или ручные ключи
+// =============================================================================
+
+type WfirmaResponse<T> = {
+  ok?: boolean
+  error?: string
+  details?: string | null
+  message?: string
+} & T
+
+function unpackWfirma<T>(data: WfirmaResponse<T>): T {
+  if (!data.ok) throw new Error(data.error ?? data.message ?? 'unknown_error')
+  return data
+}
+
+/** X2: подключение через email+password от wfirma.pl. */
+export function useWfirmaConnectWithLogin(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { email: string; password: string }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
+        body: {
+          action: 'connect_with_login',
+          salon_id: salonId,
+          email: input.email,
+          password: input.password,
+        },
+      })
+      if (error) throw error
+      return unpackWfirma(
+        data as WfirmaResponse<{ company: { id: string; name: string; nip: string } }>,
+      )
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+/** X1: подключение ручным вводом 3 ключей. */
+export function useWfirmaConnectWithCredentials(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { accessKey: string; secretKey: string; companyId: string }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
+        body: {
+          action: 'connect_with_credentials',
+          salon_id: salonId,
+          access_key: input.accessKey,
+          secret_key: input.secretKey,
+          company_id: input.companyId,
+        },
+      })
+      if (error) throw error
+      return unpackWfirma(
+        data as WfirmaResponse<{ company: { id: string; name: string; nip: string } }>,
+      )
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+/** Sync wFirma → Finkley (тянет purchase invoices в expenses). */
+export function useWfirmaSync(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
+        body: { action: 'sync', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as WfirmaResponse<{
+        stats?: { expenses_synced: number; expenses_skipped: number }
+      }>
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
+      return json.stats!
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    },
+  })
+}
+
+/**
+ * Push одного расхода Finkley → wFirma.
+ *
+ * `auto: true`  — соответствует логике из бота (см. ADR-012 §"Auto match"):
+ *   едж проверяет наличие чека и совпадение buyer_nip с компанией; если что-то
+ *   не сходится — возвращает не-ok с явным `error` и не пушит. Используется
+ *   при автоматическом пуше после save в форме.
+ * `auto: false` — push в любом случае. Кнопка «Отправить вручную» в UI.
+ */
+export type WfirmaPushResult =
+  | { kind: 'ok'; wfirmaId: string }
+  | { kind: 'skipped'; reason: 'no_receipt' | 'no_buyer_nip' | 'nip_mismatch' }
+  | { kind: 'already_pushed'; wfirmaId: string }
+  | { kind: 'error'; reason: string }
+
+export function useWfirmaPushExpense(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<WfirmaPushResult, Error, { expenseId: string; auto: boolean }>({
+    mutationFn: async ({ expenseId, auto }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
+        body: {
+          action: 'push_expense',
+          salon_id: salonId,
+          expense_id: expenseId,
+          auto,
+        },
+      })
+      if (error) {
+        // FunctionsHttpError — попробуем достать тело ответа (для already_pushed 409)
+        type WithCtx = { context?: { json?: () => Promise<unknown> } }
+        const ctx = (error as unknown as WithCtx).context
+        if (ctx?.json) {
+          try {
+            const body = (await ctx.json()) as WfirmaResponse<{ wfirma_id?: string }>
+            if (body.error === 'already_pushed' && body.wfirma_id) {
+              return { kind: 'already_pushed', wfirmaId: body.wfirma_id }
+            }
+            return { kind: 'error', reason: body.error ?? body.message ?? error.message }
+          } catch {
+            // ignore
+          }
+        }
+        throw error
+      }
+      const json = data as WfirmaResponse<{
+        wfirma_id?: string
+        buyer_nip?: string
+        expected_nip?: string
+      }>
+      if (json.ok && json.wfirma_id) return { kind: 'ok', wfirmaId: json.wfirma_id }
+      if (!json.ok) {
+        switch (json.error) {
+          case 'skipped_no_receipt':
+            return { kind: 'skipped', reason: 'no_receipt' }
+          case 'skipped_no_buyer_nip':
+            return { kind: 'skipped', reason: 'no_buyer_nip' }
+          case 'skipped_nip_mismatch':
+            return { kind: 'skipped', reason: 'nip_mismatch' }
+          default:
+            return { kind: 'error', reason: json.error ?? json.message ?? 'unknown_error' }
+        }
+      }
+      return { kind: 'error', reason: 'unknown' }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
     },
   })
 }

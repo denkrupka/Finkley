@@ -250,14 +250,20 @@ SENTRY_DSN                     # https://...@sentry.io/...
 (не коммитятся, ставятся через `supabase secrets set --project-ref <ref>`)
 
 ```
-SECRETS_ENCRYPTION_KEY         # 32 байта base64 — для шифрования Booksy/wFirma токенов
+SECRETS_ENCRYPTION_KEY         # 32 байта base64 — резерв (не используется напрямую сейчас)
+WFIRMA_SECRETS_KEY             # 32 байта base64 — AES-256-GCM для wFirma secret_key (ADR-011)
+WFIRMA_APP_KEY                 # 32 hex — appKey приложения «Finkley» в wFirma (ADR-012)
+WFIRMA_AUTO_LOGIN_DISABLED     # '1' для kill-switch X2 auto-login (опц.; по умолчанию выкл.)
 STRIPE_SECRET_KEY              # sk_live_...
 STRIPE_WEBHOOK_SECRET          # whsec_...
 POSTMARK_SERVER_TOKEN          # для отправки email
-ANTHROPIC_API_KEY              # для OCR
+ANTHROPIC_API_KEY              # для OCR + AI-ассистента
 GROQ_API_KEY                   # OCR fallback
 TELEGRAM_BOT_TOKEN             # для Telegram Login валидации
 ```
+
+Сгенерить `WFIRMA_SECRETS_KEY` локально: `openssl rand -base64 32`. После генерации сохранить
+в 1Password — потеря ключа = все юзеры с подключённым wFirma переподключатся (auto-login или ручной ввод).
 
 ### Локальный `.env.local` (gitignored)
 
@@ -270,6 +276,8 @@ VITE_SENTRY_DSN=        # пусто на локалке
 
 # supabase/.env (для локальной разработки edge functions)
 SECRETS_ENCRYPTION_KEY=test_key_32_bytes_base64_encoded_xxxxxxxxxxxxx=
+WFIRMA_SECRETS_KEY=test_key_32_bytes_base64_encoded_xxxxxxxxxxxxx=
+WFIRMA_APP_KEY=121e95248b5368998ceb05bee363dd73
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_test_...
 POSTMARK_SERVER_TOKEN=test_token

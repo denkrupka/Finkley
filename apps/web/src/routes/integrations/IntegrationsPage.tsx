@@ -11,6 +11,7 @@ import {
   useDisconnectIntegration,
   useSalonIntegrations,
   useUpdateBooksyInterval,
+  useWfirmaSync,
   type IntegrationProvider,
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
@@ -18,6 +19,7 @@ import {
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { INTEGRATIONS, type IntegrationDef } from './integrations-config'
+import { WfirmaConnectDialog } from './WfirmaConnectDialog'
 
 /**
  * Список доступных интеграций. Сейчас визуал-only (TASK-27 visual scaffold):
@@ -29,6 +31,7 @@ export function IntegrationsPage() {
   const { salonId } = useParams<{ salonId: string }>()
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
   const [booksyOpen, setBooksyOpen] = useState(false)
+  const [wfirmaOpen, setWfirmaOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
 
   if (!salonId) return null
@@ -39,6 +42,7 @@ export function IntegrationsPage() {
 
   function handleConnect(p: IntegrationDef) {
     if (p.id === 'booksy') setBooksyOpen(true)
+    else if (p.id === 'wfirma') setWfirmaOpen(true)
     else setConnecting(p)
   }
 
@@ -74,6 +78,7 @@ export function IntegrationsPage() {
 
       <ConnectIntegrationDialog provider={connecting} onClose={() => setConnecting(null)} />
       <BooksyConnectDialog open={booksyOpen} onClose={() => setBooksyOpen(false)} />
+      <WfirmaConnectDialog open={wfirmaOpen} onClose={() => setWfirmaOpen(false)} />
     </div>
   )
 }
@@ -91,12 +96,41 @@ function IntegrationCard({
 }) {
   const { t } = useTranslation()
   const Icon = provider.icon
-  const sync = useBooksySync(salonId)
+  const booksySync = useBooksySync(salonId)
+  const wfirmaSync = useWfirmaSync(salonId)
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
   const updateInterval = useUpdateBooksyInterval(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
+
+  function triggerSync() {
+    if (provider.id === 'wfirma') {
+      wfirmaSync.mutate(undefined, {
+        onSuccess: (stats) =>
+          toast.success(
+            t('integrations.toast_synced_wfirma', {
+              synced: stats.expenses_synced,
+              skipped: stats.expenses_skipped,
+            }),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      })
+      return
+    }
+    booksySync.mutate(undefined, {
+      onSuccess: (stats) =>
+        toast.success(
+          t('integrations.toast_synced', {
+            staff: stats.staff_synced,
+            services: stats.services_synced,
+            visits: stats.visits_synced,
+          }),
+        ),
+      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+    })
+  }
+  const syncPending = provider.id === 'wfirma' ? wfirmaSync.isPending : booksySync.isPending
 
   return (
     <div
@@ -141,13 +175,22 @@ function IntegrationCard({
             <p className="text-muted-foreground">{t('integrations.never_synced')}</p>
           )}
           {connection.last_sync_stats ? (
-            <p className="text-foreground mt-1 font-semibold">
-              {t('integrations.last_sync_stats', {
-                staff: connection.last_sync_stats.staff_synced ?? 0,
-                services: connection.last_sync_stats.services_synced ?? 0,
-                visits: connection.last_sync_stats.visits_synced ?? 0,
-              })}
-            </p>
+            provider.id === 'wfirma' ? (
+              <p className="text-foreground mt-1 font-semibold">
+                {t('integrations.last_sync_stats_wfirma', {
+                  synced: connection.last_sync_stats.expenses_synced ?? 0,
+                  skipped: connection.last_sync_stats.expenses_skipped ?? 0,
+                })}
+              </p>
+            ) : (
+              <p className="text-foreground mt-1 font-semibold">
+                {t('integrations.last_sync_stats', {
+                  staff: connection.last_sync_stats.staff_synced ?? 0,
+                  services: connection.last_sync_stats.services_synced ?? 0,
+                  visits: connection.last_sync_stats.visits_synced ?? 0,
+                })}
+              </p>
+            )
           ) : null}
           {connection.last_error ? (
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
@@ -196,23 +239,11 @@ function IntegrationCard({
           <>
             <button
               type="button"
-              onClick={() =>
-                sync.mutate(undefined, {
-                  onSuccess: (stats) =>
-                    toast.success(
-                      t('integrations.toast_synced', {
-                        staff: stats.staff_synced,
-                        services: stats.services_synced,
-                        visits: stats.visits_synced,
-                      }),
-                    ),
-                  onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                })
-              }
-              disabled={sync.isPending}
+              onClick={triggerSync}
+              disabled={syncPending}
               className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline disabled:opacity-50"
             >
-              {sync.isPending ? (
+              {syncPending ? (
                 <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
               ) : (
                 <RefreshCw className="size-3.5" strokeWidth={2} />

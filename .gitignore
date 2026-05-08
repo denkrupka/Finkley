@@ -73,3 +73,6 @@ supabase/.temp/
 
 # Local bug-screens scratchpad (PII)
 .bug-screens/
+
+# One-off secret backups (e.g. WFIRMA_SECRETS_KEY post-rotation)
+secrets-backup/

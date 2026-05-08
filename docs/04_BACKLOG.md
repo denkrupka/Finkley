@@ -514,12 +514,25 @@ Edge function `ocr-receipt` (Anthropic Claude Haiku 4.5 vision). UI кнопка
 **Стадия:** 3 · **Оценка:** L
 **AC:** Кнопка "📷 Чек" в форме, upload в Storage, edge function `ocr-receipt` через Anthropic Claude Haiku 4.5, JSON парсинг, confirm-карточка, fallback Groq Llama Vision.
 
-### TASK-31: wFirma (PL only) 🟡 SCAFFOLD (8 мая 2026)
+### TASK-31: wFirma (PL only) ✅ DONE (8 мая 2026)
 
 **Стадия:** 3 · **Оценка:** XL
 **AC:** UI подключения (accessKey/secretKey), синк закупочных фактур, отправка expense в wFirma, KSeF, отображается только для country_code=PL.
 
-**Что в проде:** UI scaffold — wFirma в `integrations-config` с status='in_research', connect-form fields (access_key, secret_key, company_id). **НЕ сделано:** реальный sync — ждёт первых PL-юзеров с активным wFirma-аккаунтом для тестирования.
+**Что в проде:**
+
+- **Hybrid X3 connect-flow** (см. ADR-012): Quick-таб (email+password от wfirma.pl) → Edge function реверсит UI wFirma и автоматически создаёт приложение «Finkley», вытаскивая accessKey/secretKey. Manual-таб (3 ключа руками) — фолбэк для юзеров с 2FA или если auto-flow сломался.
+- **AES-256-GCM шифрование** wFirma `secret_key` через `WFIRMA_SECRETS_KEY` (см. ADR-011). Шифр/дешифр только в edge function `wfirma-proxy`.
+- **Sync** (pull): расходы wFirma → Finkley `expenses`, source='wfirma', категория «Импорт wFirma» (создаётся автоматом per salon). Cron `wfirma-auto-sync` каждые 10 минут проверяет due-integrations с дефолтным интервалом 60 минут per salon. KSeF id и contractor NIP кладутся в `expenses.metadata` для UI.
+- **Push** (single expense): кнопка «Отправить в wFirma» в списке расходов (`auto:false`) + auto-push после save если есть чек и совпал `buyer_nip` (`auto:true`). Auto-match по `expenses.metadata.buyer_nip` vs `salon_integrations.credentials.company_nip` (заполняется при connect через `companies/find`). Без NIP-совпадения push скипается с tooltip-плашкой и предложением ручной кнопки.
+- **OCR-расширение** (`ocr-receipt`): Vision-промпт теперь возвращает `vendor_nip`+`buyer_nip` (NIP sprzedawcy и nabywcy на польских фактурах). Используется в auto-match push.
+- **Валюта**: PLN/EUR/USD/любая ISO — wFirma сама конвертирует по курсу NBP (см. документацию wFirma); никаких блокировок по currency.
+
+**Что не сделано (отдельные задачи если понадобятся):**
+
+- Импорт PDF фактуры в Storage receipts при sync — пока тянем только метаданные. wFirma уже хранит PDF у себя.
+- Per-salon выбор фирмы при auto-login если в аккаунте несколько фирм — берём первую. Если у юзера их несколько — пусть подключается через Manual-таб с другим companyId.
+- Semantic-маппинг категорий wFirma → Finkley при импорте — все идут в одну дефолтную «Импорт wFirma» категорию, юзер перекатегоризирует руками.
 
 ### TASK-32: CSV-импорт ✅ DONE (7 мая 2026)
 

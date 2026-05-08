@@ -891,7 +891,17 @@
       "booksy_invalid_credentials": "Неверный email или пароль. Проверь данные в Booksy Pro.",
       "booksy_request_blocked": "Booksy заблокировал прямой логин. Используй вкладку «Токен» — это занимает 30 секунд.",
       "booksy_rate_limited": "Слишком много попыток. Подожди 5 минут и попробуй снова.",
-      "booksy_no_business": "В аккаунте нет ни одного бизнеса. Войди в Booksy Pro и создай salon-профиль."
+      "booksy_no_business": "В аккаунте нет ни одного бизнеса. Войди в Booksy Pro и создай salon-профиль.",
+      "wfirma_login_failed": "Неверный email или пароль от wfirma.pl. Если у тебя включена двухфакторка — введи ключи вручную на соседней вкладке.",
+      "wfirma_no_companies": "В аккаунте wFirma нет ни одной фирмы. Сначала добавь её в wFirma и попробуй снова.",
+      "wfirma_form_changed": "wFirma поменяли свой интерфейс — авто-подключение временно сломалось. Введи ключи вручную на соседней вкладке.",
+      "wfirma_captcha": "wFirma попросили капчу при логине. Введи ключи вручную на соседней вкладке.",
+      "wfirma_keygen_failed": "Не удалось получить ключи от wFirma. Попробуй ещё раз или введи их вручную.",
+      "wfirma_invalid_credentials": "Неверная пара access/secret ключей. Проверь, что копировал их без пробелов.",
+      "wfirma_company_id_not_found": "Эта фирма не найдена в твоём wFirma-аккаунте. Проверь Company ID.",
+      "wfirma_invalid_keys_format": "Access key и Secret key должны быть строками из 32 шестнадцатеричных символов.",
+      "wfirma_invalid_company_id": "Company ID — это число (например 884136). Найди его в URL после логина.",
+      "wfirma_auto_login_disabled": "Авто-подключение временно отключено. Введи ключи вручную на соседней вкладке."
     },
     "status": {
       "available": "Готово",
@@ -908,6 +918,20 @@
       "token_step3": "Вставь токен сюда — мы проверим и сохраним",
       "token_label": "Access token (x-access-token)"
     },
+    "wfirma": {
+      "dialog_subtitle": "Введи логин/пароль от wfirma.pl — мы получим API-ключи автоматически. Если у тебя двухфакторка или авто-подключение не сработало — есть вкладка с ручным вводом.",
+      "tab_quick": "Быстро",
+      "tab_manual": "Вручную",
+      "quick_subtitle": "Введи логин/пароль от wFirma. Мы один раз авторизуемся, сами создадим в твоём аккаунте приложение «Finkley» и сохраним его ключи. Пароль на нашем сервере не остаётся.",
+      "security_note": "Пароль используем только один раз — в момент создания ключа. Сами ключи шифруются на сервере (AES-256). Удалить «Finkley» из подключённых приложений можно в любой момент в wfirma.pl → Ustawienia → OAuth → Klucze API.",
+      "manual_step1": "Зайди на wfirma.pl под своим логином",
+      "manual_step2": "Открой Ustawienia → OAuth → Klucze API → Dodaj",
+      "manual_step3": "Введи название (например «Finkley»), подтверди паролем и скопируй Access key + Secret key",
+      "manual_step4": "Company ID найди в URL после логина (например 884136)",
+      "manual_company_id_hint": "Это число рядом с названием твоей фирмы или после /site_index/ в URL."
+    },
+    "toast_synced_wfirma": "wFirma: добавлено {{synced}} новых расходов, пропущено {{skipped}}",
+    "last_sync_stats_wfirma": "Импортировано: {{synced}} · Пропущено: {{skipped}}",
     "providers": {
       "booksy": {
         "description": "Польская платформа онлайн-записи №1 для салонов красоты. Подтянем визиты, клиентов и услуги из твоего аккаунта."
@@ -1107,7 +1131,17 @@
     "empty": "Пока нет расходов",
     "receipt_open": "Открыть чек",
     "receipt_title": "Чек",
-    "receipt_subtitle": "Закрой это окно, чтобы вернуться к списку расходов."
+    "receipt_subtitle": "Закрой это окно, чтобы вернуться к списку расходов.",
+    "wfirma": {
+      "push_button": "Отправить в wFirma",
+      "tooltip_pushed": "Отправлено в wFirma (id: {{id}})",
+      "toast_auto_pushed": "Расход добавлен и отправлен в wFirma ✓",
+      "toast_manual_pushed": "Расход отправлен в wFirma ✓",
+      "toast_already_pushed": "Этот расход уже есть в wFirma",
+      "toast_skipped_no_nip": "В wFirma не отправлено: на чеке нет NIP покупателя. Кнопка «Отправить вручную» в списке расходов.",
+      "toast_skipped_nip_mismatch": "В wFirma не отправлено: NIP nabywcy на чеке не совпадает с твоей фирмой. Кнопка «Отправить вручную» в списке расходов.",
+      "toast_push_failed": "Не получилось отправить в wFirma"
+    }
   },
   "payment_methods": {
     "cash": "Нал",

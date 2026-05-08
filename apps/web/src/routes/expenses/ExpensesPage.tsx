@@ -1,4 +1,4 @@
-import { Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
+import { CheckCircle2, FileText, Loader2, Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -19,6 +19,7 @@ import {
   useExpenses,
   type ExpenseRow,
 } from '@/hooks/useExpenses'
+import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
 import { BudgetsCard } from './BudgetsCard'
 import { useSalon } from '@/hooks/useSalons'
 import { getDatePeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
@@ -47,7 +48,12 @@ export function ExpensesPage() {
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: expenses = [], isLoading } = useExpenses(salonId, range)
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
+  const wfirmaPush = useWfirmaPushExpense(salonId)
+  const wfirmaConnected = integrations.some(
+    (i) => i.provider === 'wfirma' && i.status === 'connected',
+  )
 
   const [formOpen, setFormOpen] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
@@ -167,7 +173,7 @@ export function ExpensesPage() {
                 return (
                   <li
                     key={e.id}
-                    className="border-border grid grid-cols-[60px_1fr_auto_36px] items-center gap-3 border-t px-5 py-3 first:border-t-0"
+                    className="border-border grid grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
                     style={{ borderLeftWidth: 3, borderLeftColor: color }}
                     data-testid="expense-row"
                   >
@@ -205,19 +211,81 @@ export function ExpensesPage() {
                     <span className="num text-destructive text-right text-sm font-bold">
                       −{formatCurrency(e.amount_cents, currency)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirm(t('expenses.confirm_delete'))) return
-                        deleteExpense.mutate(e.id, {
-                          onSuccess: () => toast.success(t('expenses.toast_deleted')),
-                        })
-                      }}
-                      className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                      aria-label="delete"
-                    >
-                      <Trash2 className="size-4" strokeWidth={1.7} />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      {wfirmaConnected && e.source !== 'wfirma'
+                        ? (() => {
+                            const meta = (e.metadata ?? {}) as Record<string, unknown>
+                            const wfId =
+                              typeof meta.wfirma_expense_id === 'string'
+                                ? meta.wfirma_expense_id
+                                : null
+                            const isPushing =
+                              wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
+                            if (wfId) {
+                              return (
+                                <span
+                                  className="grid size-7 place-items-center rounded-md text-emerald-600"
+                                  title={t('expenses.wfirma.tooltip_pushed', { id: wfId })}
+                                >
+                                  <CheckCircle2 className="size-4" strokeWidth={1.8} />
+                                </span>
+                              )
+                            }
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  wfirmaPush.mutate(
+                                    { expenseId: e.id, auto: false },
+                                    {
+                                      onSuccess: (res) => {
+                                        if (res.kind === 'ok') {
+                                          toast.success(t('expenses.wfirma.toast_manual_pushed'))
+                                        } else if (res.kind === 'already_pushed') {
+                                          toast.info(t('expenses.wfirma.toast_already_pushed'))
+                                        } else if (res.kind === 'error') {
+                                          toast.error(t('expenses.wfirma.toast_push_failed'), {
+                                            description: res.reason,
+                                          })
+                                        }
+                                      },
+                                      onError: (err) => {
+                                        toast.error(t('expenses.wfirma.toast_push_failed'), {
+                                          description:
+                                            err instanceof Error ? err.message : String(err),
+                                        })
+                                      },
+                                    },
+                                  )
+                                }}
+                                disabled={isPushing}
+                                className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
+                                aria-label={t('expenses.wfirma.push_button')}
+                                title={t('expenses.wfirma.push_button')}
+                              >
+                                {isPushing ? (
+                                  <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+                                ) : (
+                                  <FileText className="size-4" strokeWidth={1.7} />
+                                )}
+                              </button>
+                            )
+                          })()
+                        : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!confirm(t('expenses.confirm_delete'))) return
+                          deleteExpense.mutate(e.id, {
+                            onSuccess: () => toast.success(t('expenses.toast_deleted')),
+                          })
+                        }}
+                        className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                        aria-label="delete"
+                      >
+                        <Trash2 className="size-4" strokeWidth={1.7} />
+                      </button>
+                    </div>
                   </li>
                 )
               })}

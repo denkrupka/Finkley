@@ -31,6 +31,7 @@ import {
   type ExpenseCategoryRow,
   type ExpenseRecurrence,
 } from '@/hooks/useExpenses'
+import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
 
@@ -107,13 +108,25 @@ export function ExpenseFormModal({
 }: Props) {
   const { t } = useTranslation()
   const { data: categories = [] } = useExpenseCategories(salonId)
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
   const createExpense = useCreateExpense(salonId)
+  const wfirmaPush = useWfirmaPushExpense(salonId)
   const ocr = useOcrReceipt()
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  // OCR-извлечённые NIP'ы — попадают в expenses.metadata при save и используются
+  // edge function wfirma-proxy для решения auto-push (см. ADR-012).
+  const [ocrNips, setOcrNips] = useState<{ buyer_nip: string | null; vendor_nip: string | null }>({
+    buyer_nip: null,
+    vendor_nip: null,
+  })
+
+  const wfirmaConnected = integrations.some(
+    (i) => i.provider === 'wfirma' && i.status === 'connected',
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -146,6 +159,10 @@ export function ExpenseFormModal({
       }
     }
 
+    const metadata: Record<string, unknown> = {}
+    if (ocrNips.buyer_nip) metadata.buyer_nip = ocrNips.buyer_nip
+    if (ocrNips.vendor_nip) metadata.vendor_nip = ocrNips.vendor_nip
+
     createExpense.mutate(
       {
         salon_id: salonId,
@@ -157,9 +174,10 @@ export function ExpenseFormModal({
         receipt_url: receiptUrl,
         recurrence: values.recurrence,
         next_occurrence_at: nextOccurrence(values.expense_at, values.recurrence),
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (created) => {
           toast.success(t('expenses.toast_added'))
           form.reset({
             expense_at: today,
@@ -170,7 +188,40 @@ export function ExpenseFormModal({
             recurrence: 'none',
           })
           setReceiptFile(null)
+          setOcrNips({ buyer_nip: null, vendor_nip: null })
           onOpenChange(false)
+
+          // Auto-push в wFirma если подключена и есть чек.
+          // Edge function сам решит — пушить или скипнуть (по NIP).
+          if (wfirmaConnected && receiptUrl && created?.id) {
+            wfirmaPush.mutate(
+              { expenseId: created.id, auto: true },
+              {
+                onSuccess: (res) => {
+                  if (res.kind === 'ok') {
+                    toast.success(t('expenses.wfirma.toast_auto_pushed'))
+                  } else if (res.kind === 'skipped') {
+                    if (res.reason === 'nip_mismatch') {
+                      toast.info(t('expenses.wfirma.toast_skipped_nip_mismatch'))
+                    } else if (res.reason === 'no_buyer_nip') {
+                      toast.info(t('expenses.wfirma.toast_skipped_no_nip'))
+                    }
+                    // no_receipt здесь не возникает — мы попадаем сюда только при receiptUrl
+                  } else if (res.kind === 'error') {
+                    toast.error(t('expenses.wfirma.toast_push_failed'), {
+                      description: res.reason,
+                    })
+                  }
+                },
+                // onError ловит сетевые сбои; локальную проблему уже логируем выше
+                onError: (err) => {
+                  toast.error(t('expenses.wfirma.toast_push_failed'), {
+                    description: err instanceof Error ? err.message : String(err),
+                  })
+                },
+              },
+            )
+          }
         },
         onError: (err) => {
           toast.error(t('expenses.toast_error'), {
@@ -302,7 +353,10 @@ export function ExpenseFormModal({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setReceiptFile(null)}
+                  onClick={() => {
+                    setReceiptFile(null)
+                    setOcrNips({ buyer_nip: null, vendor_nip: null })
+                  }}
                   className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
                   aria-label={t('expenses.form.receipt_remove')}
                 >
@@ -331,6 +385,7 @@ export function ExpenseFormModal({
                   return
                 }
                 setReceiptFile(file)
+                setOcrNips({ buyer_nip: null, vendor_nip: null })
                 // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
                 if (file && file.type.startsWith('image/')) {
                   ocr.mutate(file, {
@@ -350,6 +405,12 @@ export function ExpenseFormModal({
                       if (parsed.vendor && !form.getValues('comment')) {
                         form.setValue('comment', parsed.vendor, { shouldDirty: true })
                       }
+                      // NIP'ы — для wFirma auto-push (см. ADR-012).
+                      // Сами поля юзеру не показываем — это служебная мета.
+                      setOcrNips({
+                        buyer_nip: parsed.buyer_nip,
+                        vendor_nip: parsed.vendor_nip,
+                      })
                       toast.success(t('expenses.form.ocr_done'))
                     },
                     onError: () => {

@@ -1,15 +1,15 @@
-// Деплой edge function на prod через Supabase Management API.
-// Обходит supabase CLI 2.98.2, который не понимает новый формат токена sbp_v0_*.
+// Деплой edge function на prod (или staging при TARGET=staging) через
+// Supabase Management API. Обходит supabase CLI 2.98.2, который не понимает
+// новый формат токена sbp_v0_*.
 //
 // Использование:
 //   node scripts/deploy-edge-function.mjs <slug> [--no-verify-jwt]
-//
-// Например:
-//   node scripts/deploy-edge-function.mjs telegram-bug-collector --no-verify-jwt
+//   TARGET=staging node scripts/deploy-edge-function.mjs <slug>
 //
 // Env (читаются из apps/web/.env.local):
 //   SUPABASE_ACCESS_TOKEN
-//   VITE_SUPABASE_URL  — для определения project ref
+//   VITE_SUPABASE_URL       — prod project ref
+//   VITE_SUPABASE_URL_TEST  — staging project ref (используется при TARGET=staging)
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,9 +31,11 @@ const env = readEnv()
 const TOKEN = env.SUPABASE_ACCESS_TOKEN
 if (!TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN missing')
 
-const url = env.VITE_SUPABASE_URL ?? ''
+const target = (process.env.TARGET ?? 'prod').toLowerCase()
+const urlVar = target === 'staging' ? 'VITE_SUPABASE_URL_TEST' : 'VITE_SUPABASE_URL'
+const url = env[urlVar] ?? ''
 const REF = url.match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1]
-if (!REF) throw new Error('Cannot resolve project ref from VITE_SUPABASE_URL')
+if (!REF) throw new Error(`Cannot resolve project ref from ${urlVar}`)
 
 const slug = process.argv[2]
 if (!slug) {

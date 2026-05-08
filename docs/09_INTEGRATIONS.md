@@ -238,44 +238,64 @@ ADR: `decisions/005-booksy-integration-strategy.md`
 
 ## wFirma (PL only)
 
-**Стадия 3.**
+**Стадия 3.** Реализовано как `wfirma-proxy` edge function, см. ADR-011 (encryption) + ADR-012 (Hybrid X3 auto-login).
 
 ### API
 
-- docs.wfirma.pl
-- Авторизация: `accessKey` + `secretKey`
+- Документация: https://doc.wfirma.pl
 - Endpoint: `https://api2.wfirma.pl/`
+- Авторизация: 3 хедера — `accessKey` + `secretKey` (юзерские, 32 hex) + `appKey` (наш, общий — `WFIRMA_APP_KEY` в Edge Function secrets)
+- Формат: JSON (`?inputFormat=json&outputFormat=json`)
 
-### Хранение
+### Подключение (Hybrid X3, ADR-012)
 
-`integration_credentials.encrypted_payload`:
+Two-tab connect-диалог:
 
-```json
+1. **Quick (X2):** юзер вводит email+password от wfirma.pl. Edge function проходит 9-шаговый web-flow (login → enter company → /api_user_keys/add → /users/sudo с паролем → /api_user_keys/confirmView), парсит `accessKey`/`secretKey` из HTML и валидирует их через `companies/find`. Пароль не сохраняется.
+2. **Manual (X1):** юзер сам генерирует ключи в `wfirma.pl → Ustawienia → OAuth → Klucze API → Dodaj` и вставляет 3 значения (access/secret/companyId). Используется при 2FA или если X2 сломался.
+
+Kill-switch: `WFIRMA_AUTO_LOGIN_DISABLED=1` отключает X2-таб глобально.
+
+### Хранение (ADR-011)
+
+`salon_integrations.credentials` jsonb:
+
+```jsonc
 {
-  "access_key": "...",
-  "secret_key": "...",
-  "company_id": "<wFirma company ID>"
+  "access_key": "a09994e4505b6195ac16b0617e5e25c9",     // plaintext
+  "secret_key_enc": "<base64(iv ‖ AES-256-GCM(secret))>", // зашифровано
+  "company_id": "884136",                                // plaintext
+  "company_nip": "7831854263",                           // plaintext
+  "company_name": "Wonderful Beauty Sp. z o. o.",        // plaintext
+  "connected_via": "auto_login" | "manual"
 }
 ```
 
-### `wfirma-sync` (cron раз в час)
+Ключ AES — `WFIRMA_SECRETS_KEY` в Edge Function secrets.
 
-1. Для каждого PL salon с активным wFirma integration
-2. Расшифровать креды
-3. GET `/invoices/find` — закупочные фактуры за месяц
-4. Маппить в expenses (source='wfirma')
-5. Upsert
+### Sync (pull) — `cron_run_wfirma_syncs` каждые 10 минут
 
-### `wfirma-push-expense`
+Per-salon интервал: `salon_integrations.sync_interval_minutes` (дефолт 60).
 
-- Принимает expense_id
-- Собирает XML/JSON для `/invoices/add`
-- POST → invoice_id wFirma
-- Сохраняет в `expenses.metadata.wfirma_invoice_id`
+1. Для каждой due `wfirma`-integration выпустить одноразовый `wfirma_sync_triggers.token` и кикнуть edge function.
+2. POST `/expenses/find` с фильтром `date >= last_sync_at` (или 60 дней назад при первом).
+3. Для каждой записи: GET `/expenses/get/{id}` — детали (contractor.nip, ksef_id).
+4. Insert в `expenses` с `source='wfirma'`, `external_id=wfirma.id` (uniq dedup), `metadata={wfirma_expense_id, wfirma_ksef_id, vendor_nip, currency_original}`.
+5. Категория — дефолтная «Импорт wFirma» (создаётся при первом sync).
+
+### Push (один расход) — `push_expense`
+
+- `auto:true` (вызывается из ExpenseFormModal после save при наличии чека) — пушит только если `expenses.metadata.buyer_nip == salon_integrations.credentials.company_nip`. Иначе скипает с явным reason.
+- `auto:false` (кнопка «Отправить в wFirma» в списке расходов) — пушит безусловно.
+- POST `/expenses/add` с `type=invoice` (если есть NIP контрагента) или `type=bill` иначе. Сохраняет `wfirma_id` в `expenses.metadata.wfirma_expense_id` + timestamp в `wfirma_pushed_at`.
 
 ### KSeF
 
-wFirma уже отправляет в KSeF от имени юзера. Мы следим за статусом через `/invoices/find`.
+Не лезем напрямую — wFirma сама подтягивает фактуры из KSeF. Мы тянем из wFirma и сохраняем `<ksef_id>` (если есть) в `expenses.metadata.wfirma_ksef_id` для UI-метки.
+
+### Валюта
+
+wFirma поддерживает фактуры закупки в PLN/EUR/USD/любой ISO-валюте — конвертация в PLN автоматом по курсу NBP с предыдущего рабочего дня. Никаких блокировок по `salon.currency` мы не делаем.
 
 ---
 
@@ -408,7 +428,7 @@ Sentry.init({ dsn: Deno.env.get('SENTRY_DSN_SERVER')! })
 | Задача                       | Частота           | Edge function       |
 | ---------------------------- | ----------------- | ------------------- |
 | Booksy sync                  | каждые 30 мин     | `booksy-sync`       |
-| wFirma sync                  | каждый час        | `wfirma-sync`       |
+| wFirma sync                  | каждые 10 минут   | `wfirma-proxy`      |
 | Trial ending email           | каждый день 09:00 | `check-trials`      |
 | Weekly digest (стадия 4)     | пн 09:00          | `weekly-digest`     |
 | Generate insights (стадия 4) | каждый день 04:00 | `generate-insights` |

@@ -99,27 +99,10 @@ export const INTEGRATIONS: IntegrationDef[] = [
     description_key: 'integrations.providers.wfirma.description',
     icon: FileText,
     brandColor: '#1976D2',
-    connectFields: [
-      {
-        key: 'access_key',
-        label_key: 'integrations.fields.access_key',
-        type: 'text',
-        required: true,
-      },
-      {
-        key: 'secret_key',
-        label_key: 'integrations.fields.secret_key',
-        type: 'password',
-        required: true,
-      },
-      {
-        key: 'company_id',
-        label_key: 'integrations.fields.company_id',
-        type: 'text',
-        required: true,
-      },
-    ],
-    status: 'in_research',
+    // connectFields не используются — у wFirma свой Hybrid-диалог
+    // (auto-login email+password ИЛИ ручной ввод 3 ключей).
+    connectFields: [],
+    status: 'available',
   },
   {
     id: 'yclients',

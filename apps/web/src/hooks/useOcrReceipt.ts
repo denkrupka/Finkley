@@ -7,6 +7,8 @@ export type OcrParsedReceipt = {
   currency: string | null
   expense_at: string | null
   vendor: string | null
+  vendor_nip: string | null
+  buyer_nip: string | null
   category_guess: string | null
   raw_text: string | null
 }

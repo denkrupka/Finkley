@@ -18,6 +18,16 @@ export type ExpenseRow = {
   recurrence: ExpenseRecurrence
   next_occurrence_at: string | null
   recurrence_parent_id: string | null
+  /**
+   * Произвольные метаданные jsonb. Известные ключи:
+   *   wfirma_expense_id — расход уже отправлен в wFirma (push успешен)
+   *   wfirma_pushed_at  — ISO timestamp push'а
+   *   wfirma_ksef_id    — id фактуры в KSeF (если расход импортирован из wFirma)
+   *   buyer_nip         — NIP nabywcy из OCR-результата
+   *   vendor_nip        — NIP sprzedawcy из OCR-результата
+   *   currency_original — оригинальная валюта (для импортов из wFirma)
+   */
+  metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -65,7 +75,7 @@ export function useExpenses(salonId: string | undefined, period: ExpensesPeriod)
       const { data, error } = await supabase
         .from('expenses')
         .select(
-          'id, salon_id, category_id, expense_at, amount_cents, payment_method, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, created_at, updated_at, deleted_at',
+          'id, salon_id, category_id, expense_at, amount_cents, payment_method, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, created_at, updated_at, deleted_at',
         )
         .eq('salon_id', salonId)
         .is('deleted_at', null)
@@ -91,6 +101,12 @@ export type CreateExpenseInput = {
   receipt_url?: string | null
   recurrence?: ExpenseRecurrence
   next_occurrence_at?: string | null
+  /**
+   * Произвольные метаданные (jsonb). Сейчас используется для wFirma push:
+   * { buyer_nip?: string, vendor_nip?: string }. Edge function потом
+   * сравнивает buyer_nip с подключённой компанией и решает auto-push.
+   */
+  metadata?: Record<string, unknown>
 }
 
 export function useCreateExpense(salonId: string | undefined) {
