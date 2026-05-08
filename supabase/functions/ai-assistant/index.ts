@@ -344,55 +344,59 @@ async function handleReset(
   return jsonResponse({ ok: true, conversation_id: created.id })
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
-  }
+import { withSentry } from '../_shared/sentry.ts'
 
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
-  }
-  const userJwt = authHeader.slice('Bearer '.length)
+Deno.serve(
+  withSentry('ai-assistant', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    }
 
-  const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userJwt}` } },
-  })
-  const { data: userRes, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userRes?.user) {
-    return jsonResponse({ ok: false, error: 'invalid_token' }, 401)
-  }
-  const userId = userRes.user.id
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
+    }
+    const userJwt = authHeader.slice('Bearer '.length)
 
-  let body: {
-    action?: string
-    salon_id?: string
-    conversation_id?: string
-    message?: string
-  }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
-  }
+    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    })
+    const { data: userRes, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userRes?.user) {
+      return jsonResponse({ ok: false, error: 'invalid_token' }, 401)
+    }
+    const userId = userRes.user.id
 
-  if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
+    let body: {
+      action?: string
+      salon_id?: string
+      conversation_id?: string
+      message?: string
+    }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
 
-  switch (body.action) {
-    case 'send':
-      return handleSend(admin, userId, body.salon_id, body.conversation_id, body.message ?? '')
-    case 'history':
-      return handleHistory(admin, userId, body.salon_id, body.conversation_id)
-    case 'reset':
-      return handleReset(admin, userId, body.salon_id)
-    default:
-      return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
-  }
-})
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+
+    switch (body.action) {
+      case 'send':
+        return handleSend(admin, userId, body.salon_id, body.conversation_id, body.message ?? '')
+      case 'history':
+        return handleHistory(admin, userId, body.salon_id, body.conversation_id)
+      case 'reset':
+        return handleReset(admin, userId, body.salon_id)
+      default:
+        return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
+    }
+  }),
+)

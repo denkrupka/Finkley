@@ -19,6 +19,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { recordSyncResult } from '../_shared/notify.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -916,22 +917,25 @@ async function runSyncForSalon(
     stats = await syncBooksyData(admin, salonId, creds.access_token, creds.business_id)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    await admin
-      .from('salon_integrations')
-      .update({ status: 'error', last_error: msg })
-      .eq('salon_id', salonId)
-      .eq('provider', 'booksy')
+    const { data: salonRow } = await admin
+      .from('salons')
+      .select('name')
+      .eq('id', salonId)
+      .maybeSingle()
+    await recordSyncResult(admin, {
+      salonId,
+      provider: 'booksy',
+      ok: false,
+      errorMessage: msg,
+      salonName: (salonRow as { name?: string } | null)?.name ?? null,
+    })
     return { ok: false, status: 502, message: msg }
   }
 
+  await recordSyncResult(admin, { salonId, provider: 'booksy', ok: true })
   await admin
     .from('salon_integrations')
-    .update({
-      status: 'connected',
-      last_sync_at: new Date().toISOString(),
-      last_sync_stats: stats,
-      last_error: null,
-    })
+    .update({ status: 'connected', last_sync_stats: stats })
     .eq('salon_id', salonId)
     .eq('provider', 'booksy')
 
@@ -1004,86 +1008,90 @@ async function handleUpdateInterval(
 // Entry
 // =============================================================================
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
-  }
+import { withSentry } from '../_shared/sentry.ts'
 
-  let body: {
-    action?: string
-    salon_id?: string
-    email?: string
-    password?: string
-    captcha_token?: string
-    access_token?: string
-    token?: string
-    interval_minutes?: number
-  }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
-  }
+Deno.serve(
+  withSentry('booksy-proxy', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    }
 
-  if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
+    let body: {
+      action?: string
+      salon_id?: string
+      email?: string
+      password?: string
+      captcha_token?: string
+      access_token?: string
+      token?: string
+      interval_minutes?: number
+    }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
 
-  // Cron action: проверяем rendezvous-token, без user JWT
-  if (body.action === 'cron_sync_one') {
-    if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
-    return handleCronSyncOne(admin, body.salon_id, body.token)
-  }
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-  // Все остальные actions требуют user JWT
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
-  }
-  const userJwt = authHeader.slice('Bearer '.length)
+    // Cron action: проверяем rendezvous-token, без user JWT
+    if (body.action === 'cron_sync_one') {
+      if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
+      return handleCronSyncOne(admin, body.salon_id, body.token)
+    }
 
-  const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userJwt}` } },
-  })
-  const { data: userRes, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userRes?.user) {
-    return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
-  }
-  const userId = userRes.user.id
+    // Все остальные actions требуют user JWT
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
+    }
+    const userJwt = authHeader.slice('Bearer '.length)
 
-  switch (body.action) {
-    case 'login':
-      if (!body.email || !body.password || !body.captcha_token) {
-        return jsonResponse({ ok: false, error: 'email_password_captcha_required' }, 400)
-      }
-      return handleLogin(
-        admin,
-        userId,
-        body.salon_id,
-        body.email,
-        body.password,
-        body.captcha_token,
-      )
-    case 'login_with_token':
-      if (!body.access_token) {
-        return jsonResponse({ ok: false, error: 'access_token_required' }, 400)
-      }
-      return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
-    case 'sync':
-      return handleSync(admin, userId, body.salon_id)
-    case 'clear_visits':
-      return handleClearVisits(admin, userId, body.salon_id)
-    case 'update_interval':
-      if (typeof body.interval_minutes !== 'number') {
-        return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
-      }
-      return handleUpdateInterval(admin, userId, body.salon_id, body.interval_minutes)
-    default:
-      return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
-  }
-})
+    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    })
+    const { data: userRes, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userRes?.user) {
+      return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
+    }
+    const userId = userRes.user.id
+
+    switch (body.action) {
+      case 'login':
+        if (!body.email || !body.password || !body.captcha_token) {
+          return jsonResponse({ ok: false, error: 'email_password_captcha_required' }, 400)
+        }
+        return handleLogin(
+          admin,
+          userId,
+          body.salon_id,
+          body.email,
+          body.password,
+          body.captcha_token,
+        )
+      case 'login_with_token':
+        if (!body.access_token) {
+          return jsonResponse({ ok: false, error: 'access_token_required' }, 400)
+        }
+        return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
+      case 'sync':
+        return handleSync(admin, userId, body.salon_id)
+      case 'clear_visits':
+        return handleClearVisits(admin, userId, body.salon_id)
+      case 'update_interval':
+        if (typeof body.interval_minutes !== 'number') {
+          return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
+        }
+        return handleUpdateInterval(admin, userId, body.salon_id, body.interval_minutes)
+      default:
+        return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
+    }
+  }),
+)

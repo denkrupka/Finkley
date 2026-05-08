@@ -1,5 +1,16 @@
 name: Deploy Supabase (Migrations + Functions)
 
+# Двухступенчатый pipeline: сначала staging, потом prod через GitHub Environment
+# с required reviewers (manual approval). Если staging упадёт — prod не
+# поедет. Если staging-deploy зелёный, нажимаешь Approve в Actions UI и prod
+# получает то же самое.
+#
+# Для активации manual approval:
+# Repo Settings → Environments → New environment "production" →
+#   Required reviewers: добавить владельца (denkrupka).
+# Без reviewers job просто пройдёт без паузы — это не ломает workflow,
+# но лишает страховки. Настройка — за владельцем.
+
 on:
   push:
     branches: [main]
@@ -14,30 +25,78 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Apply migrations and deploy edge functions
+  # ---------------------------------------------------------------------------
+  # Stage 1 — staging
+  # ---------------------------------------------------------------------------
+  deploy_staging:
+    name: Stage 1 — Apply to staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
-    # Деплоим через Supabase Management API напрямую — supabase CLI 2.98.2
-    # пока не понимает новый формат personal access token (sbp_v0_*).
-    # Когда CLI догонит — можно вернуть `supabase link` + `db push` + functions deploy.
+    environment:
+      name: staging
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Apply migrations (Management API)
+      - name: Apply migrations (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          # Скрипт читает VITE_SUPABASE_URL из apps/web/.env.local; в CI задаём
-          # через временный env-файл по тому же пути для совместимости.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+        run: |
+          mkdir -p apps/web
+          {
+            echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
+            echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          } > apps/web/.env.local
+          node scripts/apply-migrations-staging.mjs staging
+
+      - name: Deploy edge functions (staging)
+        if: hashFiles('supabase/functions/**') != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+        run: |
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights"
+          for fn in supabase/functions/*/; do
+            name=$(basename "$fn")
+            if [ "$name" = "_shared" ]; then continue; fi
+            if echo "$NO_JWT_FUNCTIONS" | grep -qw "$name"; then
+              echo "Deploying $name (no JWT verification)"
+              node scripts/deploy-edge-function.mjs "$name" --no-verify-jwt
+            else
+              echo "Deploying $name (with JWT verification)"
+              node scripts/deploy-edge-function.mjs "$name"
+            fi
+          done
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 — production. Требует прохождения staging + (опц.) approval из
+  # GitHub Environment "production".
+  # ---------------------------------------------------------------------------
+  deploy_production:
+    name: Stage 2 — Apply to production (after staging)
+    needs: deploy_staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Apply migrations (production)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
         run: |
           mkdir -p apps/web
@@ -47,15 +106,13 @@ jobs:
           } > apps/web/.env.local
           node scripts/apply-migrations-staging.mjs prod
 
-      - name: Deploy edge functions (Management API)
+      - name: Deploy edge functions (production)
         if: hashFiles('supabase/functions/**') != ''
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
         run: |
-          # _shared/ — не отдельная функция, скрипт сам подтянет если функция импортит
           NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights"
-          # booksy-proxy НЕ в списке — он использует JWT юзера для membership check
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi

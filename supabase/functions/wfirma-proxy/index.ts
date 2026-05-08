@@ -27,11 +27,14 @@ import {
   wfirmaCompaniesFind,
   wfirmaExpenseAdd,
   wfirmaExpenseGet,
+  wfirmaExpensePdf,
   wfirmaExpensesFind,
   type PushExpenseInput,
   type WfirmaApiCreds,
   type WfirmaExpense,
 } from './api.ts'
+import { recordSyncResult } from '../_shared/notify.ts'
+import { mapWfirmaToFinkleyCategory } from './category-mapping.ts'
 import { decryptSecret, encryptSecret } from './crypto.ts'
 import { generateApiKeyViaWebFlow } from './web-flow.ts'
 
@@ -140,6 +143,7 @@ async function handleConnectWithLogin(
   salonId: string,
   email: string,
   password: string,
+  selectedCompanyId?: string,
 ): Promise<Response> {
   if (!(await ensureMember(admin, userId, salonId))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403)
@@ -151,9 +155,25 @@ async function handleConnectWithLogin(
     return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
   }
 
-  const flowRes = await generateApiKeyViaWebFlow(email, password)
+  const flowRes = await generateApiKeyViaWebFlow(email, password, { selectedCompanyId })
   if (!flowRes.ok) {
-    return jsonResponse({ ok: false, error: flowRes.reason, details: flowRes.details ?? null }, 400)
+    // В аккаунте >1 фирмы — отдаём список UI'ю, чтобы юзер выбрал. UI
+    // повторно дёргает action с `selected_company_id`.
+    if (flowRes.reason === 'choose_company') {
+      return jsonResponse({
+        ok: false,
+        error: 'choose_company',
+        companies: flowRes.companies,
+      })
+    }
+    return jsonResponse(
+      {
+        ok: false,
+        error: flowRes.reason,
+        details: 'details' in flowRes ? (flowRes.details ?? null) : null,
+      },
+      400,
+    )
   }
 
   // Валидируем пару + получаем company nip через api2
@@ -262,6 +282,54 @@ async function getOrCreateImportCategory(
   return created?.id ?? null
 }
 
+/**
+ * Кэш категорий для одного запуска sync. Ищем системную категорию по
+ * name внутри салона (без учёта регистра), кешируем найденный id.
+ */
+async function findSystemCategoryId(
+  admin: SupabaseClient,
+  salonId: string,
+  name: string,
+  cache: Map<string, string | null>,
+): Promise<string | null> {
+  const key = name.toLowerCase()
+  if (cache.has(key)) return cache.get(key) ?? null
+  const { data } = await admin
+    .from('expense_categories')
+    .select('id')
+    .eq('salon_id', salonId)
+    .eq('is_archived', false)
+    .ilike('name', name)
+    .limit(1)
+  const id = data?.[0]?.id ?? null
+  cache.set(key, id)
+  return id
+}
+
+/**
+ * Скачивает PDF фактуры wFirma и кладёт в Storage bucket `receipts`.
+ * Path: `<salon_id>/wfirma-<wfirma_id>-<uuid>.pdf`. Возвращает path или null.
+ */
+async function uploadWfirmaPdf(
+  admin: SupabaseClient,
+  creds: WfirmaApiCreds,
+  salonId: string,
+  wfirmaExpenseId: string,
+): Promise<string | null> {
+  const bytes = await wfirmaExpensePdf(creds, wfirmaExpenseId)
+  if (!bytes) return null
+  const path = `${salonId}/wfirma-${wfirmaExpenseId}-${crypto.randomUUID()}.pdf`
+  const { error } = await admin.storage.from('receipts').upload(path, bytes, {
+    contentType: 'application/pdf',
+    upsert: false,
+  })
+  if (error) {
+    console.warn(`wfirma pdf upload failed for ${wfirmaExpenseId}: ${error.message}`)
+    return null
+  }
+  return path
+}
+
 function plnFromExpense(e: WfirmaExpense): { amountCents: number; currency: string } | null {
   const total = parseFloat(e.total ?? '0')
   if (!isFinite(total) || total <= 0) return null
@@ -286,7 +354,15 @@ async function syncWfirmaToFinkley(
 
   if (list.expenses.length === 0) return stats
 
-  const categoryId = await getOrCreateImportCategory(admin, salonId)
+  // Fallback-категория «Импорт wFirma» создаётся лениво — только если хоть один
+  // expense не сматчился ни на одну системную.
+  let fallbackCategoryId: string | null = null
+  const ensureFallback = async (): Promise<string | null> => {
+    if (fallbackCategoryId) return fallbackCategoryId
+    fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    return fallbackCategoryId
+  }
+  const categoryCache = new Map<string, string | null>()
 
   // Bulk-load уже импортированных wFirma id чтобы не бить detail-fetch на каждый
   const { data: alreadyImported } = await admin
@@ -323,6 +399,27 @@ async function syncWfirmaToFinkley(
     const ksefId = detail.ksef_id ?? null
     const description = detail.description || detail.name || null
 
+    // Semantic-маппинг: пытаемся подобрать одну из 7 системных категорий
+    // (Аренда / Зарплата / ...) по keyword'ам в name+description+contractor.
+    // Если ничего не подошло или такой категории нет в салоне — fallback на
+    // «Импорт wFirma» (создаётся лениво).
+    const mappedName = mapWfirmaToFinkleyCategory({
+      name: detail.name,
+      description: detail.description,
+      contractor: detail.contractor?.name,
+    })
+    let categoryId: string | null = null
+    let categoryMapped: string | null = null
+    if (mappedName) {
+      categoryId = await findSystemCategoryId(admin, salonId, mappedName, categoryCache)
+      if (categoryId) categoryMapped = mappedName
+    }
+    if (!categoryId) categoryId = await ensureFallback()
+
+    // Best-effort: PDF фактуры в Storage receipts. Если wFirma не отдаёт
+    // PDF (например bill без файла) или upload упал — продолжаем без чека.
+    const receiptPath = await uploadWfirmaPdf(admin, creds, salonId, detail.id)
+
     const { error } = await admin.from('expenses').insert({
       salon_id: salonId,
       category_id: categoryId,
@@ -334,11 +431,13 @@ async function syncWfirmaToFinkley(
       invoice_number: detail.number ?? null,
       source: 'wfirma',
       external_id: detail.id,
+      receipt_url: receiptPath,
       metadata: {
         wfirma_expense_id: detail.id,
         wfirma_ksef_id: ksefId,
         vendor_nip: vendorNip,
         currency_original: money.currency,
+        ...(categoryMapped ? { wfirma_category_mapped: categoryMapped } : {}),
       },
     })
     if (error) {
@@ -372,22 +471,25 @@ async function runSyncForSalon(
     stats = await syncWfirmaToFinkley(admin, salonId, loaded.creds, lastSyncAt)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    await admin
-      .from('salon_integrations')
-      .update({ status: 'error', last_error: msg })
-      .eq('salon_id', salonId)
-      .eq('provider', 'wfirma')
+    const { data: salonRow } = await admin
+      .from('salons')
+      .select('name')
+      .eq('id', salonId)
+      .maybeSingle()
+    await recordSyncResult(admin, {
+      salonId,
+      provider: 'wfirma',
+      ok: false,
+      errorMessage: msg,
+      salonName: (salonRow as { name?: string } | null)?.name ?? null,
+    })
     return { ok: false, status: 502, message: msg }
   }
 
+  await recordSyncResult(admin, { salonId, provider: 'wfirma', ok: true })
   await admin
     .from('salon_integrations')
-    .update({
-      status: 'connected',
-      last_sync_at: new Date().toISOString(),
-      last_sync_stats: stats,
-      last_error: null,
-    })
+    .update({ status: 'connected', last_sync_stats: stats })
     .eq('salon_id', salonId)
     .eq('provider', 'wfirma')
 
@@ -544,84 +646,96 @@ async function handlePushExpense(
 // Entry
 // =============================================================================
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
-  }
+import { withSentry } from '../_shared/sentry.ts'
 
-  let body: {
-    action?: string
-    salon_id?: string
-    email?: string
-    password?: string
-    access_key?: string
-    secret_key?: string
-    company_id?: string
-    expense_id?: string
-    auto?: boolean
-    token?: string
-  }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
-  }
-  if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
+Deno.serve(
+  withSentry('wfirma-proxy', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    let body: {
+      action?: string
+      salon_id?: string
+      email?: string
+      password?: string
+      access_key?: string
+      secret_key?: string
+      company_id?: string
+      selected_company_id?: string
+      expense_id?: string
+      auto?: boolean
+      token?: string
+    }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+    }
+    if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
 
-  // Cron action — без user JWT
-  if (body.action === 'cron_sync_one') {
-    if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
-    return handleCronSyncOne(admin, body.salon_id, body.token)
-  }
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-  // Все остальные actions требуют user JWT
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
-  }
-  const userJwt = authHeader.slice('Bearer '.length)
-  const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userJwt}` } },
-  })
-  const { data: userRes, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userRes?.user) {
-    return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
-  }
-  const userId = userRes.user.id
+    // Cron action — без user JWT
+    if (body.action === 'cron_sync_one') {
+      if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
+      return handleCronSyncOne(admin, body.salon_id, body.token)
+    }
 
-  switch (body.action) {
-    case 'connect_with_login':
-      if (!body.email || !body.password) {
-        return jsonResponse({ ok: false, error: 'email_password_required' }, 400)
-      }
-      return handleConnectWithLogin(admin, userId, body.salon_id, body.email, body.password)
-    case 'connect_with_credentials':
-      if (!body.access_key || !body.secret_key || !body.company_id) {
-        return jsonResponse({ ok: false, error: 'keys_required' }, 400)
-      }
-      return handleConnectWithCredentials(
-        admin,
-        userId,
-        body.salon_id,
-        body.access_key,
-        body.secret_key,
-        body.company_id,
-      )
-    case 'sync':
-      return handleSync(admin, userId, body.salon_id)
-    case 'push_expense':
-      if (!body.expense_id) {
-        return jsonResponse({ ok: false, error: 'expense_id_required' }, 400)
-      }
-      return handlePushExpense(admin, userId, body.salon_id, body.expense_id, body.auto === true)
-    default:
-      return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
-  }
-})
+    // Все остальные actions требуют user JWT
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
+    }
+    const userJwt = authHeader.slice('Bearer '.length)
+    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    })
+    const { data: userRes, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userRes?.user) {
+      return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
+    }
+    const userId = userRes.user.id
+
+    switch (body.action) {
+      case 'connect_with_login':
+        if (!body.email || !body.password) {
+          return jsonResponse({ ok: false, error: 'email_password_required' }, 400)
+        }
+        return handleConnectWithLogin(
+          admin,
+          userId,
+          body.salon_id,
+          body.email,
+          body.password,
+          body.selected_company_id,
+        )
+      case 'connect_with_credentials':
+        if (!body.access_key || !body.secret_key || !body.company_id) {
+          return jsonResponse({ ok: false, error: 'keys_required' }, 400)
+        }
+        return handleConnectWithCredentials(
+          admin,
+          userId,
+          body.salon_id,
+          body.access_key,
+          body.secret_key,
+          body.company_id,
+        )
+      case 'sync':
+        return handleSync(admin, userId, body.salon_id)
+      case 'push_expense':
+        if (!body.expense_id) {
+          return jsonResponse({ ok: false, error: 'expense_id_required' }, 400)
+        }
+        return handlePushExpense(admin, userId, body.salon_id, body.expense_id, body.auto === true)
+      default:
+        return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
+    }
+  }),
+)

@@ -314,29 +314,33 @@ async function handleManual(
   return jsonResponse({ ok: true, mode: 'manual', generated: n })
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ error: 'function_not_configured' }, 500)
-  }
+import { withSentry } from '../_shared/sentry.ts'
 
-  let body: { salon_id?: string; token?: string; cron?: boolean }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ error: 'bad_request' }, 400)
-  }
+Deno.serve(
+  withSentry('generate-insights', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    let body: { salon_id?: string; token?: string; cron?: boolean }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ error: 'bad_request' }, 400)
+    }
 
-  if (body.cron && body.token) return handleCron(admin, body.token)
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-  // Manual mode — JWT
-  const auth = req.headers.get('Authorization') ?? ''
-  if (!auth.startsWith('Bearer ')) return jsonResponse({ error: 'unauthorized' }, 401)
-  if (!body.salon_id) return jsonResponse({ error: 'salon_id_required' }, 400)
-  return handleManual(admin, auth.slice('Bearer '.length), body.salon_id)
-})
+    if (body.cron && body.token) return handleCron(admin, body.token)
+
+    // Manual mode — JWT
+    const auth = req.headers.get('Authorization') ?? ''
+    if (!auth.startsWith('Bearer ')) return jsonResponse({ error: 'unauthorized' }, 401)
+    if (!body.salon_id) return jsonResponse({ error: 'salon_id_required' }, 400)
+    return handleManual(admin, auth.slice('Bearer '.length), body.salon_id)
+  }),
+)

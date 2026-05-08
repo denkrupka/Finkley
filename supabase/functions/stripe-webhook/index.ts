@@ -29,6 +29,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { sendEmail, type EmailTemplate } from '../_shared/notify.ts'
 import { getOwnerByStripeCustomer, getOwnerBySubscriptionId } from '../_shared/salon-lookup.ts'
+import { captureException } from '../_shared/sentry.ts'
 import { verifyStripeSignature } from '../_shared/stripe.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -238,7 +239,7 @@ Deno.serve(async (req: Request) => {
         console.log('stripe-webhook: ignoring', event.type)
     }
   } catch (err) {
-    console.error('webhook handler failed', err)
+    await captureException(err, { fn: 'stripe-webhook', event_type: event.type })
     return new Response('handler error', { status: 500 })
   }
 
