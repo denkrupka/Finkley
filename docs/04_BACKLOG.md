@@ -461,19 +461,19 @@ ADR `decisions/008-landing-stack.md`
 
 **Что в проде:** Страница `/{salonId}/reports` (заменила ComingSoon, sidebar implemented=true). KPI-карточки revenue/expense/profit с дельтой к прошлому месяцу (TrendingUp/Down). Bar-list по мастерам, donut-list по способам оплаты, top-50 услуг таблица, heatmap день×час бизнес-окна 8..21 в брендовом navy gradient. PDF — через window.print(). Миграция 20260507000006: `analytics_revenue_by_payment` + `analytics_visits_heatmap` (timezone-aware через salon.timezone), KPI/staff/service переиспользуют существующие dashboard RPC. **НЕ сделано:** маржа по услугам (нет данных о себестоимости в БД), Excel export (PDF покрывает 90% кейсов), custom date-range (только месячный курсор).
 
-### TASK-24: Группированный ввод и доп.поля визита 🟡 PARTIAL (овернайт 7 мая 2026)
+### TASK-24: Группированный ввод и доп.поля визита ✅ DONE (8 мая 2026)
 
 **Стадия:** 2 · **Оценка:** M
 **AC:** Multi-row форма, чаевые, скидки, повторяющиеся шаблоны.
 
-**Что в проде:** Поля `tip_cents` / `discount_cents` подключены в QuickEntryModal (два side-by-side инпута). Миграция 20260507000003 переписала 4 RPC дашборда: `revenue = sum(amount - discount + tip)`. **НЕ сделано:** multi-row grid (текущий «Сохранить и добавить ещё» покрывает serial entry — full grid отложен до фидбека). Повторяющиеся **шаблоны визитов** не сделаны (повторение есть только у расходов — TASK-25).
+**Что в проде:** `tip_cents` / `discount_cents` в QuickEntryModal + EditVisitModal. RPC дашборда: `revenue = sum(amount - discount + tip)`. Multi-row grid — вкладка «Несколько визитов» внутри QuickEntryModal (`BulkVisitsForm`, до 10 строк, общая дата). Повторяющиеся шаблоны — таблица `visit_templates` + RPC `upcoming_visit_templates` + `useClientTemplates` хук + UI на карточке клиента (`ClientTemplatesSection`). Notification-bell показывает «у клиента N подходит время для визита по графику».
 
-### TASK-25: Расходы — расширения 🟡 PARTIAL (овернайт 7 мая 2026)
+### TASK-25: Расходы — расширения ✅ DONE (8 мая 2026)
 
 **Стадия:** 2 · **Оценка:** M
 **AC:** Фото чека (Storage), повторяющиеся расходы, бюджет vs факт, остаток нала в кассе.
 
-**Что в проде:** Storage bucket `receipts` (private, 10 MB, image/\* + PDF) с RLS scoped по `salon_id`. UI upload + signed-URL viewer (img или iframe для PDF). `recurrence` enum (none/weekly/monthly), `next_occurrence_at`, edge function `process-recurring-expenses` (идемпотентный cron, готов, расписание pg_cron — в MORNING_TODO). **НЕ сделано:** бюджет vs факт, остаток нала в кассе — отложили до фидбека (нужно решить, что показывать на главной/в отчётах).
+**Что в проде:** Storage bucket `receipts` (private, 10 MB, image/\* + PDF) с RLS scoped по `salon_id`, signed-URL viewer. `recurrence` enum + edge function `process-recurring-expenses` + pg_cron job (раз в сутки, 03:00 UTC). Бюджет vs факт — `BudgetsCard` на странице расходов (RPC `category_budgets_progress` показывает % использования бюджета по категории). Остаток нала — `CashBalanceWidget` на дашборде (RPC `compute_cash_balance` = opening_cash + cash_revenue − cash_expenses). Поле `salons.opening_cash_balance_cents` редактируется в Settings.
 
 ### TASK-26: Экспорт данных (GDPR) ✅ DONE (овернайт 7 мая 2026)
 
@@ -486,30 +486,40 @@ ADR `decisions/008-landing-stack.md`
 
 ## Стадия 3 — Интеграции
 
-### TASK-27: Booksy — research спайк
+### TASK-27: Booksy — research спайк ✅ DONE (7 мая 2026)
+
+См. ADR `decisions/008-booksy-integration.md` — финализирован выбор: client-side hCaptcha + edge proxy POST вместо Playwright/VNC.
 
 **Стадия:** 3 · **Оценка:** M
 **AC:** Изучить рабочий паттерн прокси-логина владельца с sasovsky. Применить к Booksy. Решение зафиксировать в ADR `decisions/005-booksy-integration-strategy.md`. Если паттерн владельца не работает на Booksy (JS-rendering + hCaptcha) — план Б. До решения этой задачи остальные TASK-28..30 заблокированы.
 
-### TASK-28: Booksy интеграция UI
+### TASK-28: Booksy интеграция UI ✅ DONE (7-8 мая 2026)
+
+`/{salonId}/integrations` карточка Booksy с invisible hCaptcha, BooksyConnectDialog, статус (connected/error/pending), частота автосинка (2 мин - 24 часа), кнопки Sync now / Очистить визиты / Disconnect.
 
 **Стадия:** 3 · **Оценка:** L · **Зависит от:** TASK-27
 **AC:** `/{salonId}/integrations/booksy` форма, спиннер логина, статус, кнопка отключить.
 
-### TASK-29: Booksy синк визитов
+### TASK-29: Booksy синк визитов ✅ DONE (8 мая 2026)
+
+Edge function `booksy-proxy` синкает staff/services/clients/visits. Per-subbooking visits с `group_key` для UI группировки multi-service appointments. pg_cron каждые 2 минуты (`booksy-auto-sync`) с rendezvous-token. Reverse iteration по неделям + 45s budget = resumable sync. Цены из basket.items (paid) → dry_run (`/pos/transactions`) → default service price (fallback). Map payment_type_code → наш enum.
 
 **Стадия:** 3 · **Оценка:** L · **Зависит от:** TASK-28
 **AC:** Edge function `booksy-sync` по cron каждые 30 мин, маппинг bookings + POS в visits, идемпотентный upsert, логирование в `integration_sync_logs`, refresh токена при 401, нотификация при 3 сбоях подряд.
 
-### TASK-30: OCR расходов
+### TASK-30: OCR расходов ✅ DONE
+
+Edge function `ocr-receipt` (Anthropic Claude Haiku 4.5 vision). UI кнопка «📷 Чек» в ExpenseFormModal: upload в Storage receipts, signed URL → OCR → JSON-parsing (amount, date, vendor) → автозаполнение полей, юзер подтверждает.
 
 **Стадия:** 3 · **Оценка:** L
 **AC:** Кнопка "📷 Чек" в форме, upload в Storage, edge function `ocr-receipt` через Anthropic Claude Haiku 4.5, JSON парсинг, confirm-карточка, fallback Groq Llama Vision.
 
-### TASK-31: wFirma (PL only)
+### TASK-31: wFirma (PL only) 🟡 SCAFFOLD (8 мая 2026)
 
 **Стадия:** 3 · **Оценка:** XL
 **AC:** UI подключения (accessKey/secretKey), синк закупочных фактур, отправка expense в wFirma, KSeF, отображается только для country_code=PL.
+
+**Что в проде:** UI scaffold — wFirma в `integrations-config` с status='in_research', connect-form fields (access_key, secret_key, company_id). **НЕ сделано:** реальный sync — ждёт первых PL-юзеров с активным wFirma-аккаунтом для тестирования.
 
 ### TASK-32: CSV-импорт ✅ DONE (7 мая 2026)
 
@@ -522,26 +532,30 @@ ADR `decisions/008-landing-stack.md`
 
 ## Стадия 4 — Рост
 
-### TASK-33: AI-инсайты (rules-based + LLM polish)
+### TASK-33: AI-инсайты (rules-based + LLM polish) ✅ DONE (7 мая 2026)
+
+Edge function `generate-insights` weekly cron (`generate-weekly-insights`, понедельник 08:00 UTC), rules-engine + Claude Haiku 4.5 polish, запись в `insights`, виджет на дашборде, severity-aware sorting. Также: `AIAssistantPage` (8 мая) — отдельный чат-помощник на базе того же Claude.
 
 **Стадия:** 4 · **Оценка:** XL
 **AC:** Edge function `generate-insights` weekly cron, простые правила (убыточная услуга, низкая загрузка мастера, аномалия), запись в `insights`, виджет на дашборде. LLM-polish через Claude Haiku — формулировка естественным RU.
 
-### TASK-34: Weekly digest email 🟡 PARTIAL (7 мая 2026)
+### TASK-34: Weekly digest email ✅ DONE (8 мая 2026)
 
 **Стадия:** 4 · **Оценка:** M · **Зависит от:** TASK-33
 **AC:** Cron понедельник 9:00, 3 главные цифры + 1 инсайт, opt-out в settings.
 
-**Что в проде:** Settings → «Еженедельный дайджест» с opt-out тогглом и кнопкой «Отправить сейчас». Edge function `send-weekly-digest` (verify-jwt) проверяет membership через user-client RLS, зовёт RPC `weekly_digest_kpis` (миграция 20260507000008) — собирает revenue/expense/profit прошлой полной ISO-недели в локальной TZ салона + дельту к предыдущей неделе + топ-мастер + топ-услугу. Шаблон `weekly_digest` в Resend через `_shared/notify.sendEmail`. Колонка `salons.weekly_digest_enabled boolean default true`. **НЕ сделано:** AI-инсайт (ждёт TASK-33); auto-cron по понедельникам — требует разовой настройки service_role JWT в Vault (как раньше для recurring-expenses, но тут SQL-only переписать нельзя — нужен HTTP к Resend).
+**Что в проде:** Settings → «Еженедельный дайджест» с opt-out тогглом и кнопкой «Отправить сейчас». Edge function `send-weekly-digest` собирает revenue/expense/profit прошлой ISO-недели + дельту к предыдущей + топ-мастер + топ-услугу + **топ-инсайт текущей недели** (вытягивается из таблицы `insights`). Шаблон `weekly_digest` в Resend, рендер сразу с insight_block. Auto-cron `send-weekly-digests` (понедельник 09:00 UTC) через rendezvous-token pattern — `process_weekly_digests()` SQL функция, pg_cron + pg_net.
 
-### TASK-35: PWA + push-уведомления 🟡 PARTIAL (7 мая 2026)
+### TASK-35: PWA + push-уведомления ✅ DONE (8 мая 2026)
 
 **Стадия:** 4 · **Оценка:** L
 **AC:** manifest.json, service worker, иконки, "добавить на главный экран", Web Push API, подписка в settings.
 
-**Что в проде:** PWA install criteria: `manifest.webmanifest` (scope=/app/, theme #1A1A2E), 3 SVG-иконки (192/512/512 maskable) с буквой F на брендовом navy, `sw.js` с network-first для навигаций + cache-first для /assets/\* (offline fallback на app-shell). `<link rel=manifest>` + apple-touch-icon + iOS standalone meta в index.html. Регистрация SW в `main.tsx` только в PROD. Кнопка «Установить приложение» в Settings (`InstallAppButton.tsx`) ловит `beforeinstallprompt`, обрабатывает iOS Safari (инструкция вместо API), уже-installed (standalone display-mode). **НЕ сделано:** Web Push API (требует VAPID keys + edge function для push delivery + ADR на dependency `web-push` или собственный JWT-signer; вынес в TASK-35b).
+**Что в проде:** PWA install criteria + Web Push end-to-end. Edge function `send-push` собран чистым Deno без зависимостей: VAPID JWT signer (ES256, P-256) + RFC 8291 aes128gcm payload encryption. Actions: subscribe / unsubscribe / test. Таблица `push_subscriptions` (own-rows RLS). Service worker handles `push` event с notification, `notificationclick` фокусирует существующее окно или открывает новое. `PushNotificationsCard` в Settings с enable/disable/test, обработка unsupported (iOS pre-PWA-install) и permission-denied. VAPID keys в Supabase secrets, public — в GitHub Secrets для билда.
 
-### TASK-36: Бенчмарки
+### TASK-36: Бенчмарки ✅ DONE (7 мая 2026)
+
+Таблица `benchmark_aggregates`, RPC `compute_benchmarks` (k-anonymity N≥10), pg_cron `compute-benchmarks` (раз в сутки 03:30 UTC), opt-in `salons.benchmarks_opt_in`, виджет на дашборде «Сравнение с рынком». Покажет реальные данные когда будет 10+ салонов одного типа в стране.
 
 **Стадия:** 4 · **Оценка:** XL
 **AC:** Edge function пересчитывает агрегаты раз в сутки в `benchmark_aggregates` (страна, тип, средний чек, оборот), k-anonymity N≥10, виджет на дашборде, opt-in при регистрации.
