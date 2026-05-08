@@ -28,6 +28,23 @@ export default defineConfig({
           react: ['react', 'react-dom', 'react-router-dom'],
           supabase: ['@supabase/supabase-js'],
           recharts: ['recharts'],
+          // Heavy UI vendors — отдельный chunk, ленится через lazy-routes
+          'ui-radix': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-label',
+            '@radix-ui/react-slot',
+          ],
+          // i18n — три локали уже весомые
+          i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          // Forms — react-hook-form + zod + resolvers
+          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+          // date-fns тяжёлый, нужен только на страницах с датами
+          dates: ['date-fns'],
         },
       },
     },

@@ -1,15 +1,21 @@
 ﻿# Email Templates
 
-Шаблоны транзакционных писем для Postmark. Все на RU. Загружать в Postmark Templates с alias-ами:
+> **Источник истины** — `supabase/functions/send-email/templates.ts`. HTML здесь —
+> reference-копии для дизайн-ревью. При правке синхронизировать обе.
+
+Транзакционные письма отправляются через **Resend** (не Postmark — переехали в стадии 1
+после подписания DPA, см. ADR-неизданный). Все на RU.
+
+Алиасы шаблонов:
 
 - `welcome` — после подтверждения email
-- `email-confirmation` — для Supabase Auth confirm (заменяем дефолт)
-- `password-reset` — для Supabase Auth reset
 - `trial-ending` — за 3 дня до конца триала
 - `payment-succeeded` — после успешной оплаты
 - `payment-failed` — при неудачной оплате
 - `subscription-canceled` — после отмены
-- `weekly-digest` — еженедельный дайджест (стадия 4)
+- `gdpr-export` — ZIP-архив пользовательских данных готов
+- `weekly-digest` — еженедельный дайджест по понедельникам (KPI + AI-инсайт)
+- `team-invitation` — приглашение в команду салона (стадия 5, TASK-38)
 
 ## Принципы
 
@@ -36,12 +42,17 @@
 См. отдельные файлы:
 
 - [`welcome.html`](./welcome.html)
-- [`email-confirmation.html`](./email-confirmation.html)
-- [`password-reset.html`](./password-reset.html)
 - [`trial-ending.html`](./trial-ending.html)
 - [`payment-succeeded.html`](./payment-succeeded.html)
 - [`payment-failed.html`](./payment-failed.html)
 - [`subscription-canceled.html`](./subscription-canceled.html)
+- [`gdpr-export.html`](./gdpr-export.html)
+- [`weekly-digest.html`](./weekly-digest.html)
+- [`team-invitation.html`](./team-invitation.html)
+
+**email-confirmation** и **password-reset** — обрабатываются дефолтными
+шаблонами Supabase Auth (Auth → Email Templates в Dashboard), не через нашу
+edge function.
 
 ## Как загружать в Postmark
 
