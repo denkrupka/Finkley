@@ -151,14 +151,31 @@
     "visits": "Wizyty",
     "clients": "Klienci",
     "expenses": "Wydatki",
-    "staff": "Pracownicy",
+    "staff": "Specjaliści",
+    "services": "Usługi",
+    "inventory": "Magazyn",
     "payouts": "Wypłaty",
     "reports": "Raporty",
+    "knowledge": "Baza wiedzy",
     "ai": "AI-asystent",
     "settings": "Ustawienia",
     "more": "Więcej",
     "help": "Pomoc i FAQ",
     "drawer_title": "Menu nawigacji"
+  },
+  "services_page": {
+    "title": "Usługi salonu",
+    "subtitle": "Ceny, koszty, marża i kategorie usług."
+  },
+  "inventory": {
+    "title": "Magazyn i materiały",
+    "subtitle": "Ewidencja materiałów eksploatacyjnych z automatycznym zużyciem przy wizytach i alertami przy niskim stanie. Pojawi się w jednej z najbliższych iteracji — w oparciu o realne potrzeby pierwszych salonów.",
+    "coming_soon": "Wkrótce · etap 5"
+  },
+  "knowledge": {
+    "title": "Baza wiedzy",
+    "subtitle": "Wewnętrzne procedury, przepisy, listy kontrolne i szablony komunikacji z klientem dla zespołu salonu. Każda rola widzi to, co jest jej potrzebne. Pojawi się w etapie 5.",
+    "coming_soon": "Wkrótce · etap 5"
   },
   "salon_switcher": {
     "title": "Przełącz salon"
@@ -595,8 +612,16 @@
   },
   "settings": {
     "title": "Ustawienia",
-    "subtitle": "Profil salonu, eksport danych, usuwanie.",
+    "subtitle": "Profil salonu, zespół, rozliczenia, integracje, bezpieczeństwo.",
     "toast_saved": "Ustawienia zapisane",
+    "tabs": {
+      "profile": "Profil",
+      "billing": "Rozliczenia",
+      "team": "Zespół",
+      "integrations": "Integracje",
+      "security": "Bezpieczeństwo",
+      "appearance": "Wygląd"
+    },
     "profile": {
       "title": "Profil salonu",
       "name_label": "Nazwa salonu",

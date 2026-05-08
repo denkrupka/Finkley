@@ -152,13 +152,30 @@
     "clients": "Clients",
     "expenses": "Expenses",
     "staff": "Specialists",
+    "services": "Services",
+    "inventory": "Inventory",
     "payouts": "Payroll",
     "reports": "Reports",
+    "knowledge": "Knowledge base",
     "ai": "AI assistant",
     "settings": "Settings",
     "more": "More",
     "help": "Help & FAQ",
     "drawer_title": "Navigation menu"
+  },
+  "services_page": {
+    "title": "Salon services",
+    "subtitle": "Prices, cost, margin and service categories."
+  },
+  "inventory": {
+    "title": "Inventory & supplies",
+    "subtitle": "Track consumables with automatic deduction on each visit and low-stock alerts. Coming in a near-term iteration — driven by real needs from the first salons.",
+    "coming_soon": "Coming soon · stage 5"
+  },
+  "knowledge": {
+    "title": "Knowledge base",
+    "subtitle": "Internal SOPs, recipes, checklists and customer-communication templates for the salon team. Each role sees only what's relevant. Coming in stage 5.",
+    "coming_soon": "Coming soon · stage 5"
   },
   "salon_switcher": {
     "title": "Switch salon"
@@ -594,8 +611,16 @@
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "Salon profile, data export, deletion.",
+    "subtitle": "Salon profile, team, billing, integrations, security.",
     "toast_saved": "Settings saved",
+    "tabs": {
+      "profile": "Profile",
+      "billing": "Billing",
+      "team": "Team",
+      "integrations": "Integrations",
+      "security": "Security",
+      "appearance": "Appearance"
+    },
     "profile": {
       "title": "Salon profile",
       "name_label": "Salon name",
