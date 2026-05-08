@@ -76,3 +76,7 @@ supabase/.temp/
 
 # One-off secret backups (e.g. WFIRMA_SECRETS_KEY post-rotation)
 secrets-backup/
+
+# Claude Code runtime artefacts
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks/
