@@ -1,13 +1,19 @@
 /**
  * telegram-bug-collector — webhook от @finklay_dev_bot. Принимает сообщения
- * из общего бэг-чата владельца+партнёра, складывает в public.bug_reports
+ * из форум-чата владельца+партнёра, складывает в public.bug_reports
  * с AI-категоризацией и анализом скриншотов через Anthropic Claude.
  *
- * Команды бота:
- *   /list                   — открытые баги (newest first), сводка
- *   /done <short_id>        — отметить как fixed
- *   /note <short_id> <text> — добавить заметку к багу
- *   (любое другое сообщение) → новый баг
+ * Routing по теме форум-чата (forum supergroup):
+ *   - thread_id = TELEGRAM_THREAD_BUGS      → kind='bug'      (исправляем)
+ *   - thread_id = TELEGRAM_THREAD_FEATURES  → kind='feature'  (фича-реквест)
+ *   - другие темы (General, Вопросы и т.п.) → игнорируем silently
+ * Если оба env-var не заданы (legacy-конфиг) — принимаем всё как bug.
+ *
+ * Команды бота (работают в обеих разрешённых темах):
+ *   /list                   — открытые баги+фичи (newest first), сводка
+ *   /done <short_id>        — отметить как fixed/done
+ *   /note <short_id> <text> — добавить заметку
+ *   (любое другое сообщение) → новый bug или feature по теме
  *
  * Auth:
  *   - Telegram передаёт `X-Telegram-Bot-Api-Secret-Token` (мы задаём через
@@ -20,6 +26,8 @@
  *   TELEGRAM_BUG_BOT_TOKEN          — токен @finklay_dev_bot
  *   TELEGRAM_BUG_WEBHOOK_SECRET     — secret_token из setWebhook (random hex)
  *   TELEGRAM_BUG_CHAT_ID            — единственный разрешённый chat_id
+ *   TELEGRAM_THREAD_BUGS            — id темы «Баги» (опц., если задан вместе с FEATURES — включается routing)
+ *   TELEGRAM_THREAD_FEATURES        — id темы «Функции»
  *   ANTHROPIC_API_KEY               — для AI-категоризации (опционально)
  */
 
@@ -31,6 +39,8 @@ const BOT_TOKEN = Deno.env.get('TELEGRAM_BUG_BOT_TOKEN') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_BUG_WEBHOOK_SECRET') ?? ''
 const ALLOWED_CHAT_ID = Deno.env.get('TELEGRAM_BUG_CHAT_ID') ?? ''
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
+const THREAD_BUGS = Deno.env.get('TELEGRAM_THREAD_BUGS') ?? ''
+const THREAD_FEATURES = Deno.env.get('TELEGRAM_THREAD_FEATURES') ?? ''
 
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
 const BOT_ID = BOT_TOKEN.split(':')[0] // первая часть токена = numeric id бота
@@ -362,12 +372,23 @@ function shortId(uuid: string): string {
 }
 
 async function cmdList(admin: ReturnType<typeof createClient>, chatId: number, threadId?: number) {
-  const { data, error } = await admin
+  // Если команда пришла из темы Bugs/Features — фильтруем по соответствующему
+  // kind. Иначе (legacy / без routing) — все open подряд.
+  let filterKind: 'bug' | 'feature' | null = null
+  if (THREAD_BUGS && threadId !== undefined && String(threadId) === THREAD_BUGS) {
+    filterKind = 'bug'
+  } else if (THREAD_FEATURES && threadId !== undefined && String(threadId) === THREAD_FEATURES) {
+    filterKind = 'feature'
+  }
+
+  let q = admin
     .from('bug_reports')
-    .select('id, ai_summary, message_text, severity, area, sender_first_name, reported_at')
+    .select('id, ai_summary, message_text, severity, area, sender_first_name, reported_at, kind')
     .eq('status', 'open')
     .order('reported_at', { ascending: false })
     .limit(20)
+  if (filterKind) q = q.eq('kind', filterKind)
+  const { data, error } = await q
   if (error) {
     await tgSend(chatId, `❌ Ошибка чтения: ${error.message}`, { threadId })
     return
@@ -380,19 +401,28 @@ async function cmdList(admin: ReturnType<typeof createClient>, chatId: number, t
     area: string | null
     sender_first_name: string | null
     reported_at: string
+    kind: 'bug' | 'feature'
   }
   const rows = (data ?? []) as Row[]
   if (rows.length === 0) {
-    await tgSend(chatId, '✅ Открытых багов нет', { threadId })
+    const what = filterKind === 'feature' ? 'фич-реквестов' : 'багов'
+    await tgSend(chatId, `✅ Открытых ${what} нет`, { threadId })
     return
   }
   const lines = rows.map((r) => {
+    const emoji = r.kind === 'feature' ? '💡' : '🐛'
     const sev = r.severity ? `[${r.severity.toUpperCase()}]` : ''
     const area = r.area ? ` · ${r.area}` : ''
     const summary = r.ai_summary || (r.message_text || '').slice(0, 100)
-    return `\`${shortId(r.id)}\` ${sev}${area}\n_${r.sender_first_name ?? '?'}_: ${summary}`
+    return `${emoji} \`${shortId(r.id)}\` ${sev}${area}\n_${r.sender_first_name ?? '?'}_: ${summary}`
   })
-  await tgSend(chatId, `*Открытых багов: ${rows.length}*\n\n${lines.join('\n\n')}`, {
+  const title =
+    filterKind === 'feature'
+      ? 'Открытых фич-реквестов'
+      : filterKind === 'bug'
+        ? 'Открытых багов'
+        : 'Открытых'
+  await tgSend(chatId, `*${title}: ${rows.length}*\n\n${lines.join('\n\n')}`, {
     threadId,
   })
 }
@@ -621,6 +651,29 @@ type TgMessage = {
   is_topic_message?: boolean
 }
 
+/**
+ * Решает, что делать с сообщением: 'bug' / 'feature' / 'ignore'.
+ * Если оба env-var THREAD_BUGS + THREAD_FEATURES заданы — routing активен,
+ * сообщения из любой другой темы попадают в 'ignore'. Если хотя бы один
+ * из env-var пустой — fallback в legacy-режим: всё считается багом.
+ *
+ * Команды (`/list`, `/done`, `/help` и т.п.) проходят в обеих разрешённых
+ * темах — они работают по таблице независимо от kind, и не должны игнорироваться.
+ */
+function classifyByThread(
+  threadId: number | undefined,
+  isCommand: boolean,
+): 'bug' | 'feature' | 'ignore' {
+  // Legacy: env-vars не заданы → всё bug (back-compat)
+  if (!THREAD_BUGS || !THREAD_FEATURES) return 'bug'
+  const tid = threadId !== undefined ? String(threadId) : ''
+  if (tid === THREAD_BUGS) return 'bug'
+  if (tid === THREAD_FEATURES) return 'feature'
+  // Команда в незнакомой теме — пропустим, чтобы не плодить мусор
+  if (isCommand) return 'ignore'
+  return 'ignore'
+}
+
 async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
   if (ALLOWED_CHAT_ID && String(msg.chat.id) !== ALLOWED_CHAT_ID) {
     console.warn('rejected unauthorized chat', msg.chat.id)
@@ -629,6 +682,14 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
 
   const text = (msg.text ?? msg.caption ?? '').trim()
   const threadId = msg.message_thread_id
+  const isCommand = text.startsWith('/')
+
+  // Тема форум-чата → kind или ignore (см. classifyByThread)
+  const kind = classifyByThread(threadId, isCommand)
+  if (kind === 'ignore') {
+    // Silently — это не баг и не фича, юзеры могут трепаться в General
+    return
+  }
 
   // Реплай на сообщение бота? Это либо коррекция понимания (если в боте есть
   // short_id в backticks), либо обычный новый баг (если реплай на /help, /list).
@@ -644,7 +705,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   }
 
   // Команды
-  if (text.startsWith('/')) {
+  if (isCommand) {
     const [cmdRaw, ...rest] = text.split(/\s+/)
     const cmd = cmdRaw!.split('@')[0]!.toLowerCase() // /list@finklay_dev_bot → /list
     if (cmd === '/list') return cmdList(admin, msg.chat.id, threadId)
@@ -710,6 +771,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       ai_summary: cat.summary ?? null,
       ai_steps_to_repro: cat.steps ?? null,
       ai_categorized_at: cat.summary ? new Date().toISOString() : null,
+      kind,
     })
     .select('id')
     .single()
@@ -726,8 +788,10 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
 
   // Подтверждаем reply'ем в том же топике. Главное — человекопонятная сводка:
   // что я понял + что починить. Severity/area идут в /list и БД, в ack не лезут.
+  // Emoji различает сразу — 🐛 для bugs, 💡 для features.
   const humanSummary = cat.summary || visionSummary || null
-  const ack = [`🐛 \`${shortId(data!.id)}\``, humanSummary].filter(Boolean).join('\n\n')
+  const emoji = kind === 'feature' ? '💡' : '🐛'
+  const ack = [`${emoji} \`${shortId(data!.id)}\``, humanSummary].filter(Boolean).join('\n\n')
   await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
 }
 
