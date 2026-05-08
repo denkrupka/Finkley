@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
+import { RouteErrorBoundary } from '@/components/error-boundary/ErrorBoundary'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LoginPage } from '@/routes/auth/Login'
 import { RootRedirect } from '@/routes/RootRedirect'
@@ -92,8 +93,12 @@ function PageFallback() {
   )
 }
 
-function lazyRoute(node: React.ReactNode) {
-  return <Suspense fallback={<PageFallback />}>{node}</Suspense>
+function lazyRoute(node: React.ReactNode, label?: string) {
+  return (
+    <RouteErrorBoundary label={label}>
+      <Suspense fallback={<PageFallback />}>{node}</Suspense>
+    </RouteErrorBoundary>
+  )
 }
 
 function App() {

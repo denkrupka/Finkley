@@ -19,7 +19,13 @@ type AnyComponent = ComponentType<any>
 export function lazyWithRetry<T extends AnyComponent>(loader: () => Promise<{ default: T }>) {
   return lazy(async () => {
     try {
-      return await loader()
+      const mod = await loader()
+      // Успешная загрузка — сбрасываем флаг, чтобы при следующем релизе
+      // снова можно было перезагрузить страницу (один раз на релиз).
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('finkley:chunk-reloaded')
+      }
+      return mod
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       const isStaleChunk =
