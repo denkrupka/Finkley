@@ -2,7 +2,9 @@
 
 ## Статус
 
-`Proposed` · 2026-05-05 (в стадии 3 — `Accepted` после research-спайка TASK-27)
+`Superseded by ADR-008` · 2026-05-08
+
+Изначально планировался спайк/research перед выбором подхода. Финальное решение зафиксировано в [ADR-008](./008-booksy-integration.md): client-side hCaptcha + edge-proxy POST в `/core/v2/business_api/account/login`. Реализовано в `supabase/functions/booksy-proxy`.
 
 ## Контекст
 
