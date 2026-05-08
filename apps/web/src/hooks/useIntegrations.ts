@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
-export type IntegrationProvider = 'booksy' | 'fresha' | 'treatwell' | 'yclients'
+export type IntegrationProvider = 'booksy' | 'fresha' | 'treatwell' | 'yclients' | 'wfirma'
 
 export type SalonIntegrationPublic = {
   id: string

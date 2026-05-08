@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Calendar, CalendarCheck, CalendarClock, CalendarPlus } from 'lucide-react'
+import { Calendar, CalendarCheck, CalendarClock, CalendarPlus, FileText } from 'lucide-react'
 
 /**
  * Каталог интеграций. Источник истины — этот файл; страница и формы
@@ -9,7 +9,7 @@ import { Calendar, CalendarCheck, CalendarClock, CalendarPlus } from 'lucide-rea
  * Поля статус/last_sync идут из БД (TASK-29 sync), пока — только визуал.
  */
 
-export type IntegrationProvider = 'booksy' | 'fresha' | 'treatwell' | 'yclients'
+export type IntegrationProvider = 'booksy' | 'fresha' | 'treatwell' | 'yclients' | 'wfirma'
 
 export type ConnectField = {
   key: string
@@ -91,6 +91,35 @@ export const INTEGRATIONS: IntegrationDef[] = [
       },
     ],
     status: 'coming_soon',
+  },
+  {
+    id: 'wfirma',
+    name: 'wFirma',
+    region: 'PL',
+    description_key: 'integrations.providers.wfirma.description',
+    icon: FileText,
+    brandColor: '#1976D2',
+    connectFields: [
+      {
+        key: 'access_key',
+        label_key: 'integrations.fields.access_key',
+        type: 'text',
+        required: true,
+      },
+      {
+        key: 'secret_key',
+        label_key: 'integrations.fields.secret_key',
+        type: 'password',
+        required: true,
+      },
+      {
+        key: 'company_id',
+        label_key: 'integrations.fields.company_id',
+        type: 'text',
+        required: true,
+      },
+    ],
+    status: 'in_research',
   },
   {
     id: 'yclients',

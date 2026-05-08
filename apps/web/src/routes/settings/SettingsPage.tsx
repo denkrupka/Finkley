@@ -30,6 +30,7 @@ import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
+import { PushNotificationsCard } from './PushNotificationsCard'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
   COUNTRY_OPTIONS,
@@ -255,6 +256,11 @@ export function SettingsPage() {
           <InstallAppButton />
         </div>
       </section>
+
+      {/* Push-уведомления */}
+      <div className="mb-6">
+        <PushNotificationsCard />
+      </div>
 
       {/* Подписка */}
       <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">

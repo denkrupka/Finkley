@@ -85,3 +85,45 @@ self.addEventListener('fetch', (event) => {
     )
   }
 })
+
+// =============================================================================
+// Web Push: показываем нотификацию из payload, по клику открываем нужный URL
+// =============================================================================
+
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try {
+    payload = event.data ? event.data.json() : {}
+  } catch {
+    payload = { title: 'Finkley', body: event.data ? event.data.text() : '' }
+  }
+  const title = payload.title || 'Finkley'
+  const options = {
+    body: payload.body || '',
+    icon: '/app/icon-192.svg',
+    badge: '/app/icon-192.svg',
+    data: { url: payload.url || '/app/' },
+    tag: payload.tag || 'finkley-default',
+    requireInteraction: !!payload.requireInteraction,
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/app/'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((all) => {
+      // Ищем уже открытое окно с приложением — фокусим его и навигируем
+      for (const client of all) {
+        if (client.url.includes('/app/') && 'focus' in client) {
+          client.focus()
+          if ('navigate' in client) client.navigate(targetUrl).catch(() => undefined)
+          return
+        }
+      }
+      // Иначе открываем новое окно
+      if (self.clients.openWindow) self.clients.openWindow(targetUrl)
+    }),
+  )
+})

@@ -1,10 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro'
 
-// ⚠ TEMPLATE: эти тексты — заглушки для review юристом перед публичным запуском.
+// ⚠ TEMPLATE для review юристом: проставить актуальный NIP и адрес JDG.
 // См. docs/legal/PRIVACY_POLICY_RU.md (источник в /docs/) и docs/06_SECURITY_PRIVACY.md.
 
-const UPDATED = '6 мая 2026'
+const UPDATED = '8 мая 2026'
 ---
 
 <Layout
@@ -28,9 +28,13 @@ const UPDATED = '6 мая 2026'
       <section>
         <h2 class="text-2xl font-bold tracking-tight text-brand-navy">1. Кто мы</h2>
         <p class="mt-3">
-          Finkley — продукт <strong>[Юрлицо PL]</strong>, NIP <strong>[X]</strong>, адрес
-          <strong>[Y]</strong>. Контакт по вопросам приватности —
-          <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>.
+          Finkley — продукт ИП Denis Krupka (Jednoosobowa Działalność Gospodarcza, Polska),
+          NIP <strong>[заполняется до публичного запуска]</strong>,
+          адрес <strong>[заполняется до публичного запуска]</strong>.
+          Контакт по вопросам приватности —
+          <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">privacy@finkley.app</a>,
+          по общим вопросам —
+          <a href="mailto:support@finkley.app" class="text-brand-teal underline">support@finkley.app</a>.
         </p>
       </section>
 
@@ -104,7 +108,7 @@ const UPDATED = '6 мая 2026'
           <li><strong>Портабельность</strong> — экспорт в CSV/JSON</li>
           <li>
             <strong>Ограничение / возражение</strong> — email на
-            <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>
+            <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">privacy@finkley.app</a>
           </li>
           <li>
             <strong>Автоматизированные решения</strong> — не применимо. AI-инсайты (стадия 4) —
@@ -134,9 +138,8 @@ const UPDATED = '6 мая 2026'
       </section>
 
       <p class="border-t border-brand-border pt-6 text-sm italic text-brand-text-muted">
-        ⚠ Этот документ — рабочий шаблон для review юристом. Перед публичным запуском
-        замените заглушки [Юрлицо PL] / [NIP] / [адрес] и пропустите через юридическую проверку
-        в вашей юрисдикции.
+        Этот документ — текущая версия. Перед публичным запуском NIP и юр. адрес ИП
+        будут проставлены, документ пройдёт review польским юристом.
       </p>
     </div>
   </article>
