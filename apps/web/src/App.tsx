@@ -79,6 +79,15 @@ const ImportPage = lazyWithRetry(() =>
 const IntegrationsPage = lazyWithRetry(() =>
   import('@/routes/integrations/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage })),
 )
+const ServicesPage = lazyWithRetry(() =>
+  import('@/routes/services/ServicesPage').then((m) => ({ default: m.ServicesPage })),
+)
+const InventoryPage = lazyWithRetry(() =>
+  import('@/routes/inventory/InventoryPage').then((m) => ({ default: m.InventoryPage })),
+)
+const KnowledgePage = lazyWithRetry(() =>
+  import('@/routes/knowledge/KnowledgePage').then((m) => ({ default: m.KnowledgePage })),
+)
 const SettingsPage = lazyWithRetry(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
@@ -153,6 +162,9 @@ function App() {
         <Route path="clients" element={lazyRoute(<ClientsPage />)} />
         <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
+        <Route path="services" element={lazyRoute(<ServicesPage />)} />
+        <Route path="inventory" element={lazyRoute(<InventoryPage />)} />
+        <Route path="knowledge" element={lazyRoute(<KnowledgePage />)} />
         <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />
         <Route path="reports" element={lazyRoute(<ReportsPage />)} />
         <Route path="ai" element={lazyRoute(<AIPage />)} />

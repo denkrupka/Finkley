@@ -1,11 +1,14 @@
 import {
   BarChart3,
+  BookOpen,
   Bot,
   Calendar,
   Home,
+  Package,
   Receipt,
   Scissors,
   Settings,
+  Sparkles,
   Users,
   Wallet,
   type LucideIcon,
@@ -30,8 +33,11 @@ export type NavItemId =
   | 'clients'
   | 'expenses'
   | 'staff'
+  | 'services'
+  | 'inventory'
   | 'payouts'
   | 'reports'
+  | 'knowledge'
   | 'ai'
   | 'settings'
 
@@ -88,6 +94,22 @@ export const NAV_ITEMS: NavItem[] = [
     inBottomNav: false,
   },
   {
+    id: 'services',
+    i18nKey: 'nav.services',
+    icon: Sparkles,
+    stage: 2,
+    implemented: true,
+    inBottomNav: false,
+  },
+  {
+    id: 'inventory',
+    i18nKey: 'nav.inventory',
+    icon: Package,
+    stage: 5,
+    implemented: false, // ComingSoon — стадия 5
+    inBottomNav: false,
+  },
+  {
     id: 'payouts',
     i18nKey: 'nav.payouts',
     icon: Wallet,
@@ -101,6 +123,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     stage: 2,
     implemented: true,
+    inBottomNav: false,
+  },
+  {
+    id: 'knowledge',
+    i18nKey: 'nav.knowledge',
+    icon: BookOpen,
+    stage: 5,
+    implemented: false, // ComingSoon — стадия 5
     inBottomNav: false,
   },
   {
