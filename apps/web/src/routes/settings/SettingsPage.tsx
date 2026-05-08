@@ -1,4 +1,4 @@
-import { Download, Mail, Plug, Upload, Users } from 'lucide-react'
+import { Download, History, Mail, Plug, Upload, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -416,6 +416,26 @@ export function SettingsPage() {
           <Button variant="outline" size="md" onClick={() => navigate(`/${salonId}/settings/team`)}>
             <Users className="size-4" strokeWidth={1.7} />
             {t('settings.team.button')}
+          </Button>
+        </div>
+      </section>
+
+      {/* Журнал событий */}
+      <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.audit.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.audit.subtitle')}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => navigate(`/${salonId}/settings/audit`)}
+          >
+            <History className="size-4" strokeWidth={1.7} />
+            {t('settings.audit.button')}
           </Button>
         </div>
       </section>

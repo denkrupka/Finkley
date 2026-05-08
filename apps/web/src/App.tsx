@@ -16,6 +16,9 @@ const HelpPage = lazyWithRetry(() =>
 const TeamPage = lazyWithRetry(() =>
   import('@/routes/team/TeamPage').then((m) => ({ default: m.TeamPage })),
 )
+const AuditLogPage = lazyWithRetry(() =>
+  import('@/routes/audit/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+)
 const AcceptInvitePage = lazyWithRetry(() =>
   import('@/routes/team/AcceptInvitePage').then((m) => ({ default: m.AcceptInvitePage })),
 )
@@ -152,6 +155,7 @@ function App() {
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
         <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
+        <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
