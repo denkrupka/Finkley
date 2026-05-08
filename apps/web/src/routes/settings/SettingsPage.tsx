@@ -31,6 +31,7 @@ import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { ApiKeysCard } from './ApiKeysCard'
+import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
@@ -278,6 +279,11 @@ export function SettingsPage() {
       {/* API keys */}
       <div className="mb-6">
         <ApiKeysCard />
+      </div>
+
+      {/* Calendar feed */}
+      <div className="mb-6">
+        <CalendarFeedCard />
       </div>
 
       {/* Подписка */}

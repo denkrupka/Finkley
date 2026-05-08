@@ -6,6 +6,7 @@ import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashbo
 import { useSalon } from '@/hooks/useSalons'
 import { BenchmarksWidget } from './BenchmarksWidget'
 import { CashBalanceWidget } from './CashBalanceWidget'
+import { ForecastWidget } from './ForecastWidget'
 import { InsightsWidget } from './InsightsWidget'
 import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
@@ -104,9 +105,10 @@ export function DashboardPage() {
       {/* Бенчмарки — сравнение с рынком, daily cron, k-anonymity ≥10 */}
       <BenchmarksWidget salonId={salonId} currency={currency} />
 
-      {/* Cash on hand + предстоящие визиты — компактная пара карточек */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Cash on hand + прогноз + предстоящие визиты */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <CashBalanceWidget salonId={salonId} currency={currency} />
+        <ForecastWidget salonId={salonId} currency={currency} />
         <UpcomingVisitsWidget salonId={salonId} />
       </div>
 
