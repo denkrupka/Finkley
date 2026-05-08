@@ -25,7 +25,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { sendEmail } from '../_shared/notify.ts'
+import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -125,6 +125,7 @@ async function sendDigestForSalon(
   await sendEmail('weekly_digest', recipientEmail, {
     full_name: recipientName,
     salon_name: salon.name ?? 'Салон',
+    logo_block: renderLogoBlock((salon as { logo_url?: string | null }).logo_url),
     period_start: formatDate(k.period_start),
     period_end: formatDate(k.period_end),
     revenue: formatCents(Number(k.revenue_cents), currency),
@@ -168,7 +169,7 @@ async function handleCron(admin: SupabaseClient, token: string): Promise<Respons
   // Все активные салоны с включённым дайджестом
   const { data: salons, error: sErr } = await admin
     .from('salons')
-    .select('id, name, currency, weekly_digest_enabled, deleted_at')
+    .select('id, name, currency, logo_url, weekly_digest_enabled, deleted_at')
     .eq('weekly_digest_enabled', true)
     .is('deleted_at', null)
   if (sErr) return jsonResponse({ error: 'salons_query_failed', message: sErr.message }, 500)
@@ -242,7 +243,7 @@ async function handleManual(
   // Membership check через user-client (RLS гарантирует privacy)
   const { data: salon, error: salonErr } = await userClient
     .from('salons')
-    .select('id, name, currency, weekly_digest_enabled')
+    .select('id, name, currency, logo_url, weekly_digest_enabled')
     .eq('id', salonId)
     .maybeSingle()
   if (salonErr || !salon) return jsonResponse({ error: 'salon_not_found_or_no_access' }, 403)
@@ -257,32 +258,36 @@ async function handleManual(
 // Entry
 // =============================================================================
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ error: 'function_not_configured' }, 500)
-  }
+import { withSentry as _withSentry } from '../_shared/sentry.ts'
 
-  let body: { salon_id?: string; token?: string; cron?: boolean }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ error: 'bad_request' }, 400)
-  }
+Deno.serve(
+  _withSentry('send-weekly-digest', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    let body: { salon_id?: string; token?: string; cron?: boolean }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ error: 'bad_request' }, 400)
+    }
 
-  // Cron mode: token-based, no JWT
-  if (body.cron && body.token) {
-    return handleCron(admin, body.token)
-  }
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-  // Manual mode: JWT + salon_id
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) return jsonResponse({ error: 'unauthorized' }, 401)
-  if (!body.salon_id) return jsonResponse({ error: 'salon_id_required' }, 400)
-  return handleManual(admin, authHeader.slice('Bearer '.length), body.salon_id)
-})
+    // Cron mode: token-based, no JWT
+    if (body.cron && body.token) {
+      return handleCron(admin, body.token)
+    }
+
+    // Manual mode: JWT + salon_id
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) return jsonResponse({ error: 'unauthorized' }, 401)
+    if (!body.salon_id) return jsonResponse({ error: 'salon_id_required' }, 400)
+    return handleManual(admin, authHeader.slice('Bearer '.length), body.salon_id)
+  }),
+)

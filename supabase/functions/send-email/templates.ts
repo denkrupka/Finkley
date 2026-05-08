@@ -42,6 +42,8 @@ export const TEMPLATES: Record<TemplateAlias, EmailTemplate> = {
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
 <tr><td>
 
+{{logo_block}}
+
 <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
 Привет, {{full_name}}!
 </h1>
@@ -348,6 +350,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 <p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY · ИТОГИ НЕДЕЛИ</p>
 
 <h1 style="margin:0 0 8px 0;font-size:22px;line-height:30px;color:#0f172a;">{{salon_name}}</h1>
+{{logo_block}}
 <p style="margin:0 0 24px 0;font-size:14px;color:#64748b;">{{period_start}} — {{period_end}}</p>
 
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
@@ -479,6 +482,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 <tr><td align="center">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
 <tr><td style="padding:32px 32px 16px;">
+  {{logo_block}}
   <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6B5B95;">Приглашение в команду</p>
   <h1 style="margin:0 0 12px 0;font-size:24px;line-height:30px;font-weight:800;color:#1A1A2E;">
     {{inviter_name}} зовёт тебя в&nbsp;«{{salon_name}}»

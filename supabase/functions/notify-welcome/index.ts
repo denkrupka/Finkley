@@ -14,7 +14,7 @@
 
 import { getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { sendEmail } from '../_shared/notify.ts'
+import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -57,6 +57,7 @@ Deno.serve(async (req: Request) => {
 
   // Если salon_id пришёл — проверяем что юзер реально owner этого салона
   // (anti-abuse: чтобы нельзя было передать чужой salon_name в тело письма).
+  let logoUrl = ''
   if (salonId) {
     const { data: member } = await admin
       .from('salon_members')
@@ -67,19 +68,21 @@ Deno.serve(async (req: Request) => {
     if (!member || member.role !== 'owner') {
       salonId = null
       salonName = ''
-    } else if (!salonName) {
+    } else {
       const { data: salon } = await admin
         .from('salons')
-        .select('name')
+        .select('name, logo_url')
         .eq('id', salonId)
         .maybeSingle()
-      salonName = salon?.name ?? ''
+      if (!salonName) salonName = salon?.name ?? ''
+      logoUrl = salon?.logo_url ?? ''
     }
   }
 
   await sendEmail('welcome', email, {
     full_name: fullName || (email.split('@')[0] ?? ''),
     salon_name: salonName,
+    logo_block: renderLogoBlock(logoUrl),
     app_url: salonId ? `${APP_URL}${salonId}/dashboard` : APP_URL,
     owner_name: 'команда Finkley',
   })

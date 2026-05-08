@@ -15,7 +15,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { sendEmail } from '../_shared/notify.ts'
+import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -110,30 +110,63 @@ async function handleCreate(
     return jsonResponse({ ok: false, error: 'create_failed', message: insErr?.message }, 500)
   }
 
-  // Salon name для письма
-  const { data: salon } = await admin.from('salons').select('name').eq('id', body.salon_id).single()
+  // Salon name + logo для письма
+  const { data: salon } = await admin
+    .from('salons')
+    .select('name, logo_url')
+    .eq('id', body.salon_id)
+    .single()
   const { data: invUser } = await admin.auth.admin.getUserById(userId)
   const inviterName =
     (invUser?.user?.user_metadata as { full_name?: string } | null)?.full_name ??
     invUser?.user?.email ??
     'Owner'
 
-  // Ссылка
-  const inviteUrl = `${APP_URL}accept-invite?token=${encodeURIComponent(token)}`
+  // Базовый «accept»-URL — он содержит наш token и работает для уже
+  // авторизованного юзера. Если приглашённый ещё не зарегистрирован —
+  // оборачиваем в Supabase invite-link, который создаст auth.user, подтвердит
+  // email, залогинит и сделает redirect сюда же. Для уже существующих юзеров —
+  // просто наша ссылка (откроется на /login → /accept-invite после ввода
+  // пароля или magic-link).
+  const acceptUrl = `${APP_URL}accept-invite?token=${encodeURIComponent(token)}`
+
+  let finalInviteUrl = acceptUrl
+  if (!existing) {
+    try {
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: { redirectTo: acceptUrl },
+      })
+      const actionLink = (linkData as unknown as { properties?: { action_link?: string } })
+        ?.properties?.action_link
+      if (linkErr) {
+        console.warn('generateLink invite failed, using plain accept URL:', linkErr.message)
+      } else if (actionLink) {
+        finalInviteUrl = actionLink
+      }
+    } catch (e) {
+      console.warn(
+        'generateLink invite exception, using plain accept URL:',
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
 
   try {
     await sendEmail('team_invitation', email, {
       inviter_name: inviterName,
       salon_name: salon?.name ?? 'Salon',
+      logo_block: renderLogoBlock((salon as { logo_url?: string | null } | null)?.logo_url),
       role: body.role,
-      invite_url: inviteUrl,
+      invite_url: finalInviteUrl,
       expires_in_days: '14',
     })
   } catch (e) {
     console.warn('email send failed, invitation still created:', e instanceof Error ? e.message : e)
   }
 
-  return jsonResponse({ ok: true, invitation_id: inv.id, invite_url: inviteUrl })
+  return jsonResponse({ ok: true, invitation_id: inv.id, invite_url: finalInviteUrl })
 }
 
 async function handleCancel(
@@ -158,55 +191,59 @@ async function handleCancel(
   return jsonResponse({ ok: true })
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
-  }
+import { withSentry } from '../_shared/sentry.ts'
 
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
-  }
-  const userJwt = authHeader.slice('Bearer '.length)
+Deno.serve(
+  withSentry('send-invitation', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    }
 
-  const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userJwt}` } },
-  })
-  const { data: userRes, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userRes?.user) {
-    return jsonResponse({ ok: false, error: 'invalid_token' }, 401)
-  }
-  const userId = userRes.user.id
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
+    }
+    const userJwt = authHeader.slice('Bearer '.length)
 
-  let body: { action?: string; [k: string]: unknown }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ ok: false, error: 'bad_request' }, 400)
-  }
+    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    })
+    const { data: userRes, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userRes?.user) {
+      return jsonResponse({ ok: false, error: 'invalid_token' }, 401)
+    }
+    const userId = userRes.user.id
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+    let body: { action?: string; [k: string]: unknown }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+    }
 
-  switch (body.action) {
-    case 'create':
-      return handleCreate(
-        admin,
-        userId,
-        body as {
-          salon_id?: string
-          email?: string
-          role?: string
-          staff_id?: string | null
-        },
-      )
-    case 'cancel':
-      return handleCancel(admin, userId, body as { invitation_id?: string })
-    default:
-      return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
-  }
-})
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+
+    switch (body.action) {
+      case 'create':
+        return handleCreate(
+          admin,
+          userId,
+          body as {
+            salon_id?: string
+            email?: string
+            role?: string
+            staff_id?: string | null
+          },
+        )
+      case 'cancel':
+        return handleCancel(admin, userId, body as { invitation_id?: string })
+      default:
+        return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
+    }
+  }),
+)
