@@ -62,6 +62,55 @@ function extractDataToken(html: string): string | null {
   return m?.[1] ?? null
 }
 
+/**
+ * Парсит HTML страницы /user_companies/indexTable в список компаний.
+ * Каскад regex от специфичного к общему — wFirma периодически переименовывает
+ * CSS-классы, поэтому страхуемся.
+ *
+ * Возвращает уникальные id (Map), имя берём из первого матча по этому id.
+ */
+function parseCompaniesFromHtml(html: string): WebFlowCompanyChoice[] {
+  const found = new Map<string, string>()
+
+  const patterns: RegExp[] = [
+    // Cascade 1 (текущий): class="active-brand" между id и текстом
+    /\/user_companies\/login\/(\d+)"[^>]*class="[^"]*active-brand[^"]*"[^>]*>([^<]+)</g,
+    // Cascade 2: любой класс/атрибут после id
+    /\/user_companies\/login\/(\d+)"[^>]*>\s*([^<]+?)\s*</g,
+    // Cascade 3: id + ближайший непустой текст в пределах 200 символов
+    /\/user_companies\/login\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
+  ]
+
+  for (const re of patterns) {
+    for (const m of html.matchAll(re)) {
+      const id = m[1]
+      const rawName = (m[2] ?? '').trim()
+      if (!id || found.has(id)) continue
+      // Чистим от вложенных тегов и спан-маркеров
+      const name = rawName
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (name) found.set(id, name)
+    }
+    if (found.size > 0) break
+  }
+
+  // Если никто из паттернов не дал name, но id-шники нашли — генерим placeholder
+  if (found.size === 0) {
+    const idsOnly = new Set<string>()
+    for (const m of html.matchAll(/\/user_companies\/login\/(\d+)/g)) {
+      if (m[1]) idsOnly.add(m[1])
+    }
+    let i = 1
+    for (const id of idsOnly) {
+      found.set(id, `Firma ${i++}`)
+    }
+  }
+
+  return Array.from(found.entries()).map(([id, name]) => ({ id, name }))
+}
+
 function multipartBody(fields: Record<string, string>, boundary: string): string {
   let body = ''
   for (const [k, v] of Object.entries(fields)) {
@@ -127,19 +176,20 @@ export async function generateApiKeyViaWebFlow(
   })
   parseSetCookie(res.headers, jar)
   const companiesHtml = await res.text()
-  // Пары [id, name] из ссылок /user_companies/login/{id}
-  const companyMatches = [
-    ...companiesHtml.matchAll(
-      /\/user_companies\/login\/(\d+)"[^>]*class="active-brand"[^>]*>([^<]+)</g,
-    ),
-  ]
-  if (companyMatches.length === 0) {
-    return { ok: false, reason: 'wfirma_no_companies' }
+
+  // Каскад regex для парсинга. wFirma периодически меняет HTML/CSS-классы,
+  // поэтому пробуем по убыванию специфичности.
+  const companies = parseCompaniesFromHtml(companiesHtml)
+  if (companies.length === 0) {
+    // Логируем для отладки — sample HTML без приватных данных
+    const sample = companiesHtml.slice(0, 500).replace(/\s+/g, ' ')
+    console.warn('wfirma: no companies parsed, html sample:', sample)
+    return {
+      ok: false,
+      reason: 'wfirma_no_companies',
+      details: 'parser_no_match — структура wFirma могла измениться',
+    }
   }
-  const companies: WebFlowCompanyChoice[] = companyMatches.map((m) => ({
-    id: m[1]!,
-    name: m[2]!.trim(),
-  }))
   // Если фирм несколько — UI должен показать селектор. Возвращаем список
   // и НЕ создаём ключи (создание происходит при повторном вызове с
   // `selectedCompanyId`).
