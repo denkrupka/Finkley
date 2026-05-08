@@ -30,6 +30,26 @@ export function useUpdateSalon() {
 }
 
 /**
+ * Загружает логотип салона в публичный bucket `salon-logos` и возвращает
+ * public URL — он сохраняется в `salons.logo_url` обычным `useUpdateSalon`.
+ *
+ * Path: `<salon_id>/<uuid>.<ext>`. RLS на bucket пропускает запись только
+ * для owner/admin салона (см. миграцию 20260508000015).
+ */
+export async function uploadSalonLogo(salonId: string, file: File): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+  const path = `${salonId}/${crypto.randomUUID()}.${ext}`
+  const { error: upErr } = await supabase.storage.from('salon-logos').upload(path, file, {
+    upsert: false,
+    contentType: file.type || undefined,
+    cacheControl: '3600',
+  })
+  if (upErr) throw upErr
+  const { data } = supabase.storage.from('salon-logos').getPublicUrl(path)
+  return data.publicUrl
+}
+
+/**
  * Soft delete салона (`deleted_at = now()`). Через 30 дней grace period
  * scheduled function зачистит окончательно (TASK-26 в стадии 2).
  */

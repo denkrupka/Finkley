@@ -66,8 +66,62 @@
     --brand-border-strong: 48 9% 84%;
   }
 
-  /* Dark mode пока не используем — стадия 1 light-only.
-     Tokens подобраны позже при первой задаче с тёмной темой. */
+  /* Dark mode — активируется классом `dark` на <html>. ThemeProvider
+     ставит/снимает класс по выбору юзера или префам OS. Цвета подобраны
+     так, чтобы Finkley-акценты (navy/teal/sage/red/gold) оставались
+     узнаваемыми, а фон стал глубоким navy с лёгким уклоном в синий. */
+  .dark {
+    --background: 240 30% 7%; /* deep navy bg */
+    --foreground: 0 0% 96%;
+
+    --card: 240 28% 11%; /* поверхность карточек, чуть светлее фона */
+    --card-foreground: 0 0% 96%;
+
+    --popover: 240 28% 11%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 0 0% 96%; /* в dark «primary» зеркалится — светлая кнопка на тёмном фоне */
+    --primary-foreground: 240 28% 14%;
+
+    --secondary: 197 60% 50%; /* teal стал ярче чтобы читаться на тёмном */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 15% 18%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 197 30% 22%;
+    --accent-foreground: 197 50% 85%;
+
+    --destructive: 6 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 15% 22%;
+    --input: 240 15% 22%;
+    --ring: 197 60% 50%;
+
+    /* Доменные акценты — sage и red слегка ярче для контраста */
+    --profit: 153 55% 50%;
+    --loss: 6 65% 55%;
+
+    /* Brand palette в dark: navy сами стали фоном — для надписей-«navy»
+       используем foreground; teal/sage/red/yellow/gold чуть ярче чем
+       в light для контраста с тёмным фоном. */
+    --brand-navy: 0 0% 96%; /* фактически foreground — для текстов «brand-navy» */
+    --brand-navy-soft: 240 15% 28%;
+    --brand-navy-deep: 0 0% 100%;
+    --brand-teal: 197 60% 55%;
+    --brand-teal-soft: 197 30% 22%;
+    --brand-teal-deep: 197 70% 70%;
+    --brand-sage: 153 55% 55%;
+    --brand-sage-soft: 144 30% 22%;
+    --brand-red: 6 65% 60%;
+    --brand-red-soft: 9 40% 25%;
+    --brand-yellow: 54 60% 35%;
+    --brand-yellow-deep: 53 70% 55%;
+    --brand-gold: 41 60% 60%;
+    --brand-text-faint: 0 0% 50%;
+    --brand-border-strong: 240 15% 32%;
+  }
 }
 
 @layer base {
@@ -76,9 +130,7 @@
   }
   body {
     @apply bg-background text-foreground font-display;
-    font-feature-settings:
-      'cv11',
-      'ss01';
+    font-feature-settings: 'cv11', 'ss01';
   }
   /* Числа дашборда: моно-шрифт + tabular figures (Finkley convention). */
   .num {

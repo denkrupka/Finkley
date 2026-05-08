@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 
 import App from './App'
 import { AuthProvider } from './components/auth/AuthProvider'
+import { ThemeProvider } from './components/theme/theme-provider'
 import './i18n'
 import './styles/globals.css'
 import '@fontsource/inter/400.css'
@@ -87,12 +88,14 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <AuthProvider>
-          <App />
-          <Toaster position="bottom-right" richColors closeButton />
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <AuthProvider>
+            <App />
+            <Toaster position="bottom-right" richColors closeButton />
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 )

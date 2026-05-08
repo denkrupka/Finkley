@@ -1,6 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, TrendingUp } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import { supabase } from '@/lib/supabase/client'
 
 import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
 import { useSalon } from '@/hooks/useSalons'
@@ -79,8 +84,9 @@ export function DashboardPage() {
             : 'hsl(var(--brand-sage))',
     }))
 
-  // top-services с margin-цветом (sage/gold/red) — пока без реальной margin (TASK-23)
-  // используем revenue/visits как proxy «крупности»
+  // top-services с margin-цветом (sage/gold/red). Если в services задана
+  // cost_cents — используем реальную маржу из RPC. Иначе fallback на share
+  // от лидера как proxy «крупности».
   const maxServiceRev = Math.max(1, ...topServices.map((s) => s.revenue_cents))
 
   return (
@@ -230,9 +236,22 @@ export function DashboardPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {topServices.map((s, i) => {
-                // Псевдо-маржа по доле от лидера: > 70% → sage, > 40% → gold, иначе red
                 const share = (s.revenue_cents / maxServiceRev) * 100
-                const dot = share > 70 ? 'sage' : share > 40 ? 'gold' : 'red'
+                // Реальная маржа когда задана cost_cents у услуги.
+                // sage ≥50% / gold 35–50% / red <35% (брендовая шкала).
+                // Fallback (cost не задан) — псевдо-маржа по share от лидера.
+                const dot =
+                  s.margin_pct != null
+                    ? s.margin_pct >= 50
+                      ? 'sage'
+                      : s.margin_pct >= 35
+                        ? 'gold'
+                        : 'red'
+                    : share > 70
+                      ? 'sage'
+                      : share > 40
+                        ? 'gold'
+                        : 'red'
                 const dotClass =
                   dot === 'sage'
                     ? 'bg-brand-sage'
@@ -246,7 +265,9 @@ export function DashboardPage() {
                   >
                     <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-semibold">
                       <span className={cn('size-1.5 rounded-full', dotClass)} />
-                      {t('dashboard.top_services.share', { pct: Math.round(share) })}
+                      {s.margin_pct != null
+                        ? t('dashboard.top_services.margin', { pct: Math.round(s.margin_pct) })
+                        : t('dashboard.top_services.share', { pct: Math.round(share) })}
                     </div>
                     <div className="text-foreground line-clamp-2 text-[14px] font-semibold">
                       {s.service_name}
@@ -507,12 +528,57 @@ function PaymentDonut({
 
 function DashboardEmpty() {
   const { t } = useTranslation()
+  const { salonId } = useParams<{ salonId: string }>()
+  const qc = useQueryClient()
+  const [pending, setPending] = useState(false)
+
+  async function seedDemo() {
+    if (!salonId) return
+    if (!confirm(t('dashboard.empty.confirm_seed'))) return
+    setPending(true)
+    try {
+      const { data, error } = await supabase.rpc('seed_demo_data', { p_salon_id: salonId })
+      if (error) throw error
+      const stats = data as {
+        staff?: number
+        services?: number
+        clients?: number
+        visits?: number
+        expenses?: number
+      }
+      toast.success(
+        t('dashboard.empty.toast_seeded', {
+          visits: stats?.visits ?? 0,
+          clients: stats?.clients ?? 0,
+        }),
+      )
+      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      qc.invalidateQueries({ queryKey: ['clients', salonId] })
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+      qc.invalidateQueries({ queryKey: ['services', salonId] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPending(false)
+    }
+  }
+
   return (
     <div className="border-border bg-card mb-5 rounded-lg border border-dashed px-6 py-10 text-center">
       <h2 className="text-brand-navy text-xl font-bold tracking-tight">
         {t('dashboard.empty.title')}
       </h2>
       <p className="text-muted-foreground mt-1 text-sm">{t('dashboard.empty.subtitle')}</p>
+      <button
+        type="button"
+        onClick={seedDemo}
+        disabled={pending}
+        className="bg-secondary/10 text-secondary hover:bg-secondary/20 mt-4 rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+      >
+        {pending ? t('common.loading') : t('dashboard.empty.seed_demo')}
+      </button>
     </div>
   )
 }

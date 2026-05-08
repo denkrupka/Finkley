@@ -67,6 +67,46 @@ export function useExpenseCategories(salonId: string | undefined) {
   })
 }
 
+export function useCreateExpenseCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { name: string; sort_order?: number }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase
+        .from('expense_categories')
+        .insert({
+          salon_id: salonId,
+          name: input.name,
+          sort_order: input.sort_order ?? 100,
+          is_system: false,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data.id as string
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expense_categories', salonId] })
+    },
+  })
+}
+
+export function useUpdateExpenseCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; name?: string; is_archived?: boolean }) => {
+      const { id, ...patch } = input
+      const { error } = await supabase.from('expense_categories').update(patch).eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expense_categories', salonId] })
+      qc.invalidateQueries({ queryKey: expensesKeys(salonId) })
+    },
+  })
+}
+
 export function useExpenses(salonId: string | undefined, period: ExpensesPeriod) {
   return useQuery<ExpenseRow[]>({
     queryKey: [...expensesKeys(salonId), 'list', period],

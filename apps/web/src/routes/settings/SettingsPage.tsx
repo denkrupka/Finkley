@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
+import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
@@ -31,10 +31,13 @@ import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { ApiKeysCard } from './ApiKeysCard'
+import { AppearanceCard } from './AppearanceCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
+import { CategoriesCard } from './CategoriesCard'
 import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
+import { ServicesPricingCard } from './ServicesPricingCard'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
   COUNTRY_OPTIONS,
@@ -70,6 +73,7 @@ export function SettingsPage() {
   const [country, setCountry] = useState<CountryCode>('PL')
   const [salonType, setSalonType] = useState<SalonTypeId>('hair')
   const [logoUrl, setLogoUrl] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [confirmName, setConfirmName] = useState('')
   const [exportPending, setExportPending] = useState(false)
@@ -199,7 +203,7 @@ export function SettingsPage() {
               <SelectContent>
                 {COUNTRY_OPTIONS.map((c) => (
                   <SelectItem key={c.code} value={c.code}>
-                    {c.name} · {c.currency}
+                    {t(`onboarding.country.${c.code}`, { defaultValue: c.name })} · {c.currency}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -216,22 +220,66 @@ export function SettingsPage() {
               <SelectContent>
                 {SALON_TYPES.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name}
+                    {t(`onboarding.salon_type.${s.id}`, { defaultValue: s.name })}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <div className="flex flex-col gap-2 sm:col-span-2">
             <Label htmlFor="set-logo">{t('settings.profile.logo_label')}</Label>
-            <Input
-              id="set-logo"
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://..."
-            />
+            <div className="flex items-center gap-4">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="logo"
+                  className="border-border bg-muted size-16 rounded-md border object-contain"
+                />
+              ) : (
+                <div className="border-border bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-md border text-xs">
+                  —
+                </div>
+              )}
+              <div className="flex flex-1 flex-col gap-1.5">
+                <input
+                  id="set-logo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  className="text-muted-foreground file:border-border file:bg-muted file:text-foreground hover:file:bg-muted/80 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
+                  disabled={logoUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file || !salon) return
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error(t('settings.profile.logo_too_large'))
+                      e.target.value = ''
+                      return
+                    }
+                    try {
+                      setLogoUploading(true)
+                      const url = await uploadSalonLogo(salon.id, file)
+                      setLogoUrl(url)
+                      toast.success(t('settings.profile.logo_uploaded'))
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : String(err))
+                    } finally {
+                      setLogoUploading(false)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+                {logoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl('')}
+                    className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-2 hover:underline"
+                  >
+                    {t('settings.profile.logo_remove')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
             <p className="text-muted-foreground text-xs">{t('settings.profile.logo_hint')}</p>
           </div>
 
@@ -248,6 +296,11 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {/* Тема оформления */}
+      <div className="mb-6">
+        <AppearanceCard />
+      </div>
+
       {/* Установка приложения (PWA) */}
       <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
         <div className="flex items-center justify-between gap-4">
@@ -260,6 +313,16 @@ export function SettingsPage() {
           <InstallAppButton />
         </div>
       </section>
+
+      {/* Услуги — себестоимость и цены */}
+      <div className="mb-6">
+        <ServicesPricingCard />
+      </div>
+
+      {/* Категории услуг и расходов */}
+      <div className="mb-6">
+        <CategoriesCard />
+      </div>
 
       {/* Push-уведомления */}
       <div className="mb-6">
