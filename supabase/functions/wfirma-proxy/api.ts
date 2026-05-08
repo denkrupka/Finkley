@@ -130,6 +130,38 @@ export async function wfirmaExpensesFind(
   return { ok: true, expenses: arr }
 }
 
+/**
+ * Скачать PDF одной закупочной фактуры. wFirma поддерживает endpoint
+ * `/expenses/download/{id}?page=invoice` который отдаёт application/pdf.
+ *
+ * Возвращаем bytes, либо null если wFirma вернула не PDF (например текстовая
+ * квитанция bill, без файла). Sync не должен падать из-за этого — используется
+ * best-effort.
+ */
+export async function wfirmaExpensePdf(
+  creds: WfirmaApiCreds,
+  expenseId: string,
+): Promise<Uint8Array | null> {
+  const url = new URL(`${API_BASE}/expenses/download/${expenseId}`)
+  url.searchParams.set('page', 'invoice')
+  if (creds.companyId) url.searchParams.set('company_id', creds.companyId)
+  try {
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: authHeaders(creds),
+    })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') ?? ''
+    if (!ct.toLowerCase().includes('pdf')) return null
+    const buf = await res.arrayBuffer()
+    if (buf.byteLength === 0) return null
+    return new Uint8Array(buf)
+  } catch (e) {
+    console.warn('wfirmaExpensePdf failed', expenseId, e)
+    return null
+  }
+}
+
 /** Полные детали одной фактуры (включая ksef_id, contractor.nip). */
 export async function wfirmaExpenseGet(
   creds: WfirmaApiCreds,

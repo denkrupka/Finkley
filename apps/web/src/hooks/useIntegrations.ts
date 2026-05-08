@@ -255,10 +255,19 @@ function unpackWfirma<T>(data: WfirmaResponse<T>): T {
 }
 
 /** X2: подключение через email+password от wfirma.pl. */
+export type WfirmaCompanyChoice = { id: string; name: string }
+export type WfirmaConnectResult =
+  | { kind: 'connected'; company: { id: string; name: string; nip: string } }
+  | { kind: 'choose_company'; companies: WfirmaCompanyChoice[] }
+
 export function useWfirmaConnectWithLogin(salonId: string | undefined) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: { email: string; password: string }) => {
+  return useMutation<
+    WfirmaConnectResult,
+    Error,
+    { email: string; password: string; selectedCompanyId?: string }
+  >({
+    mutationFn: async (input) => {
       if (!salonId) throw new Error('no salon')
       const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
         body: {
@@ -266,15 +275,27 @@ export function useWfirmaConnectWithLogin(salonId: string | undefined) {
           salon_id: salonId,
           email: input.email,
           password: input.password,
+          ...(input.selectedCompanyId ? { selected_company_id: input.selectedCompanyId } : {}),
         },
       })
       if (error) throw error
-      return unpackWfirma(
-        data as WfirmaResponse<{ company: { id: string; name: string; nip: string } }>,
-      )
+      const json = data as WfirmaResponse<{
+        company?: { id: string; name: string; nip: string }
+        companies?: WfirmaCompanyChoice[]
+      }>
+      // В аккаунте wFirma несколько фирм — UI должен показать выбор и
+      // повторно отправить запрос с selected_company_id.
+      if (!json.ok && json.error === 'choose_company' && Array.isArray(json.companies)) {
+        return { kind: 'choose_company', companies: json.companies }
+      }
+      const ok = unpackWfirma(json)
+      if (!ok.company) throw new Error('no_company_in_response')
+      return { kind: 'connected', company: ok.company }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    onSuccess: (res) => {
+      if (res.kind === 'connected') {
+        qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      }
     },
   })
 }

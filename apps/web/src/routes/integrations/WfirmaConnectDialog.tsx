@@ -15,7 +15,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useWfirmaConnectWithCredentials, useWfirmaConnectWithLogin } from '@/hooks/useIntegrations'
+import {
+  useWfirmaConnectWithCredentials,
+  useWfirmaConnectWithLogin,
+  type WfirmaCompanyChoice,
+} from '@/hooks/useIntegrations'
 
 /**
  * WfirmaConnectDialog — Hybrid X3 (см. ADR-012):
@@ -38,6 +42,10 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
   const [secretKey, setSecretKey] = useState('')
   const [companyId, setCompanyId] = useState('')
 
+  // Quick step-2: список фирм (если в аккаунте wFirma их несколько)
+  const [pendingCompanies, setPendingCompanies] = useState<WfirmaCompanyChoice[] | null>(null)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+
   const connectQuick = useWfirmaConnectWithLogin(salonId)
   const connectManual = useWfirmaConnectWithCredentials(salonId)
   const isPending = connectQuick.isPending || connectManual.isPending
@@ -50,6 +58,8 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
       setAccessKey('')
       setSecretKey('')
       setCompanyId('')
+      setPendingCompanies(null)
+      setSelectedCompanyId('')
     }
   }, [open])
 
@@ -80,15 +90,21 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
     }
   }
 
-  function handleQuickSubmit() {
+  function handleQuickSubmit(opts: { selectedCompanyId?: string } = {}) {
     if (!email.trim() || !password) {
       toast.error(t('integrations.errors.fields_required'))
       return
     }
     connectQuick.mutate(
-      { email: email.trim(), password },
+      { email: email.trim(), password, selectedCompanyId: opts.selectedCompanyId },
       {
         onSuccess: (res) => {
+          if (res.kind === 'choose_company') {
+            // В аккаунте wFirma несколько фирм — показываем шаг выбора.
+            setPendingCompanies(res.companies)
+            setSelectedCompanyId(res.companies[0]?.id ?? '')
+            return
+          }
           toast.success(t('integrations.toast_connected', { name: res.company.name }))
           onClose()
         },
@@ -103,10 +119,19 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
             code === 'auto_login_disabled'
           ) {
             setMode('manual')
+            setPendingCompanies(null)
           }
         },
       },
     )
+  }
+
+  function handleConfirmCompany() {
+    if (!selectedCompanyId) {
+      toast.error(t('integrations.errors.fields_required'))
+      return
+    }
+    handleQuickSubmit({ selectedCompanyId })
   }
 
   function handleManualSubmit() {
@@ -162,7 +187,51 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
           </button>
         </div>
 
-        {mode === 'quick' ? (
+        {mode === 'quick' && pendingCompanies ? (
+          <form
+            className="flex flex-col gap-4 px-5 pb-2 pt-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleConfirmCompany()
+            }}
+          >
+            <p className="text-muted-foreground text-xs">
+              {t('integrations.wfirma.choose_company_subtitle')}
+            </p>
+            <div className="flex flex-col gap-2">
+              {pendingCompanies.map((c) => (
+                <label
+                  key={c.id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
+                    selectedCompanyId === c.id
+                      ? 'border-secondary bg-secondary/5'
+                      : 'border-border hover:border-secondary/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="wfirma-company"
+                    value={c.id}
+                    checked={selectedCompanyId === c.id}
+                    onChange={() => setSelectedCompanyId(c.id)}
+                    className="text-secondary size-4"
+                  />
+                  <span className="flex-1">
+                    <span className="text-foreground block text-sm font-semibold">{c.name}</span>
+                    <span className="text-muted-foreground block text-xs">id: {c.id}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPendingCompanies(null)}
+              className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-2 hover:underline"
+            >
+              {t('common.back')}
+            </button>
+          </form>
+        ) : mode === 'quick' ? (
           <form
             className="flex flex-col gap-4 px-5 pb-2 pt-3"
             onSubmit={(e) => {
@@ -261,7 +330,11 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
           </Button>
           <Button
             type="button"
-            onClick={mode === 'quick' ? handleQuickSubmit : handleManualSubmit}
+            onClick={() => {
+              if (mode === 'quick' && pendingCompanies) handleConfirmCompany()
+              else if (mode === 'quick') handleQuickSubmit()
+              else handleManualSubmit()
+            }}
             disabled={isPending}
           >
             {isPending ? (

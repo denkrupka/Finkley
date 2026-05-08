@@ -23,6 +23,17 @@ export type WebFlowKeys = {
   companyNip: string
 }
 
+/** Список фирм пользователя в его аккаунте wFirma — для выбора в UI. */
+export type WebFlowCompanyChoice = {
+  id: string
+  name: string
+}
+
+export type WebFlowResult =
+  | { ok: true; data: WebFlowKeys }
+  | { ok: false; reason: 'choose_company'; companies: WebFlowCompanyChoice[] }
+  | { ok: false; reason: WebFlowError; details?: string }
+
 type CookieJar = Map<string, string>
 
 function parseSetCookie(h: Headers, jar: CookieJar) {
@@ -64,10 +75,10 @@ function multipartBody(fields: Record<string, string>, boundary: string): string
 export async function generateApiKeyViaWebFlow(
   email: string,
   password: string,
-  appName = 'Finkley',
-): Promise<
-  { ok: true; data: WebFlowKeys } | { ok: false; reason: WebFlowError; details?: string }
-> {
+  options: { appName?: string; selectedCompanyId?: string } = {},
+): Promise<WebFlowResult> {
+  const appName = options.appName ?? 'Finkley'
+  const selectedCompanyId = options.selectedCompanyId ?? null
   const jar: CookieJar = new Map()
 
   // Step 1: GET /logowanie — establish initial session cookie
@@ -125,11 +136,27 @@ export async function generateApiKeyViaWebFlow(
   if (companyMatches.length === 0) {
     return { ok: false, reason: 'wfirma_no_companies' }
   }
-  // Если фирм несколько — берём первую (обычный сценарий: 1 фирма на акт);
-  // если у юзера их несколько и он хотел не первую — пусть отключит и подключит
-  // другую через ручной ввод ключей. UI выбора фирмы не делаем в первой версии.
-  const companyId = companyMatches[0]![1]!
-  const companyName = companyMatches[0]![2]!.trim()
+  const companies: WebFlowCompanyChoice[] = companyMatches.map((m) => ({
+    id: m[1]!,
+    name: m[2]!.trim(),
+  }))
+  // Если фирм несколько — UI должен показать селектор. Возвращаем список
+  // и НЕ создаём ключи (создание происходит при повторном вызове с
+  // `selectedCompanyId`).
+  let chosen: WebFlowCompanyChoice
+  if (companies.length === 1) {
+    chosen = companies[0]!
+  } else if (selectedCompanyId) {
+    const found = companies.find((c) => c.id === selectedCompanyId)
+    if (!found) {
+      return { ok: false, reason: 'wfirma_no_companies', details: 'selected_id_not_in_account' }
+    }
+    chosen = found
+  } else {
+    return { ok: false, reason: 'choose_company', companies }
+  }
+  const companyId = chosen.id
+  const companyName = chosen.name
 
   // Step 4: GET /user_companies/login/{company_id} — enter company, parse X-Wf-Token
   res = await fetch(`https://wfirma.pl/user_companies/login/${companyId}`, {
