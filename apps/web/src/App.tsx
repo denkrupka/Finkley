@@ -150,7 +150,7 @@ function App() {
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />
         <Route path="reports" element={lazyRoute(<ReportsPage />)} />
-        <Route path="ai" element={<AIPage />} />
+        <Route path="ai" element={lazyRoute(<AIPage />)} />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
         <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
