@@ -189,3 +189,63 @@
 1. Зарегистрировать pg_cron schedule для `process-recurring-expenses` (нужен `FUNCTION_INTERNAL_SECRET` в database setting).
 2. Прокликать руками: фото чека (полный путь — upload + просмотр в новой сессии), GDPR-экспорт (открыть ZIP, проверить CSV), tip/discount в визите → дашборд.
 3. Закрыть #1 (Stripe coupon) и #2 (юр-доки) когда будут силы.
+
+---
+
+## Сессия · 8 мая 2026 · Tech-debt sweep + Resend + Dark theme
+
+После закрытия Stage 5 (TASK-37..43) пробежались по техдолгу из категории «B» и
+доделали Resend. Картина для прода после сессии:
+
+### Что сделано в этой сессии
+
+**Resend домен `finkley.app`:**
+
+- API key добавлен в `apps/web/.env.local` (gitignored) + плейсхолдер в `.env.example`.
+- Через Resend API проверили что домен **уже verified, sending enabled** (DNS записи DKIM/SPF/MX/TXT настроены ранее в Cloudflare).
+- Smoke-test письмо доставлено на `deniskrupka001@gmail.com` (id `f2eb3ce2-...`).
+- В Supabase staging добавлены `RESEND_API_KEY` + `RESEND_FROM` через Management API.
+- Из Supabase prod вычищены legacy `POSTMARK_SERVER_TOKEN` / `POSTMARK_FROM` / `POSTMARK_MESSAGE_STREAM`.
+- Email-шаблоны: `Postmark template alias` → `Resend template alias` в HTML-комментариях.
+- README `docs/email-templates/README.md` переписан под Resend (раньше был под Postmark).
+
+**B-1 — TASK-12 полный CRUD услуг:** `ServicesPricingCard` (один компонент в Settings) теперь умеет: добавить услугу, переименовать (inline), сменить категорию, длительность, цену, себестоимость, заархивировать (soft-delete с подтверждением), показать архив + восстановить. Хуки `useCreateService` + `useUpdateService` (расширен).
+
+**B-2 — CRUD категорий услуг и расходов:** новая карточка `CategoriesCard` в Settings — две колонки (service / expense), inline rename, add new, archive с защитой is_system. Хуки `useCreateExpenseCategory` / `useUpdateExpenseCategory` / `useCreateServiceCategory` / `useUpdateServiceCategory`.
+
+**B-3 — team-invitation для незарегистрированных через Supabase invite-link:** `send-invitation` теперь, если приглашённого email нет в `auth.users`, вызывает `auth.admin.generateLink({type: 'invite', redirectTo: accept-url})` и кладёт `action_link` в письмо. Юзер кликает → Supabase Auth подтверждает email + логинит + редирект на `/accept-invite?token=...` → автопринятие. Один клик вместо «signup → confirm → login → accept».
+
+**B-5 — Bundle splitting:** убрали `recharts` chunk (recharts не используется в коде), добавили отдельные chunks `react-query` (42KB / 13KB gzip) и `sonner` (33KB / 9KB gzip). Initial bundle index уменьшен на ~75KB.
+
+**B-6 — telegram-auth deploy check:** prod `OPTIONS /telegram-auth` отвечает 204, функция ACTIVE. На staging пока 404 — выкатится автоматом следующим push'ем (новый двухступенчатый CI).
+
+**B-7 — Logo в email-шаблонах:** добавили `{{logo_block}}` в welcome / weekly_digest / team_invitation. Helper `renderLogoBlock(logoUrl)` в `_shared/notify.ts` собирает `<img>` с inline-стилями (display:block; max:120×48; rounded). Если у салона нет logo — пустая строка, шаблон просто не показывает блок. В edge functions `notify-welcome`, `send-weekly-digest`, `send-invitation` тянем `salon.logo_url` из БД.
+
+**B-8 — Sentry в edge functions:** новый `_shared/sentry.ts` — минимальный envelope-sender без зависимостей. При наличии `SENTRY_DSN_SERVER` шлёт error в Sentry `/store/`-endpoint (legacy, всё ещё работает). Подключено в `stripe-webhook`, `generate-export`. Остальные edge functions можно оборачивать по мере выявления проблем — helper готов.
+
+**Dark theme:** `darkMode: 'class'` уже был в Tailwind config, но `.dark` CSS-переменные не определены. Добавили в `globals.css` полный набор для всех shadcn-токенов и Finkley brand-цветов (deep navy фон, brand-\* чуть ярче для контраста). `ThemeProvider` (`components/theme/theme-provider.tsx`) — system/light/dark с persist в localStorage и слушателем `prefers-color-scheme`. `AppearanceCard` в Settings с тремя кнопками (Monitor/Sun/Moon).
+
+**Маржа по услугам, Excel-экспорт, custom date-range, Logo upload, CI staging-gate, insights schema sync** — все сделаны в предыдущем pass'е этой же даты.
+
+### Метрики качества на конец сессии
+
+- `pnpm typecheck` — зелёный
+- `pnpm lint` — зелёный (max-warnings 0)
+- `pnpm build` — собирается
+- i18n parity — 908/908/908 (ru/en/pl)
+
+### Что осталось (категория A — только владелец)
+
+- **Stripe Coupon `BETA3M`** — создать в Stripe Dashboard
+- **Юр.документы Privacy/Terms** — заменить placeholders `[Юрлицо PL]` / `[NIP]` / `[адрес]` на реальные данные ИП в `apps/landing/src/pages/{privacy,terms}.astro` + футеры email-шаблонов в `templates.ts` и `docs/email-templates/*.html`
+- **GitHub Environment "production"** с required reviewers (для нового CI staging-gate)
+- **Apple Developer Program** ($99/год) — для Apple Sign In, не критично для MVP
+
+Stripe Live mode credentials (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`) — **уже в Supabase secrets prod**. Resend API key + RESEND_FROM — **уже там же**. Anthropic, Telegram, VAPID, wFirma — тоже в проде.
+
+### Узнали нового
+
+- Resend API ключ управляет всем — даже Supabase Management API позволил удалить legacy POSTMARK\_\* за один DELETE с массивом имён.
+- `auth.admin.generateLink({type: 'invite'})` в Supabase — недокументированно толком, но работает: создаёт user, ставит email_confirmed_at = null, возвращает action_link для одноразового logon. Идеально для team-invitations.
+- В `darkMode: ['class']` Tailwind 3.4 нужно ровно `class` (не `selector`) — был лишний array-обёртка но работает.
+- React-refresh ESLint-плагин ругается если из одного файла экспортируется и компонент, и hook (`useTheme` рядом с `<ThemeProvider>`). Решение — comment-disable или разделить файлы. Выбрали disable, потому что split дороже в навигации.

@@ -58,7 +58,7 @@ export function Step1Salon({ value, onChange }: Props) {
                       : 'border-border bg-card text-foreground hover:bg-accent/50',
                   )}
                 >
-                  {c.name}
+                  {t(`onboarding.country.${c.code}`, { defaultValue: c.name })}
                   <span
                     className={cn(
                       'ml-1.5 text-[11px] font-medium',

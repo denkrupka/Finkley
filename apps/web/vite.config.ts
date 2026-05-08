@@ -27,7 +27,6 @@ export default defineConfig({
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
           supabase: ['@supabase/supabase-js'],
-          recharts: ['recharts'],
           // Heavy UI vendors — отдельный chunk, ленится через lazy-routes
           'ui-radix': [
             '@radix-ui/react-dialog',
@@ -39,6 +38,11 @@ export default defineConfig({
             '@radix-ui/react-label',
             '@radix-ui/react-slot',
           ],
+          // TanStack Query — используется во всех страницах через хуки,
+          // выносим в отдельный chunk чтобы не тянулся в initial bundle.
+          'react-query': ['@tanstack/react-query'],
+          // Toast — sonner ~12KB, в отдельный chunk чтобы не блокировал критический путь
+          sonner: ['sonner'],
           // i18n — три локали уже весомые
           i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           // Forms — react-hook-form + zod + resolvers

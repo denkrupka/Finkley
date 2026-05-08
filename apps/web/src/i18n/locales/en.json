@@ -1,6 +1,7 @@
 {
   "app": {
-    "title": "Finkley"
+    "title": "Finkley",
+    "placeholder": "App skeleton is ready. See docs/04_BACKLOG.md for the next steps."
   },
   "common": {
     "save": "Save",
@@ -15,8 +16,7 @@
     "yes": "Yes",
     "no": "No",
     "confirm": "Confirm",
-    "sign_out": "Sign out",
-    "back_home": "Back to home"
+    "sign_out": "Sign out"
   },
   "auth": {
     "or": "or",
@@ -29,6 +29,7 @@
       "no_account": "No account yet?",
       "signup_link": "Sign up",
       "google_button": "Continue with Google",
+      "facebook_button": "Continue with Facebook",
       "telegram_button": "Continue with Telegram"
     },
     "signup": {
@@ -41,18 +42,108 @@
       "password_confirm_label": "Confirm password",
       "confirm_title": "Check your email",
       "confirm_subtitle": "We sent a confirmation link to {{email}}.",
-      "confirm_hint": "Click the link to activate your account. Check spam if needed.",
+      "confirm_hint": "Click the link to activate your account. The email may end up in spam.",
       "confirm_back_to_login": "Back to sign in"
     },
     "forgot": {
       "title": "Reset password",
-      "subtitle": "We'll email you a reset link.",
+      "subtitle": "We'll email you a link to set a new password.",
       "submit": "Send link",
-      "back_to_login": "Back to sign in"
+      "sent_title": "Link sent",
+      "sent_subtitle": "Check {{email}} — there's a password reset link waiting for you.",
+      "back": "← Back to sign in"
     },
     "reset": {
       "title": "New password",
-      "submit": "Save password"
+      "subtitle": "Enter a new password for your account.",
+      "new_password_label": "New password",
+      "submit": "Save password",
+      "invalid_title": "Link expired",
+      "invalid_subtitle": "This password reset link is no longer valid. Request a new one.",
+      "request_new": "Request a new link"
+    },
+    "callback": {
+      "title": "Confirming sign-in",
+      "subtitle": "Redirecting you to the app."
+    },
+    "errors": {
+      "invalid_credentials": "Invalid email or password",
+      "email_required": "Email is required",
+      "password_required": "Password is required",
+      "password_too_short": "Password must be at least 8 characters",
+      "password_confirm_required": "Please confirm your password",
+      "passwords_do_not_match": "Passwords don't match",
+      "email_invalid": "Invalid email format"
+    }
+  },
+  "onboarding": {
+    "exit": "Exit",
+    "eta": "≈ 2 minutes",
+    "step_of": "Step {{current}} of {{total}}",
+    "skip": "Skip — I'll add it later",
+    "open_dashboard": "Open dashboard",
+    "country": {
+      "PL": "Poland",
+      "DE": "Germany",
+      "LT": "Lithuania",
+      "CZ": "Czechia",
+      "EE": "Estonia"
+    },
+    "salon_type": {
+      "hair": "Hair salon",
+      "nails": "Nail salon",
+      "spa": "Spa / cosmetology",
+      "barber": "Barbershop",
+      "cosmetology": "Cosmetology",
+      "mixed": "Mixed"
+    },
+    "steps": {
+      "salon": "Salon",
+      "staff": "Specialists",
+      "services": "Services",
+      "expenses": "Expenses",
+      "done": "Done"
+    },
+    "step1": {
+      "title": "Tell us about your salon",
+      "subtitle": "We need this — to know which country and currency you work in.",
+      "name_label": "Salon name",
+      "name_placeholder": "For example: Anna's Studio",
+      "country_label": "Country",
+      "type_label": "Salon type"
+    },
+    "step2": {
+      "title": "Add your specialists",
+      "subtitle": "Takes about 2 minutes. You can edit and add more later.",
+      "name_placeholder": "Specialist name",
+      "percent_label": "% of revenue",
+      "add": "Add specialist"
+    },
+    "step3": {
+      "title": "What you offer",
+      "subtitle": "We've added a default list. Adjust the prices and add your own services.",
+      "category": "Category",
+      "category_placeholder": "Haircuts",
+      "service": "Service",
+      "service_placeholder": "Women's haircut",
+      "price": "Price",
+      "add": "Add service",
+      "reset_seed": "Reset to template"
+    },
+    "step4": {
+      "title": "Expense categories",
+      "subtitle": "These are the main buckets your money goes into. You can add more later.",
+      "placeholder": "Category name",
+      "add": "Add category"
+    },
+    "step5": {
+      "title": "All set, {{name}}!",
+      "subtitle": "Your dashboard is ready. It's empty for now — add your first visit and the numbers will appear.",
+      "staff": "specialists",
+      "services": "services",
+      "expenses": "expense categories",
+      "benchmarks_title": "See how you compare to similar salons",
+      "benchmarks_subtitle": "I'll show you how your metrics look against the rest — average ticket, occupancy, return rate. Just industry averages, no names or addresses. You can turn it off any time."
     }
   },
   "nav": {
@@ -60,21 +151,80 @@
     "visits": "Visits",
     "clients": "Clients",
     "expenses": "Expenses",
-    "staff": "Staff",
+    "staff": "Specialists",
     "payouts": "Payroll",
     "reports": "Reports",
     "ai": "AI assistant",
     "settings": "Settings",
     "more": "More",
-    "help": "Help & FAQ"
+    "help": "Help & FAQ",
+    "drawer_title": "Navigation menu"
+  },
+  "salon_switcher": {
+    "title": "Switch salon"
+  },
+  "plan": {
+    "pro_label": "Pro plan",
+    "pro_until": "trial period"
+  },
+  "coming_soon": {
+    "subtitle": "This section will be available in stage {{stage}}. It's not here yet — but it's on the roadmap.",
+    "badge": "Soon · Stage {{stage}}"
   },
   "dashboard": {
     "title": "Dashboard",
+    "greeting": "Hi, {{name}}",
+    "greeting_subtitle_day": "Here's how things are going today.",
+    "greeting_subtitle_week": "Here's how things are going this week.",
+    "greeting_subtitle_month": "Here's how things are going this month.",
+    "greeting_subtitle_custom": "Here's how things are going for the period.",
+    "kpi": {
+      "revenue_label": "Revenue",
+      "expense_label": "Expenses",
+      "profit_label": "Profit",
+      "profit_sublabel": "net in your pocket"
+    },
+    "insights": {
+      "title": "What the AI assistant sees",
+      "dismiss": "Dismiss"
+    },
+    "benchmarks": {
+      "title": "You vs industry average",
+      "bucket_size": "Based on {{count}} salons",
+      "market_avg": "Average: {{value}}",
+      "metrics": {
+        "avg_check": "Average ticket",
+        "revenue_per_master": "Revenue / specialist",
+        "visits_per_week": "Visits / week",
+        "rebooking": "Returning clients"
+      }
+    },
+    "cash": {
+      "title": "Cash on hand"
+    },
+    "upcoming": {
+      "title": "Coming up",
+      "empty": "No recurring visits in the next week",
+      "in_days_one": "in {{count}} day",
+      "in_days_few": "in {{count}} days",
+      "in_days_many": "in {{count}} days",
+      "overdue_one": "overdue by {{count}} day",
+      "overdue_few": "overdue by {{count}} days",
+      "overdue_many": "overdue by {{count}} days"
+    },
     "period": {
       "day": "Day",
       "week": "Week",
       "month": "Month",
       "custom": "Period"
+    },
+    "forecast": {
+      "label": "Forecast",
+      "title": "End of month",
+      "vs_prev": "vs last month",
+      "so_far": "So far: {{amount}}",
+      "day_n": "Day {{n}} of {{total}}",
+      "pending": "Still expected: {{amount}} (upcoming visits)"
     },
     "period_picker": {
       "title": "Pick a period",
@@ -86,6 +236,984 @@
       "last_30": "Last 30 days",
       "last_90": "Last 90 days",
       "last_365": "Last year"
+    },
+    "empty": {
+      "title": "Your profit dashboard will appear here",
+      "subtitle": "Add your first visit — and watch the magic happen. Or try it with demo data.",
+      "cta": "+ Add visit",
+      "seed_demo": "Try with demo data",
+      "confirm_seed": "Fill the salon with test data? Creates 4 specialists, 8 services, 20 clients and 60 visits over the last 30 days. You can clean up later by hand.",
+      "toast_seeded": "Done! {{visits}} visits and {{clients}} clients created. Click around the sections to get a feel."
+    },
+    "master_bars": {
+      "title": "Revenue by specialist",
+      "active_count": "{{count}} specialists active",
+      "empty": "No visits in this period yet"
+    },
+    "payment_donut": {
+      "title": "Payment type",
+      "total": "Total",
+      "empty": "No data for the chart — add some visits."
+    },
+    "top_services": {
+      "title": "Top services",
+      "see_all": "All services",
+      "share": "{{pct}}% of leader",
+      "margin": "Margin {{pct}}%",
+      "visits": "{{count}} visits",
+      "empty": "No services with sales yet"
+    },
+    "recent_visits": {
+      "title": "Recent visits",
+      "show_all": "Show all",
+      "empty": "No visits in this period"
+    },
+    "top_staff": "Top specialists"
+  },
+  "team": {
+    "title": "Team",
+    "subtitle": "Invite teammates: an accountant, an assistant, specialists. Each one sees exactly the data they need for their job.",
+    "back_to_settings": "← Back to settings",
+    "members_title": "Current members",
+    "pending_title": "Pending invitations",
+    "empty": "You're the only member so far.",
+    "invite_button": "Invite",
+    "invite_title": "Invite to team",
+    "invite_subtitle": "The user gets an email with a link. The link is valid for 14 days.",
+    "invite_email": "Email",
+    "invite_role": "Role",
+    "invite_staff_link": "Link to specialist (for the \"Staff\" role)",
+    "invite_staff_none": "— Not selected —",
+    "invite_send": "Send invitation",
+    "linked_to_staff": "Specialist: {{name}}",
+    "member_since": "Joined: {{date}}",
+    "invited_at": "Sent: {{date}}",
+    "expires_at": "Expires: {{date}}",
+    "remove_aria": "Remove member",
+    "cancel_invite_aria": "Cancel invitation",
+    "confirm_remove": "Remove this member? Their access will be revoked immediately.",
+    "confirm_cancel_invite": "Cancel this invitation? The link in the email will stop working.",
+    "toast_invited": "Invitation sent",
+    "toast_invite_cancelled": "Invitation cancelled",
+    "toast_role_updated": "Role updated",
+    "toast_removed": "Member removed",
+    "accept_loading": "Accepting invitation…",
+    "accept_loading_subtitle": "A couple more seconds — and you'll be on the team.",
+    "accept_error_subtitle": "Reach out to whoever invited you, or write to support@finkley.app.",
+    "accept_error": {
+      "missing_token": "The link is broken",
+      "invitation_not_found": "Invitation not found",
+      "already_accepted": "This invitation has already been accepted",
+      "invitation_cancelled": "Invitation was cancelled",
+      "invitation_expired": "This invitation has expired",
+      "email_mismatch": "Email doesn't match the invitation — sign in with the right account",
+      "auth_required": "You need to sign in",
+      "unknown": "Couldn't accept the invitation"
+    },
+    "role": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "accountant": "Accountant",
+      "staff": "Staff"
+    },
+    "role_hint": {
+      "admin": "Full access, except billing and salon deletion",
+      "accountant": "Sees and edits all finances, doesn't manage the team",
+      "staff": "Sees only their own visits and clients, can't see salon finances"
+    },
+    "errors": {
+      "email_required": "Enter an email",
+      "already_member": "This user is already on the team",
+      "missing_fields": "Fill in all the fields",
+      "invalid_role": "Invalid role",
+      "forbidden": "You don't have permission to invite"
+    }
+  },
+  "help": {
+    "title": "Help",
+    "subtitle": "Answers to the most common questions. If something isn't here — get in touch.",
+    "contact_support": "Support",
+    "still_stuck": "Still stuck?",
+    "still_stuck_body": "Drop us a line — we reply within 24 hours on business days. You can also message our Telegram bot — that's where we get bug reports too.",
+    "telegram_bug": "Report a bug on Telegram",
+    "footer": "Finkley · Management accounting for beauty salons ·",
+    "q": {
+      "what": {
+        "title": "What is Finkley?",
+        "body": "Finkley is the online dashboard for a beauty salon owner. You see your profit — not appointment listings — but revenue, expenses, net profit, specialist payouts, weekly and monthly trends. No paper, no Excel, no accountant for day-to-day work."
+      },
+      "signup": {
+        "title": "How do I get started?",
+        "body": "Sign up with email or Google in 30 seconds. Then a quick onboarding (1–2 minutes): salon name, country, currency, specialists and services. You can skip any step right there — add it later."
+      },
+      "add_visit": {
+        "title": "How do I add a visit?",
+        "body": "Tap the \"+ Visit\" button in the bottom right — the modal opens from any page. Pick a specialist, service, amount, payment method — save. If the visit isn't paid yet (the client hasn't settled up) — leave it pending and charge it later."
+      },
+      "bulk_visits": {
+        "title": "Can I enter several visits at once for a day?",
+        "body": "Yes. In the \"+ Visit\" modal switch to the \"Multiple visits\" tab — a 3–10 row table where you can enter them all in one go. Handy in the evening to log the whole day at once."
+      },
+      "import_booksy": {
+        "title": "How do I pull visits from Booksy?",
+        "body": "Go to Settings → Integrations → Booksy → enter your Booksy Pro email and password. We'll pull in specialists, services, clients and visits automatically. Then choose how often to auto-sync (from 2 minutes to 24 hours). Your password is encrypted and only used for syncing."
+      },
+      "expenses": {
+        "title": "How do I track expenses?",
+        "body": "Open the \"Expenses\" section. Tap \"+\" — pick a category, amount, date, payment method. You can attach a photo of the receipt (AI will read it and auto-fill the fields). Recurring expenses (rent, specialist payroll) can be set to auto-generate: once a month the system creates the entry for you."
+      },
+      "payouts": {
+        "title": "How is specialist payroll calculated?",
+        "body": "In the \"Specialists\" section you set a payout scheme for each one: % of revenue, fixed salary, or a combination. The \"Payroll\" section automatically calculates what's owed for the chosen period based on all completed visits."
+      },
+      "reports": {
+        "title": "What reports are available?",
+        "body": "P&L (profit and loss), revenue by specialist / service / payment method, occupancy heatmap by day and hour, change vs last month. Any period — day, week, month or custom range. You can print to PDF from the browser."
+      },
+      "cancel": {
+        "title": "How do I cancel my subscription?",
+        "body": "Settings → Subscription → \"Manage subscription\" — opens the Stripe customer portal where you can cancel. Access stays until the end of the paid period. You can download all your data any time (Settings → Data export)."
+      },
+      "export_data": {
+        "title": "How do I download my data?",
+        "body": "Settings → Data export. Tap \"Download\" — we'll bundle a ZIP with CSV files of all your visits, clients, expenses, specialists and services and email you the link. Standard GDPR — your data belongs to you."
+      },
+      "delete_account": {
+        "title": "How do I delete my account?",
+        "body": "Settings → at the bottom, \"Delete salon\". Confirm by typing the salon's name. Deleted permanently: all visits, clients, expenses. If you have several salons, only the current one is deleted, the others stay."
+      },
+      "support": {
+        "title": "Where do I write with questions or bugs?",
+        "body": "Email: support@finkley.app — we reply within 24 hours on business days.\nBugs: right from the app — the bug button in the top right (or our Telegram @finklay_dev_bot). Attach a screenshot and we'll look quickly."
+      }
+    }
+  },
+  "ai": {
+    "title": "AI assistant",
+    "subtitle": "Helps with KPIs, compares to last month, suggests what to tweak.",
+    "input_placeholder": "Ask about revenue, specialists, services…",
+    "new_chat": "New chat",
+    "confirm_reset": "Start a new chat? The previous history will stay in the archive.",
+    "empty_title": "Hi! I'll help with your salon numbers.",
+    "empty_subtitle": "I know everything about your visits, specialists, services and expenses. Ask me anything — I'll answer with real data.",
+    "suggestions_label": "Suggestions",
+    "suggestions": {
+      "revenue_this_month": "How much did I make this month?",
+      "top_master": "Which specialist brings in the most revenue?",
+      "compare_prev": "Compare this month with last month",
+      "what_to_improve": "What can I improve to grow revenue?"
+    }
+  },
+  "visits": {
+    "title": "Visits",
+    "fab_label": "Visit",
+    "tabs": {
+      "single": "Single visit",
+      "bulk": "Multiple visits"
+    },
+    "bulk_button": "Multiple visits",
+    "bulk": {
+      "title": "Add multiple visits",
+      "date_label": "Date:",
+      "staff": "Specialist",
+      "service": "Service",
+      "amount": "Amount",
+      "payment": "Payment",
+      "add_row": "Add row",
+      "valid_count": "Ready to save: {{count}} of {{total}}",
+      "save_all": "Save all",
+      "max_rows": "Maximum 10 rows at a time",
+      "no_valid_rows": "Fill in at least one row (specialist + amount)",
+      "toast_done": "Saved {{count}} visits",
+      "toast_failed": "Couldn't save: {{count}}"
+    },
+    "subtitle_total": "{{count}} visits · {{revenue}}",
+    "edit_aria": "Edit visit",
+    "charge_aria": "Charge visit",
+    "status_pending": "Not charged",
+    "group_label_one": "{{count}} service in one record",
+    "group_label_few": "{{count}} services in one record",
+    "group_label_many": "{{count}} services in one record",
+    "group_label": "{{count}} services in one record",
+    "mixed_payments": "Mixed methods",
+    "toast_updated": "Visit updated",
+    "toast_charged": "Visit charged",
+    "edit": {
+      "title": "Edit visit",
+      "subtitle": "Adjust the amount, payment method or comment — changes apply right away.",
+      "amount_label": "Amount ({{currency}})",
+      "payment_label": "Payment method",
+      "tip_label": "Tip",
+      "discount_label": "Discount",
+      "comment_label": "Comment",
+      "save": "Save",
+      "saving": "Saving…"
+    },
+    "charge": {
+      "title": "Charge visit",
+      "subtitle": "Enter the actual amount and choose a payment method — the visit becomes charged and counts toward revenue.",
+      "save": "Charge"
+    },
+    "form": {
+      "title_new": "New visit",
+      "title_edit": "Edit visit",
+      "subtitle": "Logged to your book in a couple of seconds",
+      "date_label": "Date",
+      "today_pill": "today",
+      "staff_label": "Specialist",
+      "staff_placeholder": "Who handled it?",
+      "client_label": "Client",
+      "service_label": "Service",
+      "service_placeholder": "Pick a service",
+      "amount_label": "Amount",
+      "tip_label": "Tip",
+      "discount_label": "Discount",
+      "payment_method_label": "Payment",
+      "comment_label": "Comment (optional)",
+      "comment_placeholder": "For example: new client, came on a referral",
+      "submit": "Save visit",
+      "submit_and_continue": "Save and add another",
+      "continue_hint": "You can enter the next one right away — the specialist and payment are remembered."
+    },
+    "toast_added": "Visit added",
+    "toast_deleted": "Visit deleted",
+    "toast_undo": "Undo",
+    "toast_undone": "Visit deleted",
+    "toast_restore": "Restore",
+    "toast_error": "Couldn't save",
+    "empty": "No visits yet",
+    "empty_hint": "Tap \"+ Visit\" to log your first one.",
+    "no_staff": "—",
+    "confirm_delete": "Delete this visit?",
+    "filters": {
+      "all_staff": "All specialists",
+      "all_payments": "All payment types"
+    },
+    "errors": {
+      "staff_required": "Pick a specialist",
+      "amount_required": "Enter an amount",
+      "amount_positive": "Amount must be greater than zero",
+      "tip_negative": "Tip can't be negative",
+      "discount_negative": "Discount can't be negative"
+    }
+  },
+  "clients": {
+    "title": "Clients",
+    "add": "Add client",
+    "subtitle_one": "{{count}} client",
+    "subtitle_few": "{{count}} clients",
+    "subtitle_many": "{{count}} clients",
+    "subtitle": "Total: {{count}}",
+    "list_title": "All clients",
+    "templates": {
+      "title": "Recurring visits",
+      "add": "Add",
+      "every_n_days": "Every {{count}} days",
+      "paused": "paused",
+      "next": "next: {{date}}",
+      "no_details": "no specialist/service",
+      "recurrence_label": "Every N days",
+      "next_label": "Next",
+      "staff_label": "Specialist",
+      "staff_any": "Any",
+      "service_label": "Service",
+      "service_any": "Any",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete",
+      "confirm_delete": "Delete this recurring visit template?",
+      "toast_added": "Template added",
+      "errors": {
+        "bad_recurrence": "Period must be between 1 and 365 days"
+      }
+    },
+    "records": "records",
+    "empty": "No clients yet. Tap \"Add client\" — and the first card will appear.",
+    "empty_search": "Nobody found. Check the name or phone.",
+    "search_placeholder": "Search by name, phone, email",
+    "unnamed_with_phone": "Client by phone",
+    "confirm_delete": "Delete this client? Their visits stay in the book — they just won't be linked to anyone.",
+    "toast_created": "Client added",
+    "toast_updated": "Card updated",
+    "toast_deleted": "Client deleted",
+    "toast_error": "Couldn't save",
+    "kpi": {
+      "total": "Total clients",
+      "active": "With visits",
+      "lifetime_revenue": "Brought in"
+    },
+    "sort": {
+      "last_visit": "By last visit",
+      "name": "By name",
+      "revenue": "By revenue"
+    },
+    "form": {
+      "title_new": "New client",
+      "title_edit": "Edit client",
+      "name_label": "Name",
+      "name_placeholder": "For example: Anna Kowalska",
+      "phone_label": "Phone",
+      "phone_hint": "With country code: +48… for PL, +380… for UA, +7… for RU.",
+      "email_label": "Email",
+      "notes_label": "Note",
+      "notes_placeholder": "Anything important to remember about this client",
+      "submit_new": "Create",
+      "submit_edit": "Save"
+    },
+    "drawer": {
+      "visits_count": "visits",
+      "lifetime": "all-time",
+      "notes": "Note",
+      "history": "Visit history",
+      "history_empty": "No visits with this client yet.",
+      "no_service": "No service"
+    },
+    "picker": {
+      "no_client": "No client",
+      "search_placeholder": "Name or phone",
+      "create_with": "+ Create \"{{name}}\"",
+      "clear": "Clear selection"
+    },
+    "errors": {
+      "name_required": "Name is required",
+      "email_invalid": "Invalid email format"
+    }
+  },
+  "billing": {
+    "checkout_button": "Subscribe",
+    "portal_button": "Manage subscription",
+    "checkout_error": "Couldn't open checkout",
+    "portal_error": "Couldn't open the billing portal",
+    "banner": {
+      "trial_ending_one": "Trial ends tomorrow",
+      "trial_ending_other": "Trial ends in {{count}} days",
+      "expired_title": "Subscription is not active. You can view data, but new entries are temporarily disabled.",
+      "cta_subscribe": "Subscribe for €15/mo",
+      "cta_upgrade": "Pay now"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Salon profile, data export, deletion.",
+    "toast_saved": "Settings saved",
+    "profile": {
+      "title": "Salon profile",
+      "name_label": "Salon name",
+      "country_label": "Country",
+      "country_hint": "Changing country auto-updates the currency and time zone.",
+      "type_label": "Salon type",
+      "logo_label": "Salon logo",
+      "logo_hint": "PNG / JPG / WEBP / SVG, up to 5 MB. Shown in the header and emails.",
+      "logo_uploaded": "Logo uploaded",
+      "logo_too_large": "File over 5 MB — pick a smaller one",
+      "logo_remove": "Remove logo"
+    },
+    "services": {
+      "title": "Services and pricing",
+      "subtitle": "Cost set for {{withCost}} of {{total}} services — without it margin can't be calculated.",
+      "empty": "No services yet. Click «+ Service» to add the first one.",
+      "add": "Service",
+      "new_default_name": "New service",
+      "col_name": "Service",
+      "col_category": "Category",
+      "col_duration": "Min",
+      "col_price": "Price",
+      "col_cost": "Cost",
+      "col_margin": "Margin",
+      "no_category": "— no category —",
+      "cost_placeholder": "—",
+      "error_invalid": "Value must be a non-negative number",
+      "archive": "Archive",
+      "restore": "Restore",
+      "confirm_archive": "Move service to archive? Visit history is kept, but new visits can't be booked for this service.",
+      "show_archived": "Show archive",
+      "hide_archived": "Hide archive",
+      "archived_empty": "Archive is empty.",
+      "toast_created": "Service added",
+      "toast_archived": "Service archived",
+      "toast_restored": "Service restored",
+      "hint": "Changes save automatically when you click away. Margin = (price − cost) ÷ price. Green ≥50%, gold 35–50%, red <35%."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Currently {{resolved}} theme is active. Pin it or follow the system.",
+      "theme_system": "System",
+      "theme_light": "Light",
+      "theme_dark": "Dark"
+    },
+    "categories": {
+      "title": "Service & expense categories",
+      "subtitle": "Rename, add new, archive. History of existing visits and expenses is preserved when archiving.",
+      "service_title": "Service categories",
+      "expense_title": "Expense categories",
+      "empty": "Empty for now.",
+      "new_placeholder": "New category…",
+      "add": "Add",
+      "archive": "Archive",
+      "confirm_archive": "Move category to archive?",
+      "confirm_archive_system": "This is a system category created during salon setup. Archive it anyway?",
+      "toast_created": "Category added",
+      "toast_archived": "Category archived"
+    },
+    "team": {
+      "title": "Team",
+      "subtitle": "Invite an accountant, assistant or specialists with different access levels.",
+      "button": "Manage team"
+    },
+    "audit": {
+      "title": "Audit log",
+      "subtitle": "Who changed what in the salon — for transparency and audit.",
+      "button": "Open log"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "subtitle": "Connect Booksy, Fresha and other platforms — visits will sync automatically.",
+      "button": "Open integrations"
+    },
+    "benchmarks": {
+      "title": "Compare with similar salons",
+      "subtitle": "I'll show you how your metrics look against the industry average — no names or addresses, just anonymized numbers. It helps you see where you're strong and where there's room to grow.",
+      "enabled": "On — I'll see the comparison on the dashboard",
+      "disabled": "Off — no comparison is shown, your data isn't used in the aggregate stats",
+      "toast_enabled": "Comparison enabled",
+      "toast_disabled": "Comparison disabled"
+    },
+    "cash": {
+      "title": "Starting cash balance",
+      "subtitle": "How much cash you already have on hand when you start using Finkley. The \"Cash on hand\" widget on the dashboard = this number + cash visits − cash expenses.",
+      "invalid": "Invalid amount",
+      "toast_saved": "Starting balance updated"
+    },
+    "import": {
+      "title": "Import visits from CSV",
+      "subtitle": "Upload visit history from Booksy / Fresha / Treatwell or your own spreadsheet.",
+      "button": "Open import"
+    },
+    "digest": {
+      "title": "Weekly digest",
+      "subtitle": "An email every Monday: revenue/expenses/profit for the past week + top specialist and top service.",
+      "enabled": "On — emails will arrive automatically (cron activates once Vault is set up)",
+      "disabled": "Off",
+      "button": "Send now",
+      "toast_enabled": "Digest enabled",
+      "toast_disabled": "Digest disabled",
+      "toast_sent": "Email sent to {{email}}"
+    },
+    "calendar": {
+      "title": "Visit calendar (iCal)",
+      "subtitle": "Subscribe to your visit feed in Google Calendar / Apple Calendar / Outlook. Updates automatically — you'll see all your bookings right in your calendar.",
+      "copy": "Copy",
+      "how_to": "Open Google/Apple Calendar → \"Subscribe to calendar\" → paste the URL. In Outlook: \"Add calendar\" → \"Subscribe from internet\".",
+      "revoke": "Revoke link and generate a new one",
+      "confirm_revoke": "The current link will stop working in every calendar where you added it. Continue?",
+      "toast_copied": "URL copied",
+      "toast_revoked": "Link revoked. A new one will be created next time you open this."
+    },
+    "api": {
+      "title": "API keys",
+      "subtitle": "Create a key for your own integrations (Zapier, n8n, Make, scripts). Each key is shown only once — when it's created.",
+      "create": "Create key",
+      "create_title": "New API key",
+      "create_subtitle": "Once created, the key is shown one time only — copy it and save it somewhere safe.",
+      "name_label": "Name",
+      "scopes_label": "Permissions",
+      "scope": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "create_submit": "Create",
+      "show_once_title": "Copy your key now",
+      "show_once_subtitle": "This is the only time you'll see the full key. Once this dialog closes there's no way to recover it — you'd have to create a new one.",
+      "copy": "Copy",
+      "toast_copied": "Copied to clipboard",
+      "understood": "Got it, I copied it",
+      "created": "Created: {{date}}",
+      "revoke_aria": "Revoke key",
+      "confirm_revoke": "Revoke this key? Any integrations using it will stop working.",
+      "toast_revoked": "Key revoked",
+      "errors": {
+        "name_required": "Enter a name"
+      }
+    },
+    "referral": {
+      "title": "Invite friends",
+      "subtitle": "Share your code — both of you get a free month on the first payment.",
+      "copy": "Copy",
+      "toast_copied": "Code copied",
+      "invited": "Invited",
+      "activated": "Activated",
+      "fineprint": "The bonus is applied automatically after the invitee's first payment. 100% off one month of subscription."
+    },
+    "mfa": {
+      "title": "Two-factor authentication",
+      "subtitle_disabled": "Turn on 2FA so signing in needs a code from your authenticator app. Protects against password leaks.",
+      "subtitle_enabled": "✅ 2FA is on. Each sign-in requires a 6-digit code from your app.",
+      "enable": "Enable 2FA",
+      "added": "Added: {{date}}",
+      "remove_aria": "Disable 2FA",
+      "confirm_remove": "Disable 2FA? Your account will be protected by password only again.",
+      "toast_enabled": "2FA enabled 🔐",
+      "toast_disabled": "2FA disabled",
+      "enroll_title": "Set up 2FA",
+      "enroll_subtitle": "Scan the QR in your authenticator app and enter the 6-digit code to confirm.",
+      "step1": "Open an authenticator app (Google Authenticator, 1Password, Authy, Bitwarden, etc.)",
+      "step2": "Scan the QR code below or enter the secret manually",
+      "step3": "Enter the 6-digit code shown by the app",
+      "manual_secret": "Or enter manually (if the QR doesn't scan):",
+      "code_label": "Code from the app",
+      "verify": "Verify",
+      "invalid_code": "Code must be 6 digits"
+    },
+    "push": {
+      "title": "Push notifications",
+      "subtitle": "Get notified about new visits, expenses and AI insights right in your browser or on your phone — even when the tab is closed.",
+      "enable": "Enable notifications",
+      "disable": "Disable",
+      "send_test": "Send test",
+      "unsupported": "Your browser doesn't support Web Push. Try the latest Chrome or Firefox. On iOS — add the app to your home screen first.",
+      "denied": "The browser blocked notifications. Open site settings in your browser (the 🔒 icon next to the URL) and allow Notifications.",
+      "not_configured": "Push isn't set up on the server yet. Get in touch with support.",
+      "toast_subscribed": "Notifications enabled ✅",
+      "toast_unsubscribed": "Notifications disabled",
+      "toast_test_sent": "Test sent to {{count}} devices"
+    },
+    "install": {
+      "title": "Install as an app",
+      "subtitle": "Finkley becomes an icon on your phone's home screen — opens without the browser bar.",
+      "button": "Install app",
+      "already_installed": "✓ App is already installed",
+      "ios_hint": "In Safari tap the \"Share\" button → \"Add to Home Screen\".",
+      "not_available": "The browser isn't offering install yet. Use Finkley for a couple of minutes — the button will appear."
+    },
+    "export": {
+      "title": "Data export",
+      "subtitle": "All visits, expenses, clients and specialists in CSV — for accounting or GDPR.",
+      "button": "Download data",
+      "toast_ready": "Archive is ready — download started. The link was emailed to you.",
+      "toast_cached": "There's already an archive from the last 24 hours — opening it.",
+      "toast_failed": "Couldn't build the archive"
+    },
+    "delete": {
+      "title": "Delete salon",
+      "subtitle": "All data will be deleted in 30 days. After that it can't be restored.",
+      "button": "Delete salon",
+      "modal_title": "Delete salon permanently",
+      "modal_subtitle": "This action can't be undone after the 30-day grace period.",
+      "confirm_prompt": "To confirm, type the salon name: \"{{name}}\"",
+      "confirm_mismatch": "Name doesn't match",
+      "confirm_button": "Delete permanently",
+      "toast_deleted": "Salon deleted"
+    },
+    "errors": {
+      "name_too_short": "Name must be at least 2 characters"
+    },
+    "billing": {
+      "title": "Subscription",
+      "no_subscription": "No subscription. After the 14-day free trial the account becomes read-only.",
+      "status_trialing": "Trial — €15/mo after it ends",
+      "status_active": "Active — €15/mo",
+      "status_past_due": "Payment failed. Update your card in the billing portal.",
+      "status_canceled": "Cancelled. Access until the end of the paid period.",
+      "status_unpaid": "Unpaid. Subscribe to keep going.",
+      "status_paused": "Paused.",
+      "status_incomplete": "Setup not finished."
+    }
+  },
+  "staff": {
+    "title": "Specialists",
+    "subtitle": "Name and payout scheme. Specialists stay in your visit history even after archiving.",
+    "add_title": "Add specialist",
+    "add_hint": "Defaults to the \"40% of revenue\" scheme — change it after creating.",
+    "name_label": "Name",
+    "name_placeholder": "For example, Anna",
+    "percent_label": "% of revenue",
+    "fixed_label": "Fixed amount per period",
+    "chair_rent_label": "Chair rent per period",
+    "add_button": "Add",
+    "edit_button": "Edit",
+    "active": "Active · {{count}}",
+    "archived": "Archived · {{count}}",
+    "empty_active": "No specialists yet. Add the first one above.",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "confirm_archive": "Move to archive? You can restore later.",
+    "toast_added": "Specialist added",
+    "toast_saved": "Saved",
+    "toast_archived": "Moved to archive",
+    "toast_unarchived": "Restored from archive",
+    "sheet_title": "Specialist settings",
+    "sheet_subtitle": "Name and payout scheme. Changes apply to future payroll calculations.",
+    "scheme_label": "Payout scheme",
+    "schemes": {
+      "percent_revenue": {
+        "title": "% of revenue",
+        "hint": "For example 40% — the specialist gets a fixed share from each visit."
+      },
+      "fixed": {
+        "title": "Fixed rate",
+        "hint": "Same amount per period regardless of revenue. For example, 4000 PLN/month."
+      },
+      "percent_service": {
+        "title": "% per service",
+        "hint": "Different percent per service — more flexible than a single rate."
+      },
+      "chair_rent": {
+        "title": "Chair rent",
+        "hint": "The specialist pays a fixed amount for the workspace and keeps all revenue."
+      },
+      "mixed": {
+        "title": "Mixed (fixed + %)",
+        "hint": "Base plus a percent on top. For example, 2000 PLN + 25% of revenue."
+      }
+    },
+    "summary": {
+      "percent_revenue": "{{percent}}% of revenue",
+      "fixed": "{{amount}} / period (fixed)",
+      "percent_service": "% per service",
+      "chair_rent": "Rent {{amount}} / period",
+      "mixed": "{{amount}} + {{percent}}% on top"
+    },
+    "overrides": {
+      "title": "Percent per service",
+      "hint": "Empty — service doesn't count toward payroll",
+      "no_services": "Add services in salon settings first.",
+      "save_first": "Save the specialist to set per-service rates.",
+      "clear": "Reset"
+    },
+    "errors": {
+      "name_too_short": "Name must be at least 2 characters",
+      "percent_invalid": "Percent must be between 0 and 100"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "aria_label": "Notifications",
+    "count": "{{count}} in feed",
+    "empty": "All quiet — no new events",
+    "overdue": {
+      "title": "{{name}} — time to reach out",
+      "body_today": "A visit is scheduled today. Remind the client.",
+      "body_overdue_one": "Overdue by {{count}} day — remind the client.",
+      "body_overdue_few": "Overdue by {{count}} days — remind the client.",
+      "body_overdue_many": "Overdue by {{count}} days — remind the client."
+    },
+    "budget": {
+      "title": "Budget exceeded for \"{{name}}\"",
+      "body": "Already at {{pct}}% of the limit this month."
+    }
+  },
+  "integrations": {
+    "title": "Booking platform integrations",
+    "subtitle": "Connect your account — visits, clients and services will sync automatically. No manual entry.",
+    "back_to_settings": "← Back to settings",
+    "not_connected": "Not connected",
+    "connect": "Connect",
+    "connect_title": "Connect {{name}}",
+    "connect_subtitle": "Enter your {{name}} access details. Your password is encrypted and used only for syncing.",
+    "save": "Save and connect",
+    "connecting": "Connecting…",
+    "toast_saved_stub": "Integration in development — coming soon 🛠",
+    "toast_connected": "✅ Connected to {{name}}",
+    "toast_synced": "Synced: +{{staff}} specialists, +{{services}} services, +{{visits}} visits",
+    "toast_disconnected": "Integration disconnected",
+    "last_sync_at": "Last sync: {{date}}",
+    "never_synced": "Hasn't synced yet — tap \"Sync now\"",
+    "last_sync_stats": "Specialists: {{staff}} · Services: {{services}} · Visits: {{visits}}",
+    "sync_now": "Sync now",
+    "disconnect": "Disconnect",
+    "confirm_disconnect": "Disconnect this integration? Data stays, but auto-sync will stop.",
+    "clear_visits": "Clear visits",
+    "confirm_clear_visits": "Delete all visits imported from Booksy? This can't be undone. Specialists, services and clients will stay.",
+    "toast_visits_cleared": "Deleted {{n}} imported visits",
+    "sync_interval_label": "Auto-sync frequency",
+    "sync_interval_hint": "More often = faster pull-in (and a better chance of catching a record before it's deleted in Booksy).",
+    "auto_sync_every": "Auto-sync every:",
+    "toast_interval_updated": "Frequency updated",
+    "interval": {
+      "2min": "Every 2 minutes",
+      "5min": "Every 5 minutes",
+      "10min": "Every 10 minutes",
+      "20min": "Every 20 minutes",
+      "30min": "Every 30 minutes",
+      "1h": "Every hour",
+      "4h": "Every 4 hours",
+      "12h": "Every 12 hours",
+      "24h": "Once a day"
+    },
+    "locked_hint": "Coming soon",
+    "privacy_note": "All passwords are encrypted on the server with AES-256 and never stored in plain text. You can disconnect any time — the data is deleted.",
+    "security_note": "We use access only to read visits and clients. We don't write anything to your account on the platform.",
+    "fields": {
+      "email": "Account email",
+      "email_or_phone": "Account email or phone",
+      "password": "Password",
+      "access_key": "Access key (from wFirma → API)",
+      "secret_key": "Secret key (from wFirma → API)",
+      "company_id": "Company ID (from the wFirma URL)"
+    },
+    "errors": {
+      "fields_required": "Fill in all required fields",
+      "captcha_not_ready": "CAPTCHA hasn't loaded yet — wait a second",
+      "captcha_load_failed": "Couldn't load the CAPTCHA",
+      "captcha_solve_failed": "CAPTCHA didn't pass. Try again.",
+      "booksy_invalid_credentials": "Wrong email or password. Check your Booksy Pro details.",
+      "booksy_request_blocked": "Booksy blocked direct login. Use the \"Token\" tab — it takes 30 seconds.",
+      "booksy_rate_limited": "Too many attempts. Wait 5 minutes and try again.",
+      "booksy_no_business": "There's no business in this account. Sign in to Booksy Pro and create a salon profile.",
+      "wfirma_login_failed": "Wrong wfirma.pl email or password. If you have 2FA on, enter the keys manually on the next tab.",
+      "wfirma_no_companies": "No companies in this wFirma account. Add one in wFirma first and try again.",
+      "wfirma_form_changed": "wFirma changed their interface — auto-connect is temporarily broken. Enter keys manually on the next tab.",
+      "wfirma_captcha": "wFirma asked for a CAPTCHA at login. Enter the keys manually on the next tab.",
+      "wfirma_keygen_failed": "Couldn't get keys from wFirma. Try again or enter them manually.",
+      "wfirma_invalid_credentials": "Wrong access/secret key pair. Check that you copied them without spaces.",
+      "wfirma_company_id_not_found": "This company isn't in your wFirma account. Check the Company ID.",
+      "wfirma_invalid_keys_format": "Access key and Secret key must be 32-character hexadecimal strings.",
+      "wfirma_invalid_company_id": "Company ID is a number (e.g. 884136). Find it in the URL after sign-in.",
+      "wfirma_auto_login_disabled": "Auto-connect is temporarily disabled. Enter the keys manually on the next tab."
+    },
+    "status": {
+      "available": "Ready",
+      "connected": "Connected",
+      "in_research": "Soon",
+      "coming_soon": "In development"
+    },
+    "booksy": {
+      "tab_password": "Email and password",
+      "tab_token": "I have a token",
+      "token_help": "If direct login didn't work, you can grab a session token from the browser in 30 seconds:",
+      "token_step1": "Open booksy.com/pro and sign in to your account the usual way",
+      "token_step2": "Press F12 → Network tab → find any request to pl.booksy.com → copy the value of the x-access-token header",
+      "token_step3": "Paste the token here — we'll verify and save it",
+      "token_label": "Access token (x-access-token)"
+    },
+    "wfirma": {
+      "dialog_subtitle": "Enter your wfirma.pl login/password — we'll fetch the API keys automatically. If you have 2FA or auto-connect didn't work — there's a manual entry tab.",
+      "tab_quick": "Quick",
+      "tab_manual": "Manual",
+      "quick_subtitle": "Enter your wFirma login/password. We'll sign in once, create a \"Finkley\" app in your account, and store its keys. Your password isn't kept on our server.",
+      "security_note": "We use the password only once — at the moment of creating the key. The keys themselves are encrypted on the server (AES-256). You can remove \"Finkley\" from connected apps any time in wfirma.pl → Ustawienia → OAuth → Klucze API.",
+      "manual_step1": "Sign in to wfirma.pl with your account",
+      "manual_step2": "Open Ustawienia → OAuth → Klucze API → Dodaj",
+      "manual_step3": "Enter a name (e.g. \"Finkley\"), confirm with your password and copy Access key + Secret key",
+      "manual_step4": "Find the Company ID in the URL after signing in (e.g. 884136)",
+      "manual_company_id_hint": "It's the number next to your company name or after /site_index/ in the URL.",
+      "choose_company_subtitle": "There are several companies in your wFirma account. Pick which one to link this salon to in Finkley — we'll only sync expenses from it."
+    },
+    "toast_synced_wfirma": "wFirma: added {{synced}} new expenses, skipped {{skipped}}",
+    "last_sync_stats_wfirma": "Imported: {{synced}} · Skipped: {{skipped}}",
+    "providers": {
+      "booksy": {
+        "description": "Poland's #1 online booking platform for beauty salons. We'll pull visits, clients and services from your account."
+      },
+      "fresha": {
+        "description": "Global booking platform (UK / EU / US). Free for salons, supports visits + sales."
+      },
+      "treatwell": {
+        "description": "UK and European marketplace for beauty salon bookings."
+      },
+      "yclients": {
+        "description": "Popular platform in Ukraine, Russia and Kazakhstan. CRM + online booking + scheduling."
+      },
+      "wfirma": {
+        "description": "Polish accounting system (JDG/spółka). The integration sends expenses as purchase invoices and pulls in income. KSeF-ready."
+      }
+    }
+  },
+  "import": {
+    "title": "Import visits from CSV",
+    "subtitle": "Upload a file, map columns to Finkley fields, check the preview and run. Duplicates (if you reupload the same file) are skipped automatically.",
+    "back_to_settings": "← Back to settings",
+    "upload": {
+      "title": "Upload a CSV file",
+      "subtitle": "Files from Booksy, Fresha, Treatwell and standard Excel/Google Sheets exports as CSV are supported.",
+      "button": "Choose file",
+      "formats": "Separator can be a comma or semicolon (auto-detected). Quotes are optional."
+    },
+    "mapping": {
+      "title": "Map your columns",
+      "subtitle": "Found {{count}} rows. Confirm or adjust the auto-mapping.",
+      "reset": "Upload a different file"
+    },
+    "preview": {
+      "title": "Preview of the first {{count}} rows"
+    },
+    "fields": {
+      "skip": "— Skip —",
+      "visit_at": "Visit date",
+      "amount": "Amount",
+      "client_name": "Client name",
+      "client_phone": "Client phone",
+      "service_name": "Service",
+      "staff_name": "Specialist",
+      "payment_method": "Payment method",
+      "comment": "Comment"
+    },
+    "ready": "Ready to import: {{count}} rows. Existing visits with the same content will be skipped.",
+    "start_button": "Start import",
+    "toast_done": "Imported: {{inserted}}, duplicates skipped: {{skipped}}",
+    "progress": {
+      "done": "{{done}} of {{total}}",
+      "inserted": "✓ Added: {{count}}",
+      "skipped": "Duplicates skipped: {{count}}",
+      "failed": "Errors: {{count}}",
+      "errors_label": "Show errors ({{count}})",
+      "row": "Row"
+    },
+    "errors": {
+      "empty": "File is empty or has no headers",
+      "missing_required": "Map at least \"Visit date\" and \"Amount\" to continue."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Financial picture for the period: P&L, revenue by specialist / service / payment method, occupancy by day and hour.",
+    "prev_month": "Previous month",
+    "next_month": "Next month",
+    "mode_month": "Month",
+    "mode_range": "Custom range",
+    "print": "Print / PDF",
+    "export_xls": "Excel",
+    "print_period": "Period: {{start}} — {{end}}",
+    "empty": "No data for this period.",
+    "kpi": {
+      "revenue": "Revenue",
+      "expense": "Expenses",
+      "profit": "Net profit",
+      "vs_prev": "vs previous period"
+    },
+    "staff": {
+      "title": "Revenue by specialist"
+    },
+    "service": {
+      "title": "Revenue by service",
+      "name": "Service",
+      "visits": "Visits",
+      "revenue": "Revenue",
+      "margin": "Margin",
+      "share": "Share"
+    },
+    "payment": {
+      "title": "Payment methods",
+      "cash": "Cash",
+      "card": "Card",
+      "transfer": "Transfer",
+      "online": "Online",
+      "mixed": "Mixed",
+      "unknown": "Not set"
+    },
+    "heatmap": {
+      "title": "Occupancy by day and hour",
+      "legend": "Business hours 8:00–21:00. Color = number of visits; the darker, the more."
+    },
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    }
+  },
+  "payouts": {
+    "title": "Payroll",
+    "subtitle": "Calculation by payout scheme for the chosen period. Closing creates an expense in the \"Payroll\" category.",
+    "prev_month": "Previous month",
+    "next_month": "Next month",
+    "col": {
+      "staff": "Specialist",
+      "scheme": "Scheme",
+      "revenue": "Revenue",
+      "payout": "To pay",
+      "period": "Period"
+    },
+    "visits_count_one": "{{count}} visit",
+    "visits_count_few": "{{count}} visits",
+    "visits_count_many": "{{count}} visits",
+    "total": "Total",
+    "empty": "No visits in this period for active specialists.",
+    "print": "Print / PDF",
+    "print_period": "Period: {{start}} — {{end}}",
+    "close_button": "Close period",
+    "closed_label": "Period closed",
+    "confirm_close": "Close {{period}}? An expense of {{total}} will be created and payroll for this period can no longer be recalculated.",
+    "toast_closed": "Closed {{count}} payouts totaling {{total}}",
+    "history_title": "Closed periods history",
+    "status_active": "Period is active — visits can still be added. You can close after {{period}}",
+    "status_ready": "Period is over and ready to close",
+    "status_closed": "Period is closed — expenses created, no changes can be undone",
+    "errors": {
+      "already_closed": "Period is already closed",
+      "not_finished": "Period hasn't ended yet — too early to close"
+    }
+  },
+  "expenses": {
+    "title": "Expenses",
+    "subtitle_total": "Total for the period:",
+    "add": "Add expense",
+    "list_title": "All expenses",
+    "structure_title": "Expense breakdown",
+    "structure_empty": "No expenses in this period",
+    "records": "records",
+    "budgets": {
+      "title": "Budgets by category",
+      "no_limit": "No limit set",
+      "set_limit": "Set limit",
+      "change_limit": "Change",
+      "amount_placeholder": "500",
+      "saved": "Limit updated",
+      "cleared": "Limit cleared",
+      "invalid_amount": "Invalid amount"
+    },
+    "no_category": "No category",
+    "confirm_delete": "Delete this expense?",
+    "form": {
+      "title_new": "New expense",
+      "date_label": "Date",
+      "category_label": "Category",
+      "category_placeholder": "Pick a category",
+      "amount_label": "Amount",
+      "comment_label": "Comment (optional)",
+      "comment_placeholder": "For example: Wella dye, receipt #123",
+      "submit": "Save expense",
+      "receipt_label": "Receipt (photo or PDF)",
+      "receipt_placeholder": "Attach a receipt — JPG, PNG, PDF (up to 10 MB)",
+      "receipt_placeholder_ocr": "📷 Snap a photo of the receipt — I'll fill the form automatically",
+      "receipt_remove": "Remove receipt",
+      "receipt_too_big": "File is too large. Max 10 MB.",
+      "ocr_recognizing": "Reading the receipt…",
+      "ocr_done": "Receipt read — check the fields and save",
+      "ocr_failed": "Couldn't read it. Fill the fields manually.",
+      "recurrence_label": "Repeat",
+      "recurrence": {
+        "none": "Don't repeat",
+        "weekly": "Every week",
+        "monthly": "Every month"
+      },
+      "recurrence_hint": "We'll create the same expense automatically every period."
+    },
+    "errors": {
+      "category_required": "Pick a category",
+      "amount_required": "Enter an amount",
+      "amount_positive": "Amount must be greater than zero"
+    },
+    "toast_added": "Expense added",
+    "toast_deleted": "Expense deleted",
+    "toast_error": "Couldn't save",
+    "toast_upload_failed": "Couldn't upload the receipt",
+    "empty": "No expenses yet",
+    "receipt_open": "Open receipt",
+    "receipt_title": "Receipt",
+    "receipt_subtitle": "Close this window to return to the expense list.",
+    "wfirma": {
+      "push_button": "Send to wFirma",
+      "tooltip_pushed": "Sent to wFirma (id: {{id}})",
+      "toast_auto_pushed": "Expense added and sent to wFirma ✓",
+      "toast_manual_pushed": "Expense sent to wFirma ✓",
+      "toast_already_pushed": "This expense is already in wFirma",
+      "toast_skipped_no_nip": "Not sent to wFirma: no buyer NIP on the receipt. Use the \"Send manually\" button in the expense list.",
+      "toast_skipped_nip_mismatch": "Not sent to wFirma: NIP nabywcy on the receipt doesn't match your company. Use the \"Send manually\" button in the expense list.",
+      "toast_push_failed": "Couldn't send to wFirma"
     }
   },
   "payment_methods": {
@@ -94,50 +1222,5 @@
     "transfer": "Transfer",
     "online": "Online",
     "mixed": "Mixed"
-  },
-  "settings": {
-    "title": "Settings",
-    "team": {
-      "title": "Team",
-      "subtitle": "Invite an accountant, assistant or staff with different access levels.",
-      "button": "Manage team"
-    },
-    "audit": {
-      "title": "Audit log",
-      "subtitle": "Who changed what — for transparency and compliance.",
-      "button": "Open log"
-    },
-    "api": {
-      "title": "API keys",
-      "subtitle": "Create a key for your own integrations (Zapier, n8n, scripts). Each key is shown only when created."
-    },
-    "referral": {
-      "title": "Invite friends",
-      "subtitle": "Share your code — both of you get a free month on first payment."
-    },
-    "mfa": {
-      "title": "Two-factor authentication",
-      "enable": "Enable 2FA"
-    }
-  },
-  "visits": {
-    "title": "Visits",
-    "tabs": {
-      "single": "Single visit",
-      "bulk": "Multiple visits"
-    }
-  },
-  "ai": {
-    "title": "AI assistant",
-    "subtitle": "Asks about KPIs, compares to last month, suggests what to tweak.",
-    "input_placeholder": "Ask about revenue, staff, services…"
-  },
-  "team": {
-    "role": {
-      "owner": "Owner",
-      "admin": "Admin",
-      "accountant": "Accountant",
-      "staff": "Staff"
-    }
   }
 }

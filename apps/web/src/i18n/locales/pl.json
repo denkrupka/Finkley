@@ -1,6 +1,7 @@
 {
   "app": {
-    "title": "Finkley"
+    "title": "Finkley",
+    "placeholder": "Szkielet aplikacji jest gotowy. Zobacz docs/04_BACKLOG.md, by poznać kolejne kroki."
   },
   "common": {
     "save": "Zapisz",
@@ -15,8 +16,7 @@
     "yes": "Tak",
     "no": "Nie",
     "confirm": "Potwierdź",
-    "sign_out": "Wyloguj się",
-    "back_home": "Strona główna"
+    "sign_out": "Wyloguj się"
   },
   "auth": {
     "or": "lub",
@@ -28,11 +28,12 @@
       "forgot_password": "Nie pamiętasz hasła?",
       "no_account": "Nie masz jeszcze konta?",
       "signup_link": "Zarejestruj się",
-      "google_button": "Kontynuuj przez Google",
-      "telegram_button": "Kontynuuj przez Telegram"
+      "google_button": "Zaloguj się przez Google",
+      "facebook_button": "Zaloguj się przez Facebook",
+      "telegram_button": "Zaloguj się przez Telegram"
     },
     "signup": {
-      "title": "Załóż konto",
+      "title": "Rejestracja",
       "subtitle": "14 dni bezpłatnie. Bez karty na start.",
       "submit": "Załóż konto",
       "have_account": "Masz już konto?",
@@ -41,18 +42,108 @@
       "password_confirm_label": "Powtórz hasło",
       "confirm_title": "Sprawdź skrzynkę",
       "confirm_subtitle": "Wysłaliśmy link potwierdzający na {{email}}.",
-      "confirm_hint": "Kliknij w link, by aktywować konto. Sprawdź spam, jeśli list nie przyszedł.",
+      "confirm_hint": "Kliknij w link, aby aktywować konto. List może trafić do spamu.",
       "confirm_back_to_login": "Wróć do logowania"
     },
     "forgot": {
       "title": "Reset hasła",
-      "subtitle": "Wyślemy link na email.",
+      "subtitle": "Wyślemy link na email — ustawisz nowe hasło w jednym kliknięciu.",
       "submit": "Wyślij link",
-      "back_to_login": "Wróć do logowania"
+      "sent_title": "Link wysłany",
+      "sent_subtitle": "Sprawdź skrzynkę {{email}} — znajdziesz tam link do resetu hasła.",
+      "back": "← Wróć do logowania"
     },
     "reset": {
       "title": "Nowe hasło",
-      "submit": "Zapisz hasło"
+      "subtitle": "Wprowadź nowe hasło do swojego konta.",
+      "new_password_label": "Nowe hasło",
+      "submit": "Zapisz hasło",
+      "invalid_title": "Link wygasł",
+      "invalid_subtitle": "Link do resetu hasła nie jest już ważny. Poproś o nowy.",
+      "request_new": "Poproś o nowy link"
+    },
+    "callback": {
+      "title": "Potwierdzamy logowanie",
+      "subtitle": "Za chwilę przekierujemy Cię do aplikacji."
+    },
+    "errors": {
+      "invalid_credentials": "Nieprawidłowy email lub hasło",
+      "email_required": "Email jest wymagany",
+      "password_required": "Hasło jest wymagane",
+      "password_too_short": "Hasło musi mieć co najmniej 8 znaków",
+      "password_confirm_required": "Potwierdź hasło",
+      "passwords_do_not_match": "Hasła nie są takie same",
+      "email_invalid": "Nieprawidłowy format email"
+    }
+  },
+  "onboarding": {
+    "exit": "Wyjdź",
+    "eta": "≈ 2 minuty",
+    "step_of": "Krok {{current}} z {{total}}",
+    "skip": "Pomiń — dodam później",
+    "open_dashboard": "Otwórz panel",
+    "country": {
+      "PL": "Polska",
+      "DE": "Niemcy",
+      "LT": "Litwa",
+      "CZ": "Czechy",
+      "EE": "Estonia"
+    },
+    "salon_type": {
+      "hair": "Fryzjerski",
+      "nails": "Paznokcie",
+      "spa": "Spa / kosmetologia",
+      "barber": "Barbershop",
+      "cosmetology": "Kosmetologia",
+      "mixed": "Mieszany"
+    },
+    "steps": {
+      "salon": "Salon",
+      "staff": "Pracownicy",
+      "services": "Usługi",
+      "expenses": "Wydatki",
+      "done": "Gotowe"
+    },
+    "step1": {
+      "title": "Opowiedz o salonie",
+      "subtitle": "Bez tego ani rusz — musimy wiedzieć, w jakim kraju i w jakiej walucie pracujesz.",
+      "name_label": "Nazwa salonu",
+      "name_placeholder": "Na przykład: Studio Anny",
+      "country_label": "Kraj",
+      "type_label": "Typ salonu"
+    },
+    "step2": {
+      "title": "Dodaj swoich specjalistów",
+      "subtitle": "To zajmie 2 minuty. Później możesz uzupełnić i zmienić.",
+      "name_placeholder": "Imię specjalisty",
+      "percent_label": "% od przychodu",
+      "add": "Dodaj specjalistę"
+    },
+    "step3": {
+      "title": "Co robicie",
+      "subtitle": "Wstawiliśmy listę domyślną. Popraw ceny i dodaj swoje usługi.",
+      "category": "Kategoria",
+      "category_placeholder": "Strzyżenie",
+      "service": "Usługa",
+      "service_placeholder": "Strzyżenie damskie",
+      "price": "Cena",
+      "add": "Dodaj usługę",
+      "reset_seed": "Przywróć szablon"
+    },
+    "step4": {
+      "title": "Kategorie wydatków",
+      "subtitle": "To Twoje główne „kubełki”, do których trafiają pieniądze. Możesz uzupełnić później.",
+      "placeholder": "Nazwa kategorii",
+      "add": "Dodaj kategorię"
+    },
+    "step5": {
+      "title": "Gotowe, {{name}}!",
+      "subtitle": "Panel jest na miejscu. Na razie jest pusty — dodaj pierwszą wizytę i pojawią się liczby.",
+      "staff": "specjalistów",
+      "services": "usług",
+      "expenses": "kategorii wydatków",
+      "benchmarks_title": "Zobacz porównanie z podobnymi salonami",
+      "benchmarks_subtitle": "Pokażę, jak Twoje wskaźniki wyglądają na tle innych — średni rachunek, obłożenie, % powrotów. Tylko uśrednione liczby z branży, żadnych imion ani adresów. Możesz wyłączyć w każdej chwili."
     }
   },
   "nav": {
@@ -66,15 +157,74 @@
     "ai": "AI-asystent",
     "settings": "Ustawienia",
     "more": "Więcej",
-    "help": "Pomoc i FAQ"
+    "help": "Pomoc i FAQ",
+    "drawer_title": "Menu nawigacji"
+  },
+  "salon_switcher": {
+    "title": "Przełącz salon"
+  },
+  "plan": {
+    "pro_label": "Plan Pro",
+    "pro_until": "okres próbny"
+  },
+  "coming_soon": {
+    "subtitle": "Ta sekcja będzie dostępna na etapie {{stage}}. Na razie jej nie ma — ale jest w planie.",
+    "badge": "Wkrótce · Etap {{stage}}"
   },
   "dashboard": {
-    "title": "Pulpit",
+    "title": "Panel",
+    "greeting": "Cześć, {{name}}",
+    "greeting_subtitle_day": "Oto jak idą sprawy dzisiaj.",
+    "greeting_subtitle_week": "Oto jak idą sprawy w tym tygodniu.",
+    "greeting_subtitle_month": "Oto jak idą sprawy w tym miesiącu.",
+    "greeting_subtitle_custom": "Oto jak idą sprawy w wybranym okresie.",
+    "kpi": {
+      "revenue_label": "Przychód",
+      "expense_label": "Wydatki",
+      "profit_label": "Zysk",
+      "profit_sublabel": "na czysto w kieszeni"
+    },
+    "insights": {
+      "title": "AI-asystent widzi",
+      "dismiss": "Ukryj"
+    },
+    "benchmarks": {
+      "title": "Ty vs średnia w branży",
+      "bucket_size": "Na podstawie {{count}} salonów",
+      "market_avg": "Średnia: {{value}}",
+      "metrics": {
+        "avg_check": "Średni rachunek",
+        "revenue_per_master": "Przychód / specjalista",
+        "visits_per_week": "Wizyt / tydzień",
+        "rebooking": "Wracają"
+      }
+    },
+    "cash": {
+      "title": "W kasie gotówką"
+    },
+    "upcoming": {
+      "title": "Wkrótce przyjdą",
+      "empty": "Brak cyklicznych wizyt w najbliższym tygodniu",
+      "in_days_one": "za {{count}} dzień",
+      "in_days_few": "za {{count}} dni",
+      "in_days_many": "za {{count}} dni",
+      "overdue_one": "spóźniony o {{count}} dzień",
+      "overdue_few": "spóźniony o {{count}} dni",
+      "overdue_many": "spóźniony o {{count}} dni"
+    },
     "period": {
       "day": "Dzień",
       "week": "Tydzień",
       "month": "Miesiąc",
       "custom": "Okres"
+    },
+    "forecast": {
+      "label": "Prognoza",
+      "title": "Koniec miesiąca",
+      "vs_prev": "do poprzedniego miesiąca",
+      "so_far": "Już: {{amount}}",
+      "day_n": "Dzień {{n}} z {{total}}",
+      "pending": "Spodziewane: {{amount}} (nadchodzące wizyty)"
     },
     "period_picker": {
       "title": "Wybierz okres",
@@ -86,6 +236,985 @@
       "last_30": "Ostatnie 30 dni",
       "last_90": "Ostatnie 90 dni",
       "last_365": "Ostatni rok"
+    },
+    "empty": {
+      "title": "Tu pojawi się Twój panel zysków",
+      "subtitle": "Dodaj pierwszą wizytę — i zobaczysz magię. Albo wypróbuj na danych demo.",
+      "cta": "+ Dodaj wizytę",
+      "seed_demo": "Wypróbuj na danych demo",
+      "confirm_seed": "Wypełnić salon danymi testowymi? Utworzy 4 specjalistów, 8 usług, 20 klientów i 60 wizyt z ostatnich 30 dni. Można później wyczyścić ręcznie.",
+      "toast_seeded": "Gotowe! Utworzono {{visits}} wizyt i {{clients}} klientów. Pokliknij po sekcjach, żeby poczuć aplikację."
+    },
+    "master_bars": {
+      "title": "Przychód wg specjalistów",
+      "active_count": "{{count}} specjalistów aktywnych",
+      "empty": "Brak wizyt w tym okresie"
+    },
+    "payment_donut": {
+      "title": "Forma płatności",
+      "total": "Łącznie",
+      "empty": "Brak danych do wykresu — dodaj wizyty."
+    },
+    "top_services": {
+      "title": "Top usługi",
+      "see_all": "Wszystkie usługi",
+      "share": "{{pct}}% lidera",
+      "margin": "Marża {{pct}}%",
+      "visits": "{{count}} wizyt",
+      "empty": "Brak usług ze sprzedażą"
+    },
+    "recent_visits": {
+      "title": "Ostatnie rezerwacje",
+      "show_all": "Pokaż wszystkie",
+      "empty": "Brak wizyt w tym okresie"
+    },
+    "top_staff": "Top pracownicy"
+  },
+  "team": {
+    "title": "Zespół",
+    "subtitle": "Zaproś księgową, asystenta lub specjalistów do salonu. Każdy widzi tylko tyle danych, ile potrzebuje do swojej pracy.",
+    "back_to_settings": "← Wróć do ustawień",
+    "members_title": "Aktualni członkowie",
+    "pending_title": "Wysłane zaproszenia",
+    "empty": "Na razie jesteś jedynym członkiem.",
+    "invite_button": "Zaproś",
+    "invite_title": "Zaproś do zespołu",
+    "invite_subtitle": "Użytkownik dostanie email z linkiem. Ważność — 14 dni.",
+    "invite_email": "Email",
+    "invite_role": "Rola",
+    "invite_staff_link": "Powiąż z specjalistą (dla roli „Specjalista”)",
+    "invite_staff_none": "— Nie wybrano —",
+    "invite_send": "Wyślij zaproszenie",
+    "linked_to_staff": "Specjalista: {{name}}",
+    "member_since": "Dołączył(a): {{date}}",
+    "invited_at": "Wysłano: {{date}}",
+    "expires_at": "Wygasa: {{date}}",
+    "remove_aria": "Usuń członka",
+    "cancel_invite_aria": "Anuluj zaproszenie",
+    "confirm_remove": "Usunąć członka? Dostęp do danych zostanie cofnięty natychmiast.",
+    "confirm_cancel_invite": "Anulować zaproszenie? Link z emaila przestanie działać.",
+    "toast_invited": "Zaproszenie wysłane",
+    "toast_invite_cancelled": "Zaproszenie anulowane",
+    "toast_role_updated": "Rola zaktualizowana",
+    "toast_removed": "Członek usunięty",
+    "accept_loading": "Przyjmujemy zaproszenie…",
+    "accept_loading_subtitle": "Jeszcze chwilka — i będziesz w zespole.",
+    "accept_error_subtitle": "Skontaktuj się z osobą, która Cię zaprosiła, lub napisz do support@finkley.app.",
+    "accept_error": {
+      "missing_token": "Link jest uszkodzony",
+      "invitation_not_found": "Zaproszenie nie znalezione",
+      "already_accepted": "To zaproszenie zostało już przyjęte",
+      "invitation_cancelled": "Zaproszenie anulowane",
+      "invitation_expired": "Termin ważności zaproszenia upłynął",
+      "email_mismatch": "Email nie zgadza się z zaproszeniem — zaloguj się na właściwe konto",
+      "auth_required": "Musisz się zalogować",
+      "unknown": "Nie udało się przyjąć zaproszenia"
+    },
+    "role": {
+      "owner": "Właściciel",
+      "admin": "Administrator",
+      "accountant": "Księgowy",
+      "staff": "Specjalista"
+    },
+    "role_hint": {
+      "admin": "Pełen dostęp poza rozliczeniami i usuwaniem salonu",
+      "accountant": "Widzi/edytuje całe finanse, nie zarządza zespołem",
+      "staff": "Widzi tylko swoje wizyty i klientów, nie widzi finansów salonu"
+    },
+    "errors": {
+      "email_required": "Wpisz email",
+      "already_member": "Ten użytkownik już jest w zespole",
+      "missing_fields": "Wypełnij wszystkie pola",
+      "invalid_role": "Nieprawidłowa rola",
+      "forbidden": "Brak uprawnień do zapraszania"
+    }
+  },
+  "help": {
+    "title": "Pomoc",
+    "subtitle": "Odpowiedzi na najczęstsze pytania. Jeśli czegoś nie ma — napisz do nas.",
+    "contact_support": "Wsparcie",
+    "still_stuck": "Wciąż nie wiesz, jak to zrobić?",
+    "still_stuck_body": "Napisz do nas — odpowiadamy w ciągu 24 godzin w dni robocze. Możesz też prosto z bota Telegram — tam też dostajemy zgłoszenia błędów.",
+    "telegram_bug": "Zgłoś błąd na Telegramie",
+    "footer": "Finkley · Księgowość zarządcza dla salonów kosmetycznych ·",
+    "q": {
+      "what": {
+        "title": "Czym jest Finkley?",
+        "body": "Finkley to internetowy panel właścicielki salonu kosmetycznego. Widzisz nie kalendarz klientów, ale swój zysk: przychody, wydatki, czysty zysk, wypłaty specjalistów, trendy tygodnia i miesiąca. Bez papierów, bez Excela, bez księgowej do codziennej pracy."
+      },
+      "signup": {
+        "title": "Jak zacząć?",
+        "body": "Zarejestruj się przez email lub Google w 30 sekund. Potem krótkie wprowadzenie (1-2 minuty): nazwa salonu, kraj, waluta, pracownicy i usługi. Możesz tam wszystko pominąć — dodasz później."
+      },
+      "add_visit": {
+        "title": "Jak dodać wizytę?",
+        "body": "Kliknij przycisk „+ Wizyta” w prawym dolnym rogu — okno otworzy się z dowolnej strony. Wybierz specjalistę, usługę, kwotę, sposób płatności — zapisz. Jeśli wizyta bez płatności (klient nie zapłacił od razu) — zostaw ją w stanie oczekującym, rozliczysz później."
+      },
+      "bulk_visits": {
+        "title": "Można wpisać kilka wizyt naraz w ciągu dnia?",
+        "body": "Tak. W oknie „+ Wizyta” przełącz się na zakładkę „Wiele wizyt” — tabela na 3-10 wierszy, można je wprowadzić wszystkie jednym kliknięciem. Wygodnie wieczorem, by od razu zapisać cały dzień."
+      },
+      "import_booksy": {
+        "title": "Jak zaimportować wizyty z Booksy?",
+        "body": "Wejdź w Ustawienia → Integracje → Booksy → wpisz swój email/hasło z Booksy Pro. Pobierzemy specjalistów, usługi, klientów i wizyty automatycznie. Następnie wybierz częstotliwość auto-synchronizacji (od 2 minut do 24 godzin). Hasło jest szyfrowane i przechowywane wyłącznie do synchronizacji."
+      },
+      "expenses": {
+        "title": "Jak rejestrować wydatki?",
+        "body": "Sekcja „Wydatki”. Kliknij „+” — wybierz kategorię, kwotę, datę, sposób płatności. Możesz dodać zdjęcie paragonu (AI go rozpozna i autouzupełni pola). Stałe wydatki (czynsz, wypłaty specjalistów) można ustawić jako automatyczne: raz w miesiącu system sam utworzy wpis."
+      },
+      "payouts": {
+        "title": "Jak liczone są wypłaty specjalistów?",
+        "body": "W sekcji „Pracownicy” dla każdego specjalisty ustawiasz schemat wypłat: procent od przychodu, stała pensja lub kombinacja. Sekcja „Wypłaty” automatycznie liczy należność za wybrany okres z uwzględnieniem wszystkich wykonanych wizyt."
+      },
+      "reports": {
+        "title": "Jakie raporty są dostępne?",
+        "body": "P&L (zysk i strata), przychód wg specjalistów / usług / form płatności, mapa cieplna obłożenia po dniach i godzinach, dynamika do poprzedniego miesiąca. Okres dowolny — dzień, tydzień, miesiąc lub własny zakres. Można wydrukować do PDF z poziomu przeglądarki."
+      },
+      "cancel": {
+        "title": "Jak anulować subskrypcję?",
+        "body": "Ustawienia → Subskrypcja → „Zarządzaj subskrypcją” — trafisz do Stripe customer portal, gdzie można anulować. Dostęp do danych zostaje do końca opłaconego okresu. Wszystkie dane można pobrać w każdej chwili (Ustawienia → Eksport danych)."
+      },
+      "export_data": {
+        "title": "Jak pobrać swoje dane?",
+        "body": "Ustawienia → Eksport danych. Kliknij „Pobierz” — przygotujemy ZIP z plikami CSV wszystkich wizyt, klientów, wydatków, specjalistów, usług i wyślemy link na email. Standard GDPR — Twoje dane należą do Ciebie."
+      },
+      "delete_account": {
+        "title": "Jak usunąć konto?",
+        "body": "Ustawienia → na dole strony „Usuń salon”. Potwierdź wpisując nazwę salonu. Usunięcie jest nieodwracalne: wszystkie wizyty, klienci, wydatki. Jeśli masz kilka salonów — usunie się tylko bieżący, pozostałe zostaną."
+      },
+      "support": {
+        "title": "Gdzie pisać z pytaniami i błędami?",
+        "body": "Email: support@finkley.app — odpowiadamy w ciągu 24 godzin w dni robocze.\nBłędy: prosto z aplikacji — przycisk z robaczkiem w prawym górnym rogu (lub na Telegramie @finklay_dev_bot). Załącz zrzut ekranu, szybko sprawdzimy."
+      }
+    }
+  },
+  "ai": {
+    "title": "AI-asystent",
+    "subtitle": "Podpowie po wskaźnikach, porówna z poprzednim miesiącem, zaproponuje, co poprawić.",
+    "input_placeholder": "Zapytaj o przychody, specjalistów, usługi…",
+    "new_chat": "Nowy czat",
+    "confirm_reset": "Zacząć nowy czat? Stara historia zostanie w archiwum.",
+    "empty_title": "Cześć! Pomogę z liczbami salonu.",
+    "empty_subtitle": "Wiem wszystko o Twoich wizytach, specjalistach, usługach i wydatkach. Zapytaj o cokolwiek — odpowiem na podstawie prawdziwych danych.",
+    "suggestions_label": "Podpowiedzi",
+    "suggestions": {
+      "revenue_this_month": "Ile zarobiłam w tym miesiącu?",
+      "top_master": "Który specjalista przynosi największy przychód?",
+      "compare_prev": "Porównaj ten miesiąc z poprzednim",
+      "what_to_improve": "Co mogę poprawić, żeby zwiększyć przychód?"
+    }
+  },
+  "visits": {
+    "title": "Wizyty",
+    "fab_label": "Wizyta",
+    "tabs": {
+      "single": "Jedna wizyta",
+      "bulk": "Wiele wizyt"
+    },
+    "bulk_button": "Wiele wizyt",
+    "bulk": {
+      "title": "Wprowadź kilka wizyt",
+      "date_label": "Data:",
+      "staff": "Specjalista",
+      "service": "Usługa",
+      "amount": "Kwota",
+      "payment": "Płatność",
+      "add_row": "Dodaj wiersz",
+      "valid_count": "Gotowe do zapisu: {{count}} z {{total}}",
+      "save_all": "Zapisz wszystkie",
+      "max_rows": "Maksymalnie 10 wierszy naraz",
+      "no_valid_rows": "Wypełnij chociaż jeden wiersz (specjalista + kwota)",
+      "toast_done": "Zapisano {{count}} wizyt",
+      "toast_failed": "Nie udało się zapisać: {{count}}"
+    },
+    "subtitle_total": "{{count}} wizyt · {{revenue}}",
+    "edit_aria": "Edytuj wizytę",
+    "charge_aria": "Rozlicz wizytę",
+    "status_pending": "Nierozliczona",
+    "group_label_one": "{{count}} usługa w jednej rezerwacji",
+    "group_label_few": "{{count}} usługi w jednej rezerwacji",
+    "group_label_many": "{{count}} usług w jednej rezerwacji",
+    "group_label": "{{count}} usług w jednej rezerwacji",
+    "mixed_payments": "Różne metody",
+    "toast_updated": "Wizyta zaktualizowana",
+    "toast_charged": "Wizyta rozliczona",
+    "edit": {
+      "title": "Edytuj wizytę",
+      "subtitle": "Popraw kwotę, sposób płatności lub komentarz — zmiany wejdą od razu.",
+      "amount_label": "Kwota ({{currency}})",
+      "payment_label": "Sposób płatności",
+      "tip_label": "Napiwek",
+      "discount_label": "Rabat",
+      "comment_label": "Komentarz",
+      "save": "Zapisz",
+      "saving": "Zapisuję…"
+    },
+    "charge": {
+      "title": "Rozlicz wizytę",
+      "subtitle": "Wpisz faktyczną kwotę i wybierz sposób płatności — wizyta stanie się rozliczona i wejdzie do przychodu.",
+      "save": "Rozlicz"
+    },
+    "form": {
+      "title_new": "Nowa wizyta",
+      "title_edit": "Edytuj wizytę",
+      "subtitle": "Wpiszemy do księgi w parę sekund",
+      "date_label": "Data",
+      "today_pill": "dzisiaj",
+      "staff_label": "Specjalista",
+      "staff_placeholder": "Kto przyjmował?",
+      "client_label": "Klient",
+      "service_label": "Usługa",
+      "service_placeholder": "Wybierz usługę",
+      "amount_label": "Kwota",
+      "tip_label": "Napiwek",
+      "discount_label": "Rabat",
+      "payment_method_label": "Płatność",
+      "comment_label": "Komentarz (opcjonalnie)",
+      "comment_placeholder": "Na przykład: nowa klientka, z polecenia",
+      "submit": "Zapisz wizytę",
+      "submit_and_continue": "Zapisz i dodaj kolejną",
+      "continue_hint": "Możesz od razu wpisywać następną — specjalista i płatność zostały zachowane."
+    },
+    "toast_added": "Wizyta dodana",
+    "toast_updated": "Wizyta zaktualizowana",
+    "toast_deleted": "Wizyta usunięta",
+    "toast_undo": "Cofnij",
+    "toast_undone": "Wizyta usunięta",
+    "toast_restore": "Przywróć",
+    "toast_error": "Nie udało się zapisać",
+    "empty": "Na razie brak wizyt",
+    "empty_hint": "Kliknij „+ Wizyta”, żeby zapisać pierwszą.",
+    "no_staff": "—",
+    "confirm_delete": "Usunąć tę wizytę?",
+    "filters": {
+      "all_staff": "Wszyscy pracownicy",
+      "all_payments": "Wszystkie formy płatności"
+    },
+    "errors": {
+      "staff_required": "Wybierz specjalistę",
+      "amount_required": "Podaj kwotę",
+      "amount_positive": "Kwota musi być większa od zera",
+      "tip_negative": "Napiwek nie może być ujemny",
+      "discount_negative": "Rabat nie może być ujemny"
+    }
+  },
+  "clients": {
+    "title": "Klienci",
+    "add": "Dodaj klienta",
+    "subtitle_one": "{{count}} klient",
+    "subtitle_few": "{{count}} klientów",
+    "subtitle_many": "{{count}} klientów",
+    "subtitle": "Łącznie: {{count}}",
+    "list_title": "Wszyscy klienci",
+    "templates": {
+      "title": "Wizyty cykliczne",
+      "add": "Dodaj",
+      "every_n_days": "Co {{count}} dni",
+      "paused": "pauza",
+      "next": "następna: {{date}}",
+      "no_details": "bez specjalisty/usługi",
+      "recurrence_label": "Co N dni",
+      "next_label": "Następna",
+      "staff_label": "Specjalista",
+      "staff_any": "Dowolny",
+      "service_label": "Usługa",
+      "service_any": "Dowolna",
+      "pause": "Wstrzymaj",
+      "resume": "Wznów",
+      "delete": "Usuń",
+      "confirm_delete": "Usunąć szablon stałej wizyty?",
+      "toast_added": "Szablon dodany",
+      "errors": {
+        "bad_recurrence": "Okres musi być od 1 do 365 dni"
+      }
+    },
+    "records": "rekordów",
+    "empty": "Na razie brak klientów. Kliknij „Dodaj klienta” — i pojawi się pierwsza karta.",
+    "empty_search": "Nikogo nie znaleźliśmy. Sprawdź imię lub telefon.",
+    "search_placeholder": "Szukaj po imieniu, telefonie, emailu",
+    "unnamed_with_phone": "Klient po telefonie",
+    "confirm_delete": "Usunąć tego klienta? Wizyty w księdze zostaną, po prostu nie będą do niego przypisane.",
+    "toast_created": "Klient dodany",
+    "toast_updated": "Karta zaktualizowana",
+    "toast_deleted": "Klient usunięty",
+    "toast_error": "Nie udało się zapisać",
+    "kpi": {
+      "total": "Wszystkich klientów",
+      "active": "Z wizytami",
+      "lifetime_revenue": "Przynieśli"
+    },
+    "sort": {
+      "last_visit": "Wg ostatniej wizyty",
+      "name": "Wg imienia",
+      "revenue": "Wg kwoty"
+    },
+    "form": {
+      "title_new": "Nowy klient",
+      "title_edit": "Edytuj klienta",
+      "name_label": "Imię",
+      "name_placeholder": "Na przykład: Anna Kowalska",
+      "phone_label": "Telefon",
+      "phone_hint": "Z kodem kraju: +48… dla PL, +380… dla UA, +7… dla RU.",
+      "email_label": "Email",
+      "notes_label": "Notatka",
+      "notes_placeholder": "Co warto pamiętać o tym kliencie",
+      "submit_new": "Utwórz",
+      "submit_edit": "Zapisz"
+    },
+    "drawer": {
+      "visits_count": "wizyt",
+      "lifetime": "łącznie",
+      "notes": "Notatka",
+      "history": "Historia wizyt",
+      "history_empty": "Brak wizyt z tym klientem.",
+      "no_service": "Bez usługi"
+    },
+    "picker": {
+      "no_client": "Bez klienta",
+      "search_placeholder": "Imię lub telefon",
+      "create_with": "+ Utwórz „{{name}}”",
+      "clear": "Wyczyść wybór"
+    },
+    "errors": {
+      "name_required": "Imię jest wymagane",
+      "email_invalid": "Nieprawidłowy format email"
+    }
+  },
+  "billing": {
+    "checkout_button": "Wykup subskrypcję",
+    "portal_button": "Zarządzaj subskrypcją",
+    "checkout_error": "Nie udało się otworzyć płatności",
+    "portal_error": "Nie udało się otworzyć portalu rozliczeń",
+    "banner": {
+      "trial_ending_one": "Okres próbny kończy się jutro",
+      "trial_ending_other": "Okres próbny kończy się za {{count}} dni",
+      "expired_title": "Subskrypcja nieaktywna. Możesz przeglądać dane, ale nowe wpisy są chwilowo zablokowane.",
+      "cta_subscribe": "Wykup za €15/mies",
+      "cta_upgrade": "Zapłać"
+    }
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "subtitle": "Profil salonu, eksport danych, usuwanie.",
+    "toast_saved": "Ustawienia zapisane",
+    "profile": {
+      "title": "Profil salonu",
+      "name_label": "Nazwa salonu",
+      "country_label": "Kraj",
+      "country_hint": "Przy zmianie kraju automatycznie zmienią się waluta i strefa czasowa.",
+      "type_label": "Typ salonu",
+      "logo_label": "Logo salonu",
+      "logo_hint": "PNG / JPG / WEBP / SVG, do 5 MB. Pokazane w nagłówku i wiadomościach.",
+      "logo_uploaded": "Logo wgrane",
+      "logo_too_large": "Plik większy niż 5 MB — wybierz mniejszy",
+      "logo_remove": "Usuń logo"
+    },
+    "services": {
+      "title": "Usługi i ceny",
+      "subtitle": "Koszt ustawiony dla {{withCost}} z {{total}} usług — bez niego marża nie jest liczona.",
+      "empty": "Brak usług. Kliknij „+ Usługa\", aby dodać pierwszą.",
+      "add": "Usługa",
+      "new_default_name": "Nowa usługa",
+      "col_name": "Usługa",
+      "col_category": "Kategoria",
+      "col_duration": "Min",
+      "col_price": "Cena",
+      "col_cost": "Koszt",
+      "col_margin": "Marża",
+      "no_category": "— bez kategorii —",
+      "cost_placeholder": "—",
+      "error_invalid": "Wartość musi być liczbą nieujemną",
+      "archive": "Do archiwum",
+      "restore": "Przywróć",
+      "confirm_archive": "Przenieść usługę do archiwum? Historia wizyt zostanie zachowana, ale nie będzie można dodawać nowych wizyt na tę usługę.",
+      "show_archived": "Pokaż archiwum",
+      "hide_archived": "Ukryj archiwum",
+      "archived_empty": "Archiwum jest puste.",
+      "toast_created": "Usługa dodana",
+      "toast_archived": "Usługa zarchiwizowana",
+      "toast_restored": "Usługa przywrócona",
+      "hint": "Zmiany zapisują się automatycznie po kliknięciu poza pole. Marża = (cena − koszt) ÷ cena. Zielona ≥50%, złota 35–50%, czerwona <35%."
+    },
+    "appearance": {
+      "title": "Wygląd",
+      "subtitle": "Aktualnie aktywny motyw: {{resolved}}. Wybierz konkretny lub zostaw „jak w systemie\".",
+      "theme_system": "Jak w systemie",
+      "theme_light": "Jasny",
+      "theme_dark": "Ciemny"
+    },
+    "categories": {
+      "title": "Kategorie usług i wydatków",
+      "subtitle": "Zmieniaj nazwę, dodawaj nowe, archiwizuj. Historia wizyt i wydatków zostaje zachowana po archiwizacji.",
+      "service_title": "Kategorie usług",
+      "expense_title": "Kategorie wydatków",
+      "empty": "Na razie pusto.",
+      "new_placeholder": "Nowa kategoria…",
+      "add": "Dodaj",
+      "archive": "Do archiwum",
+      "confirm_archive": "Przenieść kategorię do archiwum?",
+      "confirm_archive_system": "To kategoria systemowa, utworzona podczas konfiguracji salonu. Na pewno przenieść do archiwum?",
+      "toast_created": "Kategoria dodana",
+      "toast_archived": "Kategoria zarchiwizowana"
+    },
+    "team": {
+      "title": "Zespół",
+      "subtitle": "Zaproś księgową, asystenta lub specjalistów z różnymi poziomami dostępu.",
+      "button": "Zarządzaj zespołem"
+    },
+    "audit": {
+      "title": "Dziennik zdarzeń",
+      "subtitle": "Kto co zmieniał w salonie — dla przejrzystości i audytu.",
+      "button": "Otwórz dziennik"
+    },
+    "integrations": {
+      "title": "Integracje",
+      "subtitle": "Podłącz Booksy, Fresha i inne platformy — wizyty będą pobierane automatycznie.",
+      "button": "Otwórz integracje"
+    },
+    "benchmarks": {
+      "title": "Porównanie z podobnymi salonami",
+      "subtitle": "Pokażę, jak Twoje wskaźniki wyglądają na tle średniej w branży — bez imion i adresów, tylko zanonimizowane liczby. Pomaga zrozumieć, gdzie jesteś silna, a gdzie jest pole do wzrostu.",
+      "enabled": "Włączone — zobaczę porównanie na panelu",
+      "disabled": "Wyłączone — żadne porównanie nie jest pokazywane, Twoje dane nie są wykorzystywane do wspólnej statystyki",
+      "toast_enabled": "Porównanie włączone",
+      "toast_disabled": "Porównanie wyłączone"
+    },
+    "cash": {
+      "title": "Saldo początkowe w kasie",
+      "subtitle": "Ile masz już gotówki w momencie startu z Finkley. Widget „W kasie gotówką” na panelu = ta liczba + wizyty gotówkowe − wydatki gotówkowe.",
+      "invalid": "Nieprawidłowa kwota",
+      "toast_saved": "Saldo początkowe zaktualizowane"
+    },
+    "import": {
+      "title": "Import wizyt z CSV",
+      "subtitle": "Wgraj historię wizyt z Booksy / Fresha / Treatwell lub własnej tabeli.",
+      "button": "Otwórz import"
+    },
+    "digest": {
+      "title": "Cotygodniowe podsumowanie",
+      "subtitle": "List w poniedziałek: przychód/wydatki/zysk za poprzedni tydzień + top specjalista i top usługa.",
+      "enabled": "Włączone — będą przychodzić automatycznie (cron aktywuje się przy konfiguracji Vault)",
+      "disabled": "Wyłączone",
+      "button": "Wyślij teraz",
+      "toast_enabled": "Podsumowanie włączone",
+      "toast_disabled": "Podsumowanie wyłączone",
+      "toast_sent": "List wysłany na {{email}}"
+    },
+    "calendar": {
+      "title": "Kalendarz wizyt (iCal)",
+      "subtitle": "Subskrybuj kanał wizyt w Google Calendar / Apple Calendar / Outlook. Aktualizuje się automatycznie — zobaczysz wszystkie rezerwacje wprost w swoim kalendarzu.",
+      "copy": "Kopiuj",
+      "how_to": "Otwórz Google/Apple Calendar → „Subskrybuj kalendarz” → wklej URL. W Outlook: „Dodaj kalendarz” → „Subskrybuj z internetu”.",
+      "revoke": "Cofnij link i wygeneruj nowy",
+      "confirm_revoke": "Bieżący link przestanie działać we wszystkich kalendarzach, gdzie go dodałaś. Kontynuować?",
+      "toast_copied": "URL skopiowany",
+      "toast_revoked": "Link cofnięty. Nowy zostanie utworzony przy kolejnym otwarciu."
+    },
+    "api": {
+      "title": "Klucze API",
+      "subtitle": "Utwórz klucz dla własnych integracji (Zapier, n8n, Make, skrypty). Każdy klucz pokazujemy tylko raz przy tworzeniu.",
+      "create": "Utwórz klucz",
+      "create_title": "Nowy klucz API",
+      "create_subtitle": "Po utworzeniu klucz pokażemy raz — koniecznie skopiuj i zachowaj w bezpiecznym miejscu.",
+      "name_label": "Nazwa",
+      "scopes_label": "Uprawnienia",
+      "scope": {
+        "read": "Read (odczyt)",
+        "write": "Write (zapis)"
+      },
+      "create_submit": "Utwórz",
+      "show_once_title": "Skopiuj klucz teraz",
+      "show_once_subtitle": "To jedyny raz, kiedy widzisz pełny klucz. Po zamknięciu okna nie da się go odzyskać — tylko utworzyć od nowa.",
+      "copy": "Kopiuj",
+      "toast_copied": "Skopiowano do schowka",
+      "understood": "Skopiowałam, wszystko ok",
+      "created": "Utworzono: {{date}}",
+      "revoke_aria": "Cofnij klucz",
+      "confirm_revoke": "Cofnąć klucz? Wszystkie integracje, które go używają, przestaną działać.",
+      "toast_revoked": "Klucz cofnięty",
+      "errors": {
+        "name_required": "Wpisz nazwę"
+      }
+    },
+    "referral": {
+      "title": "Zaproś znajomych",
+      "subtitle": "Udostępnij swój kod — oboje dostaniecie miesiąc gratis przy pierwszej płatności.",
+      "copy": "Kopiuj",
+      "toast_copied": "Kod skopiowany",
+      "invited": "Zaproszeń",
+      "activated": "Aktywowanych",
+      "fineprint": "Bonus jest naliczany automatycznie po pierwszej płatności zaproszonego. Rabat 100% na jeden miesiąc subskrypcji."
+    },
+    "mfa": {
+      "title": "Uwierzytelnianie dwuskładnikowe",
+      "subtitle_disabled": "Włącz 2FA, by logowanie do konta wymagało kodu z aplikacji. Chroni przed wyciekiem hasła.",
+      "subtitle_enabled": "✅ 2FA włączone. Każde logowanie wymaga 6-cyfrowego kodu z aplikacji.",
+      "enable": "Włącz 2FA",
+      "added": "Dodano: {{date}}",
+      "remove_aria": "Wyłącz 2FA",
+      "confirm_remove": "Wyłączyć 2FA? Dostęp znów będzie chroniony tylko hasłem.",
+      "toast_enabled": "2FA włączone 🔐",
+      "toast_disabled": "2FA wyłączone",
+      "enroll_title": "Konfiguracja 2FA",
+      "enroll_subtitle": "Zeskanuj QR w aplikacji-uwierzytelniaczu i wpisz 6-cyfrowy kod, by potwierdzić.",
+      "step1": "Otwórz aplikację-uwierzytelniacz (Google Authenticator, 1Password, Authy, Bitwarden itp.)",
+      "step2": "Zeskanuj kod QR poniżej lub wpisz sekret ręcznie",
+      "step3": "Wpisz 6-cyfrowy kod, który pokaże aplikacja",
+      "manual_secret": "Lub wpisz ręcznie (jeśli QR się nie skanuje):",
+      "code_label": "Kod z aplikacji",
+      "verify": "Potwierdź",
+      "invalid_code": "Kod musi mieć 6 cyfr"
+    },
+    "push": {
+      "title": "Powiadomienia push",
+      "subtitle": "Otrzymuj powiadomienia o nowych wizytach, wydatkach i podpowiedziach AI prosto w przeglądarce lub na telefonie — nawet gdy karta jest zamknięta.",
+      "enable": "Włącz powiadomienia",
+      "disable": "Wyłącz",
+      "send_test": "Wyślij test",
+      "unsupported": "Twoja przeglądarka nie obsługuje Web Push. Spróbuj najnowszej wersji Chrome lub Firefox. Na iOS — najpierw dodaj aplikację do ekranu głównego.",
+      "denied": "Przeglądarka zablokowała powiadomienia. Otwórz ustawienia strony w przeglądarce (ikonka 🔒 obok URL) i pozwól na Notifications.",
+      "not_configured": "Push chwilowo nie jest skonfigurowany na serwerze. Skontaktuj się ze wsparciem.",
+      "toast_subscribed": "Powiadomienia włączone ✅",
+      "toast_unsubscribed": "Powiadomienia wyłączone",
+      "toast_test_sent": "Test wysłany na {{count}} urządzeń"
+    },
+    "install": {
+      "title": "Zainstaluj jako aplikację",
+      "subtitle": "Finkley stanie się ikoną na ekranie głównym telefonu — będzie się otwierać bez paska przeglądarki.",
+      "button": "Zainstaluj aplikację",
+      "already_installed": "✓ Aplikacja już zainstalowana",
+      "ios_hint": "W Safari naciśnij przycisk „Udostępnij” → „Do ekranu początkowego”.",
+      "not_available": "Przeglądarka jeszcze nie proponuje instalacji. Popracuj w Finkley pare minut — przycisk się pojawi."
+    },
+    "export": {
+      "title": "Eksport danych",
+      "subtitle": "Wszystkie wizyty, wydatki, klienci i pracownicy w CSV — do księgowości lub GDPR.",
+      "button": "Pobierz dane",
+      "toast_ready": "Archiwum gotowe — pobieranie ruszyło. Link wysłany na email.",
+      "toast_cached": "Archiwum z ostatnich 24 godzin jest gotowe — otwieramy je.",
+      "toast_failed": "Nie udało się przygotować archiwum"
+    },
+    "delete": {
+      "title": "Usuń salon",
+      "subtitle": "Wszystkie dane zostaną usunięte po 30 dniach. Po tym czasie nie da się przywrócić.",
+      "button": "Usuń salon",
+      "modal_title": "Usuń salon na zawsze",
+      "modal_subtitle": "Tego działania nie można cofnąć po 30-dniowym okresie karencji.",
+      "confirm_prompt": "Aby potwierdzić, wpisz nazwę salonu: „{{name}}”",
+      "confirm_mismatch": "Nazwa się nie zgadza",
+      "confirm_button": "Usuń na zawsze",
+      "toast_deleted": "Salon usunięty"
+    },
+    "errors": {
+      "name_too_short": "Nazwa musi mieć co najmniej 2 znaki"
+    },
+    "billing": {
+      "title": "Subskrypcja",
+      "no_subscription": "Subskrypcja nie jest aktywna. Po 14 dniach bezpłatnego okresu próbnego konto przejdzie w tryb tylko do odczytu.",
+      "status_trialing": "Okres próbny — €15/mies po jego zakończeniu",
+      "status_active": "Aktywna — €15/mies",
+      "status_past_due": "Płatność nie przeszła. Zaktualizuj kartę w portalu rozliczeń.",
+      "status_canceled": "Anulowana. Dostęp do końca opłaconego okresu.",
+      "status_unpaid": "Nieopłacona. Wykup subskrypcję, żeby kontynuować.",
+      "status_paused": "Wstrzymana.",
+      "status_incomplete": "Procedura nie została zakończona."
+    }
+  },
+  "staff": {
+    "title": "Pracownicy",
+    "subtitle": "Imię i schemat wypłat. Pracownicy zostają w historii wizyt nawet po archiwizacji.",
+    "add_title": "Dodaj specjalistę",
+    "add_hint": "Domyślnie ustawiamy schemat „40% od przychodu” — zmienisz po utworzeniu.",
+    "name_label": "Imię",
+    "name_placeholder": "Na przykład: Ania",
+    "percent_label": "% od przychodu",
+    "fixed_label": "Stała kwota za okres",
+    "chair_rent_label": "Wynajem stanowiska za okres",
+    "add_button": "Dodaj",
+    "edit_button": "Zmień",
+    "active": "Aktywni · {{count}}",
+    "archived": "W archiwum · {{count}}",
+    "empty_active": "Na razie brak specjalistów. Dodaj pierwszego powyżej.",
+    "archive": "Archiwizuj",
+    "unarchive": "Przywróć",
+    "confirm_archive": "Przenieść do archiwum? Można przywrócić później.",
+    "toast_added": "Specjalista dodany",
+    "toast_saved": "Zapisano",
+    "toast_archived": "Przeniesiony do archiwum",
+    "toast_unarchived": "Przywrócony z archiwum",
+    "sheet_title": "Ustawienia specjalistę",
+    "sheet_subtitle": "Imię i schemat wypłat. Zmiany zadziałają dla przyszłych obliczeń wypłat.",
+    "scheme_label": "Schemat wypłat",
+    "schemes": {
+      "percent_revenue": {
+        "title": "% od przychodu",
+        "hint": "Na przykład 40% — specjalista dostaje stały procent z każdej wizyty."
+      },
+      "fixed": {
+        "title": "Stała stawka",
+        "hint": "Ta sama kwota za okres niezależnie od przychodu. Na przykład 4000 PLN/mies."
+      },
+      "percent_service": {
+        "title": "% od każdej usługi",
+        "hint": "Własny procent dla każdej usługi — bardziej elastyczne niż jedna stawka."
+      },
+      "chair_rent": {
+        "title": "Wynajem stanowiska",
+        "hint": "Specjalista płaci stałą kwotę za stanowisko, cały przychód zabiera dla siebie."
+      },
+      "mixed": {
+        "title": "Mieszana (stała + %)",
+        "hint": "Baza + procent na wierzchu. Na przykład 2000 PLN + 25% od przychodu."
+      }
+    },
+    "summary": {
+      "percent_revenue": "{{percent}}% od przychodu",
+      "fixed": "{{amount}} / okres (stała)",
+      "percent_service": "% od każdej usługi",
+      "chair_rent": "Wynajem {{amount}} / okres",
+      "mixed": "{{amount}} + {{percent}}% na wierzchu"
+    },
+    "overrides": {
+      "title": "Procent za usługę",
+      "hint": "Puste — usługa nie wlicza się do wypłaty",
+      "no_services": "Najpierw dodaj usługi w ustawieniach salonu.",
+      "save_first": "Zapisz specjalistę, by ustawić stawki za usługi.",
+      "clear": "Wyczyść"
+    },
+    "errors": {
+      "name_too_short": "Imię musi mieć co najmniej 2 znaki",
+      "percent_invalid": "Procent musi być od 0 do 100"
+    }
+  },
+  "notifications": {
+    "title": "Powiadomienia",
+    "aria_label": "Powiadomienia",
+    "count": "{{count}} w kanale",
+    "empty": "Spokojnie — brak nowych zdarzeń",
+    "overdue": {
+      "title": "{{name}} — pora napisać",
+      "body_today": "Dziś zaplanowana wizyta. Przypomnij klientce.",
+      "body_overdue_one": "Spóźnione o {{count}} dzień — przypomnij klientce.",
+      "body_overdue_few": "Spóźnione o {{count}} dni — przypomnij klientce.",
+      "body_overdue_many": "Spóźnione o {{count}} dni — przypomnij klientce."
+    },
+    "budget": {
+      "title": "Przekroczony budżet „{{name}}”",
+      "body": "W tym miesiącu już {{pct}}% limitu."
+    }
+  },
+  "integrations": {
+    "title": "Integracje z platformami rezerwacji",
+    "subtitle": "Podłącz swoje konto — wizyty, klienci i usługi będą synchronizować się automatycznie. Nie trzeba niczego wpisywać ręcznie.",
+    "back_to_settings": "← Wróć do ustawień",
+    "not_connected": "Niepodłączone",
+    "connect": "Podłącz",
+    "connect_title": "Podłącz {{name}}",
+    "connect_subtitle": "Wpisz dane dostępowe do {{name}}. Hasło jest szyfrowane i używane wyłącznie do synchronizacji.",
+    "save": "Zapisz i podłącz",
+    "connecting": "Podłączam…",
+    "toast_saved_stub": "Integracja w przygotowaniu — wkrótce zadziała 🛠",
+    "toast_connected": "✅ Konto {{name}} podłączone",
+    "toast_synced": "Synchronizacja: +{{staff}} specjalistów, +{{services}} usług, +{{visits}} wizyt",
+    "toast_disconnected": "Integracja odłączona",
+    "last_sync_at": "Ostatnia synchronizacja: {{date}}",
+    "never_synced": "Jeszcze nie synchronizowano — kliknij „Synchronizuj teraz”",
+    "last_sync_stats": "Specjalistaów: {{staff}} · Usług: {{services}} · Wizyt: {{visits}}",
+    "sync_now": "Synchronizuj teraz",
+    "disconnect": "Odłącz",
+    "confirm_disconnect": "Odłączyć integrację? Dane zostaną, ale automatyczna synchronizacja zatrzyma się.",
+    "clear_visits": "Wyczyść wizyty",
+    "confirm_clear_visits": "Usunąć wszystkie wizyty zaimportowane z Booksy? Tego działania nie da się cofnąć. Pracownicy, usługi i klienci zostają.",
+    "toast_visits_cleared": "Usunięto {{n}} zaimportowanych wizyt",
+    "sync_interval_label": "Częstotliwość auto-synchronizacji",
+    "sync_interval_hint": "Im częściej, tym szybciej wizyty są pobierane (i tym większa szansa złapania rezerwacji przed jej skasowaniem w Booksy).",
+    "auto_sync_every": "Auto-sync co:",
+    "toast_interval_updated": "Częstotliwość zaktualizowana",
+    "interval": {
+      "2min": "Co 2 minuty",
+      "5min": "Co 5 minut",
+      "10min": "Co 10 minut",
+      "20min": "Co 20 minut",
+      "30min": "Co 30 minut",
+      "1h": "Co godzinę",
+      "4h": "Co 4 godziny",
+      "12h": "Co 12 godzin",
+      "24h": "Raz na dobę"
+    },
+    "locked_hint": "Wkrótce dostępne",
+    "privacy_note": "Wszystkie hasła są szyfrowane na serwerze z użyciem AES-256, nigdzie nie są przechowywane w postaci jawnej. Integrację można odłączyć w każdej chwili — dane zostaną usunięte.",
+    "security_note": "Dostęp używamy wyłącznie do odczytu wizyt i klientów. Niczego nie zapisujemy na Twoim koncie na platformie.",
+    "fields": {
+      "email": "Email z konta",
+      "email_or_phone": "Email lub telefon z konta",
+      "password": "Hasło",
+      "access_key": "Access key (z wFirma → API)",
+      "secret_key": "Secret key (z wFirma → API)",
+      "company_id": "Company ID (z wFirma → URL)"
+    },
+    "errors": {
+      "fields_required": "Wypełnij wszystkie wymagane pola",
+      "captcha_not_ready": "Captcha jeszcze się nie załadowała — poczekaj sekundę",
+      "captcha_load_failed": "Nie udało się załadować captchy",
+      "captcha_solve_failed": "Captcha niezaliczona. Spróbuj ponownie.",
+      "booksy_invalid_credentials": "Nieprawidłowy email lub hasło. Sprawdź dane w Booksy Pro.",
+      "booksy_request_blocked": "Booksy zablokował bezpośrednie logowanie. Skorzystaj z zakładki „Token” — to zajmuje 30 sekund.",
+      "booksy_rate_limited": "Za dużo prób. Poczekaj 5 minut i spróbuj ponownie.",
+      "booksy_no_business": "Na koncie nie ma żadnego biznesu. Zaloguj się do Booksy Pro i utwórz profil salonu.",
+      "wfirma_login_failed": "Nieprawidłowy email lub hasło z wfirma.pl. Jeśli masz włączone uwierzytelnianie dwuskładnikowe — wpisz klucze ręcznie w sąsiedniej zakładce.",
+      "wfirma_no_companies": "Na koncie wFirma nie ma żadnej firmy. Najpierw dodaj ją w wFirma i spróbuj ponownie.",
+      "wfirma_form_changed": "wFirma zmieniła swój interfejs — auto-podłączenie chwilowo nie działa. Wpisz klucze ręcznie w sąsiedniej zakładce.",
+      "wfirma_captcha": "wFirma poprosiła o captchę przy logowaniu. Wpisz klucze ręcznie w sąsiedniej zakładce.",
+      "wfirma_keygen_failed": "Nie udało się pobrać kluczy z wFirma. Spróbuj ponownie lub wpisz je ręcznie.",
+      "wfirma_invalid_credentials": "Nieprawidłowa para access/secret. Sprawdź, czy skopiowałaś je bez spacji.",
+      "wfirma_company_id_not_found": "Tej firmy nie znaleziono na Twoim koncie wFirma. Sprawdź Company ID.",
+      "wfirma_invalid_keys_format": "Access key i Secret key muszą być ciągami 32 znaków szesnastkowych.",
+      "wfirma_invalid_company_id": "Company ID to liczba (na przykład 884136). Znajdź ją w URL po zalogowaniu.",
+      "wfirma_auto_login_disabled": "Auto-podłączenie chwilowo wyłączone. Wpisz klucze ręcznie w sąsiedniej zakładce."
+    },
+    "status": {
+      "available": "Gotowe",
+      "connected": "Podłączone",
+      "in_research": "Wkrótce",
+      "coming_soon": "W przygotowaniu"
+    },
+    "booksy": {
+      "tab_password": "Email i hasło",
+      "tab_token": "Mam token",
+      "token_help": "Jeśli bezpośrednie logowanie nie zadziałało, można pobrać token sesji z przeglądarki w 30 sekund:",
+      "token_step1": "Otwórz booksy.com/pro i zaloguj się na swoje konto w zwykły sposób",
+      "token_step2": "Wciśnij F12 → zakładka Network → znajdź dowolne żądanie do pl.booksy.com → skopiuj wartość nagłówka x-access-token",
+      "token_step3": "Wklej token tutaj — sprawdzimy i zapiszemy",
+      "token_label": "Access token (x-access-token)"
+    },
+    "wfirma": {
+      "dialog_subtitle": "Wpisz login/hasło z wfirma.pl — pobierzemy klucze API automatycznie. Jeśli masz uwierzytelnianie dwuskładnikowe lub auto-podłączenie nie zadziała — jest zakładka z ręcznym wpisaniem.",
+      "tab_quick": "Szybko",
+      "tab_manual": "Ręcznie",
+      "quick_subtitle": "Wpisz login/hasło z wFirma. Raz się zalogujemy, sami utworzymy na Twoim koncie aplikację „Finkley” i zapiszemy jej klucze. Hasło nie zostaje na naszym serwerze.",
+      "security_note": "Hasła używamy tylko raz — w momencie tworzenia klucza. Same klucze są szyfrowane na serwerze (AES-256). Aplikację „Finkley” możesz usunąć z podłączonych aplikacji w każdej chwili w wfirma.pl → Ustawienia → OAuth → Klucze API.",
+      "manual_step1": "Wejdź na wfirma.pl pod swoim loginem",
+      "manual_step2": "Otwórz Ustawienia → OAuth → Klucze API → Dodaj",
+      "manual_step3": "Wpisz nazwę (na przykład „Finkley”), potwierdź hasłem i skopiuj Access key + Secret key",
+      "manual_step4": "Company ID znajdź w URL po zalogowaniu (na przykład 884136)",
+      "manual_company_id_hint": "To liczba obok nazwy Twojej firmy lub po /site_index/ w URL.",
+      "choose_company_subtitle": "Na Twoim koncie wFirma jest kilka firm. Wybierz, do której z nich przypisać ten salon w Finkley — będziemy synchronizować wydatki tylko z niej."
+    },
+    "toast_synced_wfirma": "wFirma: dodano {{synced}} nowych wydatków, pominięto {{skipped}}",
+    "last_sync_stats_wfirma": "Zaimportowano: {{synced}} · Pominięto: {{skipped}}",
+    "providers": {
+      "booksy": {
+        "description": "Polska platforma rezerwacji online numer 1 dla salonów kosmetycznych. Pobierzemy wizyty, klientów i usługi z Twojego konta."
+      },
+      "fresha": {
+        "description": "Globalna platforma rezerwacji (UK / EU / US). Bezpłatna dla salonów, obsługuje wizyty + sprzedaż."
+      },
+      "treatwell": {
+        "description": "Brytyjski i europejski marketplace rezerwacji salonów kosmetycznych."
+      },
+      "yclients": {
+        "description": "Popularna platforma na Ukrainie, w Rosji i Kazachstanie. CRM + rezerwacja online + grafik."
+      },
+      "wfirma": {
+        "description": "Polski system księgowy (JDG/spółka). Integracja wyśle wydatki jako faktury zakupu + pobierze przychody. Gotowa na KSeF."
+      }
+    }
+  },
+  "import": {
+    "title": "Import wizyt z CSV",
+    "subtitle": "Wgraj plik, dopasuj kolumny do pól Finkley, sprawdź podgląd i uruchom. Duplikaty (jeśli wgrasz ten sam plik ponownie) zostaną pominięte automatycznie.",
+    "back_to_settings": "← Wróć do ustawień",
+    "upload": {
+      "title": "Wgraj plik CSV",
+      "subtitle": "Obsługujemy pliki z Booksy, Fresha, Treatwell i zwykłe tabele Excel/Google Sheets wyeksportowane do CSV.",
+      "button": "Wybierz plik",
+      "formats": "Separator — przecinek lub średnik (wykrywamy automatycznie). Cudzysłowy opcjonalne."
+    },
+    "mapping": {
+      "title": "Dopasuj kolumny",
+      "subtitle": "Znaleziono {{count}} wierszy. Potwierdź lub popraw automatyczne dopasowanie.",
+      "reset": "Wgraj inny plik"
+    },
+    "preview": {
+      "title": "Podgląd pierwszych {{count}} wierszy"
+    },
+    "fields": {
+      "skip": "— Pomiń —",
+      "visit_at": "Data wizyty",
+      "amount": "Kwota",
+      "client_name": "Imię klienta",
+      "client_phone": "Telefon klienta",
+      "service_name": "Usługa",
+      "staff_name": "Specjalista",
+      "payment_method": "Sposób płatności",
+      "comment": "Komentarz"
+    },
+    "ready": "Gotowe do importu: {{count}} wierszy. Istniejące wizyty z taką samą zawartością zostaną pominięte.",
+    "start_button": "Rozpocznij import",
+    "toast_done": "Zaimportowano: {{inserted}}, pominięto duplikatów: {{skipped}}",
+    "progress": {
+      "done": "{{done}} z {{total}}",
+      "inserted": "✓ Dodano: {{count}}",
+      "skipped": "Pominięto duplikatów: {{count}}",
+      "failed": "Błędy: {{count}}",
+      "errors_label": "Pokaż błędy ({{count}})",
+      "row": "Wiersz"
+    },
+    "errors": {
+      "empty": "Plik jest pusty lub nie zawiera nagłówków",
+      "missing_required": "Dopasuj co najmniej „Datę wizyty” i „Kwotę”, aby kontynuować."
+    }
+  },
+  "reports": {
+    "title": "Raporty",
+    "subtitle": "Obraz finansowy za okres: P&L, przychód wg specjalistów / usług / form płatności, obłożenie po dniach i godzinach.",
+    "prev_month": "Poprzedni miesiąc",
+    "next_month": "Następny miesiąc",
+    "mode_month": "Miesiąc",
+    "mode_range": "Okres",
+    "print": "Drukuj / PDF",
+    "export_xls": "Excel",
+    "print_period": "Okres: {{start}} — {{end}}",
+    "empty": "Brak danych za ten okres.",
+    "kpi": {
+      "revenue": "Przychód",
+      "expense": "Wydatki",
+      "profit": "Zysk netto",
+      "vs_prev": "do poprzedniego okresu"
+    },
+    "staff": {
+      "title": "Przychód wg specjalistów"
+    },
+    "service": {
+      "title": "Przychód wg usług",
+      "name": "Usługa",
+      "visits": "Wizyt",
+      "revenue": "Przychód",
+      "margin": "Marża",
+      "share": "Udział"
+    },
+    "payment": {
+      "title": "Sposoby płatności",
+      "cash": "Gotówka",
+      "card": "Karta",
+      "transfer": "Przelew",
+      "online": "Online",
+      "mixed": "Mieszana",
+      "unknown": "Nieokreślony"
+    },
+    "heatmap": {
+      "title": "Obłożenie po dniach i godzinach",
+      "legend": "Okno biznesowe 8:00–21:00. Kolor — liczba wizyt; im ciemniejszy, tym więcej."
+    },
+    "weekday": {
+      "mon": "Pon",
+      "tue": "Wt",
+      "wed": "Śr",
+      "thu": "Czw",
+      "fri": "Pt",
+      "sat": "Sob",
+      "sun": "Nd"
+    }
+  },
+  "payouts": {
+    "title": "Wypłaty",
+    "subtitle": "Wyliczenie wg schematów wypłat za wybrany okres. Zamknięcie tworzy wydatek w kategorii „Wypłaty”.",
+    "prev_month": "Poprzedni miesiąc",
+    "next_month": "Następny miesiąc",
+    "col": {
+      "staff": "Specjalista",
+      "scheme": "Schemat",
+      "revenue": "Przychód",
+      "payout": "Do wypłaty",
+      "period": "Okres"
+    },
+    "visits_count_one": "{{count}} wizyta",
+    "visits_count_few": "{{count}} wizyty",
+    "visits_count_many": "{{count}} wizyt",
+    "total": "Razem",
+    "empty": "W tym okresie brak wizyt u aktywnych specjalistów.",
+    "print": "Drukuj / PDF",
+    "print_period": "Okres: {{start}} — {{end}}",
+    "close_button": "Zamknij okres",
+    "closed_label": "Okres zamknięty",
+    "confirm_close": "Zamknąć {{period}}? Powstanie wydatek {{total}} i wypłat za ten okres nie da się już przeliczyć.",
+    "toast_closed": "Zamknięto {{count}} wypłat na kwotę {{total}}",
+    "history_title": "Historia zamkniętych okresów",
+    "status_active": "Okres aktywny — wizyty mogą jeszcze dochodzić. Zamknąć można po {{period}}",
+    "status_ready": "Okres zakończony, można zamykać",
+    "status_closed": "Okres zamknięty — wydatki utworzone, zmian nie da się cofnąć",
+    "errors": {
+      "already_closed": "Okres jest już zamknięty",
+      "not_finished": "Okres jeszcze się nie zakończył — za wcześnie na zamykanie"
+    }
+  },
+  "expenses": {
+    "title": "Wydatki",
+    "subtitle_total": "Łącznie za okres:",
+    "add": "Dodaj wydatek",
+    "list_title": "Wszystkie wydatki",
+    "structure_title": "Struktura wydatków",
+    "structure_empty": "Brak wydatków w tym okresie",
+    "records": "rekordów",
+    "budgets": {
+      "title": "Budżety wg kategorii",
+      "no_limit": "Limit nieustawiony",
+      "set_limit": "Ustaw limit",
+      "change_limit": "Zmień",
+      "amount_placeholder": "500",
+      "saved": "Limit zaktualizowany",
+      "cleared": "Limit usunięty",
+      "invalid_amount": "Nieprawidłowa kwota"
+    },
+    "no_category": "Bez kategorii",
+    "confirm_delete": "Usunąć ten wydatek?",
+    "form": {
+      "title_new": "Nowy wydatek",
+      "date_label": "Data",
+      "category_label": "Kategoria",
+      "category_placeholder": "Wybierz kategorię",
+      "amount_label": "Kwota",
+      "comment_label": "Komentarz (opcjonalnie)",
+      "comment_placeholder": "Na przykład: farba Wella, paragon nr 123",
+      "submit": "Zapisz wydatek",
+      "receipt_label": "Paragon (zdjęcie lub PDF)",
+      "receipt_placeholder": "Załącz paragon — JPG, PNG, PDF (do 10 MB)",
+      "receipt_placeholder_ocr": "📷 Sfotografuj paragon — wypełnię formularz automatycznie",
+      "receipt_remove": "Odłącz paragon",
+      "receipt_too_big": "Plik za duży. Maksimum — 10 MB.",
+      "ocr_recognizing": "Rozpoznaję paragon…",
+      "ocr_done": "Paragon rozpoznany, sprawdź pola i zapisz",
+      "ocr_failed": "Nie udało się rozpoznać. Wypełnij pola ręcznie.",
+      "recurrence_label": "Powtarzanie",
+      "recurrence": {
+        "none": "Nie powtarzaj",
+        "weekly": "Co tydzień",
+        "monthly": "Co miesiąc"
+      },
+      "recurrence_hint": "Będziemy tworzyć taki sam wydatek automatycznie co okres."
+    },
+    "errors": {
+      "category_required": "Wybierz kategorię",
+      "amount_required": "Podaj kwotę",
+      "amount_positive": "Kwota musi być większa od zera"
+    },
+    "toast_added": "Wydatek dodany",
+    "toast_deleted": "Wydatek usunięty",
+    "toast_error": "Nie udało się zapisać",
+    "toast_upload_failed": "Nie udało się wgrać paragonu",
+    "empty": "Na razie brak wydatków",
+    "receipt_open": "Otwórz paragon",
+    "receipt_title": "Paragon",
+    "receipt_subtitle": "Zamknij to okno, by wrócić do listy wydatków.",
+    "wfirma": {
+      "push_button": "Wyślij do wFirma",
+      "tooltip_pushed": "Wysłano do wFirma (id: {{id}})",
+      "toast_auto_pushed": "Wydatek dodany i wysłany do wFirma ✓",
+      "toast_manual_pushed": "Wydatek wysłany do wFirma ✓",
+      "toast_already_pushed": "Ten wydatek już jest w wFirma",
+      "toast_skipped_no_nip": "Nie wysłano do wFirma: na paragonie nie ma NIP nabywcy. Przycisk „Wyślij ręcznie” na liście wydatków.",
+      "toast_skipped_nip_mismatch": "Nie wysłano do wFirma: NIP nabywcy na paragonie nie zgadza się z Twoją firmą. Przycisk „Wyślij ręcznie” na liście wydatków.",
+      "toast_push_failed": "Nie udało się wysłać do wFirma"
     }
   },
   "payment_methods": {
@@ -93,51 +1222,6 @@
     "card": "Karta",
     "transfer": "Przelew",
     "online": "Online",
-    "mixed": "Mieszane"
-  },
-  "settings": {
-    "title": "Ustawienia",
-    "team": {
-      "title": "Zespół",
-      "subtitle": "Zaproś księgową, asystenta lub pracowników z różnymi poziomami dostępu.",
-      "button": "Zarządzaj zespołem"
-    },
-    "audit": {
-      "title": "Dziennik zdarzeń",
-      "subtitle": "Kto co zmieniał — dla przejrzystości i audytu.",
-      "button": "Otwórz dziennik"
-    },
-    "api": {
-      "title": "Klucze API",
-      "subtitle": "Utwórz klucz dla własnych integracji (Zapier, n8n, skrypty). Każdy klucz pokazujemy tylko raz przy tworzeniu."
-    },
-    "referral": {
-      "title": "Zaproś znajomych",
-      "subtitle": "Udostępnij swój kod — oboje dostaniecie miesiąc gratis przy pierwszej płatności."
-    },
-    "mfa": {
-      "title": "Uwierzytelnianie dwuskładnikowe",
-      "enable": "Włącz 2FA"
-    }
-  },
-  "visits": {
-    "title": "Wizyty",
-    "tabs": {
-      "single": "Jedna wizyta",
-      "bulk": "Wiele wizyt"
-    }
-  },
-  "ai": {
-    "title": "AI-asystent",
-    "subtitle": "Powie o przychodach, porówna z poprzednim miesiącem, podpowie co poprawić.",
-    "input_placeholder": "Zapytaj o przychody, pracowników, usługi…"
-  },
-  "team": {
-    "role": {
-      "owner": "Właściciel",
-      "admin": "Administrator",
-      "accountant": "Księgowa",
-      "staff": "Pracownik"
-    }
+    "mixed": "Mieszana"
   }
 }

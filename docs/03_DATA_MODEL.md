@@ -507,24 +507,43 @@ create policy "owners and admins can read audit" on audit_log
 ### `insights` — стадия 4
 
 ```sql
+create type insight_severity as enum ('info', 'warning', 'critical');
+
 create table public.insights (
   id uuid primary key default gen_random_uuid(),
   salon_id uuid not null references salons(id) on delete cascade,
-  insight_type text not null,            -- 'unprofitable_service', 'staff_low_load', 'anomaly_revenue'
-  severity text not null default 'info', -- 'info', 'warning', 'critical'
+  kind text not null,                            -- 'unprofitable_service', 'staff_low_load', 'anomaly_revenue', ...
+  area text,                                     -- 'services' | 'staff' | 'expenses' | 'revenue' (для группировки в UI)
+  severity insight_severity not null default 'info',
   title text not null,
-  description text,
-  metadata jsonb default '{}',
+  body text,                                     -- человекочитаемое описание (после Haiku polish)
+  payload jsonb,                                 -- структурированные данные правила (service_id, drop_pct, ...)
   is_dismissed boolean not null default false,
   generated_at timestamptz not null default now(),
-  dismissed_at timestamptz
+  dismissed_at timestamptz,
+  created_at timestamptz not null default now()
 );
 
 alter table public.insights enable row level security;
 
-create policy "members access insights" on insights
-  for all using (salon_id in (select salon_id from salon_members where user_id = auth.uid()));
+-- Раздельные политики на read и update — юзер салона может только read и
+-- dismiss (через update is_dismissed), а insert/delete только service_role
+-- через edge function generate-insights.
+create policy "members read insights" on public.insights
+  for select
+  using (salon_id in (select salon_id from salon_members where user_id = auth.uid()));
+
+create policy "members dismiss own salon insights" on public.insights
+  for update
+  using (salon_id in (select salon_id from salon_members where user_id = auth.uid()))
+  with check (salon_id in (select salon_id from salon_members where user_id = auth.uid()));
 ```
+
+**Поля, не попавшие в первую версию документа** (расхождение с миграцией
+`20260505000006`, синхронизировано 8 мая): `kind` вместо `insight_type`, `body`
+вместо `description`, `payload` вместо `metadata`, `severity` — enum
+`insight_severity` (не text). `area` и `dismissed_at` добавлены миграцией
+`20260507000012`.
 
 ## Триггеры и функции
 
