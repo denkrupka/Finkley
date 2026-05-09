@@ -37,6 +37,24 @@ export type AspspRow = {
   beta?: boolean
 }
 
+export type BankTransactionRow = {
+  id: string
+  account_id: string
+  external_id: string
+  type: 'debit' | 'credit'
+  amount_cents: number
+  currency: string
+  description: string | null
+  counterparty: string | null
+  executed_at: string
+  expense_id: string | null
+}
+
+export type BankInflowRow = BankTransactionRow & {
+  bank_name: string | null
+  account_iban: string | null
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 const FN_URL = SUPABASE_URL.replace(/\/$/, '') + '/functions/v1'
 
@@ -84,6 +102,76 @@ export function useBankAccountsForConnections(connectionIds: string[]) {
     },
     enabled: connectionIds.length > 0,
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Поступления — credit-транзакции из всех подключённых банков салона за
+ * период. RLS-проверка идёт через bank_accounts → bank_connections →
+ * salon_members; поэтому достаточно фильтра по периоду + type='credit'.
+ *
+ * Возвращаем join'нутую форму с bank_name/iban для красивого UI.
+ */
+export function useBankInflows(
+  salonId: string | undefined,
+  period: { start: string; end: string },
+) {
+  return useQuery<BankInflowRow[]>({
+    queryKey: ['bank-inflows', salonId, period],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('bank_transactions')
+        .select(
+          `id, account_id, external_id, type, amount_cents, currency, description,
+           counterparty, executed_at, expense_id,
+           bank_accounts!inner (
+             iban,
+             bank_connections!inner (
+               salon_id, bank_name, bank_aspsp_name
+             )
+           )`,
+        )
+        .eq('type', 'credit')
+        .eq('bank_accounts.bank_connections.salon_id', salonId)
+        .gte('executed_at', period.start)
+        .lt('executed_at', period.end)
+        .order('executed_at', { ascending: false })
+        .limit(500)
+      if (error) throw error
+      // Supabase возвращает nested foreign-table'ы как массивы (даже когда
+      // отношение по факту 1:1), потому что выводит type из postgresql FK.
+      // Берём первый элемент.
+      type Joined = BankTransactionRow & {
+        bank_accounts?: Array<{
+          iban: string | null
+          bank_connections?: Array<{
+            bank_name: string | null
+            bank_aspsp_name: string | null
+          }> | null
+        }> | null
+      }
+      return ((data ?? []) as unknown as Joined[]).map((r): BankInflowRow => {
+        const account = r.bank_accounts?.[0]
+        const conn = account?.bank_connections?.[0]
+        return {
+          id: r.id,
+          account_id: r.account_id,
+          external_id: r.external_id,
+          type: r.type,
+          amount_cents: r.amount_cents,
+          currency: r.currency,
+          description: r.description,
+          counterparty: r.counterparty,
+          executed_at: r.executed_at,
+          expense_id: r.expense_id,
+          bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
+          account_iban: account?.iban ?? null,
+        }
+      })
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
   })
 }
 

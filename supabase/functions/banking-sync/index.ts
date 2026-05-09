@@ -62,7 +62,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'enable_banking_not_configured' }, 500)
   }
 
-  let body: { connection_id?: string; secret?: string; is_initial?: boolean }
+  let body: {
+    connection_id?: string
+    secret?: string
+    cron_token?: string
+    is_initial?: boolean
+  }
   try {
     body = await req.json()
   } catch {
@@ -74,10 +79,35 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  // Auth: либо internal secret (server-to-server), либо user-JWT с
-  // membership-check в рамках салона.
-  const isInternal = body.secret && timingSafeEqual(body.secret, INTERNAL_SECRET)
-  if (!isInternal) {
+  // Auth: три варианта:
+  //   1) FUNCTION_INTERNAL_SECRET в body.secret — для callback'а после
+  //      successful bank-auth (сразу запустить первичный sync)
+  //   2) cron_token из bank_sync_triggers — для pg_cron'а (one-shot,
+  //      потребляется при использовании, истекает через 15 мин)
+  //   3) user-JWT с membership-check — для ручного «Sync now» из UI
+  const isInternalSecret = body.secret && timingSafeEqual(body.secret, INTERNAL_SECRET)
+  let isCronToken = false
+  if (!isInternalSecret && body.cron_token) {
+    const { data: trig } = await admin
+      .from('bank_sync_triggers')
+      .select('token, connection_id, expires_at, consumed_at')
+      .eq('token', body.cron_token)
+      .maybeSingle()
+    if (
+      trig &&
+      trig.connection_id === body.connection_id &&
+      !trig.consumed_at &&
+      new Date(trig.expires_at as string) > new Date()
+    ) {
+      isCronToken = true
+      // Консьюмим — токен одноразовый
+      await admin
+        .from('bank_sync_triggers')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('token', body.cron_token)
+    }
+  }
+  if (!isInternalSecret && !isCronToken) {
     const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
     const { data: conn, error: connErr } = await admin

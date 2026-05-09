@@ -18,6 +18,7 @@ export type TemplateAlias =
   | 'gdpr_export'
   | 'weekly_digest'
   | 'team_invitation'
+  | 'bank_consent_expiring'
 
 export type EmailTemplate = {
   subject: string
@@ -504,6 +505,50 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
   </p>
   <p style="margin:0;font-size:13px;color:#64748b;">
     Ссылка действует {{expires_in_days}} дней. Если ты не ждал такого приглашения — просто проигнорируй это письмо.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · управленческий учёт для салонов красоты
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+  },
+
+  bank_consent_expiring: {
+    subject: 'Подключение «{{bank_name}}» истекает через {{days_left}} дн.',
+    html: `<!DOCTYPE html>
+<html lang="ru"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Действие через {{days_left}} дн.</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    Подключение банка «{{bank_name}}» скоро истечёт
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    По правилам PSD2 банк требует, чтобы ты лично подтверждал доступ Finkley
+    к транзакциям не реже, чем раз в 6 месяцев. Текущее подтверждение для
+    «{{bank_name}}» ({{salon_name}}) истекает <strong>{{valid_until}}</strong>.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Если не переподключить — авто-импорт расходов остановится. Ничего страшного:
+    транзакции, которые уже подтянулись, никуда не денутся, ты просто перестанешь
+    получать новые. Чтобы продолжить, нажми кнопку и пройди подтверждение в банке
+    (займёт 30 секунд).
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{reconnect_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Переподключить банк
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    Если ты больше не пользуешься этим банком — можешь просто отключить его
+    в настройках интеграций. Импортированные ранее расходы останутся.
   </p>
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">

@@ -29,6 +29,7 @@ import {
 import type { PaymentMethod } from '@/hooks/useVisits'
 import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
 import { BudgetsCard } from './BudgetsCard'
+import { InflowsList } from './InflowsList'
 import { useSalon } from '@/hooks/useSalons'
 import { getDatePeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -53,6 +54,7 @@ export function ExpensesPage() {
   const period = (params.get('period') ?? 'month') as PeriodKey
   const categoryFilter = params.get('cat') || ''
   const payFilter = (params.get('pay') || '') as PaymentMethod | ''
+  const tab = (params.get('view') === 'inflows' ? 'inflows' : 'expenses') as 'expenses' | 'inflows'
   const range = getDatePeriodRange(period, new Date(), readCustomFromParams(params))
 
   function setFilter(key: string, value: string | null) {
@@ -132,262 +134,296 @@ export function ExpensesPage() {
             </span>
           </p>
         </div>
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => setFormOpen(true)}
-          data-testid="add-expense"
-        >
-          <Plus className="size-4" strokeWidth={2.4} />
-          {t('expenses.add')}
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Select
-          value={categoryFilter || 'all'}
-          onValueChange={(v) => setFilter('cat', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('expenses.filters.all_categories')}</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={payFilter || 'all'}
-          onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
-            {(['cash', 'card', 'transfer'] as const).map((p) => (
-              <SelectItem key={p} value={p}>
-                {t(`payment_methods.${p}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Summary cards 4-в-ряд */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {summaryCategories.map((c) => (
-          <div
-            key={c.id}
-            className="border-border bg-card shadow-finsm rounded-lg border p-4"
-            style={{ borderLeftWidth: 4, borderLeftColor: c.color }}
+        {tab === 'expenses' ? (
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setFormOpen(true)}
+            data-testid="add-expense"
           >
-            <div className="text-muted-foreground text-xs font-semibold">{c.name}</div>
-            <div className="num text-foreground mt-2 text-xl font-bold tracking-tight">
-              {formatCurrency(c.total_cents, currency)}
-            </div>
-          </div>
-        ))}
+            <Plus className="size-4" strokeWidth={2.4} />
+            {t('expenses.add')}
+          </Button>
+        ) : null}
       </div>
 
-      {/* 2-column body */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
-        {/* List */}
-        <div className="border-border bg-card shadow-finsm rounded-lg border">
-          <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
-            <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {t('expenses.list_title')}
-            </h2>
-            <span className="text-muted-foreground text-xs">
-              {expenses.length} {t('expenses.records')}
-            </span>
+      {/* Tabs: Расходы / Поступления (банк) */}
+      <div className="border-border bg-card shadow-finsm mb-5 rounded-lg border p-1.5">
+        <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5">
+          {(['expenses', 'inflows'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilter('view', id === 'expenses' ? null : id)}
+              className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                tab === id
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+              }`}
+            >
+              {t(`expenses.tabs.${id}`)}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {tab === 'inflows' ? (
+        <InflowsList salonId={salonId} period={range} currency={currency} />
+      ) : null}
+
+      {tab === 'expenses' ? (
+        <>
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Select
+              value={categoryFilter || 'all'}
+              onValueChange={(v) => setFilter('cat', v === 'all' ? null : v)}
+            >
+              <SelectTrigger className="h-10 w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('expenses.filters.all_categories')}</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={payFilter || 'all'}
+              onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
+            >
+              <SelectTrigger className="h-10 w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
+                {(['cash', 'card', 'transfer'] as const).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {t(`payment_methods.${p}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {isLoading ? (
-            <div className="space-y-2 p-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
-              ))}
-            </div>
-          ) : expenses.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-muted-foreground text-sm">{t('expenses.empty')}</p>
-            </div>
-          ) : (
-            <ul>
-              {expenses.map((e: ExpenseRow) => {
-                const cat = e.category_id ? categoryById.get(e.category_id) : null
-                const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
-                const color =
-                  idx >= 0
-                    ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
-                    : '#9A9A9A'
-                return (
-                  <li
-                    key={e.id}
-                    className="border-border grid grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
-                    style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                    data-testid="expense-row"
-                  >
-                    <span className="num text-muted-foreground text-xs">
-                      {formatExpenseDate(e.expense_at)}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-                        <span className="truncate">
-                          {e.comment || cat?.name || t('expenses.no_category')}
+
+          {/* Summary cards 4-в-ряд */}
+          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {summaryCategories.map((c) => (
+              <div
+                key={c.id}
+                className="border-border bg-card shadow-finsm rounded-lg border p-4"
+                style={{ borderLeftWidth: 4, borderLeftColor: c.color }}
+              >
+                <div className="text-muted-foreground text-xs font-semibold">{c.name}</div>
+                <div className="num text-foreground mt-2 text-xl font-bold tracking-tight">
+                  {formatCurrency(c.total_cents, currency)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 2-column body */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
+            {/* List */}
+            <div className="border-border bg-card shadow-finsm rounded-lg border">
+              <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
+                <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                  {t('expenses.list_title')}
+                </h2>
+                <span className="text-muted-foreground text-xs">
+                  {expenses.length} {t('expenses.records')}
+                </span>
+              </div>
+              {isLoading ? (
+                <div className="space-y-2 p-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
+                  ))}
+                </div>
+              ) : expenses.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-muted-foreground text-sm">{t('expenses.empty')}</p>
+                </div>
+              ) : (
+                <ul>
+                  {expenses.map((e: ExpenseRow) => {
+                    const cat = e.category_id ? categoryById.get(e.category_id) : null
+                    const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
+                    const color =
+                      idx >= 0
+                        ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
+                        : '#9A9A9A'
+                    return (
+                      <li
+                        key={e.id}
+                        className="border-border grid grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
+                        style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                        data-testid="expense-row"
+                      >
+                        <span className="num text-muted-foreground text-xs">
+                          {formatExpenseDate(e.expense_at)}
                         </span>
-                        {e.recurrence && e.recurrence !== 'none' ? (
-                          <Repeat
-                            className="text-brand-teal size-3 shrink-0"
-                            strokeWidth={2}
-                            aria-label={t(`expenses.form.recurrence.${e.recurrence}`)}
-                          />
-                        ) : null}
-                        {e.receipt_url ? (
-                          <button
-                            type="button"
-                            onClick={() => openReceipt(e.receipt_url!)}
-                            className="text-brand-teal hover:bg-muted/40 grid size-5 shrink-0 place-items-center rounded-md"
-                            aria-label={t('expenses.receipt_open')}
-                            data-testid="expense-receipt"
-                          >
-                            <Paperclip className="size-3.5" strokeWidth={1.7} />
-                          </button>
-                        ) : null}
-                      </span>
-                      {cat ? (
-                        <span className="text-brand-text-faint block text-[11px]">{cat.name}</span>
-                      ) : null}
-                    </span>
-                    <span className="num text-destructive text-right text-sm font-bold">
-                      −{formatCurrency(e.amount_cents, currency)}
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      {wfirmaConnected && e.source !== 'wfirma'
-                        ? (() => {
-                            const meta = (e.metadata ?? {}) as Record<string, unknown>
-                            const wfId =
-                              typeof meta.wfirma_expense_id === 'string'
-                                ? meta.wfirma_expense_id
-                                : null
-                            const isPushing =
-                              wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
-                            if (wfId) {
-                              return (
-                                <span
-                                  className="grid size-7 place-items-center rounded-md text-emerald-600"
-                                  title={t('expenses.wfirma.tooltip_pushed', { id: wfId })}
-                                >
-                                  <CheckCircle2 className="size-4" strokeWidth={1.8} />
-                                </span>
-                              )
-                            }
-                            return (
+                        <span className="min-w-0">
+                          <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                            <span className="truncate">
+                              {e.comment || cat?.name || t('expenses.no_category')}
+                            </span>
+                            {e.recurrence && e.recurrence !== 'none' ? (
+                              <Repeat
+                                className="text-brand-teal size-3 shrink-0"
+                                strokeWidth={2}
+                                aria-label={t(`expenses.form.recurrence.${e.recurrence}`)}
+                              />
+                            ) : null}
+                            {e.receipt_url ? (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  wfirmaPush.mutate(
-                                    { expenseId: e.id, auto: false },
-                                    {
-                                      onSuccess: (res) => {
-                                        if (res.kind === 'ok') {
-                                          toast.success(t('expenses.wfirma.toast_manual_pushed'))
-                                        } else if (res.kind === 'already_pushed') {
-                                          toast.info(t('expenses.wfirma.toast_already_pushed'))
-                                        } else if (res.kind === 'error') {
-                                          toast.error(t('expenses.wfirma.toast_push_failed'), {
-                                            description: res.reason,
-                                          })
-                                        }
-                                      },
-                                      onError: (err) => {
-                                        toast.error(t('expenses.wfirma.toast_push_failed'), {
-                                          description:
-                                            err instanceof Error ? err.message : String(err),
-                                        })
-                                      },
-                                    },
-                                  )
-                                }}
-                                disabled={isPushing}
-                                className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
-                                aria-label={t('expenses.wfirma.push_button')}
-                                title={t('expenses.wfirma.push_button')}
+                                onClick={() => openReceipt(e.receipt_url!)}
+                                className="text-brand-teal hover:bg-muted/40 grid size-5 shrink-0 place-items-center rounded-md"
+                                aria-label={t('expenses.receipt_open')}
+                                data-testid="expense-receipt"
                               >
-                                {isPushing ? (
-                                  <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
-                                ) : (
-                                  <FileText className="size-4" strokeWidth={1.7} />
-                                )}
+                                <Paperclip className="size-3.5" strokeWidth={1.7} />
                               </button>
-                            )
-                          })()
-                        : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!confirm(t('expenses.confirm_delete'))) return
-                          deleteExpense.mutate(e.id, {
-                            onSuccess: () => toast.success(t('expenses.toast_deleted')),
-                          })
-                        }}
-                        className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                        aria-label="delete"
-                      >
-                        <Trash2 className="size-4" strokeWidth={1.7} />
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Structure + Budgets */}
-        <div className="flex flex-col gap-4">
-          <BudgetsCard salonId={salonId} currency={currency} />
-          <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-            <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-              {t('expenses.structure_title')}
-            </h2>
-            {structureCategories.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t('expenses.structure_empty')}</p>
-            ) : (
-              <div className="flex flex-col gap-3.5">
-                {structureCategories.map((c) => {
-                  const pct = total > 0 ? (c.total_cents / total) * 100 : 0
-                  return (
-                    <div key={c.id}>
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                        <span className="text-foreground text-sm font-medium">{c.name}</span>
-                        <span className="num text-brand-navy text-sm font-bold">
-                          {formatCurrency(c.total_cents, currency)}{' '}
-                          <span className="text-brand-text-faint font-medium">
-                            · {Math.round(pct)}%
+                            ) : null}
                           </span>
+                          {cat ? (
+                            <span className="text-brand-text-faint block text-[11px]">
+                              {cat.name}
+                            </span>
+                          ) : null}
                         </span>
-                      </div>
-                      <div className="bg-background h-2.5 overflow-hidden rounded-full">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${pct}%`, background: c.color }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
+                        <span className="num text-destructive text-right text-sm font-bold">
+                          −{formatCurrency(e.amount_cents, currency)}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          {wfirmaConnected && e.source !== 'wfirma'
+                            ? (() => {
+                                const meta = (e.metadata ?? {}) as Record<string, unknown>
+                                const wfId =
+                                  typeof meta.wfirma_expense_id === 'string'
+                                    ? meta.wfirma_expense_id
+                                    : null
+                                const isPushing =
+                                  wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
+                                if (wfId) {
+                                  return (
+                                    <span
+                                      className="grid size-7 place-items-center rounded-md text-emerald-600"
+                                      title={t('expenses.wfirma.tooltip_pushed', { id: wfId })}
+                                    >
+                                      <CheckCircle2 className="size-4" strokeWidth={1.8} />
+                                    </span>
+                                  )
+                                }
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      wfirmaPush.mutate(
+                                        { expenseId: e.id, auto: false },
+                                        {
+                                          onSuccess: (res) => {
+                                            if (res.kind === 'ok') {
+                                              toast.success(
+                                                t('expenses.wfirma.toast_manual_pushed'),
+                                              )
+                                            } else if (res.kind === 'already_pushed') {
+                                              toast.info(t('expenses.wfirma.toast_already_pushed'))
+                                            } else if (res.kind === 'error') {
+                                              toast.error(t('expenses.wfirma.toast_push_failed'), {
+                                                description: res.reason,
+                                              })
+                                            }
+                                          },
+                                          onError: (err) => {
+                                            toast.error(t('expenses.wfirma.toast_push_failed'), {
+                                              description:
+                                                err instanceof Error ? err.message : String(err),
+                                            })
+                                          },
+                                        },
+                                      )
+                                    }}
+                                    disabled={isPushing}
+                                    className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
+                                    aria-label={t('expenses.wfirma.push_button')}
+                                    title={t('expenses.wfirma.push_button')}
+                                  >
+                                    {isPushing ? (
+                                      <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+                                    ) : (
+                                      <FileText className="size-4" strokeWidth={1.7} />
+                                    )}
+                                  </button>
+                                )
+                              })()
+                            : null}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!confirm(t('expenses.confirm_delete'))) return
+                              deleteExpense.mutate(e.id, {
+                                onSuccess: () => toast.success(t('expenses.toast_deleted')),
+                              })
+                            }}
+                            className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                            aria-label="delete"
+                          >
+                            <Trash2 className="size-4" strokeWidth={1.7} />
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Structure + Budgets */}
+            <div className="flex flex-col gap-4">
+              <BudgetsCard salonId={salonId} currency={currency} />
+              <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+                <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
+                  {t('expenses.structure_title')}
+                </h2>
+                {structureCategories.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">{t('expenses.structure_empty')}</p>
+                ) : (
+                  <div className="flex flex-col gap-3.5">
+                    {structureCategories.map((c) => {
+                      const pct = total > 0 ? (c.total_cents / total) * 100 : 0
+                      return (
+                        <div key={c.id}>
+                          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                            <span className="text-foreground text-sm font-medium">{c.name}</span>
+                            <span className="num text-brand-navy text-sm font-bold">
+                              {formatCurrency(c.total_cents, currency)}{' '}
+                              <span className="text-brand-text-faint font-medium">
+                                · {Math.round(pct)}%
+                              </span>
+                            </span>
+                          </div>
+                          <div className="bg-background h-2.5 overflow-hidden rounded-full">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: c.color }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      ) : null}
 
       <ExpenseFormModal
         open={formOpen}
