@@ -2,12 +2,15 @@ import { useTranslation } from 'react-i18next'
 
 import { CategoriesCard } from '@/routes/settings/CategoriesCard'
 import { ServicesPricingCard } from '@/routes/settings/ServicesPricingCard'
+import { ServicesByCategoryCard } from './ServicesByCategoryCard'
 
 /**
  * /{salonId}/services — каталог услуг и категории.
- * Перенесено сюда из Settings, чтобы услуги были в основной навигации
- * (sidebar) и редактирование цен/себестоимости/категорий было в одном
- * клике, а не глубоко в настройках.
+ *
+ * Layout (3 секции):
+ *  1) ServicesPricingCard       — плоский список с inline-edit (цена, мин, маржа)
+ *  2) ServicesByCategoryCard    — read-only сводка: услуги по категориям
+ *  3) CategoriesCard            — CRUD для service_categories и expense_categories
  */
 export function ServicesPage() {
   const { t } = useTranslation()
@@ -22,6 +25,10 @@ export function ServicesPage() {
 
       <div className="mb-6">
         <ServicesPricingCard />
+      </div>
+
+      <div className="mb-6">
+        <ServicesByCategoryCard />
       </div>
 
       <div className="mb-6">

@@ -44,6 +44,7 @@ const LAST_PAYMENT_KEY = 'finkley:last-payment'
 const LAST_STAFF_KEY = 'finkley:last-staff'
 
 type FormValues = {
+  visit_date: string // YYYY-MM-DD из <input type="date">
   staff_id: string
   client_id: string | null
   service_id: string
@@ -55,6 +56,7 @@ type FormValues = {
 }
 
 const schema = z.object({
+  visit_date: z.string().min(1, 'visits.errors.date_required'),
   staff_id: z.string().min(1, 'visits.errors.staff_required'),
   client_id: z.string().nullable().optional().default(null),
   service_id: z.string().optional().default(''),
@@ -92,6 +94,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
   const restoreVisit = useRestoreVisit(salonId)
 
   const today = useMemo(() => new Date(), [])
+  const todayIso = useMemo(() => format(today, 'yyyy-MM-dd'), [today])
   const [showAddedAndContinue, setShowAddedAndContinue] = useState(false)
 
   const initialPayment =
@@ -104,6 +107,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      visit_date: todayIso,
       staff_id: '',
       client_id: null,
       service_id: '',
@@ -120,6 +124,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
     if (!open) return
     const lastStaffValid = staff.some((s) => s.id === initialStaff)
     form.reset({
+      visit_date: todayIso,
       staff_id: lastStaffValid ? initialStaff : (staff[0]?.id ?? ''),
       client_id: null,
       service_id: '',
@@ -166,7 +171,12 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       : 0
     const svc = services.find((s) => s.id === values.service_id)
     const stf = staff.find((s) => s.id === values.staff_id)
-    const visitAt = today.toISOString()
+    // Юзер выбрал дату; время берём текущее (часы:минуты:секунды),
+    // чтобы порядок визитов в течение дня был естественным.
+    const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
+    const visitDate = new Date(today)
+    if (yyyy && mm && dd) visitDate.setFullYear(yyyy, mm - 1, dd)
+    const visitAt = visitDate.toISOString()
 
     createVisit.mutate(
       {
@@ -205,8 +215,9 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
             },
           })
           if (addAnother) {
-            // оставляем staff/payment, очищаем service/amount/tip/discount/comment/client
+            // оставляем staff/payment/date, очищаем service/amount/tip/discount/comment/client
             form.reset({
+              visit_date: values.visit_date,
               staff_id: values.staff_id,
               client_id: null,
               service_id: '',
@@ -289,13 +300,28 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
               <Label htmlFor="qe-date">{t('visits.form.date_label')}</Label>
               <div className="border-border bg-card flex h-12 items-center gap-2.5 rounded-md border-[1.5px] px-3.5">
                 <CalendarDays className="text-muted-foreground size-[17px]" strokeWidth={1.7} />
-                <span id="qe-date" className="num text-sm font-medium">
-                  {todayLabel}
-                </span>
-                <span className="bg-brand-sage-soft text-brand-sage ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold">
-                  {t('visits.form.today_pill')}
-                </span>
+                <input
+                  id="qe-date"
+                  type="date"
+                  data-testid="qe-date"
+                  {...form.register('visit_date')}
+                  className="num text-foreground h-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
+                />
+                {form.watch('visit_date') === todayIso ? (
+                  <span className="bg-brand-sage-soft text-brand-sage ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold">
+                    {t('visits.form.today_pill')}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground ml-auto text-[11px] font-medium">
+                    {todayLabel.split(',')[1]?.trim() ?? ''}
+                  </span>
+                )}
               </div>
+              {form.formState.errors.visit_date ? (
+                <p className="text-destructive text-xs font-medium" role="alert">
+                  {t(form.formState.errors.visit_date.message ?? '')}
+                </p>
+              ) : null}
             </div>
 
             {/* Мастер */}
@@ -359,9 +385,19 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
               render={({ field }) => (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="qe-service">{t('visits.form.service_label')}</Label>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={services.length === 0}
+                  >
                     <SelectTrigger id="qe-service" data-testid="qe-service">
-                      <SelectValue placeholder={t('visits.form.service_placeholder')} />
+                      <SelectValue
+                        placeholder={
+                          services.length === 0
+                            ? t('visits.form.service_empty')
+                            : t('visits.form.service_placeholder')
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {services.map((s) => (
@@ -376,6 +412,17 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
                       ))}
                     </SelectContent>
                   </Select>
+                  {services.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t('visits.form.service_empty_hint')}{' '}
+                      <a
+                        href={`/salon/${salonId}/services`}
+                        className="text-primary font-semibold hover:underline"
+                      >
+                        {t('visits.form.service_empty_link')}
+                      </a>
+                    </p>
+                  ) : null}
                 </div>
               )}
             />

@@ -44,6 +44,7 @@ export function VisitsPage() {
   const period = (params.get('period') ?? 'month') as PeriodKey
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
+  const serviceFilter = params.get('service') || ''
 
   const range = getPeriodRange(period, new Date(), readCustomFromParams(params))
   const { data: salon } = useSalon(salonId)
@@ -57,6 +58,7 @@ export function VisitsPage() {
   } = useVisits(salonId, range, {
     staffId: staffFilter || null,
     paymentMethod: paymentFilter || null,
+    serviceId: serviceFilter || null,
   })
   const deleteVisit = useDeleteVisit(salonId)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
@@ -136,6 +138,23 @@ export function VisitsPage() {
             {(['cash', 'card', 'transfer'] as const).map((p) => (
               <SelectItem key={p} value={p}>
                 {t(`payment_methods.${p}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={serviceFilter || 'all'}
+          onValueChange={(v) => setFilter('service', v === 'all' ? null : v)}
+        >
+          <SelectTrigger className="h-10 w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('visits.filters.all_services')}</SelectItem>
+            {services.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -277,7 +296,22 @@ function SingleVisitRow({
   const color = staffColor(v.staff_id, staff)
   const pay = PAY_LABEL[v.payment_method]
   return (
-    <li className={cn('border-border border-t first:border-t-0', ROW_GRID)} data-testid="visit-row">
+    <li
+      className={cn(
+        'border-border hover:bg-muted/40 cursor-pointer border-t transition-colors first:border-t-0',
+        ROW_GRID,
+      )}
+      data-testid="visit-row"
+      onClick={onEdit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onEdit()
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
       <span className="num text-muted-foreground text-xs">{visitTimeStr(v.visit_at)}</span>
       <span className="flex items-center gap-2.5">
         <span
@@ -319,7 +353,10 @@ function SingleVisitRow({
       <span className="flex items-center justify-end gap-0.5">
         <button
           type="button"
-          onClick={onEdit}
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
           className={cn(
             'grid size-8 place-items-center rounded-md',
             v.status === 'pending'
@@ -337,7 +374,10 @@ function SingleVisitRow({
         </button>
         <button
           type="button"
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
           className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
           aria-label="delete"
         >
@@ -472,8 +512,21 @@ function GroupRow({
             return (
               <li
                 key={v.id}
-                className={cn('bg-muted/20 border-border border-t', ROW_GRID, 'pl-10')}
+                className={cn(
+                  'bg-muted/20 hover:bg-muted/40 border-border cursor-pointer border-t transition-colors',
+                  ROW_GRID,
+                  'pl-10',
+                )}
                 data-testid="visit-subitem"
+                onClick={() => onEdit(v)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onEdit(v)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
               >
                 <span className="num text-muted-foreground text-xs">
                   {visitTimeStr(v.visit_at)}

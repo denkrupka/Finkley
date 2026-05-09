@@ -242,7 +242,7 @@ export function ExpenseFormModal({
         </DialogHeader>
 
         <form
-          className="flex flex-col gap-4 px-5 pb-2 pt-4"
+          className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-4"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -257,9 +257,19 @@ export function ExpenseFormModal({
             render={({ field }) => (
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="exp-cat">{t('expenses.form.category_label')}</Label>
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={categories.length === 0}
+                >
                   <SelectTrigger id="exp-cat" data-testid="exp-cat">
-                    <SelectValue placeholder={t('expenses.form.category_placeholder')} />
+                    <SelectValue
+                      placeholder={
+                        categories.length === 0
+                          ? t('expenses.form.category_empty')
+                          : t('expenses.form.category_placeholder')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c: ExpenseCategoryRow) => (
@@ -269,6 +279,17 @@ export function ExpenseFormModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {categories.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t('expenses.form.category_empty_hint')}{' '}
+                    <a
+                      href={`/salon/${salonId}/services`}
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      {t('expenses.form.category_empty_link')}
+                    </a>
+                  </p>
+                ) : null}
                 {form.formState.errors.category_id ? (
                   <p className="text-destructive text-xs font-medium" role="alert">
                     {t(form.formState.errors.category_id.message ?? '')}
