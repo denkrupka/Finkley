@@ -29,6 +29,8 @@
  *   TELEGRAM_THREAD_BUGS            — id темы «Баги» (опц., если задан вместе с FEATURES — включается routing)
  *   TELEGRAM_THREAD_FEATURES        — id темы «Функции»
  *   ANTHROPIC_API_KEY               — для AI-категоризации (опционально)
+ *   GROQ_API_KEY                    — для транскрипции голосовых через Whisper
+ *                                     (опционально; без него voice → файл без текста)
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
@@ -39,6 +41,7 @@ const BOT_TOKEN = Deno.env.get('TELEGRAM_BUG_BOT_TOKEN') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_BUG_WEBHOOK_SECRET') ?? ''
 const ALLOWED_CHAT_ID = Deno.env.get('TELEGRAM_BUG_CHAT_ID') ?? ''
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
+const GROQ_KEY = Deno.env.get('GROQ_API_KEY') ?? ''
 const THREAD_BUGS = Deno.env.get('TELEGRAM_THREAD_BUGS') ?? ''
 const THREAD_FEATURES = Deno.env.get('TELEGRAM_THREAD_FEATURES') ?? ''
 
@@ -118,12 +121,14 @@ async function tgDownload(filePath: string): Promise<{ bytes: Uint8Array; mime: 
 // =============================================================================
 
 type Attachment = {
-  type: 'photo' | 'document' | 'video'
+  type: 'photo' | 'document' | 'video' | 'voice' | 'audio'
   file_id: string
   storage_path: string | null
   mime: string
   size: number
   vision_summary?: string
+  transcript?: string
+  duration?: number
 }
 
 async function processPhoto(
@@ -139,33 +144,138 @@ async function processPhoto(
   const ext = meta.path.split('.').pop()?.toLowerCase() ?? 'jpg'
   const storagePath = `${bugIdHint}/${fileId}.${ext}`
 
+  // Telegram CDN часто отдаёт изображения как application/octet-stream —
+  // нормализуем MIME по расширению, иначе bug-attachments bucket режет
+  // upload (whitelist строго на image/jpeg|png|webp|heic|gif).
+  const photoMimeMap: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    heic: 'image/heic',
+    gif: 'image/gif',
+    pdf: 'application/pdf',
+    mp4: 'video/mp4',
+  }
+  const fixedMime =
+    photoMimeMap[ext] ??
+    (file.mime && file.mime !== 'application/octet-stream' ? file.mime : 'image/jpeg')
+
   const { error: upErr } = await admin.storage
     .from('bug-attachments')
-    .upload(storagePath, file.bytes, { contentType: file.mime, upsert: true })
+    .upload(storagePath, file.bytes, { contentType: fixedMime, upsert: true })
   if (upErr) {
     console.warn('storage upload failed', upErr)
     return {
       type: 'photo',
       file_id: fileId,
       storage_path: null,
-      mime: file.mime,
+      mime: fixedMime,
       size: meta.size,
     }
   }
 
   // AI-описание (опционально, только если есть ключ)
   let visionSummary: string | undefined
-  if (ANTHROPIC_KEY && file.mime.startsWith('image/')) {
-    visionSummary = (await analyzeScreenshot(file.bytes, file.mime)) ?? undefined
+  if (ANTHROPIC_KEY && fixedMime.startsWith('image/')) {
+    visionSummary = (await analyzeScreenshot(file.bytes, fixedMime)) ?? undefined
   }
 
   return {
     type: 'photo',
     file_id: fileId,
     storage_path: storagePath,
-    mime: file.mime,
+    mime: fixedMime,
     size: meta.size,
     vision_summary: visionSummary,
+  }
+}
+
+async function transcribeAudio(
+  bytes: Uint8Array,
+  mime: string,
+  filename: string,
+): Promise<string | null> {
+  if (!GROQ_KEY) return null
+  try {
+    // Groq Whisper API: OpenAI-compatible, принимает OGG/Opus напрямую
+    // (формат Telegram voice messages). whisper-large-v3-turbo — быстрый и
+    // достаточно точный для русского.
+    const form = new FormData()
+    form.append('file', new Blob([bytes], { type: mime }), filename)
+    form.append('model', 'whisper-large-v3-turbo')
+    form.append('response_format', 'text')
+    form.append('language', 'ru')
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${GROQ_KEY}` },
+      body: form,
+    })
+    if (!res.ok) {
+      console.warn('groq transcribe', res.status, await res.text())
+      return null
+    }
+    const text = (await res.text()).trim()
+    return text || null
+  } catch (e) {
+    console.warn('transcribeAudio', e)
+    return null
+  }
+}
+
+async function processVoice(
+  admin: ReturnType<typeof createClient>,
+  fileId: string,
+  bugIdHint: string,
+  duration: number,
+  isAudio: boolean,
+): Promise<Attachment | null> {
+  const meta = await tgGetFile(fileId)
+  if (!meta) return null
+  const file = await tgDownload(meta.path)
+  if (!file) return null
+
+  const ext = meta.path.split('.').pop()?.toLowerCase() ?? 'oga'
+  const storagePath = `${bugIdHint}/${fileId}.${ext}`
+
+  // Telegram CDN часто отдаёт OGG как application/octet-stream — фиксим
+  // на стороне клиента, чтобы и storage-bucket-policy, и Whisper API
+  // получили вменяемый MIME. Voice — всегда OGG/Opus, audio-treki по
+  // расширению (m4a → audio/mp4, mp3 → audio/mpeg, иначе fallback).
+  const mimeMap: Record<string, string> = {
+    oga: 'audio/ogg',
+    ogg: 'audio/ogg',
+    opus: 'audio/ogg',
+    mp3: 'audio/mpeg',
+    m4a: 'audio/mp4',
+    mp4: 'audio/mp4',
+    wav: 'audio/wav',
+    webm: 'audio/webm',
+  }
+  const fixedMime =
+    mimeMap[ext] ?? (file.mime && file.mime.startsWith('audio/') ? file.mime : 'audio/ogg')
+
+  const { error: upErr } = await admin.storage
+    .from('bug-attachments')
+    .upload(storagePath, file.bytes, { contentType: fixedMime, upsert: true })
+  if (upErr) console.warn('storage upload (voice) failed', upErr)
+
+  // Groq Whisper принимает только эти расширения: flac mp3 mp4 mpeg mpga m4a
+  // ogg opus wav webm. Telegram отдаёт voice как .oga — для Whisper маппим в
+  // .ogg (содержимое идентично, контейнер OGG/Opus). Иначе — 400.
+  const whisperExtMap: Record<string, string> = { oga: 'ogg' }
+  const whisperExt = whisperExtMap[ext] ?? ext
+  const transcript = await transcribeAudio(file.bytes, fixedMime, `voice.${whisperExt}`)
+
+  return {
+    type: isAudio ? 'audio' : 'voice',
+    file_id: fileId,
+    storage_path: upErr ? null : storagePath,
+    mime: fixedMime,
+    size: meta.size,
+    duration,
+    transcript: transcript ?? undefined,
   }
 }
 
@@ -635,6 +745,14 @@ async function cmdNote(
 
 type TgPhotoSize = { file_id: string; width: number; height: number; file_size?: number }
 type TgDocument = { file_id: string; mime_type?: string; file_size?: number }
+type TgVoice = { file_id: string; duration: number; mime_type?: string; file_size?: number }
+type TgAudio = {
+  file_id: string
+  duration: number
+  mime_type?: string
+  file_size?: number
+  title?: string
+}
 type TgUser = { id: number; first_name?: string; username?: string }
 type TgChat = { id: number; type: string }
 type TgMessage = {
@@ -647,6 +765,8 @@ type TgMessage = {
   caption?: string
   photo?: TgPhotoSize[]
   document?: TgDocument
+  voice?: TgVoice
+  audio?: TgAudio
   reply_to_message?: TgMessage
   is_topic_message?: boolean
 }
@@ -728,7 +848,7 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   }
 
   // Если это reply на сообщение бота с /list — парсим как duplicate? Skip пока.
-  if (!text && !msg.photo && !msg.document) return
+  if (!text && !msg.photo && !msg.document && !msg.voice && !msg.audio) return
 
   // Создаём bug_report
   const bugIdHint = `${msg.chat.id}_${msg.message_id}`
@@ -748,10 +868,19 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       attachments.push(att)
     }
   }
+  if (msg.voice) {
+    const att = await processVoice(admin, msg.voice.file_id, bugIdHint, msg.voice.duration, false)
+    if (att) attachments.push(att)
+  }
+  if (msg.audio) {
+    const att = await processVoice(admin, msg.audio.file_id, bugIdHint, msg.audio.duration, true)
+    if (att) attachments.push(att)
+  }
 
-  // AI-разметка
+  // AI-разметка. Транскрипт голосового идёт как текст наравне с подписью.
   const visionSummary = attachments.find((a) => a.vision_summary)?.vision_summary ?? ''
-  const fullText = [text, visionSummary].filter(Boolean).join('\n\n')
+  const transcript = attachments.find((a) => a.transcript)?.transcript ?? ''
+  const fullText = [text, transcript, visionSummary].filter(Boolean).join('\n\n')
   const cat = await categorizeText(fullText)
 
   const { data, error } = await admin
@@ -763,7 +892,11 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       sender_id: msg.from?.id ?? 0,
       sender_username: msg.from?.username ?? null,
       sender_first_name: msg.from?.first_name ?? null,
-      message_text: text || null,
+      // Если юзер прислал только голос без подписи — сохраняем транскрипт
+      // как message_text, чтобы баг был читаемым в /list и поиске даже без
+      // AI-summary. Если есть и текст, и голос — оба идут раздельно (caption
+      // в message_text, транскрипт виден через attachments).
+      message_text: text || transcript || null,
       attachments,
       reported_at: new Date(msg.date * 1000).toISOString(),
       severity: cat.severity ?? null,
@@ -789,9 +922,14 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   // Подтверждаем reply'ем в том же топике. Главное — человекопонятная сводка:
   // что я понял + что починить. Severity/area идут в /list и БД, в ack не лезут.
   // Emoji различает сразу — 🐛 для bugs, 💡 для features.
+  // Для голосовых — отдельной строкой показываем что распознали, чтобы юзер
+  // сразу мог реплаем поправить если Whisper ослышался.
   const humanSummary = cat.summary || visionSummary || null
   const emoji = kind === 'feature' ? '💡' : '🐛'
-  const ack = [`${emoji} \`${shortId(data!.id)}\``, humanSummary].filter(Boolean).join('\n\n')
+  const transcriptLine = transcript ? `🎤 _«${transcript}»_` : null
+  const ack = [`${emoji} \`${shortId(data!.id)}\``, transcriptLine, humanSummary]
+    .filter(Boolean)
+    .join('\n\n')
   await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
 }
 
