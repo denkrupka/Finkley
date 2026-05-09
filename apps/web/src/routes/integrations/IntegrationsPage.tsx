@@ -16,6 +16,7 @@ import {
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
 
+import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { INTEGRATIONS, type IntegrationDef } from './integrations-config'
@@ -60,6 +61,13 @@ export function IntegrationsPage() {
           {t('integrations.title')}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">{t('integrations.subtitle')}</p>
+      </div>
+
+      {/* Банкинг — отдельная секция, потому что одно подключение != одна
+          интеграция (юзер может линковать N банков с разными сессиями
+          и сроками действия). */}
+      <div className="mb-5">
+        <BankingSection salonId={salonId} />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

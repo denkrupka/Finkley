@@ -1,4 +1,4 @@
-import { Calendar, Check, FileText, Plug, TrendingUp } from 'lucide-react'
+import { Banknote, Calendar, Check, FileText, Plug, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OnboardingIntegration } from './OnboardingPage'
@@ -21,6 +21,7 @@ const INTEGRATIONS: ReadonlyArray<{
   i18nKey: string
   icon: typeof Calendar
 }> = [
+  { id: 'banking', i18nKey: 'onboarding.step5.integrations.banking', icon: Banknote },
   { id: 'booksy', i18nKey: 'onboarding.step5.integrations.booksy', icon: Calendar },
   { id: 'wfirma', i18nKey: 'onboarding.step5.integrations.wfirma', icon: FileText },
 ]

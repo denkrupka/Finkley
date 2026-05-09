@@ -25,7 +25,7 @@ import { Step5Done } from './Step5Done'
 const STEPS = ['salon', 'staff', 'services', 'expenses', 'done'] as const
 type StepId = (typeof STEPS)[number]
 
-export type OnboardingIntegration = 'booksy' | 'wfirma'
+export type OnboardingIntegration = 'booksy' | 'wfirma' | 'banking'
 
 export type OnboardingState = {
   // Шаг 1

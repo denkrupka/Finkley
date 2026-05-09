@@ -91,6 +91,9 @@ const KnowledgePage = lazyWithRetry(() =>
 const SettingsPage = lazyWithRetry(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const BankingCallbackPage = lazyWithRetry(() =>
+  import('@/routes/banking/BankingCallbackPage').then((m) => ({ default: m.BankingCallbackPage })),
+)
 
 /** Скелетон для Suspense-fallback. Простой, не привлекающий внимания. */
 function PageFallback() {
@@ -132,6 +135,10 @@ function App() {
       <Route path="/auth/callback" element={lazyRoute(<AuthCallbackPage />)} />
       <Route path="/help" element={lazyRoute(<HelpPage />)} />
       <Route path="/accept-invite" element={lazyRoute(<AcceptInvitePage />)} />
+      {/* Enable Banking redirect target — нужен access к userSession + salon list,
+          поэтому за RequireAuth ниже не оборачиваем (юзер уходил/возвращался в той
+          же сессии); сам компонент проверяет данные сессии. */}
+      <Route path="/banking/callback" element={lazyRoute(<BankingCallbackPage />)} />
 
       {/* Приватные */}
       <Route
