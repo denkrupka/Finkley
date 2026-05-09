@@ -75,12 +75,7 @@ export function SalonLayout() {
     <div className="bg-background flex min-h-screen">
       {/* Sidebar desktop */}
       <div className="hidden lg:block">
-        <Sidebar
-          salonId={salon.id}
-          salonName={salon.name}
-          salonCity={null /* TASK-18 — добавим город */}
-          ownerInitials={ownerInitials}
-        />
+        <Sidebar salonId={salon.id} />
       </div>
 
       {/* Sidebar mobile в Drawer */}
@@ -92,13 +87,7 @@ export function SalonLayout() {
             aria-describedby={undefined}
           >
             <Dialog.Title className="sr-only">{t('nav.drawer_title')}</Dialog.Title>
-            <Sidebar
-              salonId={salon.id}
-              salonName={salon.name}
-              salonCity={null}
-              ownerInitials={ownerInitials}
-              onNavigate={() => setDrawerOpen(false)}
-            />
+            <Sidebar salonId={salon.id} onNavigate={() => setDrawerOpen(false)} />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -109,6 +98,7 @@ export function SalonLayout() {
           salonId={salon.id}
           salonName={salon.name}
           todayLabel={todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}
+          ownerInitials={ownerInitials}
           onMenuClick={() => setDrawerOpen(true)}
         />
 

@@ -30,6 +30,10 @@ import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
 import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
+import { Link } from 'react-router-dom'
+
+import { HelpFAQ } from '@/routes/help/HelpFAQ'
+
 import { ApiKeysCard } from './ApiKeysCard'
 import { AppearanceCard } from './AppearanceCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
@@ -665,6 +669,24 @@ export function SettingsPage() {
             </div>
           </section>
         </>
+      )}
+
+      {activeTab === 'help' && (
+        <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+          <div className="mb-4">
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.help.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.help.subtitle')}</p>
+          </div>
+          <HelpFAQ />
+          <p className="text-muted-foreground mt-4 text-xs">
+            {t('settings.help.full_page_hint')}{' '}
+            <Link to={`/${salonId}/help`} className="text-primary font-semibold hover:underline">
+              {t('settings.help.full_page_link')}
+            </Link>
+          </p>
+        </section>
       )}
 
       {/* Confirmation Dialog */}

@@ -25,6 +25,8 @@ import { Step5Done } from './Step5Done'
 const STEPS = ['salon', 'staff', 'services', 'expenses', 'done'] as const
 type StepId = (typeof STEPS)[number]
 
+export type OnboardingIntegration = 'booksy' | 'wfirma'
+
 export type OnboardingState = {
   // Шаг 1
   name: string
@@ -38,6 +40,7 @@ export type OnboardingState = {
   expense_categories: string[]
   // Шаг 5
   benchmarks_opt_in: boolean
+  selected_integrations: OnboardingIntegration[]
 }
 
 const INITIAL: OnboardingState = {
@@ -48,6 +51,7 @@ const INITIAL: OnboardingState = {
   services: [],
   expense_categories: [...DEFAULT_EXPENSE_CATEGORIES],
   benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
+  selected_integrations: [],
 }
 
 export function OnboardingPage() {
@@ -133,7 +137,17 @@ export function OnboardingPage() {
     // Welcome-письмо в фоне — не блокирует navigate, ошибка email не должна
     // ломать UX онбординга (Postmark может тупить, sender signature пропасть).
     void triggerWelcomeEmail(newSalonId, state.name.trim())
-    navigate(`/${newSalonId}/dashboard`, { replace: true })
+    // Если юзер выбрал интеграции — отправляем сразу на settings/integrations,
+    // чтобы он подключил их (там полноценные OAuth-флоу). Иначе — на dashboard.
+    if (state.selected_integrations.length > 0) {
+      const params = new URLSearchParams({
+        tab: 'integrations',
+        prompt: state.selected_integrations.join(','),
+      })
+      navigate(`/${newSalonId}/settings?${params.toString()}`, { replace: true })
+    } else {
+      navigate(`/${newSalonId}/dashboard`, { replace: true })
+    }
   }
 
   async function triggerWelcomeEmail(salonId: string, salonName: string) {
@@ -253,6 +267,8 @@ export function OnboardingPage() {
                 }}
                 benchmarksOptIn={state.benchmarks_opt_in}
                 onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
+                selectedIntegrations={state.selected_integrations}
+                onIntegrationsToggle={(v) => patch('selected_integrations', v)}
               />
             )}
           </div>

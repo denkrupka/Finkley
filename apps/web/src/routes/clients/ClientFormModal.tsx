@@ -22,6 +22,7 @@ type FormValues = {
   name: string
   phone: string
   email: string
+  source: string
   notes: string
 }
 
@@ -34,6 +35,7 @@ const schema = z.object({
     .optional()
     .default('')
     .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'clients.errors.email_invalid'),
+  source: z.string().max(120).optional().default(''),
   notes: z.string().max(2000).optional().default(''),
 })
 
@@ -52,7 +54,7 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', phone: '', email: '', notes: '' },
+    defaultValues: { name: '', phone: '', email: '', source: '', notes: '' },
   })
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
       name: client?.name ?? '',
       phone: client?.phone ?? '',
       email: client?.email ?? '',
+      source: client?.source ?? '',
       notes: client?.notes ?? '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open
@@ -80,6 +83,7 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
       name: values.name,
       phone: phoneToSave,
       email: values.email || null,
+      source: values.source || null,
       notes: values.notes || null,
     }
 
@@ -158,6 +162,26 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
                 {t(form.formState.errors.email.message ?? '')}
               </p>
             ) : null}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cl-source">{t('clients.form.source_label')}</Label>
+            <Input
+              id="cl-source"
+              placeholder={t('clients.form.source_placeholder')}
+              {...form.register('source')}
+              list="cl-source-suggestions"
+            />
+            {/* Подсказки самых распространённых источников; юзер может писать своё. */}
+            <datalist id="cl-source-suggestions">
+              <option value="Instagram" />
+              <option value="Booksy" />
+              <option value="Google Maps" />
+              <option value="Рекомендация" />
+              <option value="Реклама" />
+              <option value="Прохожий" />
+            </datalist>
+            <p className="text-muted-foreground text-xs">{t('clients.form.source_hint')}</p>
           </div>
 
           <div className="flex flex-col gap-1.5">

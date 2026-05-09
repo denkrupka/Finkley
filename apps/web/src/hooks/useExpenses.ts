@@ -107,12 +107,17 @@ export function useUpdateExpenseCategory(salonId: string | undefined) {
   })
 }
 
-export function useExpenses(salonId: string | undefined, period: ExpensesPeriod) {
+export function useExpenses(
+  salonId: string | undefined,
+  period: ExpensesPeriod,
+  filters?: { categoryId?: string | null; paymentMethod?: PaymentMethod | null },
+) {
+  const filterKey = filters ?? {}
   return useQuery<ExpenseRow[]>({
-    queryKey: [...expensesKeys(salonId), 'list', period],
+    queryKey: [...expensesKeys(salonId), 'list', period, filterKey],
     queryFn: async () => {
       if (!salonId) return []
-      const { data, error } = await supabase
+      let q = supabase
         .from('expenses')
         .select(
           'id, salon_id, category_id, expense_at, amount_cents, payment_method, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, created_at, updated_at, deleted_at',
@@ -122,7 +127,11 @@ export function useExpenses(salonId: string | undefined, period: ExpensesPeriod)
         .gte('expense_at', period.start)
         .lte('expense_at', period.end)
         .order('expense_at', { ascending: false })
-        .limit(500)
+
+      if (filters?.categoryId) q = q.eq('category_id', filters.categoryId)
+      if (filters?.paymentMethod) q = q.eq('payment_method', filters.paymentMethod)
+
+      const { data, error } = await q.limit(500)
       if (error) throw error
       return (data ?? []) as ExpenseRow[]
     },

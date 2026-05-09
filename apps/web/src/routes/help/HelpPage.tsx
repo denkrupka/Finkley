@@ -1,30 +1,14 @@
-import { ChevronDown, ExternalLink, MessageCircle, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { ExternalLink, MessageCircle, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 
 import { LogoLockup } from '@/components/ui/logo'
-import { cn } from '@/lib/utils/cn'
 
-const FAQ_KEYS: string[] = [
-  'help.q.what',
-  'help.q.signup',
-  'help.q.add_visit',
-  'help.q.bulk_visits',
-  'help.q.import_booksy',
-  'help.q.expenses',
-  'help.q.payouts',
-  'help.q.reports',
-  'help.q.cancel',
-  'help.q.export_data',
-  'help.q.delete_account',
-  'help.q.support',
-]
+import { HelpFAQ } from './HelpFAQ'
 
 export function HelpPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
-  const [open, setOpen] = useState<string | null>(null)
 
   return (
     <div className="bg-background min-h-screen">
@@ -58,37 +42,7 @@ export function HelpPage() {
           </div>
         </div>
 
-        <ul className="border-border bg-card shadow-finsm divide-border divide-y overflow-hidden rounded-lg border">
-          {FAQ_KEYS.map((key) => {
-            const isOpen = open === key
-            const titleKey = `${key}.title`
-            const bodyKey = `${key}.body`
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => setOpen(isOpen ? null : key)}
-                  className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors"
-                  aria-expanded={isOpen}
-                >
-                  <span className="text-foreground text-base font-semibold">{t(titleKey)}</span>
-                  <ChevronDown
-                    className={cn(
-                      'text-muted-foreground size-4 shrink-0 transition-transform',
-                      isOpen ? 'rotate-180' : '',
-                    )}
-                    strokeWidth={2}
-                  />
-                </button>
-                {isOpen ? (
-                  <div className="text-foreground/80 px-5 pb-4 text-sm leading-relaxed">
-                    <p className="whitespace-pre-wrap">{t(bodyKey)}</p>
-                  </div>
-                ) : null}
-              </li>
-            )
-          })}
-        </ul>
+        <HelpFAQ />
 
         <div className="border-secondary/30 bg-secondary/5 mt-8 rounded-lg border p-5">
           <h2 className="text-brand-navy text-lg font-bold">{t('help.still_stuck')}</h2>

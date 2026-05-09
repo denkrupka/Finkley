@@ -1,4 +1,4 @@
-import { CreditCard, Palette, Plug, Shield, User, Users } from 'lucide-react'
+import { CreditCard, HelpCircle, Palette, Plug, Shield, User, Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export const SETTINGS_TABS = [
@@ -8,6 +8,7 @@ export const SETTINGS_TABS = [
   'integrations',
   'security',
   'appearance',
+  'help',
 ] as const
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number]
@@ -19,6 +20,7 @@ const TAB_ICONS: Record<SettingsTab, typeof User> = {
   integrations: Plug,
   security: Shield,
   appearance: Palette,
+  help: HelpCircle,
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
@@ -14,11 +15,13 @@ type Props = {
   salonName: string
   /** Сегодняшняя дата человеческой строкой («Понедельник, 6 мая») */
   todayLabel: string
+  /** Инициалы пользователя — для аватара в правом верхнем углу. */
+  ownerInitials: string
   /** Дёргается на mobile при клике на бургер — родитель открывает drawer-sidebar */
   onMenuClick?: () => void
 }
 
-export function TopBar({ salonId, salonName, todayLabel, onMenuClick }: Props) {
+export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuClick }: Props) {
   const { t } = useTranslation()
   const { signOut } = useAuth()
   return (
@@ -47,13 +50,37 @@ export function TopBar({ salonId, salonName, todayLabel, onMenuClick }: Props) {
         <PeriodToggle />
       </div>
 
-      {/* Bell + locale switcher + sign-out (desktop) / только bell (mobile) */}
+      {/* Bell + locale switcher + plan + avatar + sign-out (desktop) / только bell + avatar (mobile) */}
       <div className="flex items-center gap-2 sm:gap-3">
         <NotificationsBell salonId={salonId} />
 
         <div className="hidden lg:block">
           <LocaleSwitcher />
         </div>
+
+        {/* Plan badge — clickable → /billing. Скрыто на самых узких экранах,
+            чтобы не теснить топбар. Аватар видим всегда. */}
+        <Link
+          to={`/${salonId}/settings?tab=billing`}
+          className="border-brand-yellow-deep/40 hidden h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 transition-shadow hover:shadow-sm sm:inline-flex"
+          aria-label={t('plan.badge_aria')}
+          title={t('plan.pro_label')}
+        >
+          <span className="from-brand-gold grid size-5 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[10px] font-extrabold leading-none text-white">
+            ★
+          </span>
+          <span className="text-brand-navy text-[11px] font-bold">{t('plan.pro_label')}</span>
+        </Link>
+
+        {/* Avatar — clickable → /settings (профиль). */}
+        <Link
+          to={`/${salonId}/settings`}
+          className="text-brand-navy grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#E8C4B8] to-[#D4A599] text-xs font-bold transition-shadow hover:shadow-sm"
+          aria-label={t('common.profile_aria')}
+          title={ownerInitials}
+        >
+          {ownerInitials}
+        </Link>
 
         {/* Sign-out — позже переедет в dropdown профиля (TASK-18) */}
         <Button

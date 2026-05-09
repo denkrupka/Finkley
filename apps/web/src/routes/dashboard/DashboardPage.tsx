@@ -13,6 +13,7 @@ import { BenchmarksWidget } from './BenchmarksWidget'
 import { CashBalanceWidget } from './CashBalanceWidget'
 import { ForecastWidget } from './ForecastWidget'
 import { InsightsWidget } from './InsightsWidget'
+import { MiniCalendarWidget } from './MiniCalendarWidget'
 import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
@@ -111,11 +112,14 @@ export function DashboardPage() {
       {/* Бенчмарки — сравнение с рынком, daily cron, k-anonymity ≥10 */}
       <BenchmarksWidget salonId={salonId} currency={currency} />
 
-      {/* Cash on hand + прогноз + предстоящие визиты */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Cash on hand + прогноз + предстоящие визиты + мини-календарь
+          (по запросу e34d725d/1d40c533: календарь в правом верхнем углу с
+          popover'ом визитов на день при клике). */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_minmax(220px,1.1fr)]">
         <CashBalanceWidget salonId={salonId} currency={currency} />
         <ForecastWidget salonId={salonId} currency={currency} />
         <UpcomingVisitsWidget salonId={salonId} />
+        <MiniCalendarWidget salonId={salonId} currency={currency} />
       </div>
 
       {/* KPI row */}

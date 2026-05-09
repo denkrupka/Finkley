@@ -1,5 +1,7 @@
-import { Check, TrendingUp } from 'lucide-react'
+import { Calendar, Check, FileText, Plug, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+
+import type { OnboardingIntegration } from './OnboardingPage'
 
 type Props = {
   summary: {
@@ -10,10 +12,35 @@ type Props = {
   }
   benchmarksOptIn: boolean
   onBenchmarksToggle: (value: boolean) => void
+  selectedIntegrations: OnboardingIntegration[]
+  onIntegrationsToggle: (value: OnboardingIntegration[]) => void
 }
 
-export function Step5Done({ summary, benchmarksOptIn, onBenchmarksToggle }: Props) {
+const INTEGRATIONS: ReadonlyArray<{
+  id: OnboardingIntegration
+  i18nKey: string
+  icon: typeof Calendar
+}> = [
+  { id: 'booksy', i18nKey: 'onboarding.step5.integrations.booksy', icon: Calendar },
+  { id: 'wfirma', i18nKey: 'onboarding.step5.integrations.wfirma', icon: FileText },
+]
+
+export function Step5Done({
+  summary,
+  benchmarksOptIn,
+  onBenchmarksToggle,
+  selectedIntegrations,
+  onIntegrationsToggle,
+}: Props) {
   const { t } = useTranslation()
+
+  function toggleIntegration(id: OnboardingIntegration) {
+    if (selectedIntegrations.includes(id)) {
+      onIntegrationsToggle(selectedIntegrations.filter((x) => x !== id))
+    } else {
+      onIntegrationsToggle([...selectedIntegrations, id])
+    }
+  }
 
   return (
     <div className="text-center">
@@ -57,6 +84,49 @@ export function Step5Done({ summary, benchmarksOptIn, onBenchmarksToggle }: Prop
           </p>
         </div>
       </label>
+
+      {/* Выбор интеграций — opt-in. После submit'а юзер сразу попадёт в settings
+          с открытой вкладкой Integrations и подсветкой выбранных провайдеров. */}
+      <div className="mx-auto mt-6 max-w-md text-left">
+        <div className="text-brand-navy mb-2 flex items-center gap-1.5 text-sm font-bold">
+          <Plug className="text-brand-teal size-4" strokeWidth={2} />
+          {t('onboarding.step5.integrations.title')}
+        </div>
+        <p className="text-muted-foreground mb-3 text-xs leading-snug">
+          {t('onboarding.step5.integrations.subtitle')}
+        </p>
+        <div className="grid gap-2">
+          {INTEGRATIONS.map(({ id, i18nKey, icon: Icon }) => {
+            const checked = selectedIntegrations.includes(id)
+            return (
+              <label
+                key={id}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                  checked
+                    ? 'border-brand-teal bg-brand-teal-soft/40'
+                    : 'border-border bg-card hover:bg-muted/30'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleIntegration(id)}
+                  className="mt-0.5 size-4 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                    <Icon className="text-brand-teal size-4" strokeWidth={1.8} />
+                    {t(`${i18nKey}.label`)}
+                  </div>
+                  <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+                    {t(`${i18nKey}.hint`)}
+                  </p>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

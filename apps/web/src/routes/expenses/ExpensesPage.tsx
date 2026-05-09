@@ -13,12 +13,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   getReceiptSignedUrl,
   useDeleteExpense,
   useExpenseCategories,
   useExpenses,
   type ExpenseRow,
 } from '@/hooks/useExpenses'
+import type { PaymentMethod } from '@/hooks/useVisits'
 import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
 import { BudgetsCard } from './BudgetsCard'
 import { useSalon } from '@/hooks/useSalons'
@@ -41,13 +49,25 @@ const CATEGORY_COLORS = [
 export function ExpensesPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const period = (params.get('period') ?? 'month') as PeriodKey
+  const categoryFilter = params.get('cat') || ''
+  const payFilter = (params.get('pay') || '') as PaymentMethod | ''
   const range = getDatePeriodRange(period, new Date(), readCustomFromParams(params))
+
+  function setFilter(key: string, value: string | null) {
+    const next = new URLSearchParams(params)
+    if (value && value !== 'all') next.set(key, value)
+    else next.delete(key)
+    setParams(next, { replace: true })
+  }
 
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)
-  const { data: expenses = [], isLoading } = useExpenses(salonId, range)
+  const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
+    categoryId: categoryFilter || null,
+    paymentMethod: payFilter || null,
+  })
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
@@ -121,6 +141,43 @@ export function ExpensesPage() {
           <Plus className="size-4" strokeWidth={2.4} />
           {t('expenses.add')}
         </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select
+          value={categoryFilter || 'all'}
+          onValueChange={(v) => setFilter('cat', v === 'all' ? null : v)}
+        >
+          <SelectTrigger className="h-10 w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('expenses.filters.all_categories')}</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={payFilter || 'all'}
+          onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
+        >
+          <SelectTrigger className="h-10 w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
+            {(['cash', 'card', 'transfer'] as const).map((p) => (
+              <SelectItem key={p} value={p}>
+                {t(`payment_methods.${p}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Summary cards 4-в-ряд */}

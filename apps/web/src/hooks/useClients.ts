@@ -109,6 +109,7 @@ export type CreateClientInput = {
   name: string
   phone?: string | null
   email?: string | null
+  source?: string | null
   notes?: string | null
 }
 
@@ -121,6 +122,7 @@ export function useCreateClient(salonId: string | undefined) {
         name: input.name.trim(),
         phone: input.phone?.trim() || null,
         email: input.email?.trim() || null,
+        source: input.source?.trim() || null,
         notes: input.notes?.trim() || null,
       }
       const { data, error } = await supabase.from('clients').insert(payload).select('*').single()
@@ -138,6 +140,7 @@ export type UpdateClientInput = {
   name?: string
   phone?: string | null
   email?: string | null
+  source?: string | null
   notes?: string | null
 }
 
