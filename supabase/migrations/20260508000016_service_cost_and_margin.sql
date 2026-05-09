@@ -17,6 +17,12 @@
 alter table public.services
   add column if not exists cost_cents bigint;
 
+-- В предыдущей версии функция возвращала меньше колонок (без cost/margin).
+-- Postgres не позволяет менять return type через CREATE OR REPLACE — нужно
+-- дропнуть старую сигнатуру первой. CASCADE на случай, если на неё навешано
+-- что-то ещё (grant'ы, view'ы — на момент миграции — ничего, но safe).
+drop function if exists public.top_services_by_revenue(uuid, timestamptz, timestamptz, int);
+
 create or replace function public.top_services_by_revenue(
   p_salon_id uuid,
   p_period_start timestamptz,
