@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase/client'
 
 import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
 import { useSalon } from '@/hooks/useSalons'
+import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
+
 import { BenchmarksWidget } from './BenchmarksWidget'
 import { CashBalanceWidget } from './CashBalanceWidget'
 import { ForecastWidget } from './ForecastWidget'
@@ -105,6 +107,10 @@ export function DashboardPage() {
       </header>
 
       {isEmpty ? <DashboardEmpty /> : null}
+
+      {/* Стартовый тур по приложению — показывается раз при первом
+          входе на дашборд, потом юзер может перезапустить из Help-таба. */}
+      <OnboardingTour salonId={salonId} />
 
       {/* AI-инсайты — до 3-х актуальных, генерируются weekly cron'ом */}
       <InsightsWidget salonId={salonId} />
