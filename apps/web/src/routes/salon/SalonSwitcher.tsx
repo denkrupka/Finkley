@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -14,9 +14,12 @@ type Props = {
 /**
  * Дропдаун для переключения между салонами юзера. Показывается в TopBar.
  *
- * - Если у юзера один салон — рендерим неинтерактивный текст (без кнопки).
- * - Если несколько — кнопка с chevron открывает меню; выбор → router.push
- *   на /{newSalonId}/dashboard и сохранение в localStorage.
+ * - Если у юзера один салон — кнопка с chevron всё равно есть, чтобы можно
+ *   было создать второй салон через пункт «+ Создать ещё салон» (TASK
+ *   b829aa55: multi-salon UX).
+ * - Если несколько — выбор переключает на /{newSalonId}/dashboard.
+ * - Создание дополнительного салона ведёт на /onboarding — тот же 5-шаговый
+ *   wizard, что и для первого.
  */
 export function SalonSwitcher({ salonId, salonName }: Props) {
   const { t } = useTranslation()
@@ -24,9 +27,8 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
   const navigate = useNavigate()
 
   const list = salons ?? []
-  if (list.length <= 1) {
-    return <span className="text-brand-navy text-[15px] font-bold tracking-tight">{salonName}</span>
-  }
+  // Даже при одном салоне показываем dropdown — внутри пункт «+ Создать ещё».
+  // Раньше тут был просто текст; теперь это всегда кнопка-меню.
 
   return (
     <DropdownMenu.Root>
@@ -67,6 +69,15 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
               </DropdownMenu.Item>
             )
           })}
+          <DropdownMenu.Separator className="bg-border my-1 h-px" />
+          <DropdownMenu.Item
+            className="text-secondary data-[highlighted]:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm font-semibold outline-none"
+            onSelect={() => navigate('/onboarding')}
+            data-testid="salon-switcher-add"
+          >
+            <Plus className="size-4" strokeWidth={2} />
+            {t('salon_switcher.add_new')}
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
