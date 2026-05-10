@@ -46,12 +46,12 @@ jobs:
       - name: Apply migrations (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          VITE_SUPABASE_URL_TEST: ${{ secrets.VITE_SUPABASE_URL_TEST }}
         run: |
           mkdir -p apps/web
           {
             echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
-            echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+            echo "VITE_SUPABASE_URL_TEST=$VITE_SUPABASE_URL_TEST"
           } > apps/web/.env.local
           node scripts/apply-migrations-staging.mjs staging
 
@@ -59,9 +59,15 @@ jobs:
         if: hashFiles('supabase/functions/**') != ''
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          VITE_SUPABASE_URL_TEST: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          TARGET: staging
         run: |
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights banking-sync"
+          mkdir -p apps/web
+          {
+            echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
+            echo "VITE_SUPABASE_URL_TEST=$VITE_SUPABASE_URL_TEST"
+          } > apps/web/.env.local
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights banking-sync banking-expiry-notify"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
@@ -111,8 +117,14 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          TARGET: prod
         run: |
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights banking-sync"
+          mkdir -p apps/web
+          {
+            echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
+            echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          } > apps/web/.env.local
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth send-email process-recurring-expenses telegram-bug-collector send-weekly-digest generate-insights banking-sync banking-expiry-notify"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
