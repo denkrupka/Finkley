@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- helper rememberLastSalon co-located with RootRedirect */
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 
 import { useMySalons } from '@/hooks/useSalons'
 
@@ -7,12 +7,25 @@ const LAST_SALON_KEY = 'finkley:last-salon-id'
 
 /**
  * Корневой редирект для авторизованного юзера:
+ * - есть ?code= и ?state= в query → Enable Banking вернул юзера сюда
+ *   (их dashboard whitelist'ит только корневой URL, не /banking/callback);
+ *   форвардим на /banking/callback сохраняя query
  * - нет ни одного салона → /onboarding
  * - есть салоны → /{salonId}/dashboard
  *   (предпочитаем последний выбранный из localStorage, иначе первый по created_at)
  */
 export function RootRedirect() {
+  const [searchParams] = useSearchParams()
   const { data: salons, isLoading, error } = useMySalons()
+
+  // Перехват банковского callback'а раньше всех проверок — он не зависит
+  // от наличия салона и должен сработать даже если useMySalons загружается.
+  // Также ловим error/error_description (юзер отказал в банке).
+  const hasBankCallback =
+    (searchParams.has('code') && searchParams.has('state')) || searchParams.has('error_description')
+  if (hasBankCallback) {
+    return <Navigate to={`/banking/callback?${searchParams.toString()}`} replace />
+  }
 
   if (isLoading) {
     return (
