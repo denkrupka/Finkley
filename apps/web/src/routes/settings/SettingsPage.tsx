@@ -38,6 +38,7 @@ import { ApiKeysCard } from './ApiKeysCard'
 import { AppearanceCard } from './AppearanceCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
+import { SegmentationCard } from './SegmentationCard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
@@ -354,6 +355,9 @@ export function SettingsPage() {
               </Button>
             </div>
           </section>
+
+          {/* Сегментация клиентов: retention/churn окна */}
+          <SegmentationCard salon={salon} />
         </>
       )}
 

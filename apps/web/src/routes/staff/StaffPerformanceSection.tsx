@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useSalon } from '@/hooks/useSalons'
 import { useVisits } from '@/hooks/useVisits'
-import { getPeriodRange } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
@@ -10,7 +10,12 @@ const STAFF_PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#
 
 type Props = {
   salonId: string
-  staff: Array<{ id: string; full_name: string; is_active: boolean }>
+  staff: Array<{
+    id: string
+    full_name: string
+    is_active: boolean
+    retention_window_days?: number | null
+  }>
   currency: string
 }
 
@@ -27,50 +32,62 @@ type Props = {
  */
 export function StaffPerformanceSection({ salonId, staff, currency }: Props) {
   const { t } = useTranslation()
+  const { data: salon } = useSalon(salonId)
+  const salonWindow = salon?.retention_window_days ?? 60
 
-  // Берём 30-дневное окно — стандарт для оценки текущей эффективности.
-  // Когда понадобится period switcher — вынесем в URL params.
-  const range = useMemo(() => getPeriodRange('month', new Date(), undefined), [])
+  // Берём максимальное окно ретеншна по всем мастерам (или дефолт салона) —
+  // тянем visits за этот период; per-master ретеншн считаем уже из этого
+  // выборного диапазона. Если salon=60 а у одного мастера 90 — нужно тянуть 90.
+  const lookbackDays = useMemo(
+    () => Math.max(salonWindow, ...staff.map((s) => s.retention_window_days ?? 0)),
+    [salonWindow, staff],
+  )
+  const range = useMemo(() => {
+    const end = new Date()
+    const start = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
+    return { start: start.toISOString(), end: end.toISOString() }
+  }, [lookbackDays])
   const { data: visits = [], isLoading } = useVisits(salonId, range)
 
-  const stats = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        visitCount: number
-        revenueCents: number
-        clients: Set<string>
-        clientVisitCount: Map<string, number>
-        services: Map<string, number>
-      }
-    >()
+  // Группируем визиты по staff_id; KPI считаем внутри render с учётом
+  // индивидуального retention-window мастера.
+  const visitsByStaff = useMemo(() => {
+    const map = new Map<string, typeof visits>()
     for (const v of visits) {
       if (!v.staff_id) continue
-      let s = map.get(v.staff_id)
-      if (!s) {
-        s = {
-          visitCount: 0,
-          revenueCents: 0,
-          clients: new Set(),
-          clientVisitCount: new Map(),
-          services: new Map(),
-        }
-        map.set(v.staff_id, s)
-      }
-      s.visitCount++
-      s.revenueCents += v.amount_cents
-      if (v.client_id) {
-        s.clients.add(v.client_id)
-        s.clientVisitCount.set(v.client_id, (s.clientVisitCount.get(v.client_id) ?? 0) + 1)
-      }
-      const svc = v.service_id ?? '__none__'
-      s.services.set(svc, (s.services.get(svc) ?? 0) + 1)
+      const arr = map.get(v.staff_id) ?? []
+      arr.push(v)
+      map.set(v.staff_id, arr)
     }
     return map
   }, [visits])
 
+  function statsFor(staffId: string, windowDays: number) {
+    const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000
+    const inWindow = (visitsByStaff.get(staffId) ?? []).filter(
+      (v) => new Date(v.visit_at).getTime() >= cutoff,
+    )
+    const clientVisitCount = new Map<string, number>()
+    let revenueCents = 0
+    for (const v of inWindow) {
+      revenueCents += v.amount_cents
+      if (v.client_id)
+        clientVisitCount.set(v.client_id, (clientVisitCount.get(v.client_id) ?? 0) + 1)
+    }
+    return {
+      visitCount: inWindow.length,
+      revenueCents,
+      uniqueClients: clientVisitCount.size,
+      returningClients: Array.from(clientVisitCount.values()).filter((n) => n >= 2).length,
+    }
+  }
+
   const activeStaff = staff.filter((s) => s.is_active)
-  const totalRevenue = Array.from(stats.values()).reduce((acc, s) => acc + s.revenueCents, 0)
+  // Total revenue считаем по salon-window для фейр-сравнения (доли мастеров).
+  const totalRevenue = activeStaff.reduce(
+    (acc, s) => acc + statsFor(s.id, salonWindow).revenueCents,
+    0,
+  )
 
   if (isLoading) {
     return (
@@ -118,19 +135,18 @@ export function StaffPerformanceSection({ salonId, staff, currency }: Props) {
           </thead>
           <tbody>
             {activeStaff.map((s, i) => {
-              const st = stats.get(s.id)
-              const visits = st?.visitCount ?? 0
-              const rev = st?.revenueCents ?? 0
-              const clients = st?.clients.size ?? 0
-              const returning = st
-                ? Array.from(st.clientVisitCount.values()).filter((n) => n >= 2).length
-                : 0
+              const masterWindow = s.retention_window_days ?? salonWindow
+              const st = statsFor(s.id, masterWindow)
+              const visits = st.visitCount
+              const rev = st.revenueCents
+              const clients = st.uniqueClients
+              const returning = st.returningClients
               const retention = clients > 0 ? Math.round((returning / clients) * 100) : null
               const avg = visits > 0 ? Math.round(rev / visits) : 0
               const share = totalRevenue > 0 ? (rev / totalRevenue) * 100 : 0
               const color = STAFF_PALETTE[i % STAFF_PALETTE.length]!
-              // Условный «фокус-нид»: 0 визитов или отрицательная динамика
               const flagAttention = visits === 0
+              const isCustomWindow = s.retention_window_days != null
               return (
                 <tr key={s.id} className="border-border border-b last:border-b-0">
                   <td className="py-2.5 pr-3">
@@ -172,6 +188,10 @@ export function StaffPerformanceSection({ salonId, staff, currency }: Props) {
                               ? 'text-brand-gold-deep'
                               : 'text-destructive',
                         )}
+                        title={t('staff.performance.window_tooltip', {
+                          days: masterWindow,
+                          custom: isCustomWindow ? ' (индивид.)' : '',
+                        })}
                       >
                         {retention}%
                       </span>

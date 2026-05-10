@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useStaff } from '@/hooks/useStaff'
+import { DAY_KEYS, useStaff, type StaffRow, type WeeklyDay } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
 import { useVisits } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -13,11 +13,32 @@ type Props = {
   salonId: string
 }
 
-const DEFAULT_OPEN_HOUR = 9
-const DEFAULT_CLOSE_HOUR = 19
 const DEFAULT_VISIT_MIN = 60
 const SLOT_GRANULARITY_MIN = 30
 const DAYS_AHEAD = 7
+
+function dayKeyOf(d: Date): (typeof DAY_KEYS)[number] {
+  // JavaScript: 0=вс, 1=пн, ... 6=сб. Мы храним в порядке pn..vs.
+  const idx = (d.getDay() + 6) % 7 // shift: 0=пн, ..., 6=вс
+  return DAY_KEYS[idx]!
+}
+
+function parseTime(hhmm: string): { h: number; m: number } {
+  const [h, m] = hhmm.split(':').map(Number)
+  return { h: Number.isFinite(h) ? h! : 9, m: Number.isFinite(m) ? m! : 0 }
+}
+
+function dayBounds(staff: StaffRow, day: Date): { start: Date; end: Date; off: boolean } {
+  const cfg: WeeklyDay | undefined = staff.weekly_schedule?.[dayKeyOf(day)]
+  const base = cfg ?? { start: '09:00', end: '19:00', off: false }
+  const start = new Date(day)
+  const end = new Date(day)
+  const s = parseTime(base.start)
+  const e = parseTime(base.end)
+  start.setHours(s.h, s.m, 0, 0)
+  end.setHours(e.h, e.m, 0, 0)
+  return { start, end, off: !!base.off }
+}
 
 /**
  * «Свободные окна» — виджет для /visits, показывает по каждому активному
@@ -79,19 +100,17 @@ export function FreeSlotsPanel({ salonId }: Props) {
 
   /**
    * Свободные слоты для одного мастера в один день:
-   * day-window [open, close) минус все busy-интервалы в этом дне.
+   * day-window из его расписания минус все busy-интервалы.
+   * Возвращает [] если у мастера в этот день выходной.
    */
-  function freeSlotsForDay(staffId: string, day: Date): Interval[] {
-    const dayStart = new Date(day)
-    dayStart.setHours(DEFAULT_OPEN_HOUR, 0, 0, 0)
-    const dayEnd = new Date(day)
-    dayEnd.setHours(DEFAULT_CLOSE_HOUR, 0, 0, 0)
+  function freeSlotsForDay(staff: StaffRow, day: Date): Interval[] {
+    const { start: dayStart, end: dayEnd, off } = dayBounds(staff, day)
+    if (off) return []
 
-    const busy = (busyByStaff.get(staffId) ?? []).filter(
+    const busy = (busyByStaff.get(staff.id) ?? []).filter(
       (b) => b.end > dayStart && b.start < dayEnd,
     )
 
-    // Subtract busy from [dayStart, dayEnd)
     const free: Interval[] = []
     let cursor = dayStart
     for (const b of busy) {
@@ -102,7 +121,6 @@ export function FreeSlotsPanel({ salonId }: Props) {
     }
     if (cursor < dayEnd) free.push({ start: cursor, end: dayEnd })
 
-    // Filter out tiny slivers (< granularity)
     return free.filter((s) => s.end.getTime() - s.start.getTime() >= SLOT_GRANULARITY_MIN * 60_000)
   }
 
@@ -186,7 +204,7 @@ export function FreeSlotsPanel({ salonId }: Props) {
                   <h4 className="text-foreground mb-2 text-xs font-bold">{s.full_name}</h4>
                   <div className="grid gap-2">
                     {days.map((d) => {
-                      const slots = freeSlotsForDay(s.id, d)
+                      const slots = freeSlotsForDay(s, d)
                       const isToday = isSameDay(d, new Date())
                       const dLabel = format(d, 'EEEE, d MMMM', { locale: ru })
                       return (

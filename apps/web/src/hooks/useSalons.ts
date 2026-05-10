@@ -14,6 +14,8 @@ export type SalonRow = {
   weekly_digest_enabled: boolean
   benchmarks_opt_in: boolean
   opening_cash_balance_cents: number
+  retention_window_days: number
+  churn_window_days: number
   created_at: string
 }
 
@@ -33,13 +35,35 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
       return (data ?? []) as SalonRow[]
     },
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Роль текущего юзера в салоне (owner/admin/staff). Используется для
+ * условного рендера UI редактирования (только owner/admin).
+ */
+export function useSalonMembership(salonId: string | undefined) {
+  return useQuery<{ role: string } | null>({
+    queryKey: ['salon-membership', salonId],
+    queryFn: async () => {
+      if (!salonId) return null
+      const { data, error } = await supabase
+        .from('salon_members')
+        .select('role')
+        .eq('salon_id', salonId)
+        .maybeSingle()
+      if (error) throw error
+      return (data as { role: string } | null) ?? null
+    },
+    enabled: !!salonId,
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -54,7 +78,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
         )
         .eq('id', salonId)
         .maybeSingle()

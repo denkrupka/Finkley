@@ -16,7 +16,12 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useServices, type ServiceRow } from '@/hooks/useServices'
-import type { StaffPayoutScheme, StaffRow } from '@/hooks/useStaff'
+import {
+  DAY_KEYS,
+  type StaffPayoutScheme,
+  type StaffRow,
+  type WeeklySchedule,
+} from '@/hooks/useStaff'
 import { useUpdateStaff } from '@/hooks/useStaffMutations'
 import {
   useDeleteStaffServiceOverride,
@@ -50,6 +55,20 @@ function inputToCents(value: string): number {
   return Math.round(n * 100)
 }
 
+function defaultSchedule(): WeeklySchedule {
+  const work = { start: '09:00', end: '19:00', off: false }
+  const off = { start: '09:00', end: '19:00', off: true }
+  return {
+    mon: { ...work },
+    tue: { ...work },
+    wed: { ...work },
+    thu: { ...work },
+    fri: { ...work },
+    sat: { ...off },
+    sun: { ...off },
+  }
+}
+
 export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
   const { t } = useTranslation()
   const update = useUpdateStaff(salonId)
@@ -59,6 +78,10 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
   const [percent, setPercent] = useState('40')
   const [fixedAmount, setFixedAmount] = useState('')
   const [chairRent, setChairRent] = useState('')
+  const [retailEnabled, setRetailEnabled] = useState(true)
+  const [retailPercent, setRetailPercent] = useState('') // '' = use payout_percent
+  const [retentionDays, setRetentionDays] = useState('') // '' = inherit salon
+  const [schedule, setSchedule] = useState<WeeklySchedule>(defaultSchedule())
 
   useEffect(() => {
     if (!staff) return
@@ -67,6 +90,10 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
     setPercent(staff.payout_percent != null ? String(staff.payout_percent) : '40')
     setFixedAmount(centsToInput(staff.payout_fixed_cents))
     setChairRent(centsToInput(staff.chair_rent_cents))
+    setRetailEnabled(staff.retail_payout_enabled)
+    setRetailPercent(staff.retail_payout_percent != null ? String(staff.retail_payout_percent) : '')
+    setRetentionDays(staff.retention_window_days != null ? String(staff.retention_window_days) : '')
+    setSchedule(staff.weekly_schedule ?? defaultSchedule())
   }, [staff?.id, staff])
 
   function save() {
@@ -84,6 +111,24 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
       toast.error(t('staff.errors.percent_invalid'))
       return
     }
+    const retailPctNum =
+      retailPercent.trim() === '' ? null : Number(retailPercent.replace(',', '.'))
+    if (
+      retailPctNum !== null &&
+      (Number.isNaN(retailPctNum) || retailPctNum < 0 || retailPctNum > 100)
+    ) {
+      toast.error(t('staff.errors.percent_invalid'))
+      return
+    }
+    const retentionNum = retentionDays.trim() === '' ? null : parseInt(retentionDays, 10)
+    if (
+      retentionNum !== null &&
+      (Number.isNaN(retentionNum) || retentionNum < 7 || retentionNum > 365)
+    ) {
+      toast.error(t('staff.errors.retention_invalid'))
+      return
+    }
+
     update.mutate(
       {
         id: staff.id,
@@ -93,6 +138,10 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
         payout_fixed_cents:
           scheme === 'fixed' || scheme === 'mixed' ? inputToCents(fixedAmount) : null,
         chair_rent_cents: scheme === 'chair_rent' ? inputToCents(chairRent) : null,
+        weekly_schedule: schedule,
+        retail_payout_enabled: retailEnabled,
+        retail_payout_percent: retailPctNum,
+        retention_window_days: retentionNum,
       },
       {
         onSuccess: () => {
@@ -187,6 +236,121 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
             {scheme === 'percent_service' ? (
               <ServiceOverridesEditor staffId={staff?.id} salonId={salonId} />
             ) : null}
+
+            {/* ─── Рабочее расписание ─────────────────────────────────── */}
+            <div className="border-border rounded-md border p-4">
+              <Label className="mb-2 block">{t('staff.schedule.title')}</Label>
+              <p className="text-muted-foreground mb-3 text-xs">{t('staff.schedule.hint')}</p>
+              <div className="flex flex-col gap-1.5">
+                {DAY_KEYS.map((d) => {
+                  const day = schedule[d]
+                  return (
+                    <div
+                      key={d}
+                      className="grid grid-cols-[60px_auto_1fr_1fr] items-center gap-2 text-sm"
+                    >
+                      <span className="text-foreground font-semibold">
+                        {t(`staff.schedule.days.${d}`)}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={!day.off}
+                        onChange={(e) =>
+                          setSchedule({
+                            ...schedule,
+                            [d]: { ...day, off: !e.target.checked },
+                          })
+                        }
+                        className="size-4 cursor-pointer"
+                      />
+                      <input
+                        type="time"
+                        value={day.start}
+                        disabled={day.off}
+                        onChange={(e) =>
+                          setSchedule({ ...schedule, [d]: { ...day, start: e.target.value } })
+                        }
+                        className="border-border bg-card num h-8 rounded-md border px-2 text-xs disabled:opacity-40"
+                      />
+                      <input
+                        type="time"
+                        value={day.end}
+                        disabled={day.off}
+                        onChange={(e) =>
+                          setSchedule({ ...schedule, [d]: { ...day, end: e.target.value } })
+                        }
+                        className="border-border bg-card num h-8 rounded-md border px-2 text-xs disabled:opacity-40"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ─── Retail payout ──────────────────────────────────────── */}
+            <div className="border-border rounded-md border p-4">
+              <Label className="mb-2 block">{t('staff.retail_payout.title')}</Label>
+              <p className="text-muted-foreground mb-3 text-xs">{t('staff.retail_payout.hint')}</p>
+              <label className="text-foreground flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={retailEnabled}
+                  onChange={(e) => setRetailEnabled(e.target.checked)}
+                  className="size-4 cursor-pointer"
+                />
+                {t('staff.retail_payout.enabled_label')}
+              </label>
+              {retailEnabled ? (
+                <div className="mt-3 flex flex-col gap-1.5">
+                  <Label htmlFor="staff-edit-retail-pct" className="text-xs">
+                    {t('staff.retail_payout.percent_label')}
+                  </Label>
+                  <div className="border-border bg-card flex h-10 items-center rounded-md border px-3">
+                    <input
+                      id="staff-edit-retail-pct"
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder={t('staff.retail_payout.placeholder_inherit', {
+                        pct: percent || '40',
+                      })}
+                      value={retailPercent}
+                      onChange={(e) => setRetailPercent(e.target.value)}
+                      className="num text-foreground h-full flex-1 bg-transparent text-sm outline-none"
+                    />
+                    <span className="num text-muted-foreground text-sm">%</span>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {t('staff.retail_payout.percent_help')}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* ─── Retention window (per-master) ─────────────────────── */}
+            <div className="border-border rounded-md border p-4">
+              <Label htmlFor="staff-edit-retention" className="mb-2 block">
+                {t('staff.retention_window.title')}
+              </Label>
+              <p className="text-muted-foreground mb-3 text-xs">
+                {t('staff.retention_window.hint')}
+              </p>
+              <div className="border-border bg-card flex h-10 items-center rounded-md border px-3">
+                <input
+                  id="staff-edit-retention"
+                  type="number"
+                  min={7}
+                  max={365}
+                  placeholder={t('staff.retention_window.placeholder_inherit')}
+                  value={retentionDays}
+                  onChange={(e) => setRetentionDays(e.target.value)}
+                  className="num text-foreground h-full flex-1 bg-transparent text-sm outline-none"
+                />
+                <span className="num text-muted-foreground text-sm">
+                  {t('staff.retention_window.days')}
+                </span>
+              </div>
+            </div>
           </div>
         </SheetBody>
         <SheetFooter>

@@ -9,6 +9,27 @@ export type StaffPayoutScheme =
   | 'chair_rent'
   | 'mixed'
 
+export type WeeklyDay = { start: string; end: string; off: boolean }
+export type WeeklySchedule = {
+  mon: WeeklyDay
+  tue: WeeklyDay
+  wed: WeeklyDay
+  thu: WeeklyDay
+  fri: WeeklyDay
+  sat: WeeklyDay
+  sun: WeeklyDay
+}
+
+export const DAY_KEYS: ReadonlyArray<keyof WeeklySchedule> = [
+  'mon',
+  'tue',
+  'wed',
+  'thu',
+  'fri',
+  'sat',
+  'sun',
+]
+
 export type StaffRow = {
   id: string
   salon_id: string
@@ -18,10 +39,14 @@ export type StaffRow = {
   payout_fixed_cents: number | null
   chair_rent_cents: number | null
   is_active: boolean
+  weekly_schedule: WeeklySchedule
+  retail_payout_enabled: boolean
+  retail_payout_percent: number | null
+  retention_window_days: number | null
 }
 
 const STAFF_FIELDS =
-  'id, salon_id, full_name, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active'
+  'id, salon_id, full_name, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days'
 
 export function useStaff(salonId: string | undefined, opts?: { activeOnly?: boolean }) {
   const activeOnly = opts?.activeOnly ?? true

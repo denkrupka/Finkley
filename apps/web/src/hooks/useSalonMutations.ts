@@ -11,6 +11,8 @@ export type UpdateSalonInput = {
   salon_type?: string
   locale?: string
   logo_url?: string | null
+  retention_window_days?: number
+  churn_window_days?: number
 }
 
 export function useUpdateSalon() {

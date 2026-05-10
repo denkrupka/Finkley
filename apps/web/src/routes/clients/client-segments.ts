@@ -15,20 +15,27 @@ export type ClientSegment = 'new' | 'regular' | 'lapsed' | 'churned' | 'prospect
 
 const DAY = 24 * 60 * 60 * 1000
 
+export type SegmentThresholds = {
+  retentionDays: number // default 60
+  churnDays: number // default 180
+}
+
+export const DEFAULT_THRESHOLDS: SegmentThresholds = { retentionDays: 60, churnDays: 180 }
+
 export function clientSegment(
   c: Pick<ClientRow, 'visit_count' | 'last_visit_at' | 'created_at'>,
+  thresholds: SegmentThresholds = DEFAULT_THRESHOLDS,
 ): ClientSegment {
   const now = Date.now()
   const last = c.last_visit_at ? new Date(c.last_visit_at).getTime() : null
   const created = new Date(c.created_at).getTime()
 
   if (last === null) {
-    // Не был ни разу
     return now - created < 30 * DAY ? 'prospect' : 'lapsed'
   }
   const daysSince = (now - last) / DAY
-  if (daysSince > 180) return 'churned'
-  if (daysSince > 60) return 'lapsed'
+  if (daysSince > thresholds.churnDays) return 'churned'
+  if (daysSince > thresholds.retentionDays) return 'lapsed'
   if (c.visit_count >= 2) return 'regular'
   return 'new'
 }

@@ -60,10 +60,19 @@ export function ClientsPage() {
 
   const { data: allClients = [], isLoading } = useClients(salonId, { search, sort })
 
-  // Считаем сегменты для всех клиентов (без фильтра — нужны для KPI)
+  // Считаем сегменты для всех клиентов (без фильтра — нужны для KPI).
+  // Окна берём из настроек салона (retention/churn — задаются в /settings).
+  const thresholds = useMemo(
+    () => ({
+      retentionDays: salon?.retention_window_days ?? 60,
+      churnDays: salon?.churn_window_days ?? 180,
+    }),
+    [salon?.retention_window_days, salon?.churn_window_days],
+  )
+
   const segmented = useMemo(
-    () => allClients.map((c) => ({ ...c, segment: clientSegment(c) })),
-    [allClients],
+    () => allClients.map((c) => ({ ...c, segment: clientSegment(c, thresholds) })),
+    [allClients, thresholds],
   )
 
   const clients = useMemo(

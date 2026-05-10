@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
-import type { StaffPayoutScheme } from './useStaff'
+import type { StaffPayoutScheme, WeeklySchedule } from './useStaff'
 
 /**
  * Поля, которые поддерживает UI-форма мастера. Бэкенд хранит все поля схемы
@@ -15,6 +15,10 @@ export type StaffWriteInput = {
   payout_percent?: number | null
   payout_fixed_cents?: number | null
   chair_rent_cents?: number | null
+  weekly_schedule?: WeeklySchedule
+  retail_payout_enabled?: boolean
+  retail_payout_percent?: number | null
+  retention_window_days?: number | null
 }
 
 /**
@@ -22,12 +26,12 @@ export type StaffWriteInput = {
  * чтобы не путали при чтении и не ломали будущий расчёт payouts.
  */
 function normalize(input: StaffWriteInput) {
-  const base = {
+  const base: Record<string, unknown> = {
     full_name: input.full_name.trim(),
     payout_scheme: input.payout_scheme,
-    payout_percent: null as number | null,
-    payout_fixed_cents: null as number | null,
-    chair_rent_cents: null as number | null,
+    payout_percent: null,
+    payout_fixed_cents: null,
+    chair_rent_cents: null,
   }
   switch (input.payout_scheme) {
     case 'fixed':
@@ -37,7 +41,6 @@ function normalize(input: StaffWriteInput) {
       base.payout_percent = input.payout_percent ?? 0
       break
     case 'percent_service':
-      // Базового % нет — задаётся per-service в staff_service_overrides.
       break
     case 'chair_rent':
       base.chair_rent_cents = input.chair_rent_cents ?? 0
@@ -47,6 +50,14 @@ function normalize(input: StaffWriteInput) {
       base.payout_percent = input.payout_percent ?? 0
       break
   }
+  // Опциональные поля передаём только если заданы — иначе оставляем дефолты в БД.
+  if (input.weekly_schedule !== undefined) base.weekly_schedule = input.weekly_schedule
+  if (input.retail_payout_enabled !== undefined)
+    base.retail_payout_enabled = input.retail_payout_enabled
+  if (input.retail_payout_percent !== undefined)
+    base.retail_payout_percent = input.retail_payout_percent
+  if (input.retention_window_days !== undefined)
+    base.retention_window_days = input.retention_window_days
   return base
 }
 
