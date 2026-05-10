@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { EditVisitModal } from './EditVisitModal'
+import { FreeSlotsPanel } from './FreeSlotsPanel'
 
 import {
   Select,
@@ -160,6 +161,9 @@ export function VisitsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Свободные окна — раскрывающаяся панель над списком визитов */}
+      <FreeSlotsPanel salonId={salonId} />
 
       {/* Body */}
       {isLoading ? (
