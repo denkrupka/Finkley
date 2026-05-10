@@ -13,6 +13,7 @@ import { useArchiveStaff, useCreateStaff, useUnarchiveStaff } from '@/hooks/useS
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 import { StaffEditSheet } from './StaffEditSheet'
+import { StaffPerformanceSection } from './StaffPerformanceSection'
 
 const PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#FBE5C0']
 
@@ -45,6 +46,12 @@ export function StaffPage() {
       </div>
 
       <NewStaffForm salonId={salonId} />
+
+      {active.length > 0 ? (
+        <div className="mt-6">
+          <StaffPerformanceSection salonId={salonId} staff={active} currency={currency} />
+        </div>
+      ) : null}
 
       <h2 className="text-muted-foreground mb-3 mt-6 text-xs font-bold uppercase tracking-wider">
         {t('staff.active', { count: active.length })}
