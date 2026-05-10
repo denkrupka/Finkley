@@ -12,6 +12,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
 
 import { BenchmarksWidget } from './BenchmarksWidget'
+import { LowStockWidget } from './LowStockWidget'
 import { CashBalanceWidget } from './CashBalanceWidget'
 import { ForecastWidget } from './ForecastWidget'
 import { InsightsWidget } from './InsightsWidget'
@@ -111,6 +112,10 @@ export function DashboardPage() {
       {/* Стартовый тур по приложению — показывается раз при первом
           входе на дашборд, потом юзер может перезапустить из Help-таба. */}
       <OnboardingTour salonId={salonId} />
+
+      {/* Виджет «Заканчивается» — выше всех инсайтов, чтобы владелица сразу
+          видела нужно ли что-то закупить. Не показывается если всё ОК. */}
+      <LowStockWidget salonId={salonId} />
 
       {/* AI-инсайты — до 3-х актуальных, генерируются weekly cron'ом */}
       <InsightsWidget salonId={salonId} />

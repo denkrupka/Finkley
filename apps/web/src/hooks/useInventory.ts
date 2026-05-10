@@ -302,6 +302,133 @@ export function useUpsertServiceMaterial(salonId: string | undefined) {
   })
 }
 
+// =============================================================================
+// Analytics
+// =============================================================================
+
+export type PlanVsFactRow = {
+  material_id: string
+  material_name: string
+  unit: string
+  planned: number
+  actual: number
+  variance: number
+  variance_value_cents: number
+  cost_per_unit_cents: number
+}
+
+export function useInventoryPlanVsFact(
+  salonId: string | undefined,
+  period: { start: string; end: string },
+) {
+  return useQuery<PlanVsFactRow[]>({
+    queryKey: ['inv-plan-vs-fact', salonId, period],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase.rpc('inventory_plan_vs_fact', {
+        p_salon_id: salonId,
+        p_period_start: period.start,
+        p_period_end: period.end,
+      })
+      if (error) throw error
+      return (data ?? []) as PlanVsFactRow[]
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
+export type StaffConsumptionRow = {
+  staff_id: string
+  staff_full_name: string
+  material_id: string
+  material_name: string
+  unit: string
+  total_consumed: number
+  visit_count: number
+  avg_per_visit: number
+  expected_per_visit: number | null
+  cost_per_unit_cents: number
+  total_cost_cents: number
+}
+
+export function useStaffMaterialConsumption(
+  salonId: string | undefined,
+  period: { start: string; end: string },
+) {
+  return useQuery<StaffConsumptionRow[]>({
+    queryKey: ['inv-by-staff', salonId, period],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase.rpc('inventory_consumption_by_staff', {
+        p_salon_id: salonId,
+        p_period_start: period.start,
+        p_period_end: period.end,
+      })
+      if (error) throw error
+      return (data ?? []) as StaffConsumptionRow[]
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
+// =============================================================================
+// Bulk CSV import + categories management
+// =============================================================================
+
+export type CsvImportRow = {
+  name: string
+  unit?: string
+  category?: string
+  current_stock?: number
+  min_stock?: number
+  cost_per_unit_cents?: number
+  sku?: string
+  supplier?: string
+}
+
+export function useBulkImportInventory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (rows: CsvImportRow[]) => {
+      if (!salonId) throw new Error('no_salon')
+      if (rows.length === 0) return { inserted: 0 }
+      const payload = rows.map((r) => ({
+        salon_id: salonId,
+        name: r.name.trim(),
+        unit: (r.unit ?? 'шт').trim() || 'шт',
+        category: r.category?.trim() || null,
+        current_stock: r.current_stock ?? 0,
+        min_stock: r.min_stock ?? 0,
+        cost_per_unit_cents: r.cost_per_unit_cents ?? 0,
+        sku: r.sku?.trim() || null,
+        supplier: r.supplier?.trim() || null,
+      }))
+      const { data, error } = await supabase.from('inventory_items').insert(payload).select('id')
+      if (error) throw error
+      return { inserted: data?.length ?? 0 }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory-items', salonId] }),
+  })
+}
+
+export function useRenameCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { from: string; to: string | null }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ category: input.to?.trim() || null })
+        .eq('salon_id', salonId)
+        .eq('category', input.from)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory-items', salonId] }),
+  })
+}
+
 export function useDeleteServiceMaterial(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
