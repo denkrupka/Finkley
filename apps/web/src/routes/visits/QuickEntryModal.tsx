@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils/cn'
 import { ClientPicker } from '@/routes/clients/ClientPicker'
 
 import { BulkVisitsForm } from './BulkVisitsForm'
+import { RetailSaleForm } from './RetailSaleForm'
 
 const PAYMENT_OPTIONS = ['cash', 'card', 'transfer'] as const
 type PaymentOption = (typeof PAYMENT_OPTIONS)[number]
@@ -256,7 +257,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       .toUpperCase() ?? '?'
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
-  const [tab, setTab] = useState<'single' | 'bulk'>('single')
+  const [tab, setTab] = useState<'single' | 'bulk' | 'retail'>('single')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -265,7 +266,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
           <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
           <DialogDescription>{t('visits.form.subtitle')}</DialogDescription>
           <div className="border-border bg-muted/40 mt-2 inline-flex w-full rounded-full border p-[3px]">
-            {(['single', 'bulk'] as const).map((id) => (
+            {(['single', 'bulk', 'retail'] as const).map((id) => (
               <button
                 key={id}
                 type="button"
@@ -283,7 +284,14 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
           </div>
         </DialogHeader>
 
-        {tab === 'bulk' ? (
+        {tab === 'retail' ? (
+          <RetailSaleForm
+            salonId={salonId}
+            currency={currency}
+            staff={staff}
+            onDone={() => onOpenChange(false)}
+          />
+        ) : tab === 'bulk' ? (
           <BulkVisitsForm
             salonId={salonId}
             currency={currency}

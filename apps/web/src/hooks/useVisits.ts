@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'online' | 'mixed'
 export type VisitStatus = 'paid' | 'pending' | 'cancelled'
+export type VisitKind = 'visit' | 'retail'
 
 export type VisitRow = {
   id: string
@@ -21,6 +22,7 @@ export type VisitRow = {
   comment: string | null
   source: string
   group_key: string | null
+  kind: VisitKind
   created_by: string | null
   created_at: string
   updated_at: string
@@ -81,6 +83,7 @@ export type CreateVisitInput = {
   discount_cents?: number
   payment_method: PaymentMethod
   comment?: string | null
+  kind?: VisitKind
 }
 
 export function useCreateVisit(salonId: string | undefined) {
@@ -119,6 +122,7 @@ export function useCreateVisit(salonId: string | undefined) {
         comment: input.comment ?? null,
         source: 'manual',
         group_key: null,
+        kind: input.kind ?? 'visit',
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

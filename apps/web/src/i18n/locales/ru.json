@@ -527,7 +527,24 @@
     "fab_label": "Визит",
     "tabs": {
       "single": "Один визит",
-      "bulk": "Несколько визитов"
+      "bulk": "Несколько визитов",
+      "retail": "Продажа"
+    },
+    "retail": {
+      "badge": "Продажа",
+      "item_label": "Что продали",
+      "item_placeholder": "Например: шампунь Wella, абонемент",
+      "staff_label_optional": "Мастер (опционально)",
+      "staff_placeholder": "Кто продал?",
+      "staff_none": "Без мастера",
+      "comment_placeholder": "Например: бренд, размер, скидка",
+      "submit": "Записать продажу",
+      "submit_and_continue": "Записать и добавить ещё",
+      "continue_hint": "Поле очищено — вводи следующую продажу.",
+      "toast_added": "Продажа записана",
+      "errors": {
+        "item_required": "Введи название товара или услуги"
+      }
     },
     "bulk_button": "Несколько визитов",
     "bulk": {

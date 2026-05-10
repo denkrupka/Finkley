@@ -325,6 +325,11 @@ function SingleVisitRow({
         </span>
       </span>
       <span className="text-foreground hidden truncate text-sm sm:inline">
+        {v.kind === 'retail' ? (
+          <span className="bg-brand-yellow/40 text-brand-navy mr-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+            {t('visits.retail.badge')}
+          </span>
+        ) : null}
         {svc?.name ?? v.service_name_snapshot ?? '—'}
       </span>
       <span className="text-muted-foreground hidden truncate text-sm sm:inline">
