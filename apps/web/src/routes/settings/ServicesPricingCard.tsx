@@ -1,4 +1,4 @@
-import { Archive, Loader2, Plus, RotateCcw } from 'lucide-react'
+import { Archive, FlaskConical, Loader2, Plus, RotateCcw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -22,6 +22,7 @@ import {
 } from '@/hooks/useServices'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { ServiceRecipeDialog } from '@/routes/services/ServiceRecipeDialog'
 
 /**
  * ServicesPricingCard — полный CRUD услуг (TASK-12 + маржа TASK-23).
@@ -43,6 +44,7 @@ export function ServicesPricingCard() {
 
   const [showArchived, setShowArchived] = useState(false)
   const [archived, setArchived] = useState<typeof services>([])
+  const [recipeService, setRecipeService] = useState<{ id: string; name: string } | null>(null)
 
   // Локальные drafts по id — что пользователь набирает до blur.
   const [drafts, setDrafts] = useState<
@@ -329,14 +331,24 @@ export function ServicesPricingCard() {
                       ) : null}
                     </td>
                     <td className="py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => archive(s.id)}
-                        className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md transition-colors"
-                        title={t('settings.services.archive')}
-                      >
-                        <Archive className="size-4" strokeWidth={1.8} />
-                      </button>
+                      <span className="inline-flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setRecipeService({ id: s.id, name: s.name })}
+                          className="text-muted-foreground hover:text-brand-teal grid size-8 place-items-center rounded-md transition-colors"
+                          title={t('settings.services.recipe')}
+                        >
+                          <FlaskConical className="size-4" strokeWidth={1.8} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => archive(s.id)}
+                          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md transition-colors"
+                          title={t('settings.services.archive')}
+                        >
+                          <Archive className="size-4" strokeWidth={1.8} />
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 )
@@ -386,6 +398,15 @@ export function ServicesPricingCard() {
       </div>
 
       <p className="text-muted-foreground mt-3 text-xs">{t('settings.services.hint')}</p>
+
+      {salonId ? (
+        <ServiceRecipeDialog
+          open={!!recipeService}
+          onClose={() => setRecipeService(null)}
+          salonId={salonId}
+          service={recipeService}
+        />
+      ) : null}
     </section>
   )
 }
