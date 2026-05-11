@@ -97,8 +97,6 @@ export function IntegrationsPage() {
 
       {activeCategory === 'banking' ? (
         <BankingSection salonId={salonId} />
-      ) : activeCategory === 'documents' ? (
-        <DocumentsTabContent />
       ) : tabProviders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('integrations.tab_empty')}</p>
       ) : (
@@ -121,20 +119,6 @@ export function IntegrationsPage() {
       <BooksyConnectDialog open={booksyOpen} onClose={() => setBooksyOpen(false)} />
       <WfirmaConnectDialog open={wfirmaOpen} onClose={() => setWfirmaOpen(false)} />
       <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} />
-    </div>
-  )
-}
-
-/**
- * Заглушка для категории «Документы и OCR» — OCR сейчас работает прозрачно
- * на странице расходов при загрузке чека (см. TASK-30 в backlog). Здесь
- * показываем краткое объяснение и ссылку на расходы.
- */
-function DocumentsTabContent() {
-  const { t } = useTranslation()
-  return (
-    <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-      <p className="text-foreground/80 text-sm leading-snug">{t('integrations.documents_body')}</p>
     </div>
   )
 }
