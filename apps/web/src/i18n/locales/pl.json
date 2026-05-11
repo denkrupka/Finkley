@@ -1090,7 +1090,9 @@
       "banking_subtitle": "Podłącz konta bankowe przez PSD2 — operacje rozłożą się automatycznie po wydatkach i opłatach wizyt.",
       "documents": "Dokumenty i OCR",
       "documents_subtitle": "Rozpoznawanie paragonów i faktur przez AI dla wydatków, które nie trafiły do KSeF."
-    }
+    },
+    "tab_empty": "Nic jeszcze nie jest podłączone w tej kategorii.",
+    "documents_body": "OCR działa automatycznie przy wgraniu paragonu w formularzu wydatku: AI rozpoznaje kwotę, datę, sprzedawcę i NIP. Nie ma osobnych ustawień — zrób zdjęcie paragonu na stronie „Wydatki”, resztę zrobimy sami. Jeśli na paragonie jest NIP nabywcy i pasuje do Twojej firmy — wydatek automatycznie trafi do podłączonej księgowości."
   },
   "import": {
     "title": "Import wizyt z CSV",

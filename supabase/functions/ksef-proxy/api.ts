@@ -4,13 +4,14 @@
  * Источник: https://github.com/CIRFMF/ksef-api
  *
  * Auth flow (token-based):
- *   1) GET  /security/public-key-certificates → выбираем сертификат
- *      usage="KsefTokenEncryption" с самой свежей validFrom
- *   2) POST /auth/challenge (empty body) → { challenge, timestamp (ms) }
+ *   1) GET  /api/v2/security/public-key-certificates → выбираем сертификат
+ *      usage="KsefTokenEncryption" с самой свежей validFrom (на проде топ-левел
+ *      массив, не объект с обёрткой)
+ *   2) POST /api/v2/auth/challenge (empty body) → { challenge, timestamp (ms) }
  *   3) Шифруем `<token>|<timestampMs>` через RSA-OAEP-SHA256 публичным
  *      ключом сертификата, base64
- *   4) POST /auth/ksef-token { challenge, encryptedToken, contextIdentifier,
- *      publicKeyId } → { authenticationToken.token (JWT), referenceNumber }
+ *   4) POST /api/v2/auth/ksef-token { challenge, encryptedToken, contextIdentifier }
+ *      → { authenticationToken.token (JWT), referenceNumber }
  *   5) POST /auth/token/redeem (Authorization: Bearer authenticationToken)
  *      → { accessToken, refreshToken }
  *   6) Все остальные запросы — Authorization: Bearer accessToken
@@ -30,10 +31,13 @@
 
 /**
  * KSeF API 2.0 — только prod environment (решение владельца 2026-05-11).
- * Тестовые/demo окружения не используем: у владельца реальные фирмы с
- * реальными фактурами, тестировать смысла нет.
+ * Тестовые/demo окружения не используем.
+ *
+ * Базовый URL включает префикс `/api/v2` — реальные endpoints на проде
+ * именно под ним (например, `/api/v2/security/public-key-certificates`),
+ * хотя в docs на GitHub пути показаны без префикса.
  */
-const PROD_BASE = 'https://api.ksef.mf.gov.pl'
+const PROD_BASE = 'https://api.ksef.mf.gov.pl/api/v2'
 
 function baseUrl(): string {
   return PROD_BASE
@@ -76,28 +80,41 @@ export type KsefError = {
 // =============================================================================
 
 type PublicKeyCert = {
-  publicKeyId: string
   certificate: string // base64 X.509 DER
   validFrom: string
   validTo: string
-  usage: string[]
+  usage: string[] | string
 }
 
-async function fetchEncryptionKey(): Promise<
-  { ok: true; publicKeyId: string; cert: Uint8Array } | KsefError
-> {
+async function fetchEncryptionKey(): Promise<{ ok: true; cert: Uint8Array } | KsefError> {
+  const url = `${baseUrl()}/security/public-key-certificates`
   try {
-    const res = await fetch(`${baseUrl()}/security/public-key-certificates`, {
-      headers: { Accept: 'application/json' },
-    })
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
     if (!res.ok) {
-      return { ok: false, code: 'KEYGEN', status: res.status, message: await res.text() }
+      const body = await res.text()
+      return {
+        ok: false,
+        code: 'KEYGEN',
+        status: res.status,
+        message: `HTTP ${res.status} from ${url}: ${body.slice(0, 200)}`,
+      }
     }
-    const json = (await res.json()) as { publicKeyCertificates?: PublicKeyCert[] }
-    const all = json.publicKeyCertificates ?? []
+    const raw = await res.json()
+    // KSeF 2.0 prod возвращает top-level массив сертификатов.
+    // На всякий случай поддерживаем и обёртку { publicKeyCertificates: [...] }.
+    const all: PublicKeyCert[] = Array.isArray(raw)
+      ? (raw as PublicKeyCert[])
+      : (((raw as { publicKeyCertificates?: PublicKeyCert[] }).publicKeyCertificates ??
+          []) as PublicKeyCert[])
+
     const now = Date.now()
     const eligible = all
-      .filter((k) => k.usage?.includes('KsefTokenEncryption'))
+      .filter((k) => {
+        const u = k.usage as unknown
+        if (typeof u === 'string') return u === 'KsefTokenEncryption'
+        if (Array.isArray(u)) return u.includes('KsefTokenEncryption')
+        return false
+      })
       .filter((k) => {
         const from = new Date(k.validFrom).getTime()
         const to = new Date(k.validTo).getTime()
@@ -106,12 +123,20 @@ async function fetchEncryptionKey(): Promise<
       .sort((a, b) => new Date(b.validFrom).getTime() - new Date(a.validFrom).getTime())
     const chosen = eligible[0]
     if (!chosen) {
-      return { ok: false, code: 'KEYGEN', message: 'no_valid_encryption_cert' }
+      return {
+        ok: false,
+        code: 'KEYGEN',
+        message: `no_valid_encryption_cert (got ${all.length} certs from ${url})`,
+      }
     }
     const certBytes = Uint8Array.from(atob(chosen.certificate), (c) => c.charCodeAt(0))
-    return { ok: true, publicKeyId: chosen.publicKeyId, cert: certBytes }
+    return { ok: true, cert: certBytes }
   } catch (e) {
-    return { ok: false, code: 'NETWORK', message: e instanceof Error ? e.message : String(e) }
+    return {
+      ok: false,
+      code: 'NETWORK',
+      message: `${e instanceof Error ? e.message : String(e)} (url=${url})`,
+    }
   }
 }
 
@@ -266,12 +291,13 @@ export async function openSession(
     }
   }
 
-  // Step 4: submit ksef-token
+  // Step 4: submit ksef-token. publicKeyId не передаём — KSeF API 2.0 prod
+  // не возвращает его в /security/public-key-certificates (только cert + usage
+  // + validity). Сертификат сам по себе содержит идентификатор внутри.
   const submitRes = await authPostJson('/auth/ksef-token', {
     challenge: ch.challenge,
     encryptedToken,
     contextIdentifier: { type: 'nip', value: nip },
-    publicKeyId: certRes.publicKeyId,
     authorizationPolicy: null,
   })
   if (!submitRes.ok) return submitRes

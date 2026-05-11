@@ -1089,7 +1089,9 @@
       "banking_subtitle": "Connect bank accounts via PSD2 — operations are auto-matched to expenses and visit payments.",
       "documents": "Documents & OCR",
       "documents_subtitle": "AI receipt and invoice recognition for expenses that didn't land in KSeF."
-    }
+    },
+    "tab_empty": "Nothing connected in this category yet.",
+    "documents_body": "OCR runs automatically when you upload a receipt in the expense form: AI extracts amount, date, vendor and NIP. There are no separate settings — just snap a photo on the Expenses page and we do the rest. If the receipt has a buyer NIP matching your company, the expense is auto-sent to the connected accounting portal."
   },
   "import": {
     "title": "Import visits from CSV",

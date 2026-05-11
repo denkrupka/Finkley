@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
@@ -21,15 +21,15 @@ import {
 import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
-import { KsefConnectDialog } from './KsefConnectDialog'
 import {
   CATEGORY_ORDER,
   INTEGRATIONS,
-  getCategoryLabel,
   getCategorySubtitle,
   type IntegrationCategory,
   type IntegrationDef,
 } from './integrations-config'
+import { IntegrationsTabsNav } from './IntegrationsTabsNav'
+import { KsefConnectDialog } from './KsefConnectDialog'
 import { WfirmaConnectDialog } from './WfirmaConnectDialog'
 
 /**
@@ -37,14 +37,28 @@ import { WfirmaConnectDialog } from './WfirmaConnectDialog'
  * статус всегда «не подключено», кнопка connect открывает модалку с полями,
  * сохранение пока вызывает toast «скоро будет». Реальный sync — TASK-28/29.
  */
+function isCategory(v: string | null): v is IntegrationCategory {
+  return v != null && (CATEGORY_ORDER as readonly string[]).includes(v)
+}
+
 export function IntegrationsPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
+  const [params, setParams] = useSearchParams()
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
   const [booksyOpen, setBooksyOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
   const [ksefOpen, setKsefOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
+
+  // Активная вкладка — в URL `?tab=accounting`, дефолт accounting.
+  const tabParam = params.get('tab')
+  const activeCategory: IntegrationCategory = isCategory(tabParam) ? tabParam : 'accounting'
+  function setActiveCategory(cat: IntegrationCategory) {
+    const next = new URLSearchParams(params)
+    next.set('tab', cat)
+    setParams(next, { replace: true })
+  }
 
   if (!salonId) return null
 
@@ -58,6 +72,8 @@ export function IntegrationsPage() {
     else if (p.id === 'ksef') setKsefOpen(true)
     else setConnecting(p)
   }
+
+  const tabProviders = INTEGRATIONS.filter((p) => p.category === activeCategory)
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
@@ -75,35 +91,29 @@ export function IntegrationsPage() {
         <p className="text-muted-foreground mt-1 text-sm">{t('integrations.subtitle')}</p>
       </div>
 
-      {/* Группировка по категориям. Банкинг — кастомная секция (одно
-          подключение != одна интеграция: юзер линкует N банков с разными
-          сессиями и сроками). Бухгалтерия / запись — обычные карточки. */}
-      {CATEGORY_ORDER.map((cat) => {
-        if (cat === 'banking') {
-          return (
-            <CategorySection key={cat} category={cat}>
-              <BankingSection salonId={salonId} />
-            </CategorySection>
-          )
-        }
-        const providers = INTEGRATIONS.filter((p) => p.category === cat)
-        if (providers.length === 0) return null
-        return (
-          <CategorySection key={cat} category={cat}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {providers.map((p) => (
-                <IntegrationCard
-                  key={p.id}
-                  provider={p}
-                  connection={connectedMap.get(p.id) ?? null}
-                  salonId={salonId}
-                  onConnect={() => handleConnect(p)}
-                />
-              ))}
-            </div>
-          </CategorySection>
-        )
-      })}
+      <IntegrationsTabsNav active={activeCategory} onChange={setActiveCategory} />
+
+      <p className="text-muted-foreground mb-4 text-xs">{t(getCategorySubtitle(activeCategory))}</p>
+
+      {activeCategory === 'banking' ? (
+        <BankingSection salonId={salonId} />
+      ) : activeCategory === 'documents' ? (
+        <DocumentsTabContent />
+      ) : tabProviders.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t('integrations.tab_empty')}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {tabProviders.map((p) => (
+            <IntegrationCard
+              key={p.id}
+              provider={p}
+              connection={connectedMap.get(p.id) ?? null}
+              salonId={salonId}
+              onConnect={() => handleConnect(p)}
+            />
+          ))}
+        </div>
+      )}
 
       <p className="text-muted-foreground mt-6 text-xs">{t('integrations.privacy_note')}</p>
 
@@ -115,24 +125,17 @@ export function IntegrationsPage() {
   )
 }
 
-function CategorySection({
-  category,
-  children,
-}: {
-  category: IntegrationCategory
-  children: ReactNode
-}) {
+/**
+ * Заглушка для категории «Документы и OCR» — OCR сейчас работает прозрачно
+ * на странице расходов при загрузке чека (см. TASK-30 в backlog). Здесь
+ * показываем краткое объяснение и ссылку на расходы.
+ */
+function DocumentsTabContent() {
   const { t } = useTranslation()
   return (
-    <section className="mb-7">
-      <header className="mb-3">
-        <h2 className="text-brand-navy text-sm font-bold uppercase tracking-wider">
-          {t(getCategoryLabel(category))}
-        </h2>
-        <p className="text-muted-foreground mt-0.5 text-xs">{t(getCategorySubtitle(category))}</p>
-      </header>
-      {children}
-    </section>
+    <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+      <p className="text-foreground/80 text-sm leading-snug">{t('integrations.documents_body')}</p>
+    </div>
   )
 }
 
