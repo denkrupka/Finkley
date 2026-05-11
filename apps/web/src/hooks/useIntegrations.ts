@@ -2,7 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
-export type IntegrationProvider = 'booksy' | 'fresha' | 'treatwell' | 'yclients' | 'wfirma'
+export type IntegrationProvider =
+  | 'booksy'
+  | 'fresha'
+  | 'treatwell'
+  | 'yclients'
+  | 'wfirma'
+  | 'fakturownia'
+  | 'infakt'
+  | 'ksef'
 
 export type SalonIntegrationPublic = {
   id: string
@@ -15,7 +23,7 @@ export type SalonIntegrationPublic = {
     staff_synced?: number
     services_synced?: number
     visits_synced?: number
-    // wFirma
+    // wFirma / KSeF / Fakturownia / iFirma / 360Księgowość
     expenses_synced?: number
     expenses_skipped?: number
   } | null
@@ -337,6 +345,268 @@ export function useWfirmaSync(salonId: string | undefined) {
       })
       if (error) throw error
       const json = data as WfirmaResponse<{
+        stats?: { expenses_synced: number; expenses_skipped: number }
+      }>
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
+      return json.stats!
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    },
+  })
+}
+
+// =============================================================================
+// Universal accounting-portal connector + sync (TASK-47..50)
+// =============================================================================
+
+export type AccountingProvider = 'fakturownia' | 'infakt'
+
+/**
+ * Приоритет источников учёта (см. ADR-013 §D). wFirma первая, потому что у
+ * неё больше всего фич (auto-login, NIP-match, KSeF push). inFakt последний
+ * (заявка на партнёрский доступ).
+ */
+const ACCOUNTING_PRIORITY: Array<'wfirma' | AccountingProvider> = [
+  'wfirma',
+  'fakturownia',
+  'infakt',
+]
+
+/**
+ * Возвращает id первого подключённого accounting-портала по приоритету
+ * или null если ни один не подключён. Используется в expenses UI для
+ * выбора куда «отправить расход».
+ */
+export function pickActiveAccountingProvider(
+  integrations: Pick<SalonIntegrationPublic, 'provider' | 'status'>[],
+): 'wfirma' | AccountingProvider | null {
+  for (const p of ACCOUNTING_PRIORITY) {
+    if (integrations.some((i) => i.provider === p && i.status === 'connected')) return p
+  }
+  return null
+}
+
+type AnyResponse = {
+  ok?: boolean
+  error?: string
+  message?: string
+  details?: string | null
+} & Record<string, unknown>
+
+const ACCOUNTING_FUNCTION_NAME: Record<AccountingProvider, string> = {
+  fakturownia: 'fakturownia-proxy',
+  infakt: 'infakt-proxy',
+}
+
+/**
+ * Универсальный коннектор для бухгалтерских порталов с api_token-style auth.
+ * Принимает произвольный набор полей (зависит от провайдера) и шлёт их в
+ * соответствующий <provider>-proxy с action='connect_with_credentials'.
+ */
+export function useAccountingConnect(
+  provider: AccountingProvider | null,
+  salonId: string | undefined,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: Record<string, string>) => {
+      if (!salonId) throw new Error('no salon')
+      if (!provider) throw new Error('no provider')
+      const fn = ACCOUNTING_FUNCTION_NAME[provider]
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: {
+          action: 'connect_with_credentials',
+          salon_id: salonId,
+          ...input,
+        },
+      })
+      if (error) {
+        type WithCtx = { context?: { json?: () => Promise<unknown> } }
+        const ctx = (error as unknown as WithCtx).context
+        if (ctx?.json) {
+          try {
+            const body = (await ctx.json()) as AnyResponse
+            throw new Error(body.error ?? body.message ?? error.message)
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr
+          }
+        }
+        throw error
+      }
+      const json = data as AnyResponse
+      if (!json.ok) throw new Error(json.error ?? json.message ?? 'unknown_error')
+      return json
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+/**
+ * Универсальный push одного расхода Finkley → accounting-портал.
+ * Mirror'ит wFirma push: auto=true ставит фильтры (наличие чека +
+ * совпадение buyer_nip с company_nip портала), auto=false push безусловно.
+ */
+export type AccountingPushResult =
+  | { kind: 'ok'; externalId: string }
+  | { kind: 'skipped'; reason: 'no_receipt' | 'no_buyer_nip' | 'nip_mismatch' }
+  | { kind: 'already_pushed'; externalId: string }
+  | { kind: 'error'; reason: string }
+
+export function useAccountingPushExpense(
+  provider: AccountingProvider | null,
+  salonId: string | undefined,
+) {
+  const qc = useQueryClient()
+  return useMutation<AccountingPushResult, Error, { expenseId: string; auto: boolean }>({
+    mutationFn: async ({ expenseId, auto }) => {
+      if (!salonId) throw new Error('no salon')
+      if (!provider) throw new Error('no provider')
+      const fn = ACCOUNTING_FUNCTION_NAME[provider]
+      const idKey = `${provider}_id`
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: {
+          action: 'push_expense',
+          salon_id: salonId,
+          expense_id: expenseId,
+          auto,
+        },
+      })
+      if (error) {
+        type WithCtx = { context?: { json?: () => Promise<unknown> } }
+        const ctx = (error as unknown as WithCtx).context
+        if (ctx?.json) {
+          try {
+            const body = (await ctx.json()) as AnyResponse & Record<string, string | undefined>
+            const existingId = body[idKey]
+            if (body.error === 'already_pushed' && typeof existingId === 'string') {
+              return { kind: 'already_pushed', externalId: existingId }
+            }
+            return { kind: 'error', reason: body.error ?? body.message ?? error.message }
+          } catch {
+            // ignore
+          }
+        }
+        throw error
+      }
+      const json = data as AnyResponse & Record<string, string | undefined>
+      const externalId = json[idKey]
+      if (json.ok && typeof externalId === 'string') {
+        return { kind: 'ok', externalId }
+      }
+      if (!json.ok) {
+        switch (json.error) {
+          case 'skipped_no_receipt':
+            return { kind: 'skipped', reason: 'no_receipt' }
+          case 'skipped_no_buyer_nip':
+            return { kind: 'skipped', reason: 'no_buyer_nip' }
+          case 'skipped_nip_mismatch':
+            return { kind: 'skipped', reason: 'nip_mismatch' }
+          default:
+            return { kind: 'error', reason: json.error ?? json.message ?? 'unknown_error' }
+        }
+      }
+      return { kind: 'error', reason: 'unknown' }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    },
+  })
+}
+
+/** Универсальный sync для accounting-порталов. */
+export function useAccountingSync(
+  provider: AccountingProvider | null,
+  salonId: string | undefined,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      if (!provider) throw new Error('no provider')
+      const fn = ACCOUNTING_FUNCTION_NAME[provider]
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: { action: 'sync', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as AnyResponse & {
+        stats?: { expenses_synced: number; expenses_skipped: number }
+      }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
+      return json.stats ?? { expenses_synced: 0, expenses_skipped: 0 }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    },
+  })
+}
+
+// =============================================================================
+// KSeF (TASK-46): прямой коннект к госреестру через token из «Mój KSeF»
+// =============================================================================
+
+type KsefResponse<T> = {
+  ok?: boolean
+  error?: string
+  details?: string | null
+  message?: string
+} & T
+
+function unpackKsef<T>(data: KsefResponse<T>): T {
+  if (!data.ok) throw new Error(data.error ?? data.message ?? 'unknown_error')
+  return data
+}
+
+/** Подключить КСеФ через NIP + token из «Mój KSeF». */
+export function useKsefConnect(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { nip: string; token: string }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('ksef-proxy', {
+        body: {
+          action: 'connect_with_token',
+          salon_id: salonId,
+          nip: input.nip,
+          token: input.token,
+        },
+      })
+      if (error) {
+        type WithCtx = { context?: { json?: () => Promise<unknown> } }
+        const ctx = (error as unknown as WithCtx).context
+        if (ctx?.json) {
+          try {
+            const body = (await ctx.json()) as KsefResponse<unknown>
+            throw new Error(body.error ?? body.message ?? error.message)
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr
+          }
+        }
+        throw error
+      }
+      return unpackKsef(data as KsefResponse<{ nip: string }>)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+/** Sync КСеФ → Finkley (тянет входящие фактуры в expenses). */
+export function useKsefSync(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('ksef-proxy', {
+        body: { action: 'sync', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as KsefResponse<{
         stats?: { expenses_synced: number; expenses_skipped: number }
       }>
       if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')

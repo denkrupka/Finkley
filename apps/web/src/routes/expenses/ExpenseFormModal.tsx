@@ -31,7 +31,18 @@ import {
   type ExpenseCategoryRow,
   type ExpenseRecurrence,
 } from '@/hooks/useExpenses'
-import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
+import {
+  pickActiveAccountingProvider,
+  useAccountingPushExpense,
+  useSalonIntegrations,
+  useWfirmaPushExpense,
+} from '@/hooks/useIntegrations'
+
+const PORTAL_DISPLAY_NAME: Record<string, string> = {
+  wfirma: 'wFirma',
+  fakturownia: 'Fakturownia',
+  infakt: 'inFakt',
+}
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
 
@@ -124,8 +135,12 @@ export function ExpenseFormModal({
     vendor_nip: null,
   })
 
-  const wfirmaConnected = integrations.some(
-    (i) => i.provider === 'wfirma' && i.status === 'connected',
+  // Активный accounting-портал (приоритет wFirma > Fakturownia > ... — ADR-013).
+  // Он получит auto-push после save если у расхода есть чек.
+  const activeAccounting = pickActiveAccountingProvider(integrations)
+  const accountingPush = useAccountingPushExpense(
+    activeAccounting && activeAccounting !== 'wfirma' ? activeAccounting : null,
+    salonId,
   )
 
   const form = useForm<FormValues>({
@@ -191,36 +206,60 @@ export function ExpenseFormModal({
           setOcrNips({ buyer_nip: null, vendor_nip: null })
           onOpenChange(false)
 
-          // Auto-push в wFirma если подключена и есть чек.
-          // Edge function сам решит — пушить или скипнуть (по NIP).
-          if (wfirmaConnected && receiptUrl && created?.id) {
-            wfirmaPush.mutate(
-              { expenseId: created.id, auto: true },
-              {
-                onSuccess: (res) => {
-                  if (res.kind === 'ok') {
-                    toast.success(t('expenses.wfirma.toast_auto_pushed'))
-                  } else if (res.kind === 'skipped') {
-                    if (res.reason === 'nip_mismatch') {
-                      toast.info(t('expenses.wfirma.toast_skipped_nip_mismatch'))
-                    } else if (res.reason === 'no_buyer_nip') {
-                      toast.info(t('expenses.wfirma.toast_skipped_no_nip'))
+          // Auto-push в активный accounting-портал если подключён и есть чек.
+          // wFirma имеет дополнительный фильтр по NIP-match (server-side в edge
+          // function); остальные порталы пушат любой расход с чеком (тоже
+          // server-side check). См. ADR-013.
+          if (activeAccounting && receiptUrl && created?.id) {
+            const portalLabel = PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
+            if (activeAccounting === 'wfirma') {
+              wfirmaPush.mutate(
+                { expenseId: created.id, auto: true },
+                {
+                  onSuccess: (res) => {
+                    if (res.kind === 'ok') {
+                      toast.success(t('expenses.wfirma.toast_auto_pushed'))
+                    } else if (res.kind === 'skipped') {
+                      if (res.reason === 'nip_mismatch') {
+                        toast.info(t('expenses.wfirma.toast_skipped_nip_mismatch'))
+                      } else if (res.reason === 'no_buyer_nip') {
+                        toast.info(t('expenses.wfirma.toast_skipped_no_nip'))
+                      }
+                    } else if (res.kind === 'error') {
+                      toast.error(t('expenses.wfirma.toast_push_failed'), {
+                        description: res.reason,
+                      })
                     }
-                    // no_receipt здесь не возникает — мы попадаем сюда только при receiptUrl
-                  } else if (res.kind === 'error') {
+                  },
+                  onError: (err) => {
                     toast.error(t('expenses.wfirma.toast_push_failed'), {
-                      description: res.reason,
+                      description: err instanceof Error ? err.message : String(err),
                     })
-                  }
+                  },
                 },
-                // onError ловит сетевые сбои; локальную проблему уже логируем выше
-                onError: (err) => {
-                  toast.error(t('expenses.wfirma.toast_push_failed'), {
-                    description: err instanceof Error ? err.message : String(err),
-                  })
+              )
+            } else {
+              accountingPush.mutate(
+                { expenseId: created.id, auto: true },
+                {
+                  onSuccess: (res) => {
+                    if (res.kind === 'ok') {
+                      toast.success(t('expenses.portal.toast_auto_pushed', { portal: portalLabel }))
+                    } else if (res.kind === 'error') {
+                      toast.error(t('expenses.portal.toast_push_failed', { portal: portalLabel }), {
+                        description: res.reason,
+                      })
+                    }
+                    // skipped/already_pushed для не-wFirma порталов — тихий no-op
+                  },
+                  onError: (err) => {
+                    toast.error(t('expenses.portal.toast_push_failed', { portal: portalLabel }), {
+                      description: err instanceof Error ? err.message : String(err),
+                    })
+                  },
                 },
-              },
-            )
+              )
+            }
           }
         },
         onError: (err) => {

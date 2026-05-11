@@ -434,7 +434,8 @@ async function syncWfirmaToFinkley(
       receipt_url: receiptPath,
       metadata: {
         wfirma_expense_id: detail.id,
-        wfirma_ksef_id: ksefId,
+        ksef_id: ksefId, // унифицированное поле для дедупа кросс-портал
+        wfirma_ksef_id: ksefId, // legacy backwards compat — оставляем 1 релиз
         vendor_nip: vendorNip,
         currency_original: money.currency,
         ...(categoryMapped ? { wfirma_category_mapped: categoryMapped } : {}),

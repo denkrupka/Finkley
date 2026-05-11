@@ -20,12 +20,16 @@ export type ExpenseRow = {
   recurrence_parent_id: string | null
   /**
    * Произвольные метаданные jsonb. Известные ключи:
+   *   ksef_id           — NumerKSeF фактуры; уникальный кросс-портал ключ
+   *                       для дедупа (КСеФ, wFirma, Fakturownia, iFirma, ...)
    *   wfirma_expense_id — расход уже отправлен в wFirma (push успешен)
    *   wfirma_pushed_at  — ISO timestamp push'а
-   *   wfirma_ksef_id    — id фактуры в KSeF (если расход импортирован из wFirma)
+   *   wfirma_ksef_id    — legacy alias для ksef_id (1 релиз backward compat)
+   *   fakturownia_id    — id в Fakturownia (после push или из импорта)
+   *   infakt_id         — id в inFakt
    *   buyer_nip         — NIP nabywcy из OCR-результата
    *   vendor_nip        — NIP sprzedawcy из OCR-результата
-   *   currency_original — оригинальная валюта (для импортов из wFirma)
+   *   currency_original — оригинальная валюта (для импортов)
    */
   metadata: Record<string, unknown> | null
   created_at: string

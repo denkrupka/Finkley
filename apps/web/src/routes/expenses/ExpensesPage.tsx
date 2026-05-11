@@ -27,7 +27,12 @@ import {
   type ExpenseRow,
 } from '@/hooks/useExpenses'
 import type { PaymentMethod } from '@/hooks/useVisits'
-import { useSalonIntegrations, useWfirmaPushExpense } from '@/hooks/useIntegrations'
+import {
+  pickActiveAccountingProvider,
+  useAccountingPushExpense,
+  useSalonIntegrations,
+  useWfirmaPushExpense,
+} from '@/hooks/useIntegrations'
 import { BudgetsCard } from './BudgetsCard'
 import { InflowsList } from './InflowsList'
 import { useSalon } from '@/hooks/useSalons'
@@ -35,6 +40,13 @@ import { getDatePeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { ExpenseFormModal } from './ExpenseFormModal'
+
+// Display-имена бухгалтерских порталов для toast/aria-label
+const PORTAL_DISPLAY_NAME: Record<string, string> = {
+  wfirma: 'wFirma',
+  fakturownia: 'Fakturownia',
+  infakt: 'inFakt',
+}
 
 // Цвета 4-х основных summary-карточек (как в прототипе)
 const CATEGORY_COLORS = [
@@ -73,8 +85,14 @@ export function ExpensesPage() {
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
-  const wfirmaConnected = integrations.some(
-    (i) => i.provider === 'wfirma' && i.status === 'connected',
+  // Активный accounting-портал (приоритет wFirma > Fakturownia > ... — см.
+  // ADR-013). Один портал на UI-кнопку: если у юзера подключено несколько,
+  // выбираем первый по приоритету. Можно потом добавить выбор куда пушить
+  // в подменю, если будет реальный спрос.
+  const activeAccounting = pickActiveAccountingProvider(integrations)
+  const accountingPush = useAccountingPushExpense(
+    activeAccounting && activeAccounting !== 'wfirma' ? activeAccounting : null,
+    salonId,
   )
 
   const [formOpen, setFormOpen] = useState(false)
@@ -301,20 +319,31 @@ export function ExpensesPage() {
                           −{formatCurrency(e.amount_cents, currency)}
                         </span>
                         <div className="flex items-center gap-0.5">
-                          {wfirmaConnected && e.source !== 'wfirma'
+                          {activeAccounting && e.source !== activeAccounting
                             ? (() => {
                                 const meta = (e.metadata ?? {}) as Record<string, unknown>
-                                const wfId =
-                                  typeof meta.wfirma_expense_id === 'string'
-                                    ? meta.wfirma_expense_id
-                                    : null
+                                const idKey =
+                                  activeAccounting === 'wfirma'
+                                    ? 'wfirma_expense_id'
+                                    : `${activeAccounting}_id`
+                                const pushedId =
+                                  typeof meta[idKey] === 'string' ? (meta[idKey] as string) : null
+                                const portalLabel =
+                                  PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
                                 const isPushing =
-                                  wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
-                                if (wfId) {
+                                  activeAccounting === 'wfirma'
+                                    ? wfirmaPush.isPending &&
+                                      wfirmaPush.variables?.expenseId === e.id
+                                    : accountingPush.isPending &&
+                                      accountingPush.variables?.expenseId === e.id
+                                if (pushedId) {
                                   return (
                                     <span
                                       className="grid size-7 place-items-center rounded-md text-emerald-600"
-                                      title={t('expenses.wfirma.tooltip_pushed', { id: wfId })}
+                                      title={t('expenses.portal.tooltip_pushed', {
+                                        portal: portalLabel,
+                                        id: pushedId,
+                                      })}
                                     >
                                       <CheckCircle2 className="size-4" strokeWidth={1.8} />
                                     </span>
@@ -324,35 +353,83 @@ export function ExpensesPage() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      wfirmaPush.mutate(
-                                        { expenseId: e.id, auto: false },
-                                        {
-                                          onSuccess: (res) => {
-                                            if (res.kind === 'ok') {
-                                              toast.success(
-                                                t('expenses.wfirma.toast_manual_pushed'),
-                                              )
-                                            } else if (res.kind === 'already_pushed') {
-                                              toast.info(t('expenses.wfirma.toast_already_pushed'))
-                                            } else if (res.kind === 'error') {
-                                              toast.error(t('expenses.wfirma.toast_push_failed'), {
-                                                description: res.reason,
-                                              })
-                                            }
+                                      const onCommonResult = (
+                                        kind: 'ok' | 'already_pushed' | 'error',
+                                        reason?: string,
+                                      ) => {
+                                        if (kind === 'ok') {
+                                          toast.success(
+                                            t('expenses.portal.toast_manual_pushed', {
+                                              portal: portalLabel,
+                                            }),
+                                          )
+                                        } else if (kind === 'already_pushed') {
+                                          toast.info(
+                                            t('expenses.portal.toast_already_pushed', {
+                                              portal: portalLabel,
+                                            }),
+                                          )
+                                        } else {
+                                          toast.error(
+                                            t('expenses.portal.toast_push_failed', {
+                                              portal: portalLabel,
+                                            }),
+                                            { description: reason },
+                                          )
+                                        }
+                                      }
+                                      const onErr = (err: unknown) =>
+                                        toast.error(
+                                          t('expenses.portal.toast_push_failed', {
+                                            portal: portalLabel,
+                                          }),
+                                          {
+                                            description:
+                                              err instanceof Error ? err.message : String(err),
                                           },
-                                          onError: (err) => {
-                                            toast.error(t('expenses.wfirma.toast_push_failed'), {
-                                              description:
-                                                err instanceof Error ? err.message : String(err),
-                                            })
+                                        )
+                                      if (activeAccounting === 'wfirma') {
+                                        wfirmaPush.mutate(
+                                          { expenseId: e.id, auto: false },
+                                          {
+                                            onSuccess: (res) =>
+                                              onCommonResult(
+                                                res.kind === 'ok'
+                                                  ? 'ok'
+                                                  : res.kind === 'already_pushed'
+                                                    ? 'already_pushed'
+                                                    : 'error',
+                                                'reason' in res ? res.reason : undefined,
+                                              ),
+                                            onError: onErr,
                                           },
-                                        },
-                                      )
+                                        )
+                                      } else {
+                                        accountingPush.mutate(
+                                          { expenseId: e.id, auto: false },
+                                          {
+                                            onSuccess: (res) =>
+                                              onCommonResult(
+                                                res.kind === 'ok'
+                                                  ? 'ok'
+                                                  : res.kind === 'already_pushed'
+                                                    ? 'already_pushed'
+                                                    : 'error',
+                                                'reason' in res ? res.reason : undefined,
+                                              ),
+                                            onError: onErr,
+                                          },
+                                        )
+                                      }
                                     }}
                                     disabled={isPushing}
                                     className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
-                                    aria-label={t('expenses.wfirma.push_button')}
-                                    title={t('expenses.wfirma.push_button')}
+                                    aria-label={t('expenses.portal.push_button', {
+                                      portal: portalLabel,
+                                    })}
+                                    title={t('expenses.portal.push_button', {
+                                      portal: portalLabel,
+                                    })}
                                   >
                                     {isPushing ? (
                                       <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />

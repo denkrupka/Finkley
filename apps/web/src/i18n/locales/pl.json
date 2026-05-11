@@ -975,7 +975,12 @@
       "password": "Hasło",
       "access_key": "Access key (z wFirma → API)",
       "secret_key": "Secret key (z wFirma → API)",
-      "company_id": "Company ID (z wFirma → URL)"
+      "company_id": "Company ID (z wFirma → URL)",
+      "ksef_nip": "NIP firmy (10 cyfr)",
+      "ksef_token": "Token z „Mój KSeF” (uzyskaj przez Profil Zaufany)",
+      "fakturownia_subdomain": "Subdomena Fakturowni (np. mojsalon)",
+      "fakturownia_api_token": "Token API (Ustawienia → Integracje)",
+      "infakt_api_token": "Token API (otrzymywany przy dostępie partnerskim)"
     },
     "errors": {
       "fields_required": "Wypełnij wszystkie wymagane pola",
@@ -995,7 +1000,18 @@
       "wfirma_company_id_not_found": "Tej firmy nie znaleziono na Twoim koncie wFirma. Sprawdź Company ID.",
       "wfirma_invalid_keys_format": "Access key i Secret key muszą być ciągami 32 znaków szesnastkowych.",
       "wfirma_invalid_company_id": "Company ID to liczba (na przykład 884136). Znajdź ją w URL po zalogowaniu.",
-      "wfirma_auto_login_disabled": "Auto-podłączenie chwilowo wyłączone. Wpisz klucze ręcznie w sąsiedniej zakładce."
+      "wfirma_auto_login_disabled": "Auto-podłączenie chwilowo wyłączone. Wpisz klucze ręcznie w sąsiedniej zakładce.",
+      "ksef_invalid_nip": "NIP musi mieć 10 cyfr. Spacje i myślniki są w porządku — usuniemy je.",
+      "ksef_invalid_token": "Token musi mieć co najmniej 32 znaki. Skopiuj z „Mój KSeF” → Tokeny.",
+      "ksef_invalid_credentials": "KSeF nie przyjął tego tokenu. Sprawdź, czy NIP i token są z tej samej firmy.",
+      "ksef_challenge_failed": "KSeF nie odpowiada na challenge — spróbuj później lub sprawdź środowisko (test/prod).",
+      "ksef_api_error": "Błąd API KSeF. Szczegóły w logach — spróbuj ponownie za minutę.",
+      "fakturownia_invalid_credentials": "Nieprawidłowy token API Fakturowni. Sprawdź Ustawienia → Integracje → API.",
+      "fakturownia_invalid_subdomain": "Nie znaleziono subdomeny Fakturowni. To część URL PRZED `.fakturownia.pl` (np. `mojsalon`).",
+      "fakturownia_api_error": "Błąd API Fakturowni. Szczegóły w logach — spróbuj ponownie za minutę.",
+      "infakt_invalid_credentials": "inFakt nie przyjął tokenu. Upewnij się, że masz dostęp partnerski.",
+      "infakt_api_error": "Błąd API inFakt. Spróbuj ponownie za minutę.",
+      "infakt_not_partner_yet": "Integracja inFakt jest w fazie wniosku partnerskiego — kod gotowy, ale klucze jeszcze nie są wydawane."
     },
     "status": {
       "available": "Gotowe",
@@ -1026,7 +1042,19 @@
       "choose_company_subtitle": "Na Twoim koncie wFirma jest kilka firm. Wybierz, do której z nich przypisać ten salon w Finkley — będziemy synchronizować wydatki tylko z niej."
     },
     "toast_synced_wfirma": "wFirma: dodano {{synced}} nowych wydatków, pominięto {{skipped}}",
+    "toast_synced_ksef": "KSeF: dodano {{synced}} nowych faktur, pominięto {{skipped}}",
+    "toast_synced_expenses": "{{name}}: dodano {{synced}} nowych wydatków, pominięto {{skipped}}",
     "last_sync_stats_wfirma": "Zaimportowano: {{synced}} · Pominięto: {{skipped}}",
+    "last_sync_stats_expenses": "Zaimportowano: {{synced}} · Pominięto: {{skipped}}",
+    "ksef": {
+      "dialog_subtitle": "Podłącz Krajowy System e-Faktur (KSeF), jeśli nie korzystasz z wFirma/Fakturownia. Faktury od dostawców trafią do wydatków automatycznie.",
+      "step1": "Wejdź na ksef.mf.gov.pl przez Profil Zaufany",
+      "step2": "Otwórz sekcję „Tokeny” → „Wygeneruj nowy token”",
+      "step3": "Wybierz rolę „Wgląd w faktury” (dostęp tylko do odczytu)",
+      "step4": "Skopiuj token i wklej tutaj. NIP — Twój 10-cyfrowy numer podatkowy.",
+      "token_hint": "Token to długi ciąg liter i cyfr. Ważny 90+ dni.",
+      "security_note": "Token jest szyfrowany na serwerze (AES-256). Dostęp tylko do odczytu faktur (rola „Wgląd”). Możesz go odwołać w „Mój KSeF” → Tokeny w każdej chwili."
+    },
     "providers": {
       "booksy": {
         "description": "Polska platforma rezerwacji online numer 1 dla salonów kosmetycznych. Pobierzemy wizyty, klientów i usługi z Twojego konta."
@@ -1042,7 +1070,26 @@
       },
       "wfirma": {
         "description": "Polski system księgowy (JDG/spółka). Integracja wyśle wydatki jako faktury zakupu + pobierze przychody. Gotowa na KSeF."
+      },
+      "ksef": {
+        "description": "Krajowy System e-Faktur (KSeF). Podłącz, jeśli nie korzystasz z wFirma/Fakturownia — faktury od dostawców trafią do wydatków bezpośrednio z rejestru."
+      },
+      "fakturownia": {
+        "description": "Polski SaaS do księgowości i fakturowania. Wydatki i płatności synchronizujemy w obie strony."
+      },
+      "infakt": {
+        "description": "inFakt — polski serwis dla samozatrudnionych i spółek. Integracja w fazie wniosku partnerskiego — wkrótce."
       }
+    },
+    "categories": {
+      "accounting": "Księgowość i faktury",
+      "accounting_subtitle": "Polskie portale księgowe i KSeF. Podłącz jeden — faktury zakupu trafią do wydatków same.",
+      "booking": "Rezerwacja i kalendarz",
+      "booking_subtitle": "Platformy rezerwacji online. Wizyty, klienci i usługi synchronizują się automatycznie.",
+      "banking": "Bankowość",
+      "banking_subtitle": "Podłącz konta bankowe przez PSD2 — operacje rozłożą się automatycznie po wydatkach i opłatach wizyt.",
+      "documents": "Dokumenty i OCR",
+      "documents_subtitle": "Rozpoznawanie paragonów i faktur przez AI dla wydatków, które nie trafiły do KSeF."
     }
   },
   "import": {
@@ -1240,6 +1287,14 @@
       "toast_skipped_no_nip": "Nie wysłano do wFirma: na paragonie nie ma NIP nabywcy. Przycisk „Wyślij ręcznie” na liście wydatków.",
       "toast_skipped_nip_mismatch": "Nie wysłano do wFirma: NIP nabywcy na paragonie nie zgadza się z Twoją firmą. Przycisk „Wyślij ręcznie” na liście wydatków.",
       "toast_push_failed": "Nie udało się wysłać do wFirma"
+    },
+    "portal": {
+      "push_button": "Wyślij do {{portal}}",
+      "tooltip_pushed": "Wysłano do {{portal}} (id: {{id}})",
+      "toast_manual_pushed": "Wydatek wysłany do {{portal}} ✓",
+      "toast_already_pushed": "Ten wydatek już jest w {{portal}}",
+      "toast_push_failed": "Nie udało się wysłać do {{portal}}",
+      "toast_auto_pushed": "Wydatek dodany i wysłany do {{portal}} ✓"
     }
   },
   "payment_methods": {

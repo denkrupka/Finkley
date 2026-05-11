@@ -534,11 +534,101 @@ Edge function `ocr-receipt` (Anthropic Claude Haiku 4.5 vision). UI кнопка
 - **OCR-расширение** (`ocr-receipt`): Vision-промпт теперь возвращает `vendor_nip`+`buyer_nip` (NIP sprzedawcy и nabywcy на польских фактурах). Используется в auto-match push.
 - **Валюта**: PLN/EUR/USD/любая ISO — wFirma сама конвертирует по курсу NBP (см. документацию wFirma); никаких блокировок по currency.
 
-**Что не сделано (отдельные задачи если понадобятся):**
+### TASK-44: wFirma — хвосты (PDF, multi-company, category mapping) ✅ DONE (10 мая 2026)
 
-- Импорт PDF фактуры в Storage receipts при sync — пока тянем только метаданные. wFirma уже хранит PDF у себя.
-- Per-salon выбор фирмы при auto-login если в аккаунте несколько фирм — берём первую. Если у юзера их несколько — пусть подключается через Manual-таб с другим companyId.
-- Semantic-маппинг категорий wFirma → Finkley при импорте — все идут в одну дефолтную «Импорт wFirma» категорию, юзер перекатегоризирует руками.
+См. ниже плюс TASK-46..51 — закрываем стадию 3 «Интеграции» полностью.
+
+### TASK-45: Категории на странице `/integrations` ✅ DONE (10 мая 2026)
+
+**Стадия:** 3 · **Оценка:** S
+
+`/integrations` сгруппирована в 4 секции с заголовками: Бухгалтерия и фактуры / Запись и календарь / Банкинг / Документы и OCR. `INTEGRATIONS` массив в `integrations-config.ts` дополнен полем `category`. В RU/PL/EN добавлены ключи `integrations.categories.*`. BankingSection переехал в категорию banking без дубля заголовка.
+
+### TASK-46: KSeF direct — pull входящих фактур ✅ DONE (10 мая 2026)
+
+**Стадия:** 3 · **Оценка:** XL
+
+**Что в проде:**
+
+- ADR-013 «Multi-portal accounting + KSeF direct» — source-of-truth priority и дедупликация по NumerKSeF.
+- Edge function `ksef-proxy/` (TokenAuth flow): AuthorisationChallenge → RSA-OAEP-SHA256 wrap → InitToken → SessionToken; Query/Invoice/Sync для subjectType=subject2 (входящие); Invoice/Get → парсер FA(2) XML + сохранение в Storage receipts. Закрытие сессии после sync.
+- Шифрование KSeF token через AES-256-GCM (`KSEF_SECRETS_KEY` — добавить в Edge Function secrets).
+- Миграция `20260510000006_ksef_integration.sql` — таблица `ksef_sync_triggers` + UNIQUE индекс `idx_expenses_salon_ksef_id` на `(salon_id, metadata->>'ksef_id')` (источник для cross-portal дедупа).
+- Cron `ksef-auto-sync` каждые 15 минут (миграция `20260510000007_ksef_sync_cron.sql`), per-salon интервал по умолчанию 60 минут.
+- UI: `KsefConnectDialog` (NIP + token + radio test/prod environment + 4-step хелп для Profil Zaufany), интеграция в IntegrationsPage, hooks `useKsefConnect`/`useKsefSync`.
+- i18n RU/PL/EN: errors (invalid_nip/invalid_token/invalid_credentials/challenge_failed/api_error), dialog labels, tos.
+
+**Аутентификация — token-only.** Qualified signature и ePUAP-печать отложены до запроса (тяжёлый onboarding для 95% юзеров).
+
+**Push своих фактур** — отдельный TASK когда понадобится. Салоны без wFirma в основном выставляют только paragony, push не приоритет.
+
+### TASK-47: Fakturownia integration ✅ DONE (10 мая 2026)
+
+**Стадия:** 3 · **Оценка:** L
+
+Edge function `fakturownia-proxy/` — pull `/api/expenses.json` (purchase invoices) + push `/api/expenses.json`. Auth через `api_token` query param. Шифрование `FAKTUROWNIA_SECRETS_KEY`. Миграция `20260510000008` — cron `fakturownia-auto-sync` каждые 15 минут. Universal `useAccountingConnect` / `useAccountingSync` хуки в `useIntegrations.ts` обслуживают Fakturownia/iFirma/360Księgowość/inFakt через один диалог `ConnectIntegrationDialog`. Маппинг wFirma-категорий на Finkley в `category-mapping.ts`.
+
+### TASK-48: iFirma integration ❌ CANCELLED (11 мая 2026)
+
+Отменено решением владельца — не интересуют. Edge function ifirma-proxy и миграция 20260510000009 удалены из активного кода; reverse-миграция `20260511000001_drop_ifirma_ksiegowosc360.sql` дропает cron job, trigger-таблицу и soft-delete'ит salon_integrations если кто-то успел подключиться.
+
+### TASK-49: 360Księgowość integration ❌ CANCELLED (11 мая 2026)
+
+Отменено решением владельца — не интересуют. Аналогично TASK-48: код и миграция удалены, reverse-миграция чистит staging если применилось.
+
+### TASK-50: inFakt integration ✅ DONE (skeleton; partner access ожидает)
+
+**Стадия:** 3 · **Оценка:** L
+
+Edge function `infakt-proxy/` — `X-inFakt-ApiKey` header, REST `/v3/expenses.json` (pull/push), `/v3/account.json` (smoke). Шифрование `INFAKT_SECRETS_KEY`. Миграция `20260510000011` — cron `infakt-auto-sync`. Карточка на `/integrations` помечена `status: in_research` — кнопка connect открывает диалог, но 401 от inFakt отдаст понятный код `not_partner_yet`. Реальное подключение возможно после получения партнёрского API-доступа от inFakt (1-2 нед заявки).
+
+### TASK-51: Source-of-truth dedup по `ksef_id` ✅ DONE (10 мая 2026)
+
+**Стадия:** 3 · **Оценка:** M
+
+Дедупликация фактур, пришедших из нескольких порталов (КСеФ direct + wFirma/Fakturownia/iFirma/...). Реализация:
+
+- UNIQUE index `idx_expenses_salon_ksef_id` на `(salon_id, metadata->>'ksef_id') WHERE deleted_at IS NULL` (создан в TASK-46 миграции, пересоздан в TASK-51 после backfill).
+- Backfill миграция `20260510000012_dedup_ksef_id_backfill.sql`: переносит `metadata.wfirma_ksef_id` → `metadata.ksef_id` для существующих расходов wFirma (унификация поля кросс-портал).
+- Все sync-функции (КСеФ, wFirma, Fakturownia, iFirma, 360Księgowość, inFakt) пишут `ksef_id` в metadata. UNIQUE_VIOLATION (Postgres `23505`) ловится в каждом sync — расход скипается.
+- Приоритет источников (зафиксирован в ADR-013 §D): wFirma > Fakturownia > iFirma > 360Księgowość > inFakt > KSeF > OCR > manual. Бухгалтерские системы знают категорию, КСеФ — нет; потому при коллизии раньше пришедший из бухгалтерии расход остаётся.
+
+### TASK-52: Symmetry хвосты (PDF, push UI, auto-push) ✅ DONE (10 мая 2026)
+
+**Стадия:** 3 · **Оценка:** M
+
+После основной интеграции 4-х новых порталов закрыты feature-симметрии с wFirma:
+
+- **PDF импорт** при sync для всех 4 порталов (Fakturownia/iFirma/360Księgowość/inFakt). Best-effort функции `<provider>GetExpensePdf` + `upload<Provider>Pdf` помещают PDF в Storage `receipts`. Если портал не отдаёт PDF (404/auth) — расход сохраняется без чека.
+- **UI push-кнопка** в `ExpensesPage`: универсальная (одна на активный accounting-портал) — выбирает правильный hook через `pickActiveAccountingProvider()` (приоритет wFirma > Fakturownia > iFirma > 360Księgowość > inFakt). Toast/aria-label через `expenses.portal.*` i18n. Существующая `expenses.wfirma.*` оставлена для backward compat.
+- **Auto-push после save** в `ExpenseFormModal`: если у расхода есть чек и подключён accounting-портал, расход автоматически отправляется. Для wFirma — server-side NIP-match как раньше; для остальных — отправка любого расхода с чеком (NIP-match для них пока не реализован, но edge function принимает auto flag и проверяет наличие чека).
+- **Универсальный хук** `useAccountingPushExpense(provider, salonId)` в `useIntegrations.ts` — параметризованный по 4 не-wFirma порталам (wFirma имеет свой `useWfirmaPushExpense` потому что у него NIP-mismatch logic).
+
+**Что не сделано** (для прода нужно):
+
+- NIP-сравнение в auto-push для Fakturownia/iFirma/360Księgowość/inFakt (нужно сохранять `company_nip` в credentials каждого портала; для MVP опускаем — auto-push идёт только при наличии чека).
+- Тестирование PDF endpoint для 360Księgowość/inFakt — без живого аккаунта точные пути не проверены, реализация best-effort с тихим fallback на null.
+
+---
+
+**Что добавить в Edge Function secrets перед prod:**
+
+| Secret name               | Описание                                           |
+| ------------------------- | -------------------------------------------------- |
+| `KSEF_SECRETS_KEY`        | 32 байта base64 для шифрования KSeF token          |
+| `KSEF_DEFAULT_ENV`        | `test` или `prod` (по умолчанию `test`)            |
+| `FAKTUROWNIA_SECRETS_KEY` | 32 байта base64                                    |
+| `INFAKT_SECRETS_KEY`      | 32 байта base64 (когда получим партнёрский доступ) |
+
+Генерация: `openssl rand -base64 32`. Каждый отдельный — изоляция compromise (см. ADR-011/013).
+
+**Стадия:** 3 · **Оценка:** S · **Зависит от:** TASK-31
+
+**Что в проде:**
+
+- **PDF фактуры в Storage receipts** при sync — `uploadWfirmaPdf()` в `wfirma-proxy/index.ts` качает PDF через `wfirmaExpensePdf()` и кладёт в bucket `receipts` под `<salon_id>/wfirma-<id>-<uuid>.pdf`. Best-effort: если PDF недоступен или upload упал — расход сохраняется без чека.
+- **Per-salon выбор компании** при auto-login если их несколько — Edge function возвращает `error: 'choose_company', companies: [...]`, UI (`WfirmaConnectDialog`) показывает radio-список фирм step-2, юзер выбирает → action повторяется с `selected_company_id`.
+- **Semantic-mapping категорий** — `mapWfirmaToFinkleyCategory()` в `wfirma-proxy/category-mapping.ts` парсит name+description+contractor по PL/RU keywords (czynsz/аренда → Аренда, kosmetyk/материал → Материалы и т.д., 6 категорий + fallback). Lazy fallback на «Импорт wFirma» — создаётся только если хотя бы один расход не сматчился.
 
 ---
 

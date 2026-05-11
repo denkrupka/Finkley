@@ -84,17 +84,12 @@ export function BankingSection({ salonId }: Props) {
 
   return (
     <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <div className="bg-brand-teal-soft text-brand-teal-deep grid size-10 place-items-center rounded-lg">
             <Banknote className="size-5" strokeWidth={1.8} />
           </div>
-          <div>
-            <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {t('banking.section_title')}
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">{t('banking.section_subtitle')}</p>
-          </div>
+          <p className="text-foreground/80 text-sm">{t('banking.section_subtitle')}</p>
         </div>
         <Button size="sm" onClick={() => setConnectOpen(true)} data-testid="banking-add">
           <Plus className="size-4" strokeWidth={2} />

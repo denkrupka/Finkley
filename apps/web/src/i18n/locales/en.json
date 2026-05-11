@@ -974,7 +974,12 @@
       "password": "Password",
       "access_key": "Access key (from wFirma → API)",
       "secret_key": "Secret key (from wFirma → API)",
-      "company_id": "Company ID (from the wFirma URL)"
+      "company_id": "Company ID (from the wFirma URL)",
+      "ksef_nip": "Company NIP (10 digits)",
+      "ksef_token": "Token from “Mój KSeF” (issued via Profil Zaufany)",
+      "fakturownia_subdomain": "Fakturownia subdomain (e.g., mysalon)",
+      "fakturownia_api_token": "API token (Settings → Integrations)",
+      "infakt_api_token": "API token (issued under partner access)"
     },
     "errors": {
       "fields_required": "Fill in all required fields",
@@ -994,7 +999,18 @@
       "wfirma_company_id_not_found": "This company isn't in your wFirma account. Check the Company ID.",
       "wfirma_invalid_keys_format": "Access key and Secret key must be 32-character hexadecimal strings.",
       "wfirma_invalid_company_id": "Company ID is a number (e.g. 884136). Find it in the URL after sign-in.",
-      "wfirma_auto_login_disabled": "Auto-connect is temporarily disabled. Enter the keys manually on the next tab."
+      "wfirma_auto_login_disabled": "Auto-connect is temporarily disabled. Enter the keys manually on the next tab.",
+      "ksef_invalid_nip": "NIP must be 10 digits. Spaces and dashes are fine — we'll strip them.",
+      "ksef_invalid_token": "Token must be at least 32 characters. Copy it from “Mój KSeF” → Tokeny.",
+      "ksef_invalid_credentials": "KSeF rejected this token. Make sure the NIP and token belong to the same company.",
+      "ksef_challenge_failed": "KSeF isn't responding to the challenge — try again later or check the environment (test/prod).",
+      "ksef_api_error": "KSeF API error. Details are logged — try again in a minute.",
+      "fakturownia_invalid_credentials": "Wrong Fakturownia API token. Check Settings → Integrations → API.",
+      "fakturownia_invalid_subdomain": "Fakturownia subdomain not found. It's the part of the URL BEFORE `.fakturownia.pl` (e.g. `mysalon`).",
+      "fakturownia_api_error": "Fakturownia API error. Try again in a minute.",
+      "infakt_invalid_credentials": "inFakt rejected the token. Make sure you have partner access.",
+      "infakt_api_error": "inFakt API error. Try again in a minute.",
+      "infakt_not_partner_yet": "The inFakt integration is in the partner-application stage — code is ready, keys aren't issued yet."
     },
     "status": {
       "available": "Ready",
@@ -1025,7 +1041,19 @@
       "choose_company_subtitle": "There are several companies in your wFirma account. Pick which one to link this salon to in Finkley — we'll only sync expenses from it."
     },
     "toast_synced_wfirma": "wFirma: added {{synced}} new expenses, skipped {{skipped}}",
+    "toast_synced_ksef": "KSeF: added {{synced}} new invoices, skipped {{skipped}}",
+    "toast_synced_expenses": "{{name}}: added {{synced}} new expenses, skipped {{skipped}}",
     "last_sync_stats_wfirma": "Imported: {{synced}} · Skipped: {{skipped}}",
+    "last_sync_stats_expenses": "Imported: {{synced}} · Skipped: {{skipped}}",
+    "ksef": {
+      "dialog_subtitle": "Connect Poland's national e-invoice registry (KSeF) if you don't use wFirma/Fakturownia. Supplier invoices flow into expenses automatically.",
+      "step1": "Sign in to ksef.mf.gov.pl via Profil Zaufany",
+      "step2": "Open “Tokeny” → “Wygeneruj nowy token”",
+      "step3": "Pick the “Wgląd w faktury” role (read-only access)",
+      "step4": "Copy the token and paste it here. NIP is your 10-digit tax ID.",
+      "token_hint": "The token is a long alphanumeric string. Valid for 90+ days.",
+      "security_note": "The token is encrypted on the server (AES-256). Read-only access (Wgląd role). Revoke any time in “Mój KSeF” → Tokeny."
+    },
     "providers": {
       "booksy": {
         "description": "Poland's #1 online booking platform for beauty salons. We'll pull visits, clients and services from your account."
@@ -1041,7 +1069,26 @@
       },
       "wfirma": {
         "description": "Polish accounting system (JDG/spółka). The integration sends expenses as purchase invoices and pulls in income. KSeF-ready."
+      },
+      "ksef": {
+        "description": "Poland's national e-invoice system (KSeF). Connect this if you don't use wFirma/Fakturownia — supplier invoices flow into expenses straight from the registry."
+      },
+      "fakturownia": {
+        "description": "Polish SaaS for accounting and invoicing. We sync expenses and payments both ways."
+      },
+      "infakt": {
+        "description": "inFakt — Polish service for sole traders and companies. Integration is in partner-application stage — coming soon."
       }
+    },
+    "categories": {
+      "accounting": "Accounting & invoices",
+      "accounting_subtitle": "Polish accounting portals and KSeF. Connect one — purchase invoices land in expenses on their own.",
+      "booking": "Booking & calendar",
+      "booking_subtitle": "Online booking platforms. Visits, clients and services sync automatically.",
+      "banking": "Banking",
+      "banking_subtitle": "Connect bank accounts via PSD2 — operations are auto-matched to expenses and visit payments.",
+      "documents": "Documents & OCR",
+      "documents_subtitle": "AI receipt and invoice recognition for expenses that didn't land in KSeF."
     }
   },
   "import": {
@@ -1239,6 +1286,14 @@
       "toast_skipped_no_nip": "Not sent to wFirma: no buyer NIP on the receipt. Use the \"Send manually\" button in the expense list.",
       "toast_skipped_nip_mismatch": "Not sent to wFirma: NIP nabywcy on the receipt doesn't match your company. Use the \"Send manually\" button in the expense list.",
       "toast_push_failed": "Couldn't send to wFirma"
+    },
+    "portal": {
+      "push_button": "Send to {{portal}}",
+      "tooltip_pushed": "Sent to {{portal}} (id: {{id}})",
+      "toast_manual_pushed": "Expense sent to {{portal}} ✓",
+      "toast_already_pushed": "This expense is already in {{portal}}",
+      "toast_push_failed": "Couldn't send to {{portal}}",
+      "toast_auto_pushed": "Expense added and sent to {{portal}} ✓"
     }
   },
   "payment_methods": {

@@ -1,14 +1,16 @@
 import { ArrowLeft, Check, ChevronRight, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
   BOOKSY_SYNC_INTERVAL_OPTIONS,
+  useAccountingSync,
   useBooksySync,
   useClearBooksyVisits,
   useDisconnectIntegration,
+  useKsefSync,
   useSalonIntegrations,
   useUpdateBooksyInterval,
   useWfirmaSync,
@@ -19,7 +21,15 @@ import {
 import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
-import { INTEGRATIONS, type IntegrationDef } from './integrations-config'
+import { KsefConnectDialog } from './KsefConnectDialog'
+import {
+  CATEGORY_ORDER,
+  INTEGRATIONS,
+  getCategoryLabel,
+  getCategorySubtitle,
+  type IntegrationCategory,
+  type IntegrationDef,
+} from './integrations-config'
 import { WfirmaConnectDialog } from './WfirmaConnectDialog'
 
 /**
@@ -33,6 +43,7 @@ export function IntegrationsPage() {
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
   const [booksyOpen, setBooksyOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
+  const [ksefOpen, setKsefOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
 
   if (!salonId) return null
@@ -44,6 +55,7 @@ export function IntegrationsPage() {
   function handleConnect(p: IntegrationDef) {
     if (p.id === 'booksy') setBooksyOpen(true)
     else if (p.id === 'wfirma') setWfirmaOpen(true)
+    else if (p.id === 'ksef') setKsefOpen(true)
     else setConnecting(p)
   }
 
@@ -63,31 +75,64 @@ export function IntegrationsPage() {
         <p className="text-muted-foreground mt-1 text-sm">{t('integrations.subtitle')}</p>
       </div>
 
-      {/* Банкинг — отдельная секция, потому что одно подключение != одна
-          интеграция (юзер может линковать N банков с разными сессиями
-          и сроками действия). */}
-      <div className="mb-5">
-        <BankingSection salonId={salonId} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {INTEGRATIONS.map((p) => (
-          <IntegrationCard
-            key={p.id}
-            provider={p}
-            connection={connectedMap.get(p.id) ?? null}
-            salonId={salonId}
-            onConnect={() => handleConnect(p)}
-          />
-        ))}
-      </div>
+      {/* Группировка по категориям. Банкинг — кастомная секция (одно
+          подключение != одна интеграция: юзер линкует N банков с разными
+          сессиями и сроками). Бухгалтерия / запись — обычные карточки. */}
+      {CATEGORY_ORDER.map((cat) => {
+        if (cat === 'banking') {
+          return (
+            <CategorySection key={cat} category={cat}>
+              <BankingSection salonId={salonId} />
+            </CategorySection>
+          )
+        }
+        const providers = INTEGRATIONS.filter((p) => p.category === cat)
+        if (providers.length === 0) return null
+        return (
+          <CategorySection key={cat} category={cat}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {providers.map((p) => (
+                <IntegrationCard
+                  key={p.id}
+                  provider={p}
+                  connection={connectedMap.get(p.id) ?? null}
+                  salonId={salonId}
+                  onConnect={() => handleConnect(p)}
+                />
+              ))}
+            </div>
+          </CategorySection>
+        )
+      })}
 
       <p className="text-muted-foreground mt-6 text-xs">{t('integrations.privacy_note')}</p>
 
       <ConnectIntegrationDialog provider={connecting} onClose={() => setConnecting(null)} />
       <BooksyConnectDialog open={booksyOpen} onClose={() => setBooksyOpen(false)} />
       <WfirmaConnectDialog open={wfirmaOpen} onClose={() => setWfirmaOpen(false)} />
+      <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} />
     </div>
+  )
+}
+
+function CategorySection({
+  category,
+  children,
+}: {
+  category: IntegrationCategory
+  children: ReactNode
+}) {
+  const { t } = useTranslation()
+  return (
+    <section className="mb-7">
+      <header className="mb-3">
+        <h2 className="text-brand-navy text-sm font-bold uppercase tracking-wider">
+          {t(getCategoryLabel(category))}
+        </h2>
+        <p className="text-muted-foreground mt-0.5 text-xs">{t(getCategorySubtitle(category))}</p>
+      </header>
+      {children}
+    </section>
   )
 }
 
@@ -106,6 +151,12 @@ function IntegrationCard({
   const Icon = provider.icon
   const booksySync = useBooksySync(salonId)
   const wfirmaSync = useWfirmaSync(salonId)
+  const ksefSync = useKsefSync(salonId)
+  // Универсальный sync для accounting-порталов с api_token-style auth.
+  // Передаём null для booksy/wfirma/ksef — они выше в собственных хуках.
+  const accountingProviderId =
+    provider.id === 'fakturownia' || provider.id === 'infakt' ? provider.id : null
+  const accountingSync = useAccountingSync(accountingProviderId, salonId)
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
   const updateInterval = useUpdateBooksyInterval(salonId)
@@ -126,6 +177,33 @@ function IntegrationCard({
       })
       return
     }
+    if (provider.id === 'ksef') {
+      ksefSync.mutate(undefined, {
+        onSuccess: (stats) =>
+          toast.success(
+            t('integrations.toast_synced_ksef', {
+              synced: stats.expenses_synced,
+              skipped: stats.expenses_skipped,
+            }),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      })
+      return
+    }
+    if (accountingProviderId) {
+      accountingSync.mutate(undefined, {
+        onSuccess: (stats) =>
+          toast.success(
+            t('integrations.toast_synced_expenses', {
+              name: provider.name,
+              synced: stats.expenses_synced,
+              skipped: stats.expenses_skipped,
+            }),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      })
+      return
+    }
     booksySync.mutate(undefined, {
       onSuccess: (stats) =>
         toast.success(
@@ -138,7 +216,14 @@ function IntegrationCard({
       onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
     })
   }
-  const syncPending = provider.id === 'wfirma' ? wfirmaSync.isPending : booksySync.isPending
+  const syncPending =
+    provider.id === 'wfirma'
+      ? wfirmaSync.isPending
+      : provider.id === 'ksef'
+        ? ksefSync.isPending
+        : accountingProviderId
+          ? accountingSync.isPending
+          : booksySync.isPending
 
   return (
     <div
@@ -183,9 +268,12 @@ function IntegrationCard({
             <p className="text-muted-foreground">{t('integrations.never_synced')}</p>
           )}
           {connection.last_sync_stats ? (
-            provider.id === 'wfirma' ? (
+            provider.id === 'wfirma' ||
+            provider.id === 'ksef' ||
+            provider.id === 'fakturownia' ||
+            provider.id === 'infakt' ? (
               <p className="text-foreground mt-1 font-semibold">
-                {t('integrations.last_sync_stats_wfirma', {
+                {t('integrations.last_sync_stats_expenses', {
                   synced: connection.last_sync_stats.expenses_synced ?? 0,
                   skipped: connection.last_sync_stats.expenses_skipped ?? 0,
                 })}

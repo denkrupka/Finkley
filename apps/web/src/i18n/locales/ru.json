@@ -1413,7 +1413,12 @@
       "password": "Пароль",
       "access_key": "Access key (из wFirma → API)",
       "secret_key": "Secret key (из wFirma → API)",
-      "company_id": "Company ID (из wFirma → URL)"
+      "company_id": "Company ID (из wFirma → URL)",
+      "ksef_nip": "NIP компании (10 цифр)",
+      "ksef_token": "Token из «Mój KSeF» (получи через Profil Zaufany)",
+      "fakturownia_subdomain": "Поддомен Fakturownia (например, mojsalon)",
+      "fakturownia_api_token": "API-токен (Ustawienia → Integracje)",
+      "infakt_api_token": "API-токен (выдаётся при партнёрском доступе)"
     },
     "errors": {
       "fields_required": "Заполни все обязательные поля",
@@ -1433,7 +1438,18 @@
       "wfirma_company_id_not_found": "Эта фирма не найдена в твоём wFirma-аккаунте. Проверь Company ID.",
       "wfirma_invalid_keys_format": "Access key и Secret key должны быть строками из 32 шестнадцатеричных символов.",
       "wfirma_invalid_company_id": "Company ID — это число (например 884136). Найди его в URL после логина.",
-      "wfirma_auto_login_disabled": "Авто-подключение временно отключено. Введи ключи вручную на соседней вкладке."
+      "wfirma_auto_login_disabled": "Авто-подключение временно отключено. Введи ключи вручную на соседней вкладке.",
+      "ksef_invalid_nip": "NIP должен быть из 10 цифр. Пробелы и дефисы можно — мы их уберём.",
+      "ksef_invalid_token": "Токен должен быть не короче 32 символов. Скопируй из «Mój KSeF» → Tokeny.",
+      "ksef_invalid_credentials": "KSeF не принял этот токен. Проверь что NIP и токен от одной фирмы.",
+      "ksef_challenge_failed": "KSeF не отвечает на challenge — попробуй позже или проверь environment (test/prod).",
+      "ksef_api_error": "Ошибка KSeF API. Подробности залогированы — попробуй ещё раз через минуту.",
+      "fakturownia_invalid_credentials": "Неверный API-токен Fakturownia. Проверь Ustawienia → Integracje → API.",
+      "fakturownia_invalid_subdomain": "Поддомен Fakturownia не найден. Это часть URL ДО `.fakturownia.pl` (например, `mojsalon`).",
+      "fakturownia_api_error": "Ошибка Fakturownia API. Подробности залогированы — попробуй ещё раз через минуту.",
+      "infakt_invalid_credentials": "inFakt не принял токен. Убедись что у тебя партнёрский доступ.",
+      "infakt_api_error": "Ошибка inFakt API. Попробуй ещё раз через минуту.",
+      "infakt_not_partner_yet": "Интеграция inFakt пока в стадии партнёрской заявки — мы пишем код наперёд, но ключи ещё не выдают."
     },
     "status": {
       "available": "Готово",
@@ -1464,7 +1480,19 @@
       "choose_company_subtitle": "В твоём аккаунте wFirma несколько фирм. Выбери, к какой из них привязать этот салон в Finkley — мы будем синкать расходы только из неё."
     },
     "toast_synced_wfirma": "wFirma: добавлено {{synced}} новых расходов, пропущено {{skipped}}",
+    "toast_synced_ksef": "KSeF: добавлено {{synced}} новых фактур, пропущено {{skipped}}",
+    "toast_synced_expenses": "{{name}}: добавлено {{synced}} новых расходов, пропущено {{skipped}}",
     "last_sync_stats_wfirma": "Импортировано: {{synced}} · Пропущено: {{skipped}}",
+    "last_sync_stats_expenses": "Импортировано: {{synced}} · Пропущено: {{skipped}}",
+    "ksef": {
+      "dialog_subtitle": "Подключи государственный реестр фактур (КСеФ) если у тебя нет wFirma/Fakturownia. Фактуры от поставщиков подтянутся автоматически.",
+      "step1": "Зайди на ksef.mf.gov.pl через Profil Zaufany",
+      "step2": "Открой раздел «Tokeny» → «Wygeneruj nowy token»",
+      "step3": "Выбери роль «Wgląd w faktury» (доступ только на чтение)",
+      "step4": "Скопируй токен и вставь сюда. NIP — твой 10-значный налоговый номер.",
+      "token_hint": "Токен — длинная строка, начинается обычно с цифр и букв. Действует 90+ дней.",
+      "security_note": "Токен шифруется на сервере (AES-256). Доступ — только на чтение фактур (роль «Wgląd»). Отозвать можно в «Mój KSeF» → Tokeny в любой момент."
+    },
     "providers": {
       "booksy": {
         "description": "Польская платформа онлайн-записи №1 для салонов красоты. Подтянем визиты, клиентов и услуги из твоего аккаунта."
@@ -1480,7 +1508,26 @@
       },
       "wfirma": {
         "description": "Польская система бухучёта (JDG/spółka). Интеграция отправит расходы как фактуры закупки + подтянет приходы. KSeF-готова."
+      },
+      "ksef": {
+        "description": "Государственная польская система электронных фактур (KSeF). Подключи если у тебя нет wFirma/Fakturownia — фактуры от поставщиков подтянутся напрямую из реестра."
+      },
+      "fakturownia": {
+        "description": "Польский SaaS бухгалтерии и фактур. Подключим — расходы и оплаты будут синкаться в обе стороны."
+      },
+      "infakt": {
+        "description": "inFakt — польский сервис для самозанятых и спулок. Интеграция в стадии партнёрской заявки — скоро откроется."
       }
+    },
+    "categories": {
+      "accounting": "Бухгалтерия и фактуры",
+      "accounting_subtitle": "Польские бухгалтерские порталы и КСеФ. Подключи один — фактуры закупки сами окажутся в расходах.",
+      "booking": "Запись и календарь",
+      "booking_subtitle": "Платформы онлайн-записи. Визиты, клиенты и услуги синхронизируются автоматически.",
+      "banking": "Банкинг",
+      "banking_subtitle": "Подключи банковские счета через PSD2 — операции автоматически разнесутся по расходам и оплате визитов.",
+      "documents": "Документы и OCR",
+      "documents_subtitle": "Распознавание чеков и фактур через ИИ для расходов, которые не попали в КСеФ."
     }
   },
   "import": {
@@ -1696,6 +1743,14 @@
       "toast_skipped_no_nip": "В wFirma не отправлено: на чеке нет NIP покупателя. Кнопка «Отправить вручную» в списке расходов.",
       "toast_skipped_nip_mismatch": "В wFirma не отправлено: NIP nabywcy на чеке не совпадает с твоей фирмой. Кнопка «Отправить вручную» в списке расходов.",
       "toast_push_failed": "Не получилось отправить в wFirma"
+    },
+    "portal": {
+      "push_button": "Отправить в {{portal}}",
+      "tooltip_pushed": "Отправлено в {{portal}} (id: {{id}})",
+      "toast_manual_pushed": "Расход отправлен в {{portal}} ✓",
+      "toast_already_pushed": "Этот расход уже есть в {{portal}}",
+      "toast_push_failed": "Не получилось отправить в {{portal}}",
+      "toast_auto_pushed": "Расход добавлен и отправлен в {{portal}} ✓"
     }
   },
   "payment_methods": {

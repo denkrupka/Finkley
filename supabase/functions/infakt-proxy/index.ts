@@ -1,0 +1,487 @@
+/**
+ * infakt-proxy — интеграция с inFakt (PL bookkeeping). Заблокирована
+ * партнёрским доступом — код в проде, реальное подключение возможно после
+ * получения API-ключей от inFakt.
+ *
+ * Actions:
+ *   - connect_with_credentials  — api_token + smoke-test
+ *   - sync                      — pull expenses
+ *   - push_expense              — POST expense
+ *   - cron_sync_one             — pg_cron
+ *
+ * Шифрование api_token: AES-256-GCM (INFAKT_SECRETS_KEY).
+ */
+
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+
+import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { recordSyncResult } from '../_shared/notify.ts'
+import { withSentry } from '../_shared/sentry.ts'
+
+import {
+  infaktCreateExpense,
+  infaktGetExpensePdf,
+  infaktListExpenses,
+  infaktPing,
+  type InfaktCreds,
+} from './api.ts'
+import { mapInfaktToFinkleyCategory } from './category-mapping.ts'
+import { decryptSecret, encryptSecret } from './crypto.ts'
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+const DEFAULT_IMPORT_CATEGORY = 'Импорт inFakt'
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'content-type': 'application/json' },
+  })
+}
+
+type StoredCredentials = { api_token_enc: string; connected_at: string }
+
+async function loadCreds(admin: SupabaseClient, salonId: string): Promise<InfaktCreds | null> {
+  const { data } = await admin
+    .from('salon_integrations')
+    .select('credentials')
+    .eq('salon_id', salonId)
+    .eq('provider', 'infakt')
+    .maybeSingle()
+  if (!data) return null
+  const stored = data.credentials as StoredCredentials
+  if (!stored?.api_token_enc) return null
+  return { apiToken: await decryptSecret(stored.api_token_enc) }
+}
+
+async function saveCreds(
+  admin: SupabaseClient,
+  salonId: string,
+  creds: InfaktCreds,
+): Promise<void> {
+  const stored: StoredCredentials = {
+    api_token_enc: await encryptSecret(creds.apiToken),
+    connected_at: new Date().toISOString(),
+  }
+  await admin.from('salon_integrations').upsert(
+    {
+      salon_id: salonId,
+      provider: 'infakt',
+      status: 'connected',
+      credentials: stored,
+      last_error: null,
+      sync_interval_minutes: 60,
+    },
+    { onConflict: 'salon_id,provider' },
+  )
+}
+
+async function ensureMember(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from('salon_members')
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('salon_id', salonId)
+    .maybeSingle()
+  return !!data
+}
+
+async function handleConnect(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+  apiToken: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const creds: InfaktCreds = { apiToken: apiToken.trim() }
+  if (!creds.apiToken) {
+    return jsonResponse({ ok: false, error: 'fields_required' }, 400)
+  }
+  const ping = await infaktPing(creds)
+  if (!ping.ok) {
+    if (ping.code === 'AUTH') {
+      // 401 от inFakt чаще всего значит «нет партнёрского доступа» —
+      // отдельный понятный код для UI.
+      return jsonResponse({ ok: false, error: 'not_partner_yet' }, 400)
+    }
+    return jsonResponse(
+      { ok: false, error: 'infakt_api_error', details: ping.message ?? null },
+      502,
+    )
+  }
+  await saveCreds(admin, salonId, creds)
+  return jsonResponse({ ok: true })
+}
+
+type SyncStats = { expenses_synced: number; expenses_skipped: number }
+
+async function getOrCreateImportCategory(
+  admin: SupabaseClient,
+  salonId: string,
+): Promise<string | null> {
+  const { data: existing } = await admin
+    .from('expense_categories')
+    .select('id')
+    .eq('salon_id', salonId)
+    .eq('name', DEFAULT_IMPORT_CATEGORY)
+    .eq('is_archived', false)
+    .maybeSingle()
+  if (existing) return existing.id
+  const { data: created } = await admin
+    .from('expense_categories')
+    .insert({
+      salon_id: salonId,
+      name: DEFAULT_IMPORT_CATEGORY,
+      is_system: false,
+      sort_order: 1050,
+    })
+    .select('id')
+    .single()
+  return created?.id ?? null
+}
+
+async function findSystemCategoryId(
+  admin: SupabaseClient,
+  salonId: string,
+  name: string,
+  cache: Map<string, string | null>,
+): Promise<string | null> {
+  const key = name.toLowerCase()
+  if (cache.has(key)) return cache.get(key) ?? null
+  const { data } = await admin
+    .from('expense_categories')
+    .select('id')
+    .eq('salon_id', salonId)
+    .eq('is_archived', false)
+    .ilike('name', name)
+    .limit(1)
+  const id = data?.[0]?.id ?? null
+  cache.set(key, id)
+  return id
+}
+
+async function uploadInfaktPdf(
+  admin: SupabaseClient,
+  creds: InfaktCreds,
+  salonId: string,
+  expenseId: string,
+): Promise<string | null> {
+  const bytes = await infaktGetExpensePdf(creds, expenseId)
+  if (!bytes) return null
+  const path = `${salonId}/infakt-${expenseId}-${crypto.randomUUID()}.pdf`
+  const { error } = await admin.storage.from('receipts').upload(path, bytes, {
+    contentType: 'application/pdf',
+    upsert: false,
+  })
+  if (error) {
+    console.warn(`infakt pdf upload failed for ${expenseId}: ${error.message}`)
+    return null
+  }
+  return path
+}
+
+async function syncToFinkley(
+  admin: SupabaseClient,
+  salonId: string,
+  creds: InfaktCreds,
+  lastSyncAt: string | null,
+): Promise<SyncStats> {
+  const stats: SyncStats = { expenses_synced: 0, expenses_skipped: 0 }
+  const since = (() => {
+    const d = lastSyncAt ? new Date(lastSyncAt) : new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+    return d.toISOString().slice(0, 10)
+  })()
+
+  const { data: alreadyImported } = await admin
+    .from('expenses')
+    .select('external_id')
+    .eq('salon_id', salonId)
+    .eq('source', 'infakt')
+    .is('deleted_at', null)
+  const importedSet = new Set<string>()
+  for (const r of alreadyImported ?? []) {
+    if (r.external_id) importedSet.add(r.external_id)
+  }
+
+  let fallbackCategoryId: string | null = null
+  const ensureFallback = async (): Promise<string | null> => {
+    if (fallbackCategoryId) return fallbackCategoryId
+    fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    return fallbackCategoryId
+  }
+  const categoryCache = new Map<string, string | null>()
+
+  let offset = 0
+  while (offset < 3000) {
+    const list = await infaktListExpenses(creds, { sinceDate: since, offset })
+    if (!list.ok) {
+      throw new Error(`infakt_list_${list.code}${list.message ? ':' + list.message : ''}`)
+    }
+    for (const ex of list.expenses) {
+      if (importedSet.has(ex.id)) {
+        stats.expenses_skipped++
+        continue
+      }
+      if (!ex.amount || ex.amount <= 0) {
+        stats.expenses_skipped++
+        continue
+      }
+      const expenseAt = (ex.expenseDate || ex.paymentDate || since).slice(0, 10)
+      const vendor = ex.vendorName ?? '—'
+
+      const mapped = mapInfaktToFinkleyCategory({
+        vendorName: ex.vendorName,
+        description: ex.description,
+      })
+      let categoryId: string | null = null
+      let categoryMapped: string | null = null
+      if (mapped) {
+        categoryId = await findSystemCategoryId(admin, salonId, mapped, categoryCache)
+        if (categoryId) categoryMapped = mapped
+      }
+      if (!categoryId) categoryId = await ensureFallback()
+
+      const receiptPath = await uploadInfaktPdf(admin, creds, salonId, ex.id)
+
+      const { error } = await admin.from('expenses').insert({
+        salon_id: salonId,
+        category_id: categoryId,
+        expense_at: expenseAt,
+        amount_cents: Math.round(ex.amount * 100),
+        payment_method: 'transfer',
+        comment: ex.description,
+        contractor_name: vendor,
+        invoice_number: ex.number,
+        source: 'infakt',
+        external_id: ex.id,
+        receipt_url: receiptPath,
+        metadata: {
+          infakt_id: ex.id,
+          ksef_id: ex.ksefNumber,
+          vendor_nip: ex.vendorNip,
+          currency_original: ex.currency,
+          ...(categoryMapped ? { infakt_category_mapped: categoryMapped } : {}),
+        },
+      })
+      if (error) {
+        if (error.code === '23505') {
+          stats.expenses_skipped++
+          continue
+        }
+        console.warn(`infakt expense insert failed for ${ex.id}: ${error.message}`)
+        stats.expenses_skipped++
+        continue
+      }
+      stats.expenses_synced++
+    }
+    if (!list.hasMore) break
+    offset += list.expenses.length
+  }
+  return stats
+}
+
+async function runSyncForSalon(
+  admin: SupabaseClient,
+  salonId: string,
+): Promise<{ ok: true; stats: SyncStats } | { ok: false; status: number; message: string }> {
+  const creds = await loadCreds(admin, salonId)
+  if (!creds) return { ok: false, status: 404, message: 'not_connected' }
+
+  const { data: existing } = await admin
+    .from('salon_integrations')
+    .select('last_sync_at')
+    .eq('salon_id', salonId)
+    .eq('provider', 'infakt')
+    .maybeSingle()
+  const lastSyncAt = existing?.last_sync_at ?? null
+
+  let stats: SyncStats
+  try {
+    stats = await syncToFinkley(admin, salonId, creds, lastSyncAt)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const { data: salonRow } = await admin
+      .from('salons')
+      .select('name')
+      .eq('id', salonId)
+      .maybeSingle()
+    await recordSyncResult(admin, {
+      salonId,
+      provider: 'infakt',
+      ok: false,
+      errorMessage: msg,
+      salonName: (salonRow as { name?: string } | null)?.name ?? null,
+    })
+    return { ok: false, status: 502, message: msg }
+  }
+  await recordSyncResult(admin, { salonId, provider: 'infakt', ok: true })
+  await admin
+    .from('salon_integrations')
+    .update({ status: 'connected', last_sync_stats: stats })
+    .eq('salon_id', salonId)
+    .eq('provider', 'infakt')
+  return { ok: true, stats }
+}
+
+async function handleSync(admin: SupabaseClient, userId: string, salonId: string) {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const res = await runSyncForSalon(admin, salonId)
+  if (!res.ok) {
+    return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
+  }
+  return jsonResponse({ ok: true, stats: res.stats })
+}
+
+async function handleCronSyncOne(admin: SupabaseClient, salonId: string, token: string) {
+  const { data: trig, error: trigErr } = await admin
+    .from('infakt_sync_triggers')
+    .update({ used_at: new Date().toISOString() })
+    .eq('token', token)
+    .eq('salon_id', salonId)
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('token')
+    .maybeSingle()
+  if (trigErr || !trig) {
+    return jsonResponse({ ok: false, error: 'invalid_or_expired_token' }, 401)
+  }
+  const res = await runSyncForSalon(admin, salonId)
+  if (!res.ok) {
+    return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
+  }
+  return jsonResponse({ ok: true, stats: res.stats })
+}
+
+async function handlePushExpense(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+  expenseId: string,
+  auto: boolean,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const creds = await loadCreds(admin, salonId)
+  if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+
+  const { data: ex } = await admin
+    .from('expenses')
+    .select(
+      'id, expense_at, amount_cents, contractor_name, invoice_number, comment, metadata, source, receipt_url',
+    )
+    .eq('id', expenseId)
+    .eq('salon_id', salonId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (!ex) return jsonResponse({ ok: false, error: 'expense_not_found' }, 404)
+  if (ex.source === 'infakt') {
+    return jsonResponse({ ok: false, error: 'already_from_infakt' }, 409)
+  }
+  const meta = (ex.metadata ?? {}) as Record<string, unknown>
+  if (typeof meta.infakt_id === 'string') {
+    return jsonResponse({ ok: false, error: 'already_pushed', infakt_id: meta.infakt_id }, 409)
+  }
+  if (auto && !ex.receipt_url) {
+    return jsonResponse({ ok: false, error: 'skipped_no_receipt' }, 200)
+  }
+  const { data: salon } = await admin
+    .from('salons')
+    .select('currency')
+    .eq('id', salonId)
+    .maybeSingle()
+  const currency = (salon?.currency ?? 'PLN').toUpperCase()
+  const pushRes = await infaktCreateExpense(creds, {
+    expenseAt: ex.expense_at,
+    amount: ex.amount_cents / 100,
+    currency,
+    vendor: ex.contractor_name || 'Bez nazwy',
+    vendorNip: typeof meta.vendor_nip === 'string' ? meta.vendor_nip : null,
+    description: ex.comment,
+    invoiceNumber: ex.invoice_number,
+  })
+  if (!pushRes.ok) {
+    return jsonResponse(
+      { ok: false, error: 'infakt_push_failed', code: pushRes.code, message: pushRes.message },
+      502,
+    )
+  }
+  await admin
+    .from('expenses')
+    .update({
+      metadata: { ...meta, infakt_id: pushRes.id, infakt_pushed_at: new Date().toISOString() },
+    })
+    .eq('id', expenseId)
+  return jsonResponse({ ok: true, infakt_id: pushRes.id })
+}
+
+Deno.serve(
+  withSentry('infakt-proxy', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    }
+    let body: {
+      action?: string
+      salon_id?: string
+      api_token?: string
+      expense_id?: string
+      auto?: boolean
+      token?: string
+    }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ ok: false, error: 'bad_request' }, 400)
+    }
+    if (!body.salon_id) return jsonResponse({ ok: false, error: 'salon_id_required' }, 400)
+
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    if (body.action === 'cron_sync_one') {
+      if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 400)
+      return handleCronSyncOne(admin, body.salon_id, body.token)
+    }
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return jsonResponse({ ok: false, error: 'unauthorized' }, 401)
+    }
+    const userJwt = authHeader.slice('Bearer '.length)
+    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    })
+    const { data: userRes, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userRes?.user) {
+      return jsonResponse({ ok: false, error: 'invalid_token', message: userErr?.message }, 401)
+    }
+    const userId = userRes.user.id
+    switch (body.action) {
+      case 'connect_with_credentials':
+        if (!body.api_token) {
+          return jsonResponse({ ok: false, error: 'fields_required' }, 400)
+        }
+        return handleConnect(admin, userId, body.salon_id, body.api_token)
+      case 'sync':
+        return handleSync(admin, userId, body.salon_id)
+      case 'push_expense':
+        if (!body.expense_id) {
+          return jsonResponse({ ok: false, error: 'expense_id_required' }, 400)
+        }
+        return handlePushExpense(admin, userId, body.salon_id, body.expense_id, body.auto === true)
+      default:
+        return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
+    }
+  }),
+)

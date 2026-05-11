@@ -1,6 +1,7 @@
-import { Lock } from 'lucide-react'
+import { Loader2, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -14,13 +15,23 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useAccountingConnect } from '@/hooks/useIntegrations'
 
-import type { IntegrationDef } from './integrations-config'
+import type { IntegrationDef, IntegrationProvider } from './integrations-config'
+
+const ACCOUNTING_PROVIDERS: IntegrationProvider[] = ['fakturownia', 'infakt']
+
+function isAccountingProvider(id: IntegrationProvider): id is 'fakturownia' | 'infakt' {
+  return ACCOUNTING_PROVIDERS.includes(id)
+}
 
 /**
- * Generic connect-форма для провайдеров со stub-логином (Fresha/Treatwell/
- * YCLIENTS — все coming_soon). Booksy использует отдельный BooksyConnectDialog
- * с invisible hCaptcha + proxy POST.
+ * Generic connect-форма для провайдеров, которые подключаются через простой
+ * набор полей (subdomain/api_token/login/...). Использует useAccountingConnect
+ * для реальных бухгалтерских порталов; для остальных (Fresha/Treatwell/
+ * YCLIENTS — все coming_soon) показывает stub-toast.
+ *
+ * Booksy / wFirma / KSeF имеют выделенные диалоги (см. соответствующие *.tsx).
  */
 export function ConnectIntegrationDialog({
   provider,
@@ -30,13 +41,31 @@ export function ConnectIntegrationDialog({
   onClose: () => void
 }) {
   const { t } = useTranslation()
+  const { salonId } = useParams<{ salonId: string }>()
   const [values, setValues] = useState<Record<string, string>>({})
-  const isPending = false
 
-  // Сбрасываем поля при смене провайдера
+  const accountingId = provider && isAccountingProvider(provider.id) ? provider.id : null
+  const connect = useAccountingConnect(accountingId, salonId)
+
   useEffect(() => {
     setValues({})
   }, [provider?.id])
+
+  function explainError(code: string): string {
+    // Универсальные коды ошибок accounting-портала. Конкретные коды каждый
+    // провайдер отдаёт сам — здесь даём fallback.
+    const map: Record<string, string> = {
+      fields_required: 'integrations.errors.fields_required',
+      fakturownia_invalid_credentials: 'integrations.errors.fakturownia_invalid_credentials',
+      fakturownia_invalid_subdomain: 'integrations.errors.fakturownia_invalid_subdomain',
+      fakturownia_api_error: 'integrations.errors.fakturownia_api_error',
+      infakt_invalid_credentials: 'integrations.errors.infakt_invalid_credentials',
+      infakt_api_error: 'integrations.errors.infakt_api_error',
+      not_partner_yet: 'integrations.errors.infakt_not_partner_yet',
+    }
+    const key = map[code]
+    return key ? t(key) : code
+  }
 
   function handleSubmit() {
     if (!provider) return
@@ -47,8 +76,22 @@ export function ConnectIntegrationDialog({
       toast.error(t('integrations.errors.fields_required'))
       return
     }
-    toast.success(t('integrations.toast_saved_stub'))
-    onClose()
+    if (!accountingId) {
+      // Coming-soon провайдеры — тут только stub
+      toast.success(t('integrations.toast_saved_stub'))
+      onClose()
+      return
+    }
+    connect.mutate(values, {
+      onSuccess: () => {
+        toast.success(t('integrations.toast_connected', { name: provider.name }))
+        onClose()
+      },
+      onError: (err) => {
+        const code = err instanceof Error ? err.message : String(err)
+        toast.error(explainError(code))
+      },
+    })
   }
 
   return (
@@ -92,11 +135,18 @@ export function ConnectIntegrationDialog({
         </form>
 
         <DialogFooter className="px-5">
-          <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
+          <Button variant="outline" type="button" onClick={onClose} disabled={connect.isPending}>
             {t('common.cancel')}
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isPending}>
-            {t('integrations.save')}
+          <Button type="button" onClick={handleSubmit} disabled={connect.isPending}>
+            {connect.isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                {t('integrations.connecting')}
+              </>
+            ) : (
+              t('integrations.save')
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
