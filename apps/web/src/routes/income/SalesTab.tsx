@@ -1,11 +1,14 @@
-import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
   Select,
   SelectContent,
@@ -34,11 +37,9 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const range = {
-    start: startOfMonth(cursor).toISOString(),
-    end: endOfMonth(cursor).toISOString(),
-  }
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const r = periodToRange(period)
+  const range = { start: r.start.toISOString(), end: r.end.toISOString() }
 
   const { data: staff = [] } = useStaff(salonId)
   const [staffFilter, setStaffFilter] = useState<string>('')
@@ -68,17 +69,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
             })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addMonths(c, -1))}>
-            <ChevronLeft className="size-4" strokeWidth={2} />
-          </Button>
-          <span className="text-foreground text-sm font-semibold">
-            {format(cursor, 'LLLL yyyy', { locale: ru })}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addMonths(c, 1))}>
-            <ChevronRight className="size-4" strokeWidth={2} />
-          </Button>
-        </div>
+        <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
       {/* Filters */}

@@ -3,6 +3,27 @@
     "title": "Finkley",
     "placeholder": "Szkielet aplikacji jest gotowy. Zobacz docs/04_BACKLOG.md, by poznać kolejne kroki."
   },
+  "period": {
+    "aria_trigger": "Wybór okresu",
+    "clear": "Wyczyść",
+    "ok": "OK",
+    "mode": {
+      "range": "Od — Do",
+      "month": "Miesiąc",
+      "year": "Rok",
+      "recent": "Ostatnie"
+    },
+    "range": {
+      "from": "Od",
+      "to": "Do"
+    },
+    "recent": {
+      "7": "Ostatnie 7 dni",
+      "30": "Ostatnie 30 dni",
+      "90": "Ostatnie 90 dni",
+      "365": "Ostatni rok"
+    }
+  },
   "common": {
     "save": "Zapisz",
     "cancel": "Anuluj",

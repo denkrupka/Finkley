@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -8,6 +8,12 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
   Dialog,
   DialogContent,
@@ -65,10 +71,8 @@ export function OtherIncomeTab({ salonId }: { salonId: string }) {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
-  // Простое окно — текущий месяц. Полный period-toggle добавим если будет
-  // спрос; для MVP «прочие доходы» это редкие записи (раз-два в месяц).
-  const today = new Date()
-  const range = { start: startOfMonth(today), end: endOfMonth(today) }
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const range = periodToRange(period)
 
   const { data: categories = [] } = useOtherIncomeCategories(salonId)
   const { data: incomes = [], isLoading } = useOtherIncomes(salonId, range)
@@ -92,10 +96,13 @@ export function OtherIncomeTab({ salonId }: { salonId: string }) {
             </span>
           </p>
         </div>
-        <Button variant="secondary" size="md" onClick={() => setFormOpen(true)}>
-          <Plus className="size-4" strokeWidth={2.4} />
-          {t('income.other.add_button')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <Button variant="secondary" size="md" onClick={() => setFormOpen(true)}>
+            <Plus className="size-4" strokeWidth={2.4} />
+            {t('income.other.add_button')}
+          </Button>
+        </div>
       </div>
 
       <div className="border-border bg-card shadow-finsm rounded-lg border">

@@ -3,6 +3,27 @@
     "title": "Finkley",
     "placeholder": "App skeleton is ready. See docs/04_BACKLOG.md for the next steps."
   },
+  "period": {
+    "aria_trigger": "Period picker",
+    "clear": "Clear",
+    "ok": "OK",
+    "mode": {
+      "range": "From — To",
+      "month": "Month",
+      "year": "Year",
+      "recent": "Recent"
+    },
+    "range": {
+      "from": "From",
+      "to": "To"
+    },
+    "recent": {
+      "7": "Last 7 days",
+      "30": "Last 30 days",
+      "90": "Last 90 days",
+      "365": "Last year"
+    }
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

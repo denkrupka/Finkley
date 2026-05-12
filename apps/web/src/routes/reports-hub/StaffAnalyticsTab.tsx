@@ -1,10 +1,12 @@
-import { addMonths, format, startOfMonth } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useRevenueByStaff } from '@/hooks/useAnalytics'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -18,9 +20,10 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const startIso = startOfMonth(cursor).toISOString()
-  const endIso = startOfMonth(addMonths(cursor, 1)).toISOString()
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const range = periodToRange(period)
+  const startIso = range.start.toISOString()
+  const endIso = range.end.toISOString()
   const { data: rows = [], isLoading } = useRevenueByStaff(salonId, startIso, endIso)
 
   const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
@@ -32,17 +35,7 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         <h2 className="text-brand-navy text-lg font-bold tracking-tight">
           {t('reports_hub.staff.title')}
         </h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addMonths(c, -1))}>
-            <ChevronLeft className="size-4" strokeWidth={2} />
-          </Button>
-          <span className="text-foreground text-sm font-semibold">
-            {format(cursor, 'LLLL yyyy', { locale: ru })}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addMonths(c, 1))}>
-            <ChevronRight className="size-4" strokeWidth={2} />
-          </Button>
-        </div>
+        <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
