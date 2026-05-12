@@ -534,7 +534,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
 function sumFixedCents(s: FinancialSettings): number {
   const f = s.fixed
-  return (
+  const base =
     f.payroll_management_cents +
     f.payroll_admin_cents +
     f.zus_cents +
@@ -552,7 +552,10 @@ function sumFixedCents(s: FinancialSettings): number {
     f.accounting_cents +
     f.fuel_cents +
     f.other_cents
-  )
+  const custom = (f.custom ?? [])
+    .filter((c) => c.active)
+    .reduce((s, c) => s + (c.monthly_cents ?? 0), 0)
+  return base + custom
 }
 
 function sumTaxesCents(s: FinancialSettings): number {
@@ -623,11 +626,22 @@ function buildFixedRows(settings: FinancialSettings, t: (k: string) => string) {
     ['fuel_cents', 'settings.parameters.fixed.fuel'],
     ['other_cents', 'settings.parameters.fixed.other'],
   ] as const
-  return FIXED.map(([key, labelKey]) => ({
+  const standard = FIXED.map(([key, labelKey]) => ({
     label: t(labelKey),
-    values: Array.from({ length: 12 }, () => -settings.fixed[key as keyof typeof settings.fixed]),
+    values: Array.from(
+      { length: 12 },
+      () => -(settings.fixed[key as keyof typeof settings.fixed] as number),
+    ),
     indent: 2,
   }))
+  const custom = (settings.fixed.custom ?? [])
+    .filter((c) => c.active)
+    .map((c) => ({
+      label: c.label || '—',
+      values: Array.from({ length: 12 }, () => -(c.monthly_cents ?? 0)),
+      indent: 2,
+    }))
+  return [...standard, ...custom]
 }
 
 function buildInvestmentRows(

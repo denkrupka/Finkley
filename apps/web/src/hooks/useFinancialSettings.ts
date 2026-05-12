@@ -36,6 +36,10 @@ export type FixedExpenses = {
   accounting_cents: number
   fuel_cents: number
   other_cents: number
+  /** Кастомные позиции добавленные владельцем. Если позицию ранее
+   *  использовали в финансовом отчёте — её можно архивировать (active=false),
+   *  чтобы исторические расчёты не сломались. */
+  custom?: Array<{ id: string; label: string; monthly_cents: number; active: boolean }>
 }
 
 export type VariableExpenses = {
@@ -110,6 +114,7 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
     accounting_cents: 0,
     fuel_cents: 0,
     other_cents: 0,
+    custom: [],
   },
   variable: {
     admin_payroll_pct: 0,

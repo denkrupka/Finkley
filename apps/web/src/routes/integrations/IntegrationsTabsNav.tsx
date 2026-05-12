@@ -1,4 +1,4 @@
-import { Banknote, FileText, Plug } from 'lucide-react'
+import { Banknote, FileText, MessageCircle, MoreHorizontal, Plug } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -8,6 +8,8 @@ const TAB_ICONS: Record<IntegrationCategory, LucideIcon> = {
   accounting: FileText,
   booking: Plug,
   banking: Banknote,
+  messengers: MessageCircle,
+  other: MoreHorizontal,
 }
 
 /**

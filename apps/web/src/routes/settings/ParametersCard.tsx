@@ -405,6 +405,18 @@ export function ParametersCard() {
         </section>
       ))}
 
+      {/* Custom Постоянные расходы — owner добавляет свои позиции.
+          При «удалении» позиция помечается active=false (история фин. отчёта
+          не ломается — если она была активна в нужном месяце, расчёт
+          использует её на тот период). */}
+      <CustomFixedExpenses
+        items={draft.fixed.custom ?? []}
+        currency={currency}
+        onChange={(next) =>
+          setDraft((prev) => ({ ...prev, fixed: { ...prev.fixed, custom: next } }))
+        }
+      />
+
       <div className="border-border bg-card shadow-finsm sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-lg border p-3">
         <p className="text-muted-foreground text-xs">{t('settings.parameters.save_hint')}</p>
         <Button type="submit" variant="primary" size="md" disabled={save.isPending}>
@@ -412,6 +424,141 @@ export function ParametersCard() {
         </Button>
       </div>
     </form>
+  )
+}
+
+type CustomItem = { id: string; label: string; monthly_cents: number; active: boolean }
+
+function CustomFixedExpenses({
+  items,
+  currency,
+  onChange,
+}: {
+  items: CustomItem[]
+  currency: string
+  onChange: (next: CustomItem[]) => void
+}) {
+  const { t } = useTranslation()
+  const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
+
+  function addItem() {
+    onChange([
+      ...items,
+      {
+        id: crypto.randomUUID(),
+        label: '',
+        monthly_cents: 0,
+        active: true,
+      },
+    ])
+  }
+
+  function updateItem(id: string, patch: Partial<CustomItem>) {
+    onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  }
+
+  function archiveItem(id: string) {
+    // Soft-delete: помечаем неактивным чтобы исторический отчёт не сломался
+    onChange(items.map((it) => (it.id === id ? { ...it, active: false } : it)))
+  }
+
+  function restoreItem(id: string) {
+    onChange(items.map((it) => (it.id === id ? { ...it, active: true } : it)))
+  }
+
+  const active = items.filter((it) => it.active)
+  const archived = items.filter((it) => !it.active)
+
+  return (
+    <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
+      <header className="border-border mb-4 flex items-start justify-between gap-3 border-b pb-3">
+        <div>
+          <h3 className="text-brand-navy text-base font-bold tracking-tight">
+            {t('settings.parameters.custom_fixed.title')}
+          </h3>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {t('settings.parameters.custom_fixed.subtitle')}
+          </p>
+        </div>
+        <Button type="button" variant="secondary" size="sm" onClick={addItem}>
+          + {t('settings.parameters.custom_fixed.add')}
+        </Button>
+      </header>
+
+      {active.length === 0 && archived.length === 0 ? (
+        <p className="text-muted-foreground text-sm italic">
+          {t('settings.parameters.custom_fixed.empty')}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {active.map((it) => (
+            <li key={it.id} className="border-border flex items-center gap-2 rounded-md border p-2">
+              <Input
+                value={it.label}
+                onChange={(e) => updateItem(it.id, { label: e.target.value })}
+                placeholder={t('settings.parameters.custom_fixed.label_placeholder')}
+                className="h-9 flex-1 text-sm"
+              />
+              <div className="border-border bg-card flex h-9 w-32 items-center gap-1.5 rounded-md border px-2">
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={String((it.monthly_cents ?? 0) / 100)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value.replace(',', '.'))
+                    if (!Number.isFinite(n) || n < 0) return
+                    updateItem(it.id, { monthly_cents: Math.round(n * 100) })
+                  }}
+                  className="num h-full border-0 bg-transparent px-0 text-right text-sm shadow-none focus-visible:ring-0"
+                />
+                <span className="text-muted-foreground text-xs font-semibold">
+                  {currencySymbol}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => archiveItem(it.id)}
+                className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+                title={t('settings.parameters.custom_fixed.archive')}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+
+          {archived.length > 0 ? (
+            <details className="mt-2">
+              <summary className="text-muted-foreground cursor-pointer text-xs">
+                {t('settings.parameters.custom_fixed.archived', { count: archived.length })}
+              </summary>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {archived.map((it) => (
+                  <li
+                    key={it.id}
+                    className="text-muted-foreground bg-muted/30 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs"
+                  >
+                    <span className="line-through">{it.label || '—'}</span>
+                    <button
+                      type="button"
+                      onClick={() => restoreItem(it.id)}
+                      className="text-secondary font-semibold hover:underline"
+                    >
+                      {t('settings.parameters.custom_fixed.restore')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </ul>
+      )}
+
+      <p className="text-muted-foreground mt-3 text-[11px]">
+        {t('settings.parameters.custom_fixed.history_hint')}
+      </p>
+    </section>
   )
 }
 

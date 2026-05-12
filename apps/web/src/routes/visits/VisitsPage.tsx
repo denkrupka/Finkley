@@ -6,11 +6,14 @@ import {
   List,
   Pencil,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import { Link } from 'react-router-dom'
 
 import { EditVisitModal } from './EditVisitModal'
 import { FreeSlotsPanel } from './FreeSlotsPanel'
@@ -155,34 +158,44 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
             </p>
           </div>
         ) : null}
-        {/* View toggle: список / календарь */}
-        <div className="border-border bg-card inline-flex rounded-md border p-0.5">
-          <button
-            type="button"
-            onClick={() => setView('list')}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
-              view === 'list'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
+        {/* View toggle: список / календарь + CSV import */}
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/${salonId}/settings/import`}
+            className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors"
+            title={t('visits.import_csv')}
           >
-            <List className="size-3.5" strokeWidth={1.8} />
-            {t('visits.view.list')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('calendar')}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
-              view === 'calendar'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <CalendarDays className="size-3.5" strokeWidth={1.8} />
-            {t('visits.view.calendar')}
-          </button>
+            <Upload className="size-3.5" strokeWidth={1.8} />
+            {t('visits.import_csv')}
+          </Link>
+          <div className="border-border bg-card inline-flex rounded-md border p-0.5">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
+                view === 'list'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <List className="size-3.5" strokeWidth={1.8} />
+              {t('visits.view.list')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
+                view === 'calendar'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <CalendarDays className="size-3.5" strokeWidth={1.8} />
+              {t('visits.view.calendar')}
+            </button>
+          </div>
         </div>
       </div>
 

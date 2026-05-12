@@ -29,7 +29,7 @@ export type IntegrationProvider =
   | 'infakt'
   | 'ksef'
 
-export type IntegrationCategory = 'accounting' | 'booking' | 'banking'
+export type IntegrationCategory = 'accounting' | 'booking' | 'banking' | 'messengers' | 'other'
 
 export type ConnectField = {
   key: string
@@ -227,7 +227,13 @@ export const INTEGRATIONS: IntegrationDef[] = [
   },
 ]
 
-export const CATEGORY_ORDER: IntegrationCategory[] = ['accounting', 'booking', 'banking']
+export const CATEGORY_ORDER: IntegrationCategory[] = [
+  'accounting',
+  'booking',
+  'banking',
+  'messengers',
+  'other',
+]
 
 export function getCategoryLabel(category: IntegrationCategory): string {
   return `integrations.categories.${category}`

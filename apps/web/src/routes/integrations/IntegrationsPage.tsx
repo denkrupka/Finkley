@@ -1,4 +1,16 @@
-import { ArrowLeft, Check, ChevronRight, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Facebook,
+  Instagram,
+  Loader2,
+  Lock,
+  Phone,
+  RefreshCw,
+  Send,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -17,6 +29,8 @@ import {
   type IntegrationProvider,
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
+
+import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 
 import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
@@ -97,6 +111,10 @@ export function IntegrationsPage() {
 
       {activeCategory === 'banking' ? (
         <BankingSection salonId={salonId} />
+      ) : activeCategory === 'messengers' ? (
+        <MessengerConnectorsSection salonId={salonId} />
+      ) : activeCategory === 'other' ? (
+        <OtherIntegrationsSection />
       ) : tabProviders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('integrations.tab_empty')}</p>
       ) : (
@@ -395,5 +413,73 @@ function StatusPill({ status }: { status: IntegrationDef['status'] }) {
       {status === 'available' ? <Check className="size-3" strokeWidth={2.5} /> : null}
       {t(m.label)}
     </span>
+  )
+}
+
+function MessengerConnectorsSection({ salonId }: { salonId: string }) {
+  const { t } = useTranslation()
+  const channels = [
+    { id: 'telegram', name: 'Telegram', icon: Send, color: '#229ED9' },
+    { id: 'whatsapp', name: 'WhatsApp Business', icon: Phone, color: '#25D366' },
+    { id: 'instagram', name: 'Instagram Direct', icon: Instagram, color: '#E4405F' },
+    { id: 'facebook', name: 'Facebook Messenger', icon: Facebook, color: '#1877F2' },
+  ] as const
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {channels.map((ch) => {
+        const Icon = ch.icon
+        return (
+          <div
+            key={ch.id}
+            className="border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5"
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="grid size-10 shrink-0 place-items-center rounded-md"
+                style={{ background: ch.color, color: 'white' }}
+              >
+                <Icon className="size-5" strokeWidth={1.8} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-foreground text-base font-bold">{ch.name}</h3>
+                <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                  {t(`integrations.messengers.${ch.id}_subtitle`, {
+                    defaultValue: t('integrations.messengers.generic_subtitle'),
+                  })}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void salonId
+                toast.info(t('integrations.messengers.coming_soon'))
+              }}
+              className="border-border bg-card hover:bg-muted/40 inline-flex h-10 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
+            >
+              {t('integrations.messengers.connect')}
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function OtherIntegrationsSection() {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-3">
+      <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-foreground text-base font-bold">{t('settings.install.title')}</h3>
+            <p className="text-muted-foreground mt-1 text-sm">{t('settings.install.subtitle')}</p>
+          </div>
+          <InstallAppButton />
+        </div>
+      </section>
+    </div>
   )
 }
