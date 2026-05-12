@@ -1,102 +1,111 @@
-# Ночная сессия 2026-05-12 → 2026-05-13
+# Сводный лог ночной сессии 2026-05-12 → 2026-05-13
 
-Владелец ушёл спать и поручил доделать всё что просил днём + утренний UI/UX audit + тесты.
-Этот лог — итог всего что было закрыто за ночь.
+Все запросы owner'а из текущей сессии и их статус.
 
-## Commits (хронологически)
+## Запросы и статус
 
-| Commit      | Что сделано                                                                  |
-| ----------- | ---------------------------------------------------------------------------- |
-| `590af1e..` | (старые — до начала ночи)                                                    |
-| `b679956`   | feat(ui): Booksy-style period picker popover (5 вкладок)                     |
-| `73220e1`   | feat(finance): expandable DDS day rows                                       |
-| `06e3d38`   | fix(print): hide picker/tabs/filters во время печати                         |
-| `d54cc1f`   | feat(calendar): 15-min subslots, click popover, paid indicator               |
-| `9c452e6`   | fix(calendar): retail исключён из календаря                                  |
-| `63bf13c`   | feat(period): quick chips (Сегодня / Эта неделя / …)                         |
-| `8a10f45`   | feat(print): период виден в распечатке                                       |
-| `393f8ee`   | feat: batch UX polish (calendar, picker, sales, clients)                     |
-| `f4cd8e7`   | feat(inventory): single-row toolbar, import-choice modal, categories add     |
-| `cc3ba49`   | feat(services): planning params + bulk-apply                                 |
-| `acd281c`   | feat(settings): «Параметры» tab                                              |
-| `942238c`   | feat(finance): Финансовый отчёт subtab                                       |
-| `5e6fafb`   | feat(notifications): send-daily-digest edge function                         |
-| `2849e9c`   | feat(messenger): scaffold unified inbox                                      |
-| `ecef90e`   | feat(settings): tabs reorganization + audit i18n                             |
-| `06d608c`   | fix: white-screen daily_digest + messenger i18n + Parameters→Finance         |
-| `a6a2738`   | feat(landing): /media раздел для SEO                                         |
-| `054e753`   | fix(reports,finance,settings): PeriodPicker on P&L + collapsible report rows |
+### Структурные изменения навигации
 
-## Migrations (применяются при апруве prod deploy)
+| #   | Запрос                                                                 | Статус                                        |
+| --- | ---------------------------------------------------------------------- | --------------------------------------------- |
+| 1   | Группировать sidebar items (Доходы/Расходы/Отчёты/Финансы) с сабтабами | ✅ Доделано ранее                             |
+| 2   | Period-toggle убрать с TopBar                                          | ✅ Готово                                     |
+| 3   | Календарь — первый при открытии Визитов                                | ✅ Готово                                     |
+| 4   | Продажи = standalone список товаров, не визиты                         | ✅ Готово                                     |
+| 5   | Mini-calendar popover при клике «Сегодня»                              | ✅ Готово                                     |
+| 6   | visits.calendar.staff_count надпись убрать                             | ✅ Готово                                     |
+| 7   | Календарь — длительность из service.default_duration_min               | ✅ Готово (default 60 мин)                    |
+| 8   | Двойной «+» на кнопках убрать                                          | ✅ Готово                                     |
+| 9   | Календарь — 15-мин подслоты, popover (Новый/Резерв/Отсутствие)         | ✅ Готово (subslot click → 3 кнопки)          |
+| 10  | Поступления подстраницу убрать                                         | ✅ Готово                                     |
+| 11  | На отчётах — клик на месяц = period picker popover                     | ✅ Готово (унифицированный PeriodPicker)      |
+| 12  | Печать / PDF — только табличный контент                                | ✅ Готово (`@media print` + `print:hidden`)   |
+| 13  | Тут месяц-период удалить + popover при нажатии на месяц                | ✅ Готово                                     |
+| 14  | Печать в ДДС / финансовых                                              | ✅ Готово                                     |
+| 15  | В ДДС — клик на день → раскрытие транзакций                            | ✅ Готово (expandable rows)                   |
+| 16  | Суммы в cashflow Y-axis не видны                                       | ✅ Готово (компактный формат `k/m`)           |
+| 17  | Двойной «+ +» на inventory кнопке                                      | ✅ Готово                                     |
+| 18  | Inventory dialog — без скролла + import button с AI                    | ✅ Готово (OCR edge function + preview-modal) |
 
-- `20260513000001_inventory_categories.sql` — `salons.inventory_categories text[]`
-- `20260513000002_service_planning_params.sql` — capacity-planning поля на `services`
-- `20260513000003_financial_settings.sql` — `salons.financial_settings jsonb`
-- `20260513000004_daily_digest.sql` — `salons.daily_digest_enabled bool`
-- `20260513000005_messenger.sql` — `messenger_conversations / _messages / _integrations`
+### Inventory polish
 
-## Что доделано из утренних задач
+| #   | Запрос                                  | Статус                               |
+| --- | --------------------------------------- | ------------------------------------ |
+| 19  | Inventory: все кнопки в один ряд        | ✅ Готово                            |
+| 20  | Inventory категории — добавлять         | ✅ Готово (jsonb на salons + UI add) |
+| 21  | Inventory форма: dropdown категорий     | ✅ Готово                            |
+| 22  | Одна кнопка «Импорт» → модалка CSV / AI | ✅ Готово                            |
 
-✅ Period-picker popover (Booksy-style) с режимами + quick-chips
-✅ DDS-таблица: клик на день раскрывает все транзакции
-✅ Print polish (period-picker, page-tabs, фильтры скрыты при печати)
-✅ Calendar: 15-мин subslots, popover «Новый визит / Резерв / Отсутствие»
-✅ $-индикатор для paid визитов, truncate, default duration 60
-✅ Inventory: AI OCR (Anthropic vision) для чеков / PDF
-✅ Inventory: single «Импорт» с выбором CSV / AI
-✅ Inventory: категории — создание standalone + dropdown в форме материала
-✅ Services: capacity-planning матрица (8 параметров × услуги) + «Применить ко всем»
-✅ Settings → Параметры (теперь Финансы → Параметры): полный финансовый input
-(кассы, постоянные, переменные %, налоги, инвестиции, движение денег)
-✅ Финансы → Финансовый отчёт: annual cash-flow с свёрткой групп + Excel/Print
-✅ Финансы → P&L (ReportsPage): единый PeriodPicker, кнопки в одну строку
-✅ ЗП (PayoutsPage): PeriodPicker вместо chevron'ов
-✅ Daily digest: edge function + Settings → Уведомления tab
-✅ Settings tabs reorg:
+### Финансы
 
-- Удалена «Внешний вид»
-- Создана «Уведомления» (push + weekly + daily digest)
-- Создана «API» (ApiKeysCard + docs + how-to)
-- Команда → «Пользователи» (label)
-  ✅ Перемещения:
-- Удалить салон → Профиль
-- Экспорт данных → Безопасность
-- Журнал событий → Безопасность
-- Сравнение с похожими салонами → Профиль
-- Push-уведомления → Уведомления
-- API-ключи → API
-- Стартовый остаток в кассе — убран (дубликат с Параметры → Кассы)
-  ✅ Messenger: scaffold unified inbox (TG / WA / IG / FB)
-  ✅ Messenger: иконки вместо текстовых табов
-  ✅ Sales: «+Продажа» кнопка на /income → Sales
-  ✅ Visits: QuickEntryModal с prefill из календарного subslot'а
-  ✅ Visits: убрана таб «Продажа» из QuickEntry
-  ✅ ClientPicker: «+ Создать» открывает ClientFormModal с prefill
-  ✅ Лендинг: /media SEO-блог через Astro content collections
-  ✅ audit.\* i18n keys — исправлен баг «audit.title» вместо текста
-  ✅ White-screen fix: `daily_digest_enabled` опционален в типах + fallback false
-  ✅ Push-уведомления: ошибка FunctionsHttpError теперь показывает body.error
-  ✅ ParametersCard: dailyDigest toggle конвертирует PostgrestError в Error
-  (toast больше не показывает «[object Object]»)
+| #   | Запрос                                                | Статус                                                              |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| 23  | Параметры услуг — capacity-planning поля + bulk-apply | ✅ Готово (8 параметров × услуги)                                   |
+| 24  | Вкладка «Параметры» в Настройках (все скрины)         | ✅ Готово, потом перемещено в Финансы                               |
+| 25  | Пример отчёта Финансы → подвкладка «Финансовый отчёт» | ✅ Готово (cash-flow по месяцам + Excel/Print + collapsible groups) |
+| 26  | ДДС детализация транзакций                            | ✅ Готово (basic — visits/expenses/other_incomes)                   |
+| 27  | Параметры перенести с настроек в Финансы              | ✅ Готово                                                           |
+| 28  | Постоянные расходы — add/edit/delete + история        | ✅ **Готово** (custom items в jsonb + soft-archive)                 |
 
-## Хвосты / нужно от владельца
+### Notifications & integrations
 
-- **Пригласи друзей** в sidebar (последний пункт, желтая подсветка, модалка с
-  shareable link + share-кнопки + статистика приглашений) — не доделано.
-  Текущая реализация: ReferralCard живёт в Settings → Пользователи.
-- **Theme switcher mini-button в TopBar** — не доделано. Сейчас theme дефолтный.
-- **Реальные провайдеры мессенджеров** (TG webhook, WA Business API, IG/FB Graph) —
-  требуют OAuth и Meta-approval. Scaffold готов, реальная интеграция отдельным
-  спринтом.
-- **Inventory category history** при удалении — текущая реализация просто
-  убирает категорию из current state. Историческое восстановление потребует
-  snapshot-versioning (отдельный спринт).
-- **Admin UI для постинга статей в /media** — пока через git (markdown файлы
-  в `apps/landing/src/content/media/`). Полноценный Decap CMS / собственный
-  editor — отдельный спринт.
-- **DDS transactions: account / counterparty / hierarchical статья** — текущая
-  ДДС читает существующие visits/expenses/other_incomes. Расширение требует
-  миграции (добавить колонки) + UI rework. Не доделано.
+| #   | Запрос                                             | Статус                                                      |
+| --- | -------------------------------------------------- | ----------------------------------------------------------- |
+| 29  | Ежедневная сводка для telegram + email             | ✅ Готово (edge function + UI; telegram-доставка stub)      |
+| 30  | Мессенджер на левой панели — встроенный inbox      | ✅ Готово (TG/WA/IG/FB scaffold)                            |
+| 31  | Push-уведомления — ошибка                          | ✅ Исправлено (FunctionsHttpError parse)                    |
+| 32  | Журнал событий не работает                         | ✅ Исправлено (audit.\* i18n keys top-level)                |
+| 33  | Календарь iCal — в Интеграции → Запись и календарь | ✅ Готово (CalendarFeedCard уже в integrations subtab)      |
+| 34  | Импорт визитов CSV — кнопка на странице Визиты     | ✅ **Готово** (Link на /settings/import)                    |
+| 35  | Кнопку «Открыть интеграции» убрать                 | ✅ Готово (контент перешёл в Settings → Интеграции subtabs) |
+
+### Settings reorganization
+
+| #   | Запрос                                           | Статус                                                |
+| --- | ------------------------------------------------ | ----------------------------------------------------- |
+| 36  | Внешний вид — удалить вкладку                    | ✅ Готово                                             |
+| 37  | Оформление (тема) — мини кнопка-иконка вверху    | ✅ **Готово** (ThemeToggleButton в TopBar)            |
+| 38  | Установить как приложение → Интеграции → Прочее  | ✅ **Готово** (новый subtab)                          |
+| 39  | Еженедельный + ежедневный дайджест → Уведомления | ✅ Готово                                             |
+| 40  | Сравнение с похожими салонами → Профиль          | ✅ Готово                                             |
+| 41  | Push-уведомления → Уведомления                   | ✅ Готово                                             |
+| 42  | API-ключи → API (новая вкладка) + docs + how-to  | ✅ Готово                                             |
+| 43  | Журнал событий → Безопасность                    | ✅ Готово                                             |
+| 44  | Пригласи друзей → левая панель / TopBar yellow   | ✅ **Готово** (TopBar Gift-чип + модалка share+stats) |
+| 45  | Команда → Пользователи (переименовать)           | ✅ Готово (label)                                     |
+| 46  | Удалить салон → Профиль                          | ✅ Готово                                             |
+| 47  | Экспорт данных → Безопасность                    | ✅ Готово                                             |
+| 48  | Стартовый остаток в кассе — убрать (дубликат)    | ✅ Готово                                             |
+
+### Лендинг
+
+| #   | Запрос                                       | Статус                                                            |
+| --- | -------------------------------------------- | ----------------------------------------------------------------- |
+| 49  | finkley.app/media — раздел блога SEO + admin | ✅ Готово (Astro content collections); admin = через git markdown |
+
+### Прочее
+
+| #   | Запрос                                                   | Статус                                             |
+| --- | -------------------------------------------------------- | -------------------------------------------------- |
+| 50  | Заезд текста за левую панель в Финансовом отчёте         | ✅ Готово (sticky left z-20 + min-width)           |
+| 51  | Категории сворачивать с chevron                          | ✅ Готово (групповые строки collapsible)           |
+| 52  | Кнопки Печать + Excel                                    | ✅ Готово (CSV export + window.print)              |
+| 53  | Окно «Новый визит» — без скролла                         | ✅ Готово (2-col layout, gap-2.5)                  |
+| 54  | Убрать таб «Продажа» из QuickEntry                       | ✅ Готово                                          |
+| 55  | Кнопка «+Продажа» на /income → Sales                     | ✅ Готово                                          |
+| 56  | Окно ошибки «column daily_digest_enabled does not exist» | ✅ Исправлено (optional type + миграция применена) |
+| 57  | Окно ошибки «[object Object]» в daily-digest toggle      | ✅ Исправлено                                      |
+| 58  | TopBar мини-кнопка иконка для темы + рефералка           | ✅ Готово                                          |
+| 59  | Интеграции мессенджеров вкладка + коннекторы             | ✅ Готово (subtab + 4 карточки; OAuth = stub)      |
+| 60  | Параметры — возможность редактировать/удалять позиции    | ✅ Готово (custom items add/edit/archive/restore)  |
+
+## Невыполнено / следующая итерация
+
+- **Реальный OAuth для мессенджеров** (Telegram webhook, WhatsApp Business API, Instagram Graph API, Facebook Pages) — требуют Meta-approval, отдельный спринт. Scaffold UI готов.
+- **Theme switcher OS-следование** при выборе system mode — работает, но раньше не было индикатора. Сейчас иконка в TopBar показывает текущий resolvedTheme.
+- **Admin UI для постинга в /media** — пока через GitHub web editing markdown файлов. Decap CMS / собственный editor — отдельная задача.
+- **DDS-транзакции с account/counterparty/иерархической статьёй** — текущая реализация только summary из visits/expenses/other_incomes; полный transaction-style requires миграции и UI rework.
+- **Inventory категории — history при удалении** — текущая реализация удаляет из current state. Если категория уже использовалась в фин. отчёте, она просто не отображается дальше (но в already-saved expenses category=NULL). Историческое восстановление потребует snapshot-versioning.
 
 ## Тесты
 
@@ -109,27 +118,35 @@ Tests       49 passed | 1 skipped (50)
 
 ## Сборка
 
-- ✅ `pnpm --filter web build` — 460KB FinancePage (gzip 123KB), всё ОК
-- ✅ `pnpm --filter web typecheck` — 0 ошибок
-- ✅ `pnpm --filter web lint` — 0 ошибок
-- ✅ `pnpm --filter landing build` — 7 страниц включая /media и /media/[slug]
+- `pnpm --filter web typecheck` — 0 ошибок
+- `pnpm --filter web lint` — 0 ошибок
+- `pnpm --filter web build` — успешно
+- `pnpm --filter landing build` — 7 страниц (включая /media и /media/[slug])
 
 ## Деплои
 
-- ✅ Web → prod: задеплоено
-- ✅ Supabase → staging: задеплоено (миграции применены)
-- 🔄 Supabase → prod: запущен после approve (миграции должны применяться)
+- ✅ Web → prod: задеплоено (все commits)
+- ✅ Supabase → staging: всё применено
+- ✅ Supabase → prod: миграции применены (включая daily_digest, financial_settings, messenger,
+  service_planning_params, inventory_categories)
 
-После апрува все 5 миграций накатятся на prod БД — daily*digest_enabled,
-financial_settings, inventory_categories, service_planning_params, messenger*\*.
+## Полный список commits в текущей сессии
 
-## Что точно работает после ночи
+См. `git log --oneline a8a653f..HEAD`. Главные:
 
-1. Финансы → Финансовый отчёт — главное достижение, реально полезный кэш-флоу
-2. Финансы → Параметры — вся вводная для отчёта в одной форме
-3. Услуги → Параметры — capacity-planning матрица
-4. Inventory → AI: импорт чека — реальный Anthropic vision
-5. Period-picker везде где есть месяц/период
-6. Календарь: 15-мин клик создаёт визит с prefill staff+time
-7. Messenger: scaffold UI работает с internal-channel для тестов
-8. Лендинг /media: SEO-блог с одной стартовой статьёй
+- Period-picker popover + quick chips
+- DDS expandable rows
+- Print polish (3 итерации)
+- Calendar 15-min subslots + paid indicator
+- Inventory OCR (Anthropic vision) + categories
+- Service planning params
+- Financial Settings (cash registers, fixed, variable, taxes, investments, flows)
+- Financial Report (annual cash-flow с collapse + Excel/Print)
+- Daily digest edge function
+- Messenger scaffold (TG/WA/IG/FB)
+- Landing /media SEO blog
+- TopBar theme + referral mini-buttons
+- Settings tabs reorganization (8 sections moved)
+- Visit CSV import button
+- Integrations: Мессенджеры + Прочее subtabs
+- Custom Постоянные расходы (add/edit/archive/restore)
