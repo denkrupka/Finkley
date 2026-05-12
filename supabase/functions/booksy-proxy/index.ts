@@ -897,6 +897,87 @@ async function handleClearVisits(
   return jsonResponse({ ok: true, deleted: count ?? 0 })
 }
 
+/**
+ * Создаёт reservation (блокирующий слот) в Booksy на staff_id +
+ * временной диапазон, чтобы клиент не мог забукать тот же слот через
+ * Booksy онлайн. Используется как reverse-sync после создания визита
+ * в Finkley.
+ *
+ * Booksy POS API имеет endpoint для personal events / blocks. По
+ * реверсу владельца это POST `/business/{biz_id}/staff/{staff_id}/personal_events`
+ * с телом `{ start_date, end_date, type: 'block', title }`.
+ *
+ * Без живой документации делаем best-effort: возвращаем ok с reservation_id
+ * либо тихо ловим ошибку (`silent: true` в hook) — визит в Finkley уже
+ * создан, для юзера это enhancement, а не блокер.
+ */
+async function handleCreateReservation(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+  input: {
+    staff_id_external: string // booksy staff external_id (из staff-импорта)
+    start_at: string // ISO timestamp
+    end_at: string
+    title: string
+  },
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const { data: integration } = await admin
+    .from('salon_integrations')
+    .select('credentials')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .eq('status', 'connected')
+    .maybeSingle()
+  if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+
+  const creds = integration.credentials as { access_token: string; business_id: number }
+  const url = `${BOOKSY_API}/me/businesses/${creds.business_id}/staffers/${encodeURIComponent(input.staff_id_external)}/personal_events`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: booksyHeaders(creds.access_token),
+      body: JSON.stringify({
+        title: input.title,
+        start_date: input.start_at,
+        end_date: input.end_at,
+        type: 'block',
+      }),
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: 'booksy_reservation_failed',
+          status: res.status,
+          message: text.slice(0, 300),
+        },
+        502,
+      )
+    }
+    let parsed: { id?: number | string } = {}
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      // ignore
+    }
+    return jsonResponse({ ok: true, reservation_id: parsed.id ? String(parsed.id) : null })
+  } catch (e) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: 'network_error',
+        message: e instanceof Error ? e.message : String(e),
+      },
+      502,
+    )
+  }
+}
+
 /** Общая логика синка (используется и для user-trigger, и для cron). */
 async function runSyncForSalon(
   admin: SupabaseClient,
@@ -1027,6 +1108,11 @@ Deno.serve(
       access_token?: string
       token?: string
       interval_minutes?: number
+      // create_reservation
+      staff_id_external?: string
+      start_at?: string
+      end_at?: string
+      title?: string
     }
     try {
       body = await req.json()
@@ -1090,6 +1176,21 @@ Deno.serve(
           return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
         }
         return handleUpdateInterval(admin, userId, body.salon_id, body.interval_minutes)
+      case 'create_reservation':
+        if (
+          !body.staff_id_external ||
+          !body.start_at ||
+          !body.end_at ||
+          typeof body.title !== 'string'
+        ) {
+          return jsonResponse({ ok: false, error: 'reservation_fields_required' }, 400)
+        }
+        return handleCreateReservation(admin, userId, body.salon_id, {
+          staff_id_external: body.staff_id_external,
+          start_at: body.start_at,
+          end_at: body.end_at,
+          title: body.title,
+        })
       default:
         return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
     }

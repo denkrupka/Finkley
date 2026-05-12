@@ -27,6 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
+import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useCreateVisit, useDeleteVisit, useRestoreVisit } from '@/hooks/useVisits'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
@@ -91,8 +93,10 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
   const createVisit = useCreateVisit(salonId)
   const deleteVisit = useDeleteVisit(salonId)
+  const reserveBooksy = useCreateBooksyReservation()
   const restoreVisit = useRestoreVisit(salonId)
 
   const today = useMemo(() => new Date(), [])
@@ -216,6 +220,38 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
               },
             },
           })
+          // Booksy reverse-sync: блокируем слот в Booksy чтобы клиент не
+          // мог забукать одно и то же время онлайн. Silent fire-and-forget —
+          // если Booksy не подключён, у мастера нет external_id или вызов
+          // упал, визит в Finkley всё равно сохранён.
+          //
+          // На retail-продажах reservation не нужен (нет времени визита).
+          // Пока что reservation_id не сохраняется в БД — если визит
+          // отменят в Finkley, блок останется в Booksy и юзер удалит
+          // вручную. Полная двусторонняя синхронизация — отдельный TASK
+          // когда добавим visits.metadata jsonb.
+          const booksyConnected = integrations.some(
+            (i) => i.provider === 'booksy' && i.status === 'connected',
+          )
+          const stfExternal =
+            stf?.external_source === 'booksy' && stf.external_id ? stf.external_id : null
+          if (
+            booksyConnected &&
+            stfExternal &&
+            svc?.default_duration_min &&
+            svc.default_duration_min > 0
+          ) {
+            const startAt = new Date(visitAt)
+            const endAt = new Date(startAt.getTime() + svc.default_duration_min * 60000)
+            reserveBooksy.mutate({
+              salonId,
+              staffIdExternal: stfExternal,
+              startAt: startAt.toISOString(),
+              endAt: endAt.toISOString(),
+              title: svc.name ?? 'Visit',
+            })
+          }
+
           if (addAnother) {
             // оставляем staff/payment/date, очищаем service/amount/tip/discount/comment/client
             form.reset({

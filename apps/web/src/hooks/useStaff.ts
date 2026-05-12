@@ -43,10 +43,12 @@ export type StaffRow = {
   retail_payout_enabled: boolean
   retail_payout_percent: number | null
   retention_window_days: number | null
+  external_id: string | null
+  external_source: string | null
 }
 
 const STAFF_FIELDS =
-  'id, salon_id, full_name, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days'
+  'id, salon_id, full_name, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days, external_id, external_source'
 
 export function useStaff(salonId: string | undefined, opts?: { activeOnly?: boolean }) {
   const activeOnly = opts?.activeOnly ?? true
