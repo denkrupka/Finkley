@@ -5,6 +5,7 @@ import { CalendarDays } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -257,7 +258,19 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       .toUpperCase() ?? '?'
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
-  const [tab, setTab] = useState<'single' | 'bulk' | 'retail'>('single')
+  // Когда модал открывается из IncomePage с активным табом «Продажи»
+  // (`?tab=sales`) или со страницы /visits с фильтром `?kind=retail` —
+  // по умолчанию активируем таб розничной продажи.
+  const [pageParams] = useSearchParams()
+  const initialTab: 'single' | 'bulk' | 'retail' =
+    pageParams.get('kind') === 'retail' || pageParams.get('tab') === 'sales' ? 'retail' : 'single'
+  const [tab, setTab] = useState<'single' | 'bulk' | 'retail'>(initialTab)
+  // Если открыли модал, потом сменили активный таб страницы, потом открыли
+  // снова — обновляем initial выбор.
+  useEffect(() => {
+    if (open) setTab(initialTab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

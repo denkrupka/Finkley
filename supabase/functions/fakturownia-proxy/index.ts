@@ -310,7 +310,7 @@ async function syncFakturowniaToFinkley(
       }
       stats.expenses_synced++
 
-      // Auto-import в платёжный календарь — если фактура не оплачена
+      // Auto-import / reverse-sync в платёжный календарь
       if (!ex.paid && (ex.payment_date || ex.expense_date)) {
         const dueDate = (ex.payment_date ?? ex.expense_date)!.slice(0, 10)
         const { error: pmtErr } = await admin.from('scheduled_payments').insert({
@@ -326,6 +326,23 @@ async function syncFakturowniaToFinkley(
         if (pmtErr && pmtErr.code !== '23505') {
           console.warn(
             `scheduled_payment insert failed fakturownia ${externalId}: ${pmtErr.message}`,
+          )
+        }
+      } else if (ex.paid) {
+        // Фактура оплачена в Fakturownia — отмечаем календарь
+        const { error: pmtErr } = await admin
+          .from('scheduled_payments')
+          .update({
+            status: 'paid',
+            paid_at: ex.payment_date ? `${ex.payment_date}T00:00:00Z` : new Date().toISOString(),
+          })
+          .eq('salon_id', salonId)
+          .eq('source', 'fakturownia')
+          .eq('external_id', externalId)
+          .eq('status', 'pending')
+        if (pmtErr) {
+          console.warn(
+            `scheduled_payment reverse-sync failed fakturownia ${externalId}: ${pmtErr.message}`,
           )
         }
       }

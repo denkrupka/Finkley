@@ -448,10 +448,10 @@ async function syncWfirmaToFinkley(
     }
     stats.expenses_synced++
 
-    // Auto-import в платёжный календарь — если фактура ещё не оплачена.
-    // wFirma даёт `paid_date` (когда оплачено) и `date` (дата документа).
-    // Поле «termin platnosci» отдельно от document date — оно может быть
-    // позже; пока используем document date как due_date (хуже не сделает).
+    // Auto-import / reverse-sync в платёжный календарь.
+    // Если paid_date null — добавляем в календарь как pending (или ничего
+    // не делаем при повторном sync — защита UNIQUE_VIOLATION).
+    // Если paid_date появился — помечаем calendar row как paid.
     if (!detail.paid_date && (detail.date || expenseAt)) {
       const dueDate = (detail.date ?? expenseAt).slice(0, 10)
       const { error: pmtErr } = await admin.from('scheduled_payments').insert({
@@ -467,6 +467,24 @@ async function syncWfirmaToFinkley(
       // UNIQUE_VIOLATION (23505) — уже в календаре, всё ок
       if (pmtErr && pmtErr.code !== '23505') {
         console.warn(`scheduled_payment insert failed wfirma ${detail.id}: ${pmtErr.message}`)
+      }
+    } else if (detail.paid_date) {
+      // Фактура оплачена в wFirma — отмечаем в нашем календаре
+      const { error: pmtErr } = await admin
+        .from('scheduled_payments')
+        .update({
+          status: 'paid',
+          paid_at:
+            detail.paid_date.length >= 10
+              ? `${detail.paid_date.slice(0, 10)}T00:00:00Z`
+              : new Date().toISOString(),
+        })
+        .eq('salon_id', salonId)
+        .eq('source', 'wfirma')
+        .eq('external_id', detail.id)
+        .eq('status', 'pending')
+      if (pmtErr) {
+        console.warn(`scheduled_payment reverse-sync failed wfirma ${detail.id}: ${pmtErr.message}`)
       }
     }
   }
