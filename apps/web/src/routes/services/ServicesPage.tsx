@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next'
 
 import { CategoriesCard } from '@/routes/settings/CategoriesCard'
 import { ServicesPricingCard } from '@/routes/settings/ServicesPricingCard'
+
+import { ServicePlanningCard } from './ServicePlanningCard'
 import { ServicesByCategoryCard } from './ServicesByCategoryCard'
 
 /**
@@ -25,6 +27,10 @@ export function ServicesPage() {
 
       <div className="mb-6">
         <ServicesPricingCard />
+      </div>
+
+      <div className="mb-6">
+        <ServicePlanningCard />
       </div>
 
       <div className="mb-6">
