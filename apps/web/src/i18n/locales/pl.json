@@ -155,7 +155,7 @@
     "services": "Usługi",
     "inventory": "Magazyn",
     "payouts": "Wypłaty",
-    "reports": "Raporty",
+    "reports": "Finanse",
     "knowledge": "Baza wiedzy",
     "ai": "AI-asystent",
     "settings": "Ustawienia",
@@ -1140,7 +1140,7 @@
     }
   },
   "reports": {
-    "title": "Raporty",
+    "title": "Finanse",
     "subtitle": "Obraz finansowy za okres: P&L, przychód wg specjalistów / usług / form płatności, obłożenie po dniach i godzinach.",
     "prev_month": "Poprzedni miesiąc",
     "next_month": "Następny miesiąc",

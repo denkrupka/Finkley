@@ -155,7 +155,7 @@
     "services": "Services",
     "inventory": "Inventory",
     "payouts": "Payroll",
-    "reports": "Reports",
+    "reports": "Finance",
     "knowledge": "Knowledge base",
     "ai": "AI assistant",
     "settings": "Settings",
@@ -1139,7 +1139,7 @@
     }
   },
   "reports": {
-    "title": "Reports",
+    "title": "Finance",
     "subtitle": "Financial picture for the period: P&L, revenue by specialist / service / payment method, occupancy by day and hour.",
     "prev_month": "Previous month",
     "next_month": "Next month",
