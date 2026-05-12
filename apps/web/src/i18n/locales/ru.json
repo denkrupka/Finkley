@@ -1758,7 +1758,14 @@
       "col_running": "Накопит.",
       "legend_inflow": "Приход",
       "legend_outflow": "Расход",
-      "legend_running": "Накопит. остаток"
+      "legend_running": "Накопит. остаток",
+      "no_tx_for_day": "Нет детализированных транзакций за этот день",
+      "source": {
+        "visit": "Визит",
+        "retail": "Товар",
+        "other_income": "Доход",
+        "expense": "Расход"
+      }
     },
     "payments": {
       "title": "Счета на оплату",

@@ -1323,7 +1323,14 @@
       "col_running": "Skum.",
       "legend_inflow": "Wpływy",
       "legend_outflow": "Wydatki",
-      "legend_running": "Saldo skumulowane"
+      "legend_running": "Saldo skumulowane",
+      "no_tx_for_day": "Brak szczegółowych transakcji w tym dniu",
+      "source": {
+        "visit": "Wizyta",
+        "retail": "Produkt",
+        "other_income": "Przychód",
+        "expense": "Wydatek"
+      }
     },
     "payments": {
       "title": "Do zapłaty",

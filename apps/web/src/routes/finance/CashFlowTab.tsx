@@ -1,7 +1,9 @@
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
   Bar,
   CartesianGrid,
@@ -21,8 +23,26 @@ import {
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useCashFlowDaily } from '@/hooks/useCashFlow'
+import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
+import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
+import { useStaff } from '@/hooks/useStaff'
+import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
+
+/**
+ * Унифицированная транзакция для разворачивающейся строки ДДС.
+ * Источник определяет таргет навигации при клике на строку.
+ */
+type Tx = {
+  id: string
+  day: string // yyyy-mm-dd
+  kind: 'inflow' | 'outflow'
+  source: 'visit' | 'retail' | 'other_income' | 'expense'
+  amountCents: number
+  title: string
+  subtitle: string | null
+}
 
 /**
  * Контент таба «ДДС» страницы /finance. Показывает приход/расход/нетто по
@@ -32,15 +52,83 @@ import { formatCurrency } from '@/lib/utils/format-currency'
  */
 export function CashFlowTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const range = periodToRange(period)
   const from = format(range.start, 'yyyy-MM-dd')
   const to = format(range.end, 'yyyy-MM-dd')
 
   const { data: rows = [], isLoading } = useCashFlowDaily(salonId, from, to)
+
+  const visitsRange = { start: range.start.toISOString(), end: range.end.toISOString() }
+  const { data: visits = [] } = useVisits(salonId, visitsRange)
+  const { data: otherIncomes = [] } = useOtherIncomes(salonId, range)
+  const { data: expenses = [] } = useExpenses(salonId, { start: from, end: to })
+  const { data: staff = [] } = useStaff(salonId)
+  const { data: expenseCategories = [] } = useExpenseCategories(salonId)
+  const { data: incomeCategories = [] } = useOtherIncomeCategories(salonId)
+
+  const txByDay = useMemo<Record<string, Tx[]>>(() => {
+    const grouped: Record<string, Tx[]> = {}
+    const pushTx = (day: string, tx: Tx) => {
+      if (!grouped[day]) grouped[day] = []
+      grouped[day].push(tx)
+    }
+
+    for (const v of visits) {
+      const day = v.visit_at.slice(0, 10)
+      const amt = v.amount_cents - v.discount_cents + v.tip_cents
+      if (amt === 0) continue
+      const staffName = staff.find((s) => s.id === v.staff_id)?.full_name ?? null
+      pushTx(day, {
+        id: v.id,
+        day,
+        kind: 'inflow',
+        source: v.kind === 'retail' ? 'retail' : 'visit',
+        amountCents: amt,
+        title: v.service_name_snapshot ?? (v.kind === 'retail' ? '—' : '—'),
+        subtitle: staffName,
+      })
+    }
+    for (const oi of otherIncomes) {
+      const day = oi.income_at.slice(0, 10)
+      const cat = incomeCategories.find((c) => c.id === oi.category_id)?.name ?? '—'
+      pushTx(day, {
+        id: oi.id,
+        day,
+        kind: 'inflow',
+        source: 'other_income',
+        amountCents: oi.amount_cents,
+        title: cat,
+        subtitle: oi.comment,
+      })
+    }
+    for (const e of expenses) {
+      const day = e.expense_at.slice(0, 10)
+      const cat = expenseCategories.find((c) => c.id === e.category_id)?.name ?? '—'
+      pushTx(day, {
+        id: e.id,
+        day,
+        kind: 'outflow',
+        source: 'expense',
+        amountCents: e.amount_cents,
+        title: cat,
+        subtitle: e.comment,
+      })
+    }
+    return grouped
+  }, [visits, otherIncomes, expenses, staff, expenseCategories, incomeCategories])
+
+  function navigateToEntity(tx: Tx) {
+    if (tx.source === 'visit') navigate(`/${salonId}/income?tab=visits`)
+    else if (tx.source === 'retail') navigate(`/${salonId}/income?tab=sales`)
+    else if (tx.source === 'other_income') navigate(`/${salonId}/income?tab=other`)
+    else navigate(`/${salonId}/expenses`)
+  }
 
   const { totalIn, totalOut, totalNet, withRunning } = useMemo(() => {
     let running = 0
@@ -192,41 +280,113 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
             </thead>
             <tbody>
               {withRunning
-                // Скрываем дни без движений — нет смысла показывать
                 .filter((r) => r.inflow_cents !== 0 || r.outflow_cents !== 0)
-                .map((r) => (
-                  <tr key={r.day} className="border-border/60 border-t">
-                    <td className="text-muted-foreground px-4 py-2 text-xs">
-                      {format(new Date(r.day), 'd MMM, EEEEEE', { locale: ru })}
-                    </td>
-                    <td className="num text-brand-sage-deep px-4 py-2 text-right font-semibold">
-                      {r.inflow_cents > 0 ? `+${formatCurrency(r.inflow_cents, currency)}` : '—'}
-                    </td>
-                    <td className="num text-destructive px-4 py-2 text-right font-semibold">
-                      {r.outflow_cents > 0 ? `−${formatCurrency(r.outflow_cents, currency)}` : '—'}
-                    </td>
-                    <td
-                      className={`num px-4 py-2 text-right font-semibold ${
-                        r.net_cents > 0
-                          ? 'text-brand-sage-deep'
-                          : r.net_cents < 0
-                            ? 'text-destructive'
-                            : 'text-muted-foreground'
-                      }`}
+                .flatMap((r) => {
+                  const isOpen = expandedDay === r.day
+                  const dayTxs = txByDay[r.day] ?? []
+                  const headerRow = (
+                    <tr
+                      key={r.day}
+                      onClick={() => setExpandedDay(isOpen ? null : r.day)}
+                      className="border-border/60 hover:bg-muted/30 cursor-pointer border-t transition-colors"
                     >
-                      {r.net_cents > 0 ? '+' : r.net_cents < 0 ? '−' : ''}
-                      {formatCurrency(Math.abs(r.net_cents), currency)}
-                    </td>
-                    <td
-                      className={`num px-4 py-2 text-right font-semibold ${
-                        r.running_cents >= 0 ? 'text-foreground' : 'text-destructive'
-                      }`}
+                      <td className="text-muted-foreground px-4 py-2 text-xs">
+                        <span className="inline-flex items-center gap-1.5">
+                          <ChevronRight
+                            className={`size-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                            strokeWidth={2.2}
+                          />
+                          {format(new Date(r.day), 'd MMM, EEEEEE', { locale: ru })}
+                        </span>
+                      </td>
+                      <td className="num text-brand-sage-deep px-4 py-2 text-right font-semibold">
+                        {r.inflow_cents > 0 ? `+${formatCurrency(r.inflow_cents, currency)}` : '—'}
+                      </td>
+                      <td className="num text-destructive px-4 py-2 text-right font-semibold">
+                        {r.outflow_cents > 0
+                          ? `−${formatCurrency(r.outflow_cents, currency)}`
+                          : '—'}
+                      </td>
+                      <td
+                        className={`num px-4 py-2 text-right font-semibold ${
+                          r.net_cents > 0
+                            ? 'text-brand-sage-deep'
+                            : r.net_cents < 0
+                              ? 'text-destructive'
+                              : 'text-muted-foreground'
+                        }`}
+                      >
+                        {r.net_cents > 0 ? '+' : r.net_cents < 0 ? '−' : ''}
+                        {formatCurrency(Math.abs(r.net_cents), currency)}
+                      </td>
+                      <td
+                        className={`num px-4 py-2 text-right font-semibold ${
+                          r.running_cents >= 0 ? 'text-foreground' : 'text-destructive'
+                        }`}
+                      >
+                        {r.running_cents >= 0 ? '' : '−'}
+                        {formatCurrency(Math.abs(r.running_cents), currency)}
+                      </td>
+                    </tr>
+                  )
+
+                  if (!isOpen) return [headerRow]
+
+                  const txRows = dayTxs.map((tx) => (
+                    <tr
+                      key={`${tx.source}-${tx.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigateToEntity(tx)
+                      }}
+                      className="bg-muted/10 hover:bg-muted/30 border-border/40 cursor-pointer border-t border-dashed transition-colors"
+                      title={t(`finance.cashflow.source.${tx.source}`)}
                     >
-                      {r.running_cents >= 0 ? '' : '−'}
-                      {formatCurrency(Math.abs(r.running_cents), currency)}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-2 pl-10 text-xs">
+                        <span className="text-foreground block max-w-[280px] truncate font-medium">
+                          {tx.title}
+                        </span>
+                        {tx.subtitle ? (
+                          <span className="text-muted-foreground block max-w-[280px] truncate text-[11px]">
+                            {tx.subtitle}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="num text-brand-sage-deep px-4 py-2 text-right">
+                        {tx.kind === 'inflow' ? `+${formatCurrency(tx.amountCents, currency)}` : ''}
+                      </td>
+                      <td className="num text-destructive px-4 py-2 text-right">
+                        {tx.kind === 'outflow'
+                          ? `−${formatCurrency(tx.amountCents, currency)}`
+                          : ''}
+                      </td>
+                      <td
+                        colSpan={2}
+                        className="text-muted-foreground px-4 py-2 text-right text-[11px] uppercase tracking-wider"
+                      >
+                        {t(`finance.cashflow.source.${tx.source}`)}
+                      </td>
+                    </tr>
+                  ))
+
+                  if (txRows.length === 0) {
+                    txRows.push(
+                      <tr
+                        key={`${r.day}-empty`}
+                        className="bg-muted/10 border-border/40 border-t border-dashed"
+                      >
+                        <td
+                          colSpan={5}
+                          className="text-muted-foreground px-4 py-2 pl-10 text-xs italic"
+                        >
+                          {t('finance.cashflow.no_tx_for_day')}
+                        </td>
+                      </tr>,
+                    )
+                  }
+
+                  return [headerRow, ...txRows]
+                })}
             </tbody>
           </table>
         )}
