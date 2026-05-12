@@ -117,23 +117,29 @@ export function MessengerPage() {
                 className="h-9 pl-8 text-sm"
               />
             </div>
-            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-              <ChannelChip
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <IconChip
                 label={t('messenger.all_channels')}
-                color="#0F4C5C"
                 active={activeChannel === null}
+                color="#0F4C5C"
                 onClick={() => setActiveChannel(null)}
-              />
+              >
+                <MessageCircle className="size-3.5" strokeWidth={2} />
+              </IconChip>
               {(['telegram', 'whatsapp', 'instagram', 'facebook'] as const).map((ch) => {
                 const meta = CHANNEL_META[ch]
+                const Icon = meta.icon
                 return (
-                  <ChannelChip
+                  <IconChip
                     key={ch}
                     label={meta.label}
-                    color={meta.color}
                     active={activeChannel === ch}
+                    color={meta.color}
                     onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
-                  />
+                    iconOnly
+                  >
+                    <Icon className="size-3.5" strokeWidth={2} />
+                  </IconChip>
                 )
               })}
             </div>
@@ -236,28 +242,36 @@ export function MessengerPage() {
   )
 }
 
-function ChannelChip({
+function IconChip({
   label,
   color,
   active,
   onClick,
+  iconOnly,
+  children,
 }: {
   label: string
   color: string
   active: boolean
   onClick: () => void
+  iconOnly?: boolean
+  children: React.ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className={cn(
-        'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+        'inline-flex shrink-0 items-center gap-1 rounded-full border transition-colors',
+        iconOnly ? 'size-8 justify-center' : 'px-2.5 py-1 text-[11px] font-semibold',
         active ? 'text-white' : 'text-foreground bg-card border-border hover:bg-muted/40',
       )}
       style={active ? { background: color, borderColor: color } : undefined}
     >
-      {label}
+      {children}
+      {!iconOnly ? <span>{label}</span> : null}
     </button>
   )
 }

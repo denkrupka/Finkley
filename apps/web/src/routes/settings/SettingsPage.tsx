@@ -53,7 +53,6 @@ import { HelpFAQ } from '@/routes/help/HelpFAQ'
 import { ApiKeysCard } from './ApiKeysCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
-import { ParametersCard } from './ParametersCard'
 import { SegmentationCard } from './SegmentationCard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
@@ -799,8 +798,6 @@ export function SettingsPage() {
           </section>
         </>
       )}
-
-      {activeTab === 'parameters' && <ParametersCard />}
 
       {activeTab === 'billing' && (
         <>

@@ -6,7 +6,6 @@ import {
   HelpCircle,
   Plug,
   Shield,
-  SlidersHorizontal,
   User,
   Users,
 } from 'lucide-react'
@@ -15,7 +14,6 @@ import { useTranslation } from 'react-i18next'
 export const SETTINGS_TABS = [
   'profile',
   'catalogs',
-  'parameters',
   'notifications',
   'api',
   'billing',
@@ -30,7 +28,6 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number]
 const TAB_ICONS: Record<SettingsTab, typeof User> = {
   profile: User,
   catalogs: BookOpen,
-  parameters: SlidersHorizontal,
   notifications: Bell,
   api: Code,
   billing: CreditCard,

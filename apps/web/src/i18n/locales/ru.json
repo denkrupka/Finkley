@@ -3,6 +3,33 @@
     "title": "Finkley",
     "placeholder": "Скелет приложения готов. См. docs/04_BACKLOG.md для следующих шагов."
   },
+  "messenger": {
+    "title": "Мессенджер",
+    "subtitle": "Единый центр переписки с клиентами из всех каналов: Telegram, WhatsApp, Instagram, Facebook.",
+    "search_placeholder": "Поиск по имени клиента…",
+    "all_channels": "Все",
+    "empty_list": "Чатов пока нет. Подключи мессенджеры в Настройки → Интеграции.",
+    "select_chat": "Выбери чат слева чтобы открыть переписку",
+    "unnamed": "Без имени",
+    "composer_placeholder": "Напиши сообщение…",
+    "attach_image": "Прикрепить фото",
+    "attach_soon": "Прикрепление файлов — скоро",
+    "create_visit": "Создать визит",
+    "bulk_button": "Рассылка",
+    "bulk": {
+      "title": "Массовая рассылка",
+      "placeholder": "Текст сообщения для всех выбранных клиентов…",
+      "selected": "Выбрано {{count}} из {{total}}",
+      "select_all": "Все",
+      "clear": "Сбросить",
+      "send_button": "Отправить ({{count}})",
+      "toast_sent": "Отправлено {{count}} клиентам",
+      "errors": {
+        "empty_text": "Введите текст сообщения",
+        "no_recipients": "Выберите хотя бы один чат"
+      }
+    }
+  },
   "audit": {
     "title": "Журнал событий",
     "subtitle": "Кто что менял в салоне — для прозрачности и аудита.",
@@ -1940,7 +1967,8 @@
       "pnl": "P&L",
       "cashflow": "ДДС",
       "report": "Финансовый отчёт",
-      "payments": "Счета на оплату"
+      "payments": "Счета на оплату",
+      "parameters": "Параметры"
     },
     "report": {
       "title": "Финансовый отчёт",

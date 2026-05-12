@@ -65,7 +65,8 @@ export function useSendDailyDigest(salonId: string | undefined) {
   })
 }
 
-/** Toggle `salons.daily_digest_enabled`. */
+/** Toggle `salons.daily_digest_enabled`. Колонка появилась миграцией
+ *  20260513000004 — если она ещё не применилась, показываем понятную ошибку. */
 export function useToggleDailyDigest(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
@@ -75,7 +76,12 @@ export function useToggleDailyDigest(salonId: string | undefined) {
         .from('salons')
         .update({ daily_digest_enabled: enabled })
         .eq('id', salonId)
-      if (error) throw error
+      if (error) {
+        if (/does not exist/i.test(error.message)) {
+          throw new Error('Миграция БД ещё не применена — обнови staging/prod')
+        }
+        throw error
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salons'] })
