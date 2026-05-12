@@ -618,11 +618,39 @@
     "toast_saved": "Ustawienia zapisane",
     "tabs": {
       "profile": "Profil",
+      "catalogs": "Słowniki",
       "billing": "Rozliczenia",
       "team": "Zespół",
       "integrations": "Integracje",
       "security": "Bezpieczeństwo",
-      "appearance": "Wygląd"
+      "appearance": "Wygląd",
+      "help": "Pomoc"
+    },
+    "catalogs": {
+      "title": "Słowniki",
+      "subtitle": "Dane bazowe salonu: specjaliści, usługi, klienci, magazyn, kategorie wydatków. Analityka — w sekcji „Raporty”.",
+      "items": {
+        "staff": {
+          "title": "Specjaliści",
+          "subtitle": "Lista pracowników, schematy wynagrodzeń, grafiki, specjalizacje."
+        },
+        "services": {
+          "title": "Usługi",
+          "subtitle": "Katalog usług z cenami, czasem, kosztem własnym i recepturami materiałów."
+        },
+        "clients": {
+          "title": "Klienci",
+          "subtitle": "Baza klientów z historią wizyt, telefonami, e-mailami i notatkami."
+        },
+        "inventory": {
+          "title": "Magazyn",
+          "subtitle": "Towary i materiały, stany, plan-fakt, alerty niskiego stanu."
+        },
+        "expense_categories": {
+          "title": "Kategorie wydatków",
+          "subtitle": "Kategorie systemowe + własne. Zarządzane na stronie wydatków."
+        }
+      }
     },
     "profile": {
       "title": "Profil salonu",
@@ -1150,7 +1178,32 @@
       "other": "Pozostałe przychody"
     },
     "sales_placeholder": "Sprzedaż towarów — rozszerzona sekcja w przygotowaniu. Na razie sprzedaż detaliczna jest rejestrowana jako wizyta typu „retail”; filtr pojawi się tu w kolejnym sprincie.",
-    "other_placeholder": "Pozostałe przychody (najem stanowiska, cashback, odsetki, inne) — sekcja w przygotowaniu. Wkrótce: dodaj wpis, kategorie, podsumowanie."
+    "other": {
+      "title": "Pozostałe przychody",
+      "subtitle_total": "Razem w miesiącu:",
+      "add_button": "+ Dodaj przychód",
+      "empty": "Brak wpisów. Tu wprowadzaj nieregularne wpływy: najem stanowiska, cashback, odsetki, zwroty od dostawców.",
+      "confirm_delete": "Usunąć ten wpis przychodu?",
+      "toast_added": "Przychód dodany",
+      "toast_deleted": "Wpis usunięty",
+      "toast_error": "Nie udało się zapisać"
+    },
+    "other_form": {
+      "title": "Nowy pozostały przychód",
+      "date": "Data",
+      "category": "Kategoria",
+      "category_placeholder": "Wybierz kategorię",
+      "amount": "Kwota",
+      "payment_method": "Forma płatności",
+      "payment_placeholder": "Nie podano",
+      "comment": "Komentarz",
+      "comment_placeholder": "Np. najem stanowiska za maj",
+      "errors": {
+        "category_required": "Wybierz kategorię",
+        "amount_required": "Wpisz kwotę",
+        "amount_positive": "Kwota musi być większa od zera"
+      }
+    }
   },
   "reports_hub": {
     "title": "Raporty",
@@ -1172,7 +1225,62 @@
       "payments": "Do zapłaty"
     },
     "cashflow_placeholder": "Przepływy pieniężne — sekcja w przygotowaniu.",
-    "payments_placeholder": "Kalendarz płatności — sekcja w przygotowaniu."
+    "payments_placeholder": "Kalendarz płatności — sekcja w przygotowaniu.",
+    "cashflow": {
+      "title": "Przepływy pieniężne",
+      "total_inflow": "Wpływy",
+      "total_outflow": "Wydatki",
+      "total_net": "Netto",
+      "empty": "Brak ruchów w tym okresie.",
+      "col_date": "Data",
+      "col_inflow": "Wpływ",
+      "col_outflow": "Wydatek",
+      "col_net": "Netto",
+      "col_running": "Skum."
+    },
+    "payments": {
+      "title": "Do zapłaty",
+      "subtitle": "Zaplanowane płatności do dostawców. Auto-import z wFirma/Fakturownia/KSeF — następny sprint; na razie dodawaj ręcznie.",
+      "add_button": "+ Dodaj płatność",
+      "empty": "Brak płatności. Dodaj fakturę do zapłacenia — pojawi się w kalendarzu z terminem.",
+      "summary_overdue": "Przeterminowane",
+      "summary_overdue_count_one": "{{count}} przeterminowana",
+      "summary_overdue_count_few": "{{count}} przeterminowane",
+      "summary_overdue_count_many": "{{count}} przeterminowanych",
+      "summary_overdue_count_other": "{{count}} przeterminowanych",
+      "summary_upcoming": "Nadchodzące",
+      "summary_upcoming_count_one": "{{count}} płatność",
+      "summary_upcoming_count_few": "{{count}} płatności",
+      "summary_upcoming_count_many": "{{count}} płatności",
+      "summary_upcoming_count_other": "{{count}} płatności",
+      "days_overdue": "przeterminowana o {{n}} dni",
+      "today": "dziś",
+      "in_days": "za {{n}} dni",
+      "mark_paid": "Oznacz jako zapłacone",
+      "confirm_mark_paid": "Czy utworzyć też wpis wydatku w kasie? OK — tak (zalecane, aby trafiło do przepływów). Anuluj — nie, tylko oznacz jako zapłacone.",
+      "confirm_delete": "Usunąć tę płatność z kalendarza?",
+      "toast_added": "Płatność dodana do kalendarza",
+      "toast_paid": "Płatność oznaczona jako zapłacona",
+      "toast_deleted": "Płatność usunięta",
+      "toast_error": "Nie udało się zapisać"
+    },
+    "payments_form": {
+      "title": "Nowa płatność do zapłaty",
+      "due_date": "Termin",
+      "vendor": "Dostawca",
+      "vendor_placeholder": "Komu płacimy",
+      "invoice_number": "Numer faktury",
+      "invoice_placeholder": "FV/2026/05/123",
+      "amount": "Kwota",
+      "category": "Kategoria wydatków",
+      "category_placeholder": "Nie wybrana",
+      "comment": "Komentarz",
+      "errors": {
+        "vendor_required": "Podaj dostawcę",
+        "amount_required": "Wpisz kwotę",
+        "amount_positive": "Kwota musi być większa od zera"
+      }
+    }
   },
   "reports": {
     "title": "Finanse",

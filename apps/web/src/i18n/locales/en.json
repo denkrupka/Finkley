@@ -617,11 +617,39 @@
     "toast_saved": "Settings saved",
     "tabs": {
       "profile": "Profile",
+      "catalogs": "Catalogs",
       "billing": "Billing",
       "team": "Team",
       "integrations": "Integrations",
       "security": "Security",
-      "appearance": "Appearance"
+      "appearance": "Appearance",
+      "help": "Help"
+    },
+    "catalogs": {
+      "title": "Catalogs",
+      "subtitle": "Salon base data: specialists, services, clients, inventory, expense categories. Analytics — in the “Reports” section.",
+      "items": {
+        "staff": {
+          "title": "Specialists",
+          "subtitle": "Employee list, payout schemes, schedules, specializations."
+        },
+        "services": {
+          "title": "Services",
+          "subtitle": "Service catalog with prices, duration, cost and material recipes."
+        },
+        "clients": {
+          "title": "Clients",
+          "subtitle": "Client database with visit history, phones, emails and notes."
+        },
+        "inventory": {
+          "title": "Inventory",
+          "subtitle": "Products and supplies, stock, plan-vs-fact, low-stock alerts."
+        },
+        "expense_categories": {
+          "title": "Expense categories",
+          "subtitle": "System + custom categories. Managed on the expenses page."
+        }
+      }
     },
     "profile": {
       "title": "Salon profile",
@@ -1149,7 +1177,32 @@
       "other": "Other income"
     },
     "sales_placeholder": "Retail sales — extended section in development. For now product sales are tracked as visits with kind=retail; a dedicated filter will land here next sprint.",
-    "other_placeholder": "Other income (chair rent, cashback, bank interest, etc.) — section in development. Coming soon: add entry, categories, summary."
+    "other": {
+      "title": "Other income",
+      "subtitle_total": "Total for month:",
+      "add_button": "+ Add income",
+      "empty": "No entries yet. Add irregular receipts here: chair rent, bank cashback, interest, supplier refunds.",
+      "confirm_delete": "Delete this income entry?",
+      "toast_added": "Income added",
+      "toast_deleted": "Entry deleted",
+      "toast_error": "Couldn't save"
+    },
+    "other_form": {
+      "title": "New other income",
+      "date": "Date",
+      "category": "Category",
+      "category_placeholder": "Pick a category",
+      "amount": "Amount",
+      "payment_method": "Payment method",
+      "payment_placeholder": "Not set",
+      "comment": "Comment",
+      "comment_placeholder": "e.g. chair rent for May",
+      "errors": {
+        "category_required": "Pick a category",
+        "amount_required": "Enter the amount",
+        "amount_positive": "Amount must be greater than zero"
+      }
+    }
   },
   "reports_hub": {
     "title": "Reports",
@@ -1171,7 +1224,58 @@
       "payments": "Payments"
     },
     "cashflow_placeholder": "Cash flow — section in development.",
-    "payments_placeholder": "Payment calendar — section in development."
+    "payments_placeholder": "Payment calendar — section in development.",
+    "cashflow": {
+      "title": "Cash flow",
+      "total_inflow": "Inflow",
+      "total_outflow": "Outflow",
+      "total_net": "Net",
+      "empty": "No movements in this period.",
+      "col_date": "Date",
+      "col_inflow": "Inflow",
+      "col_outflow": "Outflow",
+      "col_net": "Net",
+      "col_running": "Running"
+    },
+    "payments": {
+      "title": "Payments to make",
+      "subtitle": "Scheduled supplier payments. Auto-import from wFirma/Fakturownia/KSeF — next sprint; add manually for now.",
+      "add_button": "+ Add payment",
+      "empty": "No payments. Add an invoice to pay — it will appear in the calendar with a due date.",
+      "summary_overdue": "Overdue",
+      "summary_overdue_count_one": "{{count}} overdue",
+      "summary_overdue_count_other": "{{count}} overdue",
+      "summary_upcoming": "Upcoming",
+      "summary_upcoming_count_one": "{{count}} payment",
+      "summary_upcoming_count_other": "{{count}} payments",
+      "days_overdue": "overdue by {{n}} d",
+      "today": "today",
+      "in_days": "in {{n}} d",
+      "mark_paid": "Mark paid",
+      "confirm_mark_paid": "Also create an expense record? OK — yes (recommended, so it shows up in cash flow). Cancel — no, just mark as paid.",
+      "confirm_delete": "Remove this payment from the calendar?",
+      "toast_added": "Payment added to the calendar",
+      "toast_paid": "Payment marked as paid",
+      "toast_deleted": "Payment removed",
+      "toast_error": "Couldn't save"
+    },
+    "payments_form": {
+      "title": "New payment to make",
+      "due_date": "Due date",
+      "vendor": "Supplier",
+      "vendor_placeholder": "Whom we pay",
+      "invoice_number": "Invoice number",
+      "invoice_placeholder": "FV/2026/05/123",
+      "amount": "Amount",
+      "category": "Expense category",
+      "category_placeholder": "Not selected",
+      "comment": "Comment",
+      "errors": {
+        "vendor_required": "Specify the supplier",
+        "amount_required": "Enter the amount",
+        "amount_positive": "Amount must be greater than zero"
+      }
+    }
   },
   "reports": {
     "title": "Finance",

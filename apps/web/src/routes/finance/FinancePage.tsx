@@ -5,6 +5,9 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { ReportsPage } from '@/routes/reports/ReportsPage'
 
+import { CashFlowTab } from './CashFlowTab'
+import { PaymentsTab } from './PaymentsTab'
+
 type FinanceTab = 'pnl' | 'cashflow' | 'payments'
 
 const TABS: PageTab<FinanceTab>[] = [
@@ -52,14 +55,10 @@ export function FinancePage() {
 
       {active === 'pnl' ? (
         <ReportsPage />
+      ) : active === 'cashflow' ? (
+        <CashFlowTab salonId={salonId} />
       ) : (
-        <div className="border-border bg-card shadow-finsm rounded-lg border p-6">
-          <p className="text-foreground/80 text-sm leading-snug">
-            {active === 'cashflow'
-              ? t('finance.cashflow_placeholder')
-              : t('finance.payments_placeholder')}
-          </p>
-        </div>
+        <PaymentsTab salonId={salonId} />
       )}
     </div>
   )

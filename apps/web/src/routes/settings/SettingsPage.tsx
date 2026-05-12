@@ -1,4 +1,16 @@
-import { Download, History, Mail, Plug, Upload, Users } from 'lucide-react'
+import {
+  ChevronRight,
+  Download,
+  History,
+  Mail,
+  Package,
+  Plug,
+  Receipt,
+  Scissors,
+  Sparkles,
+  Upload,
+  Users,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -59,6 +71,39 @@ import {
  * - «Удалить салон» — soft delete, требует ввести имя салона как подтверждение
  * - «Экспорт данных» — placeholder, реальный CSV/PDF в TASK-26
  */
+/**
+ * Простая card-ссылка для секции «Справочники». Ведёт на полноценную
+ * CRUD-страницу (мастера/услуги/клиенты/...) которые до TASK-53 жили
+ * прямо в sidebar.
+ */
+function CatalogCard({
+  to,
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  to: string
+  icon: typeof Users
+  title: string
+  subtitle: string
+}) {
+  return (
+    <Link
+      to={to}
+      className="border-border bg-card hover:border-secondary/60 hover:bg-muted/30 flex items-center gap-3 rounded-lg border p-4 transition-colors"
+    >
+      <div className="bg-brand-teal-soft text-brand-teal-deep grid size-10 shrink-0 place-items-center rounded-md">
+        <Icon className="size-5" strokeWidth={1.8} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-foreground text-sm font-semibold">{title}</p>
+        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{subtitle}</p>
+      </div>
+      <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
+    </Link>
+  )
+}
+
 export function SettingsPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
@@ -359,6 +404,47 @@ export function SettingsPage() {
           {/* Сегментация клиентов: retention/churn окна */}
           <SegmentationCard salon={salon} />
         </>
+      )}
+
+      {activeTab === 'catalogs' && (
+        <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+          <h2 className="text-brand-navy text-base font-bold tracking-tight">
+            {t('settings.catalogs.title')}
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">{t('settings.catalogs.subtitle')}</p>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <CatalogCard
+              to={`/${salonId}/staff`}
+              icon={Scissors}
+              title={t('settings.catalogs.items.staff.title')}
+              subtitle={t('settings.catalogs.items.staff.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/services`}
+              icon={Sparkles}
+              title={t('settings.catalogs.items.services.title')}
+              subtitle={t('settings.catalogs.items.services.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/clients`}
+              icon={Users}
+              title={t('settings.catalogs.items.clients.title')}
+              subtitle={t('settings.catalogs.items.clients.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/inventory`}
+              icon={Package}
+              title={t('settings.catalogs.items.inventory.title')}
+              subtitle={t('settings.catalogs.items.inventory.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/expenses?view=categories`}
+              icon={Receipt}
+              title={t('settings.catalogs.items.expense_categories.title')}
+              subtitle={t('settings.catalogs.items.expense_categories.subtitle')}
+            />
+          </div>
+        </section>
       )}
 
       {activeTab === 'appearance' && (
