@@ -172,7 +172,15 @@
   "inventory": {
     "title": "Magazyn i materiały",
     "subtitle": "Ewidencja materiałów eksploatacyjnych z automatycznym zużyciem przy wizytach i alertami przy niskim stanie. Pojawi się w jednej z najbliższych iteracji — w oparciu o realne potrzeby pierwszych salonów.",
-    "coming_soon": "Wkrótce · etap 5"
+    "coming_soon": "Wkrótce · etap 5",
+    "form": {
+      "ocr": {
+        "title": "Import z paragonu / WZ / zamówienia",
+        "subtitle": "Wgraj PDF lub zdjęcie — AI odczyta pozycje i zaproponuje je dodać. Przed zapisem sprawdzisz i wyedytujesz.",
+        "button": "Wgraj",
+        "soon": "Import OCR magazynu w przygotowaniu. Wkrótce: wrzucasz paragon/WZ — AI zwraca listę pozycji, edytujesz i potwierdzasz."
+      }
+    }
   },
   "knowledge": {
     "title": "Baza wiedzy",

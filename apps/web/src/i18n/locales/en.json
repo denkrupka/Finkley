@@ -172,7 +172,15 @@
   "inventory": {
     "title": "Inventory & supplies",
     "subtitle": "Track consumables with automatic deduction on each visit and low-stock alerts. Coming in a near-term iteration — driven by real needs from the first salons.",
-    "coming_soon": "Coming soon · stage 5"
+    "coming_soon": "Coming soon · stage 5",
+    "form": {
+      "ocr": {
+        "title": "Import from receipt / WZ / order",
+        "subtitle": "Upload a PDF or photo — AI reads the items and suggests adding them. You can review and edit before saving.",
+        "button": "Upload",
+        "soon": "Inventory OCR import is in development. Coming soon: drop a receipt/WZ — AI returns a position list, you edit and confirm."
+      }
+    }
   },
   "knowledge": {
     "title": "Knowledge base",

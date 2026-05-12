@@ -121,7 +121,15 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
                 tickLine={false}
                 fontSize={11}
                 stroke="#9A9A9A"
-                tickFormatter={(v: number) => formatCurrency(Math.abs(v) * 100, currency)}
+                width={64}
+                tickFormatter={(v: number) => {
+                  // Компактный формат для оси: 12345 → "12.3k", 1500000 → "1.5m".
+                  // Полное значение остаётся в tooltip + в таблице ниже.
+                  const abs = Math.abs(v)
+                  if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}m`
+                  if (abs >= 1000) return `${(v / 1000).toFixed(abs >= 10_000 ? 0 : 1)}k`
+                  return String(Math.round(v))
+                }}
               />
               <Tooltip
                 formatter={(v: number) => formatCurrency(Math.abs(v) * 100, currency)}
