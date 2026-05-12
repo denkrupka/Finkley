@@ -33,6 +33,18 @@ const RECENT_OPTIONS = [7, 30, 90, 365]
 
 type Mode = 'month' | 'year' | 'range' | 'recent'
 
+function QuickChip({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border-border bg-card text-foreground hover:bg-muted/50 rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
+    >
+      {label}
+    </button>
+  )
+}
+
 export function PeriodPickerPopover({
   value,
   onChange,
@@ -84,6 +96,49 @@ export function PeriodPickerPopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[480px] p-0">
+        {/* Quick chips: «Этот месяц», «Прошлый», «Эта неделя», «Сегодня» */}
+        <div className="border-border flex flex-wrap gap-1.5 border-b p-2">
+          <QuickChip
+            label={t('period.quick.this_month')}
+            onClick={() => {
+              onChange({
+                kind: 'month',
+                year: today.getFullYear(),
+                month: today.getMonth() + 1,
+              })
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.last_month')}
+            onClick={() => {
+              const d = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+              onChange({ kind: 'month', year: d.getFullYear(), month: d.getMonth() + 1 })
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.this_year')}
+            onClick={() => {
+              onChange({ kind: 'year', year: today.getFullYear() })
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.last_30')}
+            onClick={() => {
+              onChange({ kind: 'recent', days: 30 })
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.last_90')}
+            onClick={() => {
+              onChange({ kind: 'recent', days: 90 })
+              setOpen(false)
+            }}
+          />
+        </div>
         <div className="grid grid-cols-[160px_1fr]">
           <ul className="border-border bg-muted/20 flex flex-col gap-1 border-r p-2 text-sm">
             {(['range', 'month', 'year', 'recent'] as const).map((m) => (

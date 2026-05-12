@@ -22,6 +22,13 @@
       "30": "Ostatnie 30 dni",
       "90": "Ostatnie 90 dni",
       "365": "Ostatni rok"
+    },
+    "quick": {
+      "this_month": "Ten miesiąc",
+      "last_month": "Poprzedni miesiąc",
+      "this_year": "Ten rok",
+      "last_30": "30 dni",
+      "last_90": "90 dni"
     }
   },
   "common": {
