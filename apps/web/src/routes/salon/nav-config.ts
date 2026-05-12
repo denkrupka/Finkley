@@ -1,43 +1,43 @@
 import {
   BarChart3,
-  BookOpen,
   Bot,
-  Calendar,
   Home,
   Package,
+  PiggyBank,
   Receipt,
-  Scissors,
   Settings,
-  Sparkles,
-  Users,
-  Wallet,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 
 /**
  * Источник правды для навигации salon-scoped роутов.
- * 8 пунктов sidebar в порядке `Design/project/chrome.jsx` → `Sidebar`.
  *
- * Каждый пункт знает:
- * - id      — соответствует пути после /{salonId}/
- * - i18nKey — путь в ru.json (`nav.<id>`)
- * - icon    — lucide-react аналог иконки из Design/project/icons.jsx
- * - stage   — на какой стадии MVP появляется реальная страница; до этого — ComingSoon
+ * После TASK-53 (12 мая 2026) sidebar показывает **группы**, а внутри каждой
+ * страницы — горизонтальные табы с подкатегориями:
+ *
+ *   Главная   → /dashboard
+ *   Доходы    → /income (табы: Визиты / Продажи / Прочие)
+ *   Расходы   → /expenses
+ *   Отчёты    → /reports (табы: Услуги / Клиенты / Мастера / Зарплата)
+ *   Финансы   → /finance (табы: P&L / ДДС / Счета на оплату)
+ *   Склад     → /inventory
+ *   AI        → /ai
+ *   Настройки → /settings (внутри есть «Справочники» с CRUD мастеров/услуг/клиентов)
+ *
+ * CRUD по справочникам (мастера/услуги/клиенты/категории) живёт в Settings →
+ * Справочники, **не** в Отчётах. В Отчётах — только аналитика.
  *
  * mobile.includeInBottomNav — какие 4 пункта показывать в bottom-nav
  * (5-й слот — «Ещё», ведёт в /settings).
  */
 export type NavItemId =
   | 'dashboard'
-  | 'visits'
-  | 'clients'
+  | 'income'
   | 'expenses'
-  | 'staff'
-  | 'services'
-  | 'inventory'
-  | 'payouts'
   | 'reports'
-  | 'knowledge'
+  | 'finance'
+  | 'inventory'
   | 'ai'
   | 'settings'
 
@@ -58,64 +58,24 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.dashboard',
     icon: Home,
     stage: 1,
-    implemented: false, // станет true в TASK-14
-    inBottomNav: true,
-  },
-  {
-    id: 'visits',
-    i18nKey: 'nav.visits',
-    icon: Calendar,
-    stage: 1,
-    implemented: false, // станет true в TASK-11
-    inBottomNav: true,
-  },
-  {
-    id: 'clients',
-    i18nKey: 'nav.clients',
-    icon: Users,
-    stage: 2,
     implemented: true,
-    inBottomNav: false,
+    inBottomNav: true,
+  },
+  {
+    id: 'income',
+    i18nKey: 'nav.income',
+    icon: TrendingUp,
+    stage: 1,
+    implemented: true,
+    inBottomNav: true,
   },
   {
     id: 'expenses',
     i18nKey: 'nav.expenses',
     icon: Receipt,
     stage: 1,
-    implemented: false, // станет true в TASK-13
+    implemented: true,
     inBottomNav: true,
-  },
-  {
-    id: 'staff',
-    i18nKey: 'nav.staff',
-    icon: Scissors,
-    stage: 1,
-    implemented: false, // станет true в TASK-12
-    inBottomNav: false,
-  },
-  {
-    id: 'services',
-    i18nKey: 'nav.services',
-    icon: Sparkles,
-    stage: 2,
-    implemented: true,
-    inBottomNav: false,
-  },
-  {
-    id: 'inventory',
-    i18nKey: 'nav.inventory',
-    icon: Package,
-    stage: 5,
-    implemented: false, // ComingSoon — стадия 5
-    inBottomNav: false,
-  },
-  {
-    id: 'payouts',
-    i18nKey: 'nav.payouts',
-    icon: Wallet,
-    stage: 2,
-    implemented: true,
-    inBottomNav: false,
   },
   {
     id: 'reports',
@@ -126,11 +86,19 @@ export const NAV_ITEMS: NavItem[] = [
     inBottomNav: false,
   },
   {
-    id: 'knowledge',
-    i18nKey: 'nav.knowledge',
-    icon: BookOpen,
+    id: 'finance',
+    i18nKey: 'nav.finance',
+    icon: PiggyBank,
+    stage: 2,
+    implemented: true,
+    inBottomNav: false,
+  },
+  {
+    id: 'inventory',
+    i18nKey: 'nav.inventory',
+    icon: Package,
     stage: 5,
-    implemented: false, // ComingSoon — стадия 5
+    implemented: true,
     inBottomNav: false,
   },
   {

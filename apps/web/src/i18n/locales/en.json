@@ -148,6 +148,7 @@
   },
   "nav": {
     "dashboard": "Home",
+    "income": "Income",
     "visits": "Visits",
     "clients": "Clients",
     "expenses": "Expenses",
@@ -155,7 +156,8 @@
     "services": "Services",
     "inventory": "Inventory",
     "payouts": "Payroll",
-    "reports": "Finance",
+    "reports": "Reports",
+    "finance": "Finance",
     "knowledge": "Knowledge base",
     "ai": "AI assistant",
     "settings": "Settings",
@@ -1137,6 +1139,39 @@
       "empty": "File is empty or has no headers",
       "missing_required": "Map at least \"Visit date\" and \"Amount\" to continue."
     }
+  },
+  "income": {
+    "title": "Income",
+    "subtitle": "All revenue sources: visits, retail sales and other receipts.",
+    "tabs": {
+      "visits": "Visits",
+      "sales": "Sales",
+      "other": "Other income"
+    },
+    "sales_placeholder": "Retail sales — extended section in development. For now product sales are tracked as visits with kind=retail; a dedicated filter will land here next sprint.",
+    "other_placeholder": "Other income (chair rent, cashback, bank interest, etc.) — section in development. Coming soon: add entry, categories, summary."
+  },
+  "reports_hub": {
+    "title": "Reports",
+    "subtitle": "Analytics by catalogs. Specialist/service/client CRUD lives in Settings → Catalogs.",
+    "tabs": {
+      "services": "Services",
+      "clients": "Clients",
+      "staff": "Specialists",
+      "payouts": "Payroll"
+    },
+    "clients_placeholder": "Client analytics — section in development. Client list is currently in Settings → Catalogs → Clients."
+  },
+  "finance": {
+    "title": "Finance",
+    "subtitle": "P&L, cash flow (DDS), upcoming payments.",
+    "tabs": {
+      "pnl": "P&L",
+      "cashflow": "Cash flow",
+      "payments": "Payments"
+    },
+    "cashflow_placeholder": "Cash flow — section in development.",
+    "payments_placeholder": "Payment calendar — section in development."
   },
   "reports": {
     "title": "Finance",

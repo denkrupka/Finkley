@@ -148,6 +148,7 @@
   },
   "nav": {
     "dashboard": "Główna",
+    "income": "Przychody",
     "visits": "Wizyty",
     "clients": "Klienci",
     "expenses": "Wydatki",
@@ -155,7 +156,8 @@
     "services": "Usługi",
     "inventory": "Magazyn",
     "payouts": "Wypłaty",
-    "reports": "Finanse",
+    "reports": "Raporty",
+    "finance": "Finanse",
     "knowledge": "Baza wiedzy",
     "ai": "AI-asystent",
     "settings": "Ustawienia",
@@ -1138,6 +1140,39 @@
       "empty": "Plik jest pusty lub nie zawiera nagłówków",
       "missing_required": "Dopasuj co najmniej „Datę wizyty” i „Kwotę”, aby kontynuować."
     }
+  },
+  "income": {
+    "title": "Przychody",
+    "subtitle": "Wszystkie źródła przychodu: wizyty, sprzedaż towarów i pozostałe wpływy.",
+    "tabs": {
+      "visits": "Wizyty",
+      "sales": "Sprzedaż",
+      "other": "Pozostałe przychody"
+    },
+    "sales_placeholder": "Sprzedaż towarów — rozszerzona sekcja w przygotowaniu. Na razie sprzedaż detaliczna jest rejestrowana jako wizyta typu „retail”; filtr pojawi się tu w kolejnym sprincie.",
+    "other_placeholder": "Pozostałe przychody (najem stanowiska, cashback, odsetki, inne) — sekcja w przygotowaniu. Wkrótce: dodaj wpis, kategorie, podsumowanie."
+  },
+  "reports_hub": {
+    "title": "Raporty",
+    "subtitle": "Analityka po słownikach. CRUD specjalistów, usług i klientów — w Ustawieniach → Słowniki.",
+    "tabs": {
+      "services": "Usługi",
+      "clients": "Klienci",
+      "staff": "Specjaliści",
+      "payouts": "Wynagrodzenia"
+    },
+    "clients_placeholder": "Analityka klientów — sekcja w przygotowaniu. Lista klientów dostępna w Ustawieniach → Słowniki → Klienci."
+  },
+  "finance": {
+    "title": "Finanse",
+    "subtitle": "P&L, przepływy pieniężne (DDS), faktury do zapłaty.",
+    "tabs": {
+      "pnl": "P&L",
+      "cashflow": "Przepływy",
+      "payments": "Do zapłaty"
+    },
+    "cashflow_placeholder": "Przepływy pieniężne — sekcja w przygotowaniu.",
+    "payments_placeholder": "Kalendarz płatności — sekcja w przygotowaniu."
   },
   "reports": {
     "title": "Finanse",
