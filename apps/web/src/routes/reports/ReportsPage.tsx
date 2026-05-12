@@ -1,18 +1,16 @@
-import { addMonths, endOfMonth, format, startOfMonth } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import {
-  ChevronLeft,
-  ChevronRight,
-  FileSpreadsheet,
-  Printer,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react'
+import { format } from 'date-fns'
+import { FileSpreadsheet, Printer, TrendingDown, TrendingUp } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
   useAnalyticsKpis,
   useRevenueByPayment,
@@ -58,31 +56,19 @@ export function ReportsPage() {
   const currency = salon?.currency ?? 'PLN'
   const timezone = salon?.timezone ?? 'Europe/Warsaw'
 
-  // Mode: 'month' — навигация курсором по месяцам (как было раньше).
-  // 'range' — произвольный диапазон через два date-инпута. RPC принимает
-  // start/end в любом случае.
-  const [mode, setMode] = useState<'month' | 'range'>('month')
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const monthAgoStr = format(addMonths(new Date(), -1), 'yyyy-MM-dd')
-  const [rangeStart, setRangeStart] = useState<string>(monthAgoStr)
-  const [rangeEnd, setRangeEnd] = useState<string>(todayStr)
-
-  const periodStart = mode === 'month' ? startOfMonth(cursor) : new Date(`${rangeStart}T00:00:00`)
-  const periodEnd = mode === 'month' ? endOfMonth(cursor) : new Date(`${rangeEnd}T23:59:59`)
+  // Единый PeriodPickerPopover вместо month/range toggle. Поддерживает
+  // месяц, год, range Od-Do, recent N days, + quick chips.
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const range = periodToRange(period)
+  const periodStart = range.start
+  const periodEnd = range.end
   const periodStartIso = periodStart.toISOString()
-  // RPC ожидает exclusive верхнюю границу
-  const periodEndIso =
-    mode === 'month'
-      ? startOfMonth(addMonths(cursor, 1)).toISOString()
-      : new Date(`${rangeEnd}T23:59:59.999`).toISOString()
+  const periodEndIso = new Date(periodEnd.getTime() + 1).toISOString()
 
+  // Предыдущий период — сдвиг назад на ту же длительность.
   const prevDurationMs = periodEnd.getTime() - periodStart.getTime()
-  const prevStart =
-    mode === 'month'
-      ? startOfMonth(addMonths(cursor, -1))
-      : new Date(periodStart.getTime() - prevDurationMs)
-  const prevEnd = mode === 'month' ? startOfMonth(cursor) : new Date(periodStart)
+  const prevStart = new Date(periodStart.getTime() - prevDurationMs - 1)
+  const prevEnd = new Date(periodStart.getTime() - 1)
 
   const kpis = useAnalyticsKpis(salonId, periodStartIso, periodEndIso)
   const prevKpis = useAnalyticsKpis(salonId, prevStart.toISOString(), prevEnd.toISOString())
@@ -159,71 +145,7 @@ export function ReportsPage() {
           <p className="text-muted-foreground mt-1 text-sm print:hidden">{t('reports.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
-          {/* Mode-tabs */}
-          <div className="bg-muted/40 inline-flex rounded-md p-1 text-xs">
-            <button
-              type="button"
-              onClick={() => setMode('month')}
-              className={`rounded-sm px-3 py-1 font-semibold transition-colors ${
-                mode === 'month' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-              }`}
-            >
-              {t('reports.mode_month')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('range')}
-              className={`rounded-sm px-3 py-1 font-semibold transition-colors ${
-                mode === 'range' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-              }`}
-            >
-              {t('reports.mode_range')}
-            </button>
-          </div>
-
-          {mode === 'month' ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setCursor((c) => addMonths(c, -1))}
-                className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-                aria-label={t('reports.prev_month')}
-              >
-                <ChevronLeft className="size-4" strokeWidth={2} />
-              </button>
-              <div className="border-border bg-card text-brand-navy min-w-[160px] rounded-md border px-3 py-2 text-center text-sm font-semibold capitalize">
-                {format(cursor, 'LLLL yyyy', { locale: ru })}
-              </div>
-              <button
-                type="button"
-                onClick={() => setCursor((c) => addMonths(c, 1))}
-                className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-                aria-label={t('reports.next_month')}
-              >
-                <ChevronRight className="size-4" strokeWidth={2} />
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                type="date"
-                value={rangeStart}
-                max={rangeEnd}
-                onChange={(e) => setRangeStart(e.target.value)}
-                className="border-border bg-card text-foreground rounded-md border px-3 py-2 text-sm"
-              />
-              <span className="text-muted-foreground text-xs">—</span>
-              <input
-                type="date"
-                value={rangeEnd}
-                min={rangeStart}
-                max={todayStr}
-                onChange={(e) => setRangeEnd(e.target.value)}
-                className="border-border bg-card text-foreground rounded-md border px-3 py-2 text-sm"
-              />
-            </>
-          )}
-
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
           <Button variant="outline" onClick={handleExportXls}>
             <FileSpreadsheet className="size-4" strokeWidth={2} />
             {t('reports.export_xls')}

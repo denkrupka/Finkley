@@ -1,8 +1,10 @@
 import { endOfMonth, format, startOfMonth, startOfYear } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { useMemo } from 'react'
+import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
 import { useExpenses } from '@/hooks/useExpenses'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
@@ -102,6 +104,21 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     bold?: boolean
     indent?: number
     color?: 'navy' | 'sage' | 'destructive' | 'muted'
+    /** Уникальный ключ для collapse-логики (если эта строка — header группы). */
+    groupKey?: string
+    /** Если задан — строка является дочерней для groupKey и скрывается при свёртывании. */
+    parentGroupKey?: string
+  }
+
+  // Свёрнутые группы — Set с groupKey
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  function toggleGroup(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const fixedTotalMonthly = sumFixedCents(settings)
@@ -171,9 +188,25 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       values: revenueByMonth.map((r, i) => r - (expensesTotalByMonth[i] ?? 0)),
       bold: true,
     },
-    { label: t('finance.report.revenue'), values: revenueByMonth, bold: true, color: 'navy' },
-    { label: t('finance.report.revenue_services'), values: visitsByMonth, indent: 1 },
-    { label: t('finance.report.revenue_other'), values: otherIncomeByMonth, indent: 1 },
+    {
+      label: t('finance.report.revenue'),
+      values: revenueByMonth,
+      bold: true,
+      color: 'navy',
+      groupKey: 'revenue',
+    },
+    {
+      label: t('finance.report.revenue_services'),
+      values: visitsByMonth,
+      indent: 1,
+      parentGroupKey: 'revenue',
+    },
+    {
+      label: t('finance.report.revenue_other'),
+      values: otherIncomeByMonth,
+      indent: 1,
+      parentGroupKey: 'revenue',
+    },
 
     {
       label: t('finance.report.expenses_total'),
@@ -187,16 +220,19 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       bold: true,
       color: 'destructive',
+      groupKey: 'production',
     },
     {
       label: t('finance.report.production_master_payout'),
       values: masterPayout.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'production',
     },
     {
       label: t('finance.report.production_materials'),
       values: materials.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'production',
     },
 
     {
@@ -205,26 +241,31 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       bold: true,
       color: 'destructive',
+      groupKey: 'variable',
     },
     {
       label: t('settings.parameters.variable.admin_payroll'),
       values: varAdminPayroll.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'variable',
     },
     {
       label: t('settings.parameters.variable.bank_commission'),
       values: varBankComm.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'variable',
     },
     {
       label: t('settings.parameters.variable.ad_budget'),
       values: varAdBudget.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'variable',
     },
     {
       label: t('settings.parameters.variable.bonuses'),
       values: varBonuses.map((v) => -v),
       indent: 2,
+      parentGroupKey: 'variable',
     },
 
     {
@@ -233,8 +274,9 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       bold: true,
       color: 'destructive',
+      groupKey: 'fixed',
     },
-    ...buildFixedRows(settings, t),
+    ...buildFixedRows(settings, t).map((r) => ({ ...r, parentGroupKey: 'fixed' })),
 
     {
       label: t('finance.report.taxes'),
@@ -242,26 +284,31 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       bold: true,
       color: 'destructive',
+      groupKey: 'taxes',
     },
     {
       label: t('settings.parameters.taxes.pit36'),
       values: constant(settings.taxes.pit36_cents).map((v) => -v),
       indent: 2,
+      parentGroupKey: 'taxes',
     },
     {
       label: t('settings.parameters.taxes.vat'),
       values: constant(settings.taxes.vat_cents).map((v) => -v),
       indent: 2,
+      parentGroupKey: 'taxes',
     },
     {
       label: t('settings.parameters.taxes.cit'),
       values: constant(settings.taxes.cit_cents).map((v) => -v),
       indent: 2,
+      parentGroupKey: 'taxes',
     },
     {
       label: t('settings.parameters.taxes.pit3'),
       values: constant(settings.taxes.pit3_cents).map((v) => -v),
       indent: 2,
+      parentGroupKey: 'taxes',
     },
 
     {
@@ -269,16 +316,21 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       values: investmentsByMonth.map((v) => -v),
       bold: true,
       color: 'destructive',
+      groupKey: 'investing',
     },
-    ...buildInvestmentRows(settings, t, currentMonthIdx),
+    ...buildInvestmentRows(settings, t, currentMonthIdx).map((r) => ({
+      ...r,
+      parentGroupKey: 'investing',
+    })),
 
     {
       label: t('finance.report.section_financing'),
       values: flowsByMonth.map((v) => -v),
       bold: true,
       color: 'destructive',
+      groupKey: 'financing',
     },
-    ...buildFlowRows(settings, t),
+    ...buildFlowRows(settings, t).map((r) => ({ ...r, parentGroupKey: 'financing' })),
 
     {
       label: t('finance.report.period_saldo'),
@@ -296,22 +348,55 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
 
+  function exportCsv() {
+    const headers = [
+      t('finance.report.col_row'),
+      t('finance.report.col_total'),
+      ...months.map((m) => format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })),
+    ]
+    const lines = [headers.join(';')]
+    for (const row of rows) {
+      const cells = [row.label, yearTotal(row.values), ...row.values]
+      lines.push(
+        cells.map((c) => (typeof c === 'number' ? (c / 100).toFixed(2) : `"${c}"`)).join(';'),
+      )
+    }
+    const csv = '﻿' + lines.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `financial-report-${year}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
-      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-brand-navy text-lg font-bold tracking-tight">
             {t('finance.report.title')}
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">{t('finance.report.subtitle')}</p>
         </div>
-        <div className="border-border bg-card rounded-md border px-3 py-2 text-right">
-          <p className="text-muted-foreground text-xs uppercase tracking-wider">
-            {t('finance.report.current_balance')}
-          </p>
-          <p className="num text-foreground text-lg font-bold">
-            {formatCurrency(openingBalance, currency)}
-          </p>
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <Button variant="outline" size="md" onClick={exportCsv}>
+            <FileSpreadsheet className="size-4" strokeWidth={1.8} />
+            {t('finance.report.export_csv')}
+          </Button>
+          <Button variant="outline" size="md" onClick={() => window.print()}>
+            <Printer className="size-4" strokeWidth={1.8} />
+            {t('finance.report.print')}
+          </Button>
+          <div className="border-border bg-card rounded-md border px-3 py-2 text-right">
+            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              {t('finance.report.current_balance')}
+            </p>
+            <p className="num text-foreground text-sm font-bold">
+              {formatCurrency(openingBalance, currency)}
+            </p>
+          </div>
         </div>
       </header>
 
@@ -319,7 +404,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         <table className="w-full border-collapse text-xs">
           <thead className="bg-muted/40 text-muted-foreground text-[10px] uppercase tracking-wider">
             <tr>
-              <th className="bg-muted/40 sticky left-0 z-10 px-3 py-2 text-left font-semibold">
+              <th className="bg-muted/40 sticky left-0 z-20 min-w-[200px] px-3 py-2 text-left font-semibold">
                 {t('finance.report.col_row')}
               </th>
               <th className="px-2 py-2 text-right font-semibold">
@@ -333,48 +418,65 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
-              <tr
-                key={idx}
-                className={`border-border/60 border-t ${row.bold ? 'bg-muted/10' : ''}`}
-              >
-                <td
-                  className={`bg-card sticky left-0 z-10 px-3 py-1.5 ${row.bold ? 'text-foreground font-bold' : 'text-foreground'}`}
-                  style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
-                >
-                  {row.label}
-                </td>
-                <td
-                  className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                    row.color === 'navy'
-                      ? 'text-foreground'
-                      : row.color === 'sage'
-                        ? 'text-brand-sage-deep'
-                        : row.color === 'destructive'
-                          ? 'text-destructive'
-                          : 'text-foreground'
-                  }`}
-                >
-                  {formatNumberSafe(yearTotal(row.values), currency)}
-                </td>
-                {row.values.map((v, mi) => (
-                  <td
-                    key={mi}
-                    className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                      row.color === 'navy'
-                        ? 'text-foreground'
-                        : row.color === 'sage'
-                          ? 'text-brand-sage-deep'
-                          : row.color === 'destructive'
-                            ? 'text-destructive'
-                            : 'text-muted-foreground'
-                    }`}
+            {rows
+              // Скрываем дочерние строки если родительская группа свёрнута
+              .filter((row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)))
+              .map((row, idx) => {
+                const hasGroup = !!row.groupKey
+                const isCollapsed = hasGroup && collapsed.has(row.groupKey!)
+                return (
+                  <tr
+                    key={`${row.label}-${idx}`}
+                    className={`border-border/60 border-t ${row.bold ? 'bg-muted/10' : ''} ${hasGroup ? 'hover:bg-muted/30 cursor-pointer' : ''}`}
+                    onClick={hasGroup ? () => toggleGroup(row.groupKey!) : undefined}
                   >
-                    {v === 0 ? '—' : formatNumberSafe(v, currency)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+                    <td
+                      className={`bg-card sticky left-0 z-10 px-3 py-1.5 ${row.bold ? 'text-foreground font-bold' : 'text-foreground'}`}
+                      style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        {hasGroup ? (
+                          isCollapsed ? (
+                            <ChevronRight className="size-3.5 shrink-0" strokeWidth={2} />
+                          ) : (
+                            <ChevronDown className="size-3.5 shrink-0" strokeWidth={2} />
+                          )
+                        ) : null}
+                        <span>{row.label}</span>
+                      </span>
+                    </td>
+                    <td
+                      className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
+                        row.color === 'navy'
+                          ? 'text-foreground'
+                          : row.color === 'sage'
+                            ? 'text-brand-sage-deep'
+                            : row.color === 'destructive'
+                              ? 'text-destructive'
+                              : 'text-foreground'
+                      }`}
+                    >
+                      {formatNumberSafe(yearTotal(row.values), currency)}
+                    </td>
+                    {row.values.map((v, mi) => (
+                      <td
+                        key={mi}
+                        className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
+                          row.color === 'navy'
+                            ? 'text-foreground'
+                            : row.color === 'sage'
+                              ? 'text-brand-sage-deep'
+                              : row.color === 'destructive'
+                                ? 'text-destructive'
+                                : 'text-muted-foreground'
+                        }`}
+                      >
+                        {v === 0 ? '—' : formatNumberSafe(v, currency)}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
           </tbody>
         </table>
       </div>

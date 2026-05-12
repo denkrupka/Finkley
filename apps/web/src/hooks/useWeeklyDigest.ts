@@ -77,10 +77,13 @@ export function useToggleDailyDigest(salonId: string | undefined) {
         .update({ daily_digest_enabled: enabled })
         .eq('id', salonId)
       if (error) {
-        if (/does not exist/i.test(error.message)) {
-          throw new Error('Миграция БД ещё не применена — обнови staging/prod')
+        // PostgrestError — это plain object, не Error. Конвертируем
+        // в настоящий Error чтобы toast не показал "[object Object]".
+        const msg = error.message ?? String(error)
+        if (/does not exist/i.test(msg)) {
+          throw new Error('Миграция БД ещё не применена. Подожди пару минут — деплой в процессе.')
         }
-        throw error
+        throw new Error(msg)
       }
     },
     onSuccess: () => {

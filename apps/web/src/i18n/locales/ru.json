@@ -1993,7 +1993,9 @@
       "taxes": "Налоги",
       "period_saldo": "Сальдо за период",
       "end_balance": "Остаток на конец месяца",
-      "end_balance_by_register": "Остаток на конец месяца — по кассам"
+      "end_balance_by_register": "Остаток на конец месяца — по кассам",
+      "export_csv": "Excel / CSV",
+      "print": "Печать / PDF"
     },
     "cashflow_placeholder": "Движение денежных средств (ДДС) — раздел в разработке.",
     "payments_placeholder": "Платёжный календарь — раздел в разработке.",
