@@ -32,6 +32,7 @@
     }
   },
   "common": {
+    "print_period": "Okres: {{start}} — {{end}}",
     "save": "Zapisz",
     "cancel": "Anuluj",
     "delete": "Usuń",

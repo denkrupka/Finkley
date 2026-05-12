@@ -152,6 +152,11 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
+      {/* Период — виден только на печати, чтобы в распечатке было ясно за что */}
+      <p className="text-muted-foreground mb-3 hidden text-sm print:block">
+        {t('common.print_period', { start: from, end: to })}
+      </p>
+
       {/* Totals */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="border-border bg-card shadow-finsm rounded-lg border p-4">

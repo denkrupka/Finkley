@@ -37,6 +37,13 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
+      <p className="text-muted-foreground mb-3 hidden text-sm print:block">
+        {t('common.print_period', {
+          start: startIso.slice(0, 10),
+          end: endIso.slice(0, 10),
+        })}
+      </p>
+
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (
           <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
