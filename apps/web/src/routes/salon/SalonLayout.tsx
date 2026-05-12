@@ -13,7 +13,6 @@ import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
 import { BottomNav } from './BottomNav'
 import { FAB } from './FAB'
-import { PeriodToggle } from './PeriodToggle'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -101,13 +100,6 @@ export function SalonLayout() {
           ownerInitials={ownerInitials}
           onMenuClick={() => setDrawerOpen(true)}
         />
-
-        {/* Mobile-only period toggle (на desktop он в TopBar) */}
-        <div className="border-border bg-card border-b px-4 py-2 lg:hidden">
-          <div className="flex justify-center">
-            <PeriodToggle />
-          </div>
-        </div>
 
         <SubscriptionBanner />
 

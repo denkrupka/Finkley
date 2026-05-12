@@ -6,6 +6,7 @@ import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { VisitsPage } from '@/routes/visits/VisitsPage'
 
 import { OtherIncomeTab } from './OtherIncomeTab'
+import { SalesTab } from './SalesTab'
 
 type IncomeTab = 'visits' | 'sales' | 'other'
 
@@ -55,7 +56,7 @@ export function IncomePage() {
       {active === 'visits' ? (
         <VisitsPage forcedKind="visit" />
       ) : active === 'sales' ? (
-        <VisitsPage forcedKind="retail" />
+        <SalesTab salonId={salonId} />
       ) : (
         <OtherIncomeTab salonId={salonId} />
       )}

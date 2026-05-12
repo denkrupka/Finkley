@@ -438,11 +438,11 @@
       "today": "Dziś",
       "day_off": "Dzień wolny",
       "walk_in": "Bez umówienia",
-      "no_staff": "Brak aktywnych specjalistów. Dodaj w Ustawienia → Słowniki → Specjaliści.",
-      "staff_count_one": "{{n}} specjalista",
-      "staff_count_few": "{{n}} specjalistów",
-      "staff_count_many": "{{n}} specjalistów",
-      "staff_count_other": "{{n}} specjalistów"
+      "no_staff": "Brak aktywnych specjalistów. Dodaj w Ustawienia → Słowniki → Specjaliści."
+    },
+    "mini_calendar": {
+      "week_col": "Tydz.",
+      "jump_week": "Przejdź do tygodnia"
     },
     "bulk_button": "Wiele wizyt",
     "bulk": {
@@ -1192,10 +1192,27 @@
       "other": "Pozostałe przychody"
     },
     "sales_placeholder": "Sprzedaż towarów — rozszerzona sekcja w przygotowaniu. Na razie sprzedaż detaliczna jest rejestrowana jako wizyta typu „retail”; filtr pojawi się tu w kolejnym sprincie.",
+    "sales": {
+      "title": "Sprzedaż towarów",
+      "subtitle_total": "{{count}} sprzedaży · razem {{revenue}}",
+      "add_button": "Sprzedaż",
+      "empty": "W tym miesiącu nie ma sprzedaży. Naciśnij „+ Wizyta” w prawym dolnym rogu — otworzy się zakładka „Sprzedaż”.",
+      "confirm_delete": "Usunąć tę sprzedaż?",
+      "toast_deleted": "Sprzedaż usunięta",
+      "col_date": "Data",
+      "col_item": "Towar",
+      "col_staff": "Specjalista",
+      "col_payment": "Płatność",
+      "col_amount": "Kwota",
+      "filters": {
+        "all_staff": "Wszyscy specjaliści",
+        "all_payments": "Wszystkie płatności"
+      }
+    },
     "other": {
       "title": "Pozostałe przychody",
       "subtitle_total": "Razem w miesiącu:",
-      "add_button": "+ Dodaj przychód",
+      "add_button": "Dodaj przychód",
       "empty": "Brak wpisów. Tu wprowadzaj nieregularne wpływy: najem stanowiska, cashback, odsetki, zwroty od dostawców.",
       "confirm_delete": "Usunąć ten wpis przychodu?",
       "toast_added": "Przychód dodany",
@@ -1282,7 +1299,7 @@
     "payments": {
       "title": "Do zapłaty",
       "subtitle": "Zaplanowane płatności do dostawców. Auto-import z wFirma/Fakturownia/KSeF — następny sprint; na razie dodawaj ręcznie.",
-      "add_button": "+ Dodaj płatność",
+      "add_button": "Dodaj płatność",
       "empty": "Brak płatności. Dodaj fakturę do zapłacenia — pojawi się w kalendarzu z terminem.",
       "summary_overdue": "Przeterminowane",
       "summary_overdue_count_one": "{{count}} przeterminowana",

@@ -144,3 +144,38 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* =============================================================================
+ * Print stylesheet — при window.print() прячем app-chrome (TopBar / Sidebar /
+ * BottomNav / FAB / NotificationsBell) и оставляем только основной контент
+ * страницы. Дополнительно — фон белый, без shadow/rounded декора.
+ *
+ * Элементы помечаются `data-print-hide` атрибутом в JSX, либо использовать
+ * Tailwind `print:hidden` для одноразовых случаев.
+ * =============================================================================
+ */
+@media print {
+  body {
+    background: white !important;
+  }
+  [data-print-hide],
+  /* Стандартные app-chrome теги */
+  body > div > header,
+  body > div > aside,
+  body > div > nav,
+  nav[aria-label],
+  /* FAB / floating buttons (Sonner, hCaptcha) */
+  [data-sonner-toaster],
+  iframe[title*="hCaptcha"] {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+  /* Убираем тени и закругления у карточек — на бумаге чище */
+  .shadow-finsm,
+  .shadow-finxl {
+    box-shadow: none !important;
+  }
+}

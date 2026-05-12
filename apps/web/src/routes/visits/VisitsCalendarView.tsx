@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
@@ -13,6 +14,7 @@ import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
 import { EditVisitModal } from './EditVisitModal'
+import { MiniMonthCalendar } from './MiniMonthCalendar'
 
 // =============================================================================
 // Конфиг сетки
@@ -137,9 +139,16 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
           <Button variant="outline" size="sm" onClick={() => setCursor((c) => addDays(c, -1))}>
             <ChevronLeft className="size-4" strokeWidth={2} />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCursor(startOfDay(new Date()))}>
-            {t('visits.calendar.today')}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {t('visits.calendar.today')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="center" className="w-auto p-3">
+              <MiniMonthCalendar value={cursor} onChange={(d) => setCursor(startOfDay(d))} />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="sm" onClick={() => setCursor((c) => addDays(c, 1))}>
             <ChevronRight className="size-4" strokeWidth={2} />
           </Button>
@@ -147,9 +156,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         <h2 className="text-brand-navy text-base font-bold tracking-tight">
           {format(cursor, 'EEEE, d MMMM yyyy', { locale: ru })}
         </h2>
-        <div className="text-muted-foreground text-xs">
-          {t('visits.calendar.staff_count', { n: staff.length })}
-        </div>
+        <div />
       </div>
 
       {staff.length === 0 ? (

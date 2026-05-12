@@ -71,8 +71,9 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
   const serviceFilter = params.get('service') || ''
-  /** Toggle list/calendar. По дефолту list для backward compat. */
-  const view = params.get('view') === 'calendar' ? 'calendar' : 'list'
+  /** Toggle list/calendar. По дефолту calendar (так удобнее, owner 2026-05-12).
+   *  ?view=list переключает на список (как было раньше). */
+  const view = params.get('view') === 'list' ? 'list' : 'calendar'
   // `?kind=retail` фильтрует список до товарных продаж. Может быть задан
   // через URL (старые роуты) или пропсом `forcedKind` (из IncomePage).
   const kindParam = params.get('kind')
@@ -123,7 +124,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
 
   function setView(v: 'list' | 'calendar') {
     const next = new URLSearchParams(params)
-    if (v === 'calendar') next.set('view', 'calendar')
+    if (v === 'list') next.set('view', 'list')
     else next.delete('view')
     setParams(next, { replace: true })
   }

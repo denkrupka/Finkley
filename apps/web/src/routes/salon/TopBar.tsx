@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
 import { useAuth } from '@/hooks/useAuth'
 import { NotificationsBell } from './NotificationsBell'
-import { PeriodToggle } from './PeriodToggle'
 import { SalonSwitcher } from './SalonSwitcher'
 
 type Props = {
@@ -45,10 +44,10 @@ export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuCl
         <SalonSwitcher salonId={salonId} salonName={salonName} />
       </div>
 
-      {/* Period toggle (desktop по центру; на mobile живёт под TopBar в самой странице) */}
-      <div className="hidden flex-1 justify-center lg:flex">
-        <PeriodToggle />
-      </div>
+      {/* Period toggle убран из TopBar по решению owner (2026-05-12).
+          Страницы которые используют ?period= URL-параметр имеют собственный
+          period-selector внутри (Reports/Finance/Cashflow/Visits-list). */}
+      <div className="flex flex-1" />
 
       {/* Bell + locale switcher + plan + avatar + sign-out (desktop) / только bell + avatar (mobile) */}
       <div className="flex items-center gap-2 sm:gap-3">
