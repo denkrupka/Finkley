@@ -166,7 +166,11 @@
   nav[aria-label],
   /* FAB / floating buttons (Sonner, hCaptcha) */
   [data-sonner-toaster],
-  iframe[title*="hCaptcha"] {
+  iframe[title*="hCaptcha"],
+  /* PageTabsNav (tablist) и фильтр-инпуты вне таблиц — на печати лишние */
+  [role='tablist'],
+  main input[type='date'],
+  main select {
     display: none !important;
   }
   main {

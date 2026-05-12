@@ -77,7 +77,7 @@ export function PeriodPickerPopover({
         <Button
           variant="outline"
           size="md"
-          className="min-w-[160px] justify-center capitalize"
+          className="min-w-[160px] justify-center capitalize print:hidden"
           aria-label={t('period.aria_trigger')}
         >
           {periodLabel(value)}
