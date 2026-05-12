@@ -332,6 +332,11 @@ Deno.serve(async (req: Request) => {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
   }
+  // Раннее предупреждение: если VAPID не настроен — sub/test всё равно
+  // упадут, лучше показать понятную ошибку сразу.
+  if (!VAPID_PUB || !VAPID_PRIV) {
+    console.warn('send-push: VAPID env not configured — subscribe/test будут возвращать ошибку')
+  }
 
   const authHeader = req.headers.get('Authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {

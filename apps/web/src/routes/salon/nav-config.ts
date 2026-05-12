@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   Home,
+  MessageCircle,
   Package,
   PiggyBank,
   Receipt,
@@ -38,6 +39,7 @@ export type NavItemId =
   | 'reports'
   | 'finance'
   | 'inventory'
+  | 'messenger'
   | 'ai'
   | 'settings'
 
@@ -98,6 +100,14 @@ export const NAV_ITEMS: NavItem[] = [
     i18nKey: 'nav.inventory',
     icon: Package,
     stage: 5,
+    implemented: true,
+    inBottomNav: false,
+  },
+  {
+    id: 'messenger',
+    i18nKey: 'nav.messenger',
+    icon: MessageCircle,
+    stage: 6,
     implemented: true,
     inBottomNav: false,
   },

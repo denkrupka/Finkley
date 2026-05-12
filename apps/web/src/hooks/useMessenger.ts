@@ -1,0 +1,209 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+
+import { supabase } from '@/lib/supabase/client'
+
+export type MessengerChannel = 'telegram' | 'whatsapp' | 'instagram' | 'facebook' | 'internal'
+
+export type MessengerConversation = {
+  id: string
+  salon_id: string
+  channel: MessengerChannel
+  external_user_id: string
+  display_name: string
+  avatar_url: string | null
+  client_id: string | null
+  unread_count: number
+  last_message_at: string
+  last_message_preview: string | null
+  created_at: string
+  archived_at: string | null
+}
+
+export type MessengerMessage = {
+  id: string
+  conversation_id: string
+  salon_id: string
+  direction: 'in' | 'out'
+  text: string | null
+  media_path: string | null
+  media_kind: 'image' | 'video' | 'audio' | 'file' | null
+  external_message_id: string | null
+  sent_by_user_id: string | null
+  created_at: string
+}
+
+export type MessengerIntegration = {
+  id: string
+  salon_id: string
+  channel: MessengerChannel
+  status: 'disconnected' | 'pending' | 'connected' | 'error'
+  external_account_id: string | null
+  display_name: string | null
+  last_synced_at: string | null
+  last_error: string | null
+}
+
+export function useConversations(
+  salonId: string | undefined,
+  filter?: { channel?: MessengerChannel | null; search?: string },
+) {
+  const filterKey = filter ?? {}
+  return useQuery<MessengerConversation[]>({
+    queryKey: ['messenger-conversations', salonId, filterKey],
+    queryFn: async () => {
+      if (!salonId) return []
+      let q = supabase
+        .from('messenger_conversations')
+        .select(
+          'id, salon_id, channel, external_user_id, display_name, avatar_url, client_id, unread_count, last_message_at, last_message_preview, created_at, archived_at',
+        )
+        .eq('salon_id', salonId)
+        .is('archived_at', null)
+        .order('last_message_at', { ascending: false })
+        .limit(200)
+      if (filter?.channel) q = q.eq('channel', filter.channel)
+      if (filter?.search) q = q.ilike('display_name', `%${filter.search}%`)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as MessengerConversation[]
+    },
+    enabled: !!salonId,
+    staleTime: 10_000,
+  })
+}
+
+export function useConversationMessages(conversationId: string | undefined) {
+  return useQuery<MessengerMessage[]>({
+    queryKey: ['messenger-messages', conversationId],
+    queryFn: async () => {
+      if (!conversationId) return []
+      const { data, error } = await supabase
+        .from('messenger_messages')
+        .select(
+          'id, conversation_id, salon_id, direction, text, media_path, media_kind, external_message_id, sent_by_user_id, created_at',
+        )
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+        .limit(500)
+      if (error) throw error
+      return (data ?? []) as MessengerMessage[]
+    },
+    enabled: !!conversationId,
+    staleTime: 5_000,
+  })
+}
+
+export function useSendMessage(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      conversation_id: string
+      text?: string
+      media_path?: string
+      media_kind?: MessengerMessage['media_kind']
+    }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase
+        .from('messenger_messages')
+        .insert({
+          conversation_id: input.conversation_id,
+          salon_id: salonId,
+          direction: 'out',
+          text: input.text ?? null,
+          media_path: input.media_path ?? null,
+          media_kind: input.media_kind ?? null,
+        })
+        .select('*')
+        .single()
+      if (error) throw error
+      return data as MessengerMessage
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['messenger-messages', vars.conversation_id] })
+      qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}
+
+export function useMarkConversationRead(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const { error } = await supabase
+        .from('messenger_conversations')
+        .update({ unread_count: 0 })
+        .eq('id', conversationId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}
+
+export function useMessengerIntegrations(salonId: string | undefined) {
+  return useQuery<MessengerIntegration[]>({
+    queryKey: ['messenger-integrations', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('messenger_integrations')
+        .select(
+          'id, salon_id, channel, status, external_account_id, display_name, last_synced_at, last_error',
+        )
+        .eq('salon_id', salonId)
+      if (error) throw error
+      return (data ?? []) as MessengerIntegration[]
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
+/** Создаёт internal-conversation для теста UI без подключённых каналов. */
+export function useCreateInternalConversation(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { display_name: string }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase
+        .from('messenger_conversations')
+        .insert({
+          salon_id: salonId,
+          channel: 'internal',
+          external_user_id: `internal-${crypto.randomUUID()}`,
+          display_name: input.display_name,
+        })
+        .select('*')
+        .single()
+      if (error) throw error
+      return data as MessengerConversation
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}
+
+/** Bulk-send: отправить одно сообщение во все conversation_ids. */
+export function useBulkBroadcast(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { conversation_ids: string[]; text: string }) => {
+      if (!salonId) throw new Error('no_salon')
+      if (input.conversation_ids.length === 0) return { inserted: 0 }
+      const rows = input.conversation_ids.map((id) => ({
+        conversation_id: id,
+        salon_id: salonId,
+        direction: 'out' as const,
+        text: input.text,
+      }))
+      const { data, error } = await supabase.from('messenger_messages').insert(rows).select('id')
+      if (error) throw error
+      return { inserted: data?.length ?? 0 }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}

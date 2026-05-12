@@ -134,14 +134,31 @@ export function useUnsubscribePush() {
   })
 }
 
-/** Послать тестовое уведомление текущему юзеру (на все его устройства). */
+/** Послать тестовое уведомление текущему юзеру (на все его устройства).
+ *
+ *  При ошибке вытаскиваем response.body — supabase-js по умолчанию выкидывает
+ *  generic «Failed to send a request», что бесполезно для дебага.
+ */
 export function useTestPush() {
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('send-push', {
         body: { action: 'test' },
       })
-      if (error) throw error
+      if (error) {
+        // supabase-js v2: FunctionsHttpError имеет .context (Response). Парсим body
+        // чтобы юзер увидел реальную причину вместо «Failed to send a request».
+        const ctx = (error as { context?: Response }).context
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = (await ctx.json()) as { error?: string }
+            if (body?.error) throw new Error(body.error)
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr
+          }
+        }
+        throw error
+      }
       const json = data as { ok: boolean; sent?: number; failed?: number; error?: string }
       if (!json.ok) throw new Error(json.error ?? 'test_failed')
       return json.sent ?? 0

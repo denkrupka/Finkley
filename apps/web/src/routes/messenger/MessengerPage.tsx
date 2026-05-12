@@ -1,0 +1,565 @@
+import { formatDistanceToNowStrict } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import {
+  CalendarPlus,
+  Facebook,
+  Image as ImageIcon,
+  Instagram,
+  MessageCircle,
+  Phone,
+  Search,
+  Send,
+  Users,
+  X,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  useBulkBroadcast,
+  useConversationMessages,
+  useConversations,
+  useMarkConversationRead,
+  useSendMessage,
+  type MessengerChannel,
+  type MessengerConversation,
+} from '@/hooks/useMessenger'
+import { cn } from '@/lib/utils/cn'
+
+/**
+ * Встроенный мессенджер. Унифицирует входящие из подключённых каналов
+ * (Telegram / WhatsApp / Instagram / Facebook). Layout — две колонки:
+ *   слева  — список чатов с фильтром по каналу + поиск
+ *   справа — лента сообщений + composer (текст / фото) + quick-actions.
+ *
+ * Quick-action «Создать визит» в шапке чата открывает FAB QuickEntryModal
+ * с prefill = клиент (если matched по messenger_conversations.client_id).
+ *
+ * Bulk-рассылка — модалка «Рассылка», выбираем conversations + текст.
+ */
+
+const CHANNEL_META: Record<
+  MessengerChannel,
+  { label: string; color: string; icon: typeof MessageCircle }
+> = {
+  telegram: { label: 'Telegram', color: '#229ED9', icon: Send },
+  whatsapp: { label: 'WhatsApp', color: '#25D366', icon: Phone },
+  instagram: { label: 'Instagram', color: '#E4405F', icon: Instagram },
+  facebook: { label: 'Facebook', color: '#1877F2', icon: Facebook },
+  internal: { label: 'Внутренний', color: '#6B7280', icon: MessageCircle },
+}
+
+export function MessengerPage() {
+  const { t } = useTranslation()
+  const { salonId } = useParams<{ salonId: string }>()
+  const [activeChannel, setActiveChannel] = useState<MessengerChannel | null>(null)
+  const [search, setSearch] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+
+  const { data: conversations = [], isLoading: convLoading } = useConversations(salonId, {
+    channel: activeChannel,
+    search,
+  })
+  const { data: messages = [] } = useConversationMessages(selectedId ?? undefined)
+  const sendMessage = useSendMessage(salonId)
+  const markRead = useMarkConversationRead(salonId)
+  const selected = conversations.find((c) => c.id === selectedId) ?? null
+
+  // Auto-mark read on open
+  useEffect(() => {
+    if (selectedId) markRead.mutate(selectedId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
+  if (!salonId) return null
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] flex-1 flex-col px-5 py-6 sm:px-8">
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+            {t('messenger.title')}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t('messenger.subtitle')}</p>
+        </div>
+        <Button variant="secondary" size="md" onClick={() => setBulkOpen(true)}>
+          <Users className="size-4" strokeWidth={1.8} />
+          {t('messenger.bulk_button')}
+        </Button>
+      </header>
+
+      <div className="border-border bg-card shadow-finsm flex min-h-0 flex-1 overflow-hidden rounded-lg border">
+        {/* Список чатов */}
+        <aside className="border-border bg-muted/10 flex w-[340px] shrink-0 flex-col border-r">
+          {/* Search + filters */}
+          <div className="border-border border-b p-2">
+            <div className="relative">
+              <Search
+                className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                strokeWidth={1.7}
+              />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('messenger.search_placeholder')}
+                className="h-9 pl-8 text-sm"
+              />
+            </div>
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+              <ChannelChip
+                label={t('messenger.all_channels')}
+                color="#0F4C5C"
+                active={activeChannel === null}
+                onClick={() => setActiveChannel(null)}
+              />
+              {(['telegram', 'whatsapp', 'instagram', 'facebook'] as const).map((ch) => {
+                const meta = CHANNEL_META[ch]
+                return (
+                  <ChannelChip
+                    key={ch}
+                    label={meta.label}
+                    color={meta.color}
+                    active={activeChannel === ch}
+                    onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+
+          {/* List */}
+          <ul className="flex-1 overflow-y-auto">
+            {convLoading ? (
+              <li className="text-muted-foreground p-4 text-xs">{t('common.loading')}</li>
+            ) : conversations.length === 0 ? (
+              <li className="text-muted-foreground p-4 text-center text-xs">
+                {t('messenger.empty_list')}
+              </li>
+            ) : (
+              conversations.map((c) => (
+                <ConversationRow
+                  key={c.id}
+                  conversation={c}
+                  active={selectedId === c.id}
+                  onSelect={() => setSelectedId(c.id)}
+                />
+              ))
+            )}
+          </ul>
+        </aside>
+
+        {/* Диалог */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {selected ? (
+            <>
+              <header className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-2.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ChannelIcon channel={selected.channel} size={20} />
+                  <div className="min-w-0">
+                    <p className="text-foreground truncate text-sm font-semibold">
+                      {selected.display_name || t('messenger.unnamed')}
+                    </p>
+                    <p className="text-muted-foreground text-[11px]">
+                      {CHANNEL_META[selected.channel].label}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('finsalon:open-quick-entry', {
+                          detail: {
+                            staffId: '',
+                            when: new Date().toISOString(),
+                          },
+                        }),
+                      )
+                    }}
+                  >
+                    <CalendarPlus className="size-4" strokeWidth={1.8} />
+                    {t('messenger.create_visit')}
+                  </Button>
+                </div>
+              </header>
+
+              <MessagesList messages={messages} />
+
+              <Composer
+                disabled={sendMessage.isPending}
+                onSend={(text, mediaPath, mediaKind) =>
+                  sendMessage.mutate(
+                    {
+                      conversation_id: selected.id,
+                      text: text || undefined,
+                      media_path: mediaPath,
+                      media_kind: mediaKind,
+                    },
+                    {
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    },
+                  )
+                }
+              />
+            </>
+          ) : (
+            <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+              <MessageCircle className="text-muted-foreground/50 size-12" strokeWidth={1.2} />
+              <p className="text-sm">{t('messenger.select_chat')}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BulkBroadcastDialog
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        salonId={salonId}
+        conversations={conversations}
+      />
+    </div>
+  )
+}
+
+function ChannelChip({
+  label,
+  color,
+  active,
+  onClick,
+}: {
+  label: string
+  color: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+        active ? 'text-white' : 'text-foreground bg-card border-border hover:bg-muted/40',
+      )}
+      style={active ? { background: color, borderColor: color } : undefined}
+    >
+      {label}
+    </button>
+  )
+}
+
+function ChannelIcon({ channel, size = 16 }: { channel: MessengerChannel; size?: number }) {
+  const meta = CHANNEL_META[channel]
+  const Icon = meta.icon
+  return (
+    <span
+      className="grid shrink-0 place-items-center rounded-full"
+      style={{ background: meta.color, color: 'white', width: size + 8, height: size + 8 }}
+      title={meta.label}
+    >
+      <Icon size={size - 4} strokeWidth={2} />
+    </span>
+  )
+}
+
+function ConversationRow({
+  conversation,
+  active,
+  onSelect,
+}: {
+  conversation: MessengerConversation
+  active: boolean
+  onSelect: () => void
+}) {
+  const initials = (conversation.display_name || '?')
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+  const time = formatDistanceToNowStrict(new Date(conversation.last_message_at), {
+    addSuffix: false,
+    locale: ru,
+  })
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          'flex w-full items-start gap-3 border-b px-3 py-2.5 text-left transition-colors',
+          active ? 'bg-primary/10' : 'hover:bg-muted/40',
+          'border-border/40',
+        )}
+      >
+        <span className="relative">
+          {conversation.avatar_url ? (
+            <img
+              src={conversation.avatar_url}
+              alt=""
+              className="size-10 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="bg-brand-teal-soft text-brand-teal-deep grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold">
+              {initials || '?'}
+            </span>
+          )}
+          <span className="absolute -bottom-0.5 -right-0.5">
+            <ChannelIcon channel={conversation.channel} size={14} />
+          </span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="text-foreground truncate text-sm font-semibold">
+              {conversation.display_name || '—'}
+            </span>
+            <span className="text-muted-foreground shrink-0 text-[10px]">{time}</span>
+          </span>
+          <span className="mt-0.5 flex items-baseline justify-between gap-2">
+            <span className="text-muted-foreground line-clamp-1 text-xs">
+              {conversation.last_message_preview ?? ''}
+            </span>
+            {conversation.unread_count > 0 ? (
+              <span className="bg-primary text-primary-foreground inline-flex shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-5">
+                {conversation.unread_count}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </button>
+    </li>
+  )
+}
+
+function MessagesList({
+  messages,
+}: {
+  messages: ReturnType<typeof useConversationMessages>['data']
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
+  }, [messages])
+  return (
+    <div ref={ref} className="bg-muted/10 flex-1 overflow-y-auto p-4">
+      <div className="flex flex-col gap-2">
+        {(messages ?? []).map((m) => (
+          <div
+            key={m.id}
+            className={cn(
+              'max-w-[75%] rounded-lg px-3 py-2 text-sm',
+              m.direction === 'out'
+                ? 'bg-primary text-primary-foreground ml-auto'
+                : 'bg-card text-foreground border-border border',
+            )}
+          >
+            {m.text ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : null}
+            {m.media_kind === 'image' ? (
+              <span className="text-xs italic opacity-80">📷 image</span>
+            ) : null}
+            <p
+              className={cn(
+                'mt-1 text-[10px] opacity-70',
+                m.direction === 'out' ? 'text-right' : 'text-left',
+              )}
+            >
+              {new Date(m.created_at).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Composer({
+  disabled,
+  onSend,
+}: {
+  disabled: boolean
+  onSend: (
+    text: string,
+    mediaPath?: string,
+    mediaKind?: 'image' | 'video' | 'audio' | 'file',
+  ) => void
+}) {
+  const { t } = useTranslation()
+  const [value, setValue] = useState('')
+  return (
+    <div className="border-border bg-card flex items-center gap-2 border-t p-2">
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md"
+        title={t('messenger.attach_image')}
+        onClick={() => toast.info(t('messenger.attach_soon'))}
+      >
+        <ImageIcon className="size-4" strokeWidth={1.8} />
+      </button>
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            if (value.trim()) {
+              onSend(value.trim())
+              setValue('')
+            }
+          }
+        }}
+        placeholder={t('messenger.composer_placeholder')}
+        className="h-10"
+        disabled={disabled}
+      />
+      <Button
+        type="button"
+        variant="primary"
+        size="md"
+        disabled={disabled || !value.trim()}
+        onClick={() => {
+          if (value.trim()) {
+            onSend(value.trim())
+            setValue('')
+          }
+        }}
+      >
+        <Send className="size-4" strokeWidth={1.8} />
+      </Button>
+    </div>
+  )
+}
+
+function BulkBroadcastDialog({
+  open,
+  onClose,
+  salonId,
+  conversations,
+}: {
+  open: boolean
+  onClose: () => void
+  salonId: string
+  conversations: MessengerConversation[]
+}) {
+  const { t } = useTranslation()
+  const [text, setText] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const broadcast = useBulkBroadcast(salonId)
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function send() {
+    if (!text.trim()) {
+      toast.error(t('messenger.bulk.errors.empty_text'))
+      return
+    }
+    if (selected.size === 0) {
+      toast.error(t('messenger.bulk.errors.no_recipients'))
+      return
+    }
+    broadcast.mutate(
+      { conversation_ids: Array.from(selected), text: text.trim() },
+      {
+        onSuccess: (r) => {
+          toast.success(t('messenger.bulk.toast_sent', { count: r.inserted }))
+          setText('')
+          setSelected(new Set())
+          onClose()
+        },
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:!max-w-[640px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="text-secondary size-5" strokeWidth={1.8} />
+            {t('messenger.bulk.title')}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 px-5 pb-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t('messenger.bulk.placeholder')}
+            rows={4}
+            className="border-border bg-card rounded-md border p-3 text-sm"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-muted-foreground text-xs">
+              {t('messenger.bulk.selected', { count: selected.size, total: conversations.length })}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelected(new Set(conversations.map((c) => c.id)))}
+              >
+                {t('messenger.bulk.select_all')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
+                {t('messenger.bulk.clear')}
+              </Button>
+            </div>
+          </div>
+          <ul className="max-h-[40vh] overflow-y-auto rounded-md border">
+            {conversations.map((c) => (
+              <li key={c.id}>
+                <label className="hover:bg-muted/40 flex cursor-pointer items-center gap-2 border-b px-3 py-1.5 text-sm last:border-b-0">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    onChange={() => toggle(c.id)}
+                    className="size-4"
+                  />
+                  <ChannelIcon channel={c.channel} size={14} />
+                  <span className="flex-1 truncate">{c.display_name}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            <X className="size-4" strokeWidth={1.8} />
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onClick={send} disabled={broadcast.isPending}>
+            <Send className="size-4" strokeWidth={1.8} />
+            {broadcast.isPending
+              ? t('common.loading')
+              : t('messenger.bulk.send_button', { count: selected.size })}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
