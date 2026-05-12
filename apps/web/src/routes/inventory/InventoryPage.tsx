@@ -1,4 +1,13 @@
-import { AlertTriangle, BarChart3, Package, Plus, Search, Tags, Upload } from 'lucide-react'
+import {
+  AlertTriangle,
+  BarChart3,
+  Package,
+  Plus,
+  Search,
+  Sparkles,
+  Tags,
+  Upload,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -22,6 +31,7 @@ import { InventoryCategoriesDialog } from './InventoryCategoriesDialog'
 import { InventoryImportDialog } from './InventoryImportDialog'
 import { InventoryItemDrawer } from './InventoryItemDrawer'
 import { InventoryItemFormDialog } from './InventoryItemFormDialog'
+import { InventoryOcrDialog } from './InventoryOcrDialog'
 import { StocktakeDialog } from './StocktakeDialog'
 
 export function InventoryPage() {
@@ -39,6 +49,7 @@ export function InventoryPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [stocktakeOpen, setStocktakeOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [ocrOpen, setOcrOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [drawerItem, setDrawerItem] = useState<InventoryItemRow | null>(null)
 
@@ -100,6 +111,10 @@ export function InventoryPage() {
             <Button variant="ghost" size="md" onClick={() => setImportOpen(true)}>
               <Upload className="size-4" strokeWidth={1.8} />
               {t('inventory.import_button')}
+            </Button>
+            <Button variant="secondary" size="md" onClick={() => setOcrOpen(true)}>
+              <Sparkles className="size-4" strokeWidth={1.8} />
+              {t('inventory.ocr_button')}
             </Button>
             <Button variant="outline" size="md" onClick={() => setStocktakeOpen(true)}>
               {t('inventory.stocktake_button')}
@@ -309,6 +324,13 @@ export function InventoryPage() {
       <InventoryItemFormDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        salonId={salonId}
+        currency={currency}
+      />
+
+      <InventoryOcrDialog
+        open={ocrOpen}
+        onClose={() => setOcrOpen(false)}
         salonId={salonId}
         currency={currency}
       />

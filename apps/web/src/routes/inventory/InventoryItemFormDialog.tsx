@@ -141,38 +141,6 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
           <DialogDescription>{t('inventory.form.subtitle')}</DialogDescription>
         </DialogHeader>
 
-        {/* Import-кнопка: PDF/фото чека/WZ/заказа → AI парсит позиции →
-            preview-список → юзер подтверждает. Сейчас открывает stub-toast —
-            edge function inventory-ocr будет реализован отдельным TASK. */}
-        {!isEdit ? (
-          <div className="border-secondary/30 bg-secondary/5 mx-5 mb-2 flex items-center justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-foreground text-sm font-semibold">
-                {t('inventory.form.ocr.title')}
-              </p>
-              <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-                {t('inventory.form.ocr.subtitle')}
-              </p>
-            </div>
-            <label className="border-secondary text-secondary hover:bg-secondary inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors hover:text-white">
-              <input
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  // TODO: вызвать inventory-ocr edge function, показать preview
-                  // с inline-редактированием и кнопкой «Создать всё».
-                  toast.info(t('inventory.form.ocr.soon'))
-                  e.target.value = ''
-                }}
-              />
-              {t('inventory.form.ocr.button')}
-            </label>
-          </div>
-        ) : null}
-
         <form
           className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 pb-2 pt-2"
           onSubmit={(e) => {
