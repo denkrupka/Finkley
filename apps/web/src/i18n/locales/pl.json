@@ -430,6 +430,20 @@
       "single": "Jedna wizyta",
       "bulk": "Wiele wizyt"
     },
+    "view": {
+      "list": "Lista",
+      "calendar": "Kalendarz"
+    },
+    "calendar": {
+      "today": "Dziś",
+      "day_off": "Dzień wolny",
+      "walk_in": "Bez umówienia",
+      "no_staff": "Brak aktywnych specjalistów. Dodaj w Ustawienia → Słowniki → Specjaliści.",
+      "staff_count_one": "{{n}} specjalista",
+      "staff_count_few": "{{n}} specjalistów",
+      "staff_count_many": "{{n}} specjalistów",
+      "staff_count_other": "{{n}} specjalistów"
+    },
     "bulk_button": "Wiele wizyt",
     "bulk": {
       "title": "Wprowadź kilka wizyt",

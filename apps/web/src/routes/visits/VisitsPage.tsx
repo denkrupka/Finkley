@@ -1,4 +1,12 @@
-import { Calculator, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import {
+  Calculator,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  List,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -6,6 +14,7 @@ import { toast } from 'sonner'
 
 import { EditVisitModal } from './EditVisitModal'
 import { FreeSlotsPanel } from './FreeSlotsPanel'
+import { VisitsCalendarView } from './VisitsCalendarView'
 
 import {
   Select,
@@ -62,6 +71,8 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
   const serviceFilter = params.get('service') || ''
+  /** Toggle list/calendar. По дефолту list для backward compat. */
+  const view = params.get('view') === 'calendar' ? 'calendar' : 'list'
   // `?kind=retail` фильтрует список до товарных продаж. Может быть задан
   // через URL (старые роуты) или пропсом `forcedKind` (из IncomePage).
   const kindParam = params.get('kind')
@@ -110,169 +121,218 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const totalRevenue = visits.reduce((acc, v) => acc + v.amount_cents, 0)
   const grouped = groupByDay(visits)
 
+  function setView(v: 'list' | 'calendar') {
+    const next = new URLSearchParams(params)
+    if (v === 'calendar') next.set('view', 'calendar')
+    else next.delete('view')
+    setParams(next, { replace: true })
+  }
+
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {t('visits.subtitle_total', {
-            count: visits.length,
-            revenue: formatCurrency(totalRevenue, currency),
-          })}
-        </p>
-      </div>
-
-      <EditVisitModal
-        visit={editingVisit}
-        onClose={() => setEditingVisit(null)}
-        salonId={salonId}
-        currency={currency}
-      />
-      {null /* helpers below */}
-
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Select
-          value={staffFilter || 'all'}
-          onValueChange={(v) => setFilter('staff', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('visits.filters.all_staff')}</SelectItem>
-            {staff.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={paymentFilter || 'all'}
-          onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('visits.filters.all_payments')}</SelectItem>
-            {(['cash', 'card', 'transfer'] as const).map((p) => (
-              <SelectItem key={p} value={p}>
-                {t(`payment_methods.${p}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={serviceFilter || 'all'}
-          onValueChange={(v) => setFilter('service', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('visits.filters.all_services')}</SelectItem>
-            {services.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Свободные окна — раскрывающаяся панель над списком визитов */}
-      <FreeSlotsPanel salonId={salonId} />
-
-      {/* Body */}
-      {isLoading ? (
-        <div className="flex flex-col gap-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-muted/60 h-14 animate-pulse rounded-md" />
-          ))}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t('visits.subtitle_total', {
+              count: visits.length,
+              revenue: formatCurrency(totalRevenue, currency),
+            })}
+          </p>
         </div>
-      ) : error ? (
-        <p className="text-destructive text-sm">{(error as Error).message}</p>
-      ) : visits.length === 0 ? (
-        <div className="border-border bg-card rounded-lg border border-dashed px-6 py-12 text-center">
-          <p className="text-muted-foreground text-base font-medium">{t('visits.empty')}</p>
-          <p className="text-muted-foreground mt-1 text-sm">{t('visits.empty_hint')}</p>
+        {/* View toggle: список / календарь */}
+        <div className="border-border bg-card inline-flex rounded-md border p-0.5">
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
+              view === 'list'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <List className="size-3.5" strokeWidth={1.8} />
+            {t('visits.view.list')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('calendar')}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
+              view === 'calendar'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <CalendarDays className="size-3.5" strokeWidth={1.8} />
+            {t('visits.view.calendar')}
+          </button>
+        </div>
+      </div>
+
+      {view === 'calendar' ? (
+        <div className="border-border bg-card shadow-finsm flex-1 overflow-hidden rounded-lg border">
+          <VisitsCalendarView salonId={salonId} />
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {Array.from(grouped.entries()).map(([day, items]) => (
-            <section key={day}>
-              <h2 className="text-muted-foreground mb-3 text-xs font-bold uppercase tracking-wider">
-                {formatVisitDayHeading(day + 'T00:00:00.000Z')}
-              </h2>
-              <ul className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
-                {(() => {
-                  // Группируем визиты по group_key. Уникальные группы рендерятся
-                  // как раскрываемая строка; visits без group_key — обычная строка.
-                  type RenderGroup = { key: string; visits: VisitRow[] }
-                  const seen = new Set<string>()
-                  const rows: (VisitRow | RenderGroup)[] = []
-                  for (const v of items) {
-                    if (v.group_key) {
-                      if (seen.has(v.group_key)) continue
-                      seen.add(v.group_key)
-                      const groupVisits = items.filter((x) => x.group_key === v.group_key)
-                      rows.push({ key: v.group_key, visits: groupVisits })
-                    } else {
-                      rows.push(v)
-                    }
-                  }
-                  return rows.map((row) => {
-                    if ('visits' in row) {
-                      return (
-                        <GroupRow
-                          key={row.key}
-                          group={row}
-                          isExpanded={expandedGroups.has(row.key)}
-                          onToggle={() => toggleGroup(row.key)}
-                          onEdit={(v) => setEditingVisit(v)}
-                          onDelete={(id) => {
-                            if (!confirm(t('visits.confirm_delete'))) return
-                            deleteVisit.mutate(id, {
-                              onSuccess: () => toast.success(t('visits.toast_deleted')),
-                            })
-                          }}
-                          staff={staff}
-                          services={services}
-                          clients={clients}
-                          currency={currency}
-                          t={t}
-                        />
-                      )
-                    }
-                    return (
-                      <SingleVisitRow
-                        key={row.id}
-                        visit={row}
-                        onEdit={() => setEditingVisit(row)}
-                        onDelete={() => {
-                          if (!confirm(t('visits.confirm_delete'))) return
-                          deleteVisit.mutate(row.id, {
-                            onSuccess: () => toast.success(t('visits.toast_deleted')),
-                          })
-                        }}
-                        staff={staff}
-                        services={services}
-                        clients={clients}
-                        currency={currency}
-                        t={t}
-                      />
-                    )
-                  })
-                })()}
-              </ul>
-            </section>
-          ))}
-        </div>
+        <>
+          {/* Перенесённый ниже list-content внутри fragment чтобы Calendar
+            бранч не рендерил его */}
+
+          <EditVisitModal
+            visit={editingVisit}
+            onClose={() => setEditingVisit(null)}
+            salonId={salonId}
+            currency={currency}
+          />
+          {null /* helpers below */}
+
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Select
+              value={staffFilter || 'all'}
+              onValueChange={(v) => setFilter('staff', v === 'all' ? null : v)}
+            >
+              <SelectTrigger className="h-10 w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('visits.filters.all_staff')}</SelectItem>
+                {staff.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={paymentFilter || 'all'}
+              onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
+            >
+              <SelectTrigger className="h-10 w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('visits.filters.all_payments')}</SelectItem>
+                {(['cash', 'card', 'transfer'] as const).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {t(`payment_methods.${p}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={serviceFilter || 'all'}
+              onValueChange={(v) => setFilter('service', v === 'all' ? null : v)}
+            >
+              <SelectTrigger className="h-10 w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('visits.filters.all_services')}</SelectItem>
+                {services.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Свободные окна — раскрывающаяся панель над списком визитов */}
+          <FreeSlotsPanel salonId={salonId} />
+
+          {/* Body */}
+          {isLoading ? (
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="bg-muted/60 h-14 animate-pulse rounded-md" />
+              ))}
+            </div>
+          ) : error ? (
+            <p className="text-destructive text-sm">{(error as Error).message}</p>
+          ) : visits.length === 0 ? (
+            <div className="border-border bg-card rounded-lg border border-dashed px-6 py-12 text-center">
+              <p className="text-muted-foreground text-base font-medium">{t('visits.empty')}</p>
+              <p className="text-muted-foreground mt-1 text-sm">{t('visits.empty_hint')}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {Array.from(grouped.entries()).map(([day, items]) => (
+                <section key={day}>
+                  <h2 className="text-muted-foreground mb-3 text-xs font-bold uppercase tracking-wider">
+                    {formatVisitDayHeading(day + 'T00:00:00.000Z')}
+                  </h2>
+                  <ul className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+                    {(() => {
+                      // Группируем визиты по group_key. Уникальные группы рендерятся
+                      // как раскрываемая строка; visits без group_key — обычная строка.
+                      type RenderGroup = { key: string; visits: VisitRow[] }
+                      const seen = new Set<string>()
+                      const rows: (VisitRow | RenderGroup)[] = []
+                      for (const v of items) {
+                        if (v.group_key) {
+                          if (seen.has(v.group_key)) continue
+                          seen.add(v.group_key)
+                          const groupVisits = items.filter((x) => x.group_key === v.group_key)
+                          rows.push({ key: v.group_key, visits: groupVisits })
+                        } else {
+                          rows.push(v)
+                        }
+                      }
+                      return rows.map((row) => {
+                        if ('visits' in row) {
+                          return (
+                            <GroupRow
+                              key={row.key}
+                              group={row}
+                              isExpanded={expandedGroups.has(row.key)}
+                              onToggle={() => toggleGroup(row.key)}
+                              onEdit={(v) => setEditingVisit(v)}
+                              onDelete={(id) => {
+                                if (!confirm(t('visits.confirm_delete'))) return
+                                deleteVisit.mutate(id, {
+                                  onSuccess: () => toast.success(t('visits.toast_deleted')),
+                                })
+                              }}
+                              staff={staff}
+                              services={services}
+                              clients={clients}
+                              currency={currency}
+                              t={t}
+                            />
+                          )
+                        }
+                        return (
+                          <SingleVisitRow
+                            key={row.id}
+                            visit={row}
+                            onEdit={() => setEditingVisit(row)}
+                            onDelete={() => {
+                              if (!confirm(t('visits.confirm_delete'))) return
+                              deleteVisit.mutate(row.id, {
+                                onSuccess: () => toast.success(t('visits.toast_deleted')),
+                              })
+                            }}
+                            staff={staff}
+                            services={services}
+                            clients={clients}
+                            currency={currency}
+                            t={t}
+                          />
+                        )
+                      })
+                    })()}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

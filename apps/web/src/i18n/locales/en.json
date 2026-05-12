@@ -430,6 +430,18 @@
       "single": "Single visit",
       "bulk": "Multiple visits"
     },
+    "view": {
+      "list": "List",
+      "calendar": "Calendar"
+    },
+    "calendar": {
+      "today": "Today",
+      "day_off": "Day off",
+      "walk_in": "Walk-in",
+      "no_staff": "No active staff. Add specialists in Settings → Catalogs → Specialists.",
+      "staff_count_one": "{{n}} specialist",
+      "staff_count_other": "{{n}} specialists"
+    },
     "bulk_button": "Multiple visits",
     "bulk": {
       "title": "Add multiple visits",
