@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
-import { useClients, useCreateClient, type ClientRow } from '@/hooks/useClients'
+import { useClients, type ClientRow } from '@/hooks/useClients'
 import { cn } from '@/lib/utils/cn'
-import { formatPhoneDisplay, toE164 } from '@/lib/utils/format-phone'
+import { formatPhoneDisplay } from '@/lib/utils/format-phone'
+
+import { ClientFormModal } from './ClientFormModal'
 
 type Props = {
   salonId: string
@@ -32,7 +34,10 @@ export function ClientPicker({ salonId, value, onChange, placeholder, testId }: 
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { data: clients = [] } = useClients(salonId, { search: query, sort: 'last_visit' })
-  const createClient = useCreateClient(salonId)
+  // Полная модалка создания клиента (имя/телефон/email/комментарий) —
+  // вместо инлайн-создания. Открывается из «Создать <query>».
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createPrefill, setCreatePrefill] = useState('')
 
   const selected: ClientRow | null = useMemo(() => {
     if (!value) return null
@@ -50,22 +55,10 @@ export function ClientPicker({ salonId, value, onChange, placeholder, testId }: 
     setOpen(false)
   }
 
-  function createAndSelect() {
-    const q = query.trim()
-    if (!q) return
-    // Если ввели только цифры — это похоже на телефон
-    const looksLikePhone = /^[\d+\s()-]+$/.test(q) && q.replace(/[^\d]/g, '').length >= 7
-    const phoneE164 = looksLikePhone ? toE164(q) : null
-    createClient.mutate(
-      {
-        salon_id: salonId,
-        name: looksLikePhone ? t('clients.unnamed_with_phone') : q,
-        phone: phoneE164 ?? (looksLikePhone ? q : null),
-      },
-      {
-        onSuccess: (row) => selectClient(row.id),
-      },
-    )
+  function openCreateModal() {
+    setCreatePrefill(query.trim())
+    setCreateModalOpen(true)
+    setOpen(false)
   }
 
   return (
@@ -174,9 +167,8 @@ export function ClientPicker({ salonId, value, onChange, placeholder, testId }: 
             {query.trim() && clients.length === 0 ? (
               <button
                 type="button"
-                onClick={createAndSelect}
-                disabled={createClient.isPending}
-                className="text-secondary hover:bg-muted/40 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold disabled:opacity-50"
+                onClick={openCreateModal}
+                className="text-secondary hover:bg-muted/40 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold"
                 data-testid="cl-picker-create"
               >
                 <Plus className="size-4" strokeWidth={2} />
@@ -186,6 +178,14 @@ export function ClientPicker({ salonId, value, onChange, placeholder, testId }: 
           </div>
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
+
+      <ClientFormModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        salonId={salonId}
+        prefillName={createPrefill}
+        onCreated={(created) => onChange(created.id)}
+      />
     </PopoverPrimitive.Root>
   )
 }

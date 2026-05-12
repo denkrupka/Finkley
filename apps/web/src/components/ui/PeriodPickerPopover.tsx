@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { addWeeks, endOfWeek, format, startOfWeek } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,17 @@ import { Button } from '@/components/ui/button'
 import { periodLabel, type PeriodValue } from '@/components/ui/period-picker-utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils/cn'
+
+/** Хелпер: формирует range для недели вокруг даты d (понедельник — воскресенье). */
+function weekRange(d: Date): PeriodValue {
+  const start = startOfWeek(d, { weekStartsOn: 1 })
+  const end = endOfWeek(d, { weekStartsOn: 1 })
+  return {
+    kind: 'range',
+    from: format(start, 'yyyy-MM-dd'),
+    to: format(end, 'yyyy-MM-dd'),
+  }
+}
 
 /**
  * Универсальный селектор периода в стиле Booksy. Кнопка-триггер показывает
@@ -96,8 +107,36 @@ export function PeriodPickerPopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[480px] p-0">
-        {/* Quick chips: «Этот месяц», «Прошлый», «Эта неделя», «Сегодня» */}
         <div className="border-border flex flex-wrap gap-1.5 border-b p-2">
+          <QuickChip
+            label={t('period.quick.today')}
+            onClick={() => {
+              const iso = format(today, 'yyyy-MM-dd')
+              onChange({ kind: 'range', from: iso, to: iso })
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.this_week')}
+            onClick={() => {
+              onChange(weekRange(today))
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.last_week')}
+            onClick={() => {
+              onChange(weekRange(addWeeks(today, -1)))
+              setOpen(false)
+            }}
+          />
+          <QuickChip
+            label={t('period.quick.next_week')}
+            onClick={() => {
+              onChange(weekRange(addWeeks(today, 1)))
+              setOpen(false)
+            }}
+          />
           <QuickChip
             label={t('period.quick.this_month')}
             onClick={() => {

@@ -20,13 +20,9 @@ import { MiniMonthCalendar } from './MiniMonthCalendar'
 // =============================================================================
 // Конфиг сетки
 // =============================================================================
-/** Бизнес-окно — какие часы показываем на оси. Если у конкретного мастера
- *  смена выходит за это окно, его working-hours штриховка просто обрежется. */
-const HOUR_START = 8
-const HOUR_END = 22 // exclusive
-const TOTAL_MIN = (HOUR_END - HOUR_START) * 60
-/** Высота 1 минуты в px. Подбирал по Booksy — 72px/час даёт читабельные слоты. */
-const PX_PER_MIN = 1.2
+/** Fallback бизнес-окно, если ни у одного мастера нет расписания. */
+const FALLBACK_HOUR_START = 9
+const FALLBACK_HOUR_END = 20
 /** Default длительность визита если у услуги не задано duration_min. 60 мин —
  *  типичная длительность услуги в beauty-салоне (Booksy/wFirma часто не
  *  отдают duration при импорте). */
@@ -63,11 +59,6 @@ function minutesFromMidnight(d: Date): number {
 function parseHHMM(s: string): number {
   const [h, m] = s.split(':').map(Number)
   return (h || 0) * 60 + (m || 0)
-}
-
-/** Top-offset в px на time-grid'е для конкретного количества минут от полуночи. */
-function pxTopForMinutes(minFromMidnight: number): number {
-  return (minFromMidnight - HOUR_START * 60) * PX_PER_MIN
 }
 
 // =============================================================================
@@ -113,6 +104,48 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const dayKey = DAY_KEYS[cursor.getDay()]!
   const today = isSameDay(cursor, new Date())
 
+  // Бизнес-окно вычисляется по расписанию мастеров на текущий день,
+  // чтобы календарь умещался без вертикального скролла. Pad ±30 мин по краям.
+  const { HOUR_START, HOUR_END } = useMemo(() => {
+    let minStart = Infinity
+    let maxEnd = -Infinity
+    for (const s of staff) {
+      const sched = s.weekly_schedule?.[dayKey]
+      if (!sched || sched.off) continue
+      minStart = Math.min(minStart, parseHHMM(sched.start))
+      maxEnd = Math.max(maxEnd, parseHHMM(sched.end))
+    }
+    if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+      return { HOUR_START: FALLBACK_HOUR_START, HOUR_END: FALLBACK_HOUR_END }
+    }
+    const hs = Math.max(0, Math.floor((minStart - 30) / 60))
+    const he = Math.min(24, Math.ceil((maxEnd + 30) / 60))
+    return { HOUR_START: hs, HOUR_END: he }
+  }, [staff, dayKey])
+
+  const TOTAL_MIN = (HOUR_END - HOUR_START) * 60
+
+  // PX_PER_MIN адаптируется под доступную высоту, чтобы всё умещалось без
+  // вертикального скролла. Резерв 64px на header-row с аватарами + 16px паддинг.
+  const gridScrollRef = useRef<HTMLDivElement>(null)
+  const [containerHeight, setContainerHeight] = useState(0)
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (!el) return
+    const update = () => setContainerHeight(el.clientHeight)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const availableH = Math.max(300, containerHeight - 64 - 16)
+  // Кламп: не сжимаем слишком тонко (subslot < 12px нечитаемо) и не растягиваем
+  // больше 1.4px/мин (выглядит водянисто на больших экранах).
+  const PX_PER_MIN = Math.min(1.4, Math.max(0.8, availableH / TOTAL_MIN))
+
+  const pxTopForMinutes = (minFromMidnight: number): number =>
+    (minFromMidnight - HOUR_START * 60) * PX_PER_MIN
+
   // Текущее время — обновляем раз в минуту для красной линии
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -122,17 +155,6 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const nowMinutes = today ? minutesFromMidnight(now) : null
   const nowInsideGrid =
     nowMinutes != null && nowMinutes >= HOUR_START * 60 && nowMinutes < HOUR_END * 60
-
-  // Auto-scroll to current time (или 9:00 если today вне рабочих часов).
-  // Делаем один раз при mount + при смене даты.
-  const gridScrollRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!gridScrollRef.current) return
-    const targetMin = today && nowInsideGrid ? nowMinutes! - 60 : 9 * 60 - HOUR_START * 60
-    const px = Math.max(0, pxTopForMinutes(HOUR_START * 60 + Math.max(0, targetMin)))
-    gridScrollRef.current.scrollTop = px
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayStart.getTime()])
 
   // Хук-helper: возвращает duration в минутах для конкретного визита
   const durationFor = (v: VisitRow): number => {
@@ -177,17 +199,18 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
-          {/* Time-axis + staff-columns wrapper */}
+          {/* Time-axis + staff-columns wrapper. По вертикали — НЕ скроллим
+              (рассчитываем PX_PER_MIN так, чтобы всё умещалось), по горизонтали
+              скролл если мастеров много. */}
           <div
             ref={gridScrollRef}
-            className="flex-1 overflow-auto"
+            className="flex-1 overflow-x-auto overflow-y-hidden"
             style={{ scrollBehavior: 'auto' }}
           >
             <div
-              className="relative grid"
+              className="relative grid h-full"
               style={{
                 gridTemplateColumns: `${TIME_AXIS_WIDTH_PX}px repeat(${staff.length}, ${COL_WIDTH_PX}px)`,
-                minHeight: TOTAL_MIN * PX_PER_MIN + 48,
               }}
             >
               {/* Sticky header row с аватарами мастеров */}
@@ -359,18 +382,16 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                               const POPOVER_W = 240
                               const POPOVER_H = 180
                               const padding = 8
-                              // Clamp left так чтобы popover не вылазил за правый край.
-                              const leftRaw = rect.left
+                              // Popover у нас position:fixed → координаты viewport,
+                              // window.scrollY НЕ добавляем (иначе уезжает вниз при
+                              // любом скролле страницы).
                               const leftClamped = Math.min(
-                                leftRaw,
+                                rect.left,
                                 window.innerWidth - POPOVER_W - padding,
                               )
-                              // Если внизу не хватает места — показываем выше слота.
                               const spaceBelow = window.innerHeight - rect.bottom
                               const topRaw =
-                                spaceBelow >= POPOVER_H
-                                  ? rect.bottom + window.scrollY
-                                  : rect.top + window.scrollY - POPOVER_H
+                                spaceBelow >= POPOVER_H ? rect.bottom : rect.top - POPOVER_H
                               setSubslotMenu({
                                 staffId: s.id,
                                 when,

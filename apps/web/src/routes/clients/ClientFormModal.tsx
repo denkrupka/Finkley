@@ -45,9 +45,20 @@ type Props = {
   salonId: string
   /** Если передан — режим редактирования */
   client?: ClientRow | null
+  /** Префил поля «Имя» при создании (например, из ClientPicker query). */
+  prefillName?: string
+  /** Колбек после успешного создания — для ClientPicker, чтобы выбрать клиента. */
+  onCreated?: (client: ClientRow) => void
 }
 
-export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) {
+export function ClientFormModal({
+  open,
+  onOpenChange,
+  salonId,
+  client,
+  prefillName,
+  onCreated,
+}: Props) {
   const { t } = useTranslation()
   const create = useCreateClient(salonId)
   const update = useUpdateClient(salonId)
@@ -59,15 +70,21 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
 
   useEffect(() => {
     if (!open) return
+    // prefillName используется только при создании (когда client пустой) —
+    // например, ClientPicker подкидывает введённый query.
+    const looksLikePhone =
+      !!prefillName &&
+      /^[\d+\s()-]+$/.test(prefillName) &&
+      prefillName.replace(/[^\d]/g, '').length >= 7
     form.reset({
-      name: client?.name ?? '',
-      phone: client?.phone ?? '',
+      name: client?.name ?? (looksLikePhone ? '' : (prefillName ?? '')),
+      phone: client?.phone ?? (looksLikePhone ? prefillName! : ''),
       email: client?.email ?? '',
       source: client?.source ?? '',
       notes: client?.notes ?? '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open
-  }, [open, client?.id])
+  }, [open, client?.id, prefillName])
 
   const isEdit = !!client
   const pending = create.isPending || update.isPending
@@ -87,10 +104,6 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
       notes: values.notes || null,
     }
 
-    const onSuccess = () => {
-      toast.success(isEdit ? t('clients.toast_updated') : t('clients.toast_created'))
-      onOpenChange(false)
-    }
     const onError = (err: unknown) => {
       toast.error(t('clients.toast_error'), {
         description: err instanceof Error ? err.message : String(err),
@@ -98,9 +111,28 @@ export function ClientFormModal({ open, onOpenChange, salonId, client }: Props) 
     }
 
     if (isEdit && client) {
-      update.mutate({ id: client.id, ...payload }, { onSuccess, onError })
+      update.mutate(
+        { id: client.id, ...payload },
+        {
+          onSuccess: () => {
+            toast.success(t('clients.toast_updated'))
+            onOpenChange(false)
+          },
+          onError,
+        },
+      )
     } else {
-      create.mutate({ salon_id: salonId, ...payload }, { onSuccess, onError })
+      create.mutate(
+        { salon_id: salonId, ...payload },
+        {
+          onSuccess: (created) => {
+            toast.success(t('clients.toast_created'))
+            onCreated?.(created)
+            onOpenChange(false)
+          },
+          onError,
+        },
+      )
     }
   }
 

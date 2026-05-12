@@ -1,8 +1,16 @@
-import { Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   currentMonthPeriod,
   periodToRange,
@@ -21,6 +29,7 @@ import { useStaff } from '@/hooks/useStaff'
 import { useDeleteVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
+import { RetailSaleForm } from '@/routes/visits/RetailSaleForm'
 
 const PAYMENT_OPTIONS: PaymentMethod[] = ['cash', 'card', 'transfer']
 
@@ -44,6 +53,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const { data: staff = [] } = useStaff(salonId)
   const [staffFilter, setStaffFilter] = useState<string>('')
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
+  const [createOpen, setCreateOpen] = useState(false)
 
   const { data: sales = [], isLoading } = useVisits(salonId, range, {
     kind: 'retail',
@@ -69,7 +79,13 @@ export function SalesTab({ salonId }: { salonId: string }) {
             })}
           </p>
         </div>
-        <PeriodPickerPopover value={period} onChange={setPeriod} />
+        <div className="flex items-center gap-2">
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <Button variant="secondary" size="md" onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4" strokeWidth={2.4} />
+            {t('income.sales.add_button')}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -175,6 +191,21 @@ export function SalesTab({ salonId }: { salonId: string }) {
           </table>
         )}
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:!max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
+            <DialogDescription>{t('income.sales.create_subtitle')}</DialogDescription>
+          </DialogHeader>
+          <RetailSaleForm
+            salonId={salonId}
+            currency={currency}
+            staff={staff}
+            onDone={() => setCreateOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

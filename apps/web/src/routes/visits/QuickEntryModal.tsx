@@ -5,7 +5,6 @@ import { CalendarDays } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -37,7 +36,6 @@ import { cn } from '@/lib/utils/cn'
 import { ClientPicker } from '@/routes/clients/ClientPicker'
 
 import { BulkVisitsForm } from './BulkVisitsForm'
-import { RetailSaleForm } from './RetailSaleForm'
 
 const PAYMENT_OPTIONS = ['cash', 'card', 'transfer'] as const
 type PaymentOption = (typeof PAYMENT_OPTIONS)[number]
@@ -307,18 +305,11 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       .toUpperCase() ?? '?'
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
-  // Когда модал открывается из IncomePage с активным табом «Продажи»
-  // (`?tab=sales`) или со страницы /visits с фильтром `?kind=retail` —
-  // по умолчанию активируем таб розничной продажи.
-  const [pageParams] = useSearchParams()
-  const initialTab: 'single' | 'bulk' | 'retail' =
-    pageParams.get('kind') === 'retail' || pageParams.get('tab') === 'sales' ? 'retail' : 'single'
-  const [tab, setTab] = useState<'single' | 'bulk' | 'retail'>(initialTab)
-  // Если открыли модал, потом сменили активный таб страницы, потом открыли
-  // снова — обновляем initial выбор.
+  // «Продажа» убрана из QuickEntryModal по решению owner (2026-05-12) —
+  // продажи теперь живут на отдельной странице /income → Sales.
+  const [tab, setTab] = useState<'single' | 'bulk'>('single')
   useEffect(() => {
-    if (open) setTab(initialTab)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open) setTab('single')
   }, [open])
 
   return (
@@ -328,7 +319,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
           <DialogDescription>{t('visits.form.subtitle')}</DialogDescription>
           <div className="border-border bg-muted/40 mt-2 inline-flex w-full rounded-full border p-[3px]">
-            {(['single', 'bulk', 'retail'] as const).map((id) => (
+            {(['single', 'bulk'] as const).map((id) => (
               <button
                 key={id}
                 type="button"
@@ -346,14 +337,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           </div>
         </DialogHeader>
 
-        {tab === 'retail' ? (
-          <RetailSaleForm
-            salonId={salonId}
-            currency={currency}
-            staff={staff}
-            onDone={() => onOpenChange(false)}
-          />
-        ) : tab === 'bulk' ? (
+        {tab === 'bulk' ? (
           <BulkVisitsForm
             salonId={salonId}
             currency={currency}

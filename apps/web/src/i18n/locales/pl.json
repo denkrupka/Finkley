@@ -24,6 +24,10 @@
       "365": "Ostatni rok"
     },
     "quick": {
+      "today": "Dziś",
+      "this_week": "Ten tydzień",
+      "last_week": "Poprzedni tydzień",
+      "next_week": "Następny tydzień",
       "this_month": "Ten miesiąc",
       "last_month": "Poprzedni miesiąc",
       "this_year": "Ten rok",

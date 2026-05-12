@@ -1,12 +1,18 @@
-import { addMonths, endOfMonth, format, startOfMonth } from 'date-fns'
+import { format, startOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Lock, Printer } from 'lucide-react'
+import { Lock, Printer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useSalon } from '@/hooks/useSalons'
 import {
   useClosePayoutPeriod,
@@ -31,12 +37,14 @@ export function PayoutsPage() {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
-  // Месяц-курсор. По умолчанию — ТЕКУЩИЙ месяц (синхронно с дашбордом и
-  // отчётами: юзер ожидает увидеть свежие визиты сразу). Закрыть период
-  // нельзя пока он не закончился — кнопка ниже сама дизейблится.
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const periodStart = format(startOfMonth(cursor), 'yyyy-MM-dd')
-  const periodEnd = format(endOfMonth(cursor), 'yyyy-MM-dd')
+  // Период (через PeriodPickerPopover). По умолчанию — ТЕКУЩИЙ месяц.
+  // Закрытие периода работает только когда период полностью завершён.
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const range = periodToRange(period)
+  // Для UI cursor (метка «Июль 2026») и подписи периода используем start
+  const cursor = startOfMonth(range.start)
+  const periodStart = format(range.start, 'yyyy-MM-dd')
+  const periodEnd = format(range.end, 'yyyy-MM-dd')
 
   const { data: rows = [], isLoading } = usePayoutsPreview(salonId, periodStart, periodEnd)
   const { data: isClosed = false } = useIsPeriodClosed(salonId, periodStart, periodEnd)
@@ -56,8 +64,8 @@ export function PayoutsPage() {
   // Период закрывать можно только если он завершился (последний день < сегодня)
   const isPeriodFinished = useMemo(() => {
     const today = new Date()
-    return endOfMonth(cursor) < new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  }, [cursor])
+    return range.end < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  }, [range.end])
 
   function onClose() {
     if (!salonId) return
@@ -108,25 +116,7 @@ export function PayoutsPage() {
         </div>
 
         <div className="flex items-center gap-2 print:hidden">
-          <button
-            type="button"
-            onClick={() => setCursor((c) => addMonths(c, -1))}
-            className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-            aria-label={t('payouts.prev_month')}
-          >
-            <ChevronLeft className="size-4" strokeWidth={2} />
-          </button>
-          <div className="border-border bg-card text-brand-navy min-w-[160px] rounded-md border px-3 py-2 text-center text-sm font-semibold capitalize">
-            {format(cursor, 'LLLL yyyy', { locale: ru })}
-          </div>
-          <button
-            type="button"
-            onClick={() => setCursor((c) => addMonths(c, 1))}
-            className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border"
-            aria-label={t('payouts.next_month')}
-          >
-            <ChevronRight className="size-4" strokeWidth={2} />
-          </button>
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
         </div>
       </div>
 

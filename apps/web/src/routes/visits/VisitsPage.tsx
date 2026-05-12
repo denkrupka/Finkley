@@ -129,19 +129,32 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
     setParams(next, { replace: true })
   }
 
+  // Когда VisitsPage встроен в IncomePage (forcedKind задан) — обёрточные
+  // отступы и заголовок уже даёт родитель. Не дублируем.
+  const embedded = !!forcedKind
+
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      {/* Header */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('visits.title')}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t('visits.subtitle_total', {
-              count: visits.length,
-              revenue: formatCurrency(totalRevenue, currency),
-            })}
-          </p>
-        </div>
+    <div className={cn('flex flex-1 flex-col', embedded ? '' : 'px-5 py-7 sm:px-8 lg:pb-12')}>
+      {/* Header — скрыт когда встроен в IncomePage */}
+      <div
+        className={cn(
+          'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between',
+          embedded ? 'mb-2 justify-end' : 'mb-5',
+        )}
+      >
+        {!embedded ? (
+          <div>
+            <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+              {t('visits.title')}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {t('visits.subtitle_total', {
+                count: visits.length,
+                revenue: formatCurrency(totalRevenue, currency),
+              })}
+            </p>
+          </div>
+        ) : null}
         {/* View toggle: список / календарь */}
         <div className="border-border bg-card inline-flex rounded-md border p-0.5">
           <button
