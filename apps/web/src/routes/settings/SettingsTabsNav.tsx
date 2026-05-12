@@ -1,9 +1,20 @@
-import { BookOpen, CreditCard, HelpCircle, Palette, Plug, Shield, User, Users } from 'lucide-react'
+import {
+  BookOpen,
+  CreditCard,
+  HelpCircle,
+  Palette,
+  Plug,
+  Shield,
+  SlidersHorizontal,
+  User,
+  Users,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export const SETTINGS_TABS = [
   'profile',
   'catalogs',
+  'parameters',
   'billing',
   'team',
   'integrations',
@@ -17,6 +28,7 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number]
 const TAB_ICONS: Record<SettingsTab, typeof User> = {
   profile: User,
   catalogs: BookOpen,
+  parameters: SlidersHorizontal,
   billing: CreditCard,
   team: Users,
   integrations: Plug,

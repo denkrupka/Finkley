@@ -681,6 +681,7 @@
     "tabs": {
       "profile": "Profile",
       "catalogs": "Catalogs",
+      "parameters": "Parameters",
       "billing": "Billing",
       "team": "Team",
       "integrations": "Integrations",

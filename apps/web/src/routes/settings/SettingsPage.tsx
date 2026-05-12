@@ -50,6 +50,7 @@ import { ApiKeysCard } from './ApiKeysCard'
 import { AppearanceCard } from './AppearanceCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
+import { ParametersCard } from './ParametersCard'
 import { SegmentationCard } from './SegmentationCard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
@@ -557,6 +558,8 @@ export function SettingsPage() {
           </section>
         </>
       )}
+
+      {activeTab === 'parameters' && <ParametersCard />}
 
       {activeTab === 'billing' && (
         <>
