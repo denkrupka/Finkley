@@ -418,14 +418,96 @@ export function useRenameCategory(salonId: string | undefined) {
   return useMutation({
     mutationFn: async (input: { from: string; to: string | null }) => {
       if (!salonId) throw new Error('no_salon')
+      // Перевешиваем категорию на items
       const { error } = await supabase
         .from('inventory_items')
         .update({ category: input.to?.trim() || null })
         .eq('salon_id', salonId)
         .eq('category', input.from)
       if (error) throw error
+      // Синхронизируем salons.inventory_categories: убираем from, добавляем to
+      const { data: salon, error: e1 } = await supabase
+        .from('salons')
+        .select('inventory_categories')
+        .eq('id', salonId)
+        .single()
+      if (e1) throw e1
+      const current = (salon?.inventory_categories ?? []) as string[]
+      const next = current.filter((c) => c !== input.from)
+      if (input.to && !next.includes(input.to)) next.push(input.to)
+      const { error: e2 } = await supabase
+        .from('salons')
+        .update({ inventory_categories: next })
+        .eq('id', salonId)
+      if (e2) throw e2
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory-items', salonId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory-items', salonId] })
+      qc.invalidateQueries({ queryKey: ['inventory-categories', salonId] })
+      qc.invalidateQueries({ queryKey: ['salon', salonId] })
+    },
+  })
+}
+
+/**
+ * Union: salons.inventory_categories ∪ DISTINCT items.category.
+ * Возвращает отсортированный список категорий для dropdown'а в форме материала
+ * и в Categories Dialog.
+ */
+export function useInventoryCategories(salonId: string | undefined) {
+  return useQuery<string[]>({
+    queryKey: ['inventory-categories', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const [salonRes, itemsRes] = await Promise.all([
+        supabase.from('salons').select('inventory_categories').eq('id', salonId).single(),
+        supabase
+          .from('inventory_items')
+          .select('category')
+          .eq('salon_id', salonId)
+          .not('category', 'is', null),
+      ])
+      if (salonRes.error) throw salonRes.error
+      if (itemsRes.error) throw itemsRes.error
+      const stored = (salonRes.data?.inventory_categories ?? []) as string[]
+      const fromItems = (itemsRes.data ?? [])
+        .map((r) => r.category as string | null)
+        .filter((c): c is string => !!c)
+      const set = new Set([...stored, ...fromItems])
+      return Array.from(set).sort((a, b) => a.localeCompare(b))
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
+  })
+}
+
+export function useAddInventoryCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      if (!salonId) throw new Error('no_salon')
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('empty')
+      const { data: salon, error: e1 } = await supabase
+        .from('salons')
+        .select('inventory_categories')
+        .eq('id', salonId)
+        .single()
+      if (e1) throw e1
+      const current = (salon?.inventory_categories ?? []) as string[]
+      if (current.includes(trimmed)) return trimmed
+      const next = [...current, trimmed]
+      const { error: e2 } = await supabase
+        .from('salons')
+        .update({ inventory_categories: next })
+        .eq('id', salonId)
+      if (e2) throw e2
+      return trimmed
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory-categories', salonId] })
+      qc.invalidateQueries({ queryKey: ['salon', salonId] })
+    },
   })
 }
 

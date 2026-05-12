@@ -1,4 +1,4 @@
-import { Pencil, Save, Tags, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Save, Tags, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -13,7 +13,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useInventoryItems, useRenameCategory, type InventoryItemRow } from '@/hooks/useInventory'
+import {
+  useAddInventoryCategory,
+  useInventoryCategories,
+  useInventoryItems,
+  useRenameCategory,
+  type InventoryItemRow,
+} from '@/hooks/useInventory'
 
 type Props = {
   open: boolean
@@ -31,21 +37,47 @@ type Props = {
 export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
   const { t } = useTranslation()
   const { data: items = [] } = useInventoryItems(salonId, { includeArchived: false })
+  const { data: allCategoryNames = [] } = useInventoryCategories(salonId)
   const rename = useRenameCategory(salonId)
+  const addCategory = useAddInventoryCategory(salonId)
 
   const [editing, setEditing] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [newCategory, setNewCategory] = useState('')
 
+  // Категории = union из allCategoryNames (включая standalone из salons) +
+  // соответствующий count из items.
   const categories = useMemo(() => {
-    const map = new Map<string, InventoryItemRow[]>()
+    const counts = new Map<string, InventoryItemRow[]>()
     for (const it of items) {
       if (!it.category) continue
-      const arr = map.get(it.category) ?? []
+      const arr = counts.get(it.category) ?? []
       arr.push(it)
-      map.set(it.category, arr)
+      counts.set(it.category, arr)
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [items])
+    return allCategoryNames
+      .map((name) => [name, counts.get(name) ?? []] as const)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+  }, [allCategoryNames, items])
+
+  function handleAddCategory() {
+    const trimmed = newCategory.trim()
+    if (!trimmed) {
+      toast.error(t('inventory.categories.errors.empty'))
+      return
+    }
+    if (allCategoryNames.includes(trimmed)) {
+      toast.error(t('inventory.categories.errors.duplicate'))
+      return
+    }
+    addCategory.mutate(trimmed, {
+      onSuccess: () => {
+        toast.success(t('inventory.categories.toast_added'))
+        setNewCategory('')
+      },
+      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+    })
+  }
 
   function startEdit(name: string) {
     setEditing(name)
@@ -98,6 +130,31 @@ export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
         </DialogHeader>
 
         <div className="flex flex-col gap-3 px-5 pb-2 pt-4">
+          {/* Add new category input */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddCategory()
+                }
+              }}
+              placeholder={t('inventory.categories.add_placeholder')}
+              className="h-10"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAddCategory}
+              disabled={addCategory.isPending || !newCategory.trim()}
+            >
+              <Plus className="size-4" strokeWidth={2.4} />
+              {t('inventory.categories.add_button')}
+            </Button>
+          </div>
+
           {categories.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('inventory.categories.empty')}</p>
           ) : (

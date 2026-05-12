@@ -1,13 +1,4 @@
-import {
-  AlertTriangle,
-  BarChart3,
-  Package,
-  Plus,
-  Search,
-  Sparkles,
-  Tags,
-  Upload,
-} from 'lucide-react'
+import { AlertTriangle, BarChart3, Package, Plus, Search, Tags, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -28,6 +19,7 @@ import { formatCurrency } from '@/lib/utils/format-currency'
 
 import { InventoryAnalyticsTab } from './InventoryAnalyticsTab'
 import { InventoryCategoriesDialog } from './InventoryCategoriesDialog'
+import { InventoryImportChoiceDialog } from './InventoryImportChoiceDialog'
 import { InventoryImportDialog } from './InventoryImportDialog'
 import { InventoryItemDrawer } from './InventoryItemDrawer'
 import { InventoryItemFormDialog } from './InventoryItemFormDialog'
@@ -50,6 +42,7 @@ export function InventoryPage() {
   const [stocktakeOpen, setStocktakeOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [ocrOpen, setOcrOpen] = useState(false)
+  const [importChoiceOpen, setImportChoiceOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [drawerItem, setDrawerItem] = useState<InventoryItemRow | null>(null)
 
@@ -103,18 +96,14 @@ export function InventoryPage() {
           <p className="text-muted-foreground mt-1 text-sm">{t('inventory.subtitle_v2')}</p>
         </div>
         {canEdit ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
             <Button variant="ghost" size="md" onClick={() => setCategoriesOpen(true)}>
               <Tags className="size-4" strokeWidth={1.8} />
               {t('inventory.categories_button')}
             </Button>
-            <Button variant="ghost" size="md" onClick={() => setImportOpen(true)}>
+            <Button variant="ghost" size="md" onClick={() => setImportChoiceOpen(true)}>
               <Upload className="size-4" strokeWidth={1.8} />
-              {t('inventory.import_button')}
-            </Button>
-            <Button variant="secondary" size="md" onClick={() => setOcrOpen(true)}>
-              <Sparkles className="size-4" strokeWidth={1.8} />
-              {t('inventory.ocr_button')}
+              {t('inventory.import_button_generic')}
             </Button>
             <Button variant="outline" size="md" onClick={() => setStocktakeOpen(true)}>
               {t('inventory.stocktake_button')}
@@ -355,6 +344,16 @@ export function InventoryPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         salonId={salonId}
+      />
+
+      <InventoryImportChoiceDialog
+        open={importChoiceOpen}
+        onClose={() => setImportChoiceOpen(false)}
+        onChoose={(kind) => {
+          setImportChoiceOpen(false)
+          if (kind === 'csv') setImportOpen(true)
+          else setOcrOpen(true)
+        }}
       />
 
       <InventoryCategoriesDialog

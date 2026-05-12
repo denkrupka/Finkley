@@ -14,7 +14,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   useCreateInventoryItem,
+  useInventoryCategories,
   useUpdateInventoryItem,
   type InventoryItemRow,
 } from '@/hooks/useInventory'
@@ -33,6 +41,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
   const { t } = useTranslation()
   const create = useCreateInventoryItem(salonId)
   const update = useUpdateInventoryItem(salonId)
+  const { data: categoryOptions = [] } = useInventoryCategories(salonId)
   const isEdit = !!item
 
   const [name, setName] = useState('')
@@ -178,12 +187,31 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-category">{t('inventory.form.category_label')}</Label>
-              <Input
-                id="inv-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder={t('inventory.form.category_placeholder')}
-              />
+              {categoryOptions.length === 0 ? (
+                <Input
+                  id="inv-category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder={t('inventory.form.category_placeholder')}
+                />
+              ) : (
+                <Select
+                  value={category || '__none__'}
+                  onValueChange={(v) => setCategory(v === '__none__' ? '' : v)}
+                >
+                  <SelectTrigger id="inv-category">
+                    <SelectValue placeholder={t('inventory.form.category_placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('inventory.form.category_none')}</SelectItem>
+                    {categoryOptions.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 

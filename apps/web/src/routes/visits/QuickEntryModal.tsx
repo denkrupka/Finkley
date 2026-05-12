@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { CalendarDays } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -290,10 +289,6 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     )
   }
 
-  const todayLabel =
-    format(today, 'd MMMM yyyy, EEEE', { locale: ru }).charAt(0).toUpperCase() +
-    format(today, 'd MMMM yyyy, EEEE', { locale: ru }).slice(1)
-
   // Цвет аватара выбранного мастера
   const selectedStaffIndex = staff.findIndex((s) => s.id === watchedStaffId)
   const selectedStaffColor =
@@ -314,7 +309,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:!max-w-[480px]">
+      <DialogContent className="sm:!max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
           <DialogDescription>{t('visits.form.subtitle')}</DialogDescription>
@@ -345,141 +340,139 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           />
         ) : (
           <form
-            className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-4"
+            className="flex min-h-0 flex-col gap-2.5 px-5 pb-2 pt-2"
             onSubmit={form.handleSubmit((v) => onSubmit(v, false))}
             noValidate
           >
-            {/* Дата */}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="qe-date">{t('visits.form.date_label')}</Label>
-              <div className="border-border bg-card flex h-12 items-center gap-2.5 rounded-md border-[1.5px] px-3.5">
-                <CalendarDays className="text-muted-foreground size-[17px]" strokeWidth={1.7} />
-                <input
-                  id="qe-date"
-                  type="date"
-                  data-testid="qe-date"
-                  {...form.register('visit_date')}
-                  className="num text-foreground h-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
-                />
-                {form.watch('visit_date') === todayIso ? (
-                  <span className="bg-brand-sage-soft text-brand-sage ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold">
-                    {t('visits.form.today_pill')}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground ml-auto text-[11px] font-medium">
-                    {todayLabel.split(',')[1]?.trim() ?? ''}
-                  </span>
-                )}
+            {/* Дата + Мастер в одной строке для компактности */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="qe-date">{t('visits.form.date_label')}</Label>
+                <div className="border-border bg-card flex h-11 items-center gap-2 rounded-md border-[1.5px] px-3">
+                  <CalendarDays className="text-muted-foreground size-[17px]" strokeWidth={1.7} />
+                  <input
+                    id="qe-date"
+                    type="date"
+                    data-testid="qe-date"
+                    {...form.register('visit_date')}
+                    className="num text-foreground h-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
+                  />
+                  {form.watch('visit_date') === todayIso ? (
+                    <span className="bg-brand-sage-soft text-brand-sage rounded-full px-2 py-0.5 text-[11px] font-bold">
+                      {t('visits.form.today_pill')}
+                    </span>
+                  ) : null}
+                </div>
+                {form.formState.errors.visit_date ? (
+                  <p className="text-destructive text-xs font-medium" role="alert">
+                    {t(form.formState.errors.visit_date.message ?? '')}
+                  </p>
+                ) : null}
               </div>
-              {form.formState.errors.visit_date ? (
-                <p className="text-destructive text-xs font-medium" role="alert">
-                  {t(form.formState.errors.visit_date.message ?? '')}
-                </p>
-              ) : null}
+
+              <Controller
+                name="staff_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="qe-staff">{t('visits.form.staff_label')}</Label>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="qe-staff" data-testid="qe-staff" className="h-11">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
+                            style={{ background: selectedStaffColor }}
+                          >
+                            {selectedStaffInitial}
+                          </span>
+                          <SelectValue placeholder={t('visits.form.staff_placeholder')} />
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staff.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.staff_id ? (
+                      <p className="text-destructive text-xs font-medium" role="alert">
+                        {t(form.formState.errors.staff_id.message ?? '')}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              />
             </div>
 
-            {/* Мастер */}
-            <Controller
-              name="staff_id"
-              control={form.control}
-              render={({ field }) => (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="qe-staff">{t('visits.form.staff_label')}</Label>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="qe-staff" data-testid="qe-staff">
-                      <span className="flex items-center gap-2.5">
-                        <span
-                          className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
-                          style={{ background: selectedStaffColor }}
-                        >
-                          {selectedStaffInitial}
-                        </span>
-                        <SelectValue placeholder={t('visits.form.staff_placeholder')} />
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {staff.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.staff_id ? (
-                    <p className="text-destructive text-xs font-medium" role="alert">
-                      {t(form.formState.errors.staff_id.message ?? '')}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            />
+            {/* Клиент + Услуга в одной строке */}
+            <div className="grid grid-cols-2 gap-3">
+              <Controller
+                name="client_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="qe-client">{t('visits.form.client_label')}</Label>
+                    <ClientPicker
+                      salonId={salonId}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={t('clients.picker.no_client')}
+                      testId="qe-client"
+                    />
+                  </div>
+                )}
+              />
 
-            {/* Клиент (опционально, typeahead) */}
-            <Controller
-              name="client_id"
-              control={form.control}
-              render={({ field }) => (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="qe-client">{t('visits.form.client_label')}</Label>
-                  <ClientPicker
-                    salonId={salonId}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder={t('clients.picker.no_client')}
-                    testId="qe-client"
-                  />
-                </div>
-              )}
-            />
-
-            {/* Услуга (Select; полноценный typeahead — позже) */}
-            <Controller
-              name="service_id"
-              control={form.control}
-              render={({ field }) => (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="qe-service">{t('visits.form.service_label')}</Label>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={services.length === 0}
-                  >
-                    <SelectTrigger id="qe-service" data-testid="qe-service">
-                      <SelectValue
-                        placeholder={
-                          services.length === 0
-                            ? t('visits.form.service_empty')
-                            : t('visits.form.service_placeholder')
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          <span className="flex w-full items-center justify-between gap-3">
-                            <span>{s.name}</span>
-                            <span className="num text-muted-foreground text-xs">
-                              ≈ {formatCurrency(s.default_price_cents, currency)}
+              <Controller
+                name="service_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="qe-service">{t('visits.form.service_label')}</Label>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={services.length === 0}
+                    >
+                      <SelectTrigger id="qe-service" data-testid="qe-service">
+                        <SelectValue
+                          placeholder={
+                            services.length === 0
+                              ? t('visits.form.service_empty')
+                              : t('visits.form.service_placeholder')
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex w-full items-center justify-between gap-3">
+                              <span>{s.name}</span>
+                              <span className="num text-muted-foreground text-xs">
+                                ≈ {formatCurrency(s.default_price_cents, currency)}
+                              </span>
                             </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {services.length === 0 ? (
-                    <p className="text-muted-foreground text-xs">
-                      {t('visits.form.service_empty_hint')}{' '}
-                      <a
-                        href={`/salon/${salonId}/services`}
-                        className="text-primary font-semibold hover:underline"
-                      >
-                        {t('visits.form.service_empty_link')}
-                      </a>
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            />
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {services.length === 0 ? (
+                      <p className="text-muted-foreground text-xs">
+                        {t('visits.form.service_empty_hint')}{' '}
+                        <a
+                          href={`/salon/${salonId}/services`}
+                          className="text-primary font-semibold hover:underline"
+                        >
+                          {t('visits.form.service_empty_link')}
+                        </a>
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              />
+            </div>
 
             {/* Сумма (yellow mono input) */}
             <div className="flex flex-col gap-2">
