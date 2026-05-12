@@ -12,6 +12,7 @@ export type SalonRow = {
   locale: string
   logo_url: string | null
   weekly_digest_enabled: boolean
+  daily_digest_enabled: boolean
   benchmarks_opt_in: boolean
   opening_cash_balance_cents: number
   retention_window_days: number
@@ -35,7 +36,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -78,7 +79,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
         )
         .eq('id', salonId)
         .maybeSingle()

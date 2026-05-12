@@ -40,14 +40,17 @@ import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import { useUpdateOpeningCashBalance } from '@/hooks/useExpenseExtras'
-import { useSendWeeklyDigest, useToggleWeeklyDigest } from '@/hooks/useWeeklyDigest'
-import { InstallAppButton } from '@/components/pwa/InstallAppButton'
+import {
+  useSendDailyDigest,
+  useSendWeeklyDigest,
+  useToggleDailyDigest,
+  useToggleWeeklyDigest,
+} from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { ApiKeysCard } from './ApiKeysCard'
-import { AppearanceCard } from './AppearanceCard'
 import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
 import { ParametersCard } from './ParametersCard'
@@ -115,6 +118,8 @@ export function SettingsPage() {
   const { data: subscription } = useSubscription(salonId)
   const sendDigest = useSendWeeklyDigest(salonId)
   const toggleDigest = useToggleWeeklyDigest(salonId)
+  const sendDailyDigest = useSendDailyDigest(salonId)
+  const toggleDailyDigest = useToggleDailyDigest(salonId)
   const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
   const updateOpeningCash = useUpdateOpeningCashBalance(salonId)
   const [openingCashDraft, setOpeningCashDraft] = useState('')
@@ -404,6 +409,58 @@ export function SettingsPage() {
 
           {/* Сегментация клиентов: retention/churn окна */}
           <SegmentationCard salon={salon} />
+
+          {/* Сравнение с рынком (benchmarks opt-in) */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.benchmarks.title')}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {t('settings.benchmarks.subtitle')}
+            </p>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={salon.benchmarks_opt_in}
+                onChange={(e) =>
+                  toggleBenchmarks.mutate(e.target.checked, {
+                    onSuccess: () =>
+                      toast.success(
+                        e.target.checked
+                          ? t('settings.benchmarks.toast_enabled')
+                          : t('settings.benchmarks.toast_disabled'),
+                      ),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }
+                className="size-4 cursor-pointer"
+              />
+              <span className="text-foreground">
+                {salon.benchmarks_opt_in
+                  ? t('settings.benchmarks.enabled')
+                  : t('settings.benchmarks.disabled')}
+              </span>
+            </label>
+          </section>
+
+          {/* Опасная зона — удаление салона */}
+          <section className="border-destructive/30 bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <h2 className="text-destructive mb-1 text-base font-bold tracking-tight">
+              {t('settings.delete.title')}
+            </h2>
+            <p className="text-muted-foreground mb-4 text-sm">{t('settings.delete.subtitle')}</p>
+            <Button
+              variant="destructive"
+              size="md"
+              onClick={() => {
+                setConfirmName('')
+                setDeleteOpen(true)
+              }}
+              data-testid="settings-delete"
+            >
+              {t('settings.delete.button')}
+            </Button>
+          </section>
         </>
       )}
 
@@ -448,41 +505,225 @@ export function SettingsPage() {
         </section>
       )}
 
-      {activeTab === 'appearance' && (
+      {activeTab === 'security' && (
         <>
-          {/* Тема оформления */}
+          {/* 2FA */}
           <div className="mb-6">
-            <AppearanceCard />
+            <MFACard />
           </div>
 
-          {/* Установка приложения (PWA) */}
+          {/* Экспорт данных */}
           <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.install.title')}
+                  {t('settings.export.title')}
                 </h2>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.install.subtitle')}
+                  {t('settings.export.subtitle')}
                 </p>
               </div>
-              <InstallAppButton />
+              <Button
+                variant="outline"
+                size="md"
+                onClick={handleExport}
+                disabled={exportPending}
+                data-testid="settings-export"
+              >
+                <Download className="size-4" strokeWidth={1.7} />
+                {exportPending ? t('common.loading') : t('settings.export.button')}
+              </Button>
+            </div>
+          </section>
+
+          {/* Журнал событий */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                  {t('settings.audit.title')}
+                </h2>
+                <p className="text-muted-foreground mt-1 text-sm">{t('settings.audit.subtitle')}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => navigate(`/${salonId}/settings/audit`)}
+              >
+                <History className="size-4" strokeWidth={1.7} />
+                {t('settings.audit.button')}
+              </Button>
             </div>
           </section>
         </>
       )}
 
-      {activeTab === 'security' && (
+      {activeTab === 'notifications' && (
         <>
           {/* Push-уведомления */}
           <div className="mb-6">
             <PushNotificationsCard />
           </div>
 
-          {/* 2FA */}
+          {/* Еженедельный дайджест */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1">
+                <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                  {t('settings.digest.title')}
+                </h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {t('settings.digest.subtitle')}
+                </p>
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={salon.weekly_digest_enabled}
+                    onChange={(e) =>
+                      toggleDigest.mutate(e.target.checked, {
+                        onSuccess: () =>
+                          toast.success(
+                            e.target.checked
+                              ? t('settings.digest.toast_enabled')
+                              : t('settings.digest.toast_disabled'),
+                          ),
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      })
+                    }
+                    className="size-4 cursor-pointer"
+                  />
+                  <span className="text-foreground">
+                    {salon.weekly_digest_enabled
+                      ? t('settings.digest.enabled')
+                      : t('settings.digest.disabled')}
+                  </span>
+                </label>
+              </div>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  sendDigest.mutate(undefined, {
+                    onSuccess: (data) =>
+                      toast.success(
+                        t('settings.digest.toast_sent', { email: data?.sent_to ?? '' }),
+                      ),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                disabled={sendDigest.isPending || !salon.weekly_digest_enabled}
+                data-testid="settings-digest-send"
+              >
+                <Mail className="size-4" strokeWidth={1.7} />
+                {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
+              </Button>
+            </div>
+          </section>
+
+          {/* Ежедневная сводка */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1">
+                <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                  {t('settings.daily_digest.title')}
+                </h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {t('settings.daily_digest.subtitle')}
+                </p>
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!salon.daily_digest_enabled}
+                    onChange={(e) =>
+                      toggleDailyDigest.mutate(e.target.checked, {
+                        onSuccess: () =>
+                          toast.success(
+                            e.target.checked
+                              ? t('settings.daily_digest.toast_enabled')
+                              : t('settings.daily_digest.toast_disabled'),
+                          ),
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      })
+                    }
+                    className="size-4 cursor-pointer"
+                  />
+                  <span className="text-foreground">
+                    {salon.daily_digest_enabled
+                      ? t('settings.daily_digest.enabled')
+                      : t('settings.daily_digest.disabled')}
+                  </span>
+                </label>
+              </div>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  sendDailyDigest.mutate(undefined, {
+                    onSuccess: (data) =>
+                      toast.success(
+                        t('settings.daily_digest.toast_sent', { email: data?.sent_to ?? '' }),
+                      ),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                disabled={sendDailyDigest.isPending || !salon.daily_digest_enabled}
+              >
+                <Mail className="size-4" strokeWidth={1.7} />
+                {sendDailyDigest.isPending
+                  ? t('common.loading')
+                  : t('settings.daily_digest.button')}
+              </Button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === 'api' && (
+        <>
           <div className="mb-6">
-            <MFACard />
+            <ApiKeysCard />
           </div>
+
+          {/* Docs link */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                  {t('settings.api.docs_title')}
+                </h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {t('settings.api.docs_subtitle')}
+                </p>
+              </div>
+              <a
+                href="/docs/api"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border bg-card hover:bg-muted/40 inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold"
+              >
+                {t('settings.api.docs_link')}
+              </a>
+            </div>
+          </section>
+
+          {/* Quick how-to */}
+          <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+            <h2 className="text-brand-navy text-base font-bold tracking-tight">
+              {t('settings.api.howto_title')}
+            </h2>
+            <ol className="text-muted-foreground mt-3 list-decimal space-y-1.5 pl-5 text-sm">
+              <li>{t('settings.api.howto_step1')}</li>
+              <li>{t('settings.api.howto_step2')}</li>
+              <li>{t('settings.api.howto_step3')}</li>
+              <li>{t('settings.api.howto_step4')}</li>
+            </ol>
+            <pre className="bg-muted/40 mt-4 overflow-x-auto rounded-md p-3 text-xs">
+              {`curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  https://api.finkley.app/v1/visits?period=month`}
+            </pre>
+          </section>
         </>
       )}
 
@@ -581,142 +822,6 @@ export function SettingsPage() {
               <BillingButtons salonId={salonId} subscription={subscription ?? null} />
             </div>
           </section>
-
-          {/* Экспорт данных */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.export.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.export.subtitle')}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleExport}
-                disabled={exportPending}
-                data-testid="settings-export"
-              >
-                <Download className="size-4" strokeWidth={1.7} />
-                {exportPending ? t('common.loading') : t('settings.export.button')}
-              </Button>
-            </div>
-          </section>
-
-          {/* Опасная зона */}
-          <section className="border-destructive/30 bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
-            <h2 className="text-destructive mb-1 text-base font-bold tracking-tight">
-              {t('settings.delete.title')}
-            </h2>
-            <p className="text-muted-foreground mb-4 text-sm">{t('settings.delete.subtitle')}</p>
-            <Button
-              variant="destructive"
-              size="md"
-              onClick={() => {
-                setConfirmName('')
-                setDeleteOpen(true)
-              }}
-              data-testid="settings-delete"
-            >
-              {t('settings.delete.button')}
-            </Button>
-          </section>
-        </>
-      )}
-
-      {activeTab === 'appearance' && (
-        <>
-          {/* Еженедельный дайджест */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.digest.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.digest.subtitle')}
-                </p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={salon.weekly_digest_enabled}
-                    onChange={(e) =>
-                      toggleDigest.mutate(e.target.checked, {
-                        onSuccess: () =>
-                          toast.success(
-                            e.target.checked
-                              ? t('settings.digest.toast_enabled')
-                              : t('settings.digest.toast_disabled'),
-                          ),
-                        onError: (err) =>
-                          toast.error(err instanceof Error ? err.message : String(err)),
-                      })
-                    }
-                    className="size-4 cursor-pointer"
-                  />
-                  <span className="text-foreground">
-                    {salon.weekly_digest_enabled
-                      ? t('settings.digest.enabled')
-                      : t('settings.digest.disabled')}
-                  </span>
-                </label>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => {
-                  sendDigest.mutate(undefined, {
-                    onSuccess: (data) =>
-                      toast.success(
-                        t('settings.digest.toast_sent', { email: data?.sent_to ?? '' }),
-                      ),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }}
-                disabled={sendDigest.isPending || !salon.weekly_digest_enabled}
-                data-testid="settings-digest-send"
-              >
-                <Mail className="size-4" strokeWidth={1.7} />
-                {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
-              </Button>
-            </div>
-          </section>
-
-          {/* Сравнение с рынком */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {t('settings.benchmarks.title')}
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {t('settings.benchmarks.subtitle')}
-            </p>
-            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={salon.benchmarks_opt_in}
-                onChange={(e) =>
-                  toggleBenchmarks.mutate(e.target.checked, {
-                    onSuccess: () =>
-                      toast.success(
-                        e.target.checked
-                          ? t('settings.benchmarks.toast_enabled')
-                          : t('settings.benchmarks.toast_disabled'),
-                      ),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }
-                className="size-4 cursor-pointer"
-              />
-              <span className="text-foreground">
-                {salon.benchmarks_opt_in
-                  ? t('settings.benchmarks.enabled')
-                  : t('settings.benchmarks.disabled')}
-              </span>
-            </label>
-          </section>
         </>
       )}
 
@@ -738,26 +843,6 @@ export function SettingsPage() {
               >
                 <Users className="size-4" strokeWidth={1.7} />
                 {t('settings.team.button')}
-              </Button>
-            </div>
-          </section>
-
-          {/* Журнал событий */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.audit.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">{t('settings.audit.subtitle')}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate(`/${salonId}/settings/audit`)}
-              >
-                <History className="size-4" strokeWidth={1.7} />
-                {t('settings.audit.button')}
               </Button>
             </div>
           </section>

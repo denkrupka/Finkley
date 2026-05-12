@@ -1,8 +1,9 @@
 import {
+  Bell,
   BookOpen,
+  Code,
   CreditCard,
   HelpCircle,
-  Palette,
   Plug,
   Shield,
   SlidersHorizontal,
@@ -15,11 +16,12 @@ export const SETTINGS_TABS = [
   'profile',
   'catalogs',
   'parameters',
+  'notifications',
+  'api',
   'billing',
   'team',
   'integrations',
   'security',
-  'appearance',
   'help',
 ] as const
 
@@ -29,11 +31,12 @@ const TAB_ICONS: Record<SettingsTab, typeof User> = {
   profile: User,
   catalogs: BookOpen,
   parameters: SlidersHorizontal,
+  notifications: Bell,
+  api: Code,
   billing: CreditCard,
   team: Users,
   integrations: Plug,
   security: Shield,
-  appearance: Palette,
   help: HelpCircle,
 }
 
