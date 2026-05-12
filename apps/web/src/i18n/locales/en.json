@@ -1213,7 +1213,31 @@
       "staff": "Specialists",
       "payouts": "Payroll"
     },
-    "clients_placeholder": "Client analytics — section in development. Client list is currently in Settings → Catalogs → Clients."
+    "clients_placeholder": "Client analytics — section in development.",
+    "staff": {
+      "title": "Revenue by specialist",
+      "total": "Total",
+      "empty": "No visits in this period."
+    },
+    "services": {
+      "title": "Revenue by service",
+      "empty": "No services performed in this period.",
+      "col_name": "Service",
+      "col_visits": "Visits",
+      "col_revenue": "Revenue",
+      "col_margin": "Margin",
+      "col_share": "Share"
+    },
+    "clients": {
+      "title": "Top clients by revenue",
+      "empty": "No client visits in this period.",
+      "col_name": "Client",
+      "col_visits": "Visits",
+      "col_revenue": "Revenue",
+      "col_avg_check": "Avg check",
+      "col_last_visit": "Last seen",
+      "open_full_list": "Open full client database"
+    }
   },
   "finance": {
     "title": "Finance",

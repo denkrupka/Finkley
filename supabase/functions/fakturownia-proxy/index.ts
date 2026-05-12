@@ -309,6 +309,26 @@ async function syncFakturowniaToFinkley(
         continue
       }
       stats.expenses_synced++
+
+      // Auto-import в платёжный календарь — если фактура не оплачена
+      if (!ex.paid && (ex.payment_date || ex.expense_date)) {
+        const dueDate = (ex.payment_date ?? ex.expense_date)!.slice(0, 10)
+        const { error: pmtErr } = await admin.from('scheduled_payments').insert({
+          salon_id: salonId,
+          due_date: dueDate,
+          amount_cents: Math.round((ex.amount ?? 0) * 100),
+          vendor_name: vendor,
+          invoice_number: ex.number,
+          category_id: categoryId,
+          source: 'fakturownia',
+          external_id: externalId,
+        })
+        if (pmtErr && pmtErr.code !== '23505') {
+          console.warn(
+            `scheduled_payment insert failed fakturownia ${externalId}: ${pmtErr.message}`,
+          )
+        }
+      }
     }
     if (!list.hasMore) break
     page++

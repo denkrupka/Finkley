@@ -4,7 +4,10 @@ import { useParams, useSearchParams } from 'react-router-dom'
 
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { PayoutsPage } from '@/routes/payouts/PayoutsPage'
-import { ReportsPage } from '@/routes/reports/ReportsPage'
+
+import { ClientsAnalyticsTab } from './ClientsAnalyticsTab'
+import { ServicesAnalyticsTab } from './ServicesAnalyticsTab'
+import { StaffAnalyticsTab } from './StaffAnalyticsTab'
 
 type ReportsTab = 'services' | 'clients' | 'staff' | 'payouts'
 
@@ -55,16 +58,14 @@ export function ReportsHubPage() {
 
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
 
-      {active === 'services' || active === 'staff' ? (
-        <ReportsPage />
-      ) : active === 'payouts' ? (
-        <PayoutsPage />
+      {active === 'services' ? (
+        <ServicesAnalyticsTab salonId={salonId} />
+      ) : active === 'staff' ? (
+        <StaffAnalyticsTab salonId={salonId} />
+      ) : active === 'clients' ? (
+        <ClientsAnalyticsTab salonId={salonId} />
       ) : (
-        <div className="border-border bg-card shadow-finsm rounded-lg border p-6">
-          <p className="text-foreground/80 text-sm leading-snug">
-            {t('reports_hub.clients_placeholder')}
-          </p>
-        </div>
+        <PayoutsPage />
       )}
     </div>
   )

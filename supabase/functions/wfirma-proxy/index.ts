@@ -447,6 +447,28 @@ async function syncWfirmaToFinkley(
       continue
     }
     stats.expenses_synced++
+
+    // Auto-import в платёжный календарь — если фактура ещё не оплачена.
+    // wFirma даёт `paid_date` (когда оплачено) и `date` (дата документа).
+    // Поле «termin platnosci» отдельно от document date — оно может быть
+    // позже; пока используем document date как due_date (хуже не сделает).
+    if (!detail.paid_date && (detail.date || expenseAt)) {
+      const dueDate = (detail.date ?? expenseAt).slice(0, 10)
+      const { error: pmtErr } = await admin.from('scheduled_payments').insert({
+        salon_id: salonId,
+        due_date: dueDate,
+        amount_cents: money.amountCents,
+        vendor_name: vendor,
+        invoice_number: detail.number ?? null,
+        category_id: categoryId,
+        source: 'wfirma',
+        external_id: detail.id,
+      })
+      // UNIQUE_VIOLATION (23505) — уже в календаре, всё ок
+      if (pmtErr && pmtErr.code !== '23505') {
+        console.warn(`scheduled_payment insert failed wfirma ${detail.id}: ${pmtErr.message}`)
+      }
+    }
   }
 
   return stats

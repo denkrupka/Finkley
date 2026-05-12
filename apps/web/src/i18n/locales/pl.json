@@ -1214,7 +1214,31 @@
       "staff": "Specjaliści",
       "payouts": "Wynagrodzenia"
     },
-    "clients_placeholder": "Analityka klientów — sekcja w przygotowaniu. Lista klientów dostępna w Ustawieniach → Słowniki → Klienci."
+    "clients_placeholder": "Analityka klientów — sekcja w przygotowaniu.",
+    "staff": {
+      "title": "Przychód wg specjalistów",
+      "total": "Razem",
+      "empty": "W tym okresie nie było wizyt."
+    },
+    "services": {
+      "title": "Przychód wg usług",
+      "empty": "W tym okresie nie wykonano usług.",
+      "col_name": "Usługa",
+      "col_visits": "Wizyt",
+      "col_revenue": "Przychód",
+      "col_margin": "Marża",
+      "col_share": "Udział"
+    },
+    "clients": {
+      "title": "Top klientów wg przychodu",
+      "empty": "W tym okresie nie było wizyt klientów.",
+      "col_name": "Klient",
+      "col_visits": "Wizyt",
+      "col_revenue": "Przychód",
+      "col_avg_check": "Średni paragon",
+      "col_last_visit": "Ostatnio",
+      "open_full_list": "Otwórz pełną bazę klientów"
+    }
   },
   "finance": {
     "title": "Finanse",
