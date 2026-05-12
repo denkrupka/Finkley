@@ -354,10 +354,25 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                               const when = new Date(dayStart)
                               when.setHours(0, 0, 0, 0)
                               when.setMinutes(minFromMidnight)
+                              const POPOVER_W = 240
+                              const POPOVER_H = 180
+                              const padding = 8
+                              // Clamp left так чтобы popover не вылазил за правый край.
+                              const leftRaw = rect.left
+                              const leftClamped = Math.min(
+                                leftRaw,
+                                window.innerWidth - POPOVER_W - padding,
+                              )
+                              // Если внизу не хватает места — показываем выше слота.
+                              const spaceBelow = window.innerHeight - rect.bottom
+                              const topRaw =
+                                spaceBelow >= POPOVER_H
+                                  ? rect.bottom + window.scrollY
+                                  : rect.top + window.scrollY - POPOVER_H
                               setSubslotMenu({
                                 staffId: s.id,
                                 when,
-                                rect: { top: rect.bottom + window.scrollY, left: rect.left },
+                                rect: { top: topRaw, left: Math.max(padding, leftClamped) },
                               })
                             }}
                             className="hover:bg-foreground/[0.03] absolute inset-x-0 cursor-pointer transition-colors"
@@ -478,7 +493,14 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <button
               type="button"
               onClick={() => {
-                window.dispatchEvent(new CustomEvent('finsalon:open-quick-entry'))
+                window.dispatchEvent(
+                  new CustomEvent('finsalon:open-quick-entry', {
+                    detail: {
+                      staffId: subslotMenu.staffId,
+                      when: subslotMenu.when.toISOString(),
+                    },
+                  }),
+                )
                 setSubslotMenu(null)
               }}
               className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-semibold"

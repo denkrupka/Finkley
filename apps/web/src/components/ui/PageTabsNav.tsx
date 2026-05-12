@@ -27,7 +27,10 @@ export function PageTabsNav<TId extends string>({
   t: (key: string) => string
 }) {
   return (
-    <div className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-1.5">
+    <div
+      className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-1.5 print:hidden"
+      data-print-hide
+    >
       <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5 sm:overflow-visible">
         {tabs.map((tab) => {
           const Icon = tab.icon

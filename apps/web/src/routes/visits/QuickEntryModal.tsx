@@ -87,9 +87,14 @@ type Props = {
   onOpenChange: (open: boolean) => void
   salonId: string
   currency: string
+  /**
+   * Префилл из календаря: клик по 15-мин субслоту → подставляем мастера
+   * и дату. Время визита берётся из `prefill.when` (ISO), мастер — `prefill.staffId`.
+   */
+  prefill?: { staffId: string; when: string } | null
 }
 
-export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props) {
+export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill }: Props) {
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
@@ -125,13 +130,21 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
     },
   })
 
-  // При открытии — выставляем дефолтного мастера и сбрасываем форму
+  // При открытии — выставляем дефолтного мастера и сбрасываем форму.
+  // Если задан prefill (из календаря) — staff/date берутся из него.
   useEffect(() => {
     if (!open) return
     const lastStaffValid = staff.some((s) => s.id === initialStaff)
+    const prefillDate = prefill ? format(new Date(prefill.when), 'yyyy-MM-dd') : todayIso
+    const prefillStaff =
+      prefill && staff.some((s) => s.id === prefill.staffId)
+        ? prefill.staffId
+        : lastStaffValid
+          ? initialStaff
+          : (staff[0]?.id ?? '')
     form.reset({
-      visit_date: todayIso,
-      staff_id: lastStaffValid ? initialStaff : (staff[0]?.id ?? ''),
+      visit_date: prefillDate,
+      staff_id: prefillStaff,
       client_id: null,
       service_id: '',
       amount: '',
@@ -140,8 +153,8 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       payment_method: initialPayment,
       comment: '',
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open / prefill
+  }, [open, prefill?.staffId, prefill?.when])
 
   // Если staff подгрузился ПОСЛЕ открытия модалки (быстрый клик на FAB),
   // ловим это и выставляем дефолт. Иначе форма требует «Выбери мастера»
@@ -177,11 +190,11 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency }: Props
       : 0
     const svc = services.find((s) => s.id === values.service_id)
     const stf = staff.find((s) => s.id === values.staff_id)
-    // Юзер выбрал дату; время берём текущее (часы:минуты:секунды),
-    // чтобы порядок визитов в течение дня был естественным.
+    // Если есть prefill из календаря — берём время из subslot'а (HH:mm).
+    // Иначе: дата из формы + текущее время (порядок визитов естественный).
     const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
-    const visitDate = new Date(today)
-    if (yyyy && mm && dd) visitDate.setFullYear(yyyy, mm - 1, dd)
+    const visitDate = prefill ? new Date(prefill.when) : new Date(today)
+    if (yyyy && mm && dd && !prefill) visitDate.setFullYear(yyyy, mm - 1, dd)
     const visitAt = visitDate.toISOString()
 
     createVisit.mutate(

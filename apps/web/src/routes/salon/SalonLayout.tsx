@@ -40,6 +40,10 @@ export function SalonLayout() {
   const { data: salons, isLoading } = useMySalons()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
+  const [quickEntryPrefill, setQuickEntryPrefill] = useState<{
+    staffId: string
+    when: string
+  } | null>(null)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
 
@@ -48,7 +52,13 @@ export function SalonLayout() {
   }, [salonId, salon])
 
   useEffect(() => {
-    function onOpenQuickEntry() {
+    function onOpenQuickEntry(e: Event) {
+      const detail = (e as CustomEvent<{ staffId?: string; when?: string }>).detail
+      if (detail?.staffId && detail.when) {
+        setQuickEntryPrefill({ staffId: detail.staffId, when: detail.when })
+      } else {
+        setQuickEntryPrefill(null)
+      }
       setQuickEntryOpen(true)
     }
     window.addEventListener('finsalon:open-quick-entry', onOpenQuickEntry)
@@ -116,16 +126,25 @@ export function SalonLayout() {
         </main>
       </div>
 
-      <FAB onClick={() => setQuickEntryOpen(true)} />
+      <FAB
+        onClick={() => {
+          setQuickEntryPrefill(null)
+          setQuickEntryOpen(true)
+        }}
+      />
       <BottomNav salonId={salon.id} />
 
       {quickEntryOpen ? (
         <Suspense fallback={null}>
           <QuickEntryModal
             open={quickEntryOpen}
-            onOpenChange={setQuickEntryOpen}
+            onOpenChange={(v) => {
+              setQuickEntryOpen(v)
+              if (!v) setQuickEntryPrefill(null)
+            }}
             salonId={salon.id}
             currency={salon.currency}
+            prefill={quickEntryPrefill}
           />
         </Suspense>
       ) : null}
