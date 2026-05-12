@@ -85,7 +85,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
   const { data: clients = [] } = useClients(salonId)
-  const { data: visits = [] } = useVisits(salonId, range)
+  // Календарь — это про услуги (kind='visit'). Retail-продажи у нас в /income → Sales
+  // и не имеют времени визита по смыслу — их в календарь рисовать не надо.
+  const { data: visits = [] } = useVisits(salonId, range, { kind: 'visit' })
 
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
   // Клик по 15-мин подслоту — открываем popover с 3 действиями.
