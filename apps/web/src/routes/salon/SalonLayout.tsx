@@ -47,6 +47,14 @@ export function SalonLayout() {
     if (salonId && salon) rememberLastSalon(salonId)
   }, [salonId, salon])
 
+  useEffect(() => {
+    function onOpenQuickEntry() {
+      setQuickEntryOpen(true)
+    }
+    window.addEventListener('finsalon:open-quick-entry', onOpenQuickEntry)
+    return () => window.removeEventListener('finsalon:open-quick-entry', onOpenQuickEntry)
+  }, [])
+
   if (isLoading) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">

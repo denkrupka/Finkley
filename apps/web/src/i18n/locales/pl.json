@@ -467,8 +467,16 @@
       "today": "Dziś",
       "day_off": "Dzień wolny",
       "walk_in": "Bez umówienia",
-      "no_staff": "Brak aktywnych specjalistów. Dodaj w Ustawienia → Słowniki → Specjaliści."
+      "no_staff": "Brak aktywnych specjalistów. Dodaj w Ustawienia → Słowniki → Specjaliści.",
+      "new_at_time": "Utwórz wpis na tę godzinę",
+      "subslot": {
+        "new_visit": "Nowa wizyta",
+        "reserve_time": "Rezerwacja czasu",
+        "absence": "Dodaj nieobecność",
+        "coming_soon": "Wkrótce dostępne"
+      }
     },
+    "status_paid": "Opłacona",
     "mini_calendar": {
       "week_col": "Tydz.",
       "jump_week": "Przejdź do tygodnia"

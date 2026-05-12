@@ -1,8 +1,9 @@
 import { addDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, UserX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -26,9 +27,12 @@ const HOUR_END = 22 // exclusive
 const TOTAL_MIN = (HOUR_END - HOUR_START) * 60
 /** Высота 1 минуты в px. Подбирал по Booksy — 72px/час даёт читабельные слоты. */
 const PX_PER_MIN = 1.2
-/** Default длительность визита если у услуги не задано duration_min (либо
- *  визит без услуги). 30 мин = базовый слот. */
-const DEFAULT_DURATION_MIN = 30
+/** Default длительность визита если у услуги не задано duration_min. 60 мин —
+ *  типичная длительность услуги в beauty-салоне (Booksy/wFirma часто не
+ *  отдают duration при импорте). */
+const DEFAULT_DURATION_MIN = 60
+/** Минимальная длительность субслота — 15 мин (как в Booksy/Versum). */
+const SUBSLOT_MIN = 15
 const COL_WIDTH_PX = 200
 const TIME_AXIS_WIDTH_PX = 64
 
@@ -84,6 +88,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: visits = [] } = useVisits(salonId, range)
 
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  // Клик по 15-мин подслоту — открываем popover с 3 действиями.
+  const [subslotMenu, setSubslotMenu] = useState<{
+    staffId: string
+    when: Date
+    rect: { top: number; left: number }
+  } | null>(null)
 
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services])
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
@@ -311,6 +321,55 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                       />
                     ))}
 
+                    {/* 15-минутные пунктирные линии — визуальный hint для подслотов */}
+                    {Array.from(
+                      { length: (HOUR_END - HOUR_START) * (60 / SUBSLOT_MIN) },
+                      (_, idx) => {
+                        if (idx % (60 / SUBSLOT_MIN) === 0) return null // часовая уже отрисована выше
+                        const min = HOUR_START * 60 + idx * SUBSLOT_MIN
+                        return (
+                          <div
+                            key={`sub-${idx}`}
+                            className="border-border/40 pointer-events-none absolute inset-x-0 border-t border-dashed"
+                            style={{ top: pxTopForMinutes(min) }}
+                          />
+                        )
+                      },
+                    )}
+
+                    {/* Кликабельный overlay подслотов — каждые 15 минут */}
+                    {Array.from(
+                      { length: (HOUR_END - HOUR_START) * (60 / SUBSLOT_MIN) },
+                      (_, idx) => {
+                        const minFromMidnight = HOUR_START * 60 + idx * SUBSLOT_MIN
+                        return (
+                          <button
+                            key={`hit-${idx}`}
+                            type="button"
+                            aria-label={t('visits.calendar.new_at_time')}
+                            onClick={(e) => {
+                              const rect = (
+                                e.currentTarget as HTMLButtonElement
+                              ).getBoundingClientRect()
+                              const when = new Date(dayStart)
+                              when.setHours(0, 0, 0, 0)
+                              when.setMinutes(minFromMidnight)
+                              setSubslotMenu({
+                                staffId: s.id,
+                                when,
+                                rect: { top: rect.bottom + window.scrollY, left: rect.left },
+                              })
+                            }}
+                            className="hover:bg-foreground/[0.03] absolute inset-x-0 cursor-pointer transition-colors"
+                            style={{
+                              top: pxTopForMinutes(minFromMidnight),
+                              height: SUBSLOT_MIN * PX_PER_MIN,
+                            }}
+                          />
+                        )
+                      },
+                    )}
+
                     {/* Карточки визитов */}
                     {staffVisits.map((v) => {
                       const visitDate = parseISO(v.visit_at)
@@ -329,9 +388,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                         <button
                           key={v.id}
                           type="button"
-                          onClick={() => setEditingVisit(v)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingVisit(v)
+                          }}
                           className={cn(
-                            'group absolute inset-x-1 cursor-pointer rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md',
+                            'group absolute inset-x-1 z-[5] cursor-pointer overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md',
                             v.status === 'cancelled' && 'opacity-50',
                           )}
                           style={{
@@ -340,18 +402,30 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                             background: palette.bg,
                             borderLeftColor: palette.accent,
                           }}
+                          title={`${format(visitDate, 'HH:mm')} · ${
+                            (v.client_id && clientById.get(v.client_id)?.name) ??
+                            t('visits.calendar.walk_in')
+                          }`}
                         >
-                          <p className="num text-foreground/80 text-[11px] font-semibold leading-tight">
+                          {/* $-индикатор оплаченного визита (правый верхний угол) */}
+                          {v.status === 'paid' ? (
+                            <CheckCircle2
+                              className="text-brand-sage-deep absolute right-1 top-1 size-3.5"
+                              strokeWidth={2.4}
+                              aria-label={t('visits.status_paid')}
+                            />
+                          ) : null}
+                          <p className="num text-foreground/80 truncate text-[11px] font-semibold leading-tight">
                             {format(visitDate, 'HH:mm', { locale: ru })} –{' '}
                             {format(new Date(visitDate.getTime() + dur * 60000), 'HH:mm', {
                               locale: ru,
                             })}
                           </p>
-                          <p className="text-foreground line-clamp-1 text-xs font-semibold">
+                          <p className="text-foreground truncate text-xs font-semibold">
                             {(v.client_id && clientById.get(v.client_id)?.name) ??
                               t('visits.calendar.walk_in')}
                           </p>
-                          <p className="text-muted-foreground line-clamp-1 text-[11px]">
+                          <p className="text-muted-foreground truncate text-[11px]">
                             {svc?.name ?? v.service_name_snapshot ?? '—'}
                           </p>
                         </button>
@@ -383,6 +457,60 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         salonId={salonId}
         currency={salon?.currency ?? 'PLN'}
       />
+
+      {/* Popover для клика по 15-мин подслоту. Позиционируется абсолютно
+          относительно клика (boundingClientRect.bottom). Закрывается на
+          клик-вне. */}
+      {subslotMenu ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSubslotMenu(null)} aria-hidden />
+          <div
+            className="border-border bg-card shadow-finxl fixed z-50 w-[240px] rounded-lg border p-2"
+            style={{
+              top: subslotMenu.rect.top,
+              left: subslotMenu.rect.left,
+            }}
+          >
+            <p className="text-muted-foreground border-border mb-1.5 border-b px-2 pb-1.5 text-[11px] uppercase tracking-wider">
+              {format(subslotMenu.when, 'd MMM, HH:mm', { locale: ru })} ·{' '}
+              {staff.find((s) => s.id === subslotMenu.staffId)?.full_name ?? ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('finsalon:open-quick-entry'))
+                setSubslotMenu(null)
+              }}
+              className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-semibold"
+            >
+              <ChevronRight className="text-secondary size-4" strokeWidth={2.2} />
+              {t('visits.calendar.subslot.new_visit')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                toast.info(t('visits.calendar.subslot.coming_soon'))
+                setSubslotMenu(null)
+              }}
+              className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
+            >
+              <Clock className="text-muted-foreground size-4" strokeWidth={2} />
+              {t('visits.calendar.subslot.reserve_time')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                toast.info(t('visits.calendar.subslot.coming_soon'))
+                setSubslotMenu(null)
+              }}
+              className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
+            >
+              <UserX className="text-muted-foreground size-4" strokeWidth={2} />
+              {t('visits.calendar.subslot.absence')}
+            </button>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }
