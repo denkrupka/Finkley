@@ -1673,7 +1673,10 @@
       "col_inflow": "Приход",
       "col_outflow": "Расход",
       "col_net": "Нетто",
-      "col_running": "Накопит."
+      "col_running": "Накопит.",
+      "legend_inflow": "Приход",
+      "legend_outflow": "Расход",
+      "legend_running": "Накопит. остаток"
     },
     "payments": {
       "title": "Счета на оплату",

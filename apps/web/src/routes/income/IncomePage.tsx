@@ -53,13 +53,11 @@ export function IncomePage() {
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
 
       {active === 'visits' ? (
-        <VisitsPage />
-      ) : active === 'other' ? (
-        <OtherIncomeTab salonId={salonId} />
+        <VisitsPage forcedKind="visit" />
+      ) : active === 'sales' ? (
+        <VisitsPage forcedKind="retail" />
       ) : (
-        <div className="border-border bg-card shadow-finsm rounded-lg border p-6">
-          <p className="text-foreground/80 text-sm leading-snug">{t('income.sales_placeholder')}</p>
-        </div>
+        <OtherIncomeTab salonId={salonId} />
       )}
     </div>
   )

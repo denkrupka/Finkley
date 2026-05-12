@@ -3,6 +3,17 @@ import { ru } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 import { Button } from '@/components/ui/button'
 import { useCashFlowDaily } from '@/hooks/useCashFlow'
@@ -90,6 +101,64 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
           </p>
         </div>
       </div>
+
+      {/* Chart */}
+      {withRunning.some((r) => r.inflow_cents !== 0 || r.outflow_cents !== 0) ? (
+        <div className="border-border bg-card shadow-finsm mb-5 rounded-lg border p-4">
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart
+              data={withRunning.map((r) => ({
+                day: format(new Date(r.day), 'd MMM', { locale: ru }),
+                inflow: r.inflow_cents / 100,
+                outflow: -(r.outflow_cents / 100),
+                running: r.running_cents / 100,
+              }))}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#E7E5DE" vertical={false} />
+              <XAxis dataKey="day" tickLine={false} fontSize={11} stroke="#9A9A9A" />
+              <YAxis
+                tickLine={false}
+                fontSize={11}
+                stroke="#9A9A9A"
+                tickFormatter={(v: number) => formatCurrency(Math.abs(v) * 100, currency)}
+              />
+              <Tooltip
+                formatter={(v: number) => formatCurrency(Math.abs(v) * 100, currency)}
+                contentStyle={{
+                  borderRadius: 8,
+                  border: '1px solid hsl(var(--border))',
+                  fontSize: 12,
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value: string) => t(`finance.cashflow.legend_${value}`)}
+              />
+              <Bar
+                dataKey="inflow"
+                name="inflow"
+                fill="hsl(var(--brand-sage))"
+                radius={[3, 3, 0, 0]}
+              />
+              <Bar
+                dataKey="outflow"
+                name="outflow"
+                fill="hsl(var(--destructive))"
+                radius={[0, 0, 3, 3]}
+              />
+              <Line
+                type="monotone"
+                dataKey="running"
+                name="running"
+                stroke="hsl(var(--brand-navy))"
+                strokeWidth={2}
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      ) : null}
 
       {/* Daily table */}
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">

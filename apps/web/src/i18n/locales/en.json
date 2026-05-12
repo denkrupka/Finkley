@@ -1235,7 +1235,10 @@
       "col_inflow": "Inflow",
       "col_outflow": "Outflow",
       "col_net": "Net",
-      "col_running": "Running"
+      "col_running": "Running",
+      "legend_inflow": "Inflow",
+      "legend_outflow": "Outflow",
+      "legend_running": "Running balance"
     },
     "payments": {
       "title": "Payments to make",

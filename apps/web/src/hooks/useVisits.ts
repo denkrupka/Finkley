@@ -42,6 +42,7 @@ export function useVisits(
     staffId?: string | null
     paymentMethod?: PaymentMethod | null
     serviceId?: string | null
+    kind?: VisitKind | null
   },
 ) {
   const filterKey = filters ?? {}
@@ -61,6 +62,7 @@ export function useVisits(
       if (filters?.staffId) q = q.eq('staff_id', filters.staffId)
       if (filters?.paymentMethod) q = q.eq('payment_method', filters.paymentMethod)
       if (filters?.serviceId) q = q.eq('service_id', filters.serviceId)
+      if (filters?.kind) q = q.eq('kind', filters.kind)
 
       const { data, error } = await q.limit(200)
       if (error) throw error

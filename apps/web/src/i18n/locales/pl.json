@@ -1236,7 +1236,10 @@
       "col_inflow": "Wpływ",
       "col_outflow": "Wydatek",
       "col_net": "Netto",
-      "col_running": "Skum."
+      "col_running": "Skum.",
+      "legend_inflow": "Wpływy",
+      "legend_outflow": "Wydatki",
+      "legend_running": "Saldo skumulowane"
     },
     "payments": {
       "title": "Do zapłaty",

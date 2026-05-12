@@ -15,7 +15,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useClients } from '@/hooks/useClients'
-import { useDeleteVisit, useVisits, type PaymentMethod, type VisitRow } from '@/hooks/useVisits'
+import {
+  useDeleteVisit,
+  useVisits,
+  type PaymentMethod,
+  type VisitKind,
+  type VisitRow,
+} from '@/hooks/useVisits'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
@@ -38,7 +44,17 @@ const PAY_LABEL: Record<PaymentMethod, { label: string; bg: string; fg: string }
   mixed: { label: 'mixed', bg: '#EEE', fg: 'hsl(var(--brand-navy))' },
 }
 
-export function VisitsPage() {
+type VisitsPageProps = {
+  /**
+   * Если задан — фильтр по виду визита `kind` форсируется (игнорирует
+   * URL-параметр `?kind`). Используется когда VisitsPage рендерится
+   * внутри IncomePage в табе «Визиты» (`forcedKind='visit'`) или
+   * «Продажи» (`forcedKind='retail'`).
+   */
+  forcedKind?: VisitKind
+}
+
+export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params, setParams] = useSearchParams()
@@ -46,6 +62,12 @@ export function VisitsPage() {
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
   const serviceFilter = params.get('service') || ''
+  // `?kind=retail` фильтрует список до товарных продаж. Может быть задан
+  // через URL (старые роуты) или пропсом `forcedKind` (из IncomePage).
+  const kindParam = params.get('kind')
+  const kindFromUrl: VisitKind | null =
+    kindParam === 'retail' || kindParam === 'visit' ? (kindParam as VisitKind) : null
+  const kindFilter: VisitKind | null = forcedKind ?? kindFromUrl
 
   const range = getPeriodRange(period, new Date(), readCustomFromParams(params))
   const { data: salon } = useSalon(salonId)
@@ -60,6 +82,7 @@ export function VisitsPage() {
     staffId: staffFilter || null,
     paymentMethod: paymentFilter || null,
     serviceId: serviceFilter || null,
+    kind: kindFilter,
   })
   const deleteVisit = useDeleteVisit(salonId)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
