@@ -5,7 +5,7 @@ interface Props {
   title: string
   description?: string
   /** Активный пункт топ-меню для подсветки */
-  active?: 'home' | 'pricing' | 'privacy' | 'terms'
+  active?: 'home' | 'pricing' | 'media' | 'privacy' | 'terms'
 }
 
 const {
@@ -68,6 +68,12 @@ const APP_URL = '/app/'
             class={`text-sm font-medium ${active === 'pricing' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
           >
             Цены
+          </a>
+          <a
+            href="/media/"
+            class={`text-sm font-medium ${active === 'media' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+          >
+            Медиа
           </a>
         </nav>
 
