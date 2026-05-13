@@ -4,7 +4,49 @@
     "placeholder": "Скелет приложения готов. См. docs/04_BACKLOG.md для следующих шагов."
   },
   "admin": {
+    "title": "Админка Finkley",
+    "subtitle": "Super-admin раздел — только для команды.",
+    "no_access_title": "Нет доступа",
+    "no_access_body": "Эта секция только для team Finkley (app_admins).",
+    "nav": {
+      "overview": "Обзор",
+      "salons": "Салоны",
+      "users": "Пользователи",
+      "media": "Блог",
+      "feedback": "Фидбек"
+    },
+    "overview": {
+      "salons_total": "Салоны",
+      "salons_active": "{{count}} активных",
+      "users_total": "Пользователи",
+      "visits_30d": "Визиты (30 дн)",
+      "expenses_30d": "Расходы (30 дн)",
+      "gross_profit_30d": "Прибыль (30 дн)",
+      "messages_total": "Сообщения",
+      "messenger_breakdown": "Подключения мессенджеров",
+      "no_integrations_yet": "Подключений пока нет."
+    },
+    "salons": {
+      "name": "Салон",
+      "owner": "Владелец",
+      "currency": "Валюта",
+      "plan": "Тариф",
+      "created": "Создан",
+      "empty": "Салонов пока нет."
+    },
+    "users": {
+      "email": "Email",
+      "last_signin": "Последний вход",
+      "created": "Регистрация",
+      "salons": "Салонов"
+    },
+    "feedback": {
+      "title": "Фидбек и баг-репорты",
+      "empty": "Пока нет обращений.",
+      "todo_note": "Интеграция с bug_reports таблицей в разработке."
+    },
     "media": {
+      "preview": "Preview",
       "title": "Медиа — управление статьями",
       "subtitle": "finsalon.app/media · публикуй статьи блога. После сохранения публикуется при следующей сборке лендинга (push в main).",
       "new_post": "Новая статья",

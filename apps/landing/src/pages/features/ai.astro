@@ -1,0 +1,79 @@
+---
+import Layout from '../../layouts/Layout.astro'
+---
+
+<Layout
+  title="AI и OCR чеков — Finkley"
+  description="Сфотографируй чек — Finkley распознает сумму, дату, поставщика и NIP. AI-помощник отвечает на вопросы о прибыли и нагрузке."
+  active="features"
+>
+  <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+      <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">AI & Automation</p>
+      <h1
+        class="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
+      >
+        Никаких ручных вводов <span class="text-brand-sage">— ИИ делает за тебя</span>
+      </h1>
+      <p class="mt-6 max-w-2xl text-lg leading-relaxed text-brand-text-muted">
+        Сфотографируй чек, сделай вопрос вслух — Finkley распознаёт, считает, отвечает. Меньше
+        рутины — больше клиентов.
+      </p>
+    </div>
+  </section>
+
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+      <div class="grid grid-cols-1 gap-12 lg:grid-cols-2">
+        <div>
+          <div class="text-3xl">🧾</div>
+          <h2 class="mt-2 text-2xl font-bold text-brand-navy">OCR чеков и инвойсов</h2>
+          <p class="mt-3 text-base leading-relaxed text-brand-text-muted">
+            Фотография чека или PDF инвойса от поставщика → распознавание суммы, даты, NIP
+            продавца, NIP nabywcy и автоматическая запись в правильную статью расходов. Если NIP
+            nabywcy совпадает с твоей фирмой — расход улетает в подключённую бухгалтерию автоматом.
+          </p>
+          <ul class="mt-4 space-y-2 text-sm text-brand-text-muted">
+            <li>✓ Поддержка кириллицы, латиницы, польского</li>
+            <li>✓ Работает с любыми форматами: бумажный чек, PDF, email-фактура</li>
+            <li>✓ Автоматическая категоризация (материалы, аренда, маркетинг…)</li>
+            <li>✓ Инвентарь — товарные позиции с чека сразу в склад</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="text-3xl">🤖</div>
+          <h2 class="mt-2 text-2xl font-bold text-brand-navy">AI-помощник</h2>
+          <p class="mt-3 text-base leading-relaxed text-brand-text-muted">
+            Спрашиваешь словами — отвечает цифрами и графиками. «Сколько я заработала в прошлом
+            месяце?», «Какая услуга самая выгодная?», «Кто из мастеров недогружен?» — без формул и
+            таблиц.
+          </p>
+          <ul class="mt-4 space-y-2 text-sm text-brand-text-muted">
+            <li>✓ Анализ маржинальности услуг и мастеров</li>
+            <li>✓ Insights: «Ваш доход вырос на 12% за неделю — продажи продукции +30%»</li>
+            <li>✓ Прогноз на месяц по тренду</li>
+            <li>✓ Бенчмарки против похожих салонов твоего размера</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-white">
+    <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+      <h2 class="text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+        Освободи 5 часов в неделю
+      </h2>
+      <p class="mt-4 text-base text-brand-text-muted">
+        Среднее время, которое салон тратит на финансы вручную. Finkley его возвращает.
+      </p>
+      <a
+        href="/app/signup"
+        class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-navy px-8 text-sm font-bold text-white shadow-lg shadow-brand-navy/20 hover:bg-brand-navy-soft"
+      >
+        Попробовать бесплатно
+      </a>
+    </div>
+  </section>
+</Layout>

@@ -103,6 +103,21 @@ const SettingsPage = lazyWithRetry(() =>
 const AdminMediaPage = lazyWithRetry(() =>
   import('@/routes/admin/AdminMediaPage').then((m) => ({ default: m.AdminMediaPage })),
 )
+const AdminLayout = lazyWithRetry(() =>
+  import('@/routes/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })),
+)
+const AdminOverviewPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminOverviewPage').then((m) => ({ default: m.AdminOverviewPage })),
+)
+const AdminSalonsPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminSalonsPage').then((m) => ({ default: m.AdminSalonsPage })),
+)
+const AdminUsersPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })),
+)
+const AdminFeedbackPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminFeedbackPage').then((m) => ({ default: m.AdminFeedbackPage })),
+)
 const BankingCallbackPage = lazyWithRetry(() =>
   import('@/routes/banking/BankingCallbackPage').then((m) => ({ default: m.BankingCallbackPage })),
 )
@@ -198,7 +213,14 @@ function App() {
         <Route path="settings/integrations-full" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
-        <Route path="admin/media" element={lazyRoute(<AdminMediaPage />)} />
+        <Route path="admin" element={lazyRoute(<AdminLayout />)}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={lazyRoute(<AdminOverviewPage />)} />
+          <Route path="salons" element={lazyRoute(<AdminSalonsPage />)} />
+          <Route path="users" element={lazyRoute(<AdminUsersPage />)} />
+          <Route path="media" element={lazyRoute(<AdminMediaPage />)} />
+          <Route path="feedback" element={lazyRoute(<AdminFeedbackPage />)} />
+        </Route>
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>

@@ -4,6 +4,45 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
+/**
+ * Минимальный markdown → HTML рендер для preview-панели админки.
+ * Поддерживает: # / ## / ###, **bold**, *italic*, [link](url), `code`,
+ * параграфы (двойной перенос). Без таблиц, кодоблоков, картинок — для них
+ * Astro-страница media/[slug] на лендинге даст полноценный рендер.
+ *
+ * SECURITY: html-экранирование `<`, `>`, `&` ДО применения markdown-замен,
+ * чтобы user-input не мог инжектить script-теги в preview.
+ */
+function simpleMarkdownToHtml(md: string): string {
+  if (!md) return ''
+  const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  let html = esc
+  // Заголовки
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+  // Inline forматирование
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+  // Ссылки [text](url) — URL санитизируем (только http/https/mailto)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+    const safe = /^(https?:|mailto:|\/)/.test(url) ? url : '#'
+    return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${text}</a>`
+  })
+  // Параграфы (две новые строки)
+  html = html
+    .split(/\n{2,}/)
+    .map((block) => {
+      const t = block.trim()
+      if (!t) return ''
+      if (/^<h[1-3]>/.test(t) || /^<(ul|ol|p)/.test(t)) return t
+      return `<p>${t.replace(/\n/g, '<br />')}</p>`
+    })
+    .join('\n')
+  return html
+}
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -220,15 +259,27 @@ export function AdminMediaPage() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <Label className="text-xs">{t('admin.media.fields.body_md')}</Label>
-            <textarea
-              value={draft.body_md ?? ''}
-              onChange={(e) => setDraft((d) => ({ ...d, body_md: e.target.value }))}
-              rows={20}
-              className="border-border bg-card mt-1 w-full rounded-md border p-3 font-mono text-sm"
-              placeholder="# Заголовок..."
-            />
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div>
+              <Label className="text-xs">{t('admin.media.fields.body_md')}</Label>
+              <textarea
+                value={draft.body_md ?? ''}
+                onChange={(e) => setDraft((d) => ({ ...d, body_md: e.target.value }))}
+                rows={20}
+                className="border-border bg-card mt-1 w-full rounded-md border p-3 font-mono text-sm"
+                placeholder="# Заголовок..."
+              />
+            </div>
+            <div>
+              <Label className="text-xs">{t('admin.media.preview')}</Label>
+              <div
+                className="border-border bg-card prose prose-sm mt-1 max-w-none overflow-y-auto rounded-md border p-3"
+                style={{ maxHeight: 480 }}
+                // Простой markdown → HTML (headers, bold, italic, links, paragraphs).
+                // Для полноценного preview лучше react-markdown — но это +60 KB бандла.
+                dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(draft.body_md ?? '') }}
+              />
+            </div>
           </div>
 
           <div className="border-border bg-card sticky bottom-0 mt-4 flex items-center justify-between gap-2 border-t pt-3">

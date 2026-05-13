@@ -1,11 +1,12 @@
 ---
 import '../styles/global.css'
+import { dict, LANGS } from '../i18n/dict'
 
 interface Props {
   title: string
   description?: string
   /** Активный пункт топ-меню для подсветки */
-  active?: 'home' | 'pricing' | 'media' | 'privacy' | 'terms'
+  active?: 'home' | 'features' | 'pricing' | 'media' | 'privacy' | 'terms'
 }
 
 const {
@@ -14,7 +15,9 @@ const {
   active = 'home',
 } = Astro.props
 
-// URL приложения (SPA в подпапке /app/ на том же gh-pages)
+// Дефолтный язык на статике — RU. Клиентский JS на DOMContentLoaded
+// меняет тексты в [data-i18n="key"] если в localStorage другой выбор.
+const t = dict.ru
 const APP_URL = '/app/'
 ---
 
@@ -60,35 +63,81 @@ const APP_URL = '/app/'
           <a
             href="/"
             class={`text-sm font-medium ${active === 'home' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+            data-i18n="nav.product"
           >
-            О продукте
+            {t['nav.product']}
+          </a>
+          <a
+            href="/features/messenger/"
+            class={`text-sm font-medium ${active === 'features' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+            data-i18n="nav.features"
+          >
+            {t['nav.features']}
           </a>
           <a
             href="/pricing"
             class={`text-sm font-medium ${active === 'pricing' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+            data-i18n="nav.pricing"
           >
-            Цены
+            {t['nav.pricing']}
           </a>
           <a
             href="/media/"
             class={`text-sm font-medium ${active === 'media' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+            data-i18n="nav.media"
           >
-            Медиа
+            {t['nav.media']}
           </a>
         </nav>
 
         <div class="flex items-center gap-3">
+          <div class="relative">
+            <button
+              type="button"
+              id="lang-switcher-btn"
+              class="inline-flex h-9 items-center gap-1 rounded-md border border-brand-border bg-white px-2 text-sm font-medium text-brand-text-muted hover:bg-brand-bg"
+              aria-label="Language"
+            >
+              <span id="lang-current-flag">🇷🇺</span>
+              <span class="hidden sm:inline" id="lang-current-label">RU</span>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </button>
+            <ul
+              id="lang-switcher-menu"
+              class="absolute right-0 top-full mt-1 hidden min-w-[140px] rounded-md border border-brand-border bg-white shadow-lg"
+              role="menu"
+            >
+              {
+                LANGS.map((l) => (
+                  <li>
+                    <button
+                      type="button"
+                      data-lang={l.code}
+                      class="lang-option flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brand-text hover:bg-brand-bg"
+                    >
+                      <span>{l.flag}</span>
+                      <span>{l.label}</span>
+                    </button>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
           <a
             href={APP_URL + 'login'}
             class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text sm:inline"
+            data-i18n="nav.login"
           >
-            Войти
+            {t['nav.login']}
           </a>
           <a
             href={APP_URL + 'signup'}
             class="inline-flex h-10 items-center rounded-md bg-brand-navy px-4 text-sm font-semibold text-white hover:bg-brand-navy-soft"
+            data-i18n="nav.signup"
           >
-            Начать бесплатно
+            {t['nav.signup']}
           </a>
         </div>
       </div>
@@ -109,18 +158,98 @@ const APP_URL = '/app/'
             F
           </div>
           <span class="font-semibold text-brand-navy">Finkley</span>
-          <span class="text-brand-text-faint">© 2026</span>
+          <span class="text-brand-text-faint" data-i18n="footer.rights">{t['footer.rights']}</span>
         </div>
         <nav class="flex flex-wrap gap-5">
-          <a href="/privacy" class={active === 'privacy' ? 'text-brand-navy' : 'hover:text-brand-text'}>
-            Privacy
+          <a
+            href="/privacy"
+            class={active === 'privacy' ? 'text-brand-navy' : 'hover:text-brand-text'}
+            data-i18n="footer.privacy"
+          >
+            {t['footer.privacy']}
           </a>
-          <a href="/terms" class={active === 'terms' ? 'text-brand-navy' : 'hover:text-brand-text'}>
-            Terms
+          <a
+            href="/terms"
+            class={active === 'terms' ? 'text-brand-navy' : 'hover:text-brand-text'}
+            data-i18n="footer.terms"
+          >
+            {t['footer.terms']}
           </a>
           <a href="mailto:info@finkley.app" class="hover:text-brand-text">info@finkley.app</a>
         </nav>
       </div>
     </footer>
+
+    <script>
+      import { dict, type Lang } from '../i18n/dict'
+
+      const LS_KEY = 'finkley.lang'
+
+      function applyLang(lang: Lang) {
+        const d = dict[lang]
+        document.documentElement.lang = lang
+        // Заменяем все элементы с data-i18n="key"
+        document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+          const key = el.dataset.i18n as keyof typeof d
+          const v = d[key]
+          if (v) el.textContent = v
+        })
+        // Обновляем индикатор в свитчере
+        const flagMap: Record<Lang, string> = { ru: '🇷🇺', en: '🇬🇧', pl: '🇵🇱' }
+        const labelMap: Record<Lang, string> = { ru: 'RU', en: 'EN', pl: 'PL' }
+        const fEl = document.getElementById('lang-current-flag')
+        const lEl = document.getElementById('lang-current-label')
+        if (fEl) fEl.textContent = flagMap[lang]
+        if (lEl) lEl.textContent = labelMap[lang]
+      }
+
+      function getStored(): Lang | null {
+        try {
+          const v = localStorage.getItem(LS_KEY)
+          if (v === 'ru' || v === 'en' || v === 'pl') return v
+        } catch {
+          /* ignore */
+        }
+        return null
+      }
+
+      function detectBrowserLang(): Lang {
+        const nav = (navigator.language || 'ru').toLowerCase()
+        if (nav.startsWith('en')) return 'en'
+        if (nav.startsWith('pl')) return 'pl'
+        return 'ru'
+      }
+
+      // На старте — применяем сохранённый или авто-определённый язык
+      document.addEventListener('DOMContentLoaded', () => {
+        const stored = getStored()
+        const initial = stored ?? detectBrowserLang()
+        if (initial !== 'ru') applyLang(initial)
+        else applyLang('ru')
+
+        // Тоггл меню
+        const btn = document.getElementById('lang-switcher-btn')
+        const menu = document.getElementById('lang-switcher-menu')
+        btn?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          menu?.classList.toggle('hidden')
+        })
+        document.addEventListener('click', () => menu?.classList.add('hidden'))
+
+        // Выбор языка
+        document.querySelectorAll<HTMLButtonElement>('.lang-option').forEach((b) => {
+          b.addEventListener('click', () => {
+            const lang = b.dataset.lang as Lang
+            try {
+              localStorage.setItem(LS_KEY, lang)
+            } catch {
+              /* ignore */
+            }
+            applyLang(lang)
+            menu?.classList.add('hidden')
+          })
+        })
+      })
+    </script>
   </body>
 </html>
