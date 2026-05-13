@@ -29,9 +29,6 @@ importers:
       '@astrojs/tailwind':
         specifier: ^5.1.2
         version: 5.1.5(astro@4.16.19(@types/node@22.19.17)(rollup@4.60.3)(typescript@5.6.3))(tailwindcss@3.4.19(yaml@2.8.4))
-      '@supabase/supabase-js':
-        specifier: ^2.45.6
-        version: 2.105.3
       astro:
         specifier: ^4.16.10
         version: 4.16.19(@types/node@22.19.17)(rollup@4.60.3)(typescript@5.6.3)
