@@ -4,17 +4,17 @@ import {
   History,
   Mail,
   Package,
-  Plug,
   Receipt,
   Scissors,
   Sparkles,
-  Upload,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import { IntegrationsContent } from '@/routes/integrations/IntegrationsPage'
 
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
@@ -50,7 +50,6 @@ import { Link } from 'react-router-dom'
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { ApiKeysCard } from './ApiKeysCard'
-import { CalendarFeedCard } from './CalendarFeedCard'
 import { MFACard } from './MFACard'
 import { SegmentationCard } from './SegmentationCard'
 import { PushNotificationsCard } from './PushNotificationsCard'
@@ -126,10 +125,26 @@ export function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  // Если URL = /settings/integrations — это вкладка интеграций. Иначе
+  // активная вкладка читается из ?tab=.
+  const isIntegrationsUrl = location.pathname.endsWith('/settings/integrations')
   const tabParam = searchParams.get('tab') as SettingsTab | null
-  const activeTab: SettingsTab =
-    tabParam && (SETTINGS_TABS as readonly string[]).includes(tabParam) ? tabParam : 'profile'
+  const activeTab: SettingsTab = isIntegrationsUrl
+    ? 'integrations'
+    : tabParam && (SETTINGS_TABS as readonly string[]).includes(tabParam)
+      ? tabParam
+      : 'profile'
   function setActiveTab(t: SettingsTab) {
+    // Спец-кейс: вкладка интеграций живёт по отдельному URL.
+    if (t === 'integrations') {
+      navigate(`/${salonId}/settings/integrations`)
+      return
+    }
+    if (isIntegrationsUrl) {
+      navigate(`/${salonId}/settings?tab=${t}`)
+      return
+    }
     const next = new URLSearchParams(searchParams)
     next.set('tab', t)
     setSearchParams(next, { replace: true })
@@ -688,69 +703,7 @@ export function SettingsPage() {
         </>
       )}
 
-      {activeTab === 'integrations' && (
-        <>
-          {/* API keys */}
-          <div className="mb-6">
-            <ApiKeysCard />
-          </div>
-
-          {/* Calendar feed */}
-          <div className="mb-6">
-            <CalendarFeedCard />
-          </div>
-        </>
-      )}
-
-      {activeTab === 'integrations' && (
-        <>
-          {/* Интеграции */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.integrations.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.integrations.subtitle')}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate(`/${salonId}/settings/integrations`)}
-                data-testid="settings-integrations"
-              >
-                <Plug className="size-4" strokeWidth={1.7} />
-                {t('settings.integrations.button')}
-              </Button>
-            </div>
-          </section>
-
-          {/* Импорт данных */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.import.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.import.subtitle')}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate(`/${salonId}/settings/import`)}
-                data-testid="settings-import"
-              >
-                <Upload className="size-4" strokeWidth={1.7} />
-                {t('settings.import.button')}
-              </Button>
-            </div>
-          </section>
-        </>
-      )}
+      {activeTab === 'integrations' && <IntegrationsContent />}
 
       {activeTab === 'billing' && (
         <>

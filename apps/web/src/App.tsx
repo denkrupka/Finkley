@@ -192,7 +192,10 @@ function App() {
         <Route path="ai" element={lazyRoute(<AIPage />)} />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
-        <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
+        {/* /settings/integrations рендерит SettingsPage (sub-tab integrations).
+            IntegrationsPage остаётся доступной для тестов / legacy ссылок. */}
+        <Route path="settings/integrations" element={lazyRoute(<SettingsPage />)} />
+        <Route path="settings/integrations-full" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
         <Route path="admin/media" element={lazyRoute(<AdminMediaPage />)} />

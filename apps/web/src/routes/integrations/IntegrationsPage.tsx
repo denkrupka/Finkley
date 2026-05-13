@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Check,
   ChevronRight,
   Facebook,
@@ -13,8 +12,10 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import { CalendarFeedCard } from '@/routes/settings/CalendarFeedCard'
 
 import {
   BOOKSY_SYNC_INTERVAL_OPTIONS,
@@ -49,15 +50,20 @@ import { KsefConnectDialog } from './KsefConnectDialog'
 import { WfirmaConnectDialog } from './WfirmaConnectDialog'
 
 /**
- * Список доступных интеграций. Сейчас визуал-only (TASK-27 visual scaffold):
- * статус всегда «не подключено», кнопка connect открывает модалку с полями,
- * сохранение пока вызывает toast «скоро будет». Реальный sync — TASK-28/29.
+ * Список доступных интеграций. Используется внутри Settings → Интеграции
+ * tab. Адрес страницы — `/{salonId}/settings/integrations`, без back-link
+ * (страница — это подвкладка настроек).
  */
 function isCategory(v: string | null): v is IntegrationCategory {
   return v != null && (CATEGORY_ORDER as readonly string[]).includes(v)
 }
 
-export function IntegrationsPage() {
+/** Вариант без собственного header'а — рендерится внутри SettingsPage. */
+export function IntegrationsContent() {
+  return <IntegrationsPage embedded />
+}
+
+export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params, setParams] = useSearchParams()
@@ -92,20 +98,15 @@ export function IntegrationsPage() {
   const tabProviders = INTEGRATIONS.filter((p) => p.category === activeCategory)
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      <div className="mb-5">
-        <Link
-          to={`/${salonId}/settings`}
-          className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-sm"
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.7} />
-          {t('integrations.back_to_settings')}
-        </Link>
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('integrations.title')}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('integrations.subtitle')}</p>
-      </div>
+    <div className={embedded ? '' : 'flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12'}>
+      {embedded ? null : (
+        <div className="mb-5">
+          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+            {t('integrations.title')}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t('integrations.subtitle')}</p>
+        </div>
+      )}
 
       <IntegrationsTabsNav active={activeCategory} onChange={setActiveCategory} />
 
@@ -130,6 +131,11 @@ export function IntegrationsPage() {
               onConnect={() => handleConnect(p)}
             />
           ))}
+          {activeCategory === 'booking' ? (
+            <div className="sm:col-span-2">
+              <CalendarFeedCard />
+            </div>
+          ) : null}
         </div>
       )}
 
