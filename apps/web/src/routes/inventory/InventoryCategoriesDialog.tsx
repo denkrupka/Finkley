@@ -1,4 +1,4 @@
-import { Pencil, Plus, Save, Tags, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Save, Tags, Trash2, Undo2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -15,9 +15,11 @@ import {
 import { Input } from '@/components/ui/input'
 import {
   useAddInventoryCategory,
+  useArchivedInventoryCategories,
   useInventoryCategories,
   useInventoryItems,
   useRenameCategory,
+  useRestoreInventoryCategory,
   type InventoryItemRow,
 } from '@/hooks/useInventory'
 
@@ -38,8 +40,10 @@ export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
   const { t } = useTranslation()
   const { data: items = [] } = useInventoryItems(salonId, { includeArchived: false })
   const { data: allCategoryNames = [] } = useInventoryCategories(salonId)
+  const { data: archivedNames = [] } = useArchivedInventoryCategories(salonId)
   const rename = useRenameCategory(salonId)
   const addCategory = useAddInventoryCategory(salonId)
+  const restore = useRestoreInventoryCategory(salonId)
 
   const [editing, setEditing] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -107,15 +111,22 @@ export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
     )
   }
 
-  function deleteCategory(name: string, count: number) {
-    if (!confirm(t('inventory.categories.confirm_delete', { name, count }))) return
+  function archiveCategory(name: string, count: number) {
+    if (!confirm(t('inventory.categories.confirm_archive', { name, count }))) return
     rename.mutate(
       { from: name, to: null },
       {
-        onSuccess: () => toast.success(t('inventory.categories.toast_deleted', { count })),
+        onSuccess: () => toast.success(t('inventory.categories.toast_archived', { count })),
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
       },
     )
+  }
+
+  function restoreCategory(name: string) {
+    restore.mutate(name, {
+      onSuccess: () => toast.success(t('inventory.categories.toast_restored')),
+      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+    })
   }
 
   return (
@@ -209,10 +220,10 @@ export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteCategory(name, list.length)}
+                          onClick={() => archiveCategory(name, list.length)}
                           disabled={rename.isPending}
                           className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                          title={t('inventory.categories.delete')}
+                          title={t('inventory.categories.archive')}
                         >
                           <Trash2 className="size-3.5" strokeWidth={1.8} />
                         </button>
@@ -223,6 +234,33 @@ export function InventoryCategoriesDialog({ open, onClose, salonId }: Props) {
               ))}
             </ul>
           )}
+
+          {archivedNames.length > 0 ? (
+            <details className="mt-1">
+              <summary className="text-muted-foreground cursor-pointer text-xs">
+                {t('inventory.categories.archived_section', { count: archivedNames.length })}
+              </summary>
+              <ul className="border-border bg-muted/20 divide-border mt-2 divide-y rounded-md border">
+                {archivedNames.map((name) => (
+                  <li
+                    key={name}
+                    className="text-muted-foreground flex items-center justify-between gap-2 px-3 py-1.5 text-xs"
+                  >
+                    <span className="line-through">{name}</span>
+                    <button
+                      type="button"
+                      onClick={() => restoreCategory(name)}
+                      disabled={restore.isPending}
+                      className="text-secondary inline-flex items-center gap-1 font-semibold hover:underline disabled:opacity-50"
+                    >
+                      <Undo2 className="size-3" strokeWidth={2} />
+                      {t('inventory.categories.restore')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
 
           <p className="text-muted-foreground text-xs">{t('inventory.categories.note')}</p>
         </div>

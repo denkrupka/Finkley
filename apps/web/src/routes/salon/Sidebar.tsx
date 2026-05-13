@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Link, NavLink } from 'react-router-dom'
 
 import { LogoLockup } from '@/components/ui/logo'
+import { ReferralButton } from '@/components/ui/ReferralButton'
+import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
 
@@ -13,25 +15,21 @@ type Props = {
 }
 
 /**
- * Sidebar 232×fullheight по референсу `Design/project/chrome.jsx` → `Sidebar`.
- * Сверху лого Finkley, в середине 8 пунктов навигации, внизу — Help-link.
- * Аватар юзера и плашка тарифа переехали в TopBar (правый верх).
- *
- * Для mobile используется в Sheet/Drawer — `onNavigate` закрывает drawer
- * при переходе.
+ * Sidebar 232×fullheight. Sticky на десктопе — всегда видна при прокрутке.
+ * Сверху лого, по центру навигация, в подвале — Help / Реферал / Тема.
  */
 export function Sidebar({ salonId, onNavigate }: Props) {
   const { t } = useTranslation()
 
   return (
-    <aside className="border-border bg-card flex h-full w-[232px] flex-shrink-0 flex-col border-r px-3.5 pb-4 pt-5">
+    <aside className="border-border bg-card sticky top-0 flex h-screen w-[232px] flex-shrink-0 flex-col self-start border-r px-3.5 pb-4 pt-5">
       {/* Logo */}
       <div className="mb-5 px-2">
         <LogoLockup size={28} />
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-0.5">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           return (
@@ -65,16 +63,21 @@ export function Sidebar({ salonId, onNavigate }: Props) {
         })}
       </nav>
 
-      {/* Аватар юзера и плашка тарифа переехали в TopBar (правый верх).
-          Здесь оставляем только Help-link. */}
-      <Link
-        to={`/${salonId}/help`}
-        onClick={onNavigate}
-        className="text-muted-foreground hover:text-foreground mt-4 inline-flex items-center gap-1.5 px-1.5 text-[11px] font-medium"
-      >
-        <HelpCircle className="size-3.5" strokeWidth={1.7} />
-        {t('nav.help')}
-      </Link>
+      {/* Footer: реферал + тема + help */}
+      <div className="border-border mt-3 flex flex-col gap-2 border-t pt-3">
+        <ReferralButton variant="sidebar" />
+        <div className="flex items-center gap-2">
+          <ThemeToggleButton variant="sidebar" />
+          <Link
+            to={`/${salonId}/help`}
+            onClick={onNavigate}
+            className="text-muted-foreground hover:text-foreground inline-flex flex-1 items-center gap-1.5 px-1.5 text-[11px] font-medium"
+          >
+            <HelpCircle className="size-3.5" strokeWidth={1.7} />
+            {t('nav.help')}
+          </Link>
+        </div>
+      </div>
     </aside>
   )
 }

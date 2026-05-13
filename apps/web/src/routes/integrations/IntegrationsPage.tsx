@@ -35,6 +35,8 @@ import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
+import { MessengerConnectDialog } from './MessengerConnectDialog'
+import { useDisconnectMessenger, useMessengerIntegrations } from '@/hooks/useMessenger'
 import {
   CATEGORY_ORDER,
   INTEGRATIONS,
@@ -418,6 +420,12 @@ function StatusPill({ status }: { status: IntegrationDef['status'] }) {
 
 function MessengerConnectorsSection({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
+  const { data: integrations = [] } = useMessengerIntegrations(salonId)
+  const disconnect = useDisconnectMessenger(salonId)
+  const [openChannel, setOpenChannel] = useState<
+    'telegram' | 'whatsapp' | 'instagram' | 'facebook' | null
+  >(null)
+
   const channels = [
     { id: 'telegram', name: 'Telegram', icon: Send, color: '#229ED9' },
     { id: 'whatsapp', name: 'WhatsApp Business', icon: Phone, color: '#25D366' },
@@ -426,44 +434,96 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
   ] as const
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {channels.map((ch) => {
-        const Icon = ch.icon
-        return (
-          <div
-            key={ch.id}
-            className="border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5"
-          >
-            <div className="flex items-start gap-3">
-              <span
-                className="grid size-10 shrink-0 place-items-center rounded-md"
-                style={{ background: ch.color, color: 'white' }}
-              >
-                <Icon className="size-5" strokeWidth={1.8} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-foreground text-base font-bold">{ch.name}</h3>
-                <p className="text-muted-foreground mt-1 text-xs leading-snug">
-                  {t(`integrations.messengers.${ch.id}_subtitle`, {
-                    defaultValue: t('integrations.messengers.generic_subtitle'),
-                  })}
-                </p>
+    <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {channels.map((ch) => {
+          const Icon = ch.icon
+          const integ = integrations.find((i) => i.channel === ch.id)
+          const isConnected = !!integ && integ.status !== 'disconnected'
+          return (
+            <div
+              key={ch.id}
+              className={[
+                'border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5',
+                isConnected && integ?.status === 'connected' ? 'border-brand-sage/40' : '',
+              ].join(' ')}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="grid size-10 shrink-0 place-items-center rounded-md"
+                  style={{ background: ch.color, color: 'white' }}
+                >
+                  <Icon className="size-5" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-foreground text-base font-bold">{ch.name}</h3>
+                    {integ?.status === 'connected' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                        <Check className="size-3" strokeWidth={2.5} />
+                        {t('integrations.status.connected')}
+                      </span>
+                    ) : integ?.status === 'pending' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                        {t('integrations.status.pending')}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                    {integ?.display_name
+                      ? integ.display_name
+                      : t(`integrations.messengers.${ch.id}_subtitle`, {
+                          defaultValue: t('integrations.messengers.generic_subtitle'),
+                        })}
+                  </p>
+                  {integ?.last_error ? (
+                    <p className="text-destructive mt-1 line-clamp-2 text-xs">
+                      ⚠ {integ.last_error}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-auto flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpenChannel(ch.id)}
+                  className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+                >
+                  {isConnected
+                    ? t('integrations.messengers.reconnect')
+                    : t('integrations.messengers.connect')}
+                </button>
+                {isConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(t('integrations.messengers.confirm_disconnect'))) return
+                      disconnect.mutate(ch.id, {
+                        onSuccess: () => toast.success(t('integrations.toast_disconnected')),
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      })
+                    }}
+                    className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+                    aria-label={t('integrations.disconnect')}
+                    title={t('integrations.disconnect')}
+                  >
+                    <Trash2 className="size-3.5" strokeWidth={1.7} />
+                  </button>
+                ) : null}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                void salonId
-                toast.info(t('integrations.messengers.coming_soon'))
-              }}
-              className="border-border bg-card hover:bg-muted/40 inline-flex h-10 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
-            >
-              {t('integrations.messengers.connect')}
-            </button>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      <MessengerConnectDialog
+        open={!!openChannel}
+        channel={openChannel}
+        salonId={salonId}
+        onClose={() => setOpenChannel(null)}
+      />
+    </>
   )
 }
 

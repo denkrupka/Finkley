@@ -15,12 +15,14 @@ import {
 import { useReferralCode, useReferralUses } from '@/hooks/useReferral'
 
 /**
- * Жёлтая кнопка «Пригласи друзей» в TopBar.
- * Клик → модалка с реферальным линком, кнопками быстрой отправки в
- * Telegram / WhatsApp / Email и копированием в буфер. Снизу — статистика
- * приглашений (отправленные / активированные).
+ * Жёлтая кнопка «Пригласи друзей». Клик → модалка с линком, share-кнопками
+ * (TG/WA/Email/Copy) и статистикой.
+ *
+ * Варианты:
+ *  - `topbar` (по умолчанию, legacy): pill 36px в TopBar.
+ *  - `sidebar`: широкая кнопка во всю ширину футера сайдбара.
  */
-export function ReferralButton() {
+export function ReferralButton({ variant = 'topbar' }: { variant?: 'topbar' | 'sidebar' } = {}) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const { data: code } = useReferralCode()
@@ -47,6 +49,8 @@ export function ReferralButton() {
   const activated = uses.filter((u) => u.activated_at !== null).length
   const sent = uses.length
 
+  const isSidebar = variant === 'sidebar'
+
   return (
     <>
       <button
@@ -54,10 +58,20 @@ export function ReferralButton() {
         onClick={() => setOpen(true)}
         title={t('referral.button')}
         aria-label={t('referral.button')}
-        className="border-brand-yellow-deep/50 inline-flex h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-2.5 transition-shadow hover:shadow-sm sm:px-3"
+        className={
+          isSidebar
+            ? 'border-brand-yellow-deep/50 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-3 transition-shadow hover:shadow-sm'
+            : 'border-brand-yellow-deep/50 inline-flex h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-2.5 transition-shadow hover:shadow-sm sm:px-3'
+        }
       >
         <Gift className="text-brand-gold size-4" strokeWidth={2} />
-        <span className="text-brand-navy hidden text-[11px] font-bold sm:inline">
+        <span
+          className={
+            isSidebar
+              ? 'text-brand-navy text-[11px] font-bold'
+              : 'text-brand-navy hidden text-[11px] font-bold sm:inline'
+          }
+        >
           {t('referral.button')}
         </span>
       </button>

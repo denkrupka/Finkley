@@ -4,8 +4,6 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
-import { ReferralButton } from '@/components/ui/ReferralButton'
-import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
 import { useAuth } from '@/hooks/useAuth'
 import { NotificationsBell } from './NotificationsBell'
 import { SalonSwitcher } from './SalonSwitcher'
@@ -51,15 +49,10 @@ export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuCl
           period-selector внутри (Reports/Finance/Cashflow/Visits-list). */}
       <div className="flex flex-1" />
 
-      {/* Bell + theme + locale + referral + plan + avatar + sign-out */}
+      {/* Bell + locale + plan + avatar + sign-out
+          Тема и реферал перенесены в подвал сайдбара. */}
       <div className="flex items-center gap-2 sm:gap-3">
         <NotificationsBell salonId={salonId} />
-
-        <ReferralButton />
-
-        <div className="hidden lg:block">
-          <ThemeToggleButton />
-        </div>
 
         <div className="hidden lg:block">
           <LocaleSwitcher />

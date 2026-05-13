@@ -6,14 +6,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils/cn'
 
 /**
- * Мини-кнопка переключения темы в TopBar (рядом с языком).
- * Клик → popover с 3 опциями: System / Light / Dark.
+ * Мини-кнопка переключения темы. Клик → popover с 3 опциями: System / Light / Dark.
+ * Когда выбран `system`, иконка показывает текущую разрешённую тему (sun/moon),
+ * а маленький индикатор Monitor поверх отмечает «следую за ОС».
  */
-export function ThemeToggleButton() {
+export function ThemeToggleButton({ variant = 'topbar' }: { variant?: 'topbar' | 'sidebar' } = {}) {
   const { t } = useTranslation()
   const { theme, resolvedTheme, setTheme } = useTheme()
 
   const Icon = resolvedTheme === 'dark' ? Moon : Sun
+  const isSystem = theme === 'system'
+  const title = isSystem
+    ? `${t('settings.appearance.title')} · ${t('settings.appearance.theme_system')}`
+    : t('settings.appearance.title')
 
   const options: Array<{ value: Theme; icon: typeof Sun; labelKey: string }> = [
     { value: 'system', icon: Monitor, labelKey: 'settings.appearance.theme_system' },
@@ -26,11 +31,23 @@ export function ThemeToggleButton() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={t('settings.appearance.title')}
-          title={t('settings.appearance.title')}
-          className="border-border bg-card hover:bg-muted/40 grid size-9 place-items-center rounded-md border transition-colors"
+          aria-label={title}
+          title={title}
+          className={cn(
+            'border-border bg-card hover:bg-muted/40 relative grid place-items-center rounded-md border transition-colors',
+            variant === 'sidebar' ? 'size-9' : 'size-9',
+          )}
         >
           <Icon className="size-4" strokeWidth={1.7} />
+          {isSystem ? (
+            <span
+              aria-hidden
+              className="border-card bg-brand-teal absolute -bottom-1 -right-1 grid size-3.5 place-items-center rounded-full border"
+              title={t('settings.appearance.theme_system')}
+            >
+              <Monitor className="size-2 text-white" strokeWidth={2.5} />
+            </span>
+          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-44 p-1">

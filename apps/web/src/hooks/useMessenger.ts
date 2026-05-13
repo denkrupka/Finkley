@@ -103,6 +103,36 @@ export function useSendMessage(salonId: string | undefined) {
       media_kind?: MessengerMessage['media_kind']
     }) => {
       if (!salonId) throw new Error('no_salon')
+
+      // Текст без медиа — через edge function messenger-send (отправит в канал
+      // если канал connected и поддерживает send). Сложные кейсы (медиа) пока
+      // пишем напрямую в БД.
+      if (input.text && !input.media_path) {
+        const { data, error } = await supabase.functions.invoke('messenger-send', {
+          body: {
+            salon_id: salonId,
+            conversation_id: input.conversation_id,
+            text: input.text,
+          },
+        })
+        if (error) {
+          // Fallback: пишем напрямую если edge function недоступна.
+          const fallback = await supabase
+            .from('messenger_messages')
+            .insert({
+              conversation_id: input.conversation_id,
+              salon_id: salonId,
+              direction: 'out',
+              text: input.text ?? null,
+            })
+            .select('*')
+            .single()
+          if (fallback.error) throw fallback.error
+          return fallback.data as MessengerMessage
+        }
+        return data as MessengerMessage
+      }
+
       const { data, error } = await supabase
         .from('messenger_messages')
         .insert({
@@ -121,6 +151,57 @@ export function useSendMessage(salonId: string | undefined) {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['messenger-messages', vars.conversation_id] })
       qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}
+
+export function useConnectMessenger(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      channel: Exclude<MessengerChannel, 'internal'>
+      credentials: Record<string, string>
+    }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase.functions.invoke('messenger-connect', {
+        body: {
+          action: 'connect',
+          salon_id: salonId,
+          channel: input.channel,
+          credentials: input.credentials,
+        },
+      })
+      if (error) throw error
+      const payload = data as {
+        ok?: boolean
+        status?: 'connected' | 'pending'
+        external_account_id?: string
+        display_name?: string
+        error?: string
+        message?: string
+      }
+      if (!payload?.ok) throw new Error(payload?.message ?? payload?.error ?? 'connect_failed')
+      return payload as { status: 'connected' | 'pending' }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-integrations', salonId] })
+    },
+  })
+}
+
+export function useDisconnectMessenger(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (channel: Exclude<MessengerChannel, 'internal'>) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase.functions.invoke('messenger-connect', {
+        body: { action: 'disconnect', salon_id: salonId, channel },
+      })
+      if (error) throw error
+      return data as { ok: boolean }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-integrations', salonId] })
     },
   })
 }

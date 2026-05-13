@@ -32,6 +32,10 @@ export type ExpenseRow = {
    *   currency_original — оригинальная валюта (для импортов)
    */
   metadata: Record<string, unknown> | null
+  /** Контрагент / поставщик (для ДДС-детализации). */
+  contractor_name: string | null
+  /** Под-статья — иерархическая детализация внутри category. */
+  sub_article: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -124,7 +128,7 @@ export function useExpenses(
       let q = supabase
         .from('expenses')
         .select(
-          'id, salon_id, category_id, expense_at, amount_cents, payment_method, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, created_at, updated_at, deleted_at',
+          'id, salon_id, category_id, expense_at, amount_cents, payment_method, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_at, updated_at, deleted_at',
         )
         .eq('salon_id', salonId)
         .is('deleted_at', null)

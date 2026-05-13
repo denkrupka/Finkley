@@ -1,17 +1,37 @@
 ---
 import Layout from '../../layouts/Layout.astro'
 import { getCollection, type CollectionEntry } from 'astro:content'
+import { marked } from 'marked'
+import { loadDbPosts, type DbPost } from '../../lib/db-posts'
+
+type MdPost = { kind: 'md'; entry: CollectionEntry<'media'> }
+type DbProp = { kind: 'db'; post: DbPost }
+type PostProp = MdPost | DbProp
 
 export async function getStaticPaths() {
-  const posts = await getCollection('media', ({ data }) => !data.draft)
-  return posts.map((post) => ({
-    params: { slug: post.slug },
-    props: { post },
-  }))
+  const mdPosts = await getCollection('media', ({ data }) => !data.draft)
+  const dbPosts = await loadDbPosts()
+  const seen = new Set<string>()
+  const paths: Array<{ params: { slug: string }; props: PostProp }> = []
+  for (const entry of mdPosts) {
+    seen.add(entry.slug)
+    paths.push({ params: { slug: entry.slug }, props: { kind: 'md', entry } })
+  }
+  for (const dbp of dbPosts) {
+    if (seen.has(dbp.slug)) continue
+    paths.push({ params: { slug: dbp.slug }, props: { kind: 'db', post: dbp } })
+  }
+  return paths
 }
 
-const { post } = Astro.props as { post: CollectionEntry<'media'> }
-const { Content } = await post.render()
+const props = Astro.props as PostProp
+
+const data = props.kind === 'md' ? props.entry.data : props.post.data
+const renderedHtml =
+  props.kind === 'md' ? null : marked.parse(props.post.body ?? '', { async: false }) as string
+
+const ContentComp =
+  props.kind === 'md' ? (await props.entry.render()).Content : null
 
 function fmt(d: Date): string {
   return new Intl.DateTimeFormat('ru-RU', {
@@ -20,6 +40,8 @@ function fmt(d: Date): string {
     year: 'numeric',
   }).format(d)
 }
+
+const post = { data }
 ---
 
 <Layout title={`${post.data.title} — Finkley`} description={post.data.description} active="media">
@@ -47,7 +69,7 @@ function fmt(d: Date): string {
     </header>
     <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div class="prose prose-slate max-w-none prose-h2:text-brand-navy prose-h3:text-brand-navy prose-a:text-brand-teal">
-        <Content />
+        {ContentComp ? <ContentComp /> : <div set:html={renderedHtml ?? ''} />}
       </div>
       <div class="mt-12 rounded-xl border border-brand-border bg-white p-6 text-center">
         <p class="text-lg font-bold text-brand-navy">Веди финансы салона как пилот — на приборах.</p>

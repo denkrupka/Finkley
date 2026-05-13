@@ -1,4 +1,4 @@
-import { SlidersHorizontal } from 'lucide-react'
+import { Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -11,285 +11,252 @@ import {
   DEFAULT_FINANCIAL_SETTINGS,
   useFinancialSettings,
   useUpdateFinancialSettings,
+  type CustomItem,
+  type CustomPctItem,
   type FinancialSettings,
 } from '@/hooks/useFinancialSettings'
 import { useSalon } from '@/hooks/useSalons'
 
 /**
- * Вкладка «Параметры» в Настройках салона.
- * Вводные данные owner'а для финансовых расчётов:
- *   - стартовые остатки касс
- *   - постоянные расходы в месяц
- *   - переменные расходы (% от выручки)
- *   - прочие плановые доходы
- *   - налоги в месяц
- *   - плановые инвестиции
- *   - вложение/распределение денег
+ * «Параметры» в Финансах. По каждой группе:
+ *   - набор preset-полей (рент, ZUS, налоги, …) — редактируемые
+ *   - блок «Свои позиции»: add / edit / archive / restore
  *
- * Все суммы в локальной валюте salon.currency. Internally — bigint в центах.
+ * При архивировании item помечается `active=false` — исторические расчёты
+ * не теряют ссылку на названия.
  */
+
+type FieldKind = 'money' | 'percent'
+
+type FieldDef<S extends keyof FinancialSettings> = {
+  path: keyof FinancialSettings[S]
+  labelKey: string
+  kind: FieldKind
+}
+
+type GroupDef<S extends keyof FinancialSettings = keyof FinancialSettings> = {
+  section: S
+  titleKey: string
+  subtitleKey?: string
+  /** Тип customs у этой секции — money (CustomItem) или percent (CustomPctItem) */
+  customKind: FieldKind
+  fields: FieldDef<S>[]
+}
+
+type AnyGroupDef =
+  | GroupDef<'cash_registers'>
+  | GroupDef<'fixed'>
+  | GroupDef<'other_income'>
+  | GroupDef<'variable'>
+  | GroupDef<'taxes'>
+  | GroupDef<'investments'>
+  | GroupDef<'flows'>
 
 const GROUPS = [
   {
+    section: 'cash_registers',
     titleKey: 'settings.parameters.cash.title',
     subtitleKey: 'settings.parameters.cash.subtitle',
-    section: 'cash_registers' as const,
+    customKind: 'money',
     fields: [
+      { path: 'director_cents', labelKey: 'settings.parameters.cash.director', kind: 'money' },
+      { path: 'safe_cents', labelKey: 'settings.parameters.cash.safe', kind: 'money' },
+      { path: 'gotowka_cents', labelKey: 'settings.parameters.cash.gotowka', kind: 'money' },
+      { path: 'bank_karta_cents', labelKey: 'settings.parameters.cash.bank_karta', kind: 'money' },
       {
-        path: 'director_cents' as const,
-        labelKey: 'settings.parameters.cash.director',
-        kind: 'money' as const,
-      },
-      {
-        path: 'safe_cents' as const,
-        labelKey: 'settings.parameters.cash.safe',
-        kind: 'money' as const,
-      },
-      {
-        path: 'gotowka_cents' as const,
-        labelKey: 'settings.parameters.cash.gotowka',
-        kind: 'money' as const,
-      },
-      {
-        path: 'bank_karta_cents' as const,
-        labelKey: 'settings.parameters.cash.bank_karta',
-        kind: 'money' as const,
-      },
-      {
-        path: 'karta_terminal_cents' as const,
+        path: 'karta_terminal_cents',
         labelKey: 'settings.parameters.cash.karta_terminal',
-        kind: 'money' as const,
+        kind: 'money',
       },
     ],
-  },
+  } as GroupDef<'cash_registers'>,
   {
+    section: 'fixed',
     titleKey: 'settings.parameters.fixed.title',
     subtitleKey: 'settings.parameters.fixed.subtitle',
-    section: 'fixed' as const,
+    customKind: 'money',
     fields: [
       {
-        path: 'payroll_management_cents' as const,
+        path: 'payroll_management_cents',
         labelKey: 'settings.parameters.fixed.payroll_management',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'payroll_admin_cents' as const,
+        path: 'payroll_admin_cents',
         labelKey: 'settings.parameters.fixed.payroll_admin',
-        kind: 'money' as const,
+        kind: 'money',
       },
+      { path: 'zus_cents', labelKey: 'settings.parameters.fixed.zus', kind: 'money' },
+      { path: 'rent_cents', labelKey: 'settings.parameters.fixed.rent', kind: 'money' },
       {
-        path: 'zus_cents' as const,
-        labelKey: 'settings.parameters.fixed.zus',
-        kind: 'money' as const,
-      },
-      {
-        path: 'rent_cents' as const,
-        labelKey: 'settings.parameters.fixed.rent',
-        kind: 'money' as const,
-      },
-      {
-        path: 'electricity_cents' as const,
+        path: 'electricity_cents',
         labelKey: 'settings.parameters.fixed.electricity',
-        kind: 'money' as const,
+        kind: 'money',
       },
+      { path: 'ad_budget_cents', labelKey: 'settings.parameters.fixed.ad_budget', kind: 'money' },
+      { path: 'smm_cents', labelKey: 'settings.parameters.fixed.smm', kind: 'money' },
+      { path: 'internet_cents', labelKey: 'settings.parameters.fixed.internet', kind: 'money' },
       {
-        path: 'ad_budget_cents' as const,
-        labelKey: 'settings.parameters.fixed.ad_budget',
-        kind: 'money' as const,
-      },
-      {
-        path: 'smm_cents' as const,
-        labelKey: 'settings.parameters.fixed.smm',
-        kind: 'money' as const,
-      },
-      {
-        path: 'internet_cents' as const,
-        labelKey: 'settings.parameters.fixed.internet',
-        kind: 'money' as const,
-      },
-      {
-        path: 'services_subscription_cents' as const,
+        path: 'services_subscription_cents',
         labelKey: 'settings.parameters.fixed.services_subscription',
-        kind: 'money' as const,
+        kind: 'money',
       },
+      { path: 'cleaning_cents', labelKey: 'settings.parameters.fixed.cleaning', kind: 'money' },
+      { path: 'household_cents', labelKey: 'settings.parameters.fixed.household', kind: 'money' },
+      { path: 'leasing_cents', labelKey: 'settings.parameters.fixed.leasing', kind: 'money' },
       {
-        path: 'cleaning_cents' as const,
-        labelKey: 'settings.parameters.fixed.cleaning',
-        kind: 'money' as const,
-      },
-      {
-        path: 'household_cents' as const,
-        labelKey: 'settings.parameters.fixed.household',
-        kind: 'money' as const,
-      },
-      {
-        path: 'leasing_cents' as const,
-        labelKey: 'settings.parameters.fixed.leasing',
-        kind: 'money' as const,
-      },
-      {
-        path: 'repair_equipment_cents' as const,
+        path: 'repair_equipment_cents',
         labelKey: 'settings.parameters.fixed.repair_equipment',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'bank_services_cents' as const,
+        path: 'bank_services_cents',
         labelKey: 'settings.parameters.fixed.bank_services',
-        kind: 'money' as const,
+        kind: 'money',
       },
-      {
-        path: 'accounting_cents' as const,
-        labelKey: 'settings.parameters.fixed.accounting',
-        kind: 'money' as const,
-      },
-      {
-        path: 'fuel_cents' as const,
-        labelKey: 'settings.parameters.fixed.fuel',
-        kind: 'money' as const,
-      },
-      {
-        path: 'other_cents' as const,
-        labelKey: 'settings.parameters.fixed.other',
-        kind: 'money' as const,
-      },
+      { path: 'accounting_cents', labelKey: 'settings.parameters.fixed.accounting', kind: 'money' },
+      { path: 'fuel_cents', labelKey: 'settings.parameters.fixed.fuel', kind: 'money' },
+      { path: 'other_cents', labelKey: 'settings.parameters.fixed.other', kind: 'money' },
     ],
-  },
+  } as GroupDef<'fixed'>,
   {
+    section: 'other_income',
     titleKey: 'settings.parameters.other_income.title',
     subtitleKey: 'settings.parameters.other_income.subtitle',
-    section: 'other_income' as const,
+    customKind: 'money',
     fields: [
       {
-        path: 'monthly_cents' as const,
+        path: 'monthly_cents',
         labelKey: 'settings.parameters.other_income.monthly',
-        kind: 'money' as const,
+        kind: 'money',
       },
     ],
-  },
+  } as GroupDef<'other_income'>,
   {
+    section: 'variable',
     titleKey: 'settings.parameters.variable.title',
     subtitleKey: 'settings.parameters.variable.subtitle',
-    section: 'variable' as const,
+    customKind: 'percent',
     fields: [
       {
-        path: 'admin_payroll_pct' as const,
+        path: 'admin_payroll_pct',
         labelKey: 'settings.parameters.variable.admin_payroll',
-        kind: 'percent' as const,
+        kind: 'percent',
       },
       {
-        path: 'bank_commission_pct' as const,
+        path: 'bank_commission_pct',
         labelKey: 'settings.parameters.variable.bank_commission',
-        kind: 'percent' as const,
+        kind: 'percent',
       },
       {
-        path: 'ad_budget_pct' as const,
+        path: 'ad_budget_pct',
         labelKey: 'settings.parameters.variable.ad_budget',
-        kind: 'percent' as const,
+        kind: 'percent',
       },
-      {
-        path: 'bonuses_pct' as const,
-        labelKey: 'settings.parameters.variable.bonuses',
-        kind: 'percent' as const,
-      },
+      { path: 'bonuses_pct', labelKey: 'settings.parameters.variable.bonuses', kind: 'percent' },
     ],
-  },
+  } as GroupDef<'variable'>,
   {
+    section: 'taxes',
     titleKey: 'settings.parameters.taxes.title',
     subtitleKey: 'settings.parameters.taxes.subtitle',
-    section: 'taxes' as const,
+    customKind: 'money',
     fields: [
-      {
-        path: 'pit36_cents' as const,
-        labelKey: 'settings.parameters.taxes.pit36',
-        kind: 'money' as const,
-      },
-      {
-        path: 'vat_cents' as const,
-        labelKey: 'settings.parameters.taxes.vat',
-        kind: 'money' as const,
-      },
-      {
-        path: 'cit_cents' as const,
-        labelKey: 'settings.parameters.taxes.cit',
-        kind: 'money' as const,
-      },
-      {
-        path: 'pit3_cents' as const,
-        labelKey: 'settings.parameters.taxes.pit3',
-        kind: 'money' as const,
-      },
+      { path: 'pit36_cents', labelKey: 'settings.parameters.taxes.pit36', kind: 'money' },
+      { path: 'vat_cents', labelKey: 'settings.parameters.taxes.vat', kind: 'money' },
+      { path: 'cit_cents', labelKey: 'settings.parameters.taxes.cit', kind: 'money' },
+      { path: 'pit3_cents', labelKey: 'settings.parameters.taxes.pit3', kind: 'money' },
     ],
-  },
+  } as GroupDef<'taxes'>,
   {
+    section: 'investments',
     titleKey: 'settings.parameters.investments.title',
     subtitleKey: 'settings.parameters.investments.subtitle',
-    section: 'investments' as const,
+    customKind: 'money',
     fields: [
       {
-        path: 'franchise_fee_cents' as const,
+        path: 'franchise_fee_cents',
         labelKey: 'settings.parameters.investments.franchise_fee',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'first_rent_cents' as const,
+        path: 'first_rent_cents',
         labelKey: 'settings.parameters.investments.first_rent',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'renovation_cents' as const,
+        path: 'renovation_cents',
         labelKey: 'settings.parameters.investments.renovation',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'equipment_cents' as const,
+        path: 'equipment_cents',
         labelKey: 'settings.parameters.investments.equipment',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'inventory_cents' as const,
+        path: 'inventory_cents',
         labelKey: 'settings.parameters.investments.inventory',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'furniture_cents' as const,
+        path: 'furniture_cents',
         labelKey: 'settings.parameters.investments.furniture',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'other_cents' as const,
+        path: 'other_cents',
         labelKey: 'settings.parameters.investments.other',
-        kind: 'money' as const,
+        kind: 'money',
       },
     ],
-  },
+  } as GroupDef<'investments'>,
   {
+    section: 'flows',
     titleKey: 'settings.parameters.flows.title',
     subtitleKey: 'settings.parameters.flows.subtitle',
-    section: 'flows' as const,
+    customKind: 'money',
     fields: [
+      { path: 'dividends_cents', labelKey: 'settings.parameters.flows.dividends', kind: 'money' },
       {
-        path: 'dividends_cents' as const,
-        labelKey: 'settings.parameters.flows.dividends',
-        kind: 'money' as const,
-      },
-      {
-        path: 'owner_contributions_cents' as const,
+        path: 'owner_contributions_cents',
         labelKey: 'settings.parameters.flows.owner_contributions',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'owner_loans_cents' as const,
+        path: 'owner_loans_cents',
         labelKey: 'settings.parameters.flows.owner_loans',
-        kind: 'money' as const,
+        kind: 'money',
       },
       {
-        path: 'other_loans_cents' as const,
+        path: 'other_loans_cents',
         labelKey: 'settings.parameters.flows.other_loans',
-        kind: 'money' as const,
+        kind: 'money',
       },
     ],
-  },
-]
+  } as GroupDef<'flows'>,
+] satisfies ReadonlyArray<AnyGroupDef>
+
+type AnyCustomItem = CustomItem | CustomPctItem
+function isPct(item: AnyCustomItem): item is CustomPctItem {
+  return (item as CustomPctItem).pct !== undefined
+}
+
+/** Нормализует legacy fixed.custom (monthly_cents) к amount_cents. */
+function normalizeCustomMoney(
+  list: Array<CustomItem & { monthly_cents?: number }> | undefined,
+): CustomItem[] {
+  if (!list) return []
+  return list.map((it) => ({
+    id: it.id,
+    label: it.label,
+    amount_cents:
+      it.amount_cents !== undefined
+        ? it.amount_cents
+        : (((it as { monthly_cents?: number }).monthly_cents ?? 0) as number),
+    active: it.active !== false,
+  }))
+}
 
 export function ParametersCard() {
   const { t } = useTranslation()
@@ -309,7 +276,7 @@ export function ParametersCard() {
     section: K,
     path: P,
     valueDisplay: string,
-    kind: 'money' | 'percent',
+    kind: FieldKind,
   ) {
     const n = Number(valueDisplay.replace(',', '.'))
     if (!Number.isFinite(n) || n < 0) return
@@ -324,11 +291,21 @@ export function ParametersCard() {
   function fieldDisplay<K extends keyof FinancialSettings, P extends keyof FinancialSettings[K]>(
     section: K,
     path: P,
-    kind: 'money' | 'percent',
+    kind: FieldKind,
   ): string {
     const v = draft[section][path] as unknown as number
     if (kind === 'money') return String((v ?? 0) / 100)
     return String(v ?? 0)
+  }
+
+  function setCustom<K extends keyof FinancialSettings>(section: K, next: AnyCustomItem[]) {
+    setDraft((prev) => {
+      const groupPrev = prev[section] as unknown as Record<string, unknown>
+      return {
+        ...prev,
+        [section]: { ...groupPrev, custom: next },
+      } as FinancialSettings
+    })
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -366,56 +343,61 @@ export function ParametersCard() {
         </div>
       </div>
 
-      {GROUPS.map((group) => (
-        <section
-          key={group.section}
-          className="border-border bg-card shadow-finsm rounded-lg border p-5"
-        >
-          <header className="border-border mb-4 border-b pb-3">
-            <h3 className="text-brand-navy text-base font-bold tracking-tight">
-              {t(group.titleKey)}
-            </h3>
-            {group.subtitleKey ? (
-              <p className="text-muted-foreground mt-0.5 text-xs">{t(group.subtitleKey)}</p>
-            ) : null}
-          </header>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.fields.map((field) => (
-              <FieldRow
-                key={String(field.path)}
-                label={t(field.labelKey)}
-                kind={field.kind}
-                currency={currency}
-                value={fieldDisplay(
-                  group.section,
-                  field.path as keyof FinancialSettings[typeof group.section],
-                  field.kind,
-                )}
-                onChange={(v) =>
-                  setField(
+      {GROUPS.map((group) => {
+        const sectionData = draft[group.section] as unknown as Record<string, unknown>
+        const rawCustom = (sectionData.custom ?? []) as AnyCustomItem[]
+        const customList: AnyCustomItem[] =
+          group.customKind === 'money'
+            ? normalizeCustomMoney(rawCustom as Array<CustomItem & { monthly_cents?: number }>)
+            : (rawCustom as CustomPctItem[])
+        return (
+          <section
+            key={group.section}
+            className="border-border bg-card shadow-finsm rounded-lg border p-5"
+          >
+            <header className="border-border mb-4 border-b pb-3">
+              <h3 className="text-brand-navy text-base font-bold tracking-tight">
+                {t(group.titleKey)}
+              </h3>
+              {group.subtitleKey ? (
+                <p className="text-muted-foreground mt-0.5 text-xs">{t(group.subtitleKey)}</p>
+              ) : null}
+            </header>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {group.fields.map((field) => (
+                <FieldRow
+                  key={String(field.path)}
+                  label={t(field.labelKey)}
+                  kind={field.kind}
+                  currency={currency}
+                  value={fieldDisplay(
                     group.section,
                     field.path as keyof FinancialSettings[typeof group.section],
-                    v,
                     field.kind,
-                  )
-                }
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+                  )}
+                  onChange={(v) =>
+                    setField(
+                      group.section,
+                      field.path as keyof FinancialSettings[typeof group.section],
+                      v,
+                      field.kind,
+                    )
+                  }
+                />
+              ))}
+            </div>
 
-      {/* Custom Постоянные расходы — owner добавляет свои позиции.
-          При «удалении» позиция помечается active=false (история фин. отчёта
-          не ломается — если она была активна в нужном месяце, расчёт
-          использует её на тот период). */}
-      <CustomFixedExpenses
-        items={draft.fixed.custom ?? []}
-        currency={currency}
-        onChange={(next) =>
-          setDraft((prev) => ({ ...prev, fixed: { ...prev.fixed, custom: next } }))
-        }
-      />
+            <CustomList
+              section={group.section}
+              kind={group.customKind}
+              items={customList}
+              currency={currency}
+              onChange={(next) => setCustom(group.section, next)}
+            />
+          </section>
+        )
+      })}
 
       <div className="border-border bg-card shadow-finsm sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-lg border p-3">
         <p className="text-muted-foreground text-xs">{t('settings.parameters.save_hint')}</p>
@@ -427,103 +409,111 @@ export function ParametersCard() {
   )
 }
 
-type CustomItem = { id: string; label: string; monthly_cents: number; active: boolean }
-
-function CustomFixedExpenses({
+function CustomList({
+  section,
+  kind,
   items,
   currency,
   onChange,
 }: {
-  items: CustomItem[]
+  section: keyof FinancialSettings
+  kind: FieldKind
+  items: AnyCustomItem[]
   currency: string
-  onChange: (next: CustomItem[]) => void
+  onChange: (next: AnyCustomItem[]) => void
 }) {
   const { t } = useTranslation()
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
 
   function addItem() {
-    onChange([
-      ...items,
-      {
-        id: crypto.randomUUID(),
-        label: '',
-        monthly_cents: 0,
-        active: true,
-      },
-    ])
+    const base = { id: crypto.randomUUID(), label: '', active: true }
+    const next: AnyCustomItem =
+      kind === 'money' ? { ...base, amount_cents: 0 } : { ...base, pct: 0 }
+    onChange([...items, next])
   }
 
-  function updateItem(id: string, patch: Partial<CustomItem>) {
-    onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  function updateItem(id: string, patch: Partial<CustomItem & CustomPctItem>) {
+    onChange(items.map((it) => (it.id === id ? ({ ...it, ...patch } as AnyCustomItem) : it)))
   }
 
   function archiveItem(id: string) {
-    // Soft-delete: помечаем неактивным чтобы исторический отчёт не сломался
-    onChange(items.map((it) => (it.id === id ? { ...it, active: false } : it)))
+    onChange(items.map((it) => (it.id === id ? ({ ...it, active: false } as AnyCustomItem) : it)))
   }
 
   function restoreItem(id: string) {
-    onChange(items.map((it) => (it.id === id ? { ...it, active: true } : it)))
+    onChange(items.map((it) => (it.id === id ? ({ ...it, active: true } as AnyCustomItem) : it)))
+  }
+
+  function deleteItem(id: string) {
+    onChange(items.filter((it) => it.id !== id))
   }
 
   const active = items.filter((it) => it.active)
   const archived = items.filter((it) => !it.active)
 
   return (
-    <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
-      <header className="border-border mb-4 flex items-start justify-between gap-3 border-b pb-3">
-        <div>
-          <h3 className="text-brand-navy text-base font-bold tracking-tight">
-            {t('settings.parameters.custom_fixed.title')}
-          </h3>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {t('settings.parameters.custom_fixed.subtitle')}
-          </p>
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={addItem}>
-          + {t('settings.parameters.custom_fixed.add')}
+    <div className="border-border mt-5 border-t pt-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-xs">
+          {t('settings.parameters.custom_section.title')}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addItem}
+          data-testid={`add-custom-${section}`}
+        >
+          <Plus className="size-3.5" strokeWidth={2} />
+          {t('settings.parameters.custom_section.add')}
         </Button>
-      </header>
+      </div>
 
       {active.length === 0 && archived.length === 0 ? (
-        <p className="text-muted-foreground text-sm italic">
-          {t('settings.parameters.custom_fixed.empty')}
+        <p className="text-muted-foreground text-xs italic">
+          {t('settings.parameters.custom_section.empty')}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-1.5">
           {active.map((it) => (
             <li key={it.id} className="border-border flex items-center gap-2 rounded-md border p-2">
               <Input
                 value={it.label}
                 onChange={(e) => updateItem(it.id, { label: e.target.value })}
-                placeholder={t('settings.parameters.custom_fixed.label_placeholder')}
+                placeholder={t('settings.parameters.custom_section.label_placeholder')}
                 className="h-9 flex-1 text-sm"
               />
-              <div className="border-border bg-card flex h-9 w-32 items-center gap-1.5 rounded-md border px-2">
+              <div className="border-border bg-card flex h-9 w-28 items-center gap-1.5 rounded-md border px-2">
                 <Input
                   type="number"
                   inputMode="decimal"
                   step="any"
                   min="0"
-                  value={String((it.monthly_cents ?? 0) / 100)}
+                  value={isPct(it) ? String(it.pct ?? 0) : String((it.amount_cents ?? 0) / 100)}
                   onChange={(e) => {
                     const n = Number(e.target.value.replace(',', '.'))
                     if (!Number.isFinite(n) || n < 0) return
-                    updateItem(it.id, { monthly_cents: Math.round(n * 100) })
+                    if (kind === 'percent') {
+                      if (n > 100) return
+                      updateItem(it.id, { pct: n })
+                    } else {
+                      updateItem(it.id, { amount_cents: Math.round(n * 100) })
+                    }
                   }}
                   className="num h-full border-0 bg-transparent px-0 text-right text-sm shadow-none focus-visible:ring-0"
                 />
                 <span className="text-muted-foreground text-xs font-semibold">
-                  {currencySymbol}
+                  {kind === 'money' ? currencySymbol : '%'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => archiveItem(it.id)}
                 className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                title={t('settings.parameters.custom_fixed.archive')}
+                title={t('settings.parameters.custom_section.archive')}
+                aria-label={t('settings.parameters.custom_section.archive')}
               >
-                ✕
+                <Trash2 className="size-3.5" strokeWidth={1.8} />
               </button>
             </li>
           ))}
@@ -531,7 +521,7 @@ function CustomFixedExpenses({
           {archived.length > 0 ? (
             <details className="mt-2">
               <summary className="text-muted-foreground cursor-pointer text-xs">
-                {t('settings.parameters.custom_fixed.archived', { count: archived.length })}
+                {t('settings.parameters.custom_section.archived', { count: archived.length })}
               </summary>
               <ul className="mt-2 flex flex-col gap-1.5">
                 {archived.map((it) => (
@@ -540,13 +530,24 @@ function CustomFixedExpenses({
                     className="text-muted-foreground bg-muted/30 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs"
                   >
                     <span className="line-through">{it.label || '—'}</span>
-                    <button
-                      type="button"
-                      onClick={() => restoreItem(it.id)}
-                      className="text-secondary font-semibold hover:underline"
-                    >
-                      {t('settings.parameters.custom_fixed.restore')}
-                    </button>
+                    <span className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => restoreItem(it.id)}
+                        className="text-secondary inline-flex items-center gap-1 font-semibold hover:underline"
+                      >
+                        <Undo2 className="size-3" strokeWidth={2} />
+                        {t('settings.parameters.custom_section.restore')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteItem(it.id)}
+                        className="hover:text-destructive font-semibold"
+                        title={t('settings.parameters.custom_section.delete_permanent')}
+                      >
+                        ✕
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -555,10 +556,10 @@ function CustomFixedExpenses({
         </ul>
       )}
 
-      <p className="text-muted-foreground mt-3 text-[11px]">
-        {t('settings.parameters.custom_fixed.history_hint')}
+      <p className="text-muted-foreground mt-2 text-[11px]">
+        {t('settings.parameters.custom_section.history_hint')}
       </p>
-    </section>
+    </div>
   )
 }
 
@@ -570,7 +571,7 @@ function FieldRow({
   onChange,
 }: {
   label: string
-  kind: 'money' | 'percent'
+  kind: FieldKind
   currency: string
   value: string
   onChange: (v: string) => void

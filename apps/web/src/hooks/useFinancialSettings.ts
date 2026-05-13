@@ -10,12 +10,16 @@ import { supabase } from '@/lib/supabase/client'
  * Все денежные значения — в центах (cents/копейки). Проценты — 0..100.
  */
 
+export type CustomItem = { id: string; label: string; amount_cents: number; active: boolean }
+export type CustomPctItem = { id: string; label: string; pct: number; active: boolean }
+
 export type CashRegisters = {
   director_cents: number
   safe_cents: number
   gotowka_cents: number
   bank_karta_cents: number
   karta_terminal_cents: number
+  custom?: CustomItem[]
 }
 
 export type FixedExpenses = {
@@ -36,10 +40,16 @@ export type FixedExpenses = {
   accounting_cents: number
   fuel_cents: number
   other_cents: number
-  /** Кастомные позиции добавленные владельцем. Если позицию ранее
-   *  использовали в финансовом отчёте — её можно архивировать (active=false),
-   *  чтобы исторические расчёты не сломались. */
-  custom?: Array<{ id: string; label: string; monthly_cents: number; active: boolean }>
+  /** Кастомные позиции добавленные владельцем. Архив (active=false) сохраняет
+   *  историю — если позиция использовалась в фин. отчёте за прошлые периоды,
+   *  расчёт не ломается. Legacy: поле monthly_cents оставлено для обратной
+   *  совместимости и читается параллельно с amount_cents в UI. */
+  custom?: Array<
+    CustomItem & {
+      /** @deprecated используется amount_cents — оставлено для существующих записей */
+      monthly_cents?: number
+    }
+  >
 }
 
 export type VariableExpenses = {
@@ -48,10 +58,12 @@ export type VariableExpenses = {
   bank_commission_pct: number
   ad_budget_pct: number
   bonuses_pct: number
+  custom?: CustomPctItem[]
 }
 
 export type OtherIncomePlanned = {
   monthly_cents: number
+  custom?: CustomItem[]
 }
 
 export type Taxes = {
@@ -59,6 +71,7 @@ export type Taxes = {
   vat_cents: number
   cit_cents: number
   pit3_cents: number
+  custom?: CustomItem[]
 }
 
 export type Investments = {
@@ -69,6 +82,7 @@ export type Investments = {
   inventory_cents: number
   furniture_cents: number
   other_cents: number
+  custom?: CustomItem[]
 }
 
 export type MoneyFlows = {
@@ -76,6 +90,7 @@ export type MoneyFlows = {
   owner_contributions_cents: number
   owner_loans_cents: number
   other_loans_cents: number
+  custom?: CustomItem[]
 }
 
 export type FinancialSettings = {
@@ -95,6 +110,7 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
     gotowka_cents: 0,
     bank_karta_cents: 0,
     karta_terminal_cents: 0,
+    custom: [],
   },
   fixed: {
     payroll_management_cents: 0,
@@ -121,15 +137,18 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
     bank_commission_pct: 0,
     ad_budget_pct: 0,
     bonuses_pct: 0,
+    custom: [],
   },
   other_income: {
     monthly_cents: 0,
+    custom: [],
   },
   taxes: {
     pit36_cents: 0,
     vat_cents: 0,
     cit_cents: 0,
     pit3_cents: 0,
+    custom: [],
   },
   investments: {
     franchise_fee_cents: 0,
@@ -139,12 +158,14 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
     inventory_cents: 0,
     furniture_cents: 0,
     other_cents: 0,
+    custom: [],
   },
   flows: {
     dividends_cents: 0,
     owner_contributions_cents: 0,
     owner_loans_cents: 0,
     other_loans_cents: 0,
+    custom: [],
   },
 }
 

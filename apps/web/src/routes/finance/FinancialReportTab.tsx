@@ -554,18 +554,27 @@ function sumFixedCents(s: FinancialSettings): number {
     f.other_cents
   const custom = (f.custom ?? [])
     .filter((c) => c.active)
-    .reduce((s, c) => s + (c.monthly_cents ?? 0), 0)
+    .reduce((s, c) => s + customAmountCents(c), 0)
   return base + custom
+}
+
+function customAmountCents(c: { amount_cents?: number; monthly_cents?: number }): number {
+  // Поддерживаем legacy monthly_cents — старые записи использовали именно его.
+  return c.amount_cents ?? c.monthly_cents ?? 0
 }
 
 function sumTaxesCents(s: FinancialSettings): number {
   const t = s.taxes
-  return t.pit36_cents + t.vat_cents + t.cit_cents + t.pit3_cents
+  const base = t.pit36_cents + t.vat_cents + t.cit_cents + t.pit3_cents
+  const custom = (t.custom ?? [])
+    .filter((c) => c.active)
+    .reduce((s, c) => s + customAmountCents(c), 0)
+  return base + custom
 }
 
 function sumInvestmentsCents(s: FinancialSettings): number {
   const i = s.investments
-  return (
+  const base =
     i.franchise_fee_cents +
     i.first_rent_cents +
     i.renovation_cents +
@@ -573,12 +582,20 @@ function sumInvestmentsCents(s: FinancialSettings): number {
     i.inventory_cents +
     i.furniture_cents +
     i.other_cents
-  )
+  const custom = (i.custom ?? [])
+    .filter((c) => c.active)
+    .reduce((s, c) => s + customAmountCents(c), 0)
+  return base + custom
 }
 
 function sumFlowsCents(s: FinancialSettings): number {
   const f = s.flows
-  return f.dividends_cents + f.owner_contributions_cents + f.owner_loans_cents + f.other_loans_cents
+  const base =
+    f.dividends_cents + f.owner_contributions_cents + f.owner_loans_cents + f.other_loans_cents
+  const custom = (f.custom ?? [])
+    .filter((c) => c.active)
+    .reduce((s, c) => s + customAmountCents(c), 0)
+  return base + custom
 }
 
 function sumCashRegistersCents(s: FinancialSettings): number {
@@ -638,7 +655,7 @@ function buildFixedRows(settings: FinancialSettings, t: (k: string) => string) {
     .filter((c) => c.active)
     .map((c) => ({
       label: c.label || '—',
-      values: Array.from({ length: 12 }, () => -(c.monthly_cents ?? 0)),
+      values: Array.from({ length: 12 }, () => -customAmountCents(c)),
       indent: 2,
     }))
   return [...standard, ...custom]
@@ -658,13 +675,23 @@ function buildInvestmentRows(
     ['furniture_cents', 'settings.parameters.investments.furniture'],
     ['other_cents', 'settings.parameters.investments.other'],
   ] as const
-  return INV.map(([key, labelKey]) => ({
+  const standard = INV.map(([key, labelKey]) => ({
     label: t(labelKey),
     values: Array.from({ length: 12 }, (_, m) =>
-      m === currentMonthIdx ? -settings.investments[key as keyof typeof settings.investments] : 0,
+      m === currentMonthIdx ? -(settings.investments[key] as number) : 0,
     ),
     indent: 1,
   }))
+  const custom = (settings.investments.custom ?? [])
+    .filter((c) => c.active)
+    .map((c) => ({
+      label: c.label || '—',
+      values: Array.from({ length: 12 }, (_, m) =>
+        m === currentMonthIdx ? -customAmountCents(c) : 0,
+      ),
+      indent: 1,
+    }))
+  return [...standard, ...custom]
 }
 
 function buildFlowRows(settings: FinancialSettings, t: (k: string) => string) {
@@ -674,9 +701,17 @@ function buildFlowRows(settings: FinancialSettings, t: (k: string) => string) {
     ['owner_loans_cents', 'settings.parameters.flows.owner_loans'],
     ['other_loans_cents', 'settings.parameters.flows.other_loans'],
   ] as const
-  return FLOW.map(([key, labelKey]) => ({
+  const standard = FLOW.map(([key, labelKey]) => ({
     label: t(labelKey),
-    values: Array.from({ length: 12 }, () => -settings.flows[key as keyof typeof settings.flows]),
+    values: Array.from({ length: 12 }, () => -(settings.flows[key] as number)),
     indent: 1,
   }))
+  const custom = (settings.flows.custom ?? [])
+    .filter((c) => c.active)
+    .map((c) => ({
+      label: c.label || '—',
+      values: Array.from({ length: 12 }, () => -customAmountCents(c)),
+      indent: 1,
+    }))
+  return [...standard, ...custom]
 }

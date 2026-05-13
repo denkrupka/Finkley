@@ -100,6 +100,9 @@ const KnowledgePage = lazyWithRetry(() =>
 const SettingsPage = lazyWithRetry(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const AdminMediaPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminMediaPage').then((m) => ({ default: m.AdminMediaPage })),
+)
 const BankingCallbackPage = lazyWithRetry(() =>
   import('@/routes/banking/BankingCallbackPage').then((m) => ({ default: m.BankingCallbackPage })),
 )
@@ -192,6 +195,7 @@ function App() {
         <Route path="settings/integrations" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
+        <Route path="admin/media" element={lazyRoute(<AdminMediaPage />)} />
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>

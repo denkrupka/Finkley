@@ -418,32 +418,100 @@ export function useRenameCategory(salonId: string | undefined) {
   return useMutation({
     mutationFn: async (input: { from: string; to: string | null }) => {
       if (!salonId) throw new Error('no_salon')
-      // Перевешиваем категорию на items
-      const { error } = await supabase
-        .from('inventory_items')
-        .update({ category: input.to?.trim() || null })
-        .eq('salon_id', salonId)
-        .eq('category', input.from)
-      if (error) throw error
-      // Синхронизируем salons.inventory_categories: убираем from, добавляем to
+      // Rename: перевешиваем items.category на новое имя.
+      // Архив (to === null): items сохраняют свой label, чтобы исторические
+      // отчёты не теряли группировку. Категория просто прячется из dropdown.
+      if (input.to !== null) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ category: input.to.trim() || null })
+          .eq('salon_id', salonId)
+          .eq('category', input.from)
+        if (error) throw error
+      }
       const { data: salon, error: e1 } = await supabase
         .from('salons')
-        .select('inventory_categories')
+        .select('inventory_categories, inventory_archived_categories')
         .eq('id', salonId)
         .single()
       if (e1) throw e1
       const current = (salon?.inventory_categories ?? []) as string[]
-      const next = current.filter((c) => c !== input.from)
-      if (input.to && !next.includes(input.to)) next.push(input.to)
+      const archived = (salon?.inventory_archived_categories ?? []) as string[]
+      const nextCurrent = current.filter((c) => c !== input.from)
+      let nextArchived = archived
+      if (input.to === null) {
+        // Архивируем — добавляем в архив (если ещё нет).
+        if (!archived.includes(input.from)) nextArchived = [...archived, input.from]
+      } else if (input.to && !nextCurrent.includes(input.to)) {
+        nextCurrent.push(input.to)
+        // Если переименовываем восстанавливаемое имя — убираем из архива.
+        nextArchived = archived.filter((c) => c !== input.to && c !== input.from)
+      }
       const { error: e2 } = await supabase
         .from('salons')
-        .update({ inventory_categories: next })
+        .update({
+          inventory_categories: nextCurrent,
+          inventory_archived_categories: nextArchived,
+        })
         .eq('id', salonId)
       if (e2) throw e2
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory-items', salonId] })
       qc.invalidateQueries({ queryKey: ['inventory-categories', salonId] })
+      qc.invalidateQueries({ queryKey: ['inventory-archived-categories', salonId] })
+      qc.invalidateQueries({ queryKey: ['salon', salonId] })
+    },
+  })
+}
+
+export function useArchivedInventoryCategories(salonId: string | undefined) {
+  return useQuery<string[]>({
+    queryKey: ['inventory-archived-categories', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('salons')
+        .select('inventory_archived_categories')
+        .eq('id', salonId)
+        .single()
+      if (error) throw error
+      return ((data?.inventory_archived_categories ?? []) as string[])
+        .slice()
+        .sort((a, b) => a.localeCompare(b))
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
+  })
+}
+
+export function useRestoreInventoryCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data: salon, error: e1 } = await supabase
+        .from('salons')
+        .select('inventory_categories, inventory_archived_categories')
+        .eq('id', salonId)
+        .single()
+      if (e1) throw e1
+      const current = (salon?.inventory_categories ?? []) as string[]
+      const archived = (salon?.inventory_archived_categories ?? []) as string[]
+      const nextCurrent = current.includes(name) ? current : [...current, name]
+      const nextArchived = archived.filter((c) => c !== name)
+      const { error: e2 } = await supabase
+        .from('salons')
+        .update({
+          inventory_categories: nextCurrent,
+          inventory_archived_categories: nextArchived,
+        })
+        .eq('id', salonId)
+      if (e2) throw e2
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory-categories', salonId] })
+      qc.invalidateQueries({ queryKey: ['inventory-archived-categories', salonId] })
       qc.invalidateQueries({ queryKey: ['salon', salonId] })
     },
   })

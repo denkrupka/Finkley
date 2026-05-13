@@ -1,10 +1,22 @@
 ---
 import Layout from '../../layouts/Layout.astro'
 import { getCollection } from 'astro:content'
+import { loadDbPosts } from '../../lib/db-posts'
 
-// Все опубликованные статьи (draft=false), сортированы по дате desc.
-const allPosts = await getCollection('media', ({ data }) => !data.draft)
-const posts = allPosts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+// Источников два:
+//   1. Markdown-файлы в src/content/media — committed в git.
+//   2. media_posts в Supabase — управляются через app /admin/media админкой.
+// Мерджим. По slug DB-пост перебивает markdown (на случай редакции).
+const mdPosts = await getCollection('media', ({ data }) => !data.draft)
+const dbPosts = await loadDbPosts()
+const bySlug = new Map<string, { slug: string; data: { title: string; description: string; date: Date; cover?: string; tags: string[]; author?: string; draft?: boolean }; source: 'md' | 'db' }>()
+for (const p of mdPosts) {
+  bySlug.set(p.slug, { slug: p.slug, data: { ...p.data, draft: !!p.data.draft }, source: 'md' })
+}
+for (const p of dbPosts) bySlug.set(p.slug, { ...p, source: 'db' })
+const posts = Array.from(bySlug.values()).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+)
 
 function fmt(d: Date): string {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)

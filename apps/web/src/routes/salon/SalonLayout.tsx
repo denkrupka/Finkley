@@ -89,8 +89,8 @@ export function SalonLayout() {
   const todayLabel = format(new Date(), 'EEEE, d MMMM', { locale: ru })
 
   return (
-    <div className="bg-background flex min-h-screen">
-      {/* Sidebar desktop */}
+    <div className="bg-background flex min-h-screen items-start">
+      {/* Sidebar desktop — sticky, всегда видна при прокрутке. */}
       <div className="hidden lg:block">
         <Sidebar salonId={salon.id} />
       </div>
@@ -109,8 +109,9 @@ export function SalonLayout() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Right side: TopBar + content + FAB + BottomNav */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Right side: TopBar + content + FAB + BottomNav
+          min-h-screen — чтобы sticky sidebar занимал полную высоту. */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <TopBar
           salonId={salon.id}
           salonName={salon.name}
@@ -121,7 +122,7 @@ export function SalonLayout() {
 
         <SubscriptionBanner />
 
-        <main className="relative flex flex-1 flex-col overflow-y-auto pb-24 lg:pb-0">
+        <main className="relative flex flex-1 flex-col pb-24 lg:pb-0">
           <Outlet />
         </main>
       </div>

@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ChevronRight } from 'lucide-react'
+import { Banknote, ChevronRight, CreditCard, Globe, Send, User2, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useCashFlowDaily } from '@/hooks/useCashFlow'
+import { useClients } from '@/hooks/useClients'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
@@ -30,18 +31,46 @@ import { useStaff } from '@/hooks/useStaff'
 import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
+type PaymentMethod = 'cash' | 'card' | 'transfer' | 'online' | 'mixed' | null
+
+function accountFromPaymentMethod(method: PaymentMethod): {
+  label: string
+  icon: typeof Banknote
+} {
+  switch (method) {
+    case 'cash':
+      return { label: 'Gotówka', icon: Banknote }
+    case 'card':
+      return { label: 'Karta', icon: CreditCard }
+    case 'transfer':
+      return { label: 'Przelew', icon: Send }
+    case 'online':
+      return { label: 'Online', icon: Globe }
+    case 'mixed':
+      return { label: 'Mixed', icon: Wallet }
+    default:
+      return { label: '—', icon: Wallet }
+  }
+}
+
 /**
  * Унифицированная транзакция для разворачивающейся строки ДДС.
  * Источник определяет таргет навигации при клике на строку.
  */
 type Tx = {
   id: string
-  day: string // yyyy-mm-dd
+  day: string
   kind: 'inflow' | 'outflow'
   source: 'visit' | 'retail' | 'other_income' | 'expense'
   amountCents: number
-  title: string
-  subtitle: string | null
+  /** Иерархическая статья: «Категория · Под-статья». */
+  article: string
+  /** Контрагент: клиент для дохода / поставщик для расхода. */
+  counterparty: string | null
+  /** Способ оплаты (касса) для drill-down аналитики. */
+  paymentMethod: PaymentMethod
+  /** Дополнительный комментарий (если есть). */
+  comment: string | null
 }
 
 /**
@@ -69,6 +98,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, range)
   const { data: expenses = [] } = useExpenses(salonId, { start: from, end: to })
   const { data: staff = [] } = useStaff(salonId)
+  const { data: clients = [] } = useClients(salonId)
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   const { data: incomeCategories = [] } = useOtherIncomeCategories(salonId)
 
@@ -84,44 +114,57 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
       const amt = v.amount_cents - v.discount_cents + v.tip_cents
       if (amt === 0) continue
       const staffName = staff.find((s) => s.id === v.staff_id)?.full_name ?? null
+      const client = clients.find((c) => c.id === v.client_id)
+      const article =
+        v.kind === 'retail'
+          ? `Продажа · ${v.service_name_snapshot ?? '—'}`
+          : `Услуга · ${v.service_name_snapshot ?? '—'}`
       pushTx(day, {
         id: v.id,
         day,
         kind: 'inflow',
         source: v.kind === 'retail' ? 'retail' : 'visit',
         amountCents: amt,
-        title: v.service_name_snapshot ?? (v.kind === 'retail' ? '—' : '—'),
-        subtitle: staffName,
+        article,
+        counterparty: client?.name ?? null,
+        paymentMethod: (v.payment_method as PaymentMethod) ?? null,
+        comment: staffName,
       })
     }
     for (const oi of otherIncomes) {
       const day = oi.income_at.slice(0, 10)
       const cat = incomeCategories.find((c) => c.id === oi.category_id)?.name ?? '—'
+      const sub = oi.sub_article ? ` · ${oi.sub_article}` : ''
       pushTx(day, {
         id: oi.id,
         day,
         kind: 'inflow',
         source: 'other_income',
         amountCents: oi.amount_cents,
-        title: cat,
-        subtitle: oi.comment,
+        article: `Прочий доход · ${cat}${sub}`,
+        counterparty: oi.payer_name ?? null,
+        paymentMethod: (oi.payment_method as PaymentMethod) ?? null,
+        comment: oi.comment ?? null,
       })
     }
     for (const e of expenses) {
       const day = e.expense_at.slice(0, 10)
       const cat = expenseCategories.find((c) => c.id === e.category_id)?.name ?? '—'
+      const sub = e.sub_article ? ` · ${e.sub_article}` : ''
       pushTx(day, {
         id: e.id,
         day,
         kind: 'outflow',
         source: 'expense',
         amountCents: e.amount_cents,
-        title: cat,
-        subtitle: e.comment,
+        article: `Расход · ${cat}${sub}`,
+        counterparty: e.contractor_name ?? null,
+        paymentMethod: (e.payment_method as PaymentMethod) ?? null,
+        comment: e.comment ?? null,
       })
     }
     return grouped
-  }, [visits, otherIncomes, expenses, staff, expenseCategories, incomeCategories])
+  }, [visits, otherIncomes, expenses, staff, clients, expenseCategories, incomeCategories])
 
   function navigateToEntity(tx: Tx) {
     if (tx.source === 'visit') navigate(`/${salonId}/income?tab=visits`)
@@ -337,42 +380,58 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
 
                   if (!isOpen) return [headerRow]
 
-                  const txRows = dayTxs.map((tx) => (
-                    <tr
-                      key={`${tx.source}-${tx.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigateToEntity(tx)
-                      }}
-                      className="bg-muted/10 hover:bg-muted/30 border-border/40 cursor-pointer border-t border-dashed transition-colors"
-                      title={t(`finance.cashflow.source.${tx.source}`)}
-                    >
-                      <td className="px-4 py-2 pl-10 text-xs">
-                        <span className="text-foreground block max-w-[280px] truncate font-medium">
-                          {tx.title}
-                        </span>
-                        {tx.subtitle ? (
-                          <span className="text-muted-foreground block max-w-[280px] truncate text-[11px]">
-                            {tx.subtitle}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="num text-brand-sage-deep px-4 py-2 text-right">
-                        {tx.kind === 'inflow' ? `+${formatCurrency(tx.amountCents, currency)}` : ''}
-                      </td>
-                      <td className="num text-destructive px-4 py-2 text-right">
-                        {tx.kind === 'outflow'
-                          ? `−${formatCurrency(tx.amountCents, currency)}`
-                          : ''}
-                      </td>
-                      <td
-                        colSpan={2}
-                        className="text-muted-foreground px-4 py-2 text-right text-[11px] uppercase tracking-wider"
+                  const txRows = dayTxs.map((tx) => {
+                    const account = accountFromPaymentMethod(tx.paymentMethod)
+                    const AccountIcon = account.icon
+                    return (
+                      <tr
+                        key={`${tx.source}-${tx.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigateToEntity(tx)
+                        }}
+                        className="bg-muted/10 hover:bg-muted/30 border-border/40 cursor-pointer border-t border-dashed transition-colors"
+                        title={t(`finance.cashflow.source.${tx.source}`)}
                       >
-                        {t(`finance.cashflow.source.${tx.source}`)}
-                      </td>
-                    </tr>
-                  ))
+                        <td className="px-4 py-2 pl-10 text-xs">
+                          <span className="text-foreground block max-w-[320px] truncate font-medium">
+                            {tx.article}
+                          </span>
+                          <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-2 text-[11px]">
+                            {tx.counterparty ? (
+                              <span className="inline-flex items-center gap-1">
+                                <User2 className="size-3" strokeWidth={1.8} />
+                                <span className="max-w-[160px] truncate">{tx.counterparty}</span>
+                              </span>
+                            ) : null}
+                            <span className="inline-flex items-center gap-1">
+                              <AccountIcon className="size-3" strokeWidth={1.8} />
+                              {account.label}
+                            </span>
+                            {tx.comment ? (
+                              <span className="max-w-[200px] truncate italic">{tx.comment}</span>
+                            ) : null}
+                          </span>
+                        </td>
+                        <td className="num text-brand-sage-deep px-4 py-2 text-right">
+                          {tx.kind === 'inflow'
+                            ? `+${formatCurrency(tx.amountCents, currency)}`
+                            : ''}
+                        </td>
+                        <td className="num text-destructive px-4 py-2 text-right">
+                          {tx.kind === 'outflow'
+                            ? `−${formatCurrency(tx.amountCents, currency)}`
+                            : ''}
+                        </td>
+                        <td
+                          colSpan={2}
+                          className="text-muted-foreground px-4 py-2 text-right text-[11px] uppercase tracking-wider"
+                        >
+                          {t(`finance.cashflow.source.${tx.source}`)}
+                        </td>
+                      </tr>
+                    )
+                  })
 
                   if (txRows.length === 0) {
                     txRows.push(

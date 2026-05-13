@@ -13,6 +13,10 @@ export type OtherIncomeRow = {
   comment: string | null
   receipt_url: string | null
   source: string
+  /** Плательщик/контрагент (для ДДС-детализации). */
+  payer_name: string | null
+  /** Под-статья (иерархическая детализация). */
+  sub_article: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null

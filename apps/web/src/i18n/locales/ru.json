@@ -3,6 +3,40 @@
     "title": "Finkley",
     "placeholder": "Скелет приложения готов. См. docs/04_BACKLOG.md для следующих шагов."
   },
+  "admin": {
+    "media": {
+      "title": "Медиа — управление статьями",
+      "subtitle": "finsalon.app/media · публикуй статьи блога. После сохранения публикуется при следующей сборке лендинга (push в main).",
+      "new_post": "Новая статья",
+      "empty": "Статей пока нет. Создай первую.",
+      "toast_saved": "Сохранено",
+      "toast_deleted": "Статья удалена",
+      "confirm_delete": "Удалить статью? Действие необратимо.",
+      "no_access_title": "Нет доступа",
+      "no_access_body": "Эта страница доступна только команде Finkley.",
+      "no_access_hint": "Если ты администратор — добавь свой user_id в таблицу app_admins в Supabase.",
+      "status": {
+        "draft": "Черновик",
+        "published": "Опубликовано"
+      },
+      "fields": {
+        "title": "Заголовок",
+        "slug": "Slug (URL)",
+        "description": "Краткое описание",
+        "cover_url": "Cover URL",
+        "tags": "Теги (через запятую)",
+        "body_md": "Текст (Markdown)"
+      },
+      "actions": {
+        "publish": "Опубликовать",
+        "unpublish": "Снять с публикации",
+        "preview": "Посмотреть на сайте →"
+      },
+      "errors": {
+        "slug_or_title_required": "Заголовок и slug обязательны"
+      }
+    }
+  },
   "referral": {
     "button": "Пригласи друзей",
     "modal_title": "Пригласи друзей в Finkley",
@@ -588,14 +622,20 @@
     },
     "categories": {
       "title": "Управление категориями",
-      "subtitle": "Создавай, переименовывай или удаляй категории. Удаление очищает поле «категория» у материалов — сами материалы не удаляются.",
+      "subtitle": "Создавай, переименовывай или убирай в архив. Архив сохраняет название у уже привязанных материалов — исторические отчёты не теряют группировку.",
       "empty": "Пока нет категорий. Добавь первую через поле ввода выше.",
       "delete": "Удалить",
+      "archive": "В архив",
+      "restore": "Восстановить",
       "add_placeholder": "Новая категория…",
       "add_button": "Добавить",
       "confirm_delete": "Удалить категорию «{{name}}»? У {{count}} материалов категория станет пустой. Сами материалы останутся.",
+      "confirm_archive": "Убрать «{{name}}» в архив? У {{count}} материалов название категории сохранится — но в новых добавлениях её не будет.",
+      "archived_section": "Архив ({{count}})",
       "toast_renamed": "Категория переименована",
       "toast_deleted": "Очищено у {{count}} материалов",
+      "toast_archived": "Категория в архиве — {{count}} материалов сохранили название",
+      "toast_restored": "Категория восстановлена",
       "toast_added": "Категория добавлена",
       "errors": {
         "empty": "Название категории не может быть пустым",
@@ -1195,6 +1235,17 @@
         "empty": "Пока нет своих позиций.",
         "history_hint": "Архивированные позиции остаются в исторических расчётах. В новых отчётах они не учитываются."
       },
+      "custom_section": {
+        "title": "Свои позиции",
+        "add": "Добавить",
+        "label_placeholder": "Название позиции",
+        "archive": "В архив",
+        "restore": "Восстановить",
+        "delete_permanent": "Удалить навсегда",
+        "archived": "Архив ({{count}})",
+        "empty": "Пока нет своих позиций. Добавь любую, чего нет в списке выше.",
+        "history_hint": "Архив не учитывается в новых отчётах, но не теряется в исторических."
+      },
       "fixed": {
         "title": "Постоянные расходы (в месяц)",
         "subtitle": "Регулярные ежемесячные платежи независимо от выручки.",
@@ -1773,6 +1824,7 @@
     "status": {
       "available": "Готово",
       "connected": "Подключено",
+      "pending": "Ожидает",
       "in_research": "Скоро",
       "coming_soon": "В разработке"
     },
@@ -1859,6 +1911,37 @@
       "instagram_subtitle": "Сообщения и комментарии Instagram Direct (Business / Creator аккаунт).",
       "facebook_subtitle": "Facebook Pages Messenger — сообщения от подписчиков страницы.",
       "connect": "Подключить",
+      "reconnect": "Перенастроить",
+      "connect_button": "Сохранить и проверить",
+      "connect_title": "Подключение · {{name}}",
+      "confirm_disconnect": "Отключить канал? Сохранённые токены удалятся, входящие сообщения перестанут приходить.",
+      "toast_connected": "{{name}} подключён",
+      "toast_saved_pending": "{{name}} — данные сохранены. После прохождения Meta App Review канал активируется.",
+      "meta_pending_note": "WhatsApp / Instagram / Facebook требуют прохождения Meta App Review для двусторонней связи. Данные сохранятся, реальный приём сообщений включится после одобрения.",
+      "generic_help": "Введи данные доступа канала. Токены сохраняются в зашифрованном виде на сервере.",
+      "telegram_help": "Создай бота через @BotFather в Telegram → /newbot → получишь токен вида 123456789:ABC-DEF1234… Вставь его сюда.",
+      "whatsapp_help": "В Meta for Developers создай приложение WhatsApp Business → возьми Phone Number ID и Permanent Access Token из настроек API.",
+      "instagram_help": "В Meta for Developers создай приложение Instagram Graph → возьми Page ID привязанной FB-страницы и долгоживущий Page Access Token.",
+      "facebook_help": "В Meta for Developers создай приложение с Pages-доступом → возьми Page ID и Page Access Token из инструмента Graph API Explorer.",
+      "field": {
+        "bot_token": "Bot Token",
+        "phone_number_id": "Phone Number ID",
+        "access_token": "Permanent Access Token",
+        "verify_token": "Webhook Verify Token",
+        "page_id": "Page ID",
+        "page_access_token": "Page Access Token"
+      },
+      "hint": {
+        "bot_token": "Получи у @BotFather после команды /newbot.",
+        "phone_number_id": "Из настроек WhatsApp Business → API setup.",
+        "access_token": "Permanent token (System User) с правами whatsapp_business_messaging.",
+        "verify_token": "Любая случайная строка — используется для подписи webhook'а.",
+        "page_id": "Численный ID страницы (см. About → Page ID).",
+        "page_access_token": "Долгоживущий Page Access Token с правами pages_messaging."
+      },
+      "errors": {
+        "required_field": "Поле «{{field}}» обязательно"
+      },
       "coming_soon": "Подключение мессенджеров — скоро. Шлёт уведомления в Telegram владельцу + появится в /messenger."
     },
     "tab_empty": "В этой категории пока ничего не подключено.",
