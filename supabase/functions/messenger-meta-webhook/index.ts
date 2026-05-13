@@ -262,20 +262,45 @@ async function ingestMessage(
     }
   }
 
-  const { data: convo } = await admin
+  // Safe upsert: если conversation уже существует с нормальным display_name
+  // (не дефолтным «User XXX»), не перезаписываем его — Meta может вернуть
+  // пустой профиль на повторных webhook'ах, и хорошее имя терялось бы.
+  const { data: existing } = await admin
     .from('messenger_conversations')
-    .upsert(
-      {
+    .select('id, display_name, avatar_url')
+    .eq('salon_id', salonId)
+    .eq('channel', channel)
+    .eq('external_user_id', externalUserId)
+    .maybeSingle()
+
+  const isFreshDefault = displayName.startsWith('User ')
+  const existingIsGood = existing?.display_name && !existing.display_name.startsWith('User ')
+  const finalDisplayName = existingIsGood && isFreshDefault ? existing.display_name : displayName
+  const finalAvatarUrl = avatarUrl ?? existing?.avatar_url ?? null
+
+  let convo: { id: string } | null = null
+  if (existing) {
+    const { data } = await admin
+      .from('messenger_conversations')
+      .update({ display_name: finalDisplayName, avatar_url: finalAvatarUrl })
+      .eq('id', existing.id)
+      .select('id')
+      .single()
+    convo = data ?? { id: existing.id }
+  } else {
+    const { data } = await admin
+      .from('messenger_conversations')
+      .insert({
         salon_id: salonId,
         channel,
         external_user_id: externalUserId,
-        display_name: displayName,
-        avatar_url: avatarUrl,
-      },
-      { onConflict: 'salon_id,channel,external_user_id' },
-    )
-    .select('id')
-    .single()
+        display_name: finalDisplayName,
+        avatar_url: finalAvatarUrl,
+      })
+      .select('id')
+      .single()
+    convo = data
+  }
   if (!convo) return
 
   let text: string | null = ev.message.text ?? null
@@ -305,8 +330,22 @@ async function ingestMessage(
         const mResp = await fetch(url)
         if (mResp.ok) {
           const buf = new Uint8Array(await mResp.arrayBuffer())
-          const mime = mResp.headers.get('content-type') ?? 'application/octet-stream'
-          const ext = mime.split('/')[1]?.split(';')[0]?.split('+')[0] ?? 'bin'
+          const mimeRaw = mResp.headers.get('content-type') ?? ''
+          const mime = mimeRaw.split(';')[0].trim() || 'application/octet-stream'
+          const extMap: Record<string, string> = {
+            'image/jpeg': 'jpg',
+            'image/png': 'png',
+            'image/webp': 'webp',
+            'image/gif': 'gif',
+            'video/mp4': 'mp4',
+            'video/quicktime': 'mov',
+            'audio/mpeg': 'mp3',
+            'audio/ogg': 'ogg',
+            'audio/mp4': 'm4a',
+            'audio/webm': 'webm',
+            'application/pdf': 'pdf',
+          }
+          const ext = extMap[mime] ?? mediaKind
           const fname = `${salonId}/incoming/${crypto.randomUUID()}.${ext}`
           const { error: upErr } = await admin.storage
             .from('messenger-media')
