@@ -91,7 +91,11 @@ export function MessengerPage() {
   if (!salonId) return null
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-1 flex-col px-5 py-6 sm:px-8">
+    // Чат-страница: занимает всю доступную высоту <main> и НЕ скроллит body.
+    // sticky=true на родителе <main> (overflow-y-auto на lg) — на десктопе
+    // мы фактически забираем у main внешний скролл и держим всё внутри
+    // высоты viewport. На мобильном падаем на обычный flex-grow.
+    <div className="flex h-full min-h-0 flex-1 flex-col px-5 py-6 sm:px-8 lg:max-h-full">
       <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <div>
           <h1 className="text-brand-navy text-2xl font-bold tracking-tight">

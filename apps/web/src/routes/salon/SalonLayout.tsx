@@ -110,8 +110,11 @@ export function SalonLayout() {
       </Dialog.Root>
 
       {/* Right side: TopBar + content + FAB + BottomNav.
-          На десктопе сдвинут вправо на ширину фиксированного sidebar (232px). */}
-      <div className="flex min-h-screen min-w-0 flex-col lg:pl-[232px]">
+          На десктопе сдвинут вправо на ширину фиксированного sidebar (232px).
+          h-screen на десктопе делает колонку строго равной viewport — TopBar
+          всегда виден, скролл живёт внутри <main>. Это нужно для страниц
+          вроде /messenger где нельзя позволить body-скроллу выпихнуть UI. */}
+      <div className="flex min-h-screen min-w-0 flex-col lg:h-screen lg:pl-[232px]">
         <TopBar
           salonId={salon.id}
           salonName={salon.name}
@@ -122,7 +125,7 @@ export function SalonLayout() {
 
         <SubscriptionBanner />
 
-        <main className="relative flex flex-1 flex-col pb-24 lg:pb-0">
+        <main className="relative flex min-h-0 flex-1 flex-col pb-24 lg:overflow-y-auto lg:pb-0">
           <Outlet />
         </main>
       </div>
