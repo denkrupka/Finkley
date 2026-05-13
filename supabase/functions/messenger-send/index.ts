@@ -132,22 +132,36 @@ Deno.serve(async (req) => {
     (convo.channel === 'facebook' || convo.channel === 'instagram')
   ) {
     try {
-      const pageToken = await decryptSecret(integ.credentials.page_access_enc as string)
+      // Определяем flow по виду credentials:
+      //   page_access_enc — FB Page Token, отправка через graph.facebook.com (flow A)
+      //   ig_access_enc   — IG User Token, отправка через graph.instagram.com (flow B)
+      const creds = (integ.credentials ?? {}) as Record<string, unknown>
+      let endpoint: string
+      let providerToken: string
+      let useBearer = false
+      if (creds.ig_access_enc) {
+        providerToken = await decryptSecret(creds.ig_access_enc as string)
+        endpoint = `https://graph.instagram.com/v21.0/me/messages`
+        useBearer = true
+      } else {
+        providerToken = await decryptSecret(creds.page_access_enc as string)
+        endpoint = `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(providerToken)}`
+      }
+
       // Meta: либо message.text, либо message.attachment. Если есть и то, и
       // то — отправляем 2 запроса (Meta API не поддерживает одновременно).
       const sendOne = async (msgPayload: Record<string, unknown>) => {
-        const r = await fetch(
-          `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(pageToken)}`,
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              recipient: { id: convo.external_user_id },
-              messaging_type: 'RESPONSE',
-              message: msgPayload,
-            }),
-          },
-        )
+        const headers: Record<string, string> = { 'content-type': 'application/json' }
+        if (useBearer) headers.authorization = `Bearer ${providerToken}`
+        const r = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            recipient: { id: convo.external_user_id },
+            messaging_type: 'RESPONSE',
+            message: msgPayload,
+          }),
+        })
         const j = (await r.json()) as {
           message_id?: string
           error?: { message: string; code: number }

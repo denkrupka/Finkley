@@ -1,0 +1,61 @@
+---
+import Layout from '../layouts/Layout.astro'
+
+// Эта страница нужна для Meta App Review (Data Deletion Request Callback).
+// URL передаётся Meta через JSON-ответ edge function instagram-data-deletion
+// и fb-data-deletion: { url: ".../data-deletion-status?id=<uuid>", confirmation_code }.
+// Юзер заходит сюда из настроек Apps and Websites в Facebook/Instagram чтобы
+// проверить статус удаления своих данных.
+
+const UPDATED = '13 мая 2026'
+---
+
+<Layout
+  title="Статус удаления данных — Finkley"
+  description="Подтверждение удаления данных пользователя из Finkley."
+  active="privacy"
+>
+  <article class="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-20">
+    <p class="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">
+      Статус удаления · обновлено {UPDATED}
+    </p>
+    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl">
+      Запрос принят
+    </h1>
+    <p class="mt-4 text-base text-brand-text-muted">
+      Мы получили запрос на удаление данных через Meta Apps &amp; Websites и обработали его.
+    </p>
+
+    <div class="mt-10 rounded-xl border border-brand-sage/30 bg-emerald-50 p-6">
+      <p class="font-semibold text-emerald-900">Что было удалено</p>
+      <ul class="mt-3 list-inside list-disc space-y-2 text-sm text-emerald-900/80">
+        <li>Зашифрованные токены доступа к Facebook/Instagram, связанные с твоим аккаунтом.</li>
+        <li>История переписки в нашем мессенджере, относящаяся к твоему профилю.</li>
+        <li>Информация о подключении (имя страницы/аккаунта, идентификаторы).</li>
+      </ul>
+    </div>
+
+    <p class="mt-8 text-sm text-brand-text-muted">
+      Если у тебя остались вопросы или требуется удалить дополнительные данные (например, аккаунт
+      Finkley целиком), напиши на
+      <a href="mailto:hello@finkley.app" class="font-semibold text-brand-navy underline"
+        >hello@finkley.app</a
+      >
+      с темой «GDPR — удаление данных».
+    </p>
+
+    <p class="mt-6 text-xs text-brand-text-muted">
+      Идентификатор запроса:
+      <code id="req-id" class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">—</code>
+    </p>
+
+    <script>
+      const url = new URL(window.location.href)
+      const id = url.searchParams.get('id')
+      if (id) {
+        const el = document.getElementById('req-id')
+        if (el) el.textContent = id
+      }
+    </script>
+  </article>
+</Layout>

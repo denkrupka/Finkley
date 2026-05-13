@@ -10,10 +10,12 @@ import {
   Send,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import { useQueryClient } from '@tanstack/react-query'
 
 import { CalendarFeedCard } from '@/routes/settings/CalendarFeedCard'
 
@@ -72,6 +74,57 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
   const [ksefOpen, setKsefOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
+  const qc = useQueryClient()
+
+  // OAuth callback: после возврата с Meta наш edge function редиректит сюда
+  // с ?fb=connected или ?ig=connected (success) или ?fb=error&reason=... (failure).
+  // Показываем toast, инвалидируем кеш integrations, чистим query params.
+  useEffect(() => {
+    const fb = params.get('fb')
+    const ig = params.get('ig')
+    const igViaPage = params.get('ig_via_page')
+    const fbPage = params.get('page')
+    const igAccount = params.get('account')
+    const reason = params.get('reason')
+
+    let touched = false
+    if (fb === 'connected') {
+      touched = true
+      toast.success(
+        fbPage
+          ? t('integrations.messengers.oauth_success', { name: 'Facebook', account: fbPage })
+          : t('integrations.messengers.toast_connected', { name: 'Facebook' }),
+      )
+      if (igViaPage) {
+        toast.success(
+          t('integrations.messengers.oauth_success', { name: 'Instagram', account: igViaPage }),
+        )
+      }
+    }
+    if (ig === 'connected') {
+      touched = true
+      toast.success(
+        igAccount
+          ? t('integrations.messengers.oauth_success', { name: 'Instagram', account: igAccount })
+          : t('integrations.messengers.toast_connected', { name: 'Instagram' }),
+      )
+    }
+    if (fb === 'error' || ig === 'error') {
+      touched = true
+      toast.error(
+        t('integrations.messengers.oauth_error', {
+          reason: reason ?? 'unknown',
+        }),
+      )
+    }
+    if (touched) {
+      qc.invalidateQueries({ queryKey: ['messenger-integrations', salonId] })
+      const next = new URLSearchParams(params)
+      for (const k of ['fb', 'ig', 'ig_via_page', 'page', 'account', 'reason']) next.delete(k)
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.get('fb'), params.get('ig')])
 
   // Активная вкладка — в URL `?tab=accounting`, дефолт accounting.
   const tabParam = params.get('tab')

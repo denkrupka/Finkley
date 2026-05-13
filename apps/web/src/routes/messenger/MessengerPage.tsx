@@ -181,7 +181,7 @@ export function MessengerPage() {
             <>
               <header className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-2.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <ChannelIcon channel={selected.channel} size={20} />
+                  <ConversationAvatar conversation={selected} size={36} />
                   <div className="min-w-0">
                     <p className="text-foreground truncate text-sm font-semibold">
                       {selected.display_name || t('messenger.unnamed')}
@@ -287,6 +287,49 @@ function IconChip({
   )
 }
 
+/**
+ * Аватарка собеседника с channel-бейджем-углом. Если avatar_url есть —
+ * показываем картинку, иначе — инициалы из display_name.
+ */
+function ConversationAvatar({
+  conversation,
+  size = 40,
+}: {
+  conversation: MessengerConversation
+  size?: number
+}) {
+  const initials =
+    (conversation.display_name || '?')
+      .split(/\s+/)
+      .map((s) => s[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '?'
+  return (
+    <span className="relative shrink-0">
+      {conversation.avatar_url ? (
+        <img
+          src={conversation.avatar_url}
+          alt=""
+          style={{ width: size, height: size }}
+          className="rounded-full object-cover"
+        />
+      ) : (
+        <span
+          style={{ width: size, height: size, fontSize: size * 0.32 }}
+          className="bg-brand-teal-soft text-brand-teal-deep grid place-items-center rounded-full font-bold"
+        >
+          {initials}
+        </span>
+      )}
+      <span className="absolute -bottom-0.5 -right-0.5">
+        <ChannelIcon channel={conversation.channel} size={Math.max(12, Math.floor(size * 0.35))} />
+      </span>
+    </span>
+  )
+}
+
 function ChannelIcon({ channel, size = 16 }: { channel: MessengerChannel; size?: number }) {
   const meta = CHANNEL_META[channel]
   const Icon = meta.icon
@@ -310,13 +353,6 @@ function ConversationRow({
   active: boolean
   onSelect: () => void
 }) {
-  const initials = (conversation.display_name || '?')
-    .split(/\s+/)
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
   const time = formatDistanceToNowStrict(new Date(conversation.last_message_at), {
     addSuffix: false,
     locale: ru,
@@ -333,22 +369,7 @@ function ConversationRow({
           'border-border/40',
         )}
       >
-        <span className="relative">
-          {conversation.avatar_url ? (
-            <img
-              src={conversation.avatar_url}
-              alt=""
-              className="size-10 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span className="bg-brand-teal-soft text-brand-teal-deep grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold">
-              {initials || '?'}
-            </span>
-          )}
-          <span className="absolute -bottom-0.5 -right-0.5">
-            <ChannelIcon channel={conversation.channel} size={14} />
-          </span>
-        </span>
+        <ConversationAvatar conversation={conversation} size={40} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
             <span className="text-foreground truncate text-sm font-semibold">

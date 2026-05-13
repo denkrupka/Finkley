@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from 'react'
 
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { useTranslation } from 'react-i18next'
-import { Navigate, Outlet, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useMySalons } from '@/hooks/useSalons'
@@ -36,6 +36,10 @@ const QuickEntryModal = lazyWithRetry(() =>
 export function SalonLayout() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
+  const location = useLocation()
+  // Скрываем FAB «+Визит» на страницах-«рабочих столах» где он мешает
+  // основному CTA (мессенджер имеет свою кнопку «Создать визит» в шапке чата).
+  const hideFab = location.pathname.endsWith('/messenger')
   const { user } = useAuth()
   const { data: salons, isLoading } = useMySalons()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -130,12 +134,14 @@ export function SalonLayout() {
         </main>
       </div>
 
-      <FAB
-        onClick={() => {
-          setQuickEntryPrefill(null)
-          setQuickEntryOpen(true)
-        }}
-      />
+      {hideFab ? null : (
+        <FAB
+          onClick={() => {
+            setQuickEntryPrefill(null)
+            setQuickEntryOpen(true)
+          }}
+        />
+      )}
       <BottomNav salonId={salon.id} />
 
       {quickEntryOpen ? (

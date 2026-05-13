@@ -202,6 +202,39 @@ export function useSendMessage(salonId: string | undefined) {
   })
 }
 
+/**
+ * Запуск OAuth-флоу для подключения FB/IG канала. Вызывает edge function
+ * `<channel>-oauth-callback?action=start&salon_id=...` с JWT юзера,
+ * получает `authorize_url`, и редиректит браузер на Meta OAuth.
+ *
+ * Юзер на Meta логинится → одобряет permissions → Meta редиректит обратно
+ * на edge function callback → она кладёт integration в БД и редиректит
+ * на /{salonId}/settings/integrations?fb=connected (или ig=connected).
+ */
+export function useStartOAuth(salonId: string | undefined) {
+  return useMutation({
+    mutationFn: async (channel: 'facebook' | 'instagram') => {
+      if (!salonId) throw new Error('no_salon')
+      const fnName = channel === 'facebook' ? 'fb-oauth-callback' : 'instagram-oauth-callback'
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) throw new Error('not_authenticated')
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL
+      const url = `${baseUrl}/functions/v1/${fnName}?action=start&salon_id=${encodeURIComponent(salonId)}`
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!r.ok) {
+        const err = (await r.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${r.status}`)
+      }
+      const j = (await r.json()) as { authorize_url?: string }
+      if (!j.authorize_url) throw new Error('no_authorize_url')
+      return j.authorize_url
+    },
+  })
+}
+
 export function useConnectMessenger(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

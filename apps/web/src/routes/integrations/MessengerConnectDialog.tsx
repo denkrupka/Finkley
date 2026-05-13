@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useConnectMessenger, type MessengerChannel } from '@/hooks/useMessenger'
+import { useConnectMessenger, useStartOAuth, type MessengerChannel } from '@/hooks/useMessenger'
 
 const META: Record<
   Exclude<MessengerChannel, 'internal'>,
@@ -36,11 +36,24 @@ type Props = {
 export function MessengerConnectDialog({ open, channel, salonId, onClose }: Props) {
   const { t } = useTranslation()
   const connect = useConnectMessenger(salonId)
+  const startOAuth = useStartOAuth(salonId)
   const [fields, setFields] = useState<Record<string, string>>({})
+  const [showManual, setShowManual] = useState(false)
 
   if (!channel) return null
   const meta = META[channel]
   const Icon = meta.icon
+  const isMetaOAuth = channel === 'facebook' || channel === 'instagram'
+
+  function handleOAuth() {
+    if (!isMetaOAuth) return
+    startOAuth.mutate(channel as 'facebook' | 'instagram', {
+      onSuccess: (authorizeUrl) => {
+        window.location.href = authorizeUrl
+      },
+      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+    })
+  }
 
   function set(key: string, val: string) {
     setFields((prev) => ({ ...prev, [key]: val }))
@@ -119,6 +132,36 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
         </DialogHeader>
 
         <div className="flex flex-col gap-3 px-5 pb-2 pt-2">
+          {isMetaOAuth ? (
+            <>
+              <Button
+                variant="primary"
+                onClick={handleOAuth}
+                disabled={startOAuth.isPending}
+                className="h-11 w-full"
+                style={{ background: meta.color }}
+              >
+                {startOAuth.isPending ? (
+                  <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                ) : (
+                  <Icon className="size-4" strokeWidth={1.8} />
+                )}
+                {t('integrations.messengers.oauth_login', { name: meta.name })}
+              </Button>
+              <p className="text-muted-foreground text-center text-xs">
+                {t('integrations.messengers.oauth_hint')}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowManual((v) => !v)}
+                className="text-muted-foreground self-center text-xs underline"
+              >
+                {showManual
+                  ? t('integrations.messengers.hide_manual')
+                  : t('integrations.messengers.show_manual')}
+              </button>
+            </>
+          ) : null}
           {channel === 'telegram' ? (
             <FieldInput
               labelKey="integrations.messengers.field.bot_token"
@@ -153,7 +196,7 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
                 placeholder="random-string"
               />
             </>
-          ) : (
+          ) : showManual ? (
             <>
               <FieldInput
                 labelKey="integrations.messengers.field.page_id"
@@ -171,9 +214,9 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
                 type="password"
               />
             </>
-          )}
+          ) : null}
 
-          {channel !== 'telegram' ? (
+          {channel === 'whatsapp' ? (
             <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
               {t('integrations.messengers.meta_pending_note')}
             </p>
@@ -184,14 +227,16 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
           <Button variant="outline" onClick={onClose} disabled={connect.isPending}>
             {t('common.cancel')}
           </Button>
-          <Button variant="primary" onClick={submit} disabled={connect.isPending}>
-            {connect.isPending ? (
-              <Loader2 className="size-4 animate-spin" strokeWidth={2} />
-            ) : (
-              <MessageCircle className="size-4" strokeWidth={1.8} />
-            )}
-            {t('integrations.messengers.connect_button')}
-          </Button>
+          {!isMetaOAuth || showManual ? (
+            <Button variant="primary" onClick={submit} disabled={connect.isPending}>
+              {connect.isPending ? (
+                <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+              ) : (
+                <MessageCircle className="size-4" strokeWidth={1.8} />
+              )}
+              {t('integrations.messengers.connect_button')}
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
