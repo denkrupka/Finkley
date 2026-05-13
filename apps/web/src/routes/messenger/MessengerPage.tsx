@@ -27,14 +27,17 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  getMessengerMediaUrl,
   useBulkBroadcast,
   useConversationMessages,
   useConversations,
   useMarkConversationRead,
   useMessengerRealtime,
   useSendMessage,
+  uploadMessengerMedia,
   type MessengerChannel,
   type MessengerConversation,
+  type MessengerMessage,
 } from '@/hooks/useMessenger'
 import { cn } from '@/lib/utils/cn'
 
@@ -88,8 +91,8 @@ export function MessengerPage() {
   if (!salonId) return null
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-1 flex-col px-5 py-6 sm:px-8">
-      <header className="mb-4 flex items-center justify-between gap-3">
+    <div className="flex h-[calc(100dvh-4rem)] flex-1 flex-col px-5 py-6 sm:px-8">
+      <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <div>
           <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
             {t('messenger.title')}
@@ -169,7 +172,7 @@ export function MessengerPage() {
         </aside>
 
         {/* Диалог */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {selected ? (
             <>
               <header className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-2.5">
@@ -208,6 +211,8 @@ export function MessengerPage() {
               <MessagesList messages={messages} />
 
               <Composer
+                salonId={salonId}
+                conversationId={selected.id}
                 disabled={sendMessage.isPending}
                 onSend={(text, mediaPath, mediaKind) =>
                   sendMessage.mutate(
@@ -363,6 +368,53 @@ function ConversationRow({
   )
 }
 
+function MessageBody({ message }: { message: MessengerMessage }) {
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!message.media_path) return
+    let cancelled = false
+    getMessengerMediaUrl(message.media_path).then((url) => {
+      if (!cancelled) setMediaUrl(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [message.media_path])
+
+  return (
+    <>
+      {message.media_path && message.media_kind === 'image' ? (
+        mediaUrl ? (
+          <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+            <img
+              src={mediaUrl}
+              alt=""
+              className="mb-1 max-h-60 w-auto max-w-full rounded-md object-cover"
+            />
+          </a>
+        ) : (
+          <span className="text-xs italic opacity-70">📷 …</span>
+        )
+      ) : null}
+      {message.text ? <p className="whitespace-pre-wrap break-words">{message.text}</p> : null}
+      {message.media_kind && !message.text && message.media_kind !== 'image' ? (
+        mediaUrl ? (
+          <a
+            href={mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs italic underline opacity-90"
+          >
+            {mediaLabel(message.media_kind)}
+          </a>
+        ) : (
+          <span className="text-xs italic opacity-80">{mediaLabel(message.media_kind)}</span>
+        )
+      ) : null}
+    </>
+  )
+}
+
 function mediaLabel(kind: string): string {
   switch (kind) {
     case 'image':
@@ -390,22 +442,19 @@ function MessagesList({
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
   }, [messages])
   return (
-    <div ref={ref} className="bg-muted/10 flex-1 overflow-y-auto p-4">
+    <div ref={ref} className="bg-muted/10 min-h-0 flex-1 overflow-y-auto p-4">
       <div className="flex flex-col gap-2">
         {(messages ?? []).map((m) => (
           <div
             key={m.id}
             className={cn(
-              'max-w-[75%] rounded-lg px-3 py-2 text-sm',
+              'w-fit max-w-[75%] rounded-lg px-3 py-2 text-sm',
               m.direction === 'out'
-                ? 'bg-primary text-primary-foreground ml-auto'
-                : 'bg-card text-foreground border-border border',
+                ? 'bg-primary text-primary-foreground self-end'
+                : 'bg-card text-foreground border-border self-start border',
             )}
           >
-            {m.text ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : null}
-            {m.media_kind && !m.text ? (
-              <span className="text-xs italic opacity-80">{mediaLabel(m.media_kind)}</span>
-            ) : null}
+            <MessageBody message={m} />
             <p
               className={cn(
                 'mt-1 text-[10px] opacity-70',
@@ -425,9 +474,13 @@ function MessagesList({
 }
 
 function Composer({
+  salonId,
+  conversationId,
   disabled,
   onSend,
 }: {
+  salonId: string
+  conversationId: string
   disabled: boolean
   onSend: (
     text: string,
@@ -437,13 +490,44 @@ function Composer({
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(t('messenger.errors.file_too_large'))
+      return
+    }
+    setUploading(true)
+    try {
+      const { path, mediaKind } = await uploadMessengerMedia(salonId, conversationId, file)
+      onSend('', path, mediaKind)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
-    <div className="border-border bg-card flex items-center gap-2 border-t p-2">
+    <div className="border-border bg-card flex shrink-0 items-center gap-2 border-t p-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*,audio/*,.pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
+      />
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md"
+        className="text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md disabled:opacity-50"
         title={t('messenger.attach_image')}
-        onClick={() => toast.info(t('messenger.attach_soon'))}
+        onClick={() => fileInputRef.current?.click()}
+        disabled={disabled || uploading}
       >
         <ImageIcon className="size-4" strokeWidth={1.8} />
       </button>
@@ -459,15 +543,15 @@ function Composer({
             }
           }
         }}
-        placeholder={t('messenger.composer_placeholder')}
+        placeholder={uploading ? t('messenger.uploading') : t('messenger.composer_placeholder')}
         className="h-10"
-        disabled={disabled}
+        disabled={disabled || uploading}
       />
       <Button
         type="button"
         variant="primary"
         size="md"
-        disabled={disabled || !value.trim()}
+        disabled={disabled || uploading || !value.trim()}
         onClick={() => {
           if (value.trim()) {
             onSend(value.trim())

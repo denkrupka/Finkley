@@ -165,48 +165,34 @@ export function useSendMessage(salonId: string | undefined) {
     }) => {
       if (!salonId) throw new Error('no_salon')
 
-      // Текст без медиа — через edge function messenger-send (отправит в канал
-      // если канал connected и поддерживает send). Сложные кейсы (медиа) пока
-      // пишем напрямую в БД.
-      if (input.text && !input.media_path) {
-        const { data, error } = await supabase.functions.invoke('messenger-send', {
-          body: {
-            salon_id: salonId,
-            conversation_id: input.conversation_id,
-            text: input.text,
-          },
-        })
-        if (error) {
-          // Fallback: пишем напрямую если edge function недоступна.
-          const fallback = await supabase
-            .from('messenger_messages')
-            .insert({
-              conversation_id: input.conversation_id,
-              salon_id: salonId,
-              direction: 'out',
-              text: input.text ?? null,
-            })
-            .select('*')
-            .single()
-          if (fallback.error) throw fallback.error
-          return fallback.data as MessengerMessage
-        }
-        return data as MessengerMessage
-      }
-
-      const { data, error } = await supabase
-        .from('messenger_messages')
-        .insert({
-          conversation_id: input.conversation_id,
+      // Все исходящие — через edge function messenger-send: она и пушит в
+      // внешний канал (TG/FB/IG), и пишет в БД. Если edge function недоступна
+      // — пишем напрямую в БД как fallback (без доставки клиенту).
+      const { data, error } = await supabase.functions.invoke('messenger-send', {
+        body: {
           salon_id: salonId,
-          direction: 'out',
-          text: input.text ?? null,
-          media_path: input.media_path ?? null,
-          media_kind: input.media_kind ?? null,
-        })
-        .select('*')
-        .single()
-      if (error) throw error
+          conversation_id: input.conversation_id,
+          text: input.text ?? '',
+          media_path: input.media_path,
+          media_kind: input.media_kind,
+        },
+      })
+      if (error) {
+        const fallback = await supabase
+          .from('messenger_messages')
+          .insert({
+            conversation_id: input.conversation_id,
+            salon_id: salonId,
+            direction: 'out',
+            text: input.text ?? null,
+            media_path: input.media_path ?? null,
+            media_kind: input.media_kind ?? null,
+          })
+          .select('*')
+          .single()
+        if (fallback.error) throw fallback.error
+        return fallback.data as MessengerMessage
+      }
       return data as MessengerMessage
     },
     onSuccess: (_d, vars) => {
@@ -248,6 +234,45 @@ export function useConnectMessenger(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['messenger-integrations', salonId] })
     },
   })
+}
+
+/**
+ * Загружает файл в bucket `messenger-media` под путь
+ * `<salonId>/<conversationId>/<uuid>.<ext>` и возвращает (path, mediaKind).
+ * mediaKind определяется по MIME — image/video/audio/file.
+ */
+export async function uploadMessengerMedia(
+  salonId: string,
+  conversationId: string,
+  file: File,
+): Promise<{ path: string; mediaKind: 'image' | 'video' | 'audio' | 'file'; mime: string }> {
+  const mime = file.type
+  const mediaKind: 'image' | 'video' | 'audio' | 'file' = mime.startsWith('image/')
+    ? 'image'
+    : mime.startsWith('video/')
+      ? 'video'
+      : mime.startsWith('audio/')
+        ? 'audio'
+        : 'file'
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
+  const id = crypto.randomUUID()
+  const path = `${salonId}/${conversationId}/${id}.${ext}`
+  const { error } = await supabase.storage.from('messenger-media').upload(path, file, {
+    contentType: mime || undefined,
+    cacheControl: '3600',
+    upsert: false,
+  })
+  if (error) throw error
+  return { path, mediaKind, mime }
+}
+
+/** Возвращает signed-url (3 часа TTL) для отображения media в чате. */
+export async function getMessengerMediaUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from('messenger-media')
+    .createSignedUrl(path, 60 * 60 * 3)
+  if (error) return null
+  return data?.signedUrl ?? null
 }
 
 export function useDisconnectMessenger(salonId: string | undefined) {

@@ -30,14 +30,23 @@ Deno.serve(async (req) => {
   const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
   if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
 
-  let body: { salon_id?: string; conversation_id?: string; text?: string }
+  let body: {
+    salon_id?: string
+    conversation_id?: string
+    text?: string
+    media_path?: string
+    media_kind?: 'image' | 'video' | 'audio' | 'file'
+  }
   try {
     body = await req.json()
   } catch {
     return jsonResponse({ error: 'invalid_json' }, 400)
   }
-  if (!body.salon_id || !body.conversation_id || !body.text) {
+  if (!body.salon_id || !body.conversation_id) {
     return jsonResponse({ error: 'missing_fields' }, 400)
+  }
+  if (!body.text && !body.media_path) {
+    return jsonResponse({ error: 'empty_message' }, 400)
   }
 
   const membership = await getSalonMembership(SUPABASE_URL, SERVICE_KEY, user.userId, body.salon_id)
@@ -66,13 +75,43 @@ Deno.serve(async (req) => {
   let externalMessageId: string | null = null
   let deliveryError: string | null = null
 
+  // Для media (фото/файлы) сгенерим signed-url из bucket'а messenger-media —
+  // его передаём в Meta API как attachment.url. TTL 1 час хватает на доставку.
+  let mediaSignedUrl: string | null = null
+  if (body.media_path) {
+    const { data: signed } = await admin.storage
+      .from('messenger-media')
+      .createSignedUrl(body.media_path, 60 * 60)
+    mediaSignedUrl = signed?.signedUrl ?? null
+  }
+
   if (integ && integ.status === 'connected' && convo.channel === 'telegram') {
     try {
       const token = await decryptSecret(integ.credentials.bot_token_enc as string)
-      const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      let tgPath = 'sendMessage'
+      let tgBody: Record<string, unknown> = {
+        chat_id: convo.external_user_id,
+        text: body.text ?? '',
+      }
+      if (mediaSignedUrl && body.media_kind === 'image') {
+        tgPath = 'sendPhoto'
+        tgBody = {
+          chat_id: convo.external_user_id,
+          photo: mediaSignedUrl,
+          caption: body.text || undefined,
+        }
+      } else if (mediaSignedUrl) {
+        tgPath = 'sendDocument'
+        tgBody = {
+          chat_id: convo.external_user_id,
+          document: mediaSignedUrl,
+          caption: body.text || undefined,
+        }
+      }
+      const resp = await fetch(`https://api.telegram.org/bot${token}/${tgPath}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ chat_id: convo.external_user_id, text: body.text }),
+        body: JSON.stringify(tgBody),
       })
       const tgJson = (await resp.json()) as {
         ok: boolean
@@ -94,28 +133,52 @@ Deno.serve(async (req) => {
   ) {
     try {
       const pageToken = await decryptSecret(integ.credentials.page_access_enc as string)
-      const resp = await fetch(
-        `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(pageToken)}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            recipient: { id: convo.external_user_id },
-            messaging_type: 'RESPONSE',
-            message: { text: body.text },
-          }),
-        },
-      )
-      const fbJson = (await resp.json()) as {
-        message_id?: string
-        recipient_id?: string
-        error?: { message: string; code: number }
+      // Meta: либо message.text, либо message.attachment. Если есть и то, и
+      // то — отправляем 2 запроса (Meta API не поддерживает одновременно).
+      const sendOne = async (msgPayload: Record<string, unknown>) => {
+        const r = await fetch(
+          `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(pageToken)}`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              recipient: { id: convo.external_user_id },
+              messaging_type: 'RESPONSE',
+              message: msgPayload,
+            }),
+          },
+        )
+        const j = (await r.json()) as {
+          message_id?: string
+          error?: { message: string; code: number }
+        }
+        if (!r.ok || j.error || !j.message_id) {
+          throw new Error(j.error?.message ?? `Meta sendMessage failed (HTTP ${r.status})`)
+        }
+        return j.message_id
       }
-      if (!resp.ok || fbJson.error || !fbJson.message_id) {
-        deliveryError = fbJson.error?.message ?? `Meta sendMessage failed (HTTP ${resp.status})`
-      } else {
-        externalMessageId = fbJson.message_id
+
+      let lastId: string | null = null
+      if (mediaSignedUrl && body.media_kind) {
+        const attachmentType =
+          body.media_kind === 'image'
+            ? 'image'
+            : body.media_kind === 'video'
+              ? 'video'
+              : body.media_kind === 'audio'
+                ? 'audio'
+                : 'file'
+        lastId = await sendOne({
+          attachment: {
+            type: attachmentType,
+            payload: { url: mediaSignedUrl, is_reusable: false },
+          },
+        })
       }
+      if (body.text) {
+        lastId = await sendOne({ text: body.text })
+      }
+      externalMessageId = lastId
     } catch (e) {
       deliveryError = e instanceof Error ? e.message : String(e)
     }
@@ -128,7 +191,9 @@ Deno.serve(async (req) => {
       conversation_id: convo.id,
       salon_id: body.salon_id,
       direction: 'out',
-      text: body.text,
+      text: body.text ?? null,
+      media_path: body.media_path ?? null,
+      media_kind: body.media_kind ?? null,
       external_message_id: externalMessageId,
       sent_by_user_id: user.userId,
     })
