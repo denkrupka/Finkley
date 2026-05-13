@@ -22,7 +22,7 @@ export function Sidebar({ salonId, onNavigate }: Props) {
   const { t } = useTranslation()
 
   return (
-    <aside className="border-border bg-card sticky top-0 flex h-screen w-[232px] flex-shrink-0 flex-col self-start border-r px-3.5 pb-4 pt-5">
+    <aside className="border-border bg-card flex h-screen w-[232px] flex-shrink-0 flex-col border-r px-3.5 pb-4 pt-5">
       {/* Logo */}
       <div className="mb-5 px-2">
         <LogoLockup size={28} />

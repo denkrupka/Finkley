@@ -56,24 +56,30 @@ export function ReferralButton({ variant = 'topbar' }: { variant?: 'topbar' | 's
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title={t('referral.button')}
-        aria-label={t('referral.button')}
+        title={t('referral.bonus_cta')}
+        aria-label={t('referral.bonus_cta')}
         className={
           isSidebar
-            ? 'border-brand-yellow-deep/50 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-3 transition-shadow hover:shadow-sm'
+            ? 'border-brand-yellow-deep/50 inline-flex w-full items-center justify-center gap-2 rounded-md border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-3 py-2 transition-shadow hover:shadow-sm'
             : 'border-brand-yellow-deep/50 inline-flex h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFE876] px-2.5 transition-shadow hover:shadow-sm sm:px-3'
         }
       >
-        <Gift className="text-brand-gold size-4" strokeWidth={2} />
-        <span
-          className={
-            isSidebar
-              ? 'text-brand-navy text-[11px] font-bold'
-              : 'text-brand-navy hidden text-[11px] font-bold sm:inline'
-          }
-        >
-          {t('referral.button')}
-        </span>
+        <Gift
+          className={isSidebar ? 'text-brand-gold size-5 shrink-0' : 'text-brand-gold size-4'}
+          strokeWidth={2}
+        />
+        {isSidebar ? (
+          <span className="flex flex-col items-start leading-tight">
+            <span className="text-brand-navy text-[12px] font-bold">{t('referral.bonus_cta')}</span>
+            <span className="text-brand-navy/70 text-[10px] font-medium">
+              {t('referral.bonus_hint')}
+            </span>
+          </span>
+        ) : (
+          <span className="text-brand-navy hidden text-[11px] font-bold sm:inline">
+            {t('referral.button')}
+          </span>
+        )}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
