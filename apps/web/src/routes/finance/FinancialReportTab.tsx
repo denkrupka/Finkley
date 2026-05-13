@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button'
 import { useExpenses } from '@/hooks/useExpenses'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
+  monthlyEquivalentCents,
   useFinancialSettings,
   type FinancialSettings,
+  type ParameterItem,
 } from '@/hooks/useFinancialSettings'
 import { useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
@@ -138,7 +140,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
 
   const visitsByMonth = monthly.map((m) => m.visitsRevenue)
-  const otherIncomeByMonth = monthly.map((m) => m.otherIncome + settings.other_income.monthly_cents)
+  const otherIncomeMonthly = settings.other_income.items
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
+  const otherIncomeByMonth = monthly.map((m) => m.otherIncome + otherIncomeMonthly)
   const revenueByMonth = visitsByMonth.map((v, i) => v + (otherIncomeByMonth[i] ?? 0))
 
   // Производственные = ЗП мастера + расходные материалы (план через %, средний
@@ -151,14 +156,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   )
   const productionByMonth = masterPayout.map((p, i) => p + (materials[i] ?? 0))
 
-  // Переменные (% выручки)
-  const varAdminPayroll = variablePctOfRevenue(settings.variable.admin_payroll_pct)
-  const varBankComm = variablePctOfRevenue(settings.variable.bank_commission_pct)
-  const varAdBudget = variablePctOfRevenue(settings.variable.ad_budget_pct)
-  const varBonuses = variablePctOfRevenue(settings.variable.bonuses_pct)
-  const variableByMonth = varAdminPayroll.map(
-    (a, i) => a + (varBankComm[i] ?? 0) + (varAdBudget[i] ?? 0) + (varBonuses[i] ?? 0),
-  )
+  // Переменные (% выручки) — сумма всех items[].pct
+  const variableTotalPct = settings.variable.items
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + (i.pct ?? 0), 0)
+  const variableByMonth = variablePctOfRevenue(variableTotalPct)
 
   const fixedByMonth = constant(fixedTotalMonthly)
   const taxesByMonth = constant(taxesTotalMonthly)
@@ -243,30 +245,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'variable',
     },
-    {
-      label: t('settings.parameters.variable.admin_payroll'),
-      values: varAdminPayroll.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'variable',
-    },
-    {
-      label: t('settings.parameters.variable.bank_commission'),
-      values: varBankComm.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'variable',
-    },
-    {
-      label: t('settings.parameters.variable.ad_budget'),
-      values: varAdBudget.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'variable',
-    },
-    {
-      label: t('settings.parameters.variable.bonuses'),
-      values: varBonuses.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'variable',
-    },
+    ...settings.variable.items
+      .filter((i) => !i.archived)
+      .map((it) => ({
+        label: it.label || '—',
+        values: variablePctOfRevenue(it.pct ?? 0).map((v) => -v),
+        indent: 2,
+        parentGroupKey: 'variable',
+      })),
 
     {
       label: t('finance.report.fixed'),
@@ -276,7 +262,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'fixed',
     },
-    ...buildFixedRows(settings, t).map((r) => ({ ...r, parentGroupKey: 'fixed' })),
+    ...buildFixedRows(settings).map((r) => ({ ...r, parentGroupKey: 'fixed' })),
 
     {
       label: t('finance.report.taxes'),
@@ -286,30 +272,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'taxes',
     },
-    {
-      label: t('settings.parameters.taxes.pit36'),
-      values: constant(settings.taxes.pit36_cents).map((v) => -v),
-      indent: 2,
+    ...buildItemsRows(settings.taxes.items, 2, -1).map((r) => ({
+      ...r,
       parentGroupKey: 'taxes',
-    },
-    {
-      label: t('settings.parameters.taxes.vat'),
-      values: constant(settings.taxes.vat_cents).map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'taxes',
-    },
-    {
-      label: t('settings.parameters.taxes.cit'),
-      values: constant(settings.taxes.cit_cents).map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'taxes',
-    },
-    {
-      label: t('settings.parameters.taxes.pit3'),
-      values: constant(settings.taxes.pit3_cents).map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'taxes',
-    },
+    })),
 
     {
       label: t('finance.report.section_investing'),
@@ -318,7 +284,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'investing',
     },
-    ...buildInvestmentRows(settings, t, currentMonthIdx).map((r) => ({
+    ...buildInvestmentRows(settings, currentMonthIdx).map((r) => ({
       ...r,
       parentGroupKey: 'investing',
     })),
@@ -330,7 +296,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'financing',
     },
-    ...buildFlowRows(settings, t).map((r) => ({ ...r, parentGroupKey: 'financing' })),
+    ...buildFlowRows(settings).map((r) => ({ ...r, parentGroupKey: 'financing' })),
 
     {
       label: t('finance.report.period_saldo'),
@@ -502,27 +468,23 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             </tr>
           </thead>
           <tbody>
-            {(
-              [
-                ['director_cents', t('settings.parameters.cash.director')],
-                ['safe_cents', t('settings.parameters.cash.safe')],
-                ['gotowka_cents', t('settings.parameters.cash.gotowka')],
-                ['bank_karta_cents', t('settings.parameters.cash.bank_karta')],
-                ['karta_terminal_cents', t('settings.parameters.cash.karta_terminal')],
-              ] as const
-            ).map(([key, label]) => (
-              <tr key={key} className="border-border/60 border-t">
-                <td className="bg-card text-foreground sticky left-0 z-10 px-3 py-1.5">{label}</td>
-                <td className="num text-muted-foreground px-2 py-1.5 text-right">
-                  {formatNumberSafe(settings.cash_registers[key], currency)}
-                </td>
-                {months.map((m) => (
-                  <td key={m} className="num text-muted-foreground px-2 py-1.5 text-right">
-                    {formatNumberSafe(settings.cash_registers[key], currency)}
+            {settings.cash_registers.items
+              .filter((i) => !i.archived)
+              .map((reg) => (
+                <tr key={reg.id} className="border-border/60 border-t">
+                  <td className="bg-card text-foreground sticky left-0 z-10 px-3 py-1.5">
+                    {reg.label || '—'}
                   </td>
-                ))}
-              </tr>
-            ))}
+                  <td className="num text-muted-foreground px-2 py-1.5 text-right">
+                    {formatNumberSafe(reg.amount_cents ?? 0, currency)}
+                  </td>
+                  {months.map((m) => (
+                    <td key={m} className="num text-muted-foreground px-2 py-1.5 text-right">
+                      {formatNumberSafe(reg.amount_cents ?? 0, currency)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
@@ -533,76 +495,32 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 // ============================ helpers ============================
 
 function sumFixedCents(s: FinancialSettings): number {
-  const f = s.fixed
-  const base =
-    f.payroll_management_cents +
-    f.payroll_admin_cents +
-    f.zus_cents +
-    f.rent_cents +
-    f.electricity_cents +
-    f.ad_budget_cents +
-    f.smm_cents +
-    f.internet_cents +
-    f.services_subscription_cents +
-    f.cleaning_cents +
-    f.household_cents +
-    f.leasing_cents +
-    f.repair_equipment_cents +
-    f.bank_services_cents +
-    f.accounting_cents +
-    f.fuel_cents +
-    f.other_cents
-  const custom = (f.custom ?? [])
-    .filter((c) => c.active)
-    .reduce((s, c) => s + customAmountCents(c), 0)
-  return base + custom
-}
-
-function customAmountCents(c: { amount_cents?: number; monthly_cents?: number }): number {
-  // Поддерживаем legacy monthly_cents — старые записи использовали именно его.
-  return c.amount_cents ?? c.monthly_cents ?? 0
+  return sumSectionMonthly(s.fixed.items)
 }
 
 function sumTaxesCents(s: FinancialSettings): number {
-  const t = s.taxes
-  const base = t.pit36_cents + t.vat_cents + t.cit_cents + t.pit3_cents
-  const custom = (t.custom ?? [])
-    .filter((c) => c.active)
-    .reduce((s, c) => s + customAmountCents(c), 0)
-  return base + custom
+  return sumSectionMonthly(s.taxes.items)
 }
 
 function sumInvestmentsCents(s: FinancialSettings): number {
-  const i = s.investments
-  const base =
-    i.franchise_fee_cents +
-    i.first_rent_cents +
-    i.renovation_cents +
-    i.equipment_cents +
-    i.inventory_cents +
-    i.furniture_cents +
-    i.other_cents
-  const custom = (i.custom ?? [])
-    .filter((c) => c.active)
-    .reduce((s, c) => s + customAmountCents(c), 0)
-  return base + custom
+  // Инвестиции — единоразовые. Используем amount как есть (не делим на period).
+  return s.investments.items
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + (i.amount_cents ?? 0), 0)
 }
 
 function sumFlowsCents(s: FinancialSettings): number {
-  const f = s.flows
-  const base =
-    f.dividends_cents + f.owner_contributions_cents + f.owner_loans_cents + f.other_loans_cents
-  const custom = (f.custom ?? [])
-    .filter((c) => c.active)
-    .reduce((s, c) => s + customAmountCents(c), 0)
-  return base + custom
+  return sumSectionMonthly(s.flows.items)
 }
 
 function sumCashRegistersCents(s: FinancialSettings): number {
-  const c = s.cash_registers
-  return (
-    c.director_cents + c.safe_cents + c.gotowka_cents + c.bank_karta_cents + c.karta_terminal_cents
-  )
+  return s.cash_registers.items
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + (i.amount_cents ?? 0), 0)
+}
+
+function sumSectionMonthly(items: ParameterItem[]): number {
+  return items.filter((i) => !i.archived).reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
 }
 
 /** Средневзвешенный % из услуг (для plan-vs-fact на ЗП мастера / расходные материалы). */
@@ -623,95 +541,54 @@ function formatNumberSafe(v: number, currency: string): string {
   return formatCurrency(v, currency)
 }
 
-function buildFixedRows(settings: FinancialSettings, t: (k: string) => string) {
-  const FIXED = [
-    ['payroll_management_cents', 'settings.parameters.fixed.payroll_management'],
-    ['payroll_admin_cents', 'settings.parameters.fixed.payroll_admin'],
-    ['zus_cents', 'settings.parameters.fixed.zus'],
-    ['rent_cents', 'settings.parameters.fixed.rent'],
-    ['electricity_cents', 'settings.parameters.fixed.electricity'],
-    ['ad_budget_cents', 'settings.parameters.fixed.ad_budget'],
-    ['smm_cents', 'settings.parameters.fixed.smm'],
-    ['internet_cents', 'settings.parameters.fixed.internet'],
-    ['services_subscription_cents', 'settings.parameters.fixed.services_subscription'],
-    ['cleaning_cents', 'settings.parameters.fixed.cleaning'],
-    ['household_cents', 'settings.parameters.fixed.household'],
-    ['leasing_cents', 'settings.parameters.fixed.leasing'],
-    ['repair_equipment_cents', 'settings.parameters.fixed.repair_equipment'],
-    ['bank_services_cents', 'settings.parameters.fixed.bank_services'],
-    ['accounting_cents', 'settings.parameters.fixed.accounting'],
-    ['fuel_cents', 'settings.parameters.fixed.fuel'],
-    ['other_cents', 'settings.parameters.fixed.other'],
-  ] as const
-  const standard = FIXED.map(([key, labelKey]) => ({
-    label: t(labelKey),
-    values: Array.from(
-      { length: 12 },
-      () => -(settings.fixed[key as keyof typeof settings.fixed] as number),
-    ),
-    indent: 2,
-  }))
-  const custom = (settings.fixed.custom ?? [])
-    .filter((c) => c.active)
-    .map((c) => ({
-      label: c.label || '—',
-      values: Array.from({ length: 12 }, () => -customAmountCents(c)),
-      indent: 2,
-    }))
-  return [...standard, ...custom]
-}
-
-function buildInvestmentRows(
-  settings: FinancialSettings,
-  t: (k: string) => string,
-  currentMonthIdx: number,
+/**
+ * Строит строки отчёта из items[] секции с учётом иерархии (parent_id).
+ * Корневые позиции рендерятся на уровне `baseIndent`, дочерние — +1.
+ *
+ * @param sign      Знак значения (+1 для доходов, -1 для расходов).
+ * @param onlyInMonth Если задан — позиция показывается только в этом месяце
+ *                    (для investments — единоразовые расходы).
+ */
+function buildItemsRows(
+  items: ParameterItem[],
+  baseIndent: number,
+  sign: 1 | -1,
+  onlyInMonth: number | null = null,
 ) {
-  const INV = [
-    ['franchise_fee_cents', 'settings.parameters.investments.franchise_fee'],
-    ['first_rent_cents', 'settings.parameters.investments.first_rent'],
-    ['renovation_cents', 'settings.parameters.investments.renovation'],
-    ['equipment_cents', 'settings.parameters.investments.equipment'],
-    ['inventory_cents', 'settings.parameters.investments.inventory'],
-    ['furniture_cents', 'settings.parameters.investments.furniture'],
-    ['other_cents', 'settings.parameters.investments.other'],
-  ] as const
-  const standard = INV.map(([key, labelKey]) => ({
-    label: t(labelKey),
-    values: Array.from({ length: 12 }, (_, m) =>
-      m === currentMonthIdx ? -(settings.investments[key] as number) : 0,
-    ),
-    indent: 1,
-  }))
-  const custom = (settings.investments.custom ?? [])
-    .filter((c) => c.active)
-    .map((c) => ({
-      label: c.label || '—',
-      values: Array.from({ length: 12 }, (_, m) =>
-        m === currentMonthIdx ? -customAmountCents(c) : 0,
-      ),
-      indent: 1,
-    }))
-  return [...standard, ...custom]
+  const visible = items.filter((i) => !i.archived)
+  const byParent = new Map<string | null, ParameterItem[]>()
+  for (const it of visible) {
+    const key = it.parent_id ?? null
+    const arr = byParent.get(key) ?? []
+    arr.push(it)
+    byParent.set(key, arr)
+  }
+  const rows: Array<{ label: string; values: number[]; indent: number }> = []
+  function pushNode(node: ParameterItem, indent: number) {
+    const monthly = monthlyEquivalentCents(node)
+    const values = Array.from({ length: 12 }, (_, m) => {
+      if (onlyInMonth !== null) {
+        return m === onlyInMonth ? sign * (node.amount_cents ?? 0) : 0
+      }
+      return sign * monthly
+    })
+    rows.push({ label: node.label || '—', values, indent })
+    const children = byParent.get(node.id) ?? []
+    for (const c of children) pushNode(c, indent + 1)
+  }
+  const roots = byParent.get(null) ?? []
+  for (const r of roots) pushNode(r, baseIndent)
+  return rows
 }
 
-function buildFlowRows(settings: FinancialSettings, t: (k: string) => string) {
-  const FLOW = [
-    ['dividends_cents', 'settings.parameters.flows.dividends'],
-    ['owner_contributions_cents', 'settings.parameters.flows.owner_contributions'],
-    ['owner_loans_cents', 'settings.parameters.flows.owner_loans'],
-    ['other_loans_cents', 'settings.parameters.flows.other_loans'],
-  ] as const
-  const standard = FLOW.map(([key, labelKey]) => ({
-    label: t(labelKey),
-    values: Array.from({ length: 12 }, () => -(settings.flows[key] as number)),
-    indent: 1,
-  }))
-  const custom = (settings.flows.custom ?? [])
-    .filter((c) => c.active)
-    .map((c) => ({
-      label: c.label || '—',
-      values: Array.from({ length: 12 }, () => -customAmountCents(c)),
-      indent: 1,
-    }))
-  return [...standard, ...custom]
+function buildFixedRows(settings: FinancialSettings) {
+  return buildItemsRows(settings.fixed.items, 2, -1)
+}
+
+function buildInvestmentRows(settings: FinancialSettings, currentMonthIdx: number) {
+  return buildItemsRows(settings.investments.items, 1, -1, currentMonthIdx)
+}
+
+function buildFlowRows(settings: FinancialSettings) {
+  return buildItemsRows(settings.flows.items, 1, -1)
 }

@@ -1,262 +1,103 @@
-import { Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
+  monthlyEquivalentCents,
   useFinancialSettings,
   useUpdateFinancialSettings,
-  type CustomItem,
-  type CustomPctItem,
   type FinancialSettings,
+  type ParamPeriod,
+  type ParameterItem,
 } from '@/hooks/useFinancialSettings'
 import { useSalon } from '@/hooks/useSalons'
+import { cn } from '@/lib/utils/cn'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 /**
- * «Параметры» в Финансах. По каждой группе:
- *   - набор preset-полей (рент, ZUS, налоги, …) — редактируемые
- *   - блок «Свои позиции»: add / edit / archive / restore
+ * Параметры финансов — единая иерархическая таблица по каждой секции.
  *
- * При архивировании item помечается `active=false` — исторические расчёты
- * не теряют ссылку на названия.
+ * Любая позиция (включая preset-«стандартные»):
+ *   - переименовывается
+ *   - редактируется (сумма / процент / период)
+ *   - получает подкатегорию (parent_id)
+ *   - архивируется (soft-delete, история отчётов не теряется)
+ *   - восстанавливается
+ *
+ * Эта структура — источник истины для Финансового отчёта: он строит строки
+ * напрямую из items[].
  */
 
-type FieldKind = 'money' | 'percent'
+type SectionKey = keyof FinancialSettings
 
-type FieldDef<S extends keyof FinancialSettings> = {
-  path: keyof FinancialSettings[S]
-  labelKey: string
-  kind: FieldKind
-}
-
-type GroupDef<S extends keyof FinancialSettings = keyof FinancialSettings> = {
-  section: S
+type SectionDef = {
+  key: SectionKey
   titleKey: string
   subtitleKey?: string
-  /** Тип customs у этой секции — money (CustomItem) или percent (CustomPctItem) */
-  customKind: FieldKind
-  fields: FieldDef<S>[]
+  /** Тип значений в секции. */
+  kind: 'money' | 'percent'
+  /** Показывать колонку «Период» (для постоянных расходов). */
+  showPeriod: boolean
 }
 
-type AnyGroupDef =
-  | GroupDef<'cash_registers'>
-  | GroupDef<'fixed'>
-  | GroupDef<'other_income'>
-  | GroupDef<'variable'>
-  | GroupDef<'taxes'>
-  | GroupDef<'investments'>
-  | GroupDef<'flows'>
-
-const GROUPS = [
+const SECTIONS: SectionDef[] = [
   {
-    section: 'cash_registers',
+    key: 'cash_registers',
     titleKey: 'settings.parameters.cash.title',
     subtitleKey: 'settings.parameters.cash.subtitle',
-    customKind: 'money',
-    fields: [
-      { path: 'director_cents', labelKey: 'settings.parameters.cash.director', kind: 'money' },
-      { path: 'safe_cents', labelKey: 'settings.parameters.cash.safe', kind: 'money' },
-      { path: 'gotowka_cents', labelKey: 'settings.parameters.cash.gotowka', kind: 'money' },
-      { path: 'bank_karta_cents', labelKey: 'settings.parameters.cash.bank_karta', kind: 'money' },
-      {
-        path: 'karta_terminal_cents',
-        labelKey: 'settings.parameters.cash.karta_terminal',
-        kind: 'money',
-      },
-    ],
-  } as GroupDef<'cash_registers'>,
+    kind: 'money',
+    showPeriod: false,
+  },
   {
-    section: 'fixed',
-    titleKey: 'settings.parameters.fixed.title',
-    subtitleKey: 'settings.parameters.fixed.subtitle',
-    customKind: 'money',
-    fields: [
-      {
-        path: 'payroll_management_cents',
-        labelKey: 'settings.parameters.fixed.payroll_management',
-        kind: 'money',
-      },
-      {
-        path: 'payroll_admin_cents',
-        labelKey: 'settings.parameters.fixed.payroll_admin',
-        kind: 'money',
-      },
-      { path: 'zus_cents', labelKey: 'settings.parameters.fixed.zus', kind: 'money' },
-      { path: 'rent_cents', labelKey: 'settings.parameters.fixed.rent', kind: 'money' },
-      {
-        path: 'electricity_cents',
-        labelKey: 'settings.parameters.fixed.electricity',
-        kind: 'money',
-      },
-      { path: 'ad_budget_cents', labelKey: 'settings.parameters.fixed.ad_budget', kind: 'money' },
-      { path: 'smm_cents', labelKey: 'settings.parameters.fixed.smm', kind: 'money' },
-      { path: 'internet_cents', labelKey: 'settings.parameters.fixed.internet', kind: 'money' },
-      {
-        path: 'services_subscription_cents',
-        labelKey: 'settings.parameters.fixed.services_subscription',
-        kind: 'money',
-      },
-      { path: 'cleaning_cents', labelKey: 'settings.parameters.fixed.cleaning', kind: 'money' },
-      { path: 'household_cents', labelKey: 'settings.parameters.fixed.household', kind: 'money' },
-      { path: 'leasing_cents', labelKey: 'settings.parameters.fixed.leasing', kind: 'money' },
-      {
-        path: 'repair_equipment_cents',
-        labelKey: 'settings.parameters.fixed.repair_equipment',
-        kind: 'money',
-      },
-      {
-        path: 'bank_services_cents',
-        labelKey: 'settings.parameters.fixed.bank_services',
-        kind: 'money',
-      },
-      { path: 'accounting_cents', labelKey: 'settings.parameters.fixed.accounting', kind: 'money' },
-      { path: 'fuel_cents', labelKey: 'settings.parameters.fixed.fuel', kind: 'money' },
-      { path: 'other_cents', labelKey: 'settings.parameters.fixed.other', kind: 'money' },
-    ],
-  } as GroupDef<'fixed'>,
+    key: 'fixed',
+    titleKey: 'settings.parameters.fixed.title_v2',
+    subtitleKey: 'settings.parameters.fixed.subtitle_v2',
+    kind: 'money',
+    showPeriod: true,
+  },
   {
-    section: 'other_income',
+    key: 'other_income',
     titleKey: 'settings.parameters.other_income.title',
     subtitleKey: 'settings.parameters.other_income.subtitle',
-    customKind: 'money',
-    fields: [
-      {
-        path: 'monthly_cents',
-        labelKey: 'settings.parameters.other_income.monthly',
-        kind: 'money',
-      },
-    ],
-  } as GroupDef<'other_income'>,
+    kind: 'money',
+    showPeriod: false,
+  },
   {
-    section: 'variable',
+    key: 'variable',
     titleKey: 'settings.parameters.variable.title',
     subtitleKey: 'settings.parameters.variable.subtitle',
-    customKind: 'percent',
-    fields: [
-      {
-        path: 'admin_payroll_pct',
-        labelKey: 'settings.parameters.variable.admin_payroll',
-        kind: 'percent',
-      },
-      {
-        path: 'bank_commission_pct',
-        labelKey: 'settings.parameters.variable.bank_commission',
-        kind: 'percent',
-      },
-      {
-        path: 'ad_budget_pct',
-        labelKey: 'settings.parameters.variable.ad_budget',
-        kind: 'percent',
-      },
-      { path: 'bonuses_pct', labelKey: 'settings.parameters.variable.bonuses', kind: 'percent' },
-    ],
-  } as GroupDef<'variable'>,
+    kind: 'percent',
+    showPeriod: false,
+  },
   {
-    section: 'taxes',
+    key: 'taxes',
     titleKey: 'settings.parameters.taxes.title',
     subtitleKey: 'settings.parameters.taxes.subtitle',
-    customKind: 'money',
-    fields: [
-      { path: 'pit36_cents', labelKey: 'settings.parameters.taxes.pit36', kind: 'money' },
-      { path: 'vat_cents', labelKey: 'settings.parameters.taxes.vat', kind: 'money' },
-      { path: 'cit_cents', labelKey: 'settings.parameters.taxes.cit', kind: 'money' },
-      { path: 'pit3_cents', labelKey: 'settings.parameters.taxes.pit3', kind: 'money' },
-    ],
-  } as GroupDef<'taxes'>,
+    kind: 'money',
+    showPeriod: true,
+  },
   {
-    section: 'investments',
+    key: 'investments',
     titleKey: 'settings.parameters.investments.title',
     subtitleKey: 'settings.parameters.investments.subtitle',
-    customKind: 'money',
-    fields: [
-      {
-        path: 'franchise_fee_cents',
-        labelKey: 'settings.parameters.investments.franchise_fee',
-        kind: 'money',
-      },
-      {
-        path: 'first_rent_cents',
-        labelKey: 'settings.parameters.investments.first_rent',
-        kind: 'money',
-      },
-      {
-        path: 'renovation_cents',
-        labelKey: 'settings.parameters.investments.renovation',
-        kind: 'money',
-      },
-      {
-        path: 'equipment_cents',
-        labelKey: 'settings.parameters.investments.equipment',
-        kind: 'money',
-      },
-      {
-        path: 'inventory_cents',
-        labelKey: 'settings.parameters.investments.inventory',
-        kind: 'money',
-      },
-      {
-        path: 'furniture_cents',
-        labelKey: 'settings.parameters.investments.furniture',
-        kind: 'money',
-      },
-      {
-        path: 'other_cents',
-        labelKey: 'settings.parameters.investments.other',
-        kind: 'money',
-      },
-    ],
-  } as GroupDef<'investments'>,
+    kind: 'money',
+    showPeriod: false,
+  },
   {
-    section: 'flows',
+    key: 'flows',
     titleKey: 'settings.parameters.flows.title',
     subtitleKey: 'settings.parameters.flows.subtitle',
-    customKind: 'money',
-    fields: [
-      { path: 'dividends_cents', labelKey: 'settings.parameters.flows.dividends', kind: 'money' },
-      {
-        path: 'owner_contributions_cents',
-        labelKey: 'settings.parameters.flows.owner_contributions',
-        kind: 'money',
-      },
-      {
-        path: 'owner_loans_cents',
-        labelKey: 'settings.parameters.flows.owner_loans',
-        kind: 'money',
-      },
-      {
-        path: 'other_loans_cents',
-        labelKey: 'settings.parameters.flows.other_loans',
-        kind: 'money',
-      },
-    ],
-  } as GroupDef<'flows'>,
-] satisfies ReadonlyArray<AnyGroupDef>
+    kind: 'money',
+    showPeriod: true,
+  },
+]
 
-type AnyCustomItem = CustomItem | CustomPctItem
-function isPct(item: AnyCustomItem): item is CustomPctItem {
-  return (item as CustomPctItem).pct !== undefined
-}
-
-/** Нормализует legacy fixed.custom (monthly_cents) к amount_cents. */
-function normalizeCustomMoney(
-  list: Array<CustomItem & { monthly_cents?: number }> | undefined,
-): CustomItem[] {
-  if (!list) return []
-  return list.map((it) => ({
-    id: it.id,
-    label: it.label,
-    amount_cents:
-      it.amount_cents !== undefined
-        ? it.amount_cents
-        : (((it as { monthly_cents?: number }).monthly_cents ?? 0) as number),
-    active: it.active !== false,
-  }))
-}
+const PERIOD_OPTIONS: ParamPeriod[] = ['day', 'month', '2months', 'quarter', 'year']
 
 export function ParametersCard() {
   const { t } = useTranslation()
@@ -267,45 +108,17 @@ export function ParametersCard() {
   const save = useUpdateFinancialSettings(salonId)
 
   const [draft, setDraft] = useState<FinancialSettings>(settings)
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
     setDraft(settings)
   }, [settings])
 
-  function setField<K extends keyof FinancialSettings, P extends keyof FinancialSettings[K]>(
-    section: K,
-    path: P,
-    valueDisplay: string,
-    kind: FieldKind,
-  ) {
-    const n = Number(valueDisplay.replace(',', '.'))
-    if (!Number.isFinite(n) || n < 0) return
-    if (kind === 'percent' && n > 100) return
-    const stored = kind === 'money' ? Math.round(n * 100) : n
+  function updateSection(key: SectionKey, update: (items: ParameterItem[]) => ParameterItem[]) {
     setDraft((prev) => ({
       ...prev,
-      [section]: { ...prev[section], [path]: stored },
+      [key]: { items: update(prev[key].items) },
     }))
-  }
-
-  function fieldDisplay<K extends keyof FinancialSettings, P extends keyof FinancialSettings[K]>(
-    section: K,
-    path: P,
-    kind: FieldKind,
-  ): string {
-    const v = draft[section][path] as unknown as number
-    if (kind === 'money') return String((v ?? 0) / 100)
-    return String(v ?? 0)
-  }
-
-  function setCustom<K extends keyof FinancialSettings>(section: K, next: AnyCustomItem[]) {
-    setDraft((prev) => {
-      const groupPrev = prev[section] as unknown as Record<string, unknown>
-      return {
-        ...prev,
-        [section]: { ...groupPrev, custom: next },
-      } as FinancialSettings
-    })
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -330,74 +143,40 @@ export function ParametersCard() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-        <div className="flex items-center gap-3">
-          <SlidersHorizontal className="text-brand-teal size-5" strokeWidth={1.7} />
-          <div>
-            <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-              {t('settings.parameters.title')}
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {t('settings.parameters.subtitle')}
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <SlidersHorizontal className="text-brand-teal size-5" strokeWidth={1.7} />
+            <div>
+              <h2 className="text-brand-navy text-lg font-bold tracking-tight">
+                {t('settings.parameters.title')}
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {t('settings.parameters.subtitle')}
+              </p>
+            </div>
           </div>
+          <label className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="size-3.5"
+            />
+            {t('settings.parameters.show_archived')}
+          </label>
         </div>
       </div>
 
-      {GROUPS.map((group) => {
-        const sectionData = draft[group.section] as unknown as Record<string, unknown>
-        const rawCustom = (sectionData.custom ?? []) as AnyCustomItem[]
-        const customList: AnyCustomItem[] =
-          group.customKind === 'money'
-            ? normalizeCustomMoney(rawCustom as Array<CustomItem & { monthly_cents?: number }>)
-            : (rawCustom as CustomPctItem[])
-        return (
-          <section
-            key={group.section}
-            className="border-border bg-card shadow-finsm rounded-lg border p-5"
-          >
-            <header className="border-border mb-4 border-b pb-3">
-              <h3 className="text-brand-navy text-base font-bold tracking-tight">
-                {t(group.titleKey)}
-              </h3>
-              {group.subtitleKey ? (
-                <p className="text-muted-foreground mt-0.5 text-xs">{t(group.subtitleKey)}</p>
-              ) : null}
-            </header>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {group.fields.map((field) => (
-                <FieldRow
-                  key={String(field.path)}
-                  label={t(field.labelKey)}
-                  kind={field.kind}
-                  currency={currency}
-                  value={fieldDisplay(
-                    group.section,
-                    field.path as keyof FinancialSettings[typeof group.section],
-                    field.kind,
-                  )}
-                  onChange={(v) =>
-                    setField(
-                      group.section,
-                      field.path as keyof FinancialSettings[typeof group.section],
-                      v,
-                      field.kind,
-                    )
-                  }
-                />
-              ))}
-            </div>
-
-            <CustomList
-              section={group.section}
-              kind={group.customKind}
-              items={customList}
-              currency={currency}
-              onChange={(next) => setCustom(group.section, next)}
-            />
-          </section>
-        )
-      })}
+      {SECTIONS.map((section) => (
+        <SectionTable
+          key={section.key}
+          def={section}
+          items={draft[section.key].items}
+          currency={currency}
+          showArchived={showArchived}
+          onChange={(updater) => updateSection(section.key, updater)}
+        />
+      ))}
 
       <div className="border-border bg-card shadow-finsm sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-lg border p-3">
         <p className="text-muted-foreground text-xs">{t('settings.parameters.save_hint')}</p>
@@ -409,191 +188,368 @@ export function ParametersCard() {
   )
 }
 
-function CustomList({
-  section,
-  kind,
-  items,
-  currency,
-  onChange,
-}: {
-  section: keyof FinancialSettings
-  kind: FieldKind
-  items: AnyCustomItem[]
+type SectionTableProps = {
+  def: SectionDef
+  items: ParameterItem[]
   currency: string
-  onChange: (next: AnyCustomItem[]) => void
-}) {
-  const { t } = useTranslation()
-  const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
+  showArchived: boolean
+  onChange: (updater: (items: ParameterItem[]) => ParameterItem[]) => void
+}
 
-  function addItem() {
-    const base = { id: crypto.randomUUID(), label: '', active: true }
-    const next: AnyCustomItem =
-      kind === 'money' ? { ...base, amount_cents: 0 } : { ...base, pct: 0 }
-    onChange([...items, next])
+function SectionTable({ def, items, currency, showArchived, onChange }: SectionTableProps) {
+  const { t } = useTranslation()
+
+  const visibleItems = useMemo(() => {
+    return showArchived ? items : items.filter((i) => !i.archived)
+  }, [items, showArchived])
+
+  // Группируем по родителю — для рендера дерева
+  const rootItems = visibleItems.filter((i) => !i.parent_id)
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, ParameterItem[]>()
+    for (const it of visibleItems) {
+      if (!it.parent_id) continue
+      const arr = map.get(it.parent_id) ?? []
+      arr.push(it)
+      map.set(it.parent_id, arr)
+    }
+    return map
+  }, [visibleItems])
+
+  function addRoot() {
+    onChange((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        label: '',
+        amount_cents: def.kind === 'money' ? 0 : undefined,
+        pct: def.kind === 'percent' ? 0 : undefined,
+        period: def.showPeriod ? 'month' : undefined,
+        parent_id: null,
+        archived: false,
+      },
+    ])
   }
 
-  function updateItem(id: string, patch: Partial<CustomItem & CustomPctItem>) {
-    onChange(items.map((it) => (it.id === id ? ({ ...it, ...patch } as AnyCustomItem) : it)))
+  function addChild(parentId: string) {
+    onChange((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        label: '',
+        amount_cents: def.kind === 'money' ? 0 : undefined,
+        pct: def.kind === 'percent' ? 0 : undefined,
+        period: def.showPeriod ? 'month' : undefined,
+        parent_id: parentId,
+        archived: false,
+      },
+    ])
+  }
+
+  function patchItem(id: string, patch: Partial<ParameterItem>) {
+    onChange((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)))
   }
 
   function archiveItem(id: string) {
-    onChange(items.map((it) => (it.id === id ? ({ ...it, active: false } as AnyCustomItem) : it)))
+    onChange((prev) => prev.map((it) => (it.id === id ? { ...it, archived: true } : it)))
   }
 
   function restoreItem(id: string) {
-    onChange(items.map((it) => (it.id === id ? ({ ...it, active: true } as AnyCustomItem) : it)))
+    onChange((prev) => prev.map((it) => (it.id === id ? { ...it, archived: false } : it)))
   }
 
   function deleteItem(id: string) {
-    onChange(items.filter((it) => it.id !== id))
+    // При полном удалении также удаляем детей
+    onChange((prev) => prev.filter((it) => it.id !== id && it.parent_id !== id))
   }
 
-  const active = items.filter((it) => it.active)
-  const archived = items.filter((it) => !it.active)
+  const sectionTotal = visibleItems
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + (def.kind === 'money' ? monthlyEquivalentCents(i) : 0), 0)
 
   return (
-    <div className="border-border mt-5 border-t pt-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-muted-foreground text-xs">
-          {t('settings.parameters.custom_section.title')}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addItem}
-          data-testid={`add-custom-${section}`}
-        >
-          <Plus className="size-3.5" strokeWidth={2} />
-          {t('settings.parameters.custom_section.add')}
-        </Button>
-      </div>
-
-      {active.length === 0 && archived.length === 0 ? (
-        <p className="text-muted-foreground text-xs italic">
-          {t('settings.parameters.custom_section.empty')}
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {active.map((it) => (
-            <li key={it.id} className="border-border flex items-center gap-2 rounded-md border p-2">
-              <Input
-                value={it.label}
-                onChange={(e) => updateItem(it.id, { label: e.target.value })}
-                placeholder={t('settings.parameters.custom_section.label_placeholder')}
-                className="h-9 flex-1 text-sm"
-              />
-              <div className="border-border bg-card flex h-9 w-28 items-center gap-1.5 rounded-md border px-2">
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  min="0"
-                  value={isPct(it) ? String(it.pct ?? 0) : String((it.amount_cents ?? 0) / 100)}
-                  onChange={(e) => {
-                    const n = Number(e.target.value.replace(',', '.'))
-                    if (!Number.isFinite(n) || n < 0) return
-                    if (kind === 'percent') {
-                      if (n > 100) return
-                      updateItem(it.id, { pct: n })
-                    } else {
-                      updateItem(it.id, { amount_cents: Math.round(n * 100) })
-                    }
-                  }}
-                  className="num h-full border-0 bg-transparent px-0 text-right text-sm shadow-none focus-visible:ring-0"
-                />
-                <span className="text-muted-foreground text-xs font-semibold">
-                  {kind === 'money' ? currencySymbol : '%'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => archiveItem(it.id)}
-                className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                title={t('settings.parameters.custom_section.archive')}
-                aria-label={t('settings.parameters.custom_section.archive')}
-              >
-                <Trash2 className="size-3.5" strokeWidth={1.8} />
-              </button>
-            </li>
-          ))}
-
-          {archived.length > 0 ? (
-            <details className="mt-2">
-              <summary className="text-muted-foreground cursor-pointer text-xs">
-                {t('settings.parameters.custom_section.archived', { count: archived.length })}
-              </summary>
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {archived.map((it) => (
-                  <li
-                    key={it.id}
-                    className="text-muted-foreground bg-muted/30 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs"
-                  >
-                    <span className="line-through">{it.label || '—'}</span>
-                    <span className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => restoreItem(it.id)}
-                        className="text-secondary inline-flex items-center gap-1 font-semibold hover:underline"
-                      >
-                        <Undo2 className="size-3" strokeWidth={2} />
-                        {t('settings.parameters.custom_section.restore')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteItem(it.id)}
-                        className="hover:text-destructive font-semibold"
-                        title={t('settings.parameters.custom_section.delete_permanent')}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </details>
+    <section className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+      <header className="border-border bg-muted/20 flex items-start justify-between gap-3 border-b px-5 py-3">
+        <div>
+          <h3 className="text-brand-navy text-base font-bold tracking-tight">{t(def.titleKey)}</h3>
+          {def.subtitleKey ? (
+            <p className="text-muted-foreground mt-0.5 text-xs">{t(def.subtitleKey)}</p>
           ) : null}
-        </ul>
-      )}
+        </div>
+        <div className="flex items-center gap-3">
+          {def.kind === 'money' && def.showPeriod ? (
+            <span className="text-muted-foreground text-xs">
+              {t('settings.parameters.section_monthly_total')}:{' '}
+              <span className="num text-foreground font-semibold">
+                {formatCurrency(sectionTotal, currency)}
+              </span>
+            </span>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" onClick={addRoot}>
+            <Plus className="size-3.5" strokeWidth={2} />
+            {t('settings.parameters.add_item')}
+          </Button>
+        </div>
+      </header>
 
-      <p className="text-muted-foreground mt-2 text-[11px]">
-        {t('settings.parameters.custom_section.history_hint')}
-      </p>
-    </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/10 text-muted-foreground border-border text-xs uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-2 text-left font-semibold">
+                {t('settings.parameters.col_label')}
+              </th>
+              <th className="w-44 px-4 py-2 text-right font-semibold">
+                {def.kind === 'money'
+                  ? t('settings.parameters.col_amount')
+                  : t('settings.parameters.col_pct')}
+              </th>
+              {def.showPeriod ? (
+                <th className="w-40 px-4 py-2 text-left font-semibold">
+                  {t('settings.parameters.col_period')}
+                </th>
+              ) : null}
+              <th className="w-28 px-4 py-2 text-right font-semibold" />
+            </tr>
+          </thead>
+          <tbody>
+            {rootItems.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={def.showPeriod ? 4 : 3}
+                  className="text-muted-foreground px-4 py-6 text-center text-xs italic"
+                >
+                  {t('settings.parameters.empty_section')}
+                </td>
+              </tr>
+            ) : (
+              rootItems.map((item) =>
+                renderRowsForItem(
+                  item,
+                  childrenByParent,
+                  0,
+                  def,
+                  currency,
+                  patchItem,
+                  archiveItem,
+                  restoreItem,
+                  deleteItem,
+                  addChild,
+                  t,
+                ),
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
-function FieldRow({
-  label,
-  kind,
+function renderRowsForItem(
+  item: ParameterItem,
+  childrenByParent: Map<string, ParameterItem[]>,
+  depth: number,
+  def: SectionDef,
+  currency: string,
+  patchItem: (id: string, patch: Partial<ParameterItem>) => void,
+  archiveItem: (id: string) => void,
+  restoreItem: (id: string) => void,
+  deleteItem: (id: string) => void,
+  addChild: (parentId: string) => void,
+  t: (k: string, opts?: Record<string, unknown>) => string,
+): React.ReactNode {
+  const children = childrenByParent.get(item.id) ?? []
+  const row = (
+    <ParameterRow
+      key={item.id}
+      item={item}
+      depth={depth}
+      def={def}
+      currency={currency}
+      hasChildren={children.length > 0}
+      onPatch={(patch) => patchItem(item.id, patch)}
+      onArchive={() => archiveItem(item.id)}
+      onRestore={() => restoreItem(item.id)}
+      onDelete={() => {
+        if (
+          !confirm(
+            t('settings.parameters.confirm_delete', {
+              label: item.label || t('settings.parameters.unnamed'),
+            }),
+          )
+        )
+          return
+        deleteItem(item.id)
+      }}
+      onAddChild={() => addChild(item.id)}
+      t={t}
+    />
+  )
+  const childRows = children.map((c) =>
+    renderRowsForItem(
+      c,
+      childrenByParent,
+      depth + 1,
+      def,
+      currency,
+      patchItem,
+      archiveItem,
+      restoreItem,
+      deleteItem,
+      addChild,
+      t,
+    ),
+  )
+  return [row, ...childRows]
+}
+
+function ParameterRow({
+  item,
+  depth,
+  def,
   currency,
-  value,
-  onChange,
+  hasChildren,
+  onPatch,
+  onArchive,
+  onRestore,
+  onDelete,
+  onAddChild,
+  t,
 }: {
-  label: string
-  kind: FieldKind
+  item: ParameterItem
+  depth: number
+  def: SectionDef
   currency: string
-  value: string
-  onChange: (v: string) => void
+  hasChildren: boolean
+  onPatch: (patch: Partial<ParameterItem>) => void
+  onArchive: () => void
+  onRestore: () => void
+  onDelete: () => void
+  onAddChild: () => void
+  t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-xs">{label}</Label>
-      <div className="border-border bg-card flex h-10 items-center gap-2 rounded-md border-[1.5px] px-3">
-        <Input
-          type="number"
-          inputMode="decimal"
-          step="any"
-          min="0"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="num h-full border-0 bg-transparent px-0 text-sm font-medium shadow-none focus-visible:ring-0"
-        />
-        <span className="text-muted-foreground text-xs font-semibold">
-          {kind === 'money' ? currencySymbol : '%'}
-        </span>
-      </div>
-    </div>
+    <tr
+      className={cn(
+        'border-border/40 hover:bg-muted/20 border-t transition-colors',
+        item.archived && 'opacity-60',
+      )}
+    >
+      <td className="px-4 py-1.5 align-middle">
+        <div className="flex min-w-0 items-center gap-1.5" style={{ paddingLeft: depth * 18 }}>
+          {hasChildren ? (
+            <ChevronDown className="text-muted-foreground size-3.5 shrink-0" strokeWidth={2} />
+          ) : depth > 0 ? (
+            <ChevronRight className="text-muted-foreground/50 size-3.5 shrink-0" strokeWidth={2} />
+          ) : (
+            <span className="w-3.5 shrink-0" />
+          )}
+          <Input
+            value={item.label}
+            onChange={(e) => onPatch({ label: e.target.value })}
+            placeholder={t('settings.parameters.label_placeholder')}
+            disabled={item.archived}
+            className="h-8 min-w-0 flex-1 text-sm"
+          />
+        </div>
+      </td>
+
+      <td className="px-4 py-1.5 align-middle">
+        <div className="border-border bg-card flex h-8 items-center gap-1.5 rounded-md border px-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min="0"
+            value={
+              def.kind === 'money' ? String((item.amount_cents ?? 0) / 100) : String(item.pct ?? 0)
+            }
+            onChange={(e) => {
+              const n = Number(e.target.value.replace(',', '.'))
+              if (!Number.isFinite(n) || n < 0) return
+              if (def.kind === 'percent') {
+                if (n > 100) return
+                onPatch({ pct: n })
+              } else {
+                onPatch({ amount_cents: Math.round(n * 100) })
+              }
+            }}
+            disabled={item.archived}
+            className="num h-full border-0 bg-transparent px-0 text-right text-sm shadow-none focus-visible:ring-0"
+          />
+          <span className="text-muted-foreground text-xs font-semibold">
+            {def.kind === 'money' ? currencySymbol : '%'}
+          </span>
+        </div>
+      </td>
+
+      {def.showPeriod ? (
+        <td className="px-4 py-1.5 align-middle">
+          <select
+            value={item.period ?? 'month'}
+            onChange={(e) => onPatch({ period: e.target.value as ParamPeriod })}
+            disabled={item.archived}
+            className="border-border bg-card h-8 w-full rounded-md border px-2 text-sm disabled:opacity-50"
+          >
+            {PERIOD_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {t(`settings.parameters.period.${p}`)}
+              </option>
+            ))}
+          </select>
+        </td>
+      ) : null}
+
+      <td className="px-4 py-1.5 text-right align-middle">
+        <div className="inline-flex items-center gap-1">
+          {!item.archived ? (
+            <>
+              <button
+                type="button"
+                onClick={onAddChild}
+                title={t('settings.parameters.add_subcategory')}
+                aria-label={t('settings.parameters.add_subcategory')}
+                className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
+              >
+                <Plus className="size-3.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={onArchive}
+                title={t('settings.parameters.archive')}
+                aria-label={t('settings.parameters.archive')}
+                className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.8} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onRestore}
+                title={t('settings.parameters.restore')}
+                aria-label={t('settings.parameters.restore')}
+                className="text-secondary hover:text-secondary/80 grid size-7 place-items-center rounded-md"
+              >
+                <Undo2 className="size-3.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                title={t('settings.parameters.delete_permanent')}
+                aria-label={t('settings.parameters.delete_permanent')}
+                className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md font-semibold"
+              >
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }

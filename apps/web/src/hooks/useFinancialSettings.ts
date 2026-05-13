@@ -3,186 +3,279 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 
 /**
- * Финансовые вводные параметры салона (owner-input). Хранятся в
- * salons.financial_settings (jsonb). Используются для будущих
- * финансовых расчётов: cash-flow, PnL, break-even, ROI.
+ * Финансовые параметры салона. Хранятся в jsonb `salons.financial_settings`.
  *
- * Все денежные значения — в центах (cents/копейки). Проценты — 0..100.
+ * Унифицированная модель: каждая секция — список `ParameterItem` (включая
+ * preset-позиции, которые раньше были «вшиты» отдельными ключами).
+ * Любую позицию можно переименовать или удалить (soft-delete). Иерархия
+ * поддерживается через `parent_id`. Поле `period` (только в fixed) задаёт
+ * частоту платежа.
+ *
+ * Денежные значения — bigint в центах. Проценты — 0..100.
  */
 
-export type CustomItem = { id: string; label: string; amount_cents: number; active: boolean }
-export type CustomPctItem = { id: string; label: string; pct: number; active: boolean }
+export type ParamPeriod = 'day' | 'month' | '2months' | 'quarter' | 'year'
 
-export type CashRegisters = {
-  director_cents: number
-  safe_cents: number
-  gotowka_cents: number
-  bank_karta_cents: number
-  karta_terminal_cents: number
-  custom?: CustomItem[]
+/** Сколько месяцев в одном периоде. month=1, year=12. day=1/30 (~ месячный эквивалент). */
+export const PERIOD_TO_MONTHS: Record<ParamPeriod, number> = {
+  day: 1 / 30,
+  month: 1,
+  '2months': 2,
+  quarter: 3,
+  year: 12,
 }
 
-export type FixedExpenses = {
-  payroll_management_cents: number
-  payroll_admin_cents: number
-  zus_cents: number
-  rent_cents: number
-  electricity_cents: number
-  ad_budget_cents: number
-  smm_cents: number
-  internet_cents: number
-  services_subscription_cents: number
-  cleaning_cents: number
-  household_cents: number
-  leasing_cents: number
-  repair_equipment_cents: number
-  bank_services_cents: number
-  accounting_cents: number
-  fuel_cents: number
-  other_cents: number
-  /** Кастомные позиции добавленные владельцем. Архив (active=false) сохраняет
-   *  историю — если позиция использовалась в фин. отчёте за прошлые периоды,
-   *  расчёт не ломается. Legacy: поле monthly_cents оставлено для обратной
-   *  совместимости и читается параллельно с amount_cents в UI. */
-  custom?: Array<
-    CustomItem & {
-      /** @deprecated используется amount_cents — оставлено для существующих записей */
-      monthly_cents?: number
-    }
-  >
+export type ParameterItem = {
+  id: string
+  label: string
+  /** Для денежных позиций (всё кроме variable %). */
+  amount_cents?: number
+  /** Для процентных позиций (variable %). */
+  pct?: number
+  /** Для постоянных расходов: частота платежа. По умолчанию — month. */
+  period?: ParamPeriod
+  /** Родительская позиция в иерархии (для подкатегорий). */
+  parent_id?: string | null
+  /** Soft-delete — позиция скрыта из новых отчётов, но название сохраняется. */
+  archived?: boolean
+  /**
+   * Маркер preset-позиции (системной). Только для миграции — не показывается
+   * юзеру и не влияет на UI. После рефакторинга все позиции редактируются
+   * одинаково.
+   */
+  preset_key?: string
 }
 
-export type VariableExpenses = {
-  /** % от выручки */
-  admin_payroll_pct: number
-  bank_commission_pct: number
-  ad_budget_pct: number
-  bonuses_pct: number
-  custom?: CustomPctItem[]
-}
-
-export type OtherIncomePlanned = {
-  monthly_cents: number
-  custom?: CustomItem[]
-}
-
-export type Taxes = {
-  pit36_cents: number
-  vat_cents: number
-  cit_cents: number
-  pit3_cents: number
-  custom?: CustomItem[]
-}
-
-export type Investments = {
-  franchise_fee_cents: number
-  first_rent_cents: number
-  renovation_cents: number
-  equipment_cents: number
-  inventory_cents: number
-  furniture_cents: number
-  other_cents: number
-  custom?: CustomItem[]
-}
-
-export type MoneyFlows = {
-  dividends_cents: number
-  owner_contributions_cents: number
-  owner_loans_cents: number
-  other_loans_cents: number
-  custom?: CustomItem[]
+export type ParameterSection = {
+  items: ParameterItem[]
 }
 
 export type FinancialSettings = {
-  cash_registers: CashRegisters
-  fixed: FixedExpenses
-  variable: VariableExpenses
-  other_income: OtherIncomePlanned
-  taxes: Taxes
-  investments: Investments
-  flows: MoneyFlows
+  cash_registers: ParameterSection
+  fixed: ParameterSection
+  variable: ParameterSection
+  other_income: ParameterSection
+  taxes: ParameterSection
+  investments: ParameterSection
+  flows: ParameterSection
+}
+
+// ---------------------------------------------------------------------------
+// Default preset items (используются при первом запуске или если поле в БД пустое)
+// ---------------------------------------------------------------------------
+
+function preset(id: string, label: string, extra: Partial<ParameterItem> = {}): ParameterItem {
+  return { id, label, preset_key: id, archived: false, ...extra }
 }
 
 export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   cash_registers: {
-    director_cents: 0,
-    safe_cents: 0,
-    gotowka_cents: 0,
-    bank_karta_cents: 0,
-    karta_terminal_cents: 0,
-    custom: [],
+    items: [
+      preset('director', 'Касса директора', { amount_cents: 0 }),
+      preset('safe', 'Сейф', { amount_cents: 0 }),
+      preset('gotowka', 'Gotówka', { amount_cents: 0 }),
+      preset('bank_karta', 'Bank/Karta', { amount_cents: 0 }),
+      preset('karta_terminal', 'Karta / Terminal', { amount_cents: 0 }),
+    ],
   },
   fixed: {
-    payroll_management_cents: 0,
-    payroll_admin_cents: 0,
-    zus_cents: 0,
-    rent_cents: 0,
-    electricity_cents: 0,
-    ad_budget_cents: 0,
-    smm_cents: 0,
-    internet_cents: 0,
-    services_subscription_cents: 0,
-    cleaning_cents: 0,
-    household_cents: 0,
-    leasing_cents: 0,
-    repair_equipment_cents: 0,
-    bank_services_cents: 0,
-    accounting_cents: 0,
-    fuel_cents: 0,
-    other_cents: 0,
-    custom: [],
+    items: [
+      preset('payroll_management', 'ФОТ Управляющий персонал — оклад', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('payroll_admin', 'ФОТ Администраторы — оклад', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('zus', 'Взносы на работников (ZUS)', { amount_cents: 0, period: 'month' }),
+      preset('rent', 'Аренда помещения', { amount_cents: 0, period: 'month' }),
+      preset('electricity', 'Электричество', { amount_cents: 0, period: 'month' }),
+      preset('ad_budget', 'Реклама', { amount_cents: 0, period: 'month' }),
+      preset('smm', 'SMM', { amount_cents: 0, period: 'month' }),
+      preset('internet', 'Интернет / телефон', { amount_cents: 0, period: 'month' }),
+      preset('services_subscription', 'Подписки на сервисы', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('cleaning', 'Клининг', { amount_cents: 0, period: 'month' }),
+      preset('household', 'Хозтовары', { amount_cents: 0, period: 'month' }),
+      preset('leasing', 'Лизинг', { amount_cents: 0, period: 'month' }),
+      preset('repair_equipment', 'Ремонт оборудования', { amount_cents: 0, period: 'month' }),
+      preset('bank_services', 'Банковские услуги', { amount_cents: 0, period: 'month' }),
+      preset('accounting', 'Бухгалтерия', { amount_cents: 0, period: 'month' }),
+      preset('fuel', 'Топливо', { amount_cents: 0, period: 'month' }),
+      preset('other', 'Прочее', { amount_cents: 0, period: 'month' }),
+    ],
   },
   variable: {
-    admin_payroll_pct: 0,
-    bank_commission_pct: 0,
-    ad_budget_pct: 0,
-    bonuses_pct: 0,
-    custom: [],
+    items: [
+      preset('admin_payroll', 'ЗП администратора (% от выручки)', { pct: 0 }),
+      preset('bank_commission', 'Банковская комиссия', { pct: 0 }),
+      preset('ad_budget', 'Реклама (% от выручки)', { pct: 0 }),
+      preset('bonuses', 'Бонусы / премии', { pct: 0 }),
+    ],
   },
   other_income: {
-    monthly_cents: 0,
-    custom: [],
+    items: [preset('monthly', 'Прочие плановые доходы (в месяц)', { amount_cents: 0 })],
   },
   taxes: {
-    pit36_cents: 0,
-    vat_cents: 0,
-    cit_cents: 0,
-    pit3_cents: 0,
-    custom: [],
+    items: [
+      preset('pit36', 'PIT-36 (НДФЛ)', { amount_cents: 0, period: 'month' }),
+      preset('vat', 'VAT (НДС)', { amount_cents: 0, period: 'month' }),
+      preset('cit', 'CIT (налог на прибыль)', { amount_cents: 0, period: 'month' }),
+      preset('pit3', 'PIT-3', { amount_cents: 0, period: 'month' }),
+    ],
   },
   investments: {
-    franchise_fee_cents: 0,
-    first_rent_cents: 0,
-    renovation_cents: 0,
-    equipment_cents: 0,
-    inventory_cents: 0,
-    furniture_cents: 0,
-    other_cents: 0,
-    custom: [],
+    items: [
+      preset('franchise_fee', 'Паушальный взнос', { amount_cents: 0 }),
+      preset('first_rent', 'Первый месяц аренды', { amount_cents: 0 }),
+      preset('renovation', 'Ремонт помещения', { amount_cents: 0 }),
+      preset('equipment', 'Оборудование', { amount_cents: 0 }),
+      preset('inventory', 'Стартовый инвентарь', { amount_cents: 0 }),
+      preset('furniture', 'Мебель', { amount_cents: 0 }),
+      preset('other', 'Прочие инвестиции', { amount_cents: 0 }),
+    ],
   },
   flows: {
-    dividends_cents: 0,
-    owner_contributions_cents: 0,
-    owner_loans_cents: 0,
-    other_loans_cents: 0,
-    custom: [],
+    items: [
+      preset('dividends', 'Дивиденды (вывод собственника)', { amount_cents: 0, period: 'month' }),
+      preset('owner_contributions', 'Вклад собственника', { amount_cents: 0, period: 'month' }),
+      preset('owner_loans', 'Займ собственника', { amount_cents: 0, period: 'month' }),
+      preset('other_loans', 'Прочие займы', { amount_cents: 0, period: 'month' }),
+    ],
   },
 }
 
-/** Глубокий merge stored + defaults — если в БД partial-объект, недостающие поля
- *  возьмутся из дефолтов. */
+// ---------------------------------------------------------------------------
+// Legacy → new shape migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Старые записи хранили preset-поля отдельными ключами + опциональный
+ * `custom: []`. Конвертим в единый items[] чтобы новый UI и расчёты работали
+ * единообразно. Юзеру переход прозрачен.
+ */
+type LegacySection = Record<string, unknown> & {
+  custom?: Array<Record<string, unknown>>
+}
+
+function migrateLegacySection(defaults: ParameterItem[], stored: unknown): ParameterItem[] {
+  if (!stored) return [...defaults]
+
+  // Новый формат — items[] напрямую
+  if (
+    typeof stored === 'object' &&
+    stored !== null &&
+    Array.isArray((stored as { items?: unknown }).items)
+  ) {
+    return ((stored as { items: ParameterItem[] }).items ?? []).map((it) => ({ ...it }))
+  }
+
+  // Legacy: preset-поля + опц. custom[]
+  const s = (stored ?? {}) as LegacySection
+  const result: ParameterItem[] = []
+
+  for (const def of defaults) {
+    if (!def.preset_key) continue
+    // Маппинг: preset_key='rent' → возможные legacy ключи 'rent_cents', 'rent_pct'
+    const moneyKey = `${def.preset_key}_cents`
+    const pctKey = `${def.preset_key}_pct`
+    let amount_cents: number | undefined = undefined
+    let pct: number | undefined = undefined
+    if (typeof s[moneyKey] === 'number') amount_cents = s[moneyKey] as number
+    if (typeof s[pctKey] === 'number') pct = s[pctKey] as number
+    // Для cash_registers/investments/flows preset-поля без _cents suffix не используются.
+    if (amount_cents === undefined && pct === undefined) {
+      // Берём дефолт
+      amount_cents = def.amount_cents
+      pct = def.pct
+    }
+    result.push({
+      ...def,
+      amount_cents: amount_cents ?? def.amount_cents,
+      pct: pct ?? def.pct,
+    })
+  }
+
+  // Legacy custom[] — добавляем как обычные items без preset_key
+  const customArr = Array.isArray(s.custom) ? s.custom : []
+  for (const raw of customArr) {
+    const obj = raw as Record<string, unknown>
+    result.push({
+      id: typeof obj.id === 'string' ? obj.id : crypto.randomUUID(),
+      label: typeof obj.label === 'string' ? obj.label : '',
+      amount_cents:
+        typeof obj.amount_cents === 'number'
+          ? (obj.amount_cents as number)
+          : typeof obj.monthly_cents === 'number'
+            ? (obj.monthly_cents as number)
+            : undefined,
+      pct: typeof obj.pct === 'number' ? (obj.pct as number) : undefined,
+      period: defaults[0]?.period ? 'month' : undefined,
+      archived: obj.active === false,
+      parent_id: typeof obj.parent_id === 'string' ? obj.parent_id : null,
+    })
+  }
+
+  return result
+}
+
 function mergeWithDefaults(stored: unknown): FinancialSettings {
-  const s = (stored ?? {}) as Partial<FinancialSettings>
+  const s = (stored ?? {}) as Partial<Record<keyof FinancialSettings, unknown>>
   return {
-    cash_registers: { ...DEFAULT_FINANCIAL_SETTINGS.cash_registers, ...(s.cash_registers ?? {}) },
-    fixed: { ...DEFAULT_FINANCIAL_SETTINGS.fixed, ...(s.fixed ?? {}) },
-    variable: { ...DEFAULT_FINANCIAL_SETTINGS.variable, ...(s.variable ?? {}) },
-    other_income: { ...DEFAULT_FINANCIAL_SETTINGS.other_income, ...(s.other_income ?? {}) },
-    taxes: { ...DEFAULT_FINANCIAL_SETTINGS.taxes, ...(s.taxes ?? {}) },
-    investments: { ...DEFAULT_FINANCIAL_SETTINGS.investments, ...(s.investments ?? {}) },
-    flows: { ...DEFAULT_FINANCIAL_SETTINGS.flows, ...(s.flows ?? {}) },
+    cash_registers: {
+      items: migrateLegacySection(
+        DEFAULT_FINANCIAL_SETTINGS.cash_registers.items,
+        s.cash_registers,
+      ),
+    },
+    fixed: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.fixed.items, s.fixed),
+    },
+    variable: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.variable.items, s.variable),
+    },
+    other_income: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.other_income.items, s.other_income),
+    },
+    taxes: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.taxes.items, s.taxes),
+    },
+    investments: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.investments.items, s.investments),
+    },
+    flows: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.flows.items, s.flows),
+    },
   }
 }
+
+// ---------------------------------------------------------------------------
+// Helpers — расчёт месячного эквивалента
+// ---------------------------------------------------------------------------
+
+/** Сумма всех неархивированных items секции в месячном эквиваленте (cents). */
+export function sumSectionMonthlyCents(section: ParameterSection): number {
+  return section.items
+    .filter((i) => !i.archived)
+    .reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
+}
+
+/** Месячный эквивалент позиции. Учитывает period (month/year/...). */
+export function monthlyEquivalentCents(item: ParameterItem): number {
+  const amount = item.amount_cents ?? 0
+  if (amount === 0) return 0
+  const period = item.period ?? 'month'
+  const months = PERIOD_TO_MONTHS[period]
+  // amount за period == amount/months за месяц
+  return Math.round(amount / months)
+}
+
+// ---------------------------------------------------------------------------
+// Queries / mutations
+// ---------------------------------------------------------------------------
 
 export function useFinancialSettings(salonId: string | undefined) {
   return useQuery<FinancialSettings>({
