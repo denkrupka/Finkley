@@ -2,6 +2,7 @@ import { formatDistanceToNowStrict } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
   CalendarPlus,
+  CheckCircle2,
   Facebook,
   Image as ImageIcon,
   Instagram,
@@ -9,6 +10,7 @@ import {
   Phone,
   Search,
   Send,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -31,6 +33,7 @@ import {
   useBulkBroadcast,
   useConversationMessages,
   useConversations,
+  useLinkConversationClient,
   useMarkConversationRead,
   useMessengerRealtime,
   useSendMessage,
@@ -39,6 +42,7 @@ import {
   type MessengerConversation,
   type MessengerMessage,
 } from '@/hooks/useMessenger'
+import { ClientFormModal } from '@/routes/clients/ClientFormModal'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -71,6 +75,8 @@ export function MessengerPage() {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [clientFormOpen, setClientFormOpen] = useState(false)
+  const linkClient = useLinkConversationClient(salonId)
 
   useMessengerRealtime(salonId)
   const { data: conversations = [], isLoading: convLoading } = useConversations(salonId, {
@@ -183,9 +189,30 @@ export function MessengerPage() {
                 <div className="flex min-w-0 items-center gap-3">
                   <ConversationAvatar conversation={selected} size={36} />
                   <div className="min-w-0">
-                    <p className="text-foreground truncate text-sm font-semibold">
-                      {selected.display_name || t('messenger.unnamed')}
-                    </p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="text-foreground truncate text-sm font-semibold">
+                        {selected.display_name || t('messenger.unnamed')}
+                      </p>
+                      {selected.client_id ? (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
+                          title={t('messenger.client_linked_tooltip')}
+                        >
+                          <CheckCircle2 className="size-3" strokeWidth={2.5} />
+                          {t('messenger.client_linked')}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setClientFormOpen(true)}
+                          className="border-primary/40 text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                          title={t('messenger.client_unlinked_tooltip')}
+                        >
+                          <UserPlus className="size-3" strokeWidth={2.5} />
+                          {t('messenger.client_unlinked')}
+                        </button>
+                      )}
+                    </div>
                     <p className="text-muted-foreground text-[11px]">
                       {CHANNEL_META[selected.channel].label}
                     </p>
@@ -201,6 +228,7 @@ export function MessengerPage() {
                           detail: {
                             staffId: '',
                             when: new Date().toISOString(),
+                            clientId: selected.client_id ?? undefined,
                           },
                         }),
                       )
@@ -249,6 +277,25 @@ export function MessengerPage() {
         salonId={salonId}
         conversations={conversations}
       />
+
+      {selected && !selected.client_id ? (
+        <ClientFormModal
+          open={clientFormOpen}
+          onOpenChange={setClientFormOpen}
+          salonId={salonId}
+          prefillName={selected.display_name || ''}
+          onCreated={(created) => {
+            // Линкуем conversation к новому клиенту, чтобы следующий раз он
+            // уже был «в базе» с пометкой ✓.
+            linkClient.mutate(
+              { conversationId: selected.id, clientId: created.id },
+              {
+                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+              },
+            )
+          }}
+        />
+      ) : null}
     </div>
   )
 }

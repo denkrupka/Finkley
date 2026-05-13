@@ -47,6 +47,7 @@ export function SalonLayout() {
   const [quickEntryPrefill, setQuickEntryPrefill] = useState<{
     staffId: string
     when: string
+    clientId?: string
   } | null>(null)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
@@ -57,9 +58,21 @@ export function SalonLayout() {
 
   useEffect(() => {
     function onOpenQuickEntry(e: Event) {
-      const detail = (e as CustomEvent<{ staffId?: string; when?: string }>).detail
+      const detail = (e as CustomEvent<{ staffId?: string; when?: string; clientId?: string }>)
+        .detail
       if (detail?.staffId && detail.when) {
-        setQuickEntryPrefill({ staffId: detail.staffId, when: detail.when })
+        setQuickEntryPrefill({
+          staffId: detail.staffId,
+          when: detail.when,
+          clientId: detail.clientId,
+        })
+      } else if (detail?.clientId) {
+        // Из мессенджера: staff не указан, но клиент известен.
+        setQuickEntryPrefill({
+          staffId: '',
+          when: detail.when ?? new Date().toISOString(),
+          clientId: detail.clientId,
+        })
       } else {
         setQuickEntryPrefill(null)
       }

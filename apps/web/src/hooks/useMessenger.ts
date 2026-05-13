@@ -235,6 +235,28 @@ export function useStartOAuth(salonId: string | undefined) {
   })
 }
 
+/**
+ * Привязывает conversation к существующему клиенту (или отвязывает если null).
+ * Используется когда пользователь создаёт нового клиента из шапки чата —
+ * после создания мы линкуем эту переписку, и при следующем сообщении видно
+ * что клиент уже в базе.
+ */
+export function useLinkConversationClient(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { conversationId: string; clientId: string | null }) => {
+      const { error } = await supabase
+        .from('messenger_conversations')
+        .update({ client_id: input.clientId })
+        .eq('id', input.conversationId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+    },
+  })
+}
+
 export function useConnectMessenger(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

@@ -88,7 +88,7 @@ type Props = {
    * Префилл из календаря: клик по 15-мин субслоту → подставляем мастера
    * и дату. Время визита берётся из `prefill.when` (ISO), мастер — `prefill.staffId`.
    */
-  prefill?: { staffId: string; when: string } | null
+  prefill?: { staffId: string; when: string; clientId?: string } | null
 }
 
 export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill }: Props) {
@@ -142,7 +142,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     form.reset({
       visit_date: prefillDate,
       staff_id: prefillStaff,
-      client_id: null,
+      client_id: prefill?.clientId ?? null,
       service_id: '',
       amount: '',
       tip: '',
@@ -151,7 +151,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       comment: '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open / prefill
-  }, [open, prefill?.staffId, prefill?.when])
+  }, [open, prefill?.staffId, prefill?.when, prefill?.clientId])
 
   // Если staff подгрузился ПОСЛЕ открытия модалки (быстрый клик на FAB),
   // ловим это и выставляем дефолт. Иначе форма требует «Выбери мастера»

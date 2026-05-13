@@ -68,6 +68,11 @@
       "file_too_large": "Файл слишком большой (макс. 20 МБ)"
     },
     "create_visit": "Создать визит",
+    "client_linked": "В базе",
+    "client_linked_tooltip": "Клиент привязан к карточке в базе салона",
+    "client_unlinked": "+ В клиенты",
+    "client_unlinked_tooltip": "Добавить в базу клиентов — переписка автоматически привяжется",
+
     "bulk_button": "Рассылка",
     "bulk": {
       "title": "Массовая рассылка",
