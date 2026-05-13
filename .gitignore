@@ -80,3 +80,6 @@ secrets-backup/
 # Claude Code runtime artefacts
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks/
+
+# Conversation transcripts (PII)
+conversation-*.txt
