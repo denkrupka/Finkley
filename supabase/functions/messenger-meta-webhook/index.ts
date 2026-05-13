@@ -217,25 +217,25 @@ async function ingestMessage(
   if (providerToken && direction === 'in') {
     try {
       if (providerKind === 'page') {
-        // FB Page Token → graph.facebook.com (работает и для FB Messenger, и для IG-via-Page)
-        const profUrl = `https://graph.facebook.com/v21.0/${externalUserId}?fields=first_name,last_name,profile_pic,name,username&access_token=${encodeURIComponent(providerToken)}`
+        // FB Messenger Profile API через Page Token: только базовые поля
+        // first_name,last_name,profile_pic. Дополнительные поля (name/username)
+        // требуют расширенных permission и могут заваливать весь запрос.
+        const profUrl = `https://graph.facebook.com/v21.0/${externalUserId}?fields=first_name,last_name,profile_pic&access_token=${encodeURIComponent(providerToken)}`
         const profResp = await fetch(profUrl)
-        if (profResp.ok) {
-          const prof = (await profResp.json()) as {
-            first_name?: string
-            last_name?: string
-            name?: string
-            username?: string
-            profile_pic?: string
-            error?: { message: string }
-          }
-          if (!prof.error) {
-            const fullName =
-              prof.name ?? [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim()
-            if (fullName) displayName = fullName
-            else if (prof.username) displayName = `@${prof.username}`
-            if (prof.profile_pic) avatarUrl = prof.profile_pic
-          }
+        const prof = (await profResp.json()) as {
+          first_name?: string
+          last_name?: string
+          profile_pic?: string
+          error?: { message: string; code?: number }
+        }
+        if (profResp.ok && !prof.error) {
+          const fullName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim()
+          if (fullName) displayName = fullName
+          if (prof.profile_pic) avatarUrl = prof.profile_pic
+        } else if (prof.error) {
+          console.warn(
+            `[webhook] FB profile fetch failed for ${externalUserId}: ${prof.error.message}`,
+          )
         }
       } else if (providerKind === 'ig') {
         // IG User Token → graph.instagram.com. Endpoint для профиля собеседника
@@ -280,6 +280,7 @@ async function ingestMessage(
 
   let text: string | null = ev.message.text ?? null
   let mediaKind: string | null = null
+  let mediaPath: string | null = null
   const att = ev.message.attachments?.[0]
   if (att) {
     const stickerId = att.payload?.sticker_id ?? ev.message.sticker_id
@@ -288,16 +289,51 @@ async function ingestMessage(
       if (!text) text = '🎭 Стикер'
     } else if (att.type === 'image') {
       mediaKind = 'image'
-      if (!text) text = '📷 Изображение'
     } else if (att.type === 'video') {
       mediaKind = 'video'
-      if (!text) text = '🎥 Видео'
     } else if (att.type === 'audio') {
       mediaKind = 'audio'
-      if (!text) text = '🎙 Аудио'
     } else if (att.type === 'file') {
       mediaKind = 'file'
-      if (!text) text = '📎 Файл'
+    }
+
+    // Скачиваем media и сохраняем в bucket `messenger-media`. URL от Meta —
+    // temporary signed (TTL ~1 час), нам нужно сразу скопировать к себе.
+    const url = att.payload?.url
+    if (url && mediaKind && mediaKind !== 'sticker') {
+      try {
+        const mResp = await fetch(url)
+        if (mResp.ok) {
+          const buf = new Uint8Array(await mResp.arrayBuffer())
+          const mime = mResp.headers.get('content-type') ?? 'application/octet-stream'
+          const ext = mime.split('/')[1]?.split(';')[0]?.split('+')[0] ?? 'bin'
+          const fname = `${salonId}/incoming/${crypto.randomUUID()}.${ext}`
+          const { error: upErr } = await admin.storage
+            .from('messenger-media')
+            .upload(fname, buf, { contentType: mime, upsert: false })
+          if (!upErr) {
+            mediaPath = fname
+          } else {
+            console.warn('[webhook] media upload failed:', upErr.message)
+          }
+        } else {
+          console.warn('[webhook] media fetch failed:', mResp.status)
+        }
+      } catch (e) {
+        console.warn('[webhook] media download error:', (e as Error).message)
+      }
+    }
+
+    // Если файл не удалось скачать — пишем хотя бы текстовый label,
+    // чтобы было видно что был attachment.
+    if (!mediaPath && !text) {
+      const labels: Record<string, string> = {
+        image: '📷 Изображение',
+        video: '🎥 Видео',
+        audio: '🎙 Аудио',
+        file: '📎 Файл',
+      }
+      text = labels[mediaKind ?? ''] ?? null
     }
   }
 
@@ -310,6 +346,7 @@ async function ingestMessage(
     direction,
     text,
     media_kind: mediaKind,
+    media_path: mediaPath,
     external_message_id: externalMessageId,
     created_at: createdAt,
   }
