@@ -309,7 +309,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:!max-w-[640px]">
+      <DialogContent className="sm:!w-[640px] sm:!max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
           <DialogDescription>{t('visits.form.subtitle')}</DialogDescription>
