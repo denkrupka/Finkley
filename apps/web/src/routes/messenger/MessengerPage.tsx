@@ -31,6 +31,7 @@ import {
   useConversationMessages,
   useConversations,
   useMarkConversationRead,
+  useMessengerRealtime,
   useSendMessage,
   type MessengerChannel,
   type MessengerConversation,
@@ -68,6 +69,7 @@ export function MessengerPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
 
+  useMessengerRealtime(salonId)
   const { data: conversations = [], isLoading: convLoading } = useConversations(salonId, {
     channel: activeChannel,
     search,
@@ -361,6 +363,23 @@ function ConversationRow({
   )
 }
 
+function mediaLabel(kind: string): string {
+  switch (kind) {
+    case 'image':
+      return '📷 Изображение'
+    case 'video':
+      return '🎥 Видео'
+    case 'audio':
+      return '🎙 Аудио'
+    case 'file':
+      return '📎 Файл'
+    case 'sticker':
+      return '🎭 Стикер'
+    default:
+      return kind
+  }
+}
+
 function MessagesList({
   messages,
 }: {
@@ -384,8 +403,8 @@ function MessagesList({
             )}
           >
             {m.text ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : null}
-            {m.media_kind === 'image' ? (
-              <span className="text-xs italic opacity-80">📷 image</span>
+            {m.media_kind && !m.text ? (
+              <span className="text-xs italic opacity-80">{mediaLabel(m.media_kind)}</span>
             ) : null}
             <p
               className={cn(

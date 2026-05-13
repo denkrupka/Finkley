@@ -1,6 +1,67 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import { supabase } from '@/lib/supabase/client'
+
+/**
+ * Realtime: подписка на новые сообщения и обновления диалогов для данного
+ * салона. Инвалидирует кеш React Query при INSERT/UPDATE → UI рисует новое
+ * сообщение мгновенно без F5.
+ *
+ * Использовать в MessengerPage один раз на маунте.
+ */
+export function useMessengerRealtime(salonId: string | undefined) {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!salonId) return
+    const channel = supabase
+      .channel(`messenger:${salonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messenger_messages',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        (payload) => {
+          const row = payload.new as { conversation_id?: string }
+          qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+          if (row.conversation_id) {
+            qc.invalidateQueries({ queryKey: ['messenger-messages', row.conversation_id] })
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messenger_conversations',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messenger_conversations',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['messenger-conversations', salonId] })
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [salonId, qc])
+}
 
 export type MessengerChannel = 'telegram' | 'whatsapp' | 'instagram' | 'facebook' | 'internal'
 

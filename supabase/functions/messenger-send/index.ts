@@ -87,6 +87,38 @@ Deno.serve(async (req) => {
     } catch (e) {
       deliveryError = e instanceof Error ? e.message : String(e)
     }
+  } else if (
+    integ &&
+    integ.status === 'connected' &&
+    (convo.channel === 'facebook' || convo.channel === 'instagram')
+  ) {
+    try {
+      const pageToken = await decryptSecret(integ.credentials.page_access_enc as string)
+      const resp = await fetch(
+        `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(pageToken)}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            recipient: { id: convo.external_user_id },
+            messaging_type: 'RESPONSE',
+            message: { text: body.text },
+          }),
+        },
+      )
+      const fbJson = (await resp.json()) as {
+        message_id?: string
+        recipient_id?: string
+        error?: { message: string; code: number }
+      }
+      if (!resp.ok || fbJson.error || !fbJson.message_id) {
+        deliveryError = fbJson.error?.message ?? `Meta sendMessage failed (HTTP ${resp.status})`
+      } else {
+        externalMessageId = fbJson.message_id
+      }
+    } catch (e) {
+      deliveryError = e instanceof Error ? e.message : String(e)
+    }
   }
 
   // Записываем локально (всегда)
@@ -107,7 +139,7 @@ Deno.serve(async (req) => {
   return jsonResponse({
     ok: true,
     message_id: inserted.id,
-    delivered: !deliveryError && (convo.channel === 'telegram' ? !!externalMessageId : false),
+    delivered: !deliveryError && !!externalMessageId,
     delivery_error: deliveryError,
   })
 })

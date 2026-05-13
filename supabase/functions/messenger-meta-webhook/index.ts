@@ -21,6 +21,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { decryptSecret } from './crypto.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -118,15 +119,25 @@ Deno.serve(async (req) => {
     // Находим интеграцию салона по external_account_id = pageOrIgId
     const { data: integ } = await admin
       .from('messenger_integrations')
-      .select('salon_id, channel, status')
+      .select('salon_id, channel, status, credentials')
       .eq('channel', channel)
       .eq('external_account_id', pageOrIgId)
       .maybeSingle()
     if (!integ?.salon_id) continue
 
+    // Расшифровываем page token — потребуется для подтягивания user profile.
+    let pageToken: string | null = null
+    if (integ.credentials?.page_access_enc) {
+      try {
+        pageToken = await decryptSecret(integ.credentials.page_access_enc as string)
+      } catch (e) {
+        console.warn('decrypt page token failed:', (e as Error).message)
+      }
+    }
+
     for (const ev of events) {
       if (!ev.message) continue
-      await ingestMessage(admin, integ.salon_id, channel, ev, pageOrIgId)
+      await ingestMessage(admin, integ.salon_id, channel, ev, pageOrIgId, pageToken)
     }
   }
 
@@ -144,10 +155,15 @@ async function ingestMessage(
     message?: {
       mid?: string
       text?: string
-      attachments?: Array<{ type: 'image' | 'video' | 'audio' | 'file' }>
+      sticker_id?: number
+      attachments?: Array<{
+        type: 'image' | 'video' | 'audio' | 'file' | 'fallback' | string
+        payload?: { url?: string; sticker_id?: number; title?: string }
+      }>
     }
   },
   pageId: string,
+  pageToken: string | null,
 ): Promise<void> {
   if (!ev.message) return
 
@@ -157,6 +173,34 @@ async function ingestMessage(
   const direction = ev.sender.id === pageId ? 'out' : 'in'
   const externalUserId = direction === 'out' ? ev.recipient.id : ev.sender.id
 
+  // Подтягиваем профиль пользователя (имя + аватар) через Graph API
+  // /PSID?fields=first_name,last_name,profile_pic
+  // У токена с pages_messaging этот endpoint доступен для users которые
+  // писали в эту page (Messenger Platform default access).
+  let displayName: string = ev.sender.name ?? `User ${externalUserId.slice(-6)}`
+  let avatarUrl: string | null = null
+  if (pageToken && direction === 'in') {
+    try {
+      const profUrl = `https://graph.facebook.com/v21.0/${externalUserId}?fields=first_name,last_name,profile_pic&access_token=${encodeURIComponent(pageToken)}`
+      const profResp = await fetch(profUrl)
+      if (profResp.ok) {
+        const prof = (await profResp.json()) as {
+          first_name?: string
+          last_name?: string
+          profile_pic?: string
+          error?: { message: string }
+        }
+        if (!prof.error) {
+          const fullName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim()
+          if (fullName) displayName = fullName
+          if (prof.profile_pic) avatarUrl = prof.profile_pic
+        }
+      }
+    } catch (e) {
+      console.warn('fetch user profile failed:', (e as Error).message)
+    }
+  }
+
   // Upsert conversation
   const { data: convo } = await admin
     .from('messenger_conversations')
@@ -165,7 +209,8 @@ async function ingestMessage(
         salon_id: salonId,
         channel,
         external_user_id: externalUserId,
-        display_name: ev.sender.name ?? `User ${externalUserId.slice(-6)}`,
+        display_name: displayName,
+        avatar_url: avatarUrl,
       },
       { onConflict: 'salon_id,channel,external_user_id' },
     )
@@ -173,8 +218,32 @@ async function ingestMessage(
     .single()
   if (!convo) return
 
-  const text = ev.message.text ?? null
-  const mediaKind = ev.message.attachments?.[0]?.type ?? null
+  // Текст и медиа. Стикер прячется в attachments с payload.sticker_id;
+  // обычные эмодзи приходят в text. Большой стикер-эмодзи Messenger'а — это
+  // image-attachment без текста, такие распознаём как 'sticker'.
+  let text: string | null = ev.message.text ?? null
+  let mediaKind: string | null = null
+  const att = ev.message.attachments?.[0]
+  if (att) {
+    const stickerId = att.payload?.sticker_id ?? ev.message.sticker_id
+    if (stickerId) {
+      mediaKind = 'sticker'
+      if (!text) text = '🎭 Стикер'
+    } else if (att.type === 'image') {
+      mediaKind = 'image'
+      if (!text) text = '📷 Изображение'
+    } else if (att.type === 'video') {
+      mediaKind = 'video'
+      if (!text) text = '🎥 Видео'
+    } else if (att.type === 'audio') {
+      mediaKind = 'audio'
+      if (!text) text = '🎙 Аудио'
+    } else if (att.type === 'file') {
+      mediaKind = 'file'
+      if (!text) text = '📎 Файл'
+    }
+  }
+
   const createdAt = ev.timestamp ? new Date(ev.timestamp).toISOString() : new Date().toISOString()
   const externalMessageId = ev.message.mid ?? null
 
