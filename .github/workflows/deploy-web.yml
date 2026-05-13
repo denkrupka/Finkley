@@ -51,6 +51,12 @@ jobs:
         run: pnpm --filter web build
 
       - name: Build landing (apps/landing)
+        env:
+          # Astro подтягивает media_posts из Supabase при сборке через
+          # apps/landing/src/lib/db-posts.ts. Без этих env-переменных функция
+          # возвращает []. Anon-ключ — RLS пускает только draft=false.
+          PUBLIC_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_PROD }}
         run: pnpm --filter landing build
 
       - name: Merge into single Pages directory
