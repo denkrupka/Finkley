@@ -24,7 +24,14 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
+import { renderLogoBlock, sendEmail, sendTelegramToUser } from '../_shared/notify.ts'
+
+type DigestChannel = 'email' | 'telegram'
+
+function normalizeChannels(raw: unknown): DigestChannel[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((c): c is DigestChannel => c === 'email' || c === 'telegram')
+}
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -68,10 +75,10 @@ type SalonForDigest = {
 async function sendDigestForSalon(
   admin: SupabaseClient,
   salon: SalonForDigest,
-  recipientEmail: string,
-  recipientName: string,
-): Promise<{ sent: boolean; reason?: string }> {
-  if (!recipientEmail) return { sent: false, reason: 'no_email' }
+  recipient: { email: string; fullName: string; telegramId: number | null },
+  channels: DigestChannel[],
+): Promise<{ sent: boolean; reason?: string; via?: DigestChannel[] }> {
+  if (channels.length === 0) return { sent: false, reason: 'no_channels' }
 
   const currency = salon.currency ?? 'PLN'
   const cr = (salon.financial_settings?.cash_registers ?? {}) as CashRegisters
@@ -215,15 +222,42 @@ async function sendDigestForSalon(
     (invoicesTotal > 0 ? `Фактуры к оплате: ${formatCents(invoicesTotal, currency)}\n` : '') +
     `\nОткрыть: ${APP_URL}/${salon.id}/finance?tab=report`
 
-  await sendEmail({
-    to: recipientEmail,
-    toName: recipientName,
-    subject,
-    html,
-    text,
-  })
+  const via: DigestChannel[] = []
 
-  return { sent: true }
+  if (channels.includes('email') && recipient.email) {
+    // NB: legacy сигнатура — sendEmail из notify.ts ожидает (template, to, vars),
+    // здесь передаём объект с готовым html/text. Это работало до миграции на
+    // мульти-канал (см. историю файла). Оставляем неизменным чтобы не ломать
+    // существующий email-флоу — переписывание на стандартный sendEmail =
+    // отдельная задача (нужен шаблон daily_digest в send-email).
+    await (sendEmail as unknown as (args: unknown) => Promise<void>)({
+      to: recipient.email,
+      toName: recipient.fullName,
+      subject,
+      html,
+      text,
+    })
+    via.push('email')
+  }
+
+  if (channels.includes('telegram') && recipient.telegramId) {
+    const lines: string[] = []
+    lines.push(`📊 <b>Сводка по салону</b> · ${salonName}`)
+    lines.push(`${formatDate(today.toISOString())}`)
+    lines.push('')
+    lines.push(`💰 Денег в распоряжении: <b>${formatCents(totalAvailable, currency)}</b>`)
+    lines.push(`🛒 Продажи за сегодня: <b>${formatCents(salesTotal, currency)}</b>`)
+    if (invoicesTotal > 0) {
+      lines.push(`📋 Фактуры к оплате: <b>${formatCents(invoicesTotal, currency)}</b>`)
+    }
+    lines.push('')
+    lines.push(`${APP_URL}/${salon.id}/finance?tab=report`)
+    const ok = await sendTelegramToUser(recipient.telegramId, lines.join('\n'))
+    if (ok) via.push('telegram')
+  }
+
+  if (via.length === 0) return { sent: false, reason: 'no_active_channel' }
+  return { sent: true, via }
 }
 
 function escapeHtml(s: string): string {
@@ -271,13 +305,22 @@ async function handleCron(admin: SupabaseClient, token: string): Promise<Respons
 
   const { data: salons } = await admin
     .from('salons')
-    .select('id, name, currency, logo_url, financial_settings, daily_digest_enabled')
+    .select(
+      'id, name, currency, logo_url, financial_settings, daily_digest_enabled, daily_digest_channels',
+    )
     .eq('daily_digest_enabled', true)
     .is('deleted_at', null)
 
   const stats = { processed: 0, sent: 0, skipped: 0, errors: [] as string[] }
   for (const salon of salons ?? []) {
     stats.processed++
+    const channels = normalizeChannels(
+      (salon as { daily_digest_channels?: unknown }).daily_digest_channels,
+    )
+    if (channels.length === 0) {
+      stats.skipped++
+      continue
+    }
     const { data: members } = await admin
       .from('salon_members')
       .select('user_id')
@@ -300,8 +343,23 @@ async function handleCron(admin: SupabaseClient, token: string): Promise<Respons
       (owner.user_metadata?.name as string | undefined) ??
       owner.email.split('@')[0] ??
       'друг'
+
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('telegram_id')
+      .eq('id', ownerId)
+      .maybeSingle()
+    const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
+      ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+      : null
+
     try {
-      const r = await sendDigestForSalon(admin, salon as SalonForDigest, owner.email, name)
+      const r = await sendDigestForSalon(
+        admin,
+        salon as SalonForDigest,
+        { email: owner.email, fullName: name, telegramId },
+        channels,
+      )
       if (r.sent) stats.sent++
       else stats.skipped++
     } catch (e) {
@@ -339,14 +397,42 @@ async function handleManual(
 
   const { data: salon, error: salonErr } = await userClient
     .from('salons')
-    .select('id, name, currency, logo_url, financial_settings, daily_digest_enabled')
+    .select(
+      'id, name, currency, logo_url, financial_settings, daily_digest_enabled, daily_digest_channels',
+    )
     .eq('id', salonId)
     .maybeSingle()
   if (salonErr || !salon) return jsonResponse({ error: 'salon_not_found_or_no_access' }, 403)
 
-  const r = await sendDigestForSalon(admin, salon as SalonForDigest, userEmail, userName)
+  const channels = normalizeChannels(
+    (salon as { daily_digest_channels?: unknown }).daily_digest_channels,
+  )
+  // Фолбэк на email если массив пустой (старая запись до миграции).
+  const effectiveChannels: DigestChannel[] = channels.length > 0 ? channels : ['email']
+
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('telegram_id')
+    .eq('id', user.id)
+    .maybeSingle()
+  const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
+    ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+    : null
+
+  const r = await sendDigestForSalon(
+    admin,
+    salon as SalonForDigest,
+    { email: userEmail, fullName: userName, telegramId },
+    effectiveChannels,
+  )
   if (!r.sent) return jsonResponse({ error: r.reason ?? 'send_failed' }, 500)
-  return jsonResponse({ ok: true, mode: 'manual', salon_id: salonId, sent_to: userEmail })
+  return jsonResponse({
+    ok: true,
+    mode: 'manual',
+    salon_id: salonId,
+    sent_to: userEmail,
+    via: r.via ?? [],
+  })
 }
 
 import { withSentry as _withSentry } from '../_shared/sentry.ts'

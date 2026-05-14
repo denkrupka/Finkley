@@ -27,14 +27,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
-import { useSalon } from '@/hooks/useSalons'
+import { useSalon, type DigestChannel } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import {
   useSendDailyDigest,
   useSendWeeklyDigest,
-  useToggleDailyDigest,
-  useToggleWeeklyDigest,
+  useUpdateDigestChannels,
 } from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
@@ -106,9 +105,9 @@ export function SettingsPage() {
   const remove = useDeleteSalon()
   const { data: subscription } = useSubscription(salonId)
   const sendDigest = useSendWeeklyDigest(salonId)
-  const toggleDigest = useToggleWeeklyDigest(salonId)
+  const updateWeeklyChannels = useUpdateDigestChannels(salonId, 'weekly')
   const sendDailyDigest = useSendDailyDigest(salonId)
-  const toggleDailyDigest = useToggleDailyDigest(salonId)
+  const updateDailyChannels = useUpdateDigestChannels(salonId, 'daily')
   const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
 
   const [name, setName] = useState('')
@@ -526,30 +525,23 @@ export function SettingsPage() {
                 <p className="text-muted-foreground mt-1 text-sm">
                   {t('settings.digest.subtitle')}
                 </p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={salon.weekly_digest_enabled}
-                    onChange={(e) =>
-                      toggleDigest.mutate(e.target.checked, {
-                        onSuccess: () =>
-                          toast.success(
-                            e.target.checked
-                              ? t('settings.digest.toast_enabled')
-                              : t('settings.digest.toast_disabled'),
-                          ),
-                        onError: (err) =>
-                          toast.error(err instanceof Error ? err.message : String(err)),
-                      })
-                    }
-                    className="size-4 cursor-pointer"
-                  />
-                  <span className="text-foreground">
-                    {salon.weekly_digest_enabled
-                      ? t('settings.digest.enabled')
-                      : t('settings.digest.disabled')}
-                  </span>
-                </label>
+                <DigestChannelsField
+                  channels={
+                    salon.weekly_digest_channels ?? (salon.weekly_digest_enabled ? ['email'] : [])
+                  }
+                  onChange={(next) =>
+                    updateWeeklyChannels.mutate(next, {
+                      onSuccess: () =>
+                        toast.success(
+                          next.length > 0
+                            ? t('settings.digest.toast_enabled')
+                            : t('settings.digest.toast_disabled'),
+                        ),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }
+                />
               </div>
               <Button
                 variant="outline"
@@ -582,30 +574,23 @@ export function SettingsPage() {
                 <p className="text-muted-foreground mt-1 text-sm">
                   {t('settings.daily_digest.subtitle')}
                 </p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={!!salon.daily_digest_enabled}
-                    onChange={(e) =>
-                      toggleDailyDigest.mutate(e.target.checked, {
-                        onSuccess: () =>
-                          toast.success(
-                            e.target.checked
-                              ? t('settings.daily_digest.toast_enabled')
-                              : t('settings.daily_digest.toast_disabled'),
-                          ),
-                        onError: (err) =>
-                          toast.error(err instanceof Error ? err.message : String(err)),
-                      })
-                    }
-                    className="size-4 cursor-pointer"
-                  />
-                  <span className="text-foreground">
-                    {salon.daily_digest_enabled
-                      ? t('settings.daily_digest.enabled')
-                      : t('settings.daily_digest.disabled')}
-                  </span>
-                </label>
+                <DigestChannelsField
+                  channels={
+                    salon.daily_digest_channels ?? (salon.daily_digest_enabled ? ['email'] : [])
+                  }
+                  onChange={(next) =>
+                    updateDailyChannels.mutate(next, {
+                      onSuccess: () =>
+                        toast.success(
+                          next.length > 0
+                            ? t('settings.daily_digest.toast_enabled')
+                            : t('settings.daily_digest.toast_disabled'),
+                        ),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }
+                />
               </div>
               <Button
                 variant="outline"
@@ -768,6 +753,59 @@ export function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+/**
+ * Два независимых чекбокса каналов доставки дайджеста (Email + Telegram).
+ * Записывает channels-массив через useUpdateDigestChannels — мастер-флажок
+ * `*_enabled` обновляется автоматически (true если хоть один канал ON).
+ *
+ * Telegram-чекбокс активен всегда; если у юзера не привязан Telegram,
+ * edge function send-*-digest просто скипнет этот канал — UX без блокировки
+ * (чтобы не приходилось перезагружать страницу после привязки).
+ */
+function DigestChannelsField({
+  channels,
+  onChange,
+}: {
+  channels: DigestChannel[]
+  onChange: (next: DigestChannel[]) => void
+}) {
+  const { t } = useTranslation()
+  function toggle(ch: DigestChannel) {
+    const next = channels.includes(ch) ? channels.filter((c) => c !== ch) : [...channels, ch]
+    onChange(next)
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+        {t('settings.digest.channels.title')}
+      </p>
+      <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={channels.includes('email')}
+          onChange={() => toggle('email')}
+          className="size-4 cursor-pointer"
+        />
+        <span className="text-foreground">{t('settings.digest.channels.email')}</span>
+      </label>
+      <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={channels.includes('telegram')}
+          onChange={() => toggle('telegram')}
+          className="size-4 cursor-pointer"
+        />
+        <span className="text-foreground">{t('settings.digest.channels.telegram')}</span>
+      </label>
+      {channels.length === 0 ? (
+        <p className="text-muted-foreground mt-1 text-xs italic">
+          {t('settings.digest.channels.all_off')}
+        </p>
+      ) : null}
     </div>
   )
 }

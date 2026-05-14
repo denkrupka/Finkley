@@ -30,9 +30,56 @@ export function renderLogoBlock(logoUrl: string | null | undefined): string {
 }
 
 /**
- * Шлёт сообщение владельцу в Telegram через @finklay_dev_bot. Никогда
- * не бросает, только console.warn. Используется для критических алертов
- * вроде «3 раза подряд упал sync Booksy».
+ * Шлёт сообщение конкретному юзеру в Telegram через @finkley_tg_bot
+ * (TELEGRAM_BOT_TOKEN — основной бот, тот же что используется в
+ * telegram-link / telegram-auth). chatId — это profiles.telegram_id
+ * привязанного аккаунта. Никогда не бросает, только console.warn —
+ * digest не должен падать из-за неработающего Telegram-канала.
+ *
+ * Требование Telegram API: юзер должен сначала сам написать боту хотя
+ * бы один раз (иначе 403 "bot can't initiate conversation"). На стороне
+ * UI это решается ссылкой "написать боту" после привязки.
+ */
+export async function sendTelegramToUser(chatId: number | string, text: string): Promise<boolean> {
+  const token = Deno.env.get('TELEGRAM_BOT_TOKEN')
+  if (!token) {
+    console.warn('sendTelegramToUser: TELEGRAM_BOT_TOKEN not configured')
+    return false
+  }
+  if (!chatId) return false
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    })
+    if (!res.ok) {
+      console.warn(
+        `sendTelegramToUser failed (chat=${chatId}):`,
+        res.status,
+        await res.text().catch(() => ''),
+      )
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn(
+      `sendTelegramToUser exception (chat=${chatId}):`,
+      e instanceof Error ? e.message : e,
+    )
+    return false
+  }
+}
+
+/**
+ * Шлёт сообщение владельцу проекта (тебе) в Telegram через
+ * @finklay_dev_bot (TELEGRAM_BUG_BOT_TOKEN). Это другой бот — для
+ * багов/алертов сервиса, не для общения с конечным юзером.
  *
  * Если задан TELEGRAM_THREAD_BUGS — шлём в тему «Баги», иначе в general.
  */

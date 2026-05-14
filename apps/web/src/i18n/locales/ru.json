@@ -1830,7 +1830,13 @@
       "button": "Отправить сейчас",
       "toast_enabled": "Дайджест включён",
       "toast_disabled": "Дайджест выключен",
-      "toast_sent": "Письмо ушло на {{email}}"
+      "toast_sent": "Письмо ушло на {{email}}",
+      "channels": {
+        "title": "Каналы доставки",
+        "email": "Email",
+        "telegram": "Telegram",
+        "all_off": "Все каналы выключены — дайджест не будет приходить."
+      }
     },
     "daily_digest": {
       "title": "Ежедневная сводка",

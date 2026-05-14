@@ -1,6 +1,38 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
+import type { DigestChannel } from '@/hooks/useSalons'
+
+/**
+ * Обновляет колонку `weekly_digest_channels` (массив каналов). Параллельно
+ * синхронизирует мастер-флажок `weekly_digest_enabled` — true если есть
+ * хотя бы один канал. Cron/edge function будут читать channels.
+ */
+export function useUpdateDigestChannels(salonId: string | undefined, kind: 'weekly' | 'daily') {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (channels: DigestChannel[]) => {
+      if (!salonId) throw new Error('no salon')
+      const channelsCol = kind === 'weekly' ? 'weekly_digest_channels' : 'daily_digest_channels'
+      const enabledCol = kind === 'weekly' ? 'weekly_digest_enabled' : 'daily_digest_enabled'
+      const enabled = channels.length > 0
+      const { error } = await supabase
+        .from('salons')
+        .update({ [channelsCol]: channels, [enabledCol]: enabled })
+        .eq('id', salonId)
+      if (error) {
+        const msg = error.message ?? String(error)
+        if (/does not exist/i.test(msg)) {
+          throw new Error('Миграция БД ещё не применена. Подожди пару минут — деплой в процессе.')
+        }
+        throw new Error(msg)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salons'] })
+    },
+  })
+}
 
 /**
  * Дёргает edge function send-weekly-digest для текущего салона.
