@@ -7,7 +7,7 @@
     "title": "Админка Finkley",
     "subtitle": "Super-admin раздел — только для команды.",
     "no_access_title": "Нет доступа",
-    "no_access_body": "Эта секция только для team Finkley (app_admins).",
+    "no_access_body": "Эта секция только для team Finkley.",
     "no_access_back": "← Вернуться на главную",
     "back_to_salon": "В кабинет «{{name}}» →",
     "sign_out": "Выйти",
