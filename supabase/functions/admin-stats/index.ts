@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
     if (action === 'feedback_approve') return handleFeedbackApprove(admin, body, user.userId)
     if (action === 'feedback_reject') return handleFeedbackReject(admin, body)
     if (action === 'feedback_status') return handleFeedbackStatus(admin, body)
+    if (action === 'feedback_attachments') return handleFeedbackAttachments(admin, body)
     if (action === 'user_set_tester') return handleUserSetTester(admin, body)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
@@ -262,7 +263,7 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
 
   const salonIds = (salons ?? []).map((s) => s.id as string)
 
-  // KPI: суммы visits/expenses по salon_id за 12 мес
+  // KPI: суммы visits/expenses по salon_id за 12 мес + Stripe-подписки за всё время
   const [{ data: visits }, { data: expenses }, { data: subs }] = await Promise.all([
     salonIds.length
       ? admin
@@ -280,7 +281,9 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
       : Promise.resolve({ data: [] as unknown[] }),
     admin
       .from('salon_subscriptions')
-      .select('salon_id, status, trial_ends_at, bonus_until, source'),
+      .select(
+        'salon_id, status, trial_ends_at, bonus_until, source, current_period_start, current_period_end, created_at',
+      ),
   ])
 
   const revenueBySalon = new Map<string, number>()
@@ -291,45 +294,91 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
   for (const e of (expenses ?? []) as { salon_id: string; amount_cents: number }[]) {
     expensesBySalon.set(e.salon_id, (expensesBySalon.get(e.salon_id) ?? 0) + (e.amount_cents ?? 0))
   }
-  const subBySalon = new Map<
-    string,
-    { status: string; trial_ends_at: string | null; bonus_until: string | null; source: string }
-  >()
-  for (const s of (subs ?? []) as {
-    salon_id: string
+  type SubInfo = {
     status: string
     trial_ends_at: string | null
     bonus_until: string | null
     source: string
-  }[]) {
-    subBySalon.set(s.salon_id, {
+    current_period_start: string | null
+    current_period_end: string | null
+    created_at: string
+  }
+  const subBySalon = new Map<string, SubInfo>()
+  for (const s of (subs ?? []) as SubInfo[] & { salon_id: string }[]) {
+    subBySalon.set((s as unknown as { salon_id: string }).salon_id, {
       status: s.status,
       trial_ends_at: s.trial_ends_at,
       bonus_until: s.bonus_until,
       source: s.source,
+      current_period_start: s.current_period_start,
+      current_period_end: s.current_period_end,
+      created_at: s.created_at,
     })
   }
 
-  // batch listUsers вместо N+1 getUserById — масштабируется на большое число салонов
-  const ownerIds = new Set((salons ?? []).map((s) => s.created_by).filter(Boolean))
-  const emailById = new Map<string, string>()
-  if (ownerIds.size > 0) {
-    const { data: users } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    for (const u of users?.users ?? []) {
-      if (ownerIds.has(u.id) && u.email) emailById.set(u.id, u.email)
+  // Профили + auth.users для имени/фамилии/email/телефона владельца
+  const ownerIds = Array.from(
+    new Set((salons ?? []).map((s) => s.created_by).filter(Boolean)),
+  ) as string[]
+  const profileById = new Map<string, { full_name: string | null; phone: string | null }>()
+  if (ownerIds.length > 0) {
+    const { data: profs } = await admin
+      .from('profiles')
+      .select('id, full_name, phone')
+      .in('id', ownerIds)
+    for (const p of (profs ?? []) as {
+      id: string
+      full_name: string | null
+      phone: string | null
+    }[]) {
+      profileById.set(p.id, { full_name: p.full_name, phone: p.phone })
     }
   }
+  const emailById = new Map<string, string>()
+  if (ownerIds.length > 0) {
+    const { data: users } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    for (const u of users?.users ?? []) {
+      if (u.email) emailById.set(u.id, u.email)
+    }
+  }
+
+  // Цена подписки портала — €15/мес (см. CLAUDE.md). Хранится в центах EUR.
+  const MONTHLY_PRICE_CENTS = 1500
 
   return jsonResponse({
     salons: (salons ?? []).map((s) => {
       const createdMs = new Date(s.created_at).getTime()
-      const monthsAlive = Math.max(
-        1,
-        Math.min(12, Math.round((now - createdMs) / (30 * 86400_000))),
-      )
+      // Месяцев с момента регистрации салона (период сотрудничества).
+      const periodMonths = Math.max(1, Math.round((now - createdMs) / (30 * 86400_000)))
+      // Для среднемесячных KPI берём не более 12 (скользящие 12 мес).
+      const kpiMonths = Math.min(12, periodMonths)
       const revenue = revenueBySalon.get(s.id) ?? 0
       const expense = expensesBySalon.get(s.id) ?? 0
       const sub = subBySalon.get(s.id)
+
+      // Доход портала от салона = сколько месяцев был paid * 1500. Считаем
+      // от current_period_start до min(now, current_period_end), но только
+      // если status был activate/canceled (платил). Для trialing/manual_admin
+      // мы ничего не получаем.
+      let portalRevenueCents = 0
+      if (
+        sub &&
+        (sub.status === 'active' || sub.status === 'past_due' || sub.status === 'canceled')
+      ) {
+        const start = sub.current_period_start
+          ? new Date(sub.current_period_start).getTime()
+          : createdMs
+        const end = sub.current_period_end
+          ? Math.min(now, new Date(sub.current_period_end).getTime())
+          : now
+        const paidMonths = Math.max(0, Math.round((end - start) / (30 * 86400_000)))
+        portalRevenueCents = paidMonths * MONTHLY_PRICE_CENTS
+      }
+
+      const ownerProfile = s.created_by ? (profileById.get(s.created_by as string) ?? null) : null
+      const ownerFullName = ownerProfile?.full_name ?? null
+      const [firstName, ...rest] = (ownerFullName ?? '').trim().split(/\s+/).filter(Boolean)
+
       return {
         id: s.id,
         name: s.name,
@@ -337,15 +386,19 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
         created_at: s.created_at,
         owner_id: s.created_by,
         owner_email: s.created_by ? (emailById.get(s.created_by as string) ?? null) : null,
+        owner_full_name: ownerFullName,
+        owner_first_name: firstName ?? null,
+        owner_last_name: rest.join(' ') || null,
+        owner_phone: ownerProfile?.phone ?? null,
         plan_status: sub?.status ?? null,
         trial_ends_at: sub?.trial_ends_at ?? null,
         bonus_until: sub?.bonus_until ?? null,
         sub_source: sub?.source ?? null,
         blocked_at: s.blocked_at,
         blocked_reason: s.blocked_reason,
-        avg_revenue_cents: Math.round(revenue / monthsAlive),
-        avg_expenses_cents: Math.round(expense / monthsAlive),
-        avg_profit_cents: Math.round((revenue - expense) / monthsAlive),
+        period_months: periodMonths,
+        avg_profit_cents: Math.round((revenue - expense) / kpiMonths),
+        portal_revenue_cents: portalRevenueCents,
       }
     }),
   })
@@ -357,16 +410,24 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
 
   const [{ data: members }, { data: profiles }, { data: appAdmins }] = await Promise.all([
     admin.from('salon_members').select('user_id, salon_id, role, salons(id, name)'),
-    admin.from('profiles').select('id, full_name, is_tester'),
+    admin.from('profiles').select('id, full_name, is_tester, phone'),
     admin.from('app_admins').select('user_id, is_super'),
   ])
-  const profileById = new Map<string, { full_name: string | null; is_tester: boolean }>()
+  const profileById = new Map<
+    string,
+    { full_name: string | null; is_tester: boolean; phone: string | null }
+  >()
   for (const p of (profiles ?? []) as {
     id: string
     full_name: string | null
     is_tester: boolean | null
+    phone: string | null
   }[]) {
-    profileById.set(p.id, { full_name: p.full_name, is_tester: !!p.is_tester })
+    profileById.set(p.id, {
+      full_name: p.full_name,
+      is_tester: !!p.is_tester,
+      phone: p.phone,
+    })
   }
   const adminById = new Map<string, { is_super: boolean }>()
   for (const a of (appAdmins ?? []) as { user_id: string; is_super: boolean | null }[]) {
@@ -418,6 +479,7 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
         last_name: lastName,
         app_role: adminRow ? (adminRow.is_super ? 'super_admin' : 'admin') : null,
         is_tester: profile?.is_tester ?? false,
+        phone: profile?.phone ?? null,
         salons: salonsArr,
       }
     }),
@@ -845,6 +907,42 @@ async function handleFeedbackReject(
     .eq('id', id)
   if (error) return jsonResponse({ error: error.message }, 500)
   return jsonResponse({ ok: true })
+}
+
+async function handleFeedbackAttachments(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const bugId = body.id
+  if (typeof bugId !== 'string') return jsonResponse({ error: 'id_required' }, 400)
+  const { data, error } = await admin
+    .from('bug_reports')
+    .select('attachments')
+    .eq('id', bugId)
+    .maybeSingle()
+  if (error) return jsonResponse({ error: error.message }, 500)
+  if (!data) return jsonResponse({ error: 'not_found' }, 404)
+
+  const atts = ((data as { attachments?: unknown[] }).attachments ?? []) as Array<{
+    storage_path?: string | null
+    mime?: string
+    name?: string
+    type?: string
+    vision_summary?: string
+    transcript?: string
+  }>
+
+  // Подписанные URL'ы для каждого attachment'а (приватный bucket bug-attachments)
+  const results = await Promise.all(
+    atts.map(async (a) => {
+      if (!a.storage_path) return { ...a, signed_url: null }
+      const { data: signed } = await admin.storage
+        .from('bug-attachments')
+        .createSignedUrl(a.storage_path, 60 * 60) // 1 час
+      return { ...a, signed_url: signed?.signedUrl ?? null }
+    }),
+  )
+  return jsonResponse({ attachments: results })
 }
 
 async function handleUserSetTester(

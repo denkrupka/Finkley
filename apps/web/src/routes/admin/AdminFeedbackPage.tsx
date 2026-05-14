@@ -1,15 +1,9 @@
-import { Bug, Check, Lightbulb, ShieldAlert, User2, Users, X } from 'lucide-react'
+import { Bug, FlaskConical, Lightbulb, ShieldAlert, User2, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 
-import {
-  useAdminFeedback,
-  useFeedbackApprove,
-  useFeedbackReject,
-  useFeedbackStatus,
-  type AdminFeedbackRow,
-} from '@/hooks/useAdmin'
+import { FeedbackDetailModal } from '@/components/admin/FeedbackDetailModal'
+import { useAdminFeedback, type AdminFeedbackRow } from '@/hooks/useAdmin'
 
 type Filter = {
   source: 'all' | 'team' | 'client' | 'tester'
@@ -18,10 +12,22 @@ type Filter = {
   onlyPending: boolean
 }
 
+const STATUS_COLOR: Record<string, string> = {
+  open: 'bg-sky-100 text-sky-700',
+  in_progress: 'bg-amber-100 text-amber-800',
+  fixed: 'bg-emerald-100 text-emerald-700',
+  wontfix: 'bg-slate-100 text-slate-600',
+  duplicate: 'bg-slate-100 text-slate-600',
+}
+
 /**
- * Фидбек/баг-репорты. Источники:
- * - team — личная команда через @finklay_dev_bot (автоматически approved)
- * - client — клиенты салонов, требует ручного апрува super-admin'а
+ * /admin/feedback — список багов и фич-реквестов из трёх источников:
+ *   team    — наша команда через @finklay_dev_bot (без модерации)
+ *   tester  — внутренние тестеры через UI-виджет (без модерации)
+ *   client  — клиенты салонов через DM-бота (требует апрува)
+ *
+ * Клик по строке открывает FeedbackDetailModal с полным описанием, AI-summary,
+ * notes и каруселью вложений.
  */
 export function AdminFeedbackPage() {
   const { t } = useTranslation()
@@ -32,6 +38,7 @@ export function AdminFeedbackPage() {
     kind: 'all',
     onlyPending: false,
   })
+  const [openRow, setOpenRow] = useState<AdminFeedbackRow | null>(null)
 
   const filtered = useMemo(() => {
     const rows = data?.feedback ?? []
@@ -112,7 +119,7 @@ export function AdminFeedbackPage() {
               { value: 'feature', label: t('admin.feedback.kind.feature') },
             ]}
           />
-          <label className="hover:bg-muted/60 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs font-semibold">
+          <label className="border-border hover:bg-muted/60 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs font-semibold">
             <input
               type="checkbox"
               checked={filter.onlyPending}
@@ -131,28 +138,37 @@ export function AdminFeedbackPage() {
         ) : (
           <ul className="divide-border divide-y">
             {filtered.map((r) => (
-              <FeedbackRow key={r.id} row={r} />
+              <FeedbackRow key={r.id} row={r} onOpen={() => setOpenRow(r)} />
             ))}
           </ul>
         )}
       </div>
+
+      {openRow ? <FeedbackDetailModal row={openRow} onClose={() => setOpenRow(null)} /> : null}
     </div>
   )
 }
 
-function FeedbackRow({ row }: { row: AdminFeedbackRow }) {
+function FeedbackRow({ row, onOpen }: { row: AdminFeedbackRow; onOpen: () => void }) {
   const { t } = useTranslation()
-  const approve = useFeedbackApprove()
-  const reject = useFeedbackReject()
-  const status = useFeedbackStatus()
-
   const isPendingApproval = row.requires_approval && !row.approved_at
   const KindIcon = row.kind === 'feature' ? Lightbulb : Bug
-  const SourceIcon = row.source === 'client' ? User2 : Users
+  const SourceIcon =
+    row.source === 'client' ? User2 : row.source === 'tester' ? FlaskConical : Users
+  const sourceTone =
+    row.source === 'client'
+      ? 'bg-amber-100 text-amber-800'
+      : row.source === 'tester'
+        ? 'bg-amber-100 text-amber-800'
+        : 'bg-slate-100 text-slate-700'
 
   return (
-    <li className="p-4">
-      <div className="flex items-start gap-3">
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="hover:bg-muted/30 flex w-full items-start gap-3 p-4 text-left transition-colors"
+      >
         <KindIcon
           className={`mt-0.5 size-4 shrink-0 ${row.kind === 'feature' ? 'text-amber-600' : 'text-rose-600'}`}
           strokeWidth={1.8}
@@ -160,21 +176,13 @@ function FeedbackRow({ row }: { row: AdminFeedbackRow }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span
-              className={[
-                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase',
-                row.source === 'client'
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-slate-100 text-slate-700',
-              ].join(' ')}
+              className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase ${sourceTone}`}
             >
               <SourceIcon className="size-3" strokeWidth={2} />
               {t(`admin.feedback.source.${row.source}`)}
             </span>
             <span
-              className={[
-                'inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase',
-                STATUS_COLOR[row.status] ?? 'bg-slate-100 text-slate-700',
-              ].join(' ')}
+              className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase ${STATUS_COLOR[row.status] ?? 'bg-slate-100 text-slate-700'}`}
             >
               {t(`admin.feedback.status.${row.status}`)}
             </span>
@@ -189,7 +197,7 @@ function FeedbackRow({ row }: { row: AdminFeedbackRow }) {
             </span>
           </div>
 
-          <p className="text-foreground mt-1 whitespace-pre-wrap text-sm">
+          <p className="text-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-sm">
             {row.message_text || row.ai_summary || '—'}
           </p>
 
@@ -210,66 +218,7 @@ function FeedbackRow({ row }: { row: AdminFeedbackRow }) {
             ) : null}
           </div>
         </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {isPendingApproval ? (
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() =>
-                  approve.mutate(
-                    { id: row.id },
-                    {
-                      onSuccess: () => toast.success(t('admin.feedback.toast.approved')),
-                      onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                    },
-                  )
-                }
-                className="inline-flex h-7 items-center gap-1 rounded-md bg-emerald-600 px-2 text-xs font-semibold text-white hover:bg-emerald-700"
-              >
-                <Check className="size-3.5" strokeWidth={2} />
-                {t('admin.feedback.action.approve')}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  reject.mutate(
-                    { id: row.id },
-                    {
-                      onSuccess: () => toast.success(t('admin.feedback.toast.rejected')),
-                      onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                    },
-                  )
-                }
-                className="inline-flex h-7 items-center gap-1 rounded-md bg-rose-600 px-2 text-xs font-semibold text-white hover:bg-rose-700"
-              >
-                <X className="size-3.5" strokeWidth={2} />
-                {t('admin.feedback.action.reject')}
-              </button>
-            </div>
-          ) : (
-            <select
-              value={row.status}
-              onChange={(e) =>
-                status.mutate(
-                  { id: row.id, status: e.target.value },
-                  {
-                    onSuccess: () => toast.success(t('admin.feedback.toast.status_updated')),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  },
-                )
-              }
-              className="border-border bg-card h-7 rounded-md border px-1.5 text-xs"
-            >
-              <option value="open">{t('admin.feedback.status.open')}</option>
-              <option value="in_progress">{t('admin.feedback.status.in_progress')}</option>
-              <option value="fixed">{t('admin.feedback.status.fixed')}</option>
-              <option value="wontfix">{t('admin.feedback.status.wontfix')}</option>
-              <option value="duplicate">{t('admin.feedback.status.duplicate')}</option>
-            </select>
-          )}
-        </div>
-      </div>
+      </button>
     </li>
   )
 }
@@ -296,12 +245,4 @@ function Select({
       ))}
     </select>
   )
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  open: 'bg-sky-100 text-sky-700',
-  in_progress: 'bg-amber-100 text-amber-800',
-  fixed: 'bg-emerald-100 text-emerald-700',
-  wontfix: 'bg-slate-100 text-slate-600',
-  duplicate: 'bg-slate-100 text-slate-600',
 }

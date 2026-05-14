@@ -141,63 +141,65 @@ export function TesterBugModal({ onClose }: { onClose: () => void }) {
           <DialogTitle>{t('tester.modal.title')}</DialogTitle>
         </DialogHeader>
 
-        <Label className="text-xs">{t('tester.modal.description_label')}</Label>
-        <textarea
-          autoFocus
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={5}
-          placeholder={t('tester.modal.description_placeholder')}
-          className="border-border bg-card mt-1 w-full rounded-md border p-2 text-sm"
-        />
+        <div className="overflow-y-auto px-5 py-4">
+          <Label htmlFor="tester-desc" className="text-xs">
+            {t('tester.modal.description_label')}
+          </Label>
+          <textarea
+            id="tester-desc"
+            autoFocus
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={5}
+            placeholder={t('tester.modal.description_placeholder')}
+            className="border-border bg-card focus-visible:ring-ring mt-1 block w-full rounded-md border p-2.5 text-sm focus-visible:outline-none focus-visible:ring-2"
+          />
 
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {/* Attach file */}
-          <label className="border-border hover:bg-muted/40 inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold">
-            <Paperclip className="size-3.5" strokeWidth={1.8} />
-            {attachment ? t('tester.modal.attachment_replace') : t('tester.modal.attach_file')}
-            <input
-              type="file"
-              accept="image/*,application/pdf,video/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </label>
-          {/* Take screenshot */}
-          <Button variant="outline" size="md" onClick={startAreaScreenshot} disabled={picking}>
-            <Camera className="size-3.5" strokeWidth={1.8} />
-            {screenshot ? t('tester.modal.screenshot_retake') : t('tester.modal.take_screenshot')}
-          </Button>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="border-border hover:bg-muted/40 inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold">
+              <Paperclip className="size-3.5" strokeWidth={1.8} />
+              {attachment ? t('tester.modal.attachment_replace') : t('tester.modal.attach_file')}
+              <input
+                type="file"
+                accept="image/*,application/pdf,video/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </label>
+            <Button variant="outline" size="md" onClick={startAreaScreenshot} disabled={picking}>
+              <Camera className="size-3.5" strokeWidth={1.8} />
+              {screenshot ? t('tester.modal.screenshot_retake') : t('tester.modal.take_screenshot')}
+            </Button>
+          </div>
+
+          {screenshot ? (
+            <div className="border-border relative mt-3 overflow-hidden rounded-md border">
+              <img src={screenshot} alt="screenshot" className="max-h-48 w-full object-contain" />
+              <button
+                type="button"
+                onClick={() => setScreenshot(null)}
+                className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                aria-label="remove screenshot"
+              >
+                <X className="size-3" strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : null}
+          {attachment ? (
+            <div className="border-border mt-3 flex items-center justify-between gap-2 rounded-md border p-2 text-xs">
+              <span className="truncate">{attachment.name}</span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {/* Previews */}
-        {screenshot ? (
-          <div className="border-border relative mt-3 overflow-hidden rounded-md border">
-            <img src={screenshot} alt="screenshot" className="max-h-40 w-full object-contain" />
-            <button
-              type="button"
-              onClick={() => setScreenshot(null)}
-              className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-              aria-label="remove screenshot"
-            >
-              <X className="size-3" strokeWidth={2.5} />
-            </button>
-          </div>
-        ) : null}
-        {attachment ? (
-          <div className="border-border mt-3 flex items-center justify-between gap-2 rounded-md border p-2 text-xs">
-            <span className="truncate">{attachment.name}</span>
-            <button
-              type="button"
-              onClick={() => setAttachment(null)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" strokeWidth={2} />
-            </button>
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="border-border flex items-center justify-end gap-2 border-t px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
             {t('common.cancel')}
           </Button>

@@ -70,11 +70,15 @@ export type AdminSalonRow = {
   created_at: string
   owner_id: string | null
   owner_email: string | null
+  owner_full_name: string | null
+  owner_first_name: string | null
+  owner_last_name: string | null
+  owner_phone: string | null
   blocked_at: string | null
   blocked_reason: string | null
-  avg_revenue_cents: number
-  avg_expenses_cents: number
+  period_months: number
   avg_profit_cents: number
+  portal_revenue_cents: number
 }
 
 export type AdminUserRow = {
@@ -85,6 +89,7 @@ export type AdminUserRow = {
   banned_until: string | null
   first_name: string | null
   last_name: string | null
+  phone: string | null
   app_role: 'super_admin' | 'admin' | null
   is_tester: boolean
   salons: Array<{ salon_id: string; salon_name: string; role: string }>
@@ -239,6 +244,26 @@ export function useFeedbackReject() {
   return useMutation({
     mutationFn: (vars: { id: string }) => postAdmin<{ ok: true }>('feedback_reject', vars),
     onSuccess: invalidate,
+  })
+}
+
+export type FeedbackAttachment = {
+  storage_path?: string | null
+  mime?: string
+  name?: string
+  type?: string
+  vision_summary?: string
+  transcript?: string
+  signed_url?: string | null
+}
+
+export function useFeedbackAttachments(bugId: string | null) {
+  return useQuery<{ attachments: FeedbackAttachment[] }>({
+    queryKey: ['admin-feedback-attachments', bugId],
+    queryFn: () =>
+      postAdmin<{ attachments: FeedbackAttachment[] }>('feedback_attachments', { id: bugId! }),
+    enabled: !!bugId,
+    staleTime: 30 * 60 * 1000,
   })
 }
 
