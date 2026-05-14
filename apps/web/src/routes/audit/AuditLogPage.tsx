@@ -1,10 +1,13 @@
 import { format, formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ArrowLeft, FileText, History } from 'lucide-react'
+import { ArrowLeft, FileText, History, User as UserIcon } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 
-import { useAuditLog, type AuditEntry } from '@/hooks/useAuditLog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useAuditLog, type AuditEntry, type AuditFilters } from '@/hooks/useAuditLog'
 
 const ACTION_ICON: Record<string, string> = {
   'visit.create': '✨',
@@ -23,10 +26,24 @@ const ACTION_ICON: Record<string, string> = {
   'salon.deleted': '🗑',
 }
 
+const ACTION_FILTERS: { value: string; key: string }[] = [
+  { value: '', key: 'audit.filter.all' },
+  { value: 'visit.', key: 'audit.filter.visits' },
+  { value: 'expense.', key: 'audit.filter.expenses' },
+  { value: 'team.', key: 'audit.filter.team' },
+  { value: 'salon.', key: 'audit.filter.salon' },
+]
+
+/**
+ * /salon/settings/audit — журнал событий. Показывает кто (имя/email),
+ * когда (полная дата + relative «час назад»), действие, базовые детали
+ * (из payload через summarizePayload). Фильтры: диапазон дат + тип события.
+ */
 export function AuditLogPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
-  const { data: entries = [], isLoading, error } = useAuditLog(salonId)
+  const [filters, setFilters] = useState<AuditFilters>({})
+  const { data: entries = [], isLoading, error } = useAuditLog(salonId, filters)
 
   if (!salonId) return null
 
@@ -45,6 +62,42 @@ export function AuditLogPage() {
           {t('audit.title')}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">{t('audit.subtitle')}</p>
+      </div>
+
+      {/* Фильтры */}
+      <div className="border-border bg-card shadow-finsm mb-4 grid grid-cols-1 gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_1fr_1fr]">
+        <div>
+          <Label className="text-xs">{t('audit.filter.from')}</Label>
+          <Input
+            type="date"
+            value={filters.fromDate ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, fromDate: e.target.value || null }))}
+            className="mt-1 h-9"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">{t('audit.filter.to')}</Label>
+          <Input
+            type="date"
+            value={filters.toDate ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, toDate: e.target.value || null }))}
+            className="mt-1 h-9"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">{t('audit.filter.type')}</Label>
+          <select
+            value={filters.actionPrefix ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, actionPrefix: e.target.value }))}
+            className="border-border bg-card mt-1 h-9 w-full rounded-md border px-2 text-sm"
+          >
+            {ACTION_FILTERS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {t(a.key)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -78,6 +131,8 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
   const ago = formatDistanceToNow(date, { addSuffix: true, locale: ru })
   const fullDate = format(date, 'd MMMM yyyy, HH:mm', { locale: ru })
 
+  const author = entry.user_full_name || entry.user_email || t('audit.unknown_author')
+
   return (
     <li className="grid grid-cols-[24px_1fr_auto] items-start gap-3 px-5 py-3.5">
       <span className="text-base leading-6" aria-hidden>
@@ -87,15 +142,25 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
         <p className="text-foreground text-sm font-medium">
           {t(`audit.action.${entry.action}`, entry.action)}
         </p>
+        <p className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 text-[11px]">
+          <UserIcon className="size-3" strokeWidth={1.8} />
+          {author}
+          {entry.user_email && entry.user_full_name ? (
+            <span className="text-muted-foreground/70"> · {entry.user_email}</span>
+          ) : null}
+        </p>
         {entry.payload ? (
           <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {summarizePayload(entry.action, entry.payload)}
           </p>
         ) : null}
       </div>
-      <span className="text-muted-foreground shrink-0 text-xs" title={fullDate}>
-        {ago}
-      </span>
+      <div className="shrink-0 text-right">
+        <p className="text-muted-foreground text-xs" title={fullDate}>
+          {ago}
+        </p>
+        <p className="text-muted-foreground/70 mt-0.5 text-[10px]">{fullDate}</p>
+      </div>
     </li>
   )
 }
@@ -104,11 +169,11 @@ function summarizePayload(action: string, payload: Record<string, unknown>): str
   if (action.startsWith('visit')) {
     const amount = (payload.amount_cents ??
       (payload.new as Record<string, unknown>)?.amount_cents) as number | undefined
-    return amount !== undefined ? `${(amount / 100).toFixed(2)} (cents)` : ''
+    return amount !== undefined ? `${(amount / 100).toFixed(2)}` : ''
   }
   if (action.startsWith('expense')) {
     const amount = (payload.amount_cents ?? payload.new_amount) as number | undefined
-    return amount !== undefined ? `${(amount / 100).toFixed(2)} (cents)` : ''
+    return amount !== undefined ? `${(amount / 100).toFixed(2)}` : ''
   }
   if (action.startsWith('team.')) {
     const email = payload.email as string | undefined
