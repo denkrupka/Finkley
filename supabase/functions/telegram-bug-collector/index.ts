@@ -794,6 +794,25 @@ function classifyByThread(
   return 'ignore'
 }
 
+/**
+ * Сообщение для незарегистрированных юзеров в личке — приглашение на finkley.app.
+ *
+ * Telegram parse_mode='Markdown' (v1): поддерживает *bold*, _italic_, `code`,
+ * [text](url). Нельзя экранировать `_` обратным слэшем — в v1 это просто текст
+ * с лишним символом. Поэтому имя бота с подчёркиваниями оборачиваем в backticks
+ * (mono), иначе `_tg_` интерпретируется как italic.
+ */
+const NOT_AUTHORIZED_MESSAGE =
+  '🔒 *Этот бот — только для пользователей Finkley*\n\n' +
+  'Чтобы сообщить о баге через Telegram, нужно сначала зарегистрироваться или войти в приложение и привязать Telegram.\n\n' +
+  '👉 [Открыть Finkley](https://finkley.app)\n\n' +
+  '*Как привязать Telegram:*\n' +
+  '1️⃣ Войдите в Finkley\n' +
+  '2️⃣ Настройки → Профиль → «Привязать Telegram»\n' +
+  '3️⃣ Авторизуйтесь через бота `@finkley_tg_bot`\n' +
+  '4️⃣ Возвращайтесь сюда — пишите что не работает, мы получим и разберёмся 🐛\n\n' +
+  '_Если уже зарегистрированы — проверьте что Telegram-аккаунт привязан в настройках профиля._'
+
 async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
   const text = (msg.text ?? msg.caption ?? '').trim()
   const threadId = msg.message_thread_id
@@ -810,15 +829,43 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     return
   }
 
+  // В private chat — проверяем что отправитель ранее авторизовался в Finkley
+  // через @finkley_tg_bot (Telegram Login виджет). Привязка хранится в
+  // profiles.telegram_id. Если нет — отвечаем красивым сообщением со ссылкой
+  // на finkley.app и НЕ создаём bug_report (защита от спама от случайных
+  // прохожих, нашедших бота через поиск).
+  let reporterUserId: string | null = null
+  if (isPrivate) {
+    const senderId = msg.from?.id
+    if (!senderId) {
+      // Технически невозможно (msg.from обязателен для текстовых сообщений),
+      // но защищаемся на всякий случай.
+      return
+    }
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('id, full_name')
+      .eq('telegram_id', senderId)
+      .maybeSingle()
+    if (!profile) {
+      // Не авторизован — приглашение, и выходим (никакой записи в БД).
+      await tgSend(msg.chat.id, NOT_AUTHORIZED_MESSAGE)
+      return
+    }
+    reporterUserId = (profile as { id: string }).id
+  }
+
   // Команды (/list, /done, /note) — только в team chat. В private игнорируем —
-  // клиенты пишут текст/скрин, не команды.
+  // клиенты пишут текст/скрин, не команды. /start и /help уже не нужны:
+  // приветствие для незарегистрированных идёт в NOT_AUTHORIZED_MESSAGE выше,
+  // а для авторизованных — после первого реального сообщения.
   if (isPrivate && isCommand) {
     if (text === '/start' || text === '/help') {
       await tgSend(
         msg.chat.id,
-        '👋 Привет! Это бот баг-репортов FinSalon.\n\n' +
-          'Опиши проблему текстом, прикрепи скриншот или запиши голосовое — мы получим и разберёмся. ' +
-          'Сообщения от клиентов проходят модерацию, поэтому ответ может прийти не сразу.',
+        '👋 Привет! Опишите проблему текстом, прикрепите скриншот или запишите голосовое — ' +
+          'мы получим и разберёмся. Сообщения от клиентов проходят модерацию, ' +
+          'поэтому ответ может прийти не сразу.',
       )
     }
     return
@@ -931,6 +978,9 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       source,
       // Клиентские баги ждут апрува в /admin/feedback. Team-баги идут в работу сразу.
       requires_approval: source === 'client',
+      // Если клиент привязал Telegram через @finkley_tg_bot — у нас уже есть
+      // его Supabase user_id (см. lookup в начале handleMessage).
+      reporter_user_id: reporterUserId,
     })
     .select('id')
     .single()
