@@ -52,12 +52,10 @@ Deno.serve(async (req) => {
 
   if (action === 'overview') {
     const [salons, members, visits, expenses, messages, integrations] = await Promise.all([
-      admin
-        .from('salons')
-        .select('id, currency, created_at, plan_status:plan_status', {
-          count: 'exact',
-          head: false,
-        }),
+      admin.from('salons').select('id, currency, created_at, plan_status:plan_status', {
+        count: 'exact',
+        head: false,
+      }),
       admin.from('salon_members').select('user_id', { count: 'exact', head: true }),
       admin
         .from('visits')
