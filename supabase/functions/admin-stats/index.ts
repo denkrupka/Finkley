@@ -82,10 +82,11 @@ Deno.serve(async (req) => {
   // Проверяем что юзер — app_admin
   const { data: adminRow } = await admin
     .from('app_admins')
-    .select('user_id')
+    .select('user_id, is_super')
     .eq('user_id', user.userId)
     .maybeSingle()
   if (!adminRow) return jsonResponse({ error: 'forbidden' }, 403)
+  const callerIsSuper = !!(adminRow as { is_super?: boolean }).is_super
 
   const url = new URL(req.url)
   const action = url.searchParams.get('action') ?? 'overview'
@@ -110,6 +111,8 @@ Deno.serve(async (req) => {
     if (action === 'user_block') return handleUserBlock(admin, body, user.userId)
     if (action === 'user_unblock') return handleUserUnblock(admin, body)
     if (action === 'member_role_change') return handleMemberRoleChange(admin, body)
+    if (action === 'admin_grant') return handleAdminGrant(admin, body, user.userId, callerIsSuper)
+    if (action === 'admin_revoke') return handleAdminRevoke(admin, body, user.userId, callerIsSuper)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
 
@@ -450,7 +453,7 @@ async function handleSalonBlock(
     action: 'admin.salon_block',
     entity_type: 'salon',
     entity_id: salonId,
-    diff: { reason },
+    payload: { reason },
   })
   return jsonResponse({ ok: true })
 }
@@ -630,7 +633,7 @@ async function handleSalonExtendDemo(
     action: 'admin.salon_extend_demo',
     entity_type: 'salon_subscription',
     entity_id: salonId,
-    diff: { until: new Date(untilTs).toISOString(), reason, mode },
+    payload: { until: new Date(untilTs).toISOString(), reason, mode },
   })
   return jsonResponse({ ok: true, mode })
 }
@@ -691,5 +694,67 @@ async function handleMemberRoleChange(
     .eq('salon_id', salonId)
     .eq('user_id', userId)
   if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleAdminGrant(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+  callerId: string,
+  callerIsSuper: boolean,
+): Promise<Response> {
+  const userId = body.user_id
+  const makeSuper = body.is_super === true
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  // Только super-admin может назначать новых super-admin
+  if (makeSuper && !callerIsSuper) return jsonResponse({ error: 'only_super_can_grant_super' }, 403)
+
+  const { error } = await admin
+    .from('app_admins')
+    .upsert({ user_id: userId, is_super: makeSuper }, { onConflict: 'user_id' })
+  if (error) return jsonResponse({ error: error.message }, 500)
+
+  await admin.from('audit_log').insert({
+    salon_id: null,
+    user_id: callerId,
+    action: 'admin.grant',
+    entity_type: 'app_admin',
+    entity_id: null,
+    payload: { target_user_id: userId, is_super: makeSuper },
+  })
+  return jsonResponse({ ok: true })
+}
+
+async function handleAdminRevoke(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+  callerId: string,
+  callerIsSuper: boolean,
+): Promise<Response> {
+  const userId = body.user_id
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  if (userId === callerId) return jsonResponse({ error: 'cannot_revoke_self' }, 400)
+
+  // Проверяем target — если super, может отозвать только другой super
+  const { data: target } = await admin
+    .from('app_admins')
+    .select('is_super')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (!target) return jsonResponse({ error: 'not_an_admin' }, 404)
+  if (target.is_super && !callerIsSuper)
+    return jsonResponse({ error: 'only_super_can_revoke_super' }, 403)
+
+  const { error } = await admin.from('app_admins').delete().eq('user_id', userId)
+  if (error) return jsonResponse({ error: error.message }, 500)
+
+  await admin.from('audit_log').insert({
+    salon_id: null,
+    user_id: callerId,
+    action: 'admin.revoke',
+    entity_type: 'app_admin',
+    entity_id: null,
+    payload: { target_user_id: userId },
+  })
   return jsonResponse({ ok: true })
 }

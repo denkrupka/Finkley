@@ -1,4 +1,4 @@
-import { Ban, ShieldCheck, UserCheck } from 'lucide-react'
+import { Ban, ShieldCheck, ShieldOff, ShieldPlus, UserCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -7,12 +7,15 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
+  useAdminGrant,
+  useAdminRevoke,
   useAdminUsers,
   useMemberRoleChange,
   useUserBlock,
   useUserUnblock,
   type AdminUserRow,
 } from '@/hooks/useAdmin'
+import { useIsAppSuperAdmin } from '@/hooks/useMediaPosts'
 
 export function AdminUsersPage() {
   const { t } = useTranslation()
@@ -77,10 +80,14 @@ function UserRow({ user, onEditRoles }: { user: AdminUserRow; onEditRoles: () =>
   const { t } = useTranslation()
   const block = useUserBlock()
   const unblock = useUserUnblock()
+  const grant = useAdminGrant()
+  const revoke = useAdminRevoke()
+  const { data: callerIsSuper } = useIsAppSuperAdmin()
 
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || '—'
   const isBanned = !!user.banned_until && new Date(user.banned_until).getTime() > Date.now()
   const isSuper = user.app_role === 'super_admin'
+  const isAdmin = user.app_role === 'admin'
 
   return (
     <tr className="border-border border-t">
@@ -140,7 +147,7 @@ function UserRow({ user, onEditRoles }: { user: AdminUserRow; onEditRoles: () =>
         {new Date(user.created_at).toLocaleDateString('ru-RU')}
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="inline-flex gap-1">
+        <div className="inline-flex flex-wrap justify-end gap-1">
           {user.salons.length > 0 ? (
             <button
               type="button"
@@ -151,6 +158,47 @@ function UserRow({ user, onEditRoles }: { user: AdminUserRow; onEditRoles: () =>
               <UserCheck className="size-3.5" strokeWidth={1.8} />
               {t('admin.users.action.edit_roles')}
             </button>
+          ) : null}
+          {/* Admin RBAC — только super-admin может назначать/снимать админов */}
+          {callerIsSuper && !isSuper ? (
+            isAdmin ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={revoke.isPending}
+                onClick={() => {
+                  if (!confirm(t('admin.users.confirm_revoke_admin'))) return
+                  revoke.mutate(
+                    { user_id: user.id },
+                    {
+                      onSuccess: () => toast.success(t('admin.users.toast.admin_revoked')),
+                      onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                    },
+                  )
+                }}
+              >
+                <ShieldOff className="size-3.5" strokeWidth={1.8} />
+                {t('admin.users.action.revoke_admin')}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={grant.isPending}
+                onClick={() =>
+                  grant.mutate(
+                    { user_id: user.id, is_super: false },
+                    {
+                      onSuccess: () => toast.success(t('admin.users.toast.admin_granted')),
+                      onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                    },
+                  )
+                }
+              >
+                <ShieldPlus className="size-3.5" strokeWidth={1.8} />
+                {t('admin.users.action.grant_admin')}
+              </Button>
+            )
           ) : null}
           {isBanned ? (
             <Button

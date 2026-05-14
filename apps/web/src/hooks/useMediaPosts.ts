@@ -43,6 +43,25 @@ export function useIsAppAdmin() {
   })
 }
 
+export function useIsAppSuperAdmin() {
+  const { user } = useAuth()
+  return useQuery<boolean>({
+    queryKey: ['is-app-super-admin', user?.id ?? 'anon'],
+    queryFn: async () => {
+      if (!user) return false
+      const { data, error } = await supabase
+        .from('app_admins')
+        .select('is_super')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (error || !data) return false
+      return !!(data as { is_super?: boolean }).is_super
+    },
+    enabled: !!user,
+    staleTime: 5 * 60_000,
+  })
+}
+
 export function useAllMediaPosts() {
   return useQuery<MediaPost[]>({
     queryKey: ['media-posts', 'all'],

@@ -201,6 +201,23 @@ export function useUserUnblock() {
   })
 }
 
+export function useAdminGrant() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { user_id: string; is_super?: boolean }) =>
+      postAdmin<{ ok: true }>('admin_grant', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAdminRevoke() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('admin_revoke', vars),
+    onSuccess: invalidate,
+  })
+}
+
 export function useMemberRoleChange() {
   const invalidate = useInvalidateUsers()
   return useMutation({
