@@ -42,6 +42,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply migrations (staging)
         env:
@@ -99,6 +100,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply migrations (production)
         env:
