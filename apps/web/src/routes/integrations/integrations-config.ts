@@ -227,11 +227,14 @@ export const INTEGRATIONS: IntegrationDef[] = [
   },
 ]
 
+// Порядок (по требованию владельца, 2026-05-15):
+//   Запись и календарь → Бухгалтерия и фактуры → Мессенджеры →
+//   Банкинг → Прочее.
 export const CATEGORY_ORDER: IntegrationCategory[] = [
-  'accounting',
   'booking',
-  'banking',
+  'accounting',
   'messengers',
+  'banking',
   'other',
 ]
 

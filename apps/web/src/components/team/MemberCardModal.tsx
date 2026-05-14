@@ -116,6 +116,18 @@ export function MemberCardModal({
                     className="mt-1 h-9"
                   />
                 </div>
+                {/* Email — read-only (менять только super-admin через /admin/users) */}
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">{t('team.member_card.email')}</Label>
+                  <Input
+                    value={member.email ?? member.invited_email ?? ''}
+                    readOnly
+                    className="text-muted-foreground mt-1 h-9 bg-slate-50"
+                  />
+                  <p className="text-muted-foreground mt-1 text-[10px]">
+                    {t('team.member_card.email_readonly')}
+                  </p>
+                </div>
                 <div className="sm:col-span-2">
                   <Label className="text-xs">{t('team.member_card.phone')}</Label>
                   <Input
@@ -149,12 +161,10 @@ export function MemberCardModal({
               </div>
             ) : (
               <div className="space-y-1.5 text-sm">
-                {member.invited_email ? (
-                  <div className="flex items-center gap-2">
-                    <Mail className="text-muted-foreground size-3.5" strokeWidth={1.8} />
-                    <span className="truncate">{member.invited_email}</span>
-                  </div>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  <Mail className="text-muted-foreground size-3.5" strokeWidth={1.8} />
+                  <span className="truncate">{member.email ?? member.invited_email ?? '—'}</span>
+                </div>
                 <div className="flex items-center gap-2">
                   <Phone className="text-muted-foreground size-3.5" strokeWidth={1.8} />
                   <span>{member.phone || '—'}</span>

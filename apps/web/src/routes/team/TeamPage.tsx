@@ -58,7 +58,10 @@ export function TeamPage() {
   const [openMember, setOpenMember] = useState<TeamMember | null>(null)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<SalonRole>('staff')
-  const [staffId, setStaffId] = useState<string>('')
+  // staffId больше не задаётся в UI — auto-resolve при accept-invite
+  // (см. accept_salon_invitation: если role='staff' и нет staff_id —
+  // создаётся новая staff row с именем приглашённого).
+  const staffId = ''
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
@@ -85,7 +88,6 @@ export function TeamPage() {
           setInviteOpen(false)
           setEmail('')
           setRole('staff')
-          setStaffId('')
           setFirstName('')
           setLastName('')
           setPhone('')
@@ -157,7 +159,9 @@ export function TeamPage() {
                         m.user_id.slice(0, 8)}
                     </p>
                     <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-                      {m.invited_email ? <span>{m.invited_email}</span> : null}
+                      {(m.email ?? m.invited_email) ? (
+                        <span>{m.email ?? m.invited_email}</span>
+                      ) : null}
                       {m.phone ? <span>{m.phone}</span> : null}
                       <span>
                         {linkedStaff
@@ -364,26 +368,10 @@ export function TeamPage() {
               </Select>
               <p className="text-muted-foreground text-xs">{t(`team.role_hint.${role}`)}</p>
             </div>
-            {role === 'staff' && staff.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inv-staff">{t('team.invite_staff_link')}</Label>
-                <Select
-                  value={staffId || 'none'}
-                  onValueChange={(v) => setStaffId(v === 'none' ? '' : v)}
-                >
-                  <SelectTrigger id="inv-staff">
-                    <SelectValue placeholder={t('team.invite_staff_none')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t('team.invite_staff_none')}</SelectItem>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {role === 'staff' ? (
+              <p className="text-muted-foreground rounded-md border border-sky-200 bg-sky-50 p-2 text-xs leading-relaxed">
+                {t('team.invite_staff_auto_hint')}
+              </p>
             ) : null}
           </form>
           <DialogFooter className="px-5">

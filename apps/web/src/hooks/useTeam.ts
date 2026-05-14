@@ -11,6 +11,7 @@ export type TeamMember = {
   staff_id: string | null
   joined_at: string | null
   invited_email: string | null
+  email: string | null
   full_name: string | null
   phone: string | null
 }
@@ -31,31 +32,41 @@ export function useTeamMembers(salonId: string | undefined) {
     queryKey: ['team-members', salonId],
     queryFn: async () => {
       if (!salonId) return []
-      const { data, error } = await supabase
+      // Базовые члены (включая staff_id и invited_email — invited_email
+      // ставится при invite в форме команды и используется как fallback).
+      const { data: members, error } = await supabase
         .from('salon_members')
         .select('id, user_id, role, staff_id, joined_at, invited_email')
         .eq('salon_id', salonId)
       if (error) throw error
-      const members = (data ?? []) as Omit<TeamMember, 'full_name' | 'phone'>[]
-      if (members.length === 0) return [] as TeamMember[]
-
-      // Догружаем имя/телефон из profiles (FK через auth.users; прямой
-      // join через PostgREST не работает, fetch отдельно).
-      const userIds = Array.from(new Set(members.map((m) => m.user_id)))
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone')
-        .in('id', userIds)
-      const byId = new Map<string, { full_name: string | null; phone: string | null }>()
-      for (const p of (profiles ?? []) as {
+      const memberRows = (members ?? []) as Array<{
         id: string
+        user_id: string
+        role: SalonRole
+        staff_id: string | null
+        joined_at: string | null
+        invited_email: string | null
+      }>
+      if (memberRows.length === 0) return [] as TeamMember[]
+
+      // Email + имя/телефон достаём через security-definer RPC list_salon_team
+      // (auth.users.email недоступен через REST для обычных юзеров).
+      const { data: rpc } = await supabase.rpc('list_salon_team', { p_salon_id: salonId })
+      const byId = new Map<
+        string,
+        { email: string | null; full_name: string | null; phone: string | null }
+      >()
+      for (const r of (rpc ?? []) as {
+        user_id: string
+        email: string | null
         full_name: string | null
         phone: string | null
       }[]) {
-        byId.set(p.id, { full_name: p.full_name, phone: p.phone })
+        byId.set(r.user_id, { email: r.email, full_name: r.full_name, phone: r.phone })
       }
-      return members.map<TeamMember>((m) => ({
+      return memberRows.map<TeamMember>((m) => ({
         ...m,
+        email: byId.get(m.user_id)?.email ?? m.invited_email,
         full_name: byId.get(m.user_id)?.full_name ?? null,
         phone: byId.get(m.user_id)?.phone ?? null,
       }))

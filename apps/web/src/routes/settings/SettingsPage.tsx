@@ -1,14 +1,4 @@
-import {
-  ChevronRight,
-  Download,
-  History,
-  Mail,
-  Package,
-  Receipt,
-  Scissors,
-  Sparkles,
-  Users,
-} from 'lucide-react'
+import { ChevronRight, Download, History, Mail, Scissors, Sparkles, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -51,8 +41,8 @@ import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { ApiKeysCard } from './ApiKeysCard'
+// SegmentationCard перенесён в /staff (Справочник мастеров).
 import { MFACard } from './MFACard'
-import { SegmentationCard } from './SegmentationCard'
 import { PushNotificationsCard } from './PushNotificationsCard'
 import { ReferralCard } from './ReferralCard'
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
@@ -378,8 +368,7 @@ export function SettingsPage() {
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
           <TelegramLinkCard />
 
-          {/* Сегментация клиентов: retention/churn окна */}
-          <SegmentationCard salon={salon} />
+          {/* Сегментация клиентов перенесена в /staff (Справочник → Мастера) */}
 
           {/* Сравнение с рынком (benchmarks opt-in) */}
           <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
@@ -460,18 +449,8 @@ export function SettingsPage() {
               title={t('settings.catalogs.items.clients.title')}
               subtitle={t('settings.catalogs.items.clients.subtitle')}
             />
-            <CatalogCard
-              to={`/${salonId}/inventory`}
-              icon={Package}
-              title={t('settings.catalogs.items.inventory.title')}
-              subtitle={t('settings.catalogs.items.inventory.subtitle')}
-            />
-            <CatalogCard
-              to={`/${salonId}/expenses?view=categories`}
-              icon={Receipt}
-              title={t('settings.catalogs.items.expense_categories.title')}
-              subtitle={t('settings.catalogs.items.expense_categories.subtitle')}
-            />
+            {/* «Склад» и «Категории расходов» удалены отсюда по требованию
+                владельца — управляются на своих страницах (/inventory, /expenses). */}
           </div>
         </section>
       )}

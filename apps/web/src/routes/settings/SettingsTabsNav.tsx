@@ -11,15 +11,19 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+// Порядок (по требованию владельца, 2026-05-15):
+//   Профиль · Пользователи · Уведомления · Справочники · Интеграции ·
+//   Биллинг · Безопасность · API · Помощь.
+// «Уведомления» оставлены (salon-настройки дайджестов).
 export const SETTINGS_TABS = [
   'profile',
-  'catalogs',
-  'notifications',
-  'api',
-  'billing',
   'team',
+  'notifications',
+  'catalogs',
   'integrations',
+  'billing',
   'security',
+  'api',
   'help',
 ] as const
 

@@ -126,9 +126,9 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.get('fb'), params.get('ig')])
 
-  // Активная вкладка — в URL `?tab=accounting`, дефолт accounting.
+  // Активная вкладка — в URL `?tab=booking`, дефолт booking (запись и календарь).
   const tabParam = params.get('tab')
-  const activeCategory: IntegrationCategory = isCategory(tabParam) ? tabParam : 'accounting'
+  const activeCategory: IntegrationCategory = isCategory(tabParam) ? tabParam : 'booking'
   function setActiveCategory(cat: IntegrationCategory) {
     const next = new URLSearchParams(params)
     next.set('tab', cat)
