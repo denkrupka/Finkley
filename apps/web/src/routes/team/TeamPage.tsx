@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { MemberCardModal } from '@/components/team/MemberCardModal'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   useTeamMembers,
   useUpdateMemberRole,
   type SalonRole,
+  type TeamMember,
 } from '@/hooks/useTeam'
 
 const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
@@ -53,6 +55,7 @@ export function TeamPage() {
   const removeMember = useRemoveMember(salonId)
 
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [openMember, setOpenMember] = useState<TeamMember | null>(null)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<SalonRole>('staff')
   const [staffId, setStaffId] = useState<string>('')
@@ -142,8 +145,12 @@ export function TeamPage() {
                   key={m.id}
                   className="border-border grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
                 >
-                  <div className="min-w-0">
-                    <p className="text-foreground truncate text-sm font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMember(m)}
+                    className="min-w-0 cursor-pointer text-left transition-colors"
+                  >
+                    <p className="text-foreground hover:text-primary truncate text-sm font-semibold">
                       {m.full_name ??
                         linkedStaff?.full_name ??
                         m.invited_email ??
@@ -162,7 +169,7 @@ export function TeamPage() {
                             })}
                       </span>
                     </div>
-                  </div>
+                  </button>
                   {canManage && !isOwner ? (
                     <Select
                       value={m.role}
@@ -399,6 +406,15 @@ export function TeamPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {openMember ? (
+        <MemberCardModal
+          member={openMember}
+          salonId={salonId}
+          canEdit={canManage || openMember.user_id === undefined}
+          onClose={() => setOpenMember(null)}
+        />
+      ) : null}
     </div>
   )
 }

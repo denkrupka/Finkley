@@ -153,6 +153,33 @@ export function useRemoveMember(salonId: string | undefined) {
   })
 }
 
+export function useUpdateMemberProfile(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      target_user_id: string
+      first_name?: string
+      last_name?: string
+      phone?: string
+    }) => {
+      const { data, error } = await supabase.functions.invoke('team-update-member', {
+        body: {
+          salon_id: salonId,
+          target_user_id: input.target_user_id,
+          first_name: input.first_name,
+          last_name: input.last_name,
+          phone: input.phone,
+        },
+      })
+      if (error) throw error
+      const json = data as { ok?: boolean; error?: string }
+      if (!json.ok) throw new Error(json.error ?? 'update_failed')
+      return json
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-members', salonId] }),
+  })
+}
+
 export function useAcceptInvitation() {
   return useMutation({
     mutationFn: async (token: string) => {

@@ -127,6 +127,12 @@ const BlockedAccountPage = lazyWithRetry(() =>
 const BlockedSalonPage = lazyWithRetry(() =>
   import('@/routes/blocked/BlockedSalonPage').then((m) => ({ default: m.BlockedSalonPage })),
 )
+const MediaListPage = lazyWithRetry(() =>
+  import('@/routes/media/MediaListPage').then((m) => ({ default: m.MediaListPage })),
+)
+const MediaArticlePage = lazyWithRetry(() =>
+  import('@/routes/media/MediaArticlePage').then((m) => ({ default: m.MediaArticlePage })),
+)
 
 /** Скелетон для Suspense-fallback. Простой, не привлекающий внимания. */
 function PageFallback() {
@@ -172,6 +178,10 @@ function App() {
           поэтому за RequireAuth ниже не оборачиваем (юзер уходил/возвращался в той
           же сессии); сам компонент проверяет данные сессии. */}
       <Route path="/banking/callback" element={lazyRoute(<BankingCallbackPage />)} />
+
+      {/* Блог Finkley — публичные, без авторизации */}
+      <Route path="/media" element={lazyRoute(<MediaListPage />)} />
+      <Route path="/media/:slug" element={lazyRoute(<MediaArticlePage />)} />
 
       {/* Блокировки — публичные (юзер должен видеть страницу даже без активной сессии) */}
       <Route path="/blocked/account" element={lazyRoute(<BlockedAccountPage />)} />

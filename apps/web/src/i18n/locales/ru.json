@@ -246,7 +246,7 @@
     "media": {
       "preview": "Preview",
       "title": "Медиа — управление статьями",
-      "subtitle": "finsalon.app/media · публикуй статьи блога. После сохранения публикуется при следующей сборке лендинга (push в main).",
+      "subtitle": "Публикация мгновенная — статья появляется на /media сразу после сохранения. SEO-лаборатория поможет довести метаданные до 100/100.",
       "new_post": "Новая статья",
       "empty": "Статей пока нет. Создай первую.",
       "toast_saved": "Сохранено",
@@ -264,10 +264,36 @@
       "fields": {
         "title": "Заголовок",
         "slug": "Slug (URL)",
+        "auto_slug": "авто из заголовка",
         "description": "Краткое описание",
         "cover_url": "Обложка (URL)",
         "tags": "Теги (через запятую)",
-        "body_html": "Содержание статьи"
+        "body_html": "Содержание статьи",
+        "target_keyword": "Целевое ключевое слово",
+        "target_keyword_hint": "Главный поисковый запрос статьи"
+      },
+      "placeholders": {
+        "title": "Например: Зачем салону управленческий учёт",
+        "description": "Что узнает читатель и зачем"
+      },
+      "ai": {
+        "generate_title": "ИИ-заголовок",
+        "generate_description": "ИИ-описание",
+        "generate_keywords": "ИИ-keywords",
+        "generate_outline": "ИИ-структура",
+        "improve_text": "Улучшить текст ИИ",
+        "toast_title_done": "Заголовок сгенерирован",
+        "toast_desc_done": "Описание сгенерировано",
+        "toast_keywords_done": "Keywords подобраны",
+        "toast_outline_done": "Outline добавлен в статью",
+        "toast_improve_done": "Текст улучшен",
+        "error_title_required": "Сначала задайте заголовок"
+      },
+      "topic_suggest": {
+        "title": "Не знаете о чём писать?",
+        "subtitle": "Введите тему — ИИ предложит 5 идей статей про учёт салона.",
+        "placeholder": "финансы салона, маржа, маркетинг…",
+        "generate": "Получить идеи"
       },
       "editor": {
         "placeholder": "Начни писать… Используй панель сверху для форматирования, добавления изображений и видео.",
@@ -1095,6 +1121,14 @@
     "invite_title": "Пригласить в команду",
     "invite_subtitle": "Юзер получит email с ссылкой. Срок действия — 14 дней.",
     "invite_email": "Email",
+    "member_card": {
+      "contacts": "Контакты",
+      "edit": "Изменить",
+      "first_name": "Имя",
+      "last_name": "Фамилия",
+      "phone": "Телефон",
+      "toast_saved": "Сохранено"
+    },
     "invite_first_name": "Имя",
     "invite_first_name_placeholder": "Анна",
     "invite_last_name": "Фамилия",
