@@ -3,6 +3,12 @@
     "title": "Finkley",
     "placeholder": "Скелет приложения готов. См. docs/04_BACKLOG.md для следующих шагов."
   },
+  "roles": {
+    "owner": "Владелец",
+    "admin": "Администратор",
+    "accountant": "Бухгалтер",
+    "staff": "Мастер"
+  },
   "tester": {
     "banner": {
       "text": "Вы — тестировщик рабочей среды Finkley. Спасибо, что помогаете нам стать лучше!",
@@ -130,12 +136,6 @@
         "delete_step3_cooldown": "Подождите {{sec}} сек",
         "delete_step3_ready": "Можно нажимать «Удалить навсегда»"
       }
-    },
-    "roles": {
-      "owner": "Владелец",
-      "admin": "Администратор",
-      "accountant": "Бухгалтер",
-      "staff": "Мастер"
     },
     "user_card": {
       "contacts": "Контакты",
