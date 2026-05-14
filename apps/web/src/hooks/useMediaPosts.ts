@@ -9,6 +9,8 @@ export type MediaPost = {
   title: string
   description: string
   body_md: string
+  /** Optional — миграция 20260514190000 может ещё не примениться. */
+  body_html?: string | null
   cover_url: string | null
   tags: string[]
   author: string
@@ -17,6 +19,12 @@ export type MediaPost = {
   created_by: string | null
   created_at: string
   updated_at: string
+  // SEO-поля (миграция 20260514190000)
+  seo_title?: string | null
+  seo_description?: string | null
+  og_image_url?: string | null
+  canonical_url?: string | null
+  keywords?: string[] | null
 }
 
 export function useIsAppAdmin() {
@@ -86,11 +94,17 @@ export function useUpsertMediaPost() {
         title: input.title.trim(),
         description: input.description?.trim() ?? '',
         body_md: input.body_md ?? '',
+        body_html: input.body_html ?? null,
         cover_url: input.cover_url ?? null,
         tags: input.tags ?? [],
         author: input.author?.trim() || 'Finkley',
         draft: input.draft ?? true,
         published_at: input.published_at ?? new Date().toISOString(),
+        seo_title: input.seo_title ?? null,
+        seo_description: input.seo_description ?? null,
+        og_image_url: input.og_image_url ?? null,
+        canonical_url: input.canonical_url ?? null,
+        keywords: input.keywords ?? null,
       }
       if (input.id) {
         const { data, error } = await supabase

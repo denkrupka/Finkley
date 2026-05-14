@@ -153,7 +153,9 @@
       "empty": "Статей пока нет. Создай первую.",
       "toast_saved": "Сохранено",
       "toast_deleted": "Статья удалена",
+      "toast_cover_uploaded": "Обложка загружена",
       "confirm_delete": "Удалить статью? Действие необратимо.",
+      "upload_cover": "Загрузить обложку",
       "no_access_title": "Нет доступа",
       "no_access_body": "Эта страница доступна только команде Finkley.",
       "no_access_hint": "Если ты администратор — добавь свой user_id в таблицу app_admins в Supabase.",
@@ -165,9 +167,25 @@
         "title": "Заголовок",
         "slug": "Slug (URL)",
         "description": "Краткое описание",
-        "cover_url": "Cover URL",
+        "cover_url": "Обложка (URL)",
         "tags": "Теги (через запятую)",
-        "body_md": "Текст (Markdown)"
+        "body_html": "Содержание статьи"
+      },
+      "editor": {
+        "placeholder": "Начни писать… Используй панель сверху для форматирования, добавления изображений и видео.",
+        "youtube_prompt": "Вставь URL YouTube-видео",
+        "vimeo_prompt": "Вставь URL Vimeo-видео",
+        "vimeo_invalid": "Не удалось распознать ID Vimeo-видео",
+        "link_prompt": "URL ссылки"
+      },
+      "seo": {
+        "title": "SEO и распространение",
+        "title_field": "SEO-заголовок (title tag)",
+        "title_hint": "Если оставить пустым — будет использован обычный заголовок.",
+        "description_field": "SEO-описание (meta description)",
+        "og_image": "OG image (для соцсетей)",
+        "canonical": "Canonical URL",
+        "keywords": "Keywords (через запятую)"
       },
       "actions": {
         "publish": "Опубликовать",

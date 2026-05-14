@@ -1,48 +1,10 @@
-import { Eye, EyeOff, Plus, Save, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Plus, Save, Search, Trash2, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
-/**
- * Минимальный markdown → HTML рендер для preview-панели админки.
- * Поддерживает: # / ## / ###, **bold**, *italic*, [link](url), `code`,
- * параграфы (двойной перенос). Без таблиц, кодоблоков, картинок — для них
- * Astro-страница media/[slug] на лендинге даст полноценный рендер.
- *
- * SECURITY: html-экранирование `<`, `>`, `&` ДО применения markdown-замен,
- * чтобы user-input не мог инжектить script-теги в preview.
- */
-function simpleMarkdownToHtml(md: string): string {
-  if (!md) return ''
-  const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  let html = esc
-  // Заголовки
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
-  // Inline forматирование
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>')
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  // Ссылки [text](url) — URL санитизируем (только http/https/mailto)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
-    const safe = /^(https?:|mailto:|\/)/.test(url) ? url : '#'
-    return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${text}</a>`
-  })
-  // Параграфы (две новые строки)
-  html = html
-    .split(/\n{2,}/)
-    .map((block) => {
-      const t = block.trim()
-      if (!t) return ''
-      if (/^<h[1-3]>/.test(t) || /^<(ul|ol|p)/.test(t)) return t
-      return `<p>${t.replace(/\n/g, '<br />')}</p>`
-    })
-    .join('\n')
-  return html
-}
-
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,14 +15,18 @@ import {
   useUpsertMediaPost,
   type MediaPost,
 } from '@/hooks/useMediaPosts'
+import { supabase } from '@/lib/supabase/client'
 
 /**
  * Админка постов finsalon.app/media. Доступ — только пользователи в app_admins.
- * Создание/редактирование markdown-постов, флаг draft/publish, теги, обложка.
  *
- * При сохранении статья появляется в Supabase. Astro landing подтягивает
- * опубликованные посты при следующей сборке (GitHub Action собирает landing
- * на push в main + есть cron-кнопка).
+ * UX:
+ * - Сайдбар слева: список статей со статусом draft/published
+ * - Главная область: WYSIWYG-редактор (TipTap) + раздел SEO + раздел метаданных
+ * - Сохраняет HTML в `body_html` (новое) и оставляет body_md пустым для новых
+ *   статей. Старые посты (с body_md) сначала отдают свой markdown в редактор
+ *   как «начальный HTML» — это упрощённый импорт, юзер при сохранении уже
+ *   получит HTML-версию.
  */
 export function AdminMediaPage() {
   const { t } = useTranslation()
@@ -72,8 +38,28 @@ export function AdminMediaPage() {
   const [draft, setDraft] = useState<Partial<MediaPost>>({})
 
   useEffect(() => {
-    if (selected) setDraft(selected)
-    else setDraft({ slug: '', title: '', description: '', body_md: '', tags: [], draft: true })
+    if (selected) {
+      setDraft({
+        ...selected,
+        // Если body_html ещё не сохранён — стартуем с markdown как HTML заглушки.
+        body_html: selected.body_html || markdownToHtml(selected.body_md ?? ''),
+      })
+    } else {
+      setDraft({
+        slug: '',
+        title: '',
+        description: '',
+        body_md: '',
+        body_html: '',
+        tags: [],
+        draft: true,
+        seo_title: null,
+        seo_description: null,
+        og_image_url: null,
+        canonical_url: null,
+        keywords: null,
+      })
+    }
   }, [selected])
 
   if (adminLoading) {
@@ -93,6 +79,28 @@ export function AdminMediaPage() {
     )
   }
 
+  async function uploadCover() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const path = `covers/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      const { error } = await supabase.storage
+        .from('blog-images')
+        .upload(path, file, { cacheControl: '3600', upsert: false })
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+      const { data } = supabase.storage.from('blog-images').getPublicUrl(path)
+      setDraft((d) => ({ ...d, cover_url: data.publicUrl }))
+      toast.success(t('admin.media.toast_cover_uploaded'))
+    }
+    input.click()
+  }
+
   function save() {
     if (!draft.slug?.trim() || !draft.title?.trim()) {
       toast.error(t('admin.media.errors.slug_or_title_required'))
@@ -105,11 +113,17 @@ export function AdminMediaPage() {
         title: draft.title,
         description: draft.description ?? '',
         body_md: draft.body_md ?? '',
+        body_html: draft.body_html ?? '',
         cover_url: draft.cover_url ?? null,
         tags: draft.tags ?? [],
         author: draft.author ?? 'Finkley',
         draft: draft.draft ?? true,
         published_at: draft.published_at ?? new Date().toISOString(),
+        seo_title: draft.seo_title ?? null,
+        seo_description: draft.seo_description ?? null,
+        og_image_url: draft.og_image_url ?? null,
+        canonical_url: draft.canonical_url ?? null,
+        keywords: draft.keywords ?? null,
       },
       {
         onSuccess: (saved) => {
@@ -136,6 +150,10 @@ export function AdminMediaPage() {
       onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
     })
   }
+
+  // SEO-character-counter
+  const seoTitleLen = (draft.seo_title ?? draft.title ?? '').length
+  const seoDescLen = (draft.seo_description ?? draft.description ?? '').length
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
@@ -165,7 +183,7 @@ export function AdminMediaPage() {
           ) : posts.length === 0 ? (
             <p className="text-muted-foreground p-4 text-xs">{t('admin.media.empty')}</p>
           ) : (
-            <ul className="max-h-[70vh] overflow-y-auto">
+            <ul className="max-h-[80vh] overflow-y-auto">
               {posts.map((p) => (
                 <li key={p.id}>
                   <button
@@ -204,6 +222,7 @@ export function AdminMediaPage() {
 
         {/* Редактор */}
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-5">
+          {/* Метаданные */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs">{t('admin.media.fields.title')}</Label>
@@ -233,12 +252,29 @@ export function AdminMediaPage() {
             </div>
             <div>
               <Label className="text-xs">{t('admin.media.fields.cover_url')}</Label>
-              <Input
-                value={draft.cover_url ?? ''}
-                onChange={(e) => setDraft((d) => ({ ...d, cover_url: e.target.value }))}
-                placeholder="https://…"
-                className="h-10"
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={draft.cover_url ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, cover_url: e.target.value }))}
+                  placeholder="https://…"
+                  className="h-10 flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={uploadCover}
+                  title={t('admin.media.upload_cover')}
+                >
+                  <Upload className="size-4" strokeWidth={1.8} />
+                </Button>
+              </div>
+              {draft.cover_url ? (
+                <img
+                  src={draft.cover_url}
+                  alt="cover"
+                  className="border-border mt-2 h-24 w-auto rounded-md border object-cover"
+                />
+              ) : null}
             </div>
             <div>
               <Label className="text-xs">{t('admin.media.fields.tags')}</Label>
@@ -259,29 +295,107 @@ export function AdminMediaPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div>
-              <Label className="text-xs">{t('admin.media.fields.body_md')}</Label>
-              <textarea
-                value={draft.body_md ?? ''}
-                onChange={(e) => setDraft((d) => ({ ...d, body_md: e.target.value }))}
-                rows={20}
-                className="border-border bg-card mt-1 w-full rounded-md border p-3 font-mono text-sm"
-                placeholder="# Заголовок..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">{t('admin.media.preview')}</Label>
-              <div
-                className="border-border bg-card prose prose-sm mt-1 max-w-none overflow-y-auto rounded-md border p-3"
-                style={{ maxHeight: 480 }}
-                // Простой markdown → HTML (headers, bold, italic, links, paragraphs).
-                // Для полноценного preview лучше react-markdown — но это +60 KB бандла.
-                dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(draft.body_md ?? '') }}
-              />
-            </div>
+          {/* WYSIWYG */}
+          <div className="mt-4">
+            <Label className="text-xs">{t('admin.media.fields.body_html')}</Label>
+            <RichTextEditor
+              value={draft.body_html ?? ''}
+              onChange={(html) => setDraft((d) => ({ ...d, body_html: html }))}
+            />
           </div>
 
+          {/* SEO panel */}
+          <details className="border-border mt-4 rounded-md border p-3" open>
+            <summary className="text-foreground flex cursor-pointer items-center gap-1.5 text-sm font-bold">
+              <Search className="size-4" strokeWidth={1.8} />
+              {t('admin.media.seo.title')}
+            </summary>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">{t('admin.media.seo.title_field')}</Label>
+                  <span
+                    className={
+                      seoTitleLen > 60 ? 'text-xs text-rose-600' : 'text-muted-foreground text-xs'
+                    }
+                  >
+                    {seoTitleLen} / 60
+                  </span>
+                </div>
+                <Input
+                  value={draft.seo_title ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, seo_title: e.target.value || null }))}
+                  placeholder={draft.title ?? '—'}
+                  className="h-10"
+                />
+                <p className="text-muted-foreground mt-1 text-[10px]">
+                  {t('admin.media.seo.title_hint')}
+                </p>
+              </div>
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">{t('admin.media.seo.description_field')}</Label>
+                  <span
+                    className={
+                      seoDescLen > 160 ? 'text-xs text-rose-600' : 'text-muted-foreground text-xs'
+                    }
+                  >
+                    {seoDescLen} / 160
+                  </span>
+                </div>
+                <textarea
+                  value={draft.seo_description ?? ''}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, seo_description: e.target.value || null }))
+                  }
+                  rows={2}
+                  className="border-border bg-card mt-1 w-full rounded-md border p-2 text-sm"
+                  placeholder={draft.description ?? '—'}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">{t('admin.media.seo.og_image')}</Label>
+                <Input
+                  value={draft.og_image_url ?? ''}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, og_image_url: e.target.value || null }))
+                  }
+                  placeholder="https://…"
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">{t('admin.media.seo.canonical')}</Label>
+                <Input
+                  value={draft.canonical_url ?? ''}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, canonical_url: e.target.value || null }))
+                  }
+                  placeholder="https://finsalon.app/media/…"
+                  className="h-10"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-xs">{t('admin.media.seo.keywords')}</Label>
+                <Input
+                  value={(draft.keywords ?? []).join(', ')}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      keywords: e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    }))
+                  }
+                  placeholder="управленческий учёт, салон красоты"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </details>
+
+          {/* Actions */}
           <div className="border-border bg-card sticky bottom-0 mt-4 flex items-center justify-between gap-2 border-t pt-3">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={togglePublish}>
@@ -326,4 +440,35 @@ export function AdminMediaPage() {
       </div>
     </div>
   )
+}
+
+/**
+ * Минимальная конвертация markdown в HTML — используется при первом
+ * редактировании старого поста (где есть только body_md). Дальше юзер
+ * сохраняет HTML через TipTap.
+ */
+function markdownToHtml(md: string): string {
+  if (!md) return ''
+  const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  let html = esc
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+    const safe = /^(https?:|mailto:|\/)/.test(url) ? url : '#'
+    return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${text}</a>`
+  })
+  html = html
+    .split(/\n{2,}/)
+    .map((block) => {
+      const t = block.trim()
+      if (!t) return ''
+      if (/^<h[1-3]>/.test(t) || /^<(ul|ol|p)/.test(t)) return t
+      return `<p>${t.replace(/\n/g, '<br />')}</p>`
+    })
+    .join('\n')
+  return html
 }
