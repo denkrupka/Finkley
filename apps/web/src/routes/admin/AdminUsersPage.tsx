@@ -45,7 +45,7 @@ export function AdminUsersPage() {
                 <td className="text-muted-foreground px-4 py-3 text-xs">
                   {new Date(u.created_at).toLocaleDateString('ru-RU')}
                 </td>
-                <td className="px-4 py-3">{u.salons_count}</td>
+                <td className="px-4 py-3">{u.salons.length}</td>
               </tr>
             ))}
           </tbody>
