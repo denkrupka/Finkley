@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase/client'
 
 export type MediaPost = {
@@ -19,19 +20,25 @@ export type MediaPost = {
 }
 
 export function useIsAppAdmin() {
+  // userId в queryKey — иначе после logout/login useQuery возвращает
+  // прошлый cached результат (false для прежней сессии).
+  const { user } = useAuth()
   return useQuery<boolean>({
-    queryKey: ['is-app-admin'],
+    queryKey: ['is-app-admin', user?.id ?? 'anon'],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser()
-      if (!u.user) return false
+      if (!user) return false
       const { data, error } = await supabase
         .from('app_admins')
         .select('user_id')
-        .eq('user_id', u.user.id)
+        .eq('user_id', user.id)
         .maybeSingle()
-      if (error) return false
+      if (error) {
+        console.warn('[useIsAppAdmin] query error:', error.message)
+        return false
+      }
       return !!data
     },
+    enabled: !!user,
     staleTime: 5 * 60_000,
   })
 }
