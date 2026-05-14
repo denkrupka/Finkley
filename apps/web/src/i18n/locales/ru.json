@@ -19,15 +19,19 @@
       "feedback": "Фидбек"
     },
     "overview": {
-      "salons_total": "Салоны",
-      "salons_active": "{{count}} активных",
-      "users_total": "Пользователи",
-      "visits_30d": "Визиты (30 дн)",
-      "expenses_30d": "Расходы (30 дн)",
-      "gross_profit_30d": "Прибыль (30 дн)",
-      "messages_total": "Сообщения",
-      "messenger_breakdown": "Подключения мессенджеров",
-      "no_integrations_yet": "Подключений пока нет."
+      "section_salons": "Салоны",
+      "section_users": "Пользователи",
+      "salons_total": "Всего салонов",
+      "salons_subscribed": "На подписке",
+      "salons_on_trial": "На демо",
+      "salons_trial_expired": "Демо закончилось",
+      "salons_inactive_no_sub": "Неактивны",
+      "inactive_hint": "без подписки и без демо, >7 дней с регистрации",
+      "users_total": "Всего пользователей",
+      "users_active_30d": "Активны за 30 дней",
+      "chart_salons": "Новые салоны по месяцам",
+      "chart_users": "Новые пользователи по месяцам",
+      "chart_visits": "Визиты по месяцам"
     },
     "salons": {
       "name": "Салон",

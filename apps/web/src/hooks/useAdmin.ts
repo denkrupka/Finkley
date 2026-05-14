@@ -23,17 +23,19 @@ async function callAdmin<T>(action: string): Promise<T> {
 }
 
 export type AdminOverview = {
-  salons: { total: number; active: number }
-  users: { total: number }
-  last30d: {
-    visits: number
-    revenue_cents: number
-    expenses: number
-    expenses_cents: number
-    gross_profit_cents: number
+  salons: {
+    total: number
+    subscribed: number
+    on_trial: number
+    trial_expired: number
+    inactive_no_sub: number
   }
-  messages_total: number
-  messenger_integrations: Record<string, { connected: number; total: number }>
+  users: { total: number; members: number; active_30d: number }
+  charts: {
+    salons_by_month: Array<{ month: string; count: number }>
+    users_by_month: Array<{ month: string; count: number }>
+    visits_by_month: Array<{ month: string; count: number }>
+  }
 }
 
 export type AdminSalonRow = {

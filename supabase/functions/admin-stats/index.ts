@@ -51,80 +51,148 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get('action') ?? 'overview'
 
   if (action === 'overview') {
-    const [salons, members, visits, expenses, messages, integrations] = await Promise.all([
-      admin.from('salons').select('id, currency, created_at, plan_status:plan_status', {
-        count: 'exact',
-        head: false,
-      }),
+    const now = Date.now()
+    const sevenDaysAgoIso = new Date(now - 7 * 86400_000).toISOString()
+    // Скользящие 12 месяцев — старт = первое число месяца, который был 11 месяцев назад
+    const chartStart = new Date(now)
+    chartStart.setUTCDate(1)
+    chartStart.setUTCHours(0, 0, 0, 0)
+    chartStart.setUTCMonth(chartStart.getUTCMonth() - 11)
+    const chartStartIso = chartStart.toISOString()
+
+    const [salons, subs, members, visits, authUsersResp] = await Promise.all([
+      admin.from('salons').select('id, created_at').is('deleted_at', null),
+      admin
+        .from('salon_subscriptions')
+        .select('salon_id, status, trial_ends_at, current_period_end'),
       admin.from('salon_members').select('user_id', { count: 'exact', head: true }),
-      admin
-        .from('visits')
-        .select('id, amount_cents, visit_at', { count: 'exact', head: false })
-        .gte('visit_at', new Date(Date.now() - 30 * 86400_000).toISOString()),
-      admin
-        .from('expenses')
-        .select('id, amount_cents', { count: 'exact', head: false })
-        .gte('created_at', new Date(Date.now() - 30 * 86400_000).toISOString()),
-      admin.from('messenger_messages').select('id', { count: 'exact', head: true }),
-      admin
-        .from('messenger_integrations')
-        .select('channel, status', { count: 'exact', head: false }),
+      admin.from('visits').select('visit_at').gte('visit_at', chartStartIso),
+      admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ])
 
-    const salonsCount = salons.count ?? salons.data?.length ?? 0
+    if (salons.error) return jsonResponse({ error: salons.error.message }, 500)
+    if (subs.error) return jsonResponse({ error: subs.error.message }, 500)
+
+    const salonsList = salons.data ?? []
+    const subsList = subs.data ?? []
+    const usersList = authUsersResp.data?.users ?? []
+
+    type Sub = {
+      salon_id: string
+      status: string
+      trial_ends_at: string | null
+      current_period_end: string | null
+    }
+    const subBySalon = new Map<string, Sub>()
+    for (const s of subsList as Sub[]) subBySalon.set(s.salon_id, s)
+
+    let subscribed = 0
+    let onTrial = 0
+    let trialExpired = 0
+    let inactiveNoSub = 0
+    for (const s of salonsList) {
+      const sub = subBySalon.get(s.id)
+      if (sub && (sub.status === 'active' || sub.status === 'past_due')) {
+        subscribed++
+      } else if (
+        sub &&
+        sub.status === 'trialing' &&
+        sub.trial_ends_at &&
+        new Date(sub.trial_ends_at).getTime() > now
+      ) {
+        onTrial++
+      } else if (sub && sub.trial_ends_at && new Date(sub.trial_ends_at).getTime() <= now) {
+        trialExpired++
+      } else if (!sub && new Date(s.created_at).getTime() < new Date(sevenDaysAgoIso).getTime()) {
+        inactiveNoSub++
+      }
+    }
+
     const memberCount = members.count ?? 0
-    const visitsCount = visits.count ?? visits.data?.length ?? 0
-    const expensesCount = expenses.count ?? expenses.data?.length ?? 0
-    const messagesTotal = messages.count ?? 0
-
-    const visitRevenueCents = (visits.data ?? []).reduce((sum, v) => sum + (v.amount_cents ?? 0), 0)
-    const expensesSumCents = (expenses.data ?? []).reduce(
-      (sum, e) => sum + (e.amount_cents ?? 0),
-      0,
-    )
-
-    const activeSalons = (salons.data ?? []).filter(
-      (s) =>
-        (s as { plan_status?: string }).plan_status === 'active' ||
-        (s as { plan_status?: string }).plan_status === 'trialing',
+    const usersTotal = usersList.length
+    const activeUsers30d = usersList.filter(
+      (u) => u.last_sign_in_at && new Date(u.last_sign_in_at).getTime() > now - 30 * 86400_000,
     ).length
 
-    const integrationsBreakdown: Record<string, { connected: number; total: number }> = {}
-    for (const i of integrations.data ?? []) {
-      const ch = (i as { channel: string }).channel
-      const st = (i as { status: string }).status
-      if (!integrationsBreakdown[ch]) integrationsBreakdown[ch] = { connected: 0, total: 0 }
-      integrationsBreakdown[ch].total++
-      if (st === 'connected') integrationsBreakdown[ch].connected++
+    // Месячные гистограммы — 12 точек. Ключ месяца "YYYY-MM"
+    function monthKey(iso: string): string {
+      const d = new Date(iso)
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
     }
+    function emptyMonths(): { month: string; count: number }[] {
+      const arr: { month: string; count: number }[] = []
+      const d = new Date(chartStart)
+      for (let i = 0; i < 12; i++) {
+        arr.push({
+          month: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+          count: 0,
+        })
+        d.setUTCMonth(d.getUTCMonth() + 1)
+      }
+      return arr
+    }
+    function tally(items: { iso: string }[]): { month: string; count: number }[] {
+      const buckets = emptyMonths()
+      const idx = new Map(buckets.map((b, i) => [b.month, i]))
+      for (const it of items) {
+        const i = idx.get(monthKey(it.iso))
+        if (i !== undefined) buckets[i].count++
+      }
+      return buckets
+    }
+
+    const salonsByMonth = tally(
+      salonsList
+        .filter((s) => new Date(s.created_at).getTime() >= chartStart.getTime())
+        .map((s) => ({ iso: s.created_at })),
+    )
+    const usersByMonth = tally(
+      usersList
+        .filter((u) => u.created_at && new Date(u.created_at).getTime() >= chartStart.getTime())
+        .map((u) => ({ iso: u.created_at as string })),
+    )
+    const visitsByMonth = tally((visits.data ?? []).map((v) => ({ iso: v.visit_at as string })))
 
     return jsonResponse({
       salons: {
-        total: salonsCount,
-        active: activeSalons,
+        total: salonsList.length,
+        subscribed,
+        on_trial: onTrial,
+        trial_expired: trialExpired,
+        inactive_no_sub: inactiveNoSub,
       },
-      users: { total: memberCount },
-      last30d: {
-        visits: visitsCount,
-        revenue_cents: visitRevenueCents,
-        expenses: expensesCount,
-        expenses_cents: expensesSumCents,
-        gross_profit_cents: visitRevenueCents - expensesSumCents,
+      users: {
+        total: usersTotal,
+        members: memberCount,
+        active_30d: activeUsers30d,
       },
-      messages_total: messagesTotal,
-      messenger_integrations: integrationsBreakdown,
+      charts: {
+        salons_by_month: salonsByMonth,
+        users_by_month: usersByMonth,
+        visits_by_month: visitsByMonth,
+      },
     })
   }
 
   if (action === 'salons') {
     const { data, error } = await admin
       .from('salons')
-      .select('id, name, currency, plan_status, created_at, owner_id')
+      .select('id, name, currency, created_at, created_by')
       .order('created_at', { ascending: false })
     if (error) return jsonResponse({ error: error.message }, 500)
 
-    // Подтянем email владельцев батчем
-    const ownerIds = Array.from(new Set((data ?? []).map((s) => s.owner_id).filter(Boolean)))
+    const { data: subs } = await admin
+      .from('salon_subscriptions')
+      .select('salon_id, status, trial_ends_at')
+    const subBySalon = new Map<string, { status: string; trial_ends_at: string | null }>()
+    for (const s of subs ?? []) {
+      subBySalon.set(s.salon_id as string, {
+        status: s.status as string,
+        trial_ends_at: (s.trial_ends_at as string | null) ?? null,
+      })
+    }
+
+    const ownerIds = Array.from(new Set((data ?? []).map((s) => s.created_by).filter(Boolean)))
     const emailById = new Map<string, string>()
     for (const id of ownerIds) {
       const { data: u } = await admin.auth.admin.getUserById(id as string)
@@ -132,10 +200,19 @@ Deno.serve(async (req) => {
     }
 
     return jsonResponse({
-      salons: (data ?? []).map((s) => ({
-        ...s,
-        owner_email: s.owner_id ? (emailById.get(s.owner_id) ?? null) : null,
-      })),
+      salons: (data ?? []).map((s) => {
+        const sub = subBySalon.get(s.id)
+        return {
+          id: s.id,
+          name: s.name,
+          currency: s.currency,
+          created_at: s.created_at,
+          owner_id: s.created_by,
+          owner_email: s.created_by ? (emailById.get(s.created_by as string) ?? null) : null,
+          plan_status: sub?.status ?? null,
+          trial_ends_at: sub?.trial_ends_at ?? null,
+        }
+      }),
     })
   }
 
