@@ -1,11 +1,27 @@
-import { ChevronDown, ChevronRight, Plus, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  ChevronRight,
+  CreditCard,
+  Home,
+  Landmark,
+  PiggyBank,
+  Plus,
+  SlidersHorizontal,
+  Sprout,
+  Trash2,
+  TrendingDown,
+  Undo2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
   monthlyEquivalentCents,
@@ -43,6 +59,8 @@ type SectionDef = {
   kind: 'money' | 'percent'
   /** Показывать колонку «Период» (для постоянных расходов). */
   showPeriod: boolean
+  /** Иконка для sub-tab navigation. */
+  icon: LucideIcon
 }
 
 const SECTIONS: SectionDef[] = [
@@ -52,6 +70,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.cash.subtitle',
     kind: 'money',
     showPeriod: false,
+    icon: CreditCard,
   },
   {
     key: 'fixed',
@@ -59,6 +78,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.fixed.subtitle_v2',
     kind: 'money',
     showPeriod: true,
+    icon: Home,
   },
   {
     key: 'other_income',
@@ -66,6 +86,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.other_income.subtitle',
     kind: 'money',
     showPeriod: false,
+    icon: PiggyBank,
   },
   {
     key: 'variable',
@@ -73,6 +94,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.variable.subtitle',
     kind: 'percent',
     showPeriod: false,
+    icon: TrendingDown,
   },
   {
     key: 'taxes',
@@ -80,6 +102,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.taxes.subtitle',
     kind: 'money',
     showPeriod: true,
+    icon: Landmark,
   },
   {
     key: 'investments',
@@ -87,6 +110,7 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.investments.subtitle',
     kind: 'money',
     showPeriod: false,
+    icon: Sprout,
   },
   {
     key: 'flows',
@@ -94,8 +118,19 @@ const SECTIONS: SectionDef[] = [
     subtitleKey: 'settings.parameters.flows.subtitle',
     kind: 'money',
     showPeriod: true,
+    icon: ArrowLeftRight,
   },
 ]
+
+const SUB_TABS: PageTab<SectionKey>[] = SECTIONS.map((s) => ({
+  id: s.key,
+  labelKey: s.titleKey,
+  icon: s.icon,
+}))
+
+function isSectionKey(v: string | null): v is SectionKey {
+  return !!v && SECTIONS.some((s) => s.key === v)
+}
 
 const PERIOD_OPTIONS: ParamPeriod[] = ['day', 'month', '2months', 'quarter', 'year']
 
@@ -109,6 +144,18 @@ export function ParametersCard() {
 
   const [draft, setDraft] = useState<FinancialSettings>(settings)
   const [showArchived, setShowArchived] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // Sub-tab внутри вкладки Параметры (которая сама — финансы?tab=parameters).
+  // Используем `?param=...` чтобы не конфликтовать с парент-`tab=parameters`.
+  const subParam = params.get('param')
+  const activeSection: SectionKey = isSectionKey(subParam) ? subParam : 'cash_registers'
+  const sectionDef = SECTIONS.find((s) => s.key === activeSection)!
+
+  function setActiveSection(id: SectionKey) {
+    const next = new URLSearchParams(params)
+    next.set('param', id)
+    setParams(next, { replace: true })
+  }
 
   useEffect(() => {
     setDraft(settings)
@@ -167,16 +214,16 @@ export function ParametersCard() {
         </div>
       </div>
 
-      {SECTIONS.map((section) => (
-        <SectionTable
-          key={section.key}
-          def={section}
-          items={draft[section.key].items}
-          currency={currency}
-          showArchived={showArchived}
-          onChange={(updater) => updateSection(section.key, updater)}
-        />
-      ))}
+      <PageTabsNav tabs={SUB_TABS} active={activeSection} onChange={setActiveSection} t={t} />
+
+      <SectionTable
+        key={sectionDef.key}
+        def={sectionDef}
+        items={draft[sectionDef.key].items}
+        currency={currency}
+        showArchived={showArchived}
+        onChange={(updater) => updateSection(sectionDef.key, updater)}
+      />
 
       <div className="border-border bg-card shadow-finsm sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-lg border p-3">
         <p className="text-muted-foreground text-xs">{t('settings.parameters.save_hint')}</p>
