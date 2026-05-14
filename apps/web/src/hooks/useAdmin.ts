@@ -85,6 +85,7 @@ export type AdminUserRow = {
   banned_until: string | null
   first_name: string | null
   last_name: string | null
+  app_role: 'super_admin' | 'admin' | null
   salons: Array<{ salon_id: string; salon_name: string; role: string }>
 }
 
@@ -173,6 +174,38 @@ export function useSalonAddUser() {
         'salon_add_user',
         vars,
       ),
+    onSuccess: invalidate,
+  })
+}
+
+function useInvalidateUsers() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['admin-users'] })
+  }
+}
+
+export function useUserBlock() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('user_block', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUserUnblock() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('user_unblock', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useMemberRoleChange() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { salon_id: string; user_id: string; role: string }) =>
+      postAdmin<{ ok: true }>('member_role_change', vars),
     onSuccess: invalidate,
   })
 }

@@ -107,6 +107,9 @@ Deno.serve(async (req) => {
     if (action === 'salon_delete') return handleSalonDelete(admin, body)
     if (action === 'salon_add_user') return handleSalonAddUser(admin, body)
     if (action === 'salon_extend_demo') return handleSalonExtendDemo(admin, body, user.userId)
+    if (action === 'user_block') return handleUserBlock(admin, body, user.userId)
+    if (action === 'user_unblock') return handleUserUnblock(admin, body)
+    if (action === 'member_role_change') return handleMemberRoleChange(admin, body)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
 
@@ -342,13 +345,18 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
   const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
   if (error) return jsonResponse({ error: error.message }, 500)
 
-  const { data: members } = await admin
-    .from('salon_members')
-    .select('user_id, salon_id, role, salons(id, name)')
-  const { data: profiles } = await admin.from('profiles').select('id, full_name')
+  const [{ data: members }, { data: profiles }, { data: appAdmins }] = await Promise.all([
+    admin.from('salon_members').select('user_id, salon_id, role, salons(id, name)'),
+    admin.from('profiles').select('id, full_name'),
+    admin.from('app_admins').select('user_id, is_super'),
+  ])
   const profileById = new Map<string, { full_name: string | null }>()
   for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) {
     profileById.set(p.id, { full_name: p.full_name })
+  }
+  const adminById = new Map<string, { is_super: boolean }>()
+  for (const a of (appAdmins ?? []) as { user_id: string; is_super: boolean | null }[]) {
+    adminById.set(a.user_id, { is_super: !!a.is_super })
   }
 
   type MemberRow = {
@@ -385,8 +393,7 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
         firstName = parts[0] ?? null
         lastName = parts.slice(1).join(' ') || null
       }
-      // Роль в админке (если есть app_admins запись — это admin/super_admin).
-      // На данном этапе у нас нет is_super; вернём 'admin' если в app_admins.
+      const adminRow = adminById.get(u.id)
       return {
         id: u.id,
         email: u.email,
@@ -395,6 +402,7 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
         banned_until: (u as { banned_until?: string }).banned_until ?? null,
         first_name: firstName,
         last_name: lastName,
+        app_role: adminRow ? (adminRow.is_super ? 'super_admin' : 'admin') : null,
         salons: salonsArr,
       }
     }),
@@ -625,4 +633,63 @@ async function handleSalonExtendDemo(
     diff: { until: new Date(untilTs).toISOString(), reason, mode },
   })
   return jsonResponse({ ok: true, mode })
+}
+
+async function handleUserBlock(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+  adminId: string,
+): Promise<Response> {
+  const userId = body.user_id
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  if (userId === adminId) return jsonResponse({ error: 'cannot_block_self' }, 400)
+
+  // Защита супер-админа от блокировки кем угодно
+  const { data: target } = await admin
+    .from('app_admins')
+    .select('is_super')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (target?.is_super) return jsonResponse({ error: 'cannot_block_super_admin' }, 403)
+
+  // Supabase ban_duration: '876000h' ~= 100 лет
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: '876000h',
+  } as { ban_duration: string })
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleUserUnblock(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const userId = body.user_id
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: 'none',
+  } as { ban_duration: string })
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleMemberRoleChange(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const salonId = body.salon_id
+  const userId = body.user_id
+  const role = body.role
+  if (typeof salonId !== 'string') return jsonResponse({ error: 'salon_id_required' }, 400)
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  if (typeof role !== 'string' || !['owner', 'admin', 'staff', 'accountant'].includes(role))
+    return jsonResponse({ error: 'invalid_role' }, 400)
+
+  const { error } = await admin
+    .from('salon_members')
+    .update({ role })
+    .eq('salon_id', salonId)
+    .eq('user_id', userId)
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
 }
