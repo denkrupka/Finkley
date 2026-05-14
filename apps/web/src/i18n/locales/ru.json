@@ -1783,6 +1783,10 @@
       "why_link": "Нажми кнопку «Войти через Telegram» ниже. Подписанные Telegram'ом данные мы проверим на сервере и сохраним только числовой ID — больше ничего.",
       "widget_label": "Войти через Telegram для привязки",
       "bot_not_configured": "Telegram-бот не настроен в этом окружении — попроси администратора задать VITE_TELEGRAM_BOT_USERNAME.",
+      "widget_blocked_title": "Кнопка «Войти через Telegram» не появилась",
+      "widget_blocked_body": "Скорее всего AdBlock блокирует виджет от telegram.org. Можно открыть бота напрямую — он сам предложит привязать аккаунт.",
+      "open_bot": "Открыть бота в Telegram",
+      "linking": "Привязываем…",
       "toast_linked": "Telegram привязан — теперь можно писать в @finklay_dev_bot",
       "toast_unlinked": "Telegram отвязан",
       "error_already_linked": "Этот Telegram-аккаунт уже привязан к другому пользователю Finkley"

@@ -345,7 +345,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             noValidate
           >
             {/* Дата + Мастер в одной строке для компактности */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="qe-date">{t('visits.form.date_label')}</Label>
                 <div className="border-border bg-card flex h-11 items-center gap-2 rounded-md border-[1.5px] px-3">
@@ -407,7 +407,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             </div>
 
             {/* Клиент + Услуга в одной строке */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Controller
                 name="client_id"
                 control={form.control}
@@ -527,7 +527,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             </div>
 
             {/* Чаевые + скидка (опциональные) */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="qe-tip">{t('visits.form.tip_label')}</Label>
                 <div className="border-border bg-card flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
