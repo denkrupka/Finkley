@@ -94,6 +94,9 @@ export function SalonLayout() {
     // SalonGuard: либо такого салона нет, либо юзер не состоит в нём.
     return <Navigate to="/" replace />
   }
+  if (salon.blocked_at) {
+    return <Navigate to={`/blocked/salon/${salon.id}`} replace />
+  }
 
   const ownerInitials =
     (user?.user_metadata?.full_name ?? user?.email ?? '?')

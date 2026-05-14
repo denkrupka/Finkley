@@ -41,6 +41,11 @@ export function LoginPage() {
     const { error } = await signInWithPassword(values.email, values.password)
     if (error) {
       const code = (error as { code?: string }).code
+      const isBanned = code === 'user_banned' || /banned|disabled/i.test(error.message)
+      if (isBanned) {
+        navigate('/blocked/account', { replace: true })
+        return
+      }
       const isCredentials = code === 'invalid_credentials' || /invalid login/i.test(error.message)
       setServerError(isCredentials ? t('auth.errors.invalid_credentials') : error.message)
       return

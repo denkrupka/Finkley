@@ -19,6 +19,9 @@ export type SalonRow = {
   retention_window_days: number
   churn_window_days: number
   created_at: string
+  /** Optional — миграция 20260514150000 может ещё не примениться. */
+  blocked_at?: string | null
+  blocked_reason?: string | null
 }
 
 /**
@@ -37,7 +40,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at, blocked_at, blocked_reason',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
