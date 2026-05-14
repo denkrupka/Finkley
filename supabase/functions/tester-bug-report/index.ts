@@ -101,6 +101,7 @@ Deno.serve(async (req: Request) => {
     attachment_name?: string
     page_url?: string
     user_agent?: string
+    salon_id?: string | null
   }
   try {
     body = await req.json()
@@ -128,6 +129,7 @@ Deno.serve(async (req: Request) => {
       requires_approval: false,
       status: 'open',
       reporter_user_id: user.userId,
+      salon_id: typeof body.salon_id === 'string' && body.salon_id ? body.salon_id : null,
     })
     .select('id')
     .single()

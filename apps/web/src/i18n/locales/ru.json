@@ -76,6 +76,7 @@
       "avg_profit": "Ср. месяч. прибыль салона",
       "portal_revenue": "Доход портала",
       "status": "Статус",
+      "valid_until": "Действителен до",
       "created": "Создан",
       "actions": "Действия",
       "empty": "Салонов пока нет.",
@@ -144,7 +145,13 @@
       "salons": "Салоны",
       "no_salons": "Не состоит ни в одном салоне",
       "set_tester": "Сделать тестировщиком",
-      "unset_tester": "Снять тестировщика"
+      "unset_tester": "Снять тестировщика",
+      "edit": "Изменить",
+      "first_name": "Имя",
+      "last_name": "Фамилия",
+      "email_field": "Email",
+      "phone_field": "Телефон",
+      "toast_saved": "Сохранено"
     },
     "users": {
       "name": "Имя",
@@ -227,6 +234,7 @@
       },
       "detail": {
         "reporter": "Отправитель",
+        "salon": "Салон",
         "message": "Описание",
         "ai_summary": "AI-summary",
         "notes": "Заметки",
@@ -1087,6 +1095,12 @@
     "invite_title": "Пригласить в команду",
     "invite_subtitle": "Юзер получит email с ссылкой. Срок действия — 14 дней.",
     "invite_email": "Email",
+    "invite_first_name": "Имя",
+    "invite_first_name_placeholder": "Анна",
+    "invite_last_name": "Фамилия",
+    "invite_last_name_placeholder": "Иванова",
+    "invite_phone": "Телефон",
+    "invite_phone_hint": "Поля имя/фамилия/телефон опциональны — заполнятся в профиле приглашённого, если у него ещё пусто.",
     "invite_role": "Роль",
     "invite_staff_link": "Связать с мастером (для роли «Мастер»)",
     "invite_staff_none": "— Не выбран —",

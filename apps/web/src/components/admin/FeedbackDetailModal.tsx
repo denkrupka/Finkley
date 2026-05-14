@@ -1,5 +1,6 @@
 import {
   Bug,
+  Building2,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -7,6 +8,8 @@ import {
   FileText,
   Lightbulb,
   Mail,
+  Phone,
+  Send,
   ShieldAlert,
   User2,
   Users,
@@ -14,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -133,28 +137,100 @@ export function FeedbackDetailModal({
               ) : null}
             </div>
 
-            {/* Reporter */}
-            {row.reporter_full_name || row.reporter_email || row.sender_first_name ? (
-              <section>
-                <h3 className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-                  {t('admin.feedback.detail.reporter')}
-                </h3>
-                <div className="text-sm">
-                  <p className="text-foreground font-semibold">
-                    {row.reporter_full_name ?? row.sender_first_name ?? '—'}
-                  </p>
-                  {row.reporter_email ? (
-                    <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                      <Mail className="size-3" strokeWidth={1.8} />
+            {/* Reporter — карточка отправителя */}
+            <section className="border-border rounded-md border bg-slate-50/50 p-3">
+              <h3 className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
+                {t('admin.feedback.detail.reporter')}
+              </h3>
+              <p className="text-foreground text-sm font-semibold">
+                {row.reporter_full_name ?? row.sender_first_name ?? '—'}
+              </p>
+              <div className="mt-1.5 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-2">
+                {row.reporter_email ? (
+                  <div className="text-muted-foreground inline-flex items-center gap-1.5">
+                    <Mail className="size-3.5" strokeWidth={1.8} />
+                    <a
+                      href={`mailto:${row.reporter_email}`}
+                      className="hover:text-foreground hover:underline"
+                    >
                       {row.reporter_email}
-                    </p>
-                  ) : null}
-                  {row.sender_username ? (
-                    <p className="text-muted-foreground text-xs">@{row.sender_username}</p>
-                  ) : null}
+                    </a>
+                  </div>
+                ) : null}
+                {row.reporter_phone ? (
+                  <div className="text-muted-foreground inline-flex items-center gap-1.5">
+                    <Phone className="size-3.5" strokeWidth={1.8} />
+                    <a
+                      href={`tel:${row.reporter_phone}`}
+                      className="hover:text-foreground hover:underline"
+                    >
+                      {row.reporter_phone}
+                    </a>
+                  </div>
+                ) : null}
+                {row.reporter_telegram ? (
+                  <div className="text-muted-foreground inline-flex items-center gap-1.5">
+                    <Send className="size-3.5" strokeWidth={1.8} />
+                    <a
+                      href={`https://t.me/${row.reporter_telegram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-foreground hover:underline"
+                    >
+                      @{row.reporter_telegram}
+                    </a>
+                  </div>
+                ) : row.sender_username ? (
+                  <div className="text-muted-foreground inline-flex items-center gap-1.5">
+                    <Send className="size-3.5" strokeWidth={1.8} />
+                    <a
+                      href={`https://t.me/${row.sender_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-foreground hover:underline"
+                    >
+                      @{row.sender_username}
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Салоны: либо явно привязанный к багу (row.salon_name), либо все
+                  салоны отправителя из salon_members (когда не указан конкретный) */}
+              {row.salon_name || row.reporter_salons.length > 0 ? (
+                <div className="border-border mt-3 border-t pt-2">
+                  <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase">
+                    {t('admin.feedback.detail.salon')}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.salon_id && row.salon_name ? (
+                      <Link
+                        to={`/${row.salon_id}/dashboard`}
+                        className="bg-primary/10 text-primary hover:bg-primary/20 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold"
+                      >
+                        <Building2 className="size-3" strokeWidth={2} />
+                        {row.salon_name}
+                      </Link>
+                    ) : (
+                      row.reporter_salons.map((s) => (
+                        <Link
+                          key={s.salon_id}
+                          to={`/${s.salon_id}/dashboard`}
+                          className="bg-muted/60 hover:bg-muted text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold"
+                          title={t(`roles.${s.role}`, { defaultValue: s.role })}
+                        >
+                          <Building2 className="size-3" strokeWidth={2} />
+                          {s.salon_name}
+                          <span className="text-muted-foreground ml-1 text-[9px] uppercase">
+                            {t(`roles.${s.role}`, { defaultValue: s.role })}
+                          </span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </section>
-            ) : null}
+              ) : null}
+            </section>
 
             {/* Описание */}
             <section>

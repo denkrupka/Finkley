@@ -11,6 +11,8 @@ export type TeamMember = {
   staff_id: string | null
   joined_at: string | null
   invited_email: string | null
+  full_name: string | null
+  phone: string | null
 }
 
 export type Invitation = {
@@ -34,7 +36,29 @@ export function useTeamMembers(salonId: string | undefined) {
         .select('id, user_id, role, staff_id, joined_at, invited_email')
         .eq('salon_id', salonId)
       if (error) throw error
-      return (data ?? []) as TeamMember[]
+      const members = (data ?? []) as Omit<TeamMember, 'full_name' | 'phone'>[]
+      if (members.length === 0) return [] as TeamMember[]
+
+      // Догружаем имя/телефон из profiles (FK через auth.users; прямой
+      // join через PostgREST не работает, fetch отдельно).
+      const userIds = Array.from(new Set(members.map((m) => m.user_id)))
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .in('id', userIds)
+      const byId = new Map<string, { full_name: string | null; phone: string | null }>()
+      for (const p of (profiles ?? []) as {
+        id: string
+        full_name: string | null
+        phone: string | null
+      }[]) {
+        byId.set(p.id, { full_name: p.full_name, phone: p.phone })
+      }
+      return members.map<TeamMember>((m) => ({
+        ...m,
+        full_name: byId.get(m.user_id)?.full_name ?? null,
+        phone: byId.get(m.user_id)?.phone ?? null,
+      }))
     },
     enabled: !!salonId,
   })
@@ -62,7 +86,14 @@ export function useInvitations(salonId: string | undefined) {
 export function useInviteMember(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { email: string; role: SalonRole; staffId?: string | null }) => {
+    mutationFn: async (input: {
+      email: string
+      role: SalonRole
+      staffId?: string | null
+      first_name?: string
+      last_name?: string
+      phone?: string
+    }) => {
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
           action: 'create',
@@ -70,6 +101,9 @@ export function useInviteMember(salonId: string | undefined) {
           email: input.email,
           role: input.role,
           staff_id: input.staffId ?? null,
+          invited_first_name: input.first_name?.trim() || null,
+          invited_last_name: input.last_name?.trim() || null,
+          invited_phone: input.phone?.trim() || null,
         },
       })
       if (error) throw error

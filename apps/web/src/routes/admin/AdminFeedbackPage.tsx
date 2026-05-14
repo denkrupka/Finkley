@@ -201,17 +201,26 @@ function FeedbackRow({ row, onOpen }: { row: AdminFeedbackRow; onOpen: () => voi
             {row.message_text || row.ai_summary || '—'}
           </p>
 
-          <div className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-[11px]">
-            {row.reporter_full_name || row.reporter_email ? (
-              <span className="font-medium">
-                {row.reporter_full_name ?? row.reporter_email}
-                {row.reporter_email && row.reporter_full_name ? ` · ${row.reporter_email}` : ''}
-              </span>
-            ) : null}
-            {row.sender_username ? <span>@{row.sender_username}</span> : null}
-            {row.sender_first_name && !row.reporter_full_name ? (
-              <span>{row.sender_first_name}</span>
-            ) : null}
+          <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+            {(() => {
+              // Имя+фамилия — приоритет profiles.full_name, fallback на sender_first_name из TG.
+              const displayName = row.reporter_full_name ?? row.sender_first_name
+              const email = row.reporter_email
+              return (
+                <>
+                  {displayName ? (
+                    <span className="text-foreground font-semibold">{displayName}</span>
+                  ) : null}
+                  {email ? <span>{email}</span> : null}
+                  {row.reporter_telegram ? (
+                    <span>@{row.reporter_telegram}</span>
+                  ) : row.sender_username ? (
+                    <span>@{row.sender_username}</span>
+                  ) : null}
+                </>
+              )
+            })()}
+            {row.salon_name ? <span>· 🏢 {row.salon_name}</span> : null}
             {row.area ? <span>· {row.area}</span> : null}
             {row.attachments && row.attachments.length > 0 ? (
               <span>· 📎 {row.attachments.length}</span>

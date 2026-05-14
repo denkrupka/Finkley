@@ -79,6 +79,8 @@ export type AdminSalonRow = {
   period_months: number
   avg_profit_cents: number
   portal_revenue_cents: number
+  effective_status: 'blocked' | 'subscribed' | 'on_trial' | 'trial_expired' | 'inactive'
+  valid_until: string | null
 }
 
 export type AdminUserRow = {
@@ -113,7 +115,11 @@ export type AdminFeedbackRow = {
   reporter_user_id: string | null
   reporter_email: string | null
   reporter_full_name: string | null
+  reporter_phone: string | null
+  reporter_telegram: string | null
+  reporter_salons: Array<{ salon_id: string; salon_name: string; role: string }>
   salon_id: string | null
+  salon_name: string | null
   attachments: Array<{
     type?: string
     storage_path?: string | null
@@ -289,6 +295,20 @@ export function useAdminRevoke() {
   const invalidate = useInvalidateUsers()
   return useMutation({
     mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('admin_revoke', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateUserProfile() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: {
+      user_id: string
+      first_name?: string
+      last_name?: string
+      phone?: string
+      email?: string
+    }) => postAdmin<{ ok: true }>('user_update_profile', vars),
     onSuccess: invalidate,
   })
 }

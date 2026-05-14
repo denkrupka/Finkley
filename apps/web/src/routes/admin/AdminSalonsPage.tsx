@@ -85,6 +85,7 @@ export function AdminSalonsPage() {
                 <th className="px-4 py-3 text-right">{t('admin.salons.avg_profit')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.portal_revenue')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.status')}</th>
+                <th className="px-4 py-3 text-left">{t('admin.salons.valid_until')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.created')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.actions')}</th>
               </tr>
@@ -100,7 +101,7 @@ export function AdminSalonsPage() {
               ))}
               {data.salons.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-muted-foreground px-4 py-8 text-center">
+                  <td colSpan={9} className="text-muted-foreground px-4 py-8 text-center">
                     {t('admin.salons.empty')}
                   </td>
                 </tr>
@@ -138,23 +139,19 @@ function SalonRow({
   const { t } = useTranslation()
   const unblock = useSalonUnblock()
 
-  function status(): { label: string; tone: keyof typeof STATUS_TONE } {
-    if (salon.blocked_at) return { label: t('admin.salons.tag.blocked'), tone: 'red' }
-    const now = Date.now()
-    const bonusActive = salon.bonus_until && new Date(salon.bonus_until).getTime() > now
-    if (salon.plan_status === 'active' || salon.plan_status === 'past_due' || bonusActive)
-      return { label: t('admin.salons.tag.subscribed'), tone: 'green' }
-    if (
-      salon.plan_status === 'trialing' &&
-      salon.trial_ends_at &&
-      new Date(salon.trial_ends_at).getTime() > now
-    )
-      return { label: t('admin.salons.tag.on_trial'), tone: 'blue' }
-    if (salon.trial_ends_at && new Date(salon.trial_ends_at).getTime() <= now)
-      return { label: t('admin.salons.tag.trial_expired'), tone: 'amber' }
-    return { label: t('admin.salons.tag.inactive'), tone: 'slate' }
+  // effective_status считается на сервере (handleSalons): учитывает explicit
+  // Stripe-saubscription, bonus_until и implicit trial (created_at + 14 дн.)
+  const STATUS_MAP: Record<
+    AdminSalonRow['effective_status'],
+    { label: string; tone: keyof typeof STATUS_TONE }
+  > = {
+    blocked: { label: t('admin.salons.tag.blocked'), tone: 'red' },
+    subscribed: { label: t('admin.salons.tag.subscribed'), tone: 'green' },
+    on_trial: { label: t('admin.salons.tag.on_trial'), tone: 'blue' },
+    trial_expired: { label: t('admin.salons.tag.trial_expired'), tone: 'amber' },
+    inactive: { label: t('admin.salons.tag.inactive'), tone: 'slate' },
   }
-  const st = status()
+  const st = STATUS_MAP[salon.effective_status]
 
   const ownerName =
     [salon.owner_first_name, salon.owner_last_name].filter(Boolean).join(' ') ||
@@ -204,6 +201,9 @@ function SalonRow({
             })}
           </p>
         ) : null}
+      </td>
+      <td className="text-muted-foreground px-4 py-3 text-xs">
+        {salon.valid_until ? new Date(salon.valid_until).toLocaleDateString('ru-RU') : '—'}
       </td>
       <td className="text-muted-foreground px-4 py-3 text-xs">
         {new Date(salon.created_at).toLocaleDateString('ru-RU')}

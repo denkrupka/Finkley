@@ -4,24 +4,31 @@ import {
   Calendar,
   FlaskConical,
   Mail,
+  Pencil,
   Phone,
+  Save,
   Shield,
   ShieldCheck,
   ShieldOff,
   ShieldPlus,
   User as UserIcon,
   UserCheck,
+  X,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   useAdminGrant,
   useAdminRevoke,
   useSetTesterFlag,
+  useUpdateUserProfile,
   useUserBlock,
   useUserUnblock,
   type AdminUserRow,
@@ -42,12 +49,40 @@ export function UserCardModal({ user, onClose }: { user: AdminUserRow; onClose: 
   const grant = useAdminGrant()
   const revoke = useAdminRevoke()
   const setTester = useSetTesterFlag()
+  const update = useUpdateUserProfile()
   const { data: callerIsSuper } = useIsAppSuperAdmin()
+
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({
+    first_name: user.first_name ?? '',
+    last_name: user.last_name ?? '',
+    email: user.email ?? '',
+    phone: user.phone ?? '',
+  })
 
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || '—'
   const isBanned = !!user.banned_until && new Date(user.banned_until).getTime() > Date.now()
   const isSuper = user.app_role === 'super_admin'
   const isAdmin = user.app_role === 'admin'
+
+  function saveProfile() {
+    update.mutate(
+      {
+        user_id: user.id,
+        first_name: draft.first_name.trim(),
+        last_name: draft.last_name.trim(),
+        phone: draft.phone.trim(),
+        email: draft.email.trim() !== user.email ? draft.email.trim() : undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t('admin.user_card.toast_saved'))
+          setEditing(false)
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -89,21 +124,100 @@ export function UserCardModal({ user, onClose }: { user: AdminUserRow; onClose: 
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto px-5 py-4">
-          {/* Contacts */}
+          {/* Contacts / Edit profile */}
           <section>
-            <h3 className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
-              {t('admin.user_card.contacts')}
-            </h3>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex items-center gap-2">
-                <Mail className="text-muted-foreground size-3.5" strokeWidth={1.8} />
-                <span className="truncate">{user.email ?? '—'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="text-muted-foreground size-3.5" strokeWidth={1.8} />
-                <span>{user.phone || '—'}</span>
-              </div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+                {t('admin.user_card.contacts')}
+              </h3>
+              {!editing ? (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-semibold"
+                >
+                  <Pencil className="size-3" strokeWidth={2} />
+                  {t('admin.user_card.edit')}
+                </button>
+              ) : null}
             </div>
+
+            {editing ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs">{t('admin.user_card.first_name')}</Label>
+                  <Input
+                    value={draft.first_name}
+                    onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))}
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t('admin.user_card.last_name')}</Label>
+                  <Input
+                    value={draft.last_name}
+                    onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))}
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t('admin.user_card.email_field')}</Label>
+                  <Input
+                    type="email"
+                    value={draft.email}
+                    onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t('admin.user_card.phone_field')}</Label>
+                  <Input
+                    value={draft.phone}
+                    onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                    placeholder="+48 ..."
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div className="flex items-center gap-2 sm:col-span-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={update.isPending}
+                    onClick={saveProfile}
+                  >
+                    <Save className="size-3.5" strokeWidth={2} />
+                    {t('common.save')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditing(false)
+                      setDraft({
+                        first_name: user.first_name ?? '',
+                        last_name: user.last_name ?? '',
+                        email: user.email ?? '',
+                        phone: user.phone ?? '',
+                      })
+                    }}
+                  >
+                    <X className="size-3.5" strokeWidth={2} />
+                    {t('common.cancel')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-center gap-2">
+                  <Mail className="text-muted-foreground size-3.5" strokeWidth={1.8} />
+                  <span className="truncate">{user.email ?? '—'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="text-muted-foreground size-3.5" strokeWidth={1.8} />
+                  <span>{user.phone || '—'}</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Activity */}

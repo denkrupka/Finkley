@@ -56,6 +56,9 @@ export function TeamPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<SalonRole>('staff')
   const [staffId, setStaffId] = useState<string>('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [phone, setPhone] = useState('')
 
   const canManage = myRole === 'owner' || myRole === 'admin'
 
@@ -69,6 +72,9 @@ export function TeamPage() {
         email: email.trim(),
         role,
         staffId: role === 'staff' ? staffId || null : null,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
       },
       {
         onSuccess: () => {
@@ -77,6 +83,9 @@ export function TeamPage() {
           setEmail('')
           setRole('staff')
           setStaffId('')
+          setFirstName('')
+          setLastName('')
+          setPhone('')
         },
         onError: (err) => {
           const msg = err instanceof Error ? err.message : String(err)
@@ -135,17 +144,24 @@ export function TeamPage() {
                 >
                   <div className="min-w-0">
                     <p className="text-foreground truncate text-sm font-semibold">
-                      {m.invited_email ?? linkedStaff?.full_name ?? m.user_id.slice(0, 8)}
+                      {m.full_name ??
+                        linkedStaff?.full_name ??
+                        m.invited_email ??
+                        m.user_id.slice(0, 8)}
                     </p>
-                    <p className="text-muted-foreground text-xs">
-                      {linkedStaff
-                        ? t('team.linked_to_staff', { name: linkedStaff.full_name })
-                        : t('team.member_since', {
-                            date: m.joined_at
-                              ? new Date(m.joined_at).toLocaleDateString('ru-RU')
-                              : '—',
-                          })}
-                    </p>
+                    <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                      {m.invited_email ? <span>{m.invited_email}</span> : null}
+                      {m.phone ? <span>{m.phone}</span> : null}
+                      <span>
+                        {linkedStaff
+                          ? t('team.linked_to_staff', { name: linkedStaff.full_name })
+                          : t('team.member_since', {
+                              date: m.joined_at
+                                ? new Date(m.joined_at).toLocaleDateString('ru-RU')
+                                : '—',
+                            })}
+                      </span>
+                    </div>
                   </div>
                   {canManage && !isOwner ? (
                     <Select
@@ -290,6 +306,40 @@ export function TeamPage() {
                 placeholder="email@example.com"
                 autoComplete="email"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="inv-first-name">{t('team.invite_first_name')}</Label>
+                <Input
+                  id="inv-first-name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder={t('team.invite_first_name_placeholder')}
+                  autoComplete="given-name"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="inv-last-name">{t('team.invite_last_name')}</Label>
+                <Input
+                  id="inv-last-name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder={t('team.invite_last_name_placeholder')}
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inv-phone">{t('team.invite_phone')}</Label>
+              <Input
+                id="inv-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+48 ..."
+                autoComplete="tel"
+              />
+              <p className="text-muted-foreground text-xs">{t('team.invite_phone_hint')}</p>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-role">{t('team.invite_role')}</Label>

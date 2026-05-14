@@ -103,6 +103,16 @@ async function handleCreate(
       staff_id: body.staff_id ?? null,
       token,
       invited_by: userId,
+      invited_first_name:
+        typeof body.invited_first_name === 'string' && body.invited_first_name
+          ? body.invited_first_name
+          : null,
+      invited_last_name:
+        typeof body.invited_last_name === 'string' && body.invited_last_name
+          ? body.invited_last_name
+          : null,
+      invited_phone:
+        typeof body.invited_phone === 'string' && body.invited_phone ? body.invited_phone : null,
     })
     .select('id, expires_at')
     .single()

@@ -118,6 +118,7 @@ Deno.serve(async (req) => {
     if (action === 'feedback_status') return handleFeedbackStatus(admin, body)
     if (action === 'feedback_attachments') return handleFeedbackAttachments(admin, body)
     if (action === 'user_set_tester') return handleUserSetTester(admin, body)
+    if (action === 'user_update_profile') return handleUserUpdateProfile(admin, body)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
 
@@ -379,6 +380,52 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
       const ownerFullName = ownerProfile?.full_name ?? null
       const [firstName, ...rest] = (ownerFullName ?? '').trim().split(/\s+/).filter(Boolean)
 
+      // Effective status + valid_until — единая точка вычисления для UI.
+      //
+      // Логика приоритетов:
+      //   1. blocked   — салон заблокирован super-admin (red)
+      //   2. subscribed — активная Stripe-сабa или активный bonus_until
+      //   3. on_trial  — explicit trialing-row ИЛИ implicit (created_at + 14 дн.)
+      //   4. trial_expired — explicit trial кончился ИЛИ implicit prошёл
+      //   5. inactive_no_sub — ни sub, ни trial (старше 30 дней без активности)
+      //
+      // valid_until = до какой даты текущий статус действителен (для UI).
+      let effectiveStatus: 'blocked' | 'subscribed' | 'on_trial' | 'trial_expired' | 'inactive' =
+        'inactive'
+      let validUntilIso: string | null = null
+
+      const IMPLICIT_TRIAL_DAYS = 14
+      const implicitTrialEndsMs = createdMs + IMPLICIT_TRIAL_DAYS * 86400_000
+
+      if (s.blocked_at) {
+        effectiveStatus = 'blocked'
+      } else if (sub && (sub.status === 'active' || sub.status === 'past_due')) {
+        effectiveStatus = 'subscribed'
+        validUntilIso = sub.current_period_end
+      } else if (sub && sub.bonus_until && new Date(sub.bonus_until).getTime() > now) {
+        effectiveStatus = 'subscribed'
+        validUntilIso = sub.bonus_until
+      } else if (
+        sub &&
+        sub.status === 'trialing' &&
+        sub.trial_ends_at &&
+        new Date(sub.trial_ends_at).getTime() > now
+      ) {
+        effectiveStatus = 'on_trial'
+        validUntilIso = sub.trial_ends_at
+      } else if (!sub && implicitTrialEndsMs > now) {
+        // Implicit trial: салон зарегистрирован < 14 дн назад, в БД ещё нет
+        // salon_subscriptions row (он создаётся Stripe-webhook'ом или вручную).
+        effectiveStatus = 'on_trial'
+        validUntilIso = new Date(implicitTrialEndsMs).toISOString()
+      } else if (sub && sub.trial_ends_at && new Date(sub.trial_ends_at).getTime() <= now) {
+        effectiveStatus = 'trial_expired'
+        validUntilIso = sub.trial_ends_at
+      } else if (!sub && implicitTrialEndsMs <= now) {
+        effectiveStatus = 'trial_expired'
+        validUntilIso = new Date(implicitTrialEndsMs).toISOString()
+      }
+
       return {
         id: s.id,
         name: s.name,
@@ -392,6 +439,8 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
         owner_phone: ownerProfile?.phone ?? null,
         plan_status: sub?.status ?? null,
         trial_ends_at: sub?.trial_ends_at ?? null,
+        effective_status: effectiveStatus,
+        valid_until: validUntilIso,
         bonus_until: sub?.bonus_until ?? null,
         sub_source: sub?.source ?? null,
         blocked_at: s.blocked_at,
@@ -496,31 +545,112 @@ async function handleFeedback(admin: AdminClient): Promise<Response> {
     .limit(500)
   if (error && error.code !== '42P01') return jsonResponse({ error: error.message }, 500)
 
-  // Резолвим reporter_user_id → имя/email для отображения «от кого пришёл баг»
+  // Резолвим reporter_user_id → полная карточка отправителя (имя, email,
+  // телефон, telegram, список салонов). Также резолвим bug_reports.salon_id
+  // → имя салона для отображения «к какому салону привязан баг».
   const reporterIds = Array.from(
     new Set((data ?? []).map((r) => r.reporter_user_id).filter(Boolean)),
   ) as string[]
-  const reporterById = new Map<string, { email: string | null; full_name: string | null }>()
-  if (reporterIds.length > 0) {
-    const { data: profs } = await admin
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', reporterIds)
-    const profById = new Map<string, string | null>()
-    for (const p of (profs ?? []) as { id: string; full_name: string | null }[]) {
-      profById.set(p.id, p.full_name)
-    }
-    // Email достаём из auth.users через listUsers — один batch
-    const { data: usersResp } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    const emailById = new Map<string, string>()
-    for (const u of usersResp?.users ?? []) {
-      if (u.email) emailById.set(u.id, u.email)
-    }
-    for (const id of reporterIds) {
-      reporterById.set(id, {
-        email: emailById.get(id) ?? null,
-        full_name: profById.get(id) ?? null,
+  const salonIdsFromBugs = Array.from(
+    new Set((data ?? []).map((r) => r.salon_id).filter(Boolean)),
+  ) as string[]
+
+  type ReporterInfo = {
+    email: string | null
+    full_name: string | null
+    phone: string | null
+    telegram_username: string | null
+    salons: Array<{ salon_id: string; salon_name: string; role: string }>
+  }
+  const reporterById = new Map<string, ReporterInfo>()
+  const salonNameById = new Map<string, string>()
+
+  if (reporterIds.length > 0 || salonIdsFromBugs.length > 0) {
+    const [{ data: profs }, usersResp, { data: members }, { data: bugSalons }] = await Promise.all([
+      reporterIds.length
+        ? admin
+            .from('profiles')
+            .select('id, full_name, phone, telegram_username')
+            .in('id', reporterIds)
+        : Promise.resolve({ data: [] }),
+      admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      reporterIds.length
+        ? admin
+            .from('salon_members')
+            .select('user_id, salon_id, role, salons(id, name)')
+            .in('user_id', reporterIds)
+        : Promise.resolve({ data: [] }),
+      salonIdsFromBugs.length
+        ? admin.from('salons').select('id, name').in('id', salonIdsFromBugs)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    const profById = new Map<
+      string,
+      { full_name: string | null; phone: string | null; telegram_username: string | null }
+    >()
+    for (const p of (profs ?? []) as {
+      id: string
+      full_name: string | null
+      phone: string | null
+      telegram_username: string | null
+    }[]) {
+      profById.set(p.id, {
+        full_name: p.full_name,
+        phone: p.phone,
+        telegram_username: p.telegram_username,
       })
+    }
+
+    // Email + fallback full_name из auth.users.user_metadata (на случай если
+    // profile.full_name пустой — юзер регистрировался через email/password
+    // без full_name в metadata, но потом dashboard заполнил metadata).
+    const authUserById = new Map<string, { email: string | null; meta_full_name: string | null }>()
+    for (const u of usersResp.data?.users ?? []) {
+      const meta = (u.user_metadata ?? {}) as { full_name?: string }
+      authUserById.set(u.id, {
+        email: u.email ?? null,
+        meta_full_name: meta.full_name ?? null,
+      })
+    }
+
+    // Салоны отправителя (для отображения связки «юзер → салон» в карточке)
+    type MemberRow = {
+      user_id: string
+      salon_id: string
+      role: string
+      salons: { id: string; name: string } | { id: string; name: string }[] | null
+    }
+    const memberSalonsByUser = new Map<
+      string,
+      Array<{ salon_id: string; salon_name: string; role: string }>
+    >()
+    for (const m of (members ?? []) as MemberRow[]) {
+      const arr = memberSalonsByUser.get(m.user_id) ?? []
+      const salonField = m.salons
+      const salonObj = Array.isArray(salonField) ? salonField[0] : salonField
+      arr.push({
+        salon_id: m.salon_id,
+        salon_name: salonObj?.name ?? '—',
+        role: m.role,
+      })
+      memberSalonsByUser.set(m.user_id, arr)
+    }
+
+    for (const id of reporterIds) {
+      const prof = profById.get(id)
+      const auth = authUserById.get(id)
+      reporterById.set(id, {
+        email: auth?.email ?? null,
+        full_name: prof?.full_name ?? auth?.meta_full_name ?? null,
+        phone: prof?.phone ?? null,
+        telegram_username: prof?.telegram_username ?? null,
+        salons: memberSalonsByUser.get(id) ?? [],
+      })
+    }
+
+    for (const s of (bugSalons ?? []) as { id: string; name: string }[]) {
+      salonNameById.set(s.id, s.name)
     }
   }
 
@@ -530,6 +660,10 @@ async function handleFeedback(admin: AdminClient): Promise<Response> {
       ...r,
       reporter_email: rep?.email ?? null,
       reporter_full_name: rep?.full_name ?? null,
+      reporter_phone: rep?.phone ?? null,
+      reporter_telegram: rep?.telegram_username ?? null,
+      reporter_salons: rep?.salons ?? [],
+      salon_name: r.salon_id ? (salonNameById.get(r.salon_id as string) ?? null) : null,
     }
   })
 
@@ -943,6 +1077,42 @@ async function handleFeedbackAttachments(
     }),
   )
   return jsonResponse({ attachments: results })
+}
+
+async function handleUserUpdateProfile(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const userId = body.user_id
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+
+  const firstName = typeof body.first_name === 'string' ? body.first_name.trim() : undefined
+  const lastName = typeof body.last_name === 'string' ? body.last_name.trim() : undefined
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : undefined
+  const email = typeof body.email === 'string' ? body.email.trim() : undefined
+
+  // 1) Обновляем auth.users.email если задан
+  if (email !== undefined && email.length > 0) {
+    const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true })
+    if (error) return jsonResponse({ error: error.message }, 500)
+  }
+
+  // 2) Обновляем profiles.full_name + phone
+  const profilePatch: Record<string, string | null> = {}
+  if (firstName !== undefined || lastName !== undefined) {
+    const fn = firstName ?? ''
+    const ln = lastName ?? ''
+    profilePatch.full_name = [fn, ln].filter((x) => x.length > 0).join(' ') || null
+  }
+  if (phone !== undefined) {
+    profilePatch.phone = phone.length > 0 ? phone : null
+  }
+  if (Object.keys(profilePatch).length > 0) {
+    const { error } = await admin.from('profiles').update(profilePatch).eq('id', userId)
+    if (error) return jsonResponse({ error: error.message }, 500)
+  }
+
+  return jsonResponse({ ok: true })
 }
 
 async function handleUserSetTester(

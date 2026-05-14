@@ -108,6 +108,13 @@ export function TesterBugModal({ onClose }: { onClose: () => void }) {
       const token = session.session?.access_token
       if (!token) throw new Error('not_authenticated')
       const baseUrl = import.meta.env.VITE_SUPABASE_URL
+      // Если тестер находится в кабинете салона (/{salon_id}/...) — привязываем
+      // баг к этому салону для удобства поиска в /admin/feedback.
+      const salonIdMatch = window.location.pathname.match(
+        /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i,
+      )
+      const salonId = salonIdMatch?.[1] ?? null
+
       const r = await fetch(`${baseUrl}/functions/v1/tester-bug-report`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -119,6 +126,7 @@ export function TesterBugModal({ onClose }: { onClose: () => void }) {
           attachment_name: attachment?.name,
           page_url: window.location.href,
           user_agent: navigator.userAgent,
+          salon_id: salonId,
         }),
       })
       if (!r.ok) {
