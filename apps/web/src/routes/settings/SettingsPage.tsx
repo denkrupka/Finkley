@@ -49,6 +49,7 @@ import { Link } from 'react-router-dom'
 
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
+import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { ApiKeysCard } from './ApiKeysCard'
 import { MFACard } from './MFACard'
 import { SegmentationCard } from './SegmentationCard'
@@ -373,6 +374,9 @@ export function SettingsPage() {
               </div>
             </div>
           </section>
+
+          {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
+          <TelegramLinkCard />
 
           {/* Сегментация клиентов: retention/churn окна */}
           <SegmentationCard salon={salon} />

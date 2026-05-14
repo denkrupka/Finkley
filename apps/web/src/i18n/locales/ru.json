@@ -1670,6 +1670,20 @@
       "subtitle": "Подключи Booksy, Fresha и другие платформы — визиты будут подтягиваться автоматически.",
       "button": "Открыть интеграции"
     },
+    "telegram": {
+      "title": "Привязка Telegram",
+      "subtitle": "После привязки сможешь писать о багах и предложениях прямо в личке бота @finklay_dev_bot — мы получим и разберёмся.",
+      "linked_title": "Telegram привязан",
+      "linked_no_username": "Telegram ID: {{id}}",
+      "unlink": "Отвязать",
+      "confirm_unlink": "Отвязать Telegram-аккаунт?",
+      "why_link": "Нажми кнопку «Войти через Telegram» ниже. Подписанные Telegram'ом данные мы проверим на сервере и сохраним только числовой ID — больше ничего.",
+      "widget_label": "Войти через Telegram для привязки",
+      "bot_not_configured": "Telegram-бот не настроен в этом окружении — попроси администратора задать VITE_TELEGRAM_BOT_USERNAME.",
+      "toast_linked": "Telegram привязан — теперь можно писать в @finklay_dev_bot",
+      "toast_unlinked": "Telegram отвязан",
+      "error_already_linked": "Этот Telegram-аккаунт уже привязан к другому пользователю Finkley"
+    },
     "benchmarks": {
       "title": "Сравнение с похожими салонами",
       "subtitle": "Покажу как твои показатели выглядят в среднем по нише — без имён и адресов, только обезличенные цифры. Тебе помогает понять где ты сильнее, где есть куда расти.",
