@@ -1,0 +1,102 @@
+name: Auto-announce bug fix to Telegram
+
+# При пуше в main парсим commit-сообщения на маркер `[bug: <short_id>]` и
+# вызываем telegram-bug-collector/announce-fix endpoint — бот сам ответит
+# в Telegram-чате «закрыли вот этот баг, …».
+#
+# Формат маркера (любой из):
+#   fix(scope): description [bug: a15e8b43]
+#   Fixes-bug: a15e8b43
+#   Closes-bug: a15e8b43
+#
+# Можно несколько маркеров в одном коммите (один фикс закрывает несколько).
+# Можно несколько коммитов в одном push — обрабатываются все.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: announce-bug-fix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Find bug IDs in pushed commits
+        id: collect
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+          # github.event.before == 0000... для force-push / first push — берём все 50 коммитов
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE="$AFTER~50..$AFTER"
+          else
+            RANGE="$BEFORE..$AFTER"
+          fi
+          mkdir -p /tmp/bugfix
+          : > /tmp/bugfix/items.tsv
+          # для каждого коммита: subject + body + sha
+          git log --format='%H%n%s%n%b%n%x1e' "$RANGE" 2>/dev/null | \
+            awk -v RS='\x1e' 'NF { print $0 "\x1e" }' | \
+          while IFS= read -r -d $'\x1e' BLOCK; do
+            SHA=$(echo "$BLOCK" | sed -n '1p')
+            [ -z "$SHA" ] && continue
+            BODY=$(echo "$BLOCK" | tail -n +2)
+            # вытаскиваем все хеш-id из [bug: xxxxxxxx], Fixes-bug: xxxxxxxx, Closes-bug: xxxxxxxx
+            IDS=$(echo "$BODY" | grep -oiE '(\[bug:[[:space:]]*[0-9a-f]{8}\]|(fixes|closes)-bug:[[:space:]]*[0-9a-f]{8})' | grep -oiE '[0-9a-f]{8}' | sort -u || true)
+            if [ -n "$IDS" ]; then
+              # description = первая строка subject без '[bug: ...]' маркера
+              DESC=$(echo "$BODY" | head -1 | sed -E 's/\[bug:[[:space:]]*[0-9a-f]{8}\]//gi' | xargs)
+              for ID in $IDS; do
+                printf '%s\t%s\t%s\n' "$ID" "$SHA" "$DESC" >> /tmp/bugfix/items.tsv
+              done
+            fi
+          done
+          COUNT=$(wc -l < /tmp/bugfix/items.tsv)
+          echo "found=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" = "0" ]; then
+            echo "No bug-fix markers in pushed commits."
+          else
+            echo "Found $COUNT bug-fix marker(s):"
+            cat /tmp/bugfix/items.tsv
+          fi
+
+      - name: Call announce-fix endpoint
+        if: steps.collect.outputs.found != '0'
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          FUNCTION_INTERNAL_SECRET: ${{ secrets.FUNCTION_INTERNAL_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${FUNCTION_INTERNAL_SECRET}" ]; then
+            echo "::error::Missing VITE_SUPABASE_URL_PROD / FUNCTION_INTERNAL_SECRET secrets"
+            exit 1
+          fi
+          while IFS=$'\t' read -r SHORT_ID COMMIT_SHA DESC; do
+            echo "→ announce $SHORT_ID @ ${COMMIT_SHA:0:7} — $DESC"
+            BODY=$(jq -n \
+              --arg s "$FUNCTION_INTERNAL_SECRET" \
+              --arg id "$SHORT_ID" \
+              --arg desc "$DESC" \
+              --arg sha "$COMMIT_SHA" \
+              '{secret:$s, short_id:$id, fix_description:$desc, commit_sha:$sha}')
+            RESP=$(curl -sS -w '\n%{http_code}' -X POST \
+              "${SUPABASE_URL}/functions/v1/telegram-bug-collector/announce-fix" \
+              -H 'content-type: application/json' \
+              -d "$BODY")
+            STATUS=$(echo "$RESP" | tail -1)
+            BODY_OUT=$(echo "$RESP" | sed '$d')
+            echo "  HTTP $STATUS: $BODY_OUT"
+            if [ "$STATUS" != "200" ]; then
+              echo "::warning::announce-fix failed for $SHORT_ID (continuing — другие баги могут пройти)"
+            fi
+          done < /tmp/bugfix/items.tsv

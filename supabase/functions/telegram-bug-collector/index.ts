@@ -795,17 +795,40 @@ function classifyByThread(
 }
 
 async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
-  if (ALLOWED_CHAT_ID && String(msg.chat.id) !== ALLOWED_CHAT_ID) {
-    console.warn('rejected unauthorized chat', msg.chat.id)
-    return
-  }
-
   const text = (msg.text ?? msg.caption ?? '').trim()
   const threadId = msg.message_thread_id
   const isCommand = text.startsWith('/')
 
-  // Тема форум-чата → kind или ignore (см. classifyByThread)
-  const kind = classifyByThread(threadId, isCommand)
+  // Source routing:
+  // - ALLOWED_CHAT_ID (team forum chat) → source='team', kind по треду
+  // - private chat (любой) → source='client', kind='bug', requires_approval=true
+  // - другой group/supergroup → reject (silent)
+  const isTeamChat = ALLOWED_CHAT_ID && String(msg.chat.id) === ALLOWED_CHAT_ID
+  const isPrivate = msg.chat.type === 'private'
+  if (!isTeamChat && !isPrivate) {
+    console.warn('rejected unauthorized chat', msg.chat.id, msg.chat.type)
+    return
+  }
+
+  // Команды (/list, /done, /note) — только в team chat. В private игнорируем —
+  // клиенты пишут текст/скрин, не команды.
+  if (isPrivate && isCommand) {
+    if (text === '/start' || text === '/help') {
+      await tgSend(
+        msg.chat.id,
+        '👋 Привет! Это бот баг-репортов FinSalon.\n\n' +
+          'Опиши проблему текстом, прикрепи скриншот или запиши голосовое — мы получим и разберёмся. ' +
+          'Сообщения от клиентов проходят модерацию, поэтому ответ может прийти не сразу.',
+      )
+    }
+    return
+  }
+
+  // В private chat — это клиент салона. kind='bug' по умолчанию,
+  // source='client', нужен апрув super-admin'а в /admin/feedback.
+  // В team chat — старый flow по тредам.
+  const source: 'team' | 'client' = isPrivate ? 'client' : 'team'
+  const kind = isPrivate ? ('bug' as const) : classifyByThread(threadId, isCommand)
   if (kind === 'ignore') {
     // Silently — это не баг и не фича, юзеры могут трепаться в General
     return
@@ -905,6 +928,9 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       ai_steps_to_repro: cat.steps ?? null,
       ai_categorized_at: cat.summary ? new Date().toISOString() : null,
       kind,
+      source,
+      // Клиентские баги ждут апрува в /admin/feedback. Team-баги идут в работу сразу.
+      requires_approval: source === 'client',
     })
     .select('id')
     .single()
@@ -919,18 +945,25 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
     return
   }
 
-  // Подтверждаем reply'ем в том же топике. Главное — человекопонятная сводка:
-  // что я понял + что починить. Severity/area идут в /list и БД, в ack не лезут.
-  // Emoji различает сразу — 🐛 для bugs, 💡 для features.
-  // Для голосовых — отдельной строкой показываем что распознали, чтобы юзер
-  // сразу мог реплаем поправить если Whisper ослышался.
-  const humanSummary = cat.summary || visionSummary || null
-  const emoji = kind === 'feature' ? '💡' : '🐛'
-  const transcriptLine = transcript ? `🎤 _«${transcript}»_` : null
-  const ack = [`${emoji} \`${shortId(data!.id)}\``, transcriptLine, humanSummary]
-    .filter(Boolean)
-    .join('\n\n')
-  await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
+  // Для team-чата: подтверждение со short_id для последующих команд /done /note.
+  // Для клиента (private): «принято, ждёт модерации» — без id, без AI-summary
+  // (клиенту незачем видеть наши internals).
+  if (source === 'client') {
+    await tgSend(
+      msg.chat.id,
+      '✅ Спасибо! Ваше сообщение получено и передано на модерацию. ' +
+        'Если будут уточняющие вопросы — мы напишем сюда.',
+      { replyTo: msg.message_id },
+    )
+  } else {
+    const humanSummary = cat.summary || visionSummary || null
+    const emoji = kind === 'feature' ? '💡' : '🐛'
+    const transcriptLine = transcript ? `🎤 _«${transcript}»_` : null
+    const ack = [`${emoji} \`${shortId(data!.id)}\``, transcriptLine, humanSummary]
+      .filter(Boolean)
+      .join('\n\n')
+    await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
+  }
 }
 
 // =============================================================================

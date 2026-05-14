@@ -21,6 +21,7 @@
 
 - **Сначала тесты, потом код, когда логика нетривиальная.** Когда логика тривиальна (CRUD, отрисовка) — тесты не нужны.
 - **Маленькие коммиты.** Один коммит = одно логическое изменение. Conventional Commits: `feat(visits): add tip field to visit form`, `fix(auth): handle expired session`, `chore: update tailwind to 4.0`.
+- **Если коммит закрывает баг из `bug_reports`** — добавляй маркер `[bug: <short_id>]` в subject или `Fixes-bug: <short_id>` в footer. Пример: `fix(visits): не сбрасываются типы при сохранении [bug: a15e8b43]`. GitHub Action `announce-bug-fix.yml` на push в main парсит маркер и автоматически дёргает `telegram-bug-collector/announce-fix` — бот сам ответит в чате что баг закрыт. Без маркера придётся вручную звать `node scripts/mark-bug-fixed.mjs <short_id> "<описание>"`.
 - **Не делай рефакторинг "за компанию".** Если задача — добавить поле в форму, не переписывай форму. Открывай отдельный тикет.
 - **Не трогай миграции БД руками.** Все изменения схемы — через `pnpm supabase migration new <name>`.
 
