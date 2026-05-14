@@ -17,6 +17,10 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // RU — единственная полная локаль приложения. Playwright Chrome по
+    // умолчанию ставит navigator.language=en-US, из-за чего i18n-detector
+    // отдаёт неполные EN-переводы и тесты, ожидающие RU-текст, падают.
+    locale: 'ru-RU',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
@@ -27,7 +31,15 @@ export default defineConfig({
     : {
         command: 'pnpm dev',
         url: 'http://localhost:5173',
+        // Если dev server уже работает на MAIN env — он остаётся и тесты
+        // обязаны создавать юзеров в MAIN (см. admin-flow.spec.ts).
+        // Если переустанавливать — Playwright перезапустит с TEST env через
+        // переменные ниже, тогда юзеры в TEST совпадут с dev server.
         reuseExistingServer: true,
         timeout: 60_000,
+        env: {
+          VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL_TEST ?? '',
+          VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY_TEST ?? '',
+        },
       },
 })

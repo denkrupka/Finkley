@@ -309,11 +309,14 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
     })
   }
 
-  const ownerIds = Array.from(new Set((salons ?? []).map((s) => s.created_by).filter(Boolean)))
+  // batch listUsers вместо N+1 getUserById — масштабируется на большое число салонов
+  const ownerIds = new Set((salons ?? []).map((s) => s.created_by).filter(Boolean))
   const emailById = new Map<string, string>()
-  for (const id of ownerIds) {
-    const { data: u } = await admin.auth.admin.getUserById(id as string)
-    if (u?.user?.email) emailById.set(id as string, u.user.email)
+  if (ownerIds.size > 0) {
+    const { data: users } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    for (const u of users?.users ?? []) {
+      if (ownerIds.has(u.id) && u.email) emailById.set(u.id, u.email)
+    }
   }
 
   return jsonResponse({

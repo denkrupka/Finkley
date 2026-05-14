@@ -38,6 +38,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * Периодически проверяем что текущая сессия валидна на стороне сервера.
+   * Если супер-админ забанил юзера в админке — `auth.getUser()` начнёт
+   * возвращать ошибку «User is banned». Мы поймаем её и редирект на
+   * /blocked/account. Проверка каждые 60 секунд — компромисс между
+   * скоростью реакции и нагрузкой на Supabase Auth.
+   */
+  useEffect(() => {
+    if (!session?.access_token) return
+    let cancelled = false
+
+    async function check() {
+      const { data, error } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (error) {
+        if (/banned|disabled/i.test(error.message)) {
+          await supabase.auth.signOut()
+          if (window.location.pathname !== '/blocked/account') {
+            window.location.href = '/blocked/account'
+          }
+        }
+        return
+      }
+      // Дополнительная страховка: если admin-API вернул banned_until — тоже
+      // редиректим. На клиентском getUser это поле обычно null, но проверяем.
+      const banned = (data.user as unknown as { banned_until?: string })?.banned_until
+      if (banned && new Date(banned).getTime() > Date.now()) {
+        await supabase.auth.signOut()
+        if (window.location.pathname !== '/blocked/account') {
+          window.location.href = '/blocked/account'
+        }
+      }
+    }
+
+    check()
+    const id = window.setInterval(check, 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [session?.access_token])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
