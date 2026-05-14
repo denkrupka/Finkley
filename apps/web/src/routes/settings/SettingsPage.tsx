@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { toast } from 'sonner'
 
 import { IntegrationsContent } from '@/routes/integrations/IntegrationsPage'
+import { TeamPage } from '@/routes/team/TeamPage'
 
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
@@ -44,7 +45,7 @@ import { ApiKeysCard } from './ApiKeysCard'
 // SegmentationCard перенесён в /staff (Справочник мастеров).
 import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
-import { ReferralCard } from './ReferralCard'
+// ReferralCard убран из Settings — раньше жил на отдельной вкладке /team.
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
@@ -677,15 +678,6 @@ export function SettingsPage() {
         </>
       )}
 
-      {activeTab === 'team' && (
-        <>
-          {/* Referral */}
-          <div className="mb-6">
-            <ReferralCard />
-          </div>
-        </>
-      )}
-
       {activeTab === 'integrations' && <IntegrationsContent />}
 
       {activeTab === 'billing' && (
@@ -712,27 +704,11 @@ export function SettingsPage() {
       )}
 
       {activeTab === 'team' && (
-        <>
-          {/* Команда */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.team.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">{t('settings.team.subtitle')}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate(`/${salonId}/settings/team`)}
-              >
-                <Users className="size-4" strokeWidth={1.7} />
-                {t('settings.team.button')}
-              </Button>
-            </div>
-          </section>
-        </>
+        /* Команда — раньше открывалась на отдельной странице через
+           «Управлять командой». По требованию владельца — рендерим
+           содержимое inline здесь же. TeamPage в режиме inline скрывает
+           свой заголовок и back-link (общая шапка Settings уже есть). */
+        <TeamPage inline />
       )}
 
       {activeTab === 'help' && (

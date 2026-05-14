@@ -42,7 +42,12 @@ const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
   { value: 'staff', key: 'team.role.staff' },
 ]
 
-export function TeamPage() {
+/**
+ * /salon/settings/team — управление командой салона.
+ * Также рендерится inline на /salon/settings?tab=team (см. TeamSettingsInline).
+ * В inline-режиме скрываем заголовок и back-link (внешняя страница уже их даёт).
+ */
+export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const { data: members = [], isLoading: membersLoading } = useTeamMembers(salonId)
@@ -103,18 +108,28 @@ export function TeamPage() {
   if (!salonId) return null
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+    <div
+      className={
+        inline ? 'flex flex-1 flex-col' : 'flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12'
+      }
+    >
       <div className="mb-5">
-        <Link
-          to={`/${salonId}/settings`}
-          className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-sm"
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.7} />
-          {t('team.back_to_settings')}
-        </Link>
+        {!inline ? (
+          <Link
+            to={`/${salonId}/settings`}
+            className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-sm"
+          >
+            <ArrowLeft className="size-4" strokeWidth={1.7} />
+            {t('team.back_to_settings')}
+          </Link>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('team.title')}</h1>
+            {!inline ? (
+              <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+                {t('team.title')}
+              </h1>
+            ) : null}
             <p className="text-muted-foreground mt-1 text-sm">{t('team.subtitle')}</p>
           </div>
           {canManage ? (
