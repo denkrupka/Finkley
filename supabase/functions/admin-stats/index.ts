@@ -113,6 +113,9 @@ Deno.serve(async (req) => {
     if (action === 'member_role_change') return handleMemberRoleChange(admin, body)
     if (action === 'admin_grant') return handleAdminGrant(admin, body, user.userId, callerIsSuper)
     if (action === 'admin_revoke') return handleAdminRevoke(admin, body, user.userId, callerIsSuper)
+    if (action === 'feedback_approve') return handleFeedbackApprove(admin, body, user.userId)
+    if (action === 'feedback_reject') return handleFeedbackReject(admin, body)
+    if (action === 'feedback_status') return handleFeedbackStatus(admin, body)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
 
@@ -416,10 +419,10 @@ async function handleFeedback(admin: AdminClient): Promise<Response> {
   const { data, error } = await admin
     .from('bug_reports')
     .select(
-      'id, telegram_chat_id, sender_username, sender_first_name, message_text, ai_summary, status, severity, kind, area, reported_at, created_at',
+      'id, telegram_chat_id, sender_username, sender_first_name, message_text, ai_summary, status, severity, kind, area, source, requires_approval, approved_by, approved_at, reporter_user_id, salon_id, reported_at, created_at',
     )
     .order('reported_at', { ascending: false })
-    .limit(200)
+    .limit(500)
   if (error && error.code !== '42P01') return jsonResponse({ error: error.message }, 500)
   return jsonResponse({ feedback: data ?? [] })
 }
@@ -756,5 +759,60 @@ async function handleAdminRevoke(
     entity_id: null,
     payload: { target_user_id: userId },
   })
+  return jsonResponse({ ok: true })
+}
+
+async function handleFeedbackApprove(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+  adminId: string,
+): Promise<Response> {
+  const id = body.id
+  if (typeof id !== 'string') return jsonResponse({ error: 'id_required' }, 400)
+  const { error } = await admin
+    .from('bug_reports')
+    .update({
+      approved_by: adminId,
+      approved_at: new Date().toISOString(),
+      requires_approval: false,
+    })
+    .eq('id', id)
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleFeedbackReject(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const id = body.id
+  if (typeof id !== 'string') return jsonResponse({ error: 'id_required' }, 400)
+  // Отклонённые отмечаем status='wontfix' и approved=true (чтоб не висели в очереди)
+  const { error } = await admin
+    .from('bug_reports')
+    .update({
+      status: 'wontfix',
+      approved_at: new Date().toISOString(),
+      requires_approval: false,
+    })
+    .eq('id', id)
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleFeedbackStatus(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const id = body.id
+  const status = body.status
+  if (typeof id !== 'string') return jsonResponse({ error: 'id_required' }, 400)
+  if (
+    typeof status !== 'string' ||
+    !['open', 'in_progress', 'fixed', 'wontfix', 'duplicate'].includes(status)
+  )
+    return jsonResponse({ error: 'invalid_status' }, 400)
+  const { error } = await admin.from('bug_reports').update({ status }).eq('id', id)
+  if (error) return jsonResponse({ error: error.message }, 500)
   return jsonResponse({ ok: true })
 }

@@ -96,10 +96,16 @@ export type AdminFeedbackRow = {
   sender_first_name: string | null
   message_text: string | null
   ai_summary: string | null
-  status: string
+  status: 'open' | 'in_progress' | 'fixed' | 'wontfix' | 'duplicate'
   severity: string | null
-  kind: string
+  kind: 'bug' | 'feature'
   area: string | null
+  source: 'team' | 'client' | 'admin_ui'
+  requires_approval: boolean
+  approved_by: string | null
+  approved_at: string | null
+  reporter_user_id: string | null
+  salon_id: string | null
   reported_at: string
   created_at: string
 }
@@ -197,6 +203,38 @@ export function useUserUnblock() {
   const invalidate = useInvalidateUsers()
   return useMutation({
     mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('user_unblock', vars),
+    onSuccess: invalidate,
+  })
+}
+
+function useInvalidateFeedback() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['admin-feedback'] })
+  }
+}
+
+export function useFeedbackApprove() {
+  const invalidate = useInvalidateFeedback()
+  return useMutation({
+    mutationFn: (vars: { id: string }) => postAdmin<{ ok: true }>('feedback_approve', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useFeedbackReject() {
+  const invalidate = useInvalidateFeedback()
+  return useMutation({
+    mutationFn: (vars: { id: string }) => postAdmin<{ ok: true }>('feedback_reject', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useFeedbackStatus() {
+  const invalidate = useInvalidateFeedback()
+  return useMutation({
+    mutationFn: (vars: { id: string; status: string }) =>
+      postAdmin<{ ok: true }>('feedback_status', vars),
     onSuccess: invalidate,
   })
 }

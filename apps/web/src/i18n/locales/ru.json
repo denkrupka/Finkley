@@ -142,8 +142,43 @@
     },
     "feedback": {
       "title": "Фидбек и баг-репорты",
+      "subtitle": "Баги и фичи из Telegram-бота. Команда (@finklay_dev_bot) идут в работу сразу. Клиентские — ждут вашего апрува.",
       "empty": "Пока нет обращений.",
-      "todo_note": "Интеграция с bug_reports таблицей в разработке."
+      "empty_filtered": "Под выбранные фильтры ничего не подходит.",
+      "pending_count": "Ожидают апрува: {{count}}",
+      "pending_approval": "Нужен апрув",
+      "todo_note": "Интеграция с bug_reports таблицей в разработке.",
+      "filter": {
+        "all_sources": "Все источники",
+        "all_statuses": "Все статусы",
+        "all_kinds": "Все типы",
+        "only_pending": "Только ожидающие апрува"
+      },
+      "source": {
+        "team": "Команда",
+        "client": "Клиент салона",
+        "admin_ui": "Admin UI"
+      },
+      "kind": {
+        "bug": "Баг",
+        "feature": "Фича"
+      },
+      "status": {
+        "open": "Открыт",
+        "in_progress": "В работе",
+        "fixed": "Исправлен",
+        "wontfix": "Не делаем",
+        "duplicate": "Дубль"
+      },
+      "action": {
+        "approve": "Одобрить",
+        "reject": "Отклонить"
+      },
+      "toast": {
+        "approved": "Баг одобрен и взят в работу",
+        "rejected": "Баг отклонён",
+        "status_updated": "Статус обновлён"
+      }
     },
     "media": {
       "preview": "Preview",
