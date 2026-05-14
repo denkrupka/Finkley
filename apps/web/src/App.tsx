@@ -181,6 +181,23 @@ function App() {
         element={<RequireAuth>{lazyRoute(<OnboardingPage />)}</RequireAuth>}
       />
 
+      {/* Super-admin (корневой, не привязан к salon) */}
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth>
+            <AdminLayout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="overview" replace />} />
+        <Route path="overview" element={lazyRoute(<AdminOverviewPage />)} />
+        <Route path="salons" element={lazyRoute(<AdminSalonsPage />)} />
+        <Route path="users" element={lazyRoute(<AdminUsersPage />)} />
+        <Route path="media" element={lazyRoute(<AdminMediaPage />)} />
+        <Route path="feedback" element={lazyRoute(<AdminFeedbackPage />)} />
+      </Route>
+
       {/* Salon-scoped */}
       <Route
         path="/:salonId"
@@ -213,14 +230,6 @@ function App() {
         <Route path="settings/integrations-full" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
-        <Route path="admin" element={lazyRoute(<AdminLayout />)}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={lazyRoute(<AdminOverviewPage />)} />
-          <Route path="salons" element={lazyRoute(<AdminSalonsPage />)} />
-          <Route path="users" element={lazyRoute(<AdminUsersPage />)} />
-          <Route path="media" element={lazyRoute(<AdminMediaPage />)} />
-          <Route path="feedback" element={lazyRoute(<AdminFeedbackPage />)} />
-        </Route>
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
