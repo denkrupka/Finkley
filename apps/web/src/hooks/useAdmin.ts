@@ -86,6 +86,7 @@ export type AdminUserRow = {
   first_name: string | null
   last_name: string | null
   app_role: 'super_admin' | 'admin' | null
+  is_tester: boolean
   salons: Array<{ salon_id: string; salon_name: string; role: string }>
 }
 
@@ -100,12 +101,23 @@ export type AdminFeedbackRow = {
   severity: string | null
   kind: 'bug' | 'feature'
   area: string | null
-  source: 'team' | 'client' | 'admin_ui'
+  source: 'team' | 'client' | 'admin_ui' | 'tester'
   requires_approval: boolean
   approved_by: string | null
   approved_at: string | null
   reporter_user_id: string | null
+  reporter_email: string | null
+  reporter_full_name: string | null
   salon_id: string | null
+  attachments: Array<{
+    type?: string
+    storage_path?: string | null
+    mime?: string
+    size?: number
+    name?: string
+    vision_summary?: string
+  }> | null
+  notes: string | null
   reported_at: string
   created_at: string
 }
@@ -252,6 +264,15 @@ export function useAdminRevoke() {
   const invalidate = useInvalidateUsers()
   return useMutation({
     mutationFn: (vars: { user_id: string }) => postAdmin<{ ok: true }>('admin_revoke', vars),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetTesterFlag() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: (vars: { user_id: string; is_tester: boolean }) =>
+      postAdmin<{ ok: true }>('user_set_tester', vars),
     onSuccess: invalidate,
   })
 }

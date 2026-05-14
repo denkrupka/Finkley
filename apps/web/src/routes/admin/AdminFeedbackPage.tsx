@@ -12,7 +12,7 @@ import {
 } from '@/hooks/useAdmin'
 
 type Filter = {
-  source: 'all' | 'team' | 'client'
+  source: 'all' | 'team' | 'client' | 'tester'
   status: 'all' | 'open' | 'in_progress' | 'fixed' | 'wontfix'
   kind: 'all' | 'bug' | 'feature'
   onlyPending: boolean
@@ -88,6 +88,7 @@ export function AdminFeedbackPage() {
             options={[
               { value: 'all', label: t('admin.feedback.filter.all_sources') },
               { value: 'team', label: t('admin.feedback.source.team') },
+              { value: 'tester', label: t('admin.feedback.source.tester') },
               { value: 'client', label: t('admin.feedback.source.client') },
             ]}
           />
@@ -193,9 +194,20 @@ function FeedbackRow({ row }: { row: AdminFeedbackRow }) {
           </p>
 
           <div className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-[11px]">
+            {row.reporter_full_name || row.reporter_email ? (
+              <span className="font-medium">
+                {row.reporter_full_name ?? row.reporter_email}
+                {row.reporter_email && row.reporter_full_name ? ` · ${row.reporter_email}` : ''}
+              </span>
+            ) : null}
             {row.sender_username ? <span>@{row.sender_username}</span> : null}
-            {row.sender_first_name ? <span>{row.sender_first_name}</span> : null}
+            {row.sender_first_name && !row.reporter_full_name ? (
+              <span>{row.sender_first_name}</span>
+            ) : null}
             {row.area ? <span>· {row.area}</span> : null}
+            {row.attachments && row.attachments.length > 0 ? (
+              <span>· 📎 {row.attachments.length}</span>
+            ) : null}
           </div>
         </div>
 

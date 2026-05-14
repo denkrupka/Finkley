@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
     if (action === 'feedback_approve') return handleFeedbackApprove(admin, body, user.userId)
     if (action === 'feedback_reject') return handleFeedbackReject(admin, body)
     if (action === 'feedback_status') return handleFeedbackStatus(admin, body)
+    if (action === 'user_set_tester') return handleUserSetTester(admin, body)
     return jsonResponse({ error: 'unknown_action' }, 400)
   }
 
@@ -356,12 +357,16 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
 
   const [{ data: members }, { data: profiles }, { data: appAdmins }] = await Promise.all([
     admin.from('salon_members').select('user_id, salon_id, role, salons(id, name)'),
-    admin.from('profiles').select('id, full_name'),
+    admin.from('profiles').select('id, full_name, is_tester'),
     admin.from('app_admins').select('user_id, is_super'),
   ])
-  const profileById = new Map<string, { full_name: string | null }>()
-  for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) {
-    profileById.set(p.id, { full_name: p.full_name })
+  const profileById = new Map<string, { full_name: string | null; is_tester: boolean }>()
+  for (const p of (profiles ?? []) as {
+    id: string
+    full_name: string | null
+    is_tester: boolean | null
+  }[]) {
+    profileById.set(p.id, { full_name: p.full_name, is_tester: !!p.is_tester })
   }
   const adminById = new Map<string, { is_super: boolean }>()
   for (const a of (appAdmins ?? []) as { user_id: string; is_super: boolean | null }[]) {
@@ -412,6 +417,7 @@ async function handleUsers(admin: AdminClient): Promise<Response> {
         first_name: firstName,
         last_name: lastName,
         app_role: adminRow ? (adminRow.is_super ? 'super_admin' : 'admin') : null,
+        is_tester: profile?.is_tester ?? false,
         salons: salonsArr,
       }
     }),
@@ -422,12 +428,50 @@ async function handleFeedback(admin: AdminClient): Promise<Response> {
   const { data, error } = await admin
     .from('bug_reports')
     .select(
-      'id, telegram_chat_id, sender_username, sender_first_name, message_text, ai_summary, status, severity, kind, area, source, requires_approval, approved_by, approved_at, reporter_user_id, salon_id, reported_at, created_at',
+      'id, telegram_chat_id, sender_username, sender_first_name, message_text, ai_summary, status, severity, kind, area, source, requires_approval, approved_by, approved_at, reporter_user_id, salon_id, attachments, notes, reported_at, created_at',
     )
     .order('reported_at', { ascending: false })
     .limit(500)
   if (error && error.code !== '42P01') return jsonResponse({ error: error.message }, 500)
-  return jsonResponse({ feedback: data ?? [] })
+
+  // Резолвим reporter_user_id → имя/email для отображения «от кого пришёл баг»
+  const reporterIds = Array.from(
+    new Set((data ?? []).map((r) => r.reporter_user_id).filter(Boolean)),
+  ) as string[]
+  const reporterById = new Map<string, { email: string | null; full_name: string | null }>()
+  if (reporterIds.length > 0) {
+    const { data: profs } = await admin
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', reporterIds)
+    const profById = new Map<string, string | null>()
+    for (const p of (profs ?? []) as { id: string; full_name: string | null }[]) {
+      profById.set(p.id, p.full_name)
+    }
+    // Email достаём из auth.users через listUsers — один batch
+    const { data: usersResp } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    const emailById = new Map<string, string>()
+    for (const u of usersResp?.users ?? []) {
+      if (u.email) emailById.set(u.id, u.email)
+    }
+    for (const id of reporterIds) {
+      reporterById.set(id, {
+        email: emailById.get(id) ?? null,
+        full_name: profById.get(id) ?? null,
+      })
+    }
+  }
+
+  const enriched = (data ?? []).map((r) => {
+    const rep = r.reporter_user_id ? reporterById.get(r.reporter_user_id as string) : null
+    return {
+      ...r,
+      reporter_email: rep?.email ?? null,
+      reporter_full_name: rep?.full_name ?? null,
+    }
+  })
+
+  return jsonResponse({ feedback: enriched })
 }
 
 // =============================================================================
@@ -799,6 +843,19 @@ async function handleFeedbackReject(
       requires_approval: false,
     })
     .eq('id', id)
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleUserSetTester(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const userId = body.user_id
+  const isTester = body.is_tester
+  if (typeof userId !== 'string') return jsonResponse({ error: 'user_id_required' }, 400)
+  if (typeof isTester !== 'boolean') return jsonResponse({ error: 'is_tester_required' }, 400)
+  const { error } = await admin.from('profiles').update({ is_tester: isTester }).eq('id', userId)
   if (error) return jsonResponse({ error: error.message }, 500)
   return jsonResponse({ ok: true })
 }

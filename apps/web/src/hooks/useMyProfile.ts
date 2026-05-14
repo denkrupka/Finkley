@@ -15,6 +15,7 @@ export type MyProfile = {
   locale: string
   telegram_id: number | null
   telegram_username: string | null
+  is_tester: boolean
 }
 
 export function useMyProfile() {
@@ -25,7 +26,7 @@ export function useMyProfile() {
       if (!user) return null
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, locale, telegram_id, telegram_username')
+        .select('id, full_name, avatar_url, locale, telegram_id, telegram_username, is_tester')
         .eq('id', user.id)
         .maybeSingle()
       if (error) throw error

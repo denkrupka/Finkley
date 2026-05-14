@@ -11,6 +11,7 @@ import {
   useAdminRevoke,
   useAdminUsers,
   useMemberRoleChange,
+  useSetTesterFlag,
   useUserBlock,
   useUserUnblock,
   type AdminUserRow,
@@ -50,6 +51,7 @@ export function AdminUsersPage() {
                 <th className="px-4 py-3 text-left">{t('admin.users.email')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.users.app_role')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.users.salons')}</th>
+                <th className="px-4 py-3 text-center">{t('admin.users.tester')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.users.last_signin')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.users.created')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.users.actions')}</th>
@@ -61,7 +63,7 @@ export function AdminUsersPage() {
               ))}
               {data.users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-muted-foreground px-4 py-8 text-center">
+                  <td colSpan={8} className="text-muted-foreground px-4 py-8 text-center">
                     {t('admin.users.empty')}
                   </td>
                 </tr>
@@ -82,6 +84,7 @@ function UserRow({ user, onEditRoles }: { user: AdminUserRow; onEditRoles: () =>
   const unblock = useUserUnblock()
   const grant = useAdminGrant()
   const revoke = useAdminRevoke()
+  const setTester = useSetTesterFlag()
   const { data: callerIsSuper } = useIsAppSuperAdmin()
 
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || '—'
@@ -139,6 +142,29 @@ function UserRow({ user, onEditRoles }: { user: AdminUserRow; onEditRoles: () =>
             ))}
           </div>
         )}
+      </td>
+      <td className="px-4 py-3 text-center">
+        <input
+          type="checkbox"
+          checked={user.is_tester}
+          disabled={setTester.isPending}
+          onChange={(e) =>
+            setTester.mutate(
+              { user_id: user.id, is_tester: e.target.checked },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    e.target.checked
+                      ? t('admin.users.toast.tester_on')
+                      : t('admin.users.toast.tester_off'),
+                  ),
+                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+              },
+            )
+          }
+          aria-label={t('admin.users.tester')}
+          className="size-4 cursor-pointer accent-amber-500"
+        />
       </td>
       <td className="text-muted-foreground px-4 py-3 text-xs">
         {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString('ru-RU') : '—'}
