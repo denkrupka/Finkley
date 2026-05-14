@@ -196,6 +196,52 @@ Deno.serve(async (req) => {
     } catch (e) {
       deliveryError = e instanceof Error ? e.message : String(e)
     }
+  } else if (integ && integ.status === 'connected' && convo.channel === 'whatsapp') {
+    try {
+      const creds = (integ.credentials ?? {}) as Record<string, unknown>
+      const waToken = await decryptSecret(creds.access_token_enc as string)
+      const phoneId = (creds.phone_number_id as string) ?? integ.credentials?.phone_number_id
+      if (!phoneId) throw new Error('phone_number_id_missing')
+      const endpoint = `https://graph.facebook.com/v21.0/${phoneId}/messages`
+
+      // WhatsApp поддерживает один тип сообщения за раз. Если есть и media,
+      // и text — отправим 2 (caption внутри media-payload + отдельный text).
+      const sendOne = async (msgPayload: Record<string, unknown>) => {
+        const r = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${waToken}`,
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: convo.external_user_id,
+            ...msgPayload,
+          }),
+        })
+        const j = (await r.json()) as {
+          messages?: Array<{ id: string }>
+          error?: { message: string; code: number }
+        }
+        if (!r.ok || j.error || !j.messages?.[0]?.id) {
+          throw new Error(j.error?.message ?? `WA send failed (HTTP ${r.status})`)
+        }
+        return j.messages[0].id
+      }
+
+      let lastId: string | null = null
+      if (mediaSignedUrl && body.media_kind) {
+        const t = body.media_kind === 'file' ? 'document' : body.media_kind
+        lastId = await sendOne({ type: t, [t]: { link: mediaSignedUrl } })
+      }
+      if (body.text) {
+        lastId = await sendOne({ type: 'text', text: { body: body.text } })
+      }
+      externalMessageId = lastId
+    } catch (e) {
+      deliveryError = e instanceof Error ? e.message : String(e)
+    }
   }
 
   // Записываем локально (всегда)

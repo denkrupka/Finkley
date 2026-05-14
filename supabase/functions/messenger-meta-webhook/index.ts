@@ -63,8 +63,30 @@ type MetaEntry = {
   changes?: ChangeEvent[]
 }
 type MetaWebhookPayload = {
-  object: 'page' | 'instagram'
+  object: 'page' | 'instagram' | 'whatsapp_business_account'
   entry: MetaEntry[]
+}
+
+// WhatsApp Cloud API payload (object='whatsapp_business_account')
+type WaContact = { profile?: { name?: string }; wa_id: string }
+type WaMessage = {
+  id: string
+  from: string
+  timestamp: string
+  type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'sticker' | string
+  text?: { body: string }
+  image?: { id: string; mime_type?: string; caption?: string }
+  video?: { id: string; mime_type?: string; caption?: string }
+  audio?: { id: string; mime_type?: string }
+  document?: { id: string; mime_type?: string; filename?: string; caption?: string }
+  sticker?: { id: string; mime_type?: string }
+}
+type WaChangeValue = {
+  messaging_product: 'whatsapp'
+  metadata: { display_phone_number: string; phone_number_id: string }
+  contacts?: WaContact[]
+  messages?: WaMessage[]
+  statuses?: Array<{ id: string; status: string; recipient_id: string }>
 }
 
 Deno.serve(async (req) => {
@@ -123,6 +145,47 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  // WhatsApp Business Cloud API имеет совершенно другую структуру событий —
+  // обрабатываем в отдельной ветке, не пытаемся уложить в MessagingEvent.
+  if (payload.object === 'whatsapp_business_account') {
+    for (const entry of payload.entry) {
+      for (const ch of entry.changes ?? []) {
+        if (ch.field !== 'messages' || !ch.value) continue
+        const v = ch.value as unknown as WaChangeValue
+        const phoneId = v.metadata?.phone_number_id
+        if (!phoneId) continue
+        const { data: integ } = await admin
+          .from('messenger_integrations')
+          .select('salon_id, status, credentials')
+          .eq('channel', 'whatsapp')
+          .eq('external_account_id', phoneId)
+          .maybeSingle()
+        if (!integ?.salon_id) {
+          console.log(`[webhook] no WA integration for phone_id=${phoneId} — skip`)
+          continue
+        }
+        const creds = (integ.credentials ?? {}) as Record<string, unknown>
+        let waToken: string | null = null
+        if (creds.access_token_enc) {
+          try {
+            waToken = await decryptSecret(creds.access_token_enc as string)
+          } catch (e) {
+            console.warn('decrypt WA token failed:', (e as Error).message)
+          }
+        }
+        // Карта профилей (имя) — приходит в contacts[]
+        const nameByWaId = new Map<string, string>()
+        for (const c of v.contacts ?? []) {
+          if (c.wa_id && c.profile?.name) nameByWaId.set(c.wa_id, c.profile.name)
+        }
+        for (const m of v.messages ?? []) {
+          await ingestWaMessage(admin, integ.salon_id, m, nameByWaId, waToken)
+        }
+      }
+    }
+    return jsonResponse({ ok: true })
+  }
 
   const channel = payload.object === 'instagram' ? 'instagram' : 'facebook'
 
@@ -390,4 +453,155 @@ async function ingestMessage(
     created_at: createdAt,
   }
   await admin.from('messenger_messages').insert(insertPayload)
+}
+
+/**
+ * Обработка одного входящего WhatsApp-сообщения.
+ *
+ * - Имя клиента: contacts[].profile.name (Meta присылает один раз в каждом
+ *   событии, мы кешируем в карте по wa_id и используем здесь).
+ * - Media: m.{image|video|audio|document}.id → нужен отдельный GET к
+ *   /v21.0/<media_id>?access_token=... чтобы получить временный URL, потом
+ *   скачать с Authorization Bearer и положить в bucket messenger-media.
+ */
+async function ingestWaMessage(
+  admin: SupabaseClient,
+  salonId: string,
+  m: WaMessage,
+  nameByWaId: Map<string, string>,
+  waToken: string | null,
+): Promise<void> {
+  const externalUserId = m.from
+  const displayName = nameByWaId.get(externalUserId) ?? `WhatsApp ${externalUserId.slice(-4)}`
+
+  // Safe upsert (как для FB/IG) — не перезаписываем уже хорошее имя на дефолт.
+  const { data: existing } = await admin
+    .from('messenger_conversations')
+    .select('id, display_name')
+    .eq('salon_id', salonId)
+    .eq('channel', 'whatsapp')
+    .eq('external_user_id', externalUserId)
+    .maybeSingle()
+
+  const isFreshDefault = displayName.startsWith('WhatsApp ')
+  const existingIsGood = existing?.display_name && !existing.display_name.startsWith('WhatsApp ')
+  const finalDisplayName = existingIsGood && isFreshDefault ? existing.display_name : displayName
+
+  let convoId: string | null = null
+  if (existing) {
+    await admin
+      .from('messenger_conversations')
+      .update({ display_name: finalDisplayName })
+      .eq('id', existing.id)
+    convoId = existing.id
+  } else {
+    const { data } = await admin
+      .from('messenger_conversations')
+      .insert({
+        salon_id: salonId,
+        channel: 'whatsapp',
+        external_user_id: externalUserId,
+        display_name: finalDisplayName,
+      })
+      .select('id')
+      .single()
+    convoId = data?.id ?? null
+  }
+  if (!convoId) return
+
+  // Текст + media
+  let text: string | null = m.text?.body ?? null
+  let mediaKind: string | null = null
+  let mediaPath: string | null = null
+  let mediaId: string | null = null
+  let mediaMime: string | null = null
+  if (m.type === 'image' && m.image) {
+    mediaKind = 'image'
+    mediaId = m.image.id
+    mediaMime = m.image.mime_type ?? null
+    if (!text) text = m.image.caption ?? null
+  } else if (m.type === 'video' && m.video) {
+    mediaKind = 'video'
+    mediaId = m.video.id
+    mediaMime = m.video.mime_type ?? null
+    if (!text) text = m.video.caption ?? null
+  } else if (m.type === 'audio' && m.audio) {
+    mediaKind = 'audio'
+    mediaId = m.audio.id
+    mediaMime = m.audio.mime_type ?? null
+  } else if (m.type === 'document' && m.document) {
+    mediaKind = 'file'
+    mediaId = m.document.id
+    mediaMime = m.document.mime_type ?? null
+    if (!text) text = m.document.caption ?? m.document.filename ?? null
+  } else if (m.type === 'sticker' && m.sticker) {
+    mediaKind = 'sticker'
+    if (!text) text = '🎭 Стикер'
+  }
+
+  if (mediaId && waToken && mediaKind && mediaKind !== 'sticker') {
+    try {
+      const metaUrl = `https://graph.facebook.com/v21.0/${mediaId}?access_token=${encodeURIComponent(waToken)}`
+      const metaResp = await fetch(metaUrl)
+      if (metaResp.ok) {
+        const j = (await metaResp.json()) as { url?: string; mime_type?: string }
+        if (j.url) {
+          const fileResp = await fetch(j.url, {
+            headers: { Authorization: `Bearer ${waToken}` },
+          })
+          if (fileResp.ok) {
+            const buf = new Uint8Array(await fileResp.arrayBuffer())
+            const mime = mediaMime ?? j.mime_type ?? 'application/octet-stream'
+            const extMap: Record<string, string> = {
+              'image/jpeg': 'jpg',
+              'image/png': 'png',
+              'image/webp': 'webp',
+              'video/mp4': 'mp4',
+              'audio/ogg': 'ogg',
+              'audio/mpeg': 'mp3',
+              'application/pdf': 'pdf',
+            }
+            const ext = extMap[mime] ?? mediaKind
+            const fname = `${salonId}/incoming/${crypto.randomUUID()}.${ext}`
+            const { error: upErr } = await admin.storage
+              .from('messenger-media')
+              .upload(fname, buf, { contentType: mime, upsert: false })
+            if (!upErr) {
+              mediaPath = fname
+            } else {
+              console.warn('[webhook][wa] media upload failed:', upErr.message)
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[webhook][wa] media download error:', (e as Error).message)
+    }
+  }
+
+  if (!mediaPath && !text && mediaKind) {
+    const labels: Record<string, string> = {
+      image: '📷 Изображение',
+      video: '🎥 Видео',
+      audio: '🎙 Аудио',
+      file: '📎 Файл',
+      sticker: '🎭 Стикер',
+    }
+    text = labels[mediaKind] ?? null
+  }
+
+  const createdAt = m.timestamp
+    ? new Date(parseInt(m.timestamp, 10) * 1000).toISOString()
+    : new Date().toISOString()
+
+  await admin.from('messenger_messages').insert({
+    conversation_id: convoId,
+    salon_id: salonId,
+    direction: 'in',
+    text,
+    media_kind: mediaKind,
+    media_path: mediaPath,
+    external_message_id: m.id,
+    created_at: createdAt,
+  })
 }
