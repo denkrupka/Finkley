@@ -9,7 +9,9 @@ import {
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useRevenueByStaff } from '@/hooks/useAnalytics'
 import { useSalon } from '@/hooks/useSalons'
+import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { StaffPerformanceSection } from '@/routes/staff/StaffPerformanceSection'
 
 /**
  * Reports → Мастера. Выручка по мастерам за выбранный месяц + доля от
@@ -25,6 +27,11 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const startIso = range.start.toISOString()
   const endIso = range.end.toISOString()
   const { data: rows = [], isLoading } = useRevenueByStaff(salonId, startIso, endIso)
+  // Полная «Эффективность мастеров» — раньше жила на /staff, перенесена
+  // сюда по ТЗ владельца (Image #32): отчёт мастеров логично смотреть в
+  // Отчётах, а не в Справочнике. Использует ретеншн-окно из salon (по
+  // умолчанию 60 дн), не period-picker.
+  const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
 
   const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
   const max = rows.reduce((m, r) => Math.max(m, r.revenue_cents), 0)
@@ -89,6 +96,10 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="mt-6">
+        <StaffPerformanceSection salonId={salonId} staff={staffList} currency={currency} />
       </div>
     </div>
   )
