@@ -69,7 +69,6 @@ import {
   COUNTRY_OPTIONS,
   SALON_TYPES,
   type CountryCode,
-  type SalonTypeId,
 } from '@/routes/onboarding/onboarding-defaults'
 
 /**
@@ -130,7 +129,10 @@ export function SettingsPage() {
 
   const [name, setName] = useState('')
   const [country, setCountry] = useState<CountryCode>('PL')
-  const [salonType, setSalonType] = useState<SalonTypeId>('hair')
+  // salonType хранит строку — либо id из SALON_TYPES, либо кастомное имя,
+  // которое пользователь ввёл сам (image #80). UI отображает либо выпадающий
+  // список, либо текстовое поле под опцией «Другое...».
+  const [salonType, setSalonType] = useState<string>('hair')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -204,7 +206,7 @@ export function SettingsPage() {
     if (!salon) return
     setName(salon.name)
     setCountry(salon.country_code as CountryCode)
-    setSalonType(salon.salon_type as SalonTypeId)
+    setSalonType(salon.salon_type ?? 'hair')
     setLogoUrl(salon.logo_url ?? '')
   }, [salon])
 
@@ -298,20 +300,56 @@ export function SettingsPage() {
                 </p>
               </div>
 
+              {/* Тип салона (image #80). Если значение совпадает с одним из
+                  предустановленных id — селект показывает его. Иначе считаем
+                  это кастомным значением — выбираем "__custom__" и рядом
+                  открываем Input для ручного редактирования. */}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="set-type">{t('settings.profile.type_label')}</Label>
-                <Select value={salonType} onValueChange={(v) => setSalonType(v as SalonTypeId)}>
-                  <SelectTrigger id="set-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SALON_TYPES.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {t(`onboarding.salon_type.${s.id}`, { defaultValue: s.name })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {(() => {
+                  const isPreset = SALON_TYPES.some((s) => s.id === salonType)
+                  const selectValue = isPreset ? salonType : '__custom__'
+                  return (
+                    <>
+                      <Select
+                        value={selectValue}
+                        onValueChange={(v) => {
+                          if (v === '__custom__') {
+                            // Переключение в режим custom — оставляем текущее
+                            // значение если оно уже custom, иначе пусто чтобы
+                            // юзер увидел свободный input.
+                            setSalonType(isPreset ? '' : salonType)
+                          } else {
+                            setSalonType(v)
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="set-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SALON_TYPES.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {t(`onboarding.salon_type.${s.id}`, { defaultValue: s.name })}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__custom__">
+                            {t('settings.profile.type_custom')}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {!isPreset ? (
+                        <Input
+                          autoFocus
+                          value={salonType}
+                          onChange={(e) => setSalonType(e.target.value)}
+                          placeholder={t('settings.profile.type_custom_placeholder')}
+                          maxLength={60}
+                        />
+                      ) : null}
+                    </>
+                  )
+                })()}
               </div>
 
               <div className="flex flex-col gap-2 sm:col-span-2">
