@@ -53,9 +53,13 @@ import type { PaymentMethod } from '@/hooks/useVisits'
 
 type FormValues = {
   expense_at: string
+  /** Image #94: обязательное короткое описание (раньше эту роль играл comment). */
+  description: string
   category_id: string
   amount: string
   payment_method: PaymentMethod | ''
+  /** Номер фактуры/чека (image #93). Опциональное. */
+  document_number: string
   comment: string
   recurrence: ExpenseRecurrence
   // Payroll: показываются только если выбранная категория is_payroll=true
@@ -67,6 +71,10 @@ type FormValues = {
 
 const schema = z.object({
   expense_at: z.string().min(1),
+  description: z
+    .string()
+    .min(1, 'expenses.errors.description_required')
+    .max(200, 'expenses.errors.description_too_long'),
   category_id: z.string().min(1, 'expenses.errors.category_required'),
   amount: z
     .string()
@@ -76,6 +84,7 @@ const schema = z.object({
     .enum(['cash', 'card', 'transfer', 'online', 'mixed', ''])
     .optional()
     .default(''),
+  document_number: z.string().max(60).optional().default(''),
   comment: z.string().max(500).optional().default(''),
   recurrence: z.enum(['none', 'weekly', 'monthly']).default('none'),
   payroll_staff_id: z.string().optional().default(''),
@@ -170,9 +179,11 @@ export function ExpenseFormModal({
     resolver: zodResolver(schema),
     defaultValues: {
       expense_at: today,
+      description: '',
       category_id: defaultCategoryId ?? '',
       amount: '',
       payment_method: '',
+      document_number: '',
       comment: '',
       recurrence: 'none',
       payroll_staff_id: '',
@@ -193,9 +204,11 @@ export function ExpenseFormModal({
     if (expense) {
       form.reset({
         expense_at: expense.expense_at.slice(0, 10),
+        description: expense.description ?? '',
         category_id: expense.category_id ?? '',
         amount: ((expense.amount_cents ?? 0) / 100).toFixed(2),
         payment_method: (expense.payment_method as PaymentMethod) ?? '',
+        document_number: expense.document_number ?? '',
         comment: expense.comment ?? '',
         recurrence: (expense.recurrence as ExpenseRecurrence) ?? 'none',
         payroll_staff_id: expense.payroll_staff_id ?? '',
@@ -206,9 +219,11 @@ export function ExpenseFormModal({
     } else {
       form.reset({
         expense_at: today,
+        description: '',
         category_id: defaultCategoryId ?? '',
         amount: '',
         payment_method: '',
+        document_number: '',
         comment: '',
         recurrence: 'none',
         payroll_staff_id: '',
@@ -245,9 +260,11 @@ export function ExpenseFormModal({
         {
           id: expense.id,
           expense_at: values.expense_at,
+          description: values.description.trim(),
           category_id: values.category_id || null,
           amount_cents: amountCents,
           payment_method: values.payment_method || null,
+          document_number: values.document_number.trim() || null,
           comment: values.comment || null,
           recurrence: values.recurrence,
           ...payrollFields,
@@ -287,9 +304,11 @@ export function ExpenseFormModal({
       {
         salon_id: salonId,
         expense_at: values.expense_at,
+        description: values.description.trim(),
         category_id: values.category_id || null,
         amount_cents: amountCents,
         payment_method: values.payment_method || null,
+        document_number: values.document_number.trim() || null,
         comment: values.comment || null,
         receipt_url: receiptUrl,
         recurrence: values.recurrence,
@@ -302,9 +321,11 @@ export function ExpenseFormModal({
           toast.success(t('expenses.toast_added'))
           form.reset({
             expense_at: today,
+            description: '',
             category_id: defaultCategoryId ?? '',
             amount: '',
             payment_method: '',
+            document_number: '',
             comment: '',
             recurrence: 'none',
           })
@@ -397,6 +418,23 @@ export function ExpenseFormModal({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
             <Input id="exp-date" type="date" {...form.register('expense_at')} />
+          </div>
+
+          {/* Image #94: новое обязательное поле «Описание» — над категорией. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="exp-description">{t('expenses.form.description_label')} *</Label>
+            <Input
+              id="exp-description"
+              {...form.register('description')}
+              placeholder={t('expenses.form.description_placeholder')}
+              maxLength={200}
+              data-testid="exp-description"
+            />
+            {form.formState.errors.description ? (
+              <p className="text-destructive text-xs font-medium" role="alert">
+                {t(form.formState.errors.description.message ?? '')}
+              </p>
+            ) : null}
           </div>
 
           <Controller
@@ -600,6 +638,23 @@ export function ExpenseFormModal({
             />
           </div>
 
+          {/* Image #93: номер документа (фактура/чек) — опциональное поле,
+              заполняется руками либо подтягивается OCR'ом с фото чека. Для
+              payroll-категорий скрываем — там документа в этом смысле нет. */}
+          {isPayrollCategory ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="exp-document-number">
+                {t('expenses.form.document_number_label')}
+              </Label>
+              <Input
+                id="exp-document-number"
+                {...form.register('document_number')}
+                placeholder={t('expenses.form.document_number_placeholder')}
+                maxLength={60}
+              />
+            </div>
+          )}
+
           {/* Фото чека (опционально). Если фото — auto-OCR через Claude Haiku.
               Image #65: для зарплатных категорий чека по смыслу не бывает —
               скрываем блок целиком, чтобы не сбивать с толку. */}
@@ -671,6 +726,12 @@ export function ExpenseFormModal({
                         }
                         if (parsed.vendor && !form.getValues('comment')) {
                           form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                        }
+                        // Описание (image #94) — auto-fill из vendor если пусто.
+                        if (parsed.vendor && !form.getValues('description')) {
+                          form.setValue('description', parsed.vendor.slice(0, 200), {
+                            shouldDirty: true,
+                          })
                         }
                         // NIP'ы — для wFirma auto-push (см. ADR-012).
                         // Сами поля юзеру не показываем — это служебная мета.

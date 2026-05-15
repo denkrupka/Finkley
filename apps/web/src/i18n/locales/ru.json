@@ -3068,6 +3068,10 @@
     "form": {
       "title_new": "Новый расход",
       "date_label": "Дата",
+      "description_label": "Описание",
+      "description_placeholder": "Например: Краска Wella, Аренда май",
+      "document_number_label": "Номер документа (фактура/чек)",
+      "document_number_placeholder": "Например: FV/2026/05/123",
       "category_label": "Категория",
       "category_placeholder": "Выбери категорию",
       "category_empty": "Сначала добавь категории",
@@ -3103,6 +3107,8 @@
       "recurrence_hint": "Будем создавать такой же расход автоматически каждый период."
     },
     "errors": {
+      "description_required": "Опиши расход коротко",
+      "description_too_long": "Описание слишком длинное (макс 200 символов)",
       "category_required": "Выбери категорию",
       "amount_required": "Укажи сумму",
       "amount_positive": "Сумма должна быть больше нуля"
