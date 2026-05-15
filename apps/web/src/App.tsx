@@ -259,6 +259,10 @@ function App() {
           path="clients"
           element={<Navigate to="../reports?tab=clients&client=list" replace />}
         />
+        {/* Legacy: /reports?tab=clients&client=top ушёл в /list — поддерживаем
+            старые закладки. Это просто заглушка на уровне ClientsAnalyticsTab:
+            если в URL пришло client=top, компонент сам отрисует list (fallback
+            в isClientsSubTab). Дополнительная редирект-маршрут не нужна. */}
         <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="services" element={lazyRoute(<ServicesPage />)} />

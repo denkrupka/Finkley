@@ -19,6 +19,7 @@ export type TemplateAlias =
   | 'weekly_digest'
   | 'team_invitation'
   | 'bank_consent_expiring'
+  | 'privacy_alert'
 
 export type EmailTemplate = {
   subject: string
@@ -505,6 +506,50 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
   </p>
   <p style="margin:0;font-size:13px;color:#64748b;">
     Ссылка действует {{expires_in_days}} дней. Если ты не ждал такого приглашения — просто проигнорируй это письмо.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · управленческий учёт для салонов красоты
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+  },
+
+  privacy_alert: {
+    subject: '🔒 Администратор {{actor_name}} просмотрел контакты {{client_count}}+ клиентов',
+    html: `<!DOCTYPE html>
+<html lang="ru"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Уведомление о приватности</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    Администратор просмотрел контакты {{client_count}}+ клиентов
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Сегодня администратор <strong>{{actor_name}}</strong> открыл список клиентов
+    салона <strong>{{salon_name}}</strong>, в котором были видны контактные
+    данные более чем {{client_count}} клиентов.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Это штатное действие для роли «администратор» — она имеет полный доступ
+    к клиентской базе по дефолту. Если ты хочешь скрыть контакты конкретно
+    для этого человека или сменить ему роль на «мастер» / «бухгалтер»,
+    зайди в раздел «Команда» в настройках салона.
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{team_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Открыть раздел «Команда»
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    Это автоматическое уведомление приходит максимум раз в день — даже если
+    администратор повторно открывал список несколько раз.
   </p>
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">

@@ -1,7 +1,7 @@
-import { formatDistanceToNow, formatDistanceToNowStrict, parseISO } from 'date-fns'
+import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { BarChart3, Cake, EyeOff, ListChecks, Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Cake, EyeOff, ListChecks, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 
@@ -10,45 +10,34 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
-  currentMonthPeriod,
-  periodToRange,
-  type PeriodValue,
-} from '@/components/ui/period-picker-utils'
-import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useAuth } from '@/hooks/useAuth'
 import { useClients, type ClientSort } from '@/hooks/useClients'
+import { useNextVisitsByClient } from '@/hooks/useNextVisits'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
-import { useTopClientsByRevenue } from '@/hooks/useTopClients'
+import { supabase } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatPhoneDisplay } from '@/lib/utils/format-phone'
 import { cn } from '@/lib/utils/cn'
 import { ClientDrawer } from '@/routes/clients/ClientDrawer'
 import { ClientFormModal } from '@/routes/clients/ClientFormModal'
-import {
-  clientSegment,
-  daysSinceLastVisit,
-  daysToBirthday,
-  type ClientSegment,
-} from '@/routes/clients/client-segments'
+import { clientSegment, daysToBirthday, type ClientSegment } from '@/routes/clients/client-segments'
 import type { ClientRow } from '@/hooks/useClients'
 import { SegmentationCard } from '@/routes/settings/SegmentationCard'
 
-type ClientsSubTab = 'list' | 'top' | 'params'
+type ClientsSubTab = 'list' | 'params'
 
 const SUB_TABS: PageTab<ClientsSubTab>[] = [
   { id: 'list', labelKey: 'reports_hub.clients.tabs.list', icon: ListChecks },
-  { id: 'top', labelKey: 'reports_hub.clients.tabs.top', icon: BarChart3 },
   { id: 'params', labelKey: 'reports_hub.clients.tabs.params', icon: SlidersHorizontal },
 ]
 
 function isClientsSubTab(v: string | null): v is ClientsSubTab {
-  return v === 'list' || v === 'top' || v === 'params'
+  return v === 'list' || v === 'params'
 }
 
 type SegmentFilter = 'all' | ClientSegment
@@ -64,19 +53,18 @@ const SEGMENT_BADGE: Record<ClientSegment, { className: string; i18nKey: string 
   prospect: { className: 'bg-muted text-muted-foreground', i18nKey: 'clients.segments.prospect' },
 }
 
+/** Порог количества клиентов с видимыми контактами, после которого
+ *  владельцу салона уходит уведомление о массовом просмотре администратором.
+ *  Установлен заказчиком (>50 = «подозрительно много в один заход»). */
+const MASS_VIEW_THRESHOLD = 50
+
 /**
- * Reports → Клиенты. Три sub-tab'а после merge'а со справочником:
+ * Reports → Клиенты. Два sub-tab'а:
+ *   - Список — полный CRUD-список с поиском/фильтром/сегментами и AI-выводами.
+ *   - Параметры — окна retention/churn для сегментации.
  *
- *   - Список   — полный список клиентов с CRUD, поиск/сортировка/фильтр
- *                по сегменту. Перенесён из /clients (бывший справочник),
- *                чтобы не плодить дублей.
- *   - Топ      — Top-20 за выбранный период по обороту, c AI-инсайтами.
- *   - Параметры — SegmentationCard (окна retention/churn).
- *
- * Активный sub-tab в URL через `?client=list|top|params`.
- *
- * RBAC: контактные данные (phone/email) показываются только owner/admin.
- * Мастера и бухгалтер видят только имя и метрики.
+ * Раньше был ещё «Топ клиентов по выручке»; владелец попросил убрать его и
+ * перенести AI-инсайты в «Список» (TASK-46).
  */
 export function ClientsAnalyticsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
@@ -98,8 +86,6 @@ export function ClientsAnalyticsTab({ salonId }: { salonId: string }) {
       <PageTabsNav tabs={SUB_TABS} active={activeSub} onChange={setActiveSub} t={t} />
       {activeSub === 'list' ? (
         <ClientsListTab salonId={salonId} currency={currency} t={t} salon={salon} />
-      ) : activeSub === 'top' ? (
-        <TopClientsTab salonId={salonId} currency={currency} t={t} />
       ) : (
         <div>{salon ? <SegmentationCard salon={salon} /> : null}</div>
       )}
@@ -118,8 +104,14 @@ function ClientsListTab({
   t: (k: string, opts?: Record<string, unknown>) => string
   salon: ReturnType<typeof useSalon>['data']
 }) {
+  const { user } = useAuth()
   const { data: membership } = useSalonMembership(salonId)
-  const canSeeContacts = membership?.role === 'owner' || membership?.role === 'admin'
+  const role = membership?.role ?? null
+  // RBAC: owner/admin видят контактные данные, остальные роли — нет.
+  // Если admin (не owner) загружает >MASS_VIEW_THRESHOLD клиентов,
+  // владельцу уходит уведомление (email + Telegram) — см. useEffect ниже.
+  const canSeeContacts = role === 'owner' || role === 'admin'
+  const isAdmin = role === 'admin'
 
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<ClientSort>('last_visit')
@@ -128,6 +120,7 @@ function ClientsListTab({
   const [drawerClient, setDrawerClient] = useState<ClientRow | null>(null)
 
   const { data: allClients = [], isLoading } = useClients(salonId, { search, sort })
+  const { data: nextVisitsByClient = new Map<string, string>() } = useNextVisitsByClient(salonId)
 
   const thresholds = useMemo(
     () => ({
@@ -148,6 +141,25 @@ function ClientsListTab({
     [segmented, segmentFilter],
   )
 
+  // Privacy alert: admin загрузил список с контактами >50 клиентов.
+  // Sticky-флаг в sessionStorage — чтобы не пинговать функцию каждый раз,
+  // когда пользователь меняет фильтр или сортировку в рамках одной сессии.
+  useEffect(() => {
+    if (!isAdmin || !user) return
+    if (allClients.length <= MASS_VIEW_THRESHOLD) return
+    const key = `finkley:privacy-alert-fired:${salonId}`
+    if (typeof sessionStorage === 'undefined') return
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    void supabase.functions
+      .invoke('privacy-mass-view-notify', {
+        body: { salon_id: salonId, client_count: allClients.length },
+      })
+      .catch(() => {
+        /* silent — это сигнальное уведомление, не критично */
+      })
+  }, [isAdmin, user, allClients.length, salonId])
+
   const counts = useMemo(() => {
     const acc: Record<ClientSegment, number> = {
       new: 0,
@@ -159,6 +171,32 @@ function ClientsListTab({
     for (const c of segmented) acc[c.segment]++
     return acc
   }, [segmented])
+
+  // AI payload — раньше жил во вкладке «Топ клиенты». Теперь рассылаем те же
+  // top-20 по обороту, но в контексте текущего фильтра. AI получает сразу
+  // структуру для размышлений «кто наши топы» и «какие сегменты в напряге».
+  const aiPayload = useMemo(() => {
+    if (segmented.length === 0) return null
+    const sortedByRevenue = [...segmented].sort(
+      (a, b) => b.total_revenue_cents - a.total_revenue_cents,
+    )
+    const top = sortedByRevenue.slice(0, 20)
+    const totalRevenue = segmented.reduce((s, c) => s + c.total_revenue_cents, 0)
+    return {
+      currency,
+      total_clients: segmented.length,
+      total_revenue_cents: totalRevenue,
+      segments: counts,
+      top_clients: top.map((c) => ({
+        name: c.name,
+        visits: c.visit_count,
+        revenue_cents: c.total_revenue_cents,
+        avg_check_cents: c.visit_count > 0 ? Math.round(c.total_revenue_cents / c.visit_count) : 0,
+        last_visit_at: c.last_visit_at,
+        segment: c.segment,
+      })),
+    }
+  }, [segmented, counts, currency])
 
   return (
     <div>
@@ -177,8 +215,9 @@ function ClientsListTab({
         </Button>
       </div>
 
-      {/* Сегменты-чипсы. Клик переключает фильтр, повторный клик — сбрасывает.
-          Owner-видимая аналитика без потери компактности. */}
+      {aiPayload ? <AiInsightsPanel kind="clients" payload={aiPayload} /> : null}
+
+      {/* Сегменты-чипсы. Клик переключает фильтр, повторный клик — сбрасывает. */}
       <div className="mb-4 flex flex-wrap gap-2">
         <SegmentPill
           label={`${t('clients.kpi.total')} · ${segmented.length}`}
@@ -231,7 +270,7 @@ function ClientsListTab({
         </Select>
       </div>
 
-      <div className="border-border bg-card shadow-finsm rounded-lg border">
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (
           <div className="space-y-2 p-3">
             {[0, 1, 2, 3].map((i) => (
@@ -245,77 +284,124 @@ function ClientsListTab({
             </p>
           </div>
         ) : (
-          <ul>
-            {clients.map((c) => {
-              const badge = SEGMENT_BADGE[c.segment]
-              const bdDays = daysToBirthday(c.birthday)
-              const lastDays = daysSinceLastVisit(c.last_visit_at)
-              return (
-                <li
-                  key={c.id}
-                  className="border-border hover:bg-muted/40 grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
-                  onClick={() => setDrawerClient(c)}
-                  data-testid="client-row-reports"
-                >
-                  <div className="min-w-0">
-                    <p className="text-foreground flex items-center gap-2 truncate text-sm font-semibold">
-                      <span className="truncate">{c.name}</span>
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase',
-                          badge.className,
-                        )}
-                      >
-                        {t(badge.i18nKey)}
-                      </span>
-                      {bdDays !== null ? (
-                        <span
-                          className="bg-brand-yellow/40 text-brand-navy inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
-                          title={t('clients.birthday_in', { count: bdDays })}
-                        >
-                          <Cake className="size-2.5" strokeWidth={2.4} />
-                          {bdDays === 0 ? t('clients.birthday_today') : `${bdDays}д`}
-                        </span>
-                      ) : null}
-                    </p>
-                    {canSeeContacts ? (
-                      <p className="num text-brand-text-faint text-[12px]">
-                        {c.phone ? formatPhoneDisplay(c.phone) : c.email || ''}
-                      </p>
-                    ) : c.phone || c.email ? (
-                      <p className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
-                        <EyeOff className="size-3" strokeWidth={1.8} />
-                        {t('reports_hub.clients.contacts_hidden')}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="text-right">
-                    <p className="num text-foreground text-sm font-bold">
-                      {formatCurrency(c.total_revenue_cents, currency)}
-                    </p>
-                    <p className="text-muted-foreground text-[11px]">
-                      {c.visit_count} {t('clients.drawer.visits_count')}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      'hidden w-[110px] text-right text-[11px] sm:block',
-                      lastDays !== null && lastDays > 60
-                        ? 'font-semibold text-amber-700'
-                        : 'text-muted-foreground',
-                    )}
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.clients.col_name_full')}
+                </th>
+                <th className="px-3 py-3 text-left font-semibold">
+                  {t('reports_hub.clients.col_tags')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_revenue')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_avg_check')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_visits')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_last_visit')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_next_visit')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((c) => {
+                const badge = SEGMENT_BADGE[c.segment]
+                const bdDays = daysToBirthday(c.birthday)
+                const avg =
+                  c.visit_count > 0 ? Math.round(c.total_revenue_cents / c.visit_count) : 0
+                const nextVisit = nextVisitsByClient.get(c.id) ?? null
+                return (
+                  <tr
+                    key={c.id}
+                    className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
+                    onClick={() => setDrawerClient(c)}
+                    data-testid="client-row-reports"
                   >
-                    {c.last_visit_at
-                      ? formatDistanceToNow(parseISO(c.last_visit_at), {
-                          addSuffix: true,
-                          locale: ru,
-                        })
-                      : '—'}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+                    <td className="px-4 py-2.5">
+                      <p className="text-foreground text-sm font-semibold">{c.name}</p>
+                      {/* Контакты: видимы только owner/admin. Для мастеров и
+                          бухгалтера — иконка-плашка «контакты скрыты по роли»,
+                          чтобы было понятно, что данные есть, но недоступны. */}
+                      {canSeeContacts ? (
+                        <p className="text-muted-foreground text-[11px]">
+                          {c.email || ''}
+                          {c.email && c.phone ? ' · ' : ''}
+                          <span className="num">{c.phone || ''}</span>
+                        </p>
+                      ) : c.phone || c.email ? (
+                        <p className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
+                          <EyeOff className="size-3" strokeWidth={1.8} />
+                          {t('reports_hub.clients.contacts_hidden')}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span
+                          className={cn(
+                            'shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase',
+                            badge.className,
+                          )}
+                        >
+                          {t(badge.i18nKey)}
+                        </span>
+                        {bdDays !== null ? (
+                          <span
+                            className="bg-brand-yellow/40 text-brand-navy inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+                            title={t('clients.birthday_in', { count: bdDays })}
+                          >
+                            <Cake className="size-2.5" strokeWidth={2.4} />
+                            {bdDays === 0 ? t('clients.birthday_today') : `${bdDays}д`}
+                          </span>
+                        ) : null}
+                        {(c.tags ?? []).map((tag) => (
+                          <span
+                            key={tag}
+                            className="bg-muted text-muted-foreground inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-medium"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="num text-brand-sage-deep px-3 py-2.5 text-right text-sm font-bold">
+                      {formatCurrency(c.total_revenue_cents, currency)}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-2.5 text-right">
+                      {formatCurrency(avg, currency)}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-2.5 text-right">
+                      {c.visit_count}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2.5 text-right text-xs">
+                      {c.last_visit_at
+                        ? formatDistanceToNow(parseISO(c.last_visit_at), {
+                            addSuffix: true,
+                            locale: ru,
+                          })
+                        : '—'}
+                    </td>
+                    <td className="text-right text-xs">
+                      {nextVisit ? (
+                        <span className="text-secondary num font-semibold">
+                          {format(parseISO(nextVisit), 'd MMM, HH:mm', { locale: ru })}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -366,128 +452,5 @@ function SegmentPill({
     >
       {label}
     </button>
-  )
-}
-
-function TopClientsTab({
-  salonId,
-  currency,
-  t,
-}: {
-  salonId: string
-  currency: string
-  t: (key: string, opts?: Record<string, unknown>) => string
-}) {
-  const { data: membership } = useSalonMembership(salonId)
-  const canSeeContacts = membership?.role === 'owner' || membership?.role === 'admin'
-
-  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
-  const range = periodToRange(period)
-  const startIso = range.start.toISOString()
-  const endIso = range.end.toISOString()
-  const { data: rows = [], isLoading } = useTopClientsByRevenue(salonId, startIso, endIso, 20)
-
-  const aiPayload = useMemo(() => {
-    if (rows.length === 0) return null
-    const totalRevenue = rows.reduce((s, r) => s + r.revenue_cents, 0)
-    return {
-      period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
-      currency,
-      total_revenue_cents: totalRevenue,
-      top_clients: rows.slice(0, 20).map((r) => ({
-        name: r.full_name,
-        visits: r.visit_count,
-        revenue_cents: r.revenue_cents,
-        avg_check_cents: r.visit_count > 0 ? Math.round(r.revenue_cents / r.visit_count) : 0,
-        last_visit_at: r.last_visit_at,
-      })),
-    }
-  }, [rows, startIso, endIso, currency])
-
-  return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-          {t('reports_hub.clients.title')}
-        </h2>
-        <PeriodPickerPopover value={period} onChange={setPeriod} />
-      </div>
-
-      {aiPayload ? <AiInsightsPanel kind="clients" payload={aiPayload} /> : null}
-
-      <p className="text-muted-foreground mb-3 hidden text-sm print:block">
-        {t('common.print_period', {
-          start: startIso.slice(0, 10),
-          end: endIso.slice(0, 10),
-        })}
-      </p>
-
-      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        {isLoading ? (
-          <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground p-6 text-sm">{t('reports_hub.clients.empty')}</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-2 text-left font-semibold">
-                  {t('reports_hub.clients.col_name')}
-                </th>
-                <th className="px-4 py-2 text-right font-semibold">
-                  {t('reports_hub.clients.col_visits')}
-                </th>
-                <th className="px-4 py-2 text-right font-semibold">
-                  {t('reports_hub.clients.col_revenue')}
-                </th>
-                <th className="px-4 py-2 text-right font-semibold">
-                  {t('reports_hub.clients.col_avg_check')}
-                </th>
-                <th className="px-4 py-2 text-right font-semibold">
-                  {t('reports_hub.clients.col_last_visit')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const avg = r.visit_count > 0 ? Math.round(r.revenue_cents / r.visit_count) : 0
-                return (
-                  <tr key={r.client_id} className="border-border/60 border-t">
-                    <td className="text-foreground px-4 py-2">
-                      <span className="block font-semibold">{r.full_name}</span>
-                      {canSeeContacts && r.phone ? (
-                        <span className="text-muted-foreground block text-xs">{r.phone}</span>
-                      ) : !canSeeContacts && r.phone ? (
-                        <span className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
-                          <EyeOff className="size-3" strokeWidth={1.8} />
-                          {t('reports_hub.clients.contacts_hidden')}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="num text-muted-foreground px-4 py-2 text-right">
-                      {r.visit_count}
-                    </td>
-                    <td className="num text-brand-sage-deep px-4 py-2 text-right font-bold">
-                      {formatCurrency(r.revenue_cents, currency)}
-                    </td>
-                    <td className="num text-muted-foreground px-4 py-2 text-right">
-                      {formatCurrency(avg, currency)}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-2 text-right text-xs">
-                      {r.last_visit_at
-                        ? formatDistanceToNowStrict(new Date(r.last_visit_at), {
-                            addSuffix: true,
-                            locale: ru,
-                          })
-                        : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
   )
 }
