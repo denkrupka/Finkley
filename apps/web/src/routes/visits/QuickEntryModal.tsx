@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { supabase } from '@/lib/supabase/client'
 import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
@@ -182,7 +183,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedServiceId])
 
-  function onSubmit(values: FormValues, addAnother = false) {
+  async function onSubmit(values: FormValues, addAnother = false) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
     const tipCents = values.tip ? Math.round(Number(values.tip.replace(',', '.')) * 100) : 0
     const discountCents = values.discount
@@ -197,6 +198,57 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     if (yyyy && mm && dd && !prefill) visitDate.setFullYear(yyyy, mm - 1, dd)
     const visitAt = visitDate.toISOString()
 
+    // Conflict-detection: проверяем что у мастера в это время нет другого
+    // визита. Длительность нового — из service.default_duration_min или 60 мин
+    // default. Считаем перекрытие как [start, start+dur) ∩ [exist, exist+dur).
+    const newDurationMin = svc?.default_duration_min ?? 60
+    const newStartMs = visitDate.getTime()
+    const newEndMs = newStartMs + newDurationMin * 60_000
+    if (values.staff_id) {
+      const dayStart = new Date(visitDate)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+      const { data: sameDayVisits } = await supabase
+        .from('visits')
+        .select('id, visit_at, service_id, service_name_snapshot, payment_method, status')
+        .eq('salon_id', salonId)
+        .eq('staff_id', values.staff_id)
+        .gte('visit_at', dayStart.toISOString())
+        .lt('visit_at', dayEnd.toISOString())
+      const conflict = (sameDayVisits ?? []).find(
+        (v: { visit_at: string; service_id: string | null }) => {
+          const existStart = new Date(v.visit_at).getTime()
+          const existSvc = v.service_id ? services.find((s) => s.id === v.service_id) : null
+          const existDur = (existSvc?.default_duration_min ?? 60) * 60_000
+          const existEnd = existStart + existDur
+          return existStart < newEndMs && existEnd > newStartMs
+        },
+      )
+      if (conflict) {
+        const c = conflict as {
+          id: string
+          visit_at: string
+          service_id: string | null
+          service_name_snapshot: string | null
+        }
+        const conflictTime = new Date(c.visit_at).toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        const conflictSvc = c.service_id
+          ? (services.find((s) => s.id === c.service_id)?.name ?? c.service_name_snapshot ?? '—')
+          : (c.service_name_snapshot ?? '—')
+        const ok = window.confirm(
+          t('visits.errors.conflict', {
+            time: conflictTime,
+            service: conflictSvc,
+          }),
+        )
+        if (!ok) return
+      }
+    }
+
     createVisit.mutate(
       {
         salon_id: salonId,
@@ -210,6 +262,10 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
         discount_cents: discountCents,
         payment_method: values.payment_method,
         comment: values.comment || null,
+        // Booksy-style: новый визит создаётся со статусом 'pending'
+        // (ждёт оплаты). После нажатия «Рассчитать» в detail-модалке статус
+        // меняется на 'paid' (см. EditVisitModal/charge-flow).
+        status: 'pending',
       },
       {
         onSuccess: (created) => {
