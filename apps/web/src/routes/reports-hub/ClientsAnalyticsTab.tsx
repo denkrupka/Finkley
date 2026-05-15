@@ -1,10 +1,11 @@
 import { formatDistanceToNowStrict } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { BarChart3, ExternalLink, SlidersHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 
+import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
   currentMonthPeriod,
@@ -81,6 +82,23 @@ function TopClientsTab({
   const endIso = range.end.toISOString()
   const { data: rows = [], isLoading } = useTopClientsByRevenue(salonId, startIso, endIso, 20)
 
+  const aiPayload = useMemo(() => {
+    if (rows.length === 0) return null
+    const totalRevenue = rows.reduce((s, r) => s + r.revenue_cents, 0)
+    return {
+      period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
+      currency,
+      total_revenue_cents: totalRevenue,
+      top_clients: rows.slice(0, 20).map((r) => ({
+        name: r.full_name,
+        visits: r.visit_count,
+        revenue_cents: r.revenue_cents,
+        avg_check_cents: r.visit_count > 0 ? Math.round(r.revenue_cents / r.visit_count) : 0,
+        last_visit_at: r.last_visit_at,
+      })),
+    }
+  }, [rows, startIso, endIso, currency])
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -89,6 +107,8 @@ function TopClientsTab({
         </h2>
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
+
+      {aiPayload ? <AiInsightsPanel kind="clients" payload={aiPayload} /> : null}
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {

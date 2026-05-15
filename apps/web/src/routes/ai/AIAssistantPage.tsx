@@ -45,6 +45,26 @@ export function AIAssistantPage() {
     )
   }
 
+  // Префилл prompt из AiInsightsPanel («Что с этим делать?»): при mount-е
+  // читаем sessionStorage и автоотправляем — юзер сразу видит ответ AI.
+  // Ждём пока загрузится история (чтобы прикрепить к существующей беседе).
+  const consumedPrefillRef = useRef(false)
+  useEffect(() => {
+    if (consumedPrefillRef.current) return
+    if (isLoading) return
+    let prefill: string | null = null
+    try {
+      prefill = window.sessionStorage.getItem('finkley:ai-prefill-prompt')
+      if (prefill) window.sessionStorage.removeItem('finkley:ai-prefill-prompt')
+    } catch {
+      // ignore
+    }
+    if (!prefill) return
+    consumedPrefillRef.current = true
+    send(prefill)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading])
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()

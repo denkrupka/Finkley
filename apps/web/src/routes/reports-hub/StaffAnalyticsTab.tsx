@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
 import {
   currentMonthPeriod,
   periodToRange,
@@ -36,6 +37,26 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
   const max = rows.reduce((m, r) => Math.max(m, r.revenue_cents), 0)
 
+  const aiPayload = useMemo(() => {
+    if (rows.length === 0) return null
+    return {
+      period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
+      currency,
+      total_revenue_cents: total,
+      staff: rows.map((r) => {
+        const meta = staffList.find((s) => s.id === r.staff_id)
+        return {
+          name: r.full_name,
+          revenue_cents: r.revenue_cents,
+          visits: (r as { visits_count?: number }).visits_count ?? null,
+          share_pct: total > 0 ? Number(((r.revenue_cents / total) * 100).toFixed(1)) : 0,
+          payout_scheme: meta?.payout_scheme ?? null,
+          weekly_schedule: meta?.weekly_schedule ?? null,
+        }
+      }),
+    }
+  }, [rows, total, startIso, endIso, currency, staffList])
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -44,6 +65,8 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         </h2>
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
+
+      {aiPayload ? <AiInsightsPanel kind="staff" payload={aiPayload} /> : null}
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
 import {
   currentMonthPeriod,
   periodToRange,
@@ -28,6 +29,25 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
 
   const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
 
+  // Payload для AI: только структурированный summary, не raw rows целиком —
+  // экономим на токенах + защита от утечки внутренних id.
+  const aiPayload = useMemo(() => {
+    if (rows.length === 0) return null
+    return {
+      period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
+      currency,
+      total_revenue_cents: total,
+      services: rows.slice(0, 30).map((r) => ({
+        name: r.service_name,
+        visits: r.visits_count,
+        revenue_cents: r.revenue_cents,
+        margin_cents: r.margin_cents,
+        margin_pct: r.margin_pct,
+        share_pct: total > 0 ? Number(((r.revenue_cents / total) * 100).toFixed(1)) : 0,
+      })),
+    }
+  }, [rows, total, startIso, endIso, currency])
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -36,6 +56,8 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
         </h2>
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
+
+      {aiPayload ? <AiInsightsPanel kind="services" payload={aiPayload} /> : null}
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {
