@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { Cake, EyeOff, ListChecks, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -173,10 +173,10 @@ function ClientsListTab({
   }, [segmented])
 
   // AI payload — раньше жил во вкладке «Топ клиенты». Теперь рассылаем те же
-  // top-20 по обороту, но в контексте текущего фильтра. AI получает сразу
-  // структуру для размышлений «кто наши топы» и «какие сегменты в напряге».
+  // top-20 по обороту, но в контексте текущего фильтра. Payload собираем
+  // даже когда клиентов 0 — плашка «AI-выводы» (opt-in через «Показать»)
+  // должна быть видна во всех состояниях, чтобы UX был консистентным.
   const aiPayload = useMemo(() => {
-    if (segmented.length === 0) return null
     const sortedByRevenue = [...segmented].sort(
       (a, b) => b.total_revenue_cents - a.total_revenue_cents,
     )
@@ -215,7 +215,7 @@ function ClientsListTab({
         </Button>
       </div>
 
-      {aiPayload ? <AiInsightsPanel kind="clients" payload={aiPayload} /> : null}
+      <AiInsightsPanel kind="clients" payload={aiPayload} />
 
       {/* Сегменты-чипсы. Клик переключает фильтр, повторный клик — сбрасывает. */}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -381,12 +381,13 @@ function ClientsListTab({
                       {c.visit_count}
                     </td>
                     <td className="text-muted-foreground px-3 py-2.5 text-right text-xs">
-                      {c.last_visit_at
-                        ? formatDistanceToNow(parseISO(c.last_visit_at), {
-                            addSuffix: true,
-                            locale: ru,
-                          })
-                        : '—'}
+                      {c.last_visit_at ? (
+                        <span className="num">
+                          {format(parseISO(c.last_visit_at), 'd MMM yyyy', { locale: ru })}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="text-right text-xs">
                       {nextVisit ? (

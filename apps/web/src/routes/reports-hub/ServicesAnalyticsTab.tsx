@@ -126,9 +126,10 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
 
   const totalRevenue = enriched.reduce((s, r) => s + r.revenue_cents, 0)
 
-  // AI payload — отправляем структурированно по группам.
+  // AI payload — отправляем структурированно по группам. Генерируется
+  // всегда, даже при пустых данных, чтобы плашка «AI-выводы» с opt-in
+  // кнопкой «Показать» отрисовывалась и в Reports → Услуги без визитов.
   const aiPayload = useMemo(() => {
-    if (groups.length === 0) return null
     return {
       period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
       currency,
@@ -158,7 +159,7 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
-      {aiPayload ? <AiInsightsPanel kind="services" payload={aiPayload} /> : null}
+      <AiInsightsPanel kind="services" payload={aiPayload} />
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (

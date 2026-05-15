@@ -53,8 +53,11 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const totalRevenue = rows.reduce((s, r) => s + r.total_revenue_cents, 0)
   const maxRevenue = rows.reduce((m, r) => Math.max(m, r.total_revenue_cents), 0)
 
+  // AI-payload генерируется даже при пустых данных — плашка «AI-выводы»
+  // отрисуется всегда (со «Скрыто/Показать» опт-ином). Если визитов нет,
+  // AI просто ответит «мало данных или всё ровно» — это уже даст владельцу
+  // понимание, что отчёт пуст, без необходимости отдельных пояснений.
   const aiPayload = useMemo(() => {
-    if (rows.length === 0) return null
     return {
       period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
       currency,
@@ -88,7 +91,7 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
 
-      {aiPayload ? <AiInsightsPanel kind="staff" payload={aiPayload} /> : null}
+      <AiInsightsPanel kind="staff" payload={aiPayload} />
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {
