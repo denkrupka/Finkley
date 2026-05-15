@@ -317,12 +317,25 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
           </Button>
           <Popover>
             <PopoverTrigger asChild>
+              {/* Bug 7813ec7f: раньше кнопка всегда показывала «Сегодня»,
+                  даже после выбора другой даты — юзер не понимал, какой
+                  день открыт. Теперь label = «Сегодня» только если cursor
+                  совпадает с сегодняшней датой, иначе — короткая дата. */}
               <Button variant="outline" size="sm">
-                {t('visits.calendar.today')}
+                {today ? t('visits.calendar.today') : format(cursor, 'EEE, d MMM', { locale: ru })}
               </Button>
             </PopoverTrigger>
             <PopoverContent align="center" className="w-auto p-3">
               <MiniMonthCalendar value={cursor} onChange={(d) => setCursor(startOfDay(d))} />
+              {!today ? (
+                <button
+                  type="button"
+                  onClick={() => setCursor(startOfDay(new Date()))}
+                  className="text-secondary border-border hover:bg-accent/50 mt-2 block w-full rounded-md border px-3 py-1.5 text-xs font-semibold"
+                >
+                  ← {t('visits.calendar.today')}
+                </button>
+              ) : null}
             </PopoverContent>
           </Popover>
           <Button variant="outline" size="sm" onClick={() => setCursor((c) => addDays(c, 1))}>
