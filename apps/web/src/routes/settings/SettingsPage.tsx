@@ -462,7 +462,7 @@ export function SettingsPage() {
               subtitle={t('settings.catalogs.items.services.subtitle')}
             />
             <CatalogCard
-              to={`/${salonId}/clients`}
+              to={`/${salonId}/reports?tab=clients&client=list`}
               icon={Users}
               title={t('settings.catalogs.items.clients.title')}
               subtitle={t('settings.catalogs.items.clients.subtitle')}

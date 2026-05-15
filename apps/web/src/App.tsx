@@ -58,9 +58,6 @@ const DashboardPage = lazyWithRetry(() =>
 const VisitsPage = lazyWithRetry(() =>
   import('@/routes/visits/VisitsPage').then((m) => ({ default: m.VisitsPage })),
 )
-const ClientsPage = lazyWithRetry(() =>
-  import('@/routes/clients/ClientsPage').then((m) => ({ default: m.ClientsPage })),
-)
 const ExpensesPage = lazyWithRetry(() =>
   import('@/routes/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })),
 )
@@ -253,7 +250,15 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={lazyRoute(<DashboardPage />)} />
         <Route path="visits" element={lazyRoute(<VisitsPage />)} />
-        <Route path="clients" element={lazyRoute(<ClientsPage />)} />
+        {/* /clients жил отдельной страницей в Settings → Справочники.
+            После TASK-42 справочник клиентов merged в Reports → Клиенты →
+            Список (полный CRUD + сегменты + RBAC). Старая страница
+            оставлена как редирект, чтобы внешние ссылки и закладки
+            продолжали работать. */}
+        <Route
+          path="clients"
+          element={<Navigate to="../reports?tab=clients&client=list" replace />}
+        />
         <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="services" element={lazyRoute(<ServicesPage />)} />
