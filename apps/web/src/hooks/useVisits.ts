@@ -86,6 +86,12 @@ export type CreateVisitInput = {
   payment_method: PaymentMethod
   comment?: string | null
   kind?: VisitKind
+  /** По умолчанию 'paid' (обычный QuickEntry создаёт оплаченный визит).
+   *  Wizard продажи может явно задать 'paid'; reservations могут 'pending'. */
+  status?: VisitStatus
+  /** Группа связанных визитов (одна продажа из 2+ позиций, чаще всего
+   *  retail-wizard). UI рендерит группу как раскрывающуюся строку. */
+  group_key?: string | null
 }
 
 export function useCreateVisit(salonId: string | undefined) {
@@ -96,7 +102,7 @@ export function useCreateVisit(salonId: string | undefined) {
         .from('visits')
         .insert({
           ...input,
-          status: 'paid' as VisitStatus,
+          status: (input.status ?? 'paid') as VisitStatus,
           source: 'manual',
         })
         .select('*')

@@ -30,7 +30,7 @@ import { useStaff } from '@/hooks/useStaff'
 import { useDeleteVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
-import { RetailSaleForm } from '@/routes/visits/RetailSaleForm'
+import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
 
 /**
  * Таб «Продажи» под /income. Показывает товарные продажи (visits с kind=retail)
@@ -194,12 +194,14 @@ export function SalesTab({ salonId }: { salonId: string }) {
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:!max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
-            <DialogDescription>{t('income.sales.create_subtitle')}</DialogDescription>
-          </DialogHeader>
-          <RetailSaleForm
+        <DialogContent className="p-0 sm:!max-w-[720px]">
+          <div className="px-5 pt-5">
+            <DialogHeader>
+              <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
+              <DialogDescription>{t('income.sales.create_subtitle')}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <RetailSaleWizard
             salonId={salonId}
             currency={currency}
             staff={staff}
