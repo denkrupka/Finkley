@@ -152,14 +152,15 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-          {t('reports_hub.services.title')}
-        </h2>
+      {/* Image #61: убрали заголовок «Услуги по группам» — табы Reports
+          (Услуги/Клиенты/Мастера/Зарплата) уже сообщают контекст. PeriodPicker
+          переехал под AI-плашку — компактнее и логичнее (период действует
+          и на отчёт, и на AI-payload). */}
+      <AiInsightsPanel kind="services" payload={aiPayload} />
+
+      <div className="mb-4 flex items-center justify-end">
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
-
-      <AiInsightsPanel kind="services" payload={aiPayload} />
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (

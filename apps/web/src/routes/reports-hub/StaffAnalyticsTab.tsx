@@ -100,183 +100,187 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         })}
       </p>
 
-      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        {isLoading ? (
-          <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground p-6 text-sm">{t('reports_hub.staff.empty')}</p>
-        ) : (
-          <table className="w-full min-w-[820px] text-sm">
-            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold">
-                  {t('reports_hub.staff.col_name')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_revenue')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_visits')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_clients')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_rebook')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_utilization')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_earnings')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.staff.col_share')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const share = totalRevenue > 0 ? (r.total_revenue_cents / totalRevenue) * 100 : 0
-                const widthPct = maxRevenue > 0 ? (r.total_revenue_cents / maxRevenue) * 100 : 0
-                const hireYears = r.hire_date
-                  ? Math.floor(
-                      (Date.now() - new Date(r.hire_date).getTime()) / (365.25 * 24 * 3600 * 1000),
-                    )
-                  : null
-                return (
-                  <tr key={r.staff_id} className="border-border/60 hover:bg-muted/20 border-t">
-                    {/* Имя + split visits/retail + 6m + стаж */}
-                    <td className="px-4 py-3">
-                      <div className="text-foreground text-sm font-semibold">
-                        {r.full_name}
-                        {!r.is_active ? (
-                          <span className="bg-muted text-muted-foreground ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase">
-                            архив
+      {/* При пустых данных таблицу и плашку «За период визитов не было.»
+          не показываем — AI-плашка наверху уже всё объясняет, и второй
+          empty-state визуально мусорит. */}
+      {!isLoading && rows.length === 0 ? null : (
+        <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+          {isLoading ? (
+            <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
+          ) : (
+            <table className="w-full min-w-[820px] text-sm">
+              <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    {t('reports_hub.staff.col_name')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_revenue')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_visits')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_clients')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_rebook')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_utilization')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_earnings')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_share')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const share = totalRevenue > 0 ? (r.total_revenue_cents / totalRevenue) * 100 : 0
+                  const widthPct = maxRevenue > 0 ? (r.total_revenue_cents / maxRevenue) * 100 : 0
+                  const hireYears = r.hire_date
+                    ? Math.floor(
+                        (Date.now() - new Date(r.hire_date).getTime()) /
+                          (365.25 * 24 * 3600 * 1000),
+                      )
+                    : null
+                  return (
+                    <tr key={r.staff_id} className="border-border/60 hover:bg-muted/20 border-t">
+                      {/* Имя + split visits/retail + 6m + стаж */}
+                      <td className="px-4 py-3">
+                        <div className="text-foreground text-sm font-semibold">
+                          {r.full_name}
+                          {!r.is_active ? (
+                            <span className="bg-muted text-muted-foreground ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                              архив
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px]">
+                          <span className="inline-flex items-center gap-1">
+                            <TrendingUp className="size-3" strokeWidth={2} />
+                            {t('reports_hub.staff.visits_short')}:{' '}
+                            {formatCurrency(r.visits_revenue_cents, currency)}
                           </span>
-                        ) : null}
-                      </div>
-                      <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px]">
-                        <span className="inline-flex items-center gap-1">
-                          <TrendingUp className="size-3" strokeWidth={2} />
-                          {t('reports_hub.staff.visits_short')}:{' '}
-                          {formatCurrency(r.visits_revenue_cents, currency)}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <ShoppingBag className="size-3" strokeWidth={2} />
-                          {t('reports_hub.staff.retail_short')}:{' '}
-                          {formatCurrency(r.retail_revenue_cents, currency)}
-                        </span>
-                        <span>
-                          6м:{' '}
-                          <span className="num">
-                            {formatCurrency(r.revenue_6m_cents, currency)}
+                          <span className="inline-flex items-center gap-1">
+                            <ShoppingBag className="size-3" strokeWidth={2} />
+                            {t('reports_hub.staff.retail_short')}:{' '}
+                            {formatCurrency(r.retail_revenue_cents, currency)}
                           </span>
-                        </span>
-                        {hireYears != null ? (
-                          <span>{t('reports_hub.staff.tenure', { years: hireYears })}</span>
-                        ) : null}
-                      </div>
-                    </td>
-                    {/* Выручка + width bar */}
-                    <td className="px-3 py-3 text-right">
-                      <div className="num text-brand-sage-deep text-sm font-bold">
-                        {formatCurrency(r.total_revenue_cents, currency)}
-                      </div>
-                      <div className="bg-muted/40 mt-1 h-1.5 w-full overflow-hidden rounded-full">
-                        <div
-                          className="bg-brand-sage h-full rounded-full"
-                          style={{ width: `${widthPct}%` }}
-                        />
-                      </div>
-                    </td>
-                    {/* Визитов */}
-                    <td className="num text-foreground px-3 py-3 text-right font-semibold">
-                      {r.visits_count}
-                    </td>
-                    {/* Уникальных клиентов / вернулось */}
-                    <td className="px-3 py-3 text-right">
-                      <div className="num text-foreground text-sm font-semibold">
-                        {r.unique_clients_count}
-                      </div>
-                      <div className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
-                        <Users className="size-3" strokeWidth={2} />
-                        {t('reports_hub.staff.returned_short')}: {r.returned_clients_count}
-                      </div>
-                    </td>
-                    {/* Rebook% */}
-                    <td className="px-3 py-3 text-right">
-                      <span
-                        className={cn(
-                          'num text-sm font-bold',
-                          r.rebook_pct >= 50
-                            ? 'text-brand-sage-deep'
-                            : r.rebook_pct >= 30
-                              ? 'text-amber-700'
-                              : 'text-destructive',
-                        )}
-                      >
-                        {r.rebook_pct}%
-                      </span>
-                    </td>
-                    {/* Utilization% */}
-                    <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        <Clock className="text-muted-foreground size-3" strokeWidth={2} />
+                          <span>
+                            6м:{' '}
+                            <span className="num">
+                              {formatCurrency(r.revenue_6m_cents, currency)}
+                            </span>
+                          </span>
+                          {hireYears != null ? (
+                            <span>{t('reports_hub.staff.tenure', { years: hireYears })}</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      {/* Выручка + width bar */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="num text-brand-sage-deep text-sm font-bold">
+                          {formatCurrency(r.total_revenue_cents, currency)}
+                        </div>
+                        <div className="bg-muted/40 mt-1 h-1.5 w-full overflow-hidden rounded-full">
+                          <div
+                            className="bg-brand-sage h-full rounded-full"
+                            style={{ width: `${widthPct}%` }}
+                          />
+                        </div>
+                      </td>
+                      {/* Визитов */}
+                      <td className="num text-foreground px-3 py-3 text-right font-semibold">
+                        {r.visits_count}
+                      </td>
+                      {/* Уникальных клиентов / вернулось */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="num text-foreground text-sm font-semibold">
+                          {r.unique_clients_count}
+                        </div>
+                        <div className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
+                          <Users className="size-3" strokeWidth={2} />
+                          {t('reports_hub.staff.returned_short')}: {r.returned_clients_count}
+                        </div>
+                      </td>
+                      {/* Rebook% */}
+                      <td className="px-3 py-3 text-right">
                         <span
                           className={cn(
                             'num text-sm font-bold',
-                            r.utilization_pct >= 70
+                            r.rebook_pct >= 50
                               ? 'text-brand-sage-deep'
-                              : r.utilization_pct >= 40
+                              : r.rebook_pct >= 30
                                 ? 'text-amber-700'
                                 : 'text-destructive',
                           )}
                         >
-                          {r.utilization_pct}%
+                          {r.rebook_pct}%
                         </span>
-                      </div>
+                      </td>
+                      {/* Utilization% */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <Clock className="text-muted-foreground size-3" strokeWidth={2} />
+                          <span
+                            className={cn(
+                              'num text-sm font-bold',
+                              r.utilization_pct >= 70
+                                ? 'text-brand-sage-deep'
+                                : r.utilization_pct >= 40
+                                  ? 'text-amber-700'
+                                  : 'text-destructive',
+                            )}
+                          >
+                            {r.utilization_pct}%
+                          </span>
+                        </div>
+                      </td>
+                      {/* Заработок мастера за период (commission по схеме). */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Wallet className="text-muted-foreground size-3" strokeWidth={2} />
+                          <span className="num text-foreground text-sm font-semibold">
+                            {formatCurrency(payoutByStaff.get(r.staff_id) ?? 0, currency)}
+                          </span>
+                        </div>
+                      </td>
+                      {/* Share % */}
+                      <td className="num text-muted-foreground px-3 py-3 text-right">
+                        {share.toFixed(1)}%
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {totalRevenue > 0 ? (
+                <tfoot className="border-border bg-muted/10 border-t">
+                  <tr>
+                    <td className="text-muted-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wider">
+                      {t('reports_hub.staff.total')}
                     </td>
-                    {/* Заработок мастера за период (commission по схеме). */}
-                    <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Wallet className="text-muted-foreground size-3" strokeWidth={2} />
-                        <span className="num text-foreground text-sm font-semibold">
-                          {formatCurrency(payoutByStaff.get(r.staff_id) ?? 0, currency)}
-                        </span>
-                      </div>
+                    <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
+                      {formatCurrency(totalRevenue, currency)}
                     </td>
-                    {/* Share % */}
-                    <td className="num text-muted-foreground px-3 py-3 text-right">
-                      {share.toFixed(1)}%
+                    <td colSpan={4} />
+                    <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
+                      {formatCurrency(
+                        payouts.reduce((s, p) => s + p.payout_cents, 0),
+                        currency,
+                      )}
                     </td>
+                    <td />
                   </tr>
-                )
-              })}
-            </tbody>
-            {totalRevenue > 0 ? (
-              <tfoot className="border-border bg-muted/10 border-t">
-                <tr>
-                  <td className="text-muted-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wider">
-                    {t('reports_hub.staff.total')}
-                  </td>
-                  <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
-                    {formatCurrency(totalRevenue, currency)}
-                  </td>
-                  <td colSpan={4} />
-                  <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
-                    {formatCurrency(
-                      payouts.reduce((s, p) => s + p.payout_cents, 0),
-                      currency,
-                    )}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            ) : null}
-          </table>
-        )}
-      </div>
+                </tfoot>
+              ) : null}
+            </table>
+          )}
+        </div>
+      )}
 
       <div className="mt-6">
         <StaffPerformanceSection salonId={salonId} staff={staffList} currency={currency} />
