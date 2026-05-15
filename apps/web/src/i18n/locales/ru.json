@@ -2744,6 +2744,8 @@
     "step3_extra_discount_pct": "Доп. скидка на всю продажу (%)",
     "step3_extra_hint": "Распределится пропорционально между позициями.",
     "step3_payment": "Метод оплаты",
+    "step3_cash_register": "Касса (куда зачислить)",
+    "step3_cash_register_empty": "Кассы ещё не настроены — добавь в Справочниках.",
     "step3_comment": "Комментарий",
     "step3_comment_placeholder": "Например: постоянный клиент, подарок",
     "step4_total_to_pay": "Сумма продажи",

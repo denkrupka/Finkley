@@ -27,7 +27,7 @@ import {
   useCreateOtherIncomeCategory,
   useOtherIncomeCategories,
 } from '@/hooks/useOtherIncomes'
-import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCreateVisit, type PaymentMethod } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -77,7 +77,7 @@ export function RetailSaleWizard({
   const createVisit = useCreateVisit(salonId)
   const createOtherIncome = useCreateOtherIncome(salonId)
   const createOtherCategory = useCreateOtherIncomeCategory(salonId)
-  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
   const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: false })
   const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
 
@@ -89,7 +89,11 @@ export function RetailSaleWizard({
     if (typeof window === 'undefined') return ''
     return window.localStorage.getItem(LAST_SALE_STAFF_KEY) ?? ''
   })
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  // Image #82: вместо payment_method-pills используем cash_registers.
+  // payment_method остаётся в БД (NOT NULL) и пишется как 'card' для
+  // обратной совместимости; реальная касса хранится в cash_register_id.
+  const [cashRegisterId, setCashRegisterId] = useState<string>('')
+  const paymentMethod: PaymentMethod = 'card'
   const [extraDiscount, setExtraDiscount] = useState('') // string из input, потом *100
   // Image #90: режим ввода доп. скидки — фиксированная сумма или %.
   // При 'percent' значение трактуется как процент от linesTotalCents;
@@ -109,12 +113,12 @@ export function RetailSaleWizard({
     if (staff.length > 0) setStaffId(staff[0]!.id)
   }, [staff, staffId])
 
-  // ── Auto-set default payment method = первый из справочника ────────────
+  // ── Auto-set default cash register = первая активная (image #82) ───────
   useEffect(() => {
-    if (paymentMethods.length > 0 && !paymentMethods.find((m) => m.code === paymentMethod)) {
-      setPaymentMethod(paymentMethods[0]!.code)
+    if (cashRegisters.length > 0 && !cashRegisters.find((r) => r.id === cashRegisterId)) {
+      setCashRegisterId(cashRegisters[0]!.id)
     }
-  }, [paymentMethods, paymentMethod])
+  }, [cashRegisters, cashRegisterId])
 
   // ── Подсчёты ───────────────────────────────────────────────────────────
   const linesTotalCents = lines.reduce(
@@ -135,7 +139,7 @@ export function RetailSaleWizard({
 
   // ── Validation ─────────────────────────────────────────────────────────
   const step1Valid = lines.length > 0 && lines.every((l) => l.quantity > 0 && l.unitPriceCents > 0)
-  const step3Valid = !!paymentMethod
+  const step3Valid = !!cashRegisterId
 
   // ── Actions ────────────────────────────────────────────────────────────
   function addLineFromInventory(itemId: string) {
@@ -278,6 +282,7 @@ export function RetailSaleWizard({
           tip_cents: 0,
           discount_cents: l.lineDiscountCents + shareOfExtra,
           payment_method: paymentMethod,
+          cash_register_id: cashRegisterId || null,
           comment: lineNotes || null,
           kind: 'retail',
           status: 'paid',
@@ -351,9 +356,9 @@ export function RetailSaleWizard({
             onExtraDiscountChange={setExtraDiscount}
             extraDiscountMode={extraDiscountMode}
             onExtraDiscountModeChange={setExtraDiscountMode}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
-            paymentMethods={paymentMethods.map((m) => ({ code: m.code, label: m.label }))}
+            cashRegisterId={cashRegisterId}
+            onCashRegisterChange={setCashRegisterId}
+            cashRegisters={cashRegisters}
             comment={comment}
             onCommentChange={setComment}
           />
@@ -981,9 +986,9 @@ function Step3({
   onExtraDiscountChange,
   extraDiscountMode,
   onExtraDiscountModeChange,
-  paymentMethod,
-  onPaymentMethodChange,
-  paymentMethods,
+  cashRegisterId,
+  onCashRegisterChange,
+  cashRegisters,
   comment,
   onCommentChange,
 }: {
@@ -994,9 +999,10 @@ function Step3({
   onExtraDiscountChange: (v: string) => void
   extraDiscountMode: 'amount' | 'percent'
   onExtraDiscountModeChange: (m: 'amount' | 'percent') => void
-  paymentMethod: PaymentMethod
-  onPaymentMethodChange: (m: PaymentMethod) => void
-  paymentMethods: { code: PaymentMethod; label: string }[]
+  /** Image #82: касса вместо payment_method. */
+  cashRegisterId: string
+  onCashRegisterChange: (id: string) => void
+  cashRegisters: Array<{ id: string; label: string }>
   comment: string
   onCommentChange: (v: string) => void
 }) {
@@ -1057,28 +1063,35 @@ function Step3({
         <p className="text-muted-foreground text-[10px]">{t('retail_wizard.step3_extra_hint')}</p>
       </div>
 
+      {/* Image #82: касса вместо способа оплаты. */}
       <div className="flex flex-col gap-1.5">
-        <Label>{t('retail_wizard.step3_payment')}</Label>
-        <div className="flex flex-wrap gap-2">
-          {paymentMethods.map((m) => {
-            const active = paymentMethod === m.code
-            return (
-              <button
-                type="button"
-                key={m.code}
-                onClick={() => onPaymentMethodChange(m.code)}
-                className={cn(
-                  'h-10 rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors',
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card hover:bg-muted/40',
-                )}
-              >
-                {m.label}
-              </button>
-            )
-          })}
-        </div>
+        <Label>{t('retail_wizard.step3_cash_register')}</Label>
+        {cashRegisters.length === 0 ? (
+          <p className="text-muted-foreground text-xs">
+            {t('retail_wizard.step3_cash_register_empty')}
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {cashRegisters.map((r) => {
+              const active = cashRegisterId === r.id
+              return (
+                <button
+                  type="button"
+                  key={r.id}
+                  onClick={() => onCashRegisterChange(r.id)}
+                  className={cn(
+                    'h-10 rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card hover:bg-muted/40',
+                  )}
+                >
+                  {r.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
