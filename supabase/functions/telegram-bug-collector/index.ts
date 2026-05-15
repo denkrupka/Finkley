@@ -1047,12 +1047,26 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
 }
 
 /**
- * Шлёт уведомление владельцу (super_admin с привязанным telegram_id) в личный
+ * Возвращает telegram_id всех super-admin'ов с привязанным Telegram.
+ * Super-admin живёт в app_admins.is_super=true → JOIN с profiles по user_id
+ * → telegram_id (если привязан через @finkley_tg_bot).
+ */
+async function listOwnerTelegramIds(admin: ReturnType<typeof createClient>): Promise<number[]> {
+  const { data: supers } = await admin.from('app_admins').select('user_id').eq('is_super', true)
+  if (!supers || supers.length === 0) return []
+  const ids = (supers as Array<{ user_id: string }>).map((r) => r.user_id)
+  const { data: profs } = await admin
+    .from('profiles')
+    .select('telegram_id')
+    .in('id', ids)
+    .not('telegram_id', 'is', null)
+  return (profs ?? []).map((p) => (p as { telegram_id: number }).telegram_id)
+}
+
+/**
+ * Шлёт уведомление владельцу (super-admin с привязанным telegram_id) в личный
  * чат с @finklay_dev_bot о новом баге. Формат: «🐛 short_id · severity · area
  * \n\n«текст пользователя» (sender)\n\n💡 AI summary».
- *
- * Если у владельца нет привязки — silent skip (не падаем). Если super_admin'ов
- * несколько — шлём всем привязанным.
  */
 async function notifyOwnerOfNewBug(
   admin: ReturnType<typeof createClient>,
@@ -1068,12 +1082,8 @@ async function notifyOwnerOfNewBug(
     source: 'team' | 'client'
   },
 ) {
-  const { data: owners } = await admin
-    .from('profiles')
-    .select('telegram_id')
-    .eq('is_super_admin', true)
-    .not('telegram_id', 'is', null)
-  if (!owners || owners.length === 0) return
+  const ownerIds = await listOwnerTelegramIds(admin)
+  if (ownerIds.length === 0) return
   const emoji = ev.kind === 'feature' ? '💡' : '🐛'
   const senderLabel = ev.senderUsername ? `@${ev.senderUsername}` : ev.senderName || 'аноним'
   const sourceLabel = ev.source === 'client' ? '👤 клиент' : '👥 команда'
@@ -1089,8 +1099,8 @@ async function notifyOwnerOfNewBug(
     lines.push(`🤖 ${ev.aiSummary}`)
   }
   const text = lines.join('\n\n')
-  for (const o of owners as Array<{ telegram_id: number }>) {
-    await tgSend(o.telegram_id, text).catch((e) => console.warn('notifyOwner', e))
+  for (const tgId of ownerIds) {
+    await tgSend(tgId, text).catch((e) => console.warn('notifyOwner', e))
   }
 }
 
@@ -1257,12 +1267,8 @@ async function handleDailyDigest(req: Request, admin: ReturnType<typeof createCl
   const closedCount = closedRes.count ?? 0
   const fixedToday = fixedTodayRes.count ?? 0
 
-  const { data: owners } = await admin
-    .from('profiles')
-    .select('telegram_id')
-    .eq('is_super_admin', true)
-    .not('telegram_id', 'is', null)
-  if (!owners || owners.length === 0) {
+  const ownerIds = await listOwnerTelegramIds(admin)
+  if (ownerIds.length === 0) {
     return jsonResponse({ ok: true, sent: 0, reason: 'no_owners_with_telegram' })
   }
 
@@ -1273,8 +1279,8 @@ async function handleDailyDigest(req: Request, admin: ReturnType<typeof createCl
     `🎯 Исправлено сегодня: *${fixedToday}*`
 
   let sent = 0
-  for (const o of owners as Array<{ telegram_id: number }>) {
-    await tgSend(o.telegram_id, text).catch((e) => console.warn('digest send', e))
+  for (const tgId of ownerIds) {
+    await tgSend(tgId, text).catch((e) => console.warn('digest send', e))
     sent++
   }
   return jsonResponse({ ok: true, sent, openCount, closedCount, fixedToday })
