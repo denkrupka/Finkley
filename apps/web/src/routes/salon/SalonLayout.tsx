@@ -21,6 +21,11 @@ import { TopBar } from './TopBar'
 const QuickEntryModal = lazyWithRetry(() =>
   import('@/routes/visits/QuickEntryModal').then((m) => ({ default: m.QuickEntryModal })),
 )
+// ExpenseFormModal лениво по той же причине — большая форма с categories
+// и subcategories, нужна только когда FAB → «Расход».
+const ExpenseFormModal = lazyWithRetry(() =>
+  import('@/routes/expenses/ExpenseFormModal').then((m) => ({ default: m.ExpenseFormModal })),
+)
 
 /**
  * Layout для всех salon-scoped роутов `/{salonId}/*`.
@@ -58,6 +63,7 @@ export function SalonLayout() {
     clientId?: string
     endAt?: string
   } | null>(null)
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
 
@@ -168,10 +174,11 @@ export function SalonLayout() {
 
       {hideFab ? null : (
         <FAB
-          onClick={() => {
+          onVisit={() => {
             setQuickEntryPrefill(null)
             setQuickEntryOpen(true)
           }}
+          onExpense={() => setExpenseModalOpen(true)}
         />
       )}
       <BottomNav salonId={salon.id} />
@@ -187,6 +194,17 @@ export function SalonLayout() {
             salonId={salon.id}
             currency={salon.currency}
             prefill={quickEntryPrefill}
+          />
+        </Suspense>
+      ) : null}
+
+      {expenseModalOpen ? (
+        <Suspense fallback={null}>
+          <ExpenseFormModal
+            open={expenseModalOpen}
+            onOpenChange={setExpenseModalOpen}
+            salonId={salon.id}
+            currency={salon.currency}
           />
         </Suspense>
       ) : null}
