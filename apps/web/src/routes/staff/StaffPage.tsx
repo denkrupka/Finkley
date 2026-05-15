@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { SegmentationCard } from '@/routes/settings/SegmentationCard'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff, type StaffRow } from '@/hooks/useStaff'
 import { useArchiveStaff, useUnarchiveStaff } from '@/hooks/useStaffMutations'
@@ -126,12 +125,7 @@ export function StaffPage() {
         </div>
       ) : null}
 
-      {/* Сегментация клиентов — перенесена сюда из настроек профиля салона */}
-      {salon ? (
-        <div className="mt-8">
-          <SegmentationCard salon={salon} />
-        </div>
-      ) : null}
+      {/* Сегментация клиентов — перенесена в /reports?tab=clients&client=params */}
 
       <StaffEditSheet
         open={editing !== null}

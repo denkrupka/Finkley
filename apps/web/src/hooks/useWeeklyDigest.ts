@@ -34,9 +34,19 @@ export function useUpdateDigestChannels(salonId: string | undefined, kind: 'week
   })
 }
 
+export type SendDigestResponse = {
+  ok: boolean
+  sent_to: string
+  via?: DigestChannel[]
+  period?: { start: string; end: string }
+}
+
 /**
  * Дёргает edge function send-weekly-digest для текущего салона.
- * Function проверит membership через JWT и пришлёт KPI-письмо на email юзера.
+ * Function проверит membership через JWT и пришлёт KPI-письмо на email
+ * и/или telegram в зависимости от выбранных каналов. Возвращает массив
+ * `via` — реально отправленные каналы (telegram скипается если нет
+ * привязки в profiles.telegram_id).
  */
 export function useSendWeeklyDigest(salonId: string | undefined) {
   return useMutation({
@@ -46,7 +56,7 @@ export function useSendWeeklyDigest(salonId: string | undefined) {
         body: { salon_id: salonId },
       })
       if (error) throw error
-      return data as { ok: boolean; sent_to: string; period: { start: string; end: string } }
+      return data as SendDigestResponse
     },
   })
 }
@@ -72,7 +82,7 @@ export function useToggleWeeklyDigest(salonId: string | undefined) {
   })
 }
 
-/** Ежедневная сводка — manual send. */
+/** Ежедневная сводка — manual send. Возвращает via-список каналов. */
 export function useSendDailyDigest(salonId: string | undefined) {
   return useMutation({
     mutationFn: async () => {
@@ -92,7 +102,7 @@ export function useSendDailyDigest(salonId: string | undefined) {
         }
         throw error
       }
-      return data as { ok: boolean; sent_to: string }
+      return data as SendDigestResponse
     },
   })
 }

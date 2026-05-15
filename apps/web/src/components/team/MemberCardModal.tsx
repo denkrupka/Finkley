@@ -7,7 +7,26 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useUpdateMemberProfile, type TeamMember } from '@/hooks/useTeam'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  useUpdateMemberProfile,
+  useUpdateMemberRole,
+  type SalonRole,
+  type TeamMember,
+} from '@/hooks/useTeam'
+
+const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
+  { value: 'owner', key: 'team.role.owner' },
+  { value: 'admin', key: 'team.role.admin' },
+  { value: 'accountant', key: 'team.role.accountant' },
+  { value: 'staff', key: 'team.role.staff' },
+]
 
 /**
  * Карточка участника команды — клик по строке в /salon/settings/team.
@@ -31,6 +50,7 @@ export function MemberCardModal({
 }) {
   const { t } = useTranslation()
   const update = useUpdateMemberProfile(salonId)
+  const updateRole = useUpdateMemberRole(salonId)
   const [editing, setEditing] = useState(false)
 
   const [firstName, ...rest] = (member.full_name ?? '').trim().split(/\s+/).filter(Boolean)
@@ -39,9 +59,11 @@ export function MemberCardModal({
     first_name: firstName ?? '',
     last_name: lastName ?? '',
     phone: member.phone ?? '',
+    role: member.role,
   })
 
   function save() {
+    // Сохраняем профиль (имя/фамилия/телефон) — это первичное действие.
     update.mutate(
       {
         target_user_id: member.user_id,
@@ -51,8 +73,23 @@ export function MemberCardModal({
       },
       {
         onSuccess: () => {
-          toast.success(t('team.member_card.toast_saved'))
-          setEditing(false)
+          // Если роль изменилась — дёргаем updateRole отдельно (RPC-вызов
+          // другой). Если не изменилась — просто закрываем редактирование.
+          if (draft.role !== member.role) {
+            updateRole.mutate(
+              { memberId: member.id, role: draft.role },
+              {
+                onSuccess: () => {
+                  toast.success(t('team.member_card.toast_saved'))
+                  setEditing(false)
+                },
+                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+              },
+            )
+          } else {
+            toast.success(t('team.member_card.toast_saved'))
+            setEditing(false)
+          }
         },
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
       },
@@ -137,8 +174,38 @@ export function MemberCardModal({
                     className="mt-1 h-9"
                   />
                 </div>
+                {/* Image #57: даём редактировать роль из карточки.
+                    Owner может изменить себя если в салоне есть второй
+                    участник (UI ограничения нет — выбор есть всегда;
+                    RPC сама проверит инвариант «минимум 1 owner». */}
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">{t('team.role.label')}</Label>
+                  <Select
+                    value={draft.role}
+                    onValueChange={(v) => setDraft((d) => ({ ...d, role: v as SalonRole }))}
+                  >
+                    <SelectTrigger className="mt-1 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLE_OPTIONS.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {t(r.key)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground mt-1 text-[10px]">
+                    {t(`team.role_hint.${draft.role}`)}
+                  </p>
+                </div>
                 <div className="flex items-center gap-2 sm:col-span-2">
-                  <Button variant="primary" size="sm" disabled={update.isPending} onClick={save}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={update.isPending || updateRole.isPending}
+                    onClick={save}
+                  >
                     <Save className="size-3.5" strokeWidth={2} />
                     {t('common.save')}
                   </Button>
@@ -151,6 +218,7 @@ export function MemberCardModal({
                         first_name: firstName ?? '',
                         last_name: lastName ?? '',
                         phone: member.phone ?? '',
+                        role: member.role,
                       })
                     }}
                   >

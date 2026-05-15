@@ -1,10 +1,11 @@
 import { formatDistanceToNowStrict } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ExternalLink } from 'lucide-react'
+import { BarChart3, ExternalLink, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
+import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
   currentMonthPeriod,
   periodToRange,
@@ -14,18 +15,66 @@ import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useSalon } from '@/hooks/useSalons'
 import { useTopClientsByRevenue } from '@/hooks/useTopClients'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { SegmentationCard } from '@/routes/settings/SegmentationCard'
+
+type ClientsSubTab = 'top' | 'params'
+
+const SUB_TABS: PageTab<ClientsSubTab>[] = [
+  { id: 'top', labelKey: 'reports_hub.clients.tabs.top', icon: BarChart3 },
+  { id: 'params', labelKey: 'reports_hub.clients.tabs.params', icon: SlidersHorizontal },
+]
+
+function isClientsSubTab(v: string | null): v is ClientsSubTab {
+  return v === 'top' || v === 'params'
+}
 
 /**
- * Reports → Клиенты. Топ-20 клиентов за выбранный месяц + ссылка на
- * полную базу клиентов в Настройках → Справочники → Клиенты.
+ * Reports → Клиенты. Два sub-tab'а:
+ *   - Топ клиентов  — Топ-20 за выбранный период (revenue/visits/last_visit)
+ *   - Параметры    — SegmentationCard (retention/churn windows). Раньше
+ *                     этот блок жил в /staff → Сегментация клиентов; по ТЗ
+ *                     владельца перенесён сюда — параметры клиентской
+ *                     сегментации логичнее в отчётах по клиентам.
  *
- * Полноценная RFM/retention/LTV аналитика — следующая итерация.
+ * Активный sub-tab сохраняется в URL через `?client=top|params`, чтобы
+ * не конфликтовать с родительским `?tab=clients`.
  */
 export function ClientsAnalyticsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
+  const [params, setParams] = useSearchParams()
+  const subParam = params.get('client')
+  const activeSub: ClientsSubTab = isClientsSubTab(subParam) ? subParam : 'top'
+
+  function setActiveSub(id: ClientsSubTab) {
+    const next = new URLSearchParams(params)
+    next.set('client', id)
+    setParams(next, { replace: true })
+  }
+
+  return (
+    <div>
+      <PageTabsNav tabs={SUB_TABS} active={activeSub} onChange={setActiveSub} t={t} />
+      {activeSub === 'top' ? (
+        <TopClientsTab salonId={salonId} currency={currency} t={t} />
+      ) : (
+        <div>{salon ? <SegmentationCard salon={salon} /> : null}</div>
+      )}
+    </div>
+  )
+}
+
+function TopClientsTab({
+  salonId,
+  currency,
+  t,
+}: {
+  salonId: string
+  currency: string
+  t: (key: string, opts?: Record<string, unknown>) => string
+}) {
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const range = periodToRange(period)
   const startIso = range.start.toISOString()

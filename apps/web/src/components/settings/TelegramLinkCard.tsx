@@ -91,7 +91,8 @@ export function TelegramLinkCard() {
 
     // Рендерим официальный виджет от Telegram. Скрипт сам вставляет <iframe>.
     setWidgetState('loading')
-    widgetRef.current.innerHTML = ''
+    const host = widgetRef.current
+    host.innerHTML = ''
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
     script.async = true
@@ -101,18 +102,36 @@ export function TelegramLinkCard() {
     script.setAttribute('data-userpic', 'false')
     script.setAttribute('data-onauth', 'onTelegramLinkAuth(user)')
     script.setAttribute('data-request-access', 'write')
-    widgetRef.current.appendChild(script)
+    host.appendChild(script)
 
-    // Проверяем через 4 сек: появился ли iframe? Если нет — показываем
-    // fallback с диагностикой (AdBlock / BotFather /setdomain не задан).
-    const id = window.setTimeout(() => {
-      const iframe = widgetRef.current?.querySelector('iframe')
-      setWidgetState(iframe ? 'ready' : 'blocked')
-    }, 4000)
+    // Reactive readiness: MutationObserver следит за тем, чтобы как
+    // только Telegram вставил iframe — мы тут же ставим 'ready' и
+    // отменяем "blocked"-таймер. Без observer'а после успешной отрисовки
+    // мы всё равно показывали бы warning (если timeout уже сработал).
+    let timeoutId = 0
+    const observer = new MutationObserver(() => {
+      const iframe = host.querySelector('iframe')
+      if (iframe) {
+        setWidgetState('ready')
+        window.clearTimeout(timeoutId)
+        observer.disconnect()
+      }
+    })
+    observer.observe(host, { childList: true, subtree: true })
+
+    // Проверяем через 6 сек: если iframe всё ещё нет — fallback.
+    // Этот fallback нужен если AdBlock полностью прибил telegram.org/js
+    // или у бота не задан /setdomain в BotFather.
+    timeoutId = window.setTimeout(() => {
+      const iframe = host.querySelector('iframe')
+      if (!iframe) setWidgetState('blocked')
+      else setWidgetState('ready')
+    }, 6000)
 
     return () => {
       delete window.onTelegramLinkAuth
-      window.clearTimeout(id)
+      window.clearTimeout(timeoutId)
+      observer.disconnect()
     }
   }, [isLinked, refetch, t])
 
@@ -160,6 +179,14 @@ export function TelegramLinkCard() {
         <p className="text-muted-foreground text-xs">{t('settings.telegram.bot_not_configured')}</p>
       ) : (
         <div className="border-border flex flex-col gap-3 rounded-md border p-4">
+          {/* Статус: не привязано — раньше не показывали, юзер не понимал
+              текущее состояние и думал что что-то сломано. */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-100 px-2.5 text-[11px] font-semibold text-amber-900">
+              <span className="size-1.5 rounded-full bg-amber-500" />
+              {t('settings.telegram.status_not_linked')}
+            </span>
+          </div>
           <div className="flex items-start gap-2">
             <Link2 className="text-muted-foreground mt-0.5 size-4" strokeWidth={2} />
             <p className="text-muted-foreground text-xs leading-relaxed">
@@ -167,33 +194,34 @@ export function TelegramLinkCard() {
             </p>
           </div>
 
-          {/* Контейнер для скрипта Telegram Login Widget. Если за 4 сек он
-              не вставит iframe — показываем fallback с прямой ссылкой на бота. */}
+          {/* Контейнер для скрипта Telegram Login Widget. */}
           <div ref={widgetRef} aria-label={t('settings.telegram.widget_label')} />
 
           {widgetState === 'loading' ? (
             <p className="text-muted-foreground text-xs">{t('common.loading')}</p>
           ) : null}
 
-          {widgetState === 'blocked' ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed">
-              <p className="font-semibold text-amber-900">
-                {t('settings.telegram.widget_blocked_title')}
-              </p>
-              <p className="mt-1 text-amber-800">{t('settings.telegram.widget_blocked_body')}</p>
-              <a
-                href={`https://t.me/${BOT_USERNAME}?start=link`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-md bg-[#229ED9] px-3 font-semibold text-white hover:bg-[#1f8fc4]"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
-                  <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
-                </svg>
-                {t('settings.telegram.open_bot')}
-              </a>
-            </div>
-          ) : null}
+          {/* Альтернативная ссылка «Открыть бота» — показываем всегда (даже
+              когда виджет работает) как удобный fallback. Раньше тут был
+              предупредительный AdBlock-warning, но он смущал юзеров когда
+              виджет на самом деле работал. */}
+          <div className="border-border/40 flex flex-wrap items-center gap-2 border-t pt-3 text-xs">
+            <span className="text-muted-foreground">{t('settings.telegram.or')}</span>
+            <a
+              href={`https://t.me/${BOT_USERNAME}?start=link`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#229ED9] px-3 font-semibold text-[#229ED9] hover:bg-[#229ED9]/10"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+                <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+              </svg>
+              {t('settings.telegram.open_bot')}
+            </a>
+            {widgetState === 'blocked' ? (
+              <span className="text-amber-700">{t('settings.telegram.widget_blocked_inline')}</span>
+            ) : null}
+          </div>
 
           {linking ? (
             <p className="text-muted-foreground text-xs">{t('settings.telegram.linking')}</p>

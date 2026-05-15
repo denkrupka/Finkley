@@ -34,6 +34,7 @@ import {
   useSendDailyDigest,
   useSendWeeklyDigest,
   useUpdateDigestChannels,
+  type SendDigestResponse,
 } from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
@@ -549,9 +550,7 @@ export function SettingsPage() {
                 onClick={() => {
                   sendDigest.mutate(undefined, {
                     onSuccess: (data) =>
-                      toast.success(
-                        t('settings.digest.toast_sent', { email: data?.sent_to ?? '' }),
-                      ),
+                      toast.success(digestSentToastText(t, salon, data, 'weekly')),
                     onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
                   })
                 }}
@@ -598,9 +597,7 @@ export function SettingsPage() {
                 onClick={() => {
                   sendDailyDigest.mutate(undefined, {
                     onSuccess: (data) =>
-                      toast.success(
-                        t('settings.daily_digest.toast_sent', { email: data?.sent_to ?? '' }),
-                      ),
+                      toast.success(digestSentToastText(t, salon, data, 'daily')),
                     onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
                   })
                 }}
@@ -808,4 +805,34 @@ function DigestChannelsField({
       ) : null}
     </div>
   )
+}
+
+/**
+ * Текст toast'а после ручной отправки дайджеста. Раньше выводили только
+ * email, что путало юзеров с включённым Telegram-каналом ("ушло на email
+ * — а где telegram?"). Теперь читаем via-массив из edge function: если
+ * telegram не был доставлен (нет привязки), показываем подсказку как
+ * привязать.
+ */
+function digestSentToastText(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  salon: { weekly_digest_channels?: DigestChannel[]; daily_digest_channels?: DigestChannel[] },
+  data: SendDigestResponse | undefined,
+  kind: 'weekly' | 'daily',
+): string {
+  const via = data?.via ?? []
+  const selectedRaw = kind === 'weekly' ? salon.weekly_digest_channels : salon.daily_digest_channels
+  const selected: DigestChannel[] = selectedRaw ?? ['email']
+  const parts: string[] = []
+  if (via.includes('email')) {
+    parts.push(t('settings.digest.toast_sent_email', { email: data?.sent_to ?? '' }))
+  }
+  if (via.includes('telegram')) {
+    parts.push(t('settings.digest.toast_sent_telegram'))
+  }
+  // Был выбран Telegram, но не доставлен — показываем подсказку.
+  if (selected.includes('telegram') && !via.includes('telegram')) {
+    parts.push(t('settings.digest.toast_telegram_skipped'))
+  }
+  return parts.length > 0 ? parts.join('. ') : t('settings.digest.toast_no_channel')
 }

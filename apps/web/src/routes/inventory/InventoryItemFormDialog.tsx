@@ -142,7 +142,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="w-[min(720px,95vw)] max-w-none">
+      <DialogContent className="w-[min(820px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? t('inventory.form.title_edit') : t('inventory.form.title_new')}
@@ -158,6 +158,9 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
           }}
           noValidate
         >
+          {/* Image #52: компактный layout 3-col чтобы модалка влезала на
+              типичный экран без скролла. Раньше было 2-col → 6 строк инпутов.
+              Сейчас Name (full), 3+3+2-col = 4 строки. */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="inv-name">{t('inventory.form.name_label')}</Label>
             <Input
@@ -169,7 +172,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-unit">{t('inventory.form.unit_label')}</Label>
               <Input
@@ -213,9 +216,18 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 </Select>
               )}
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inv-sku">{t('inventory.form.sku_label')}</Label>
+              <Input
+                id="inv-sku"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="WLA-001"
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-stock">{t('inventory.form.stock_label')}</Label>
               <Input
@@ -245,11 +257,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 value={minStock}
                 onChange={(e) => setMinStock(e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">{t('inventory.form.min_hint')}</p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-cost">
                 {t('inventory.form.cost_label', { currency: currencySymbol })}
@@ -263,37 +271,28 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 value={costPerUnit}
                 onChange={(e) => setCostPerUnit(e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">{t('inventory.form.cost_hint')}</p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="inv-sku">{t('inventory.form.sku_label')}</Label>
+              <Label htmlFor="inv-supplier">{t('inventory.form.supplier_label')}</Label>
               <Input
-                id="inv-sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="WLA-001"
+                id="inv-supplier"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder={t('inventory.form.supplier_placeholder')}
               />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="inv-supplier">{t('inventory.form.supplier_label')}</Label>
-            <Input
-              id="inv-supplier"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder={t('inventory.form.supplier_placeholder')}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="inv-notes">{t('inventory.form.notes_label')}</Label>
-            <Input
-              id="inv-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={t('inventory.form.notes_placeholder')}
-            />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inv-notes">{t('inventory.form.notes_label')}</Label>
+              <Input
+                id="inv-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={t('inventory.form.notes_placeholder')}
+              />
+            </div>
           </div>
         </form>
 

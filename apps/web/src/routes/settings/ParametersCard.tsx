@@ -7,7 +7,6 @@ import {
   Landmark,
   PiggyBank,
   Plus,
-  SlidersHorizontal,
   Sprout,
   Trash2,
   TrendingDown,
@@ -189,32 +188,24 @@ export function ParametersCard() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
-      <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <SlidersHorizontal className="text-brand-teal size-5" strokeWidth={1.7} />
-            <div>
-              <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-                {t('settings.parameters.title')}
-              </h2>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {t('settings.parameters.subtitle')}
-              </p>
-            </div>
-          </div>
-          <label className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              className="size-3.5"
-            />
-            {t('settings.parameters.show_archived')}
-          </label>
+      {/* Image #53: header "Параметры салона" удалён — он дублировал
+          h1 родительской страницы /finance + занимал место когда вкладок
+          много и они переносились. Чекбокс «архив» переехал на правую
+          сторону строки sub-tabs ниже. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 overflow-x-auto">
+          <PageTabsNav tabs={SUB_TABS} active={activeSection} onChange={setActiveSection} t={t} />
         </div>
+        <label className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="size-3.5"
+          />
+          {t('settings.parameters.show_archived')}
+        </label>
       </div>
-
-      <PageTabsNav tabs={SUB_TABS} active={activeSection} onChange={setActiveSection} t={t} />
 
       <SectionTable
         key={sectionDef.key}
