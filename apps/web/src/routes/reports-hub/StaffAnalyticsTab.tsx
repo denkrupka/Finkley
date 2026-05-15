@@ -1,4 +1,4 @@
-import { Clock, ShoppingBag, TrendingUp, Users } from 'lucide-react'
+import { Clock, ShoppingBag, TrendingUp, Users, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -9,6 +9,7 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import { usePayoutsPreview } from '@/hooks/usePayouts'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useStaffPerformanceAdvanced } from '@/hooks/useStaffPerformance'
@@ -37,6 +38,17 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const endIso = range.end.toISOString()
   const { data: rows = [], isLoading } = useStaffPerformanceAdvanced(salonId, startIso, endIso)
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
+  // Заработок мастера за период: usePayoutsPreview считает по тому же
+  // RPC, что и страница /payouts (схема commission + revenue × процент).
+  // Передаём дату-only (RPC принимает period_start/period_end типа date).
+  const startDate = startIso.slice(0, 10)
+  const endDate = endIso.slice(0, 10)
+  const { data: payouts = [] } = usePayoutsPreview(salonId, startDate, endDate)
+  const payoutByStaff = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const p of payouts) m.set(p.staff_id, p.payout_cents)
+    return m
+  }, [payouts])
 
   const totalRevenue = rows.reduce((s, r) => s + r.total_revenue_cents, 0)
   const maxRevenue = rows.reduce((m, r) => Math.max(m, r.total_revenue_cents), 0)
@@ -60,11 +72,12 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         utilization_pct: r.utilization_pct,
         revenue_6m_cents: r.revenue_6m_cents,
         hire_date: r.hire_date,
+        payout_cents: payoutByStaff.get(r.staff_id) ?? 0,
         share_pct:
           totalRevenue > 0 ? Number(((r.total_revenue_cents / totalRevenue) * 100).toFixed(1)) : 0,
       })),
     }
-  }, [rows, totalRevenue, startIso, endIso, currency])
+  }, [rows, totalRevenue, startIso, endIso, currency, payoutByStaff])
 
   return (
     <div>
@@ -110,6 +123,9 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.staff.col_utilization')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.staff.col_earnings')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.staff.col_share')}
@@ -218,6 +234,15 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                         </span>
                       </div>
                     </td>
+                    {/* Заработок мастера за период (commission по схеме). */}
+                    <td className="px-3 py-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Wallet className="text-muted-foreground size-3" strokeWidth={2} />
+                        <span className="num text-foreground text-sm font-semibold">
+                          {formatCurrency(payoutByStaff.get(r.staff_id) ?? 0, currency)}
+                        </span>
+                      </div>
+                    </td>
                     {/* Share % */}
                     <td className="num text-muted-foreground px-3 py-3 text-right">
                       {share.toFixed(1)}%
@@ -235,7 +260,14 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                   <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
                     {formatCurrency(totalRevenue, currency)}
                   </td>
-                  <td colSpan={5} />
+                  <td colSpan={4} />
+                  <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
+                    {formatCurrency(
+                      payouts.reduce((s, p) => s + p.payout_cents, 0),
+                      currency,
+                    )}
+                  </td>
+                  <td />
                 </tr>
               </tfoot>
             ) : null}
