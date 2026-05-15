@@ -63,6 +63,8 @@ export type AdminSalonRow = {
   id: string
   name: string
   currency: string
+  /** Тип салона (id из onboarding-defaults SALON_TYPES), показывается в admin-таблице. */
+  salon_type: string | null
   plan_status: string | null
   trial_ends_at: string | null
   bonus_until: string | null

@@ -76,6 +76,7 @@
     },
     "salons": {
       "name": "Салон",
+      "type": "Тип салона",
       "owner": "Владелец",
       "period_months": "Период (мес)",
       "months": "{{count}} мес",

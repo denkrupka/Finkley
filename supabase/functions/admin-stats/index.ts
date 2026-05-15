@@ -257,7 +257,7 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
 
   const { data: salons, error } = await admin
     .from('salons')
-    .select('id, name, currency, created_at, created_by, blocked_at, blocked_reason')
+    .select('id, name, currency, salon_type, created_at, created_by, blocked_at, blocked_reason')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) return jsonResponse({ error: error.message }, 500)
@@ -430,6 +430,7 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
         id: s.id,
         name: s.name,
         currency: s.currency,
+        salon_type: (s as { salon_type: string | null }).salon_type ?? null,
         created_at: s.created_at,
         owner_id: s.created_by,
         owner_email: s.created_by ? (emailById.get(s.created_by as string) ?? null) : null,

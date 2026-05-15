@@ -21,6 +21,7 @@ import {
   type AdminUserRow,
 } from '@/hooks/useAdmin'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { SALON_TYPES } from '@/routes/onboarding/onboarding-defaults'
 
 type ModalKind = 'block' | 'addUser' | 'extendDemo' | 'delete' | null
 
@@ -80,6 +81,7 @@ export function AdminSalonsPage() {
             <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">{t('admin.salons.name')}</th>
+                <th className="px-4 py-3 text-left">{t('admin.salons.type')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.owner')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.period_months')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.avg_profit')}</th>
@@ -101,7 +103,7 @@ export function AdminSalonsPage() {
               ))}
               {data.salons.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-muted-foreground px-4 py-8 text-center">
+                  <td colSpan={10} className="text-muted-foreground px-4 py-8 text-center">
                     {t('admin.salons.empty')}
                   </td>
                 </tr>
@@ -158,6 +160,13 @@ function SalonRow({
     salon.owner_email ||
     '—'
 
+  // Лейбл типа салона из onboarding-defaults — отображаем русское имя по id.
+  // Если в БД сохранён кастомный type (пользователь ввёл свой) или null —
+  // показываем как есть либо «—».
+  const typeLabel = salon.salon_type
+    ? (SALON_TYPES.find((tp) => tp.id === salon.salon_type)?.name ?? salon.salon_type)
+    : '—'
+
   return (
     <tr className="border-border hover:bg-muted/30 border-t">
       <td className="px-4 py-3 font-semibold">
@@ -165,6 +174,7 @@ function SalonRow({
           {salon.name}
         </a>
       </td>
+      <td className="text-muted-foreground px-4 py-3 text-sm">{typeLabel}</td>
       <td className="px-4 py-3">
         <button
           type="button"
