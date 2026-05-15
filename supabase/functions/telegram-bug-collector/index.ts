@@ -1029,6 +1029,69 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
       .join('\n\n')
     await tgSend(msg.chat.id, ack, { replyTo: msg.message_id, threadId })
   }
+
+  // Уведомить владельца в личку — независимо от source. Владелец = super_admin
+  // c заполненным telegram_id (привязан через @finkley_tg_bot). Личный канал
+  // нужен чтобы он видел всё сразу, не открывая форум-чат.
+  await notifyOwnerOfNewBug(admin, {
+    bugId: data!.id,
+    senderName: msg.from?.first_name ?? null,
+    senderUsername: msg.from?.username ?? null,
+    messageText: text || transcript || null,
+    aiSummary: cat.summary ?? null,
+    severity: cat.severity ?? null,
+    area: cat.area ?? null,
+    kind,
+    source,
+  })
+}
+
+/**
+ * Шлёт уведомление владельцу (super_admin с привязанным telegram_id) в личный
+ * чат с @finklay_dev_bot о новом баге. Формат: «🐛 short_id · severity · area
+ * \n\n«текст пользователя» (sender)\n\n💡 AI summary».
+ *
+ * Если у владельца нет привязки — silent skip (не падаем). Если super_admin'ов
+ * несколько — шлём всем привязанным.
+ */
+async function notifyOwnerOfNewBug(
+  admin: ReturnType<typeof createClient>,
+  ev: {
+    bugId: string
+    senderName: string | null
+    senderUsername: string | null
+    messageText: string | null
+    aiSummary: string | null
+    severity: string | null
+    area: string | null
+    kind: 'bug' | 'feature'
+    source: 'team' | 'client'
+  },
+) {
+  const { data: owners } = await admin
+    .from('profiles')
+    .select('telegram_id')
+    .eq('is_super_admin', true)
+    .not('telegram_id', 'is', null)
+  if (!owners || owners.length === 0) return
+  const emoji = ev.kind === 'feature' ? '💡' : '🐛'
+  const senderLabel = ev.senderUsername ? `@${ev.senderUsername}` : ev.senderName || 'аноним'
+  const sourceLabel = ev.source === 'client' ? '👤 клиент' : '👥 команда'
+  const sev = ev.severity ? `[${ev.severity.toUpperCase()}]` : ''
+  const area = ev.area ? ` · ${ev.area}` : ''
+  const lines: string[] = [`${emoji} \`${shortId(ev.bugId)}\` ${sev}${area} · ${sourceLabel}`]
+  if (ev.messageText) {
+    // Чистим markdown-спецсимволы, чтобы Telegram не падал на parse_mode.
+    const cleaned = ev.messageText.slice(0, 1000).replace(/[`*_]/g, '')
+    lines.push(`💬 *${senderLabel}:*\n${cleaned}`)
+  }
+  if (ev.aiSummary) {
+    lines.push(`🤖 ${ev.aiSummary}`)
+  }
+  const text = lines.join('\n\n')
+  for (const o of owners as Array<{ telegram_id: number }>) {
+    await tgSend(o.telegram_id, text).catch((e) => console.warn('notifyOwner', e))
+  }
 }
 
 // =============================================================================
@@ -1128,6 +1191,95 @@ async function handleAnnounceFix(req: Request, admin: ReturnType<typeof createCl
   return jsonResponse({ ok: true, id: row.id, announced: !!announce })
 }
 
+/**
+ * /daily-digest — серверная сводка владельцу: сколько багов открыто/закрыто,
+ * сколько исправлено сегодня. Вызывается из pg_cron или scripts/.
+ *
+ * Auth (любой из двух):
+ *  - body.secret = FUNCTION_INTERNAL_SECRET (ручной вызов из scripts/)
+ *  - body.cron = true + body.token валиден в bug_digest_triggers (cron-вызов)
+ */
+async function handleDailyDigest(req: Request, admin: ReturnType<typeof createClient>) {
+  let body: { secret?: string; token?: string; cron?: boolean }
+  try {
+    body = await req.json()
+  } catch {
+    return jsonResponse({ error: 'bad_request' }, 400)
+  }
+
+  const secretOk =
+    FUNCTION_INTERNAL_SECRET && timingSafeEqual(body.secret ?? '', FUNCTION_INTERNAL_SECRET)
+
+  let cronOk = false
+  if (body.cron && body.token) {
+    const { data: trig } = await admin
+      .from('bug_digest_triggers')
+      .select('token, used_at, expires_at')
+      .eq('token', body.token)
+      .maybeSingle()
+    if (trig) {
+      const t = trig as { token: string; used_at: string | null; expires_at: string }
+      if (!t.used_at && new Date(t.expires_at).getTime() > Date.now()) {
+        cronOk = true
+        await admin
+          .from('bug_digest_triggers')
+          .update({ used_at: new Date().toISOString() })
+          .eq('token', t.token)
+      }
+    }
+  }
+
+  if (!secretOk && !cronOk) {
+    return jsonResponse({ error: 'unauthorized' }, 401)
+  }
+
+  // Граница «сегодня»: текущий день в UTC. На owner-стороне это вечерняя
+  // отсечка, что для дайджеста ок (cron можно поставить на нужное локальное
+  // время — Europe/Warsaw etc.).
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const todayIso = today.toISOString()
+
+  const [openRes, closedRes, fixedTodayRes] = await Promise.all([
+    admin.from('bug_reports').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+    admin
+      .from('bug_reports')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['fixed', 'wontfix']),
+    admin
+      .from('bug_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'fixed')
+      .gte('fixed_at', todayIso),
+  ])
+
+  const openCount = openRes.count ?? 0
+  const closedCount = closedRes.count ?? 0
+  const fixedToday = fixedTodayRes.count ?? 0
+
+  const { data: owners } = await admin
+    .from('profiles')
+    .select('telegram_id')
+    .eq('is_super_admin', true)
+    .not('telegram_id', 'is', null)
+  if (!owners || owners.length === 0) {
+    return jsonResponse({ ok: true, sent: 0, reason: 'no_owners_with_telegram' })
+  }
+
+  const text =
+    `📊 *Сводка по багам*\n\n` +
+    `🟢 Открыто: *${openCount}*\n` +
+    `✅ Закрыто (всего): *${closedCount}*\n` +
+    `🎯 Исправлено сегодня: *${fixedToday}*`
+
+  let sent = 0
+  for (const o of owners as Array<{ telegram_id: number }>) {
+    await tgSend(o.telegram_id, text).catch((e) => console.warn('digest send', e))
+    sent++
+  }
+  return jsonResponse({ ok: true, sent, openCount, closedCount, fixedToday })
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
@@ -1143,6 +1295,9 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url)
   if (url.pathname.endsWith('/announce-fix')) {
     return handleAnnounceFix(req, admin)
+  }
+  if (url.pathname.endsWith('/daily-digest')) {
+    return handleDailyDigest(req, admin)
   }
 
   // Иначе — Telegram webhook
