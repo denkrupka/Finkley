@@ -32,7 +32,9 @@ import {
   type ExpenseCategoryRow,
   type ExpenseRecurrence,
   type ExpenseRow,
+  type PayrollKind,
 } from '@/hooks/useExpenses'
+import { useStaff } from '@/hooks/useStaff'
 import {
   pickActiveAccountingProvider,
   useAccountingPushExpense,
@@ -56,6 +58,11 @@ type FormValues = {
   payment_method: PaymentMethod | ''
   comment: string
   recurrence: ExpenseRecurrence
+  // Payroll: показываются только если выбранная категория is_payroll=true
+  payroll_staff_id: string
+  payroll_kind: PayrollKind | ''
+  payroll_period_start: string
+  payroll_period_end: string
 }
 
 const schema = z.object({
@@ -71,6 +78,10 @@ const schema = z.object({
     .default(''),
   comment: z.string().max(500).optional().default(''),
   recurrence: z.enum(['none', 'weekly', 'monthly']).default('none'),
+  payroll_staff_id: z.string().optional().default(''),
+  payroll_kind: z.enum(['advance', 'final', '']).optional().default(''),
+  payroll_period_start: z.string().optional().default(''),
+  payroll_period_end: z.string().optional().default(''),
 })
 
 /** Считает дату следующего повторения от исходной даты расхода. */
@@ -130,6 +141,7 @@ export function ExpenseFormModal({
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
+  const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
@@ -163,8 +175,17 @@ export function ExpenseFormModal({
       payment_method: '',
       comment: '',
       recurrence: 'none',
+      payroll_staff_id: '',
+      payroll_kind: '',
+      payroll_period_start: '',
+      payroll_period_end: '',
     },
   })
+
+  // Активная категория: показываем payroll-блок если is_payroll=true.
+  const watchedCategoryId = form.watch('category_id')
+  const watchedCategory = categories.find((c) => c.id === watchedCategoryId)
+  const isPayrollCategory = !!watchedCategory?.is_payroll
 
   // При открытии в edit-mode — префиллим форму данными существующего расхода.
   useEffect(() => {
@@ -177,6 +198,10 @@ export function ExpenseFormModal({
         payment_method: (expense.payment_method as PaymentMethod) ?? '',
         comment: expense.comment ?? '',
         recurrence: (expense.recurrence as ExpenseRecurrence) ?? 'none',
+        payroll_staff_id: expense.payroll_staff_id ?? '',
+        payroll_kind: (expense.payroll_kind as PayrollKind) ?? '',
+        payroll_period_start: expense.payroll_period_start ?? '',
+        payroll_period_end: expense.payroll_period_end ?? '',
       })
     } else {
       form.reset({
@@ -186,6 +211,10 @@ export function ExpenseFormModal({
         payment_method: '',
         comment: '',
         recurrence: 'none',
+        payroll_staff_id: '',
+        payroll_kind: '',
+        payroll_period_start: '',
+        payroll_period_end: '',
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
@@ -196,6 +225,21 @@ export function ExpenseFormModal({
 
     // Edit-mode: простое UPDATE без OCR/auto-push/upload (этого хватает для
     // правки уже-созданного расхода — поля те же, что при создании).
+    // Payroll-поля: записываем только если категория зарплатная.
+    const payrollFields = isPayrollCategory
+      ? {
+          payroll_staff_id: values.payroll_staff_id || null,
+          payroll_kind: (values.payroll_kind || null) as PayrollKind | null,
+          payroll_period_start: values.payroll_period_start || null,
+          payroll_period_end: values.payroll_period_end || null,
+        }
+      : {
+          payroll_staff_id: null,
+          payroll_kind: null,
+          payroll_period_start: null,
+          payroll_period_end: null,
+        }
+
     if (isEdit && expense) {
       updateExpense.mutate(
         {
@@ -206,6 +250,7 @@ export function ExpenseFormModal({
           payment_method: values.payment_method || null,
           comment: values.comment || null,
           recurrence: values.recurrence,
+          ...payrollFields,
         },
         {
           onSuccess: () => {
@@ -250,6 +295,7 @@ export function ExpenseFormModal({
         recurrence: values.recurrence,
         next_occurrence_at: nextOccurrence(values.expense_at, values.recurrence),
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        ...payrollFields,
       },
       {
         onSuccess: (created) => {
@@ -397,6 +443,84 @@ export function ExpenseFormModal({
               </div>
             )}
           />
+
+          {/* Payroll-блок: показываем только если выбранная категория
+              is_payroll=true. Поля: мастер / аванс или окончательный / период. */}
+          {isPayrollCategory ? (
+            <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex flex-col gap-3 rounded-md border p-3">
+              <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
+                {t('expenses.form.payroll_section')}
+              </p>
+
+              <Controller
+                name="payroll_staff_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">{t('expenses.form.payroll_staff')}</Label>
+                    <Select
+                      value={field.value || '__none__'}
+                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('expenses.form.payroll_staff_placeholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          {t('expenses.form.payroll_staff_placeholder')}
+                        </SelectItem>
+                        {staffList.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              />
+
+              <Controller
+                name="payroll_kind"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">{t('expenses.form.payroll_kind')}</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['advance', 'final'] as const).map((kind) => {
+                        const active = field.value === kind
+                        return (
+                          <button
+                            key={kind}
+                            type="button"
+                            onClick={() => field.onChange(active ? '' : kind)}
+                            className={`flex h-10 items-center justify-center rounded-md border-[1.5px] text-sm font-semibold transition-colors ${
+                              active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-border bg-card hover:bg-muted/40'
+                            }`}
+                          >
+                            {t(`expenses.form.payroll_kind_${kind}`)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">{t('expenses.form.payroll_period_start')}</Label>
+                  <Input type="date" {...form.register('payroll_period_start')} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">{t('expenses.form.payroll_period_end')}</Label>
+                  <Input type="date" {...form.register('payroll_period_end')} />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-amount">{t('expenses.form.amount_label')}</Label>

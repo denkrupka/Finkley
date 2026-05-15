@@ -5,6 +5,8 @@ import type { PaymentMethod } from './useVisits'
 
 export type ExpenseRecurrence = 'none' | 'weekly' | 'monthly'
 
+export type PayrollKind = 'advance' | 'final'
+
 export type ExpenseRow = {
   id: string
   salon_id: string
@@ -18,6 +20,12 @@ export type ExpenseRow = {
   recurrence: ExpenseRecurrence
   next_occurrence_at: string | null
   recurrence_parent_id: string | null
+  /** Payroll-поля: заполняются когда категория = зарплатная. См. миграцию
+   *  20260515000014. Используются в Reports → Зарплаты для расчёта остатка. */
+  payroll_staff_id: string | null
+  payroll_kind: PayrollKind | null
+  payroll_period_start: string | null
+  payroll_period_end: string | null
   /**
    * Произвольные метаданные jsonb. Известные ключи:
    *   ksef_id           — NumerKSeF фактуры; уникальный кросс-портал ключ
@@ -48,6 +56,9 @@ export type ExpenseCategoryRow = {
   is_archived: boolean
   is_system: boolean
   sort_order: number
+  /** Если true — при выборе в форме расхода показываются payroll-поля
+   *  (мастер / аванс или окончательный / период). */
+  is_payroll?: boolean
 }
 
 export type ExpensesPeriod = { start: string; end: string } // ISO dates
@@ -63,7 +74,7 @@ export function useExpenseCategories(salonId: string | undefined) {
       if (!salonId) return []
       const { data, error } = await supabase
         .from('expense_categories')
-        .select('id, salon_id, name, is_archived, is_system, sort_order')
+        .select('id, salon_id, name, is_archived, is_system, sort_order, is_payroll')
         .eq('salon_id', salonId)
         .eq('is_archived', false)
         .order('sort_order', { ascending: true })
@@ -164,6 +175,11 @@ export type CreateExpenseInput = {
    * сравнивает buyer_nip с подключённой компанией и решает auto-push.
    */
   metadata?: Record<string, unknown>
+  /** Payroll-поля (если категория зарплатная). */
+  payroll_staff_id?: string | null
+  payroll_kind?: PayrollKind | null
+  payroll_period_start?: string | null
+  payroll_period_end?: string | null
 }
 
 export function useCreateExpense(salonId: string | undefined) {
