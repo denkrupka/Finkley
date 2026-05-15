@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, Package, Plus, Search, Tags, Upload } from 'lucide-react'
+import { AlertTriangle, BarChart3, Package, Plus, Search, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 import { InventoryAnalyticsTab } from './InventoryAnalyticsTab'
-import { InventoryCategoriesDialog } from './InventoryCategoriesDialog'
 import { InventoryImportChoiceDialog } from './InventoryImportChoiceDialog'
 import { InventoryImportDialog } from './InventoryImportDialog'
 import { InventoryItemDrawer } from './InventoryItemDrawer'
@@ -43,7 +42,6 @@ export function InventoryPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [ocrOpen, setOcrOpen] = useState(false)
   const [importChoiceOpen, setImportChoiceOpen] = useState(false)
-  const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [drawerItem, setDrawerItem] = useState<InventoryItemRow | null>(null)
 
   function setTab(v: 'list' | 'analytics') {
@@ -97,10 +95,11 @@ export function InventoryPage() {
         </div>
         {canEdit ? (
           <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
-            <Button variant="ghost" size="md" onClick={() => setCategoriesOpen(true)}>
-              <Tags className="size-4" strokeWidth={1.8} />
-              {t('inventory.categories_button')}
-            </Button>
+            {/* Image #41: кнопка «Категории» убрана из header'а — категории
+                управляются inline через «+» в форме материала (Image #40)
+                и через справочник Доходы → Методы оплаты (для категорий
+                расходов аналогично). InventoryCategoriesDialog ниже
+                остаётся как код, но триггер удалён. */}
             <Button variant="ghost" size="md" onClick={() => setImportChoiceOpen(true)}>
               <Upload className="size-4" strokeWidth={1.8} />
               {t('inventory.import_button_generic')}
@@ -354,12 +353,6 @@ export function InventoryPage() {
           if (kind === 'csv') setImportOpen(true)
           else setOcrOpen(true)
         }}
-      />
-
-      <InventoryCategoriesDialog
-        open={categoriesOpen}
-        onClose={() => setCategoriesOpen(false)}
-        salonId={salonId}
       />
     </div>
   )

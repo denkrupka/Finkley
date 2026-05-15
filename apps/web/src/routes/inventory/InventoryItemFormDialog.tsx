@@ -1,3 +1,4 @@
+import { Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -53,9 +54,16 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
   const [costPerUnit, setCostPerUnit] = useState('0')
   const [supplier, setSupplier] = useState('')
   const [notes, setNotes] = useState('')
+  /** Inline-добавление новой категории (Image #40). Если true — рендерим
+   *  text input вместо dropdown'а. Подтверждение → значение становится
+   *  category для текущего материала. */
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryDraft, setNewCategoryDraft] = useState('')
 
   useEffect(() => {
     if (!open) return
+    setAddingCategory(false)
+    setNewCategoryDraft('')
     if (item) {
       setName(item.name)
       setUnit(item.unit)
@@ -190,30 +198,96 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-category">{t('inventory.form.category_label')}</Label>
-              {categoryOptions.length === 0 ? (
-                <Input
-                  id="inv-category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder={t('inventory.form.category_placeholder')}
-                />
+              {/* Inline-добавление новой категории: если addingCategory=true —
+                  показываем text input + кнопки подтверждения/отмены. Имя
+                  становится значением category для текущего материала; в
+                  глобальный список оно попадёт после сохранения (distinct()
+                  в useInventoryCategories автоматически подхватит). */}
+              {addingCategory ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    autoFocus
+                    value={newCategoryDraft}
+                    onChange={(e) => setNewCategoryDraft(e.target.value)}
+                    placeholder={t('inventory.form.category_placeholder')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        const v = newCategoryDraft.trim()
+                        if (v) {
+                          setCategory(v)
+                          setAddingCategory(false)
+                          setNewCategoryDraft('')
+                        }
+                      } else if (e.key === 'Escape') {
+                        setAddingCategory(false)
+                        setNewCategoryDraft('')
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      const v = newCategoryDraft.trim()
+                      if (!v) return
+                      setCategory(v)
+                      setAddingCategory(false)
+                      setNewCategoryDraft('')
+                    }}
+                    disabled={!newCategoryDraft.trim()}
+                  >
+                    <Plus className="size-4" strokeWidth={2} />
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingCategory(false)
+                      setNewCategoryDraft('')
+                    }}
+                    className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                    aria-label={t('common.cancel')}
+                  >
+                    <X className="size-4" strokeWidth={1.8} />
+                  </button>
+                </div>
+              ) : categoryOptions.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="inv-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder={t('inventory.form.category_placeholder')}
+                  />
+                </div>
               ) : (
-                <Select
-                  value={category || '__none__'}
-                  onValueChange={(v) => setCategory(v === '__none__' ? '' : v)}
-                >
-                  <SelectTrigger id="inv-category">
-                    <SelectValue placeholder={t('inventory.form.category_placeholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">{t('inventory.form.category_none')}</SelectItem>
-                    {categoryOptions.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={category || '__none__'}
+                    onValueChange={(v) => setCategory(v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger id="inv-category" className="flex-1">
+                      <SelectValue placeholder={t('inventory.form.category_placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t('inventory.form.category_none')}</SelectItem>
+                      {categoryOptions.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAddingCategory(true)}
+                    title={t('inventory.form.category_add_new')}
+                  >
+                    <Plus className="size-4" strokeWidth={2} />
+                  </Button>
+                </div>
               )}
             </div>
             <div className="flex flex-col gap-1.5">
