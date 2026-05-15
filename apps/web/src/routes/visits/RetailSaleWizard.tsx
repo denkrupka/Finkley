@@ -248,7 +248,7 @@ export function RetailSaleWizard({
     <div className="flex max-h-[80vh] min-h-0 flex-col">
       <StepIndicator step={step} t={t} />
 
-      <div className="flex-1 overflow-y-auto px-5 pb-2 pt-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-2 pt-3 sm:px-5">
         {step === 1 ? (
           <Step1
             inventory={inventory}
@@ -288,7 +288,7 @@ export function RetailSaleWizard({
         ) : null}
       </div>
 
-      <footer className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
+      <footer className="border-border flex items-center justify-between gap-2 border-t px-4 py-3 sm:px-5">
         {step > 1 ? (
           <Button variant="outline" size="md" onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}>
             <ArrowLeft className="size-4" strokeWidth={2} />
@@ -355,13 +355,13 @@ function StepIndicator({ step, t }: { step: 1 | 2 | 3 | 4; t: (k: string) => str
     { id: 4, label: t('retail_wizard.step4_title'), icon: Receipt },
   ]
   return (
-    <div className="border-border bg-muted/30 flex items-center gap-2 border-b px-5 py-3">
+    <div className="border-border bg-muted/30 flex items-center gap-1 border-b px-3 py-2.5 sm:gap-2 sm:px-5 sm:py-3">
       {steps.map((s, i) => {
         const active = s.id === step
         const done = s.id < step
         const Icon = s.icon
         return (
-          <div key={s.id} className="flex flex-1 items-center gap-1.5">
+          <div key={s.id} className="flex min-w-0 flex-1 items-center gap-1 sm:gap-1.5">
             <span
               className={cn(
                 'grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
@@ -378,9 +378,11 @@ function StepIndicator({ step, t }: { step: 1 | 2 | 3 | 4; t: (k: string) => str
                 <Icon className="size-3.5" strokeWidth={2} />
               )}
             </span>
+            {/* На мобиле название скрываем — иначе 4 шага не влезают.
+                Видно только подсветка активного chip'а. */}
             <span
               className={cn(
-                'truncate text-[11px] font-semibold',
+                'hidden truncate text-[11px] font-semibold sm:inline',
                 active ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
@@ -488,7 +490,7 @@ function Step1({
       </div>
 
       {tab === 'inventory' ? (
-        <div className="flex items-end gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
             <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
               {t('retail_wizard.pick_item')}
@@ -508,7 +510,7 @@ function Step1({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-[1fr_140px_auto] items-end gap-2">
+        <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_140px_auto] sm:items-end">
           <div>
             <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
               {t('retail_wizard.other_name')}
@@ -553,14 +555,15 @@ function Step1({
         </div>
       )}
 
-      {/* Таблица позиций */}
-      <div className="border-border bg-card overflow-hidden rounded-md border">
+      {/* Таблица позиций — overflow-x-auto чтобы на узких экранах
+          можно было скроллить горизонтально. */}
+      <div className="border-border bg-card overflow-x-auto rounded-md border">
         {lines.length === 0 ? (
           <p className="text-muted-foreground p-4 text-center text-xs">
             {t('retail_wizard.empty_lines')}
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[520px] text-sm">
             <thead className="border-border bg-muted/20 border-b">
               <tr className="text-muted-foreground text-left text-[10px] font-semibold uppercase tracking-wider">
                 <th className="px-3 py-2">{t('retail_wizard.col_name')}</th>

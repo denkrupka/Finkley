@@ -194,8 +194,11 @@ export function SalesTab({ salonId }: { salonId: string }) {
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="p-0 sm:!max-w-[720px]">
-          <div className="px-5 pt-5">
+        {/* width: 96vw на мобиле/планшете, 680px на десктопе.
+            На скриншоте Image #24 720px вылезал за viewport — сужаем
+            и даём gap-0/p-0 чтобы wizard сам управлял padding'ом. */}
+        <DialogContent className="w-[96vw] gap-0 p-0 sm:!max-w-[680px]">
+          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
             <DialogHeader>
               <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
               <DialogDescription>{t('income.sales.create_subtitle')}</DialogDescription>
