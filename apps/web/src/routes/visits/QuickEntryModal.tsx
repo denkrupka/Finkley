@@ -56,8 +56,6 @@ type FormValues = {
   end_time: string // HH:MM
   staff_id: string
   client_id: string | null
-  tip: string
-  discount: string
   comment: string
 }
 
@@ -71,16 +69,6 @@ const schema = z.object({
     .string()
     .nullable()
     .refine((v) => !!v && v.length > 0, 'visits.errors.client_required'),
-  tip: z
-    .string()
-    .optional()
-    .default('')
-    .refine((v) => v === '' || Number(v.replace(',', '.')) >= 0, 'visits.errors.tip_negative'),
-  discount: z
-    .string()
-    .optional()
-    .default('')
-    .refine((v) => v === '' || Number(v.replace(',', '.')) >= 0, 'visits.errors.discount_negative'),
   comment: z.string().max(500).optional().default(''),
 })
 
@@ -144,8 +132,6 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       end_time: '11:00',
       staff_id: '',
       client_id: null,
-      tip: '',
-      discount: '',
       comment: '',
     },
   })
@@ -174,8 +160,6 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       end_time: prefillEnd,
       staff_id: prefillStaff,
       client_id: prefill?.clientId ?? null,
-      tip: '',
-      discount: '',
       comment: '',
     })
     setLines([])
@@ -247,10 +231,10 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       return
     }
 
-    const tipCentsTotal = values.tip ? Math.round(Number(values.tip.replace(',', '.')) * 100) : 0
-    const discountCentsTotal = values.discount
-      ? Math.round(Number(values.discount.replace(',', '.')) * 100)
-      : 0
+    // Чаевые и скидку на этапе создания не вводим — задаются позже при
+    // нажатии «Рассчитать» в карточке визита. Здесь фиксируем 0.
+    const tipCentsTotal = 0
+    const discountCentsTotal = 0
     const stf = staff.find((s) => s.id === values.staff_id)
 
     const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
@@ -424,7 +408,31 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
-          {/* Услуги — самый верх. Можно добавить несколько. */}
+          {/* Клиент — самый верх (image #68). Сначала выбираем кому записываем,
+              потом — что именно. */}
+          <Controller
+            name="client_id"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="qe-client">{t('visits.form.client_label')} *</Label>
+                <ClientPicker
+                  salonId={salonId}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder={t('clients.picker.no_client')}
+                  testId="qe-client"
+                />
+                {form.formState.errors.client_id ? (
+                  <p className="text-destructive text-xs font-medium" role="alert">
+                    {t(form.formState.errors.client_id.message ?? '')}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          />
+
+          {/* Услуги — после клиента. Можно добавить несколько. */}
           <div className="flex flex-col gap-1.5">
             <Label>{t('visits.form.service_label')} *</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -483,7 +491,17 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
                     <div className="min-w-0 flex-1">
                       <p className="text-foreground truncate text-sm font-semibold">{l.name}</p>
                       <p className="text-muted-foreground text-[11px]">
-                        {l.duration_min ? `${l.duration_min} ${t('common.min')} · ` : ''}
+                        {/* Image #67: длительность показываем ВСЕГДА. Если у
+                            услуги duration_min не задан в /services — пишем
+                            «60 мин (по умолчанию)», чтобы было ясно, что
+                            время визита считается по дефолту, а не по
+                            прописанному значению. */}
+                        <span className="num">
+                          {l.duration_min
+                            ? `${l.duration_min} ${t('common.min')}`
+                            : `60 ${t('common.min')} (${t('visits.form.duration_default')})`}
+                        </span>
+                        {' · '}
                         <span className="num">{formatCurrency(l.price_cents, currency)}</span>
                       </p>
                     </div>
@@ -601,29 +619,6 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             )}
           />
 
-          {/* Клиент — теперь обязательное поле */}
-          <Controller
-            name="client_id"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="qe-client">{t('visits.form.client_label')} *</Label>
-                <ClientPicker
-                  salonId={salonId}
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder={t('clients.picker.no_client')}
-                  testId="qe-client"
-                />
-                {form.formState.errors.client_id ? (
-                  <p className="text-destructive text-xs font-medium" role="alert">
-                    {t(form.formState.errors.client_id.message ?? '')}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          />
-
           {/* Сумма — автоматически из суммы услуг (read-only). */}
           <div className="flex flex-col gap-1.5">
             <Label>{t('visits.form.amount_label')}</Label>
@@ -644,53 +639,9 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             </p>
           </div>
 
-          {/* Чаевые + скидка (опциональные, но валидируются на ≥0) */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="qe-tip">{t('visits.form.tip_label')}</Label>
-              <div className="border-border bg-card flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
-                <span className="num text-muted-foreground text-sm">+{currencySymbol}</span>
-                <input
-                  id="qe-tip"
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  min="0"
-                  placeholder="0"
-                  {...form.register('tip')}
-                  className="num text-foreground placeholder:text-muted-foreground/50 h-full min-w-0 flex-1 bg-transparent text-base font-semibold outline-none"
-                  data-testid="qe-tip"
-                />
-              </div>
-              {form.formState.errors.tip ? (
-                <p className="text-destructive text-xs font-medium" role="alert">
-                  {t(form.formState.errors.tip.message ?? '')}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="qe-discount">{t('visits.form.discount_label')}</Label>
-              <div className="border-border bg-card flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
-                <span className="num text-muted-foreground text-sm">−{currencySymbol}</span>
-                <input
-                  id="qe-discount"
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  min="0"
-                  placeholder="0"
-                  {...form.register('discount')}
-                  className="num text-foreground placeholder:text-muted-foreground/50 h-full min-w-0 flex-1 bg-transparent text-base font-semibold outline-none"
-                  data-testid="qe-discount"
-                />
-              </div>
-              {form.formState.errors.discount ? (
-                <p className="text-destructive text-xs font-medium" role="alert">
-                  {t(form.formState.errors.discount.message ?? '')}
-                </p>
-              ) : null}
-            </div>
-          </div>
+          {/* Чаевые и скидка на создании визита больше не показываются
+              (image #69) — они задаются при нажатии «Рассчитать» в
+              VisitDetailModal → ChargeView, когда визит реально оплачивается. */}
 
           {/* Комментарий — единственное необязательное поле */}
           <div className="flex flex-col gap-1.5">

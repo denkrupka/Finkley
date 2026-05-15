@@ -1530,6 +1530,7 @@
       "service_empty_link": "Добавить услугу →",
       "amount_label": "Сумма",
       "amount_auto_hint": "Считается из выбранных услуг автоматически.",
+      "duration_default": "по умолчанию",
       "tip_label": "Чаевые",
       "discount_label": "Скидка",
       "payment_method_label": "Оплата",

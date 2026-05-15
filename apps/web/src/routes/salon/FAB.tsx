@@ -7,10 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 /**
  * Floating action button «Добавить» с выпадающим меню.
  *
- * Раньше FAB был однокнопочным «+ Визит» и сразу открывал QuickEntryModal.
- * По багу c6a1c5df владелец хочет, чтобы FAB предлагал выбор: «Визит»
- * или «Расход» — это два самых частых действия. Меню открывается на
- * desktop pill и на mobile fab.
+ * Раньше внутри одного `<Popover>` было два `<PopoverTrigger asChild>` —
+ * desktop pill и mobile circle (bug image #70: popover выползал в левый
+ * верхний угол, потому что Radix позиционировался относительно «не того»
+ * триггера). Теперь один триггер с responsive-классами: на ≥lg
+ * рендерится pill (с текстом), на <lg — круглая кнопка с одной иконкой.
  *
  * - `onVisit` — открывает QuickEntryModal.
  * - `onExpense` — открывает ExpenseFormModal.
@@ -31,33 +32,31 @@ export function FAB({ onVisit, onExpense }: { onVisit: () => void; onExpense: ()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {/* Desktop pill */}
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="bg-primary font-display text-primary-foreground shadow-finlg fixed bottom-7 right-7 z-20 hidden h-14 items-center gap-2 rounded-full px-5 pl-[18px] text-[15px] font-semibold lg:inline-flex"
-          data-testid="fab-add-desktop"
-        >
-          <Plus className="size-5" strokeWidth={2.4} />
-          <span>{t('fab.add')}</span>
-        </button>
-      </PopoverTrigger>
-
-      {/* Mobile round, чуть выше bottom-nav */}
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="bg-primary text-primary-foreground shadow-finlg fixed bottom-20 right-5 z-20 grid size-14 place-items-center rounded-full lg:hidden"
           aria-label={t('fab.add')}
-          data-testid="fab-add-mobile"
+          data-testid="fab-add"
+          className={[
+            'bg-primary text-primary-foreground shadow-finlg fixed z-20',
+            // Mobile: круглая 56px над bottom-nav
+            'bottom-20 right-5 grid size-14 place-items-center rounded-full',
+            // Desktop (≥lg): pill 56px с текстом, ниже и правее
+            'lg:bottom-7 lg:right-7 lg:inline-flex lg:size-auto lg:h-14 lg:place-items-stretch',
+            'lg:items-center lg:gap-2 lg:rounded-full lg:px-5 lg:pl-[18px] lg:text-[15px]',
+            'font-display lg:font-semibold',
+          ].join(' ')}
         >
-          <Plus className="size-6" strokeWidth={2.4} />
+          <Plus className="size-6 lg:size-5" strokeWidth={2.4} />
+          <span className="hidden lg:inline">{t('fab.add')}</span>
         </button>
       </PopoverTrigger>
 
       <PopoverContent
         side="top"
         align="end"
+        sideOffset={8}
+        collisionPadding={16}
         className="border-border bg-card shadow-finxl w-56 rounded-lg border p-1.5"
       >
         <button
