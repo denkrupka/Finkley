@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -27,7 +28,7 @@ import {
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
-import { useDeleteVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
+import { useDeleteVisit, useVisits, visitsKeys, type PaymentMethod } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
@@ -42,6 +43,7 @@ import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
  */
 export function SalesTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
 
@@ -197,7 +199,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
         {/* width: 96vw на мобиле/планшете, 680px на десктопе.
             На скриншоте Image #24 720px вылезал за viewport — сужаем
             и даём gap-0/p-0 чтобы wizard сам управлял padding'ом. */}
-        <DialogContent className="w-[96vw] gap-0 p-0 sm:!max-w-[680px]">
+        <DialogContent className="w-[96vw] gap-0 p-0 sm:!w-[760px] sm:!max-w-[760px]">
           <div className="px-4 pt-4 sm:px-5 sm:pt-5">
             <DialogHeader>
               <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
@@ -208,7 +210,14 @@ export function SalesTab({ salonId }: { salonId: string }) {
             salonId={salonId}
             currency={currency}
             staff={staff}
-            onDone={() => setCreateOpen(false)}
+            onDone={() => {
+              // Image #92: после оформления продажи кэш visits не
+              // обновлялся, и список «Продажи» был пустой до reload.
+              // Инвалидируем явно (RetailSaleWizard сам не дёргает qc).
+              void qc.invalidateQueries({ queryKey: visitsKeys(salonId) })
+              void qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+              setCreateOpen(false)
+            }}
           />
         </DialogContent>
       </Dialog>

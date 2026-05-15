@@ -2689,6 +2689,7 @@
     "step3_total": "К оплате",
     "step3_subtotal": "Без доп. скидки",
     "step3_extra_discount": "Доп. скидка на всю продажу ({{currency}})",
+    "step3_extra_discount_pct": "Доп. скидка на всю продажу (%)",
     "step3_extra_hint": "Распределится пропорционально между позициями.",
     "step3_payment": "Метод оплаты",
     "step3_comment": "Комментарий",

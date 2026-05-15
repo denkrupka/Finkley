@@ -91,6 +91,10 @@ export function RetailSaleWizard({
   })
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [extraDiscount, setExtraDiscount] = useState('') // string из input, потом *100
+  // Image #90: режим ввода доп. скидки — фиксированная сумма или %.
+  // При 'percent' значение трактуется как процент от linesTotalCents;
+  // при 'amount' — как сумма в валюте (как раньше).
+  const [extraDiscountMode, setExtraDiscountMode] = useState<'amount' | 'percent'>('amount')
   const [comment, setComment] = useState('')
   const [documentType, setDocumentType] = useState<'receipt' | 'invoice' | 'skip'>('skip')
   const [submitting, setSubmitting] = useState(false)
@@ -117,7 +121,16 @@ export function RetailSaleWizard({
     (acc, l) => acc + Math.max(0, l.quantity * l.unitPriceCents - l.lineDiscountCents),
     0,
   )
-  const extraDiscountCents = Math.max(0, Math.round(parseDecimal(extraDiscount) * 100))
+  const extraDiscountCents =
+    extraDiscountMode === 'percent'
+      ? Math.max(
+          0,
+          Math.min(
+            linesTotalCents,
+            Math.round((linesTotalCents * parseDecimal(extraDiscount)) / 100),
+          ),
+        )
+      : Math.max(0, Math.round(parseDecimal(extraDiscount) * 100))
   const grandTotalCents = Math.max(0, linesTotalCents - extraDiscountCents)
 
   // ── Validation ─────────────────────────────────────────────────────────
@@ -336,6 +349,8 @@ export function RetailSaleWizard({
             currency={currency}
             extraDiscount={extraDiscount}
             onExtraDiscountChange={setExtraDiscount}
+            extraDiscountMode={extraDiscountMode}
+            onExtraDiscountModeChange={setExtraDiscountMode}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
             paymentMethods={paymentMethods.map((m) => ({ code: m.code, label: m.label }))}
@@ -964,6 +979,8 @@ function Step3({
   currency,
   extraDiscount,
   onExtraDiscountChange,
+  extraDiscountMode,
+  onExtraDiscountModeChange,
   paymentMethod,
   onPaymentMethodChange,
   paymentMethods,
@@ -975,6 +992,8 @@ function Step3({
   currency: string
   extraDiscount: string
   onExtraDiscountChange: (v: string) => void
+  extraDiscountMode: 'amount' | 'percent'
+  onExtraDiscountModeChange: (m: 'amount' | 'percent') => void
   paymentMethod: PaymentMethod
   onPaymentMethodChange: (m: PaymentMethod) => void
   paymentMethods: { code: PaymentMethod; label: string }[]
@@ -1002,15 +1021,39 @@ function Step3({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="rw-extra-discount">
-          {t('retail_wizard.step3_extra_discount', { currency })}
+          {extraDiscountMode === 'percent'
+            ? t('retail_wizard.step3_extra_discount_pct')
+            : t('retail_wizard.step3_extra_discount', { currency })}
         </Label>
-        <Input
-          id="rw-extra-discount"
-          inputMode="decimal"
-          value={extraDiscount}
-          onChange={(e) => onExtraDiscountChange(e.target.value)}
-          placeholder="0"
-        />
+        <div className="flex gap-2">
+          <Input
+            id="rw-extra-discount"
+            inputMode="decimal"
+            value={extraDiscount}
+            onChange={(e) => onExtraDiscountChange(e.target.value)}
+            placeholder="0"
+            className="flex-1"
+          />
+          {/* Image #90: toggle %/Сумма. % трактуется как процент от
+              суммы позиций, сумма — как фиксированное значение. */}
+          <div className="border-border bg-card inline-flex items-center rounded-md border-[1.5px] p-0.5">
+            {(['amount', 'percent'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onExtraDiscountModeChange(mode)}
+                className={
+                  'h-9 min-w-[44px] rounded-[6px] px-3 text-xs font-semibold transition-colors ' +
+                  (extraDiscountMode === mode
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground')
+                }
+              >
+                {mode === 'amount' ? currency : '%'}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="text-muted-foreground text-[10px]">{t('retail_wizard.step3_extra_hint')}</p>
       </div>
 
