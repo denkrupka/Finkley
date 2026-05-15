@@ -206,9 +206,15 @@ export function useCreateExpense(salonId: string | undefined) {
       if (error) throw error
       return data as ExpenseRow
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: expensesKeys(salonId) })
-      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    onSuccess: async () => {
+      // Image #99: refetchType: 'all' гарантирует что даже неактивные
+      // (background) queries сразу подтянут свежий список — иначе
+      // ExpensesPage иногда не показывала только что созданный расход
+      // до полного reload страницы.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: expensesKeys(salonId), refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['dashboard', salonId] }),
+      ])
     },
   })
 }
@@ -225,9 +231,11 @@ export function useUpdateExpense(salonId: string | undefined) {
       const { error } = await supabase.from('expenses').update(patch).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: expensesKeys(salonId) })
-      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: expensesKeys(salonId), refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['dashboard', salonId] }),
+      ])
     },
   })
 }
