@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpen,
+  CalendarClock,
   Code,
   CreditCard,
   HelpCircle,
@@ -11,13 +12,13 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-// Порядок (по требованию владельца, 2026-05-15):
-//   Профиль · Пользователи · Уведомления · Справочники · Интеграции ·
-//   Биллинг · Безопасность · API · Помощь.
-// «Уведомления» оставлены (salon-настройки дайджестов).
+// Порядок (2026-05-15 + image #71):
+//   Профиль · Пользователи · График работы · Уведомления · Справочники ·
+//   Интеграции · Биллинг · Безопасность · API · Помощь.
 export const SETTINGS_TABS = [
   'profile',
   'team',
+  'schedule',
   'notifications',
   'catalogs',
   'integrations',
@@ -36,6 +37,7 @@ const TAB_ICONS: Record<SettingsTab, typeof User> = {
   api: Code,
   billing: CreditCard,
   team: Users,
+  schedule: CalendarClock,
   integrations: Plug,
   security: Shield,
   help: HelpCircle,

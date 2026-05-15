@@ -1,5 +1,5 @@
-import { Calendar, Clock, Loader2, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Calendar, Loader2, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -14,85 +14,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useUpdateSalon } from '@/hooks/useSalonMutations'
-import { useSalon } from '@/hooks/useSalons'
 import {
-  DAY_KEYS_ORDERED,
-  DEFAULT_OPENING_HOURS,
   useAddHolidays,
   useDeleteHoliday,
   useDeleteHolidaysByCountry,
   useSalonHolidays,
-  type DayKey,
-  type OpeningHours,
 } from '@/hooks/useSalonHours'
 import { getHolidays, HOLIDAY_COUNTRIES } from '@/lib/holidays'
 
-const DAY_LABELS: Record<DayKey, string> = {
-  mon: 'Пн',
-  tue: 'Вт',
-  wed: 'Ср',
-  thu: 'Чт',
-  fri: 'Пт',
-  sat: 'Сб',
-  sun: 'Вс',
-}
-
 /**
- * Card в Settings → Профиль: расписание работы салона + выходные/праздники.
+ * Праздничные/нерабочие даты салона. Хранится в salon_holidays — отдельная
+ * таблица; можно добавить одиночную дату руками или одной кнопкой загрузить
+ * госпраздники страны (см. lib/holidays.ts).
  *
- * Часы — JSONB на salons.opening_hours.
- * Праздники — отдельная таблица salon_holidays. Можно добавить руками
- * (одну дату) или одной кнопкой подгрузить госпраздники любой европейской
- * страны (из lib/holidays.ts).
- *
- * Эти данные подхватываются календарём резерваций для штриховки нерабочего
- * времени (см. VisitsCalendarView).
+ * Используется календарём резерваций для штриховки нерабочих дней.
+ * Разнесён с графиком работы (SalonHoursCard) на отдельную подвкладку
+ * в Settings → «График работы».
  */
-export function OpeningHoursCard() {
+export function SalonHolidaysCard() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
-  const { data: salon } = useSalon(salonId)
-  const update = useUpdateSalon()
   const { data: holidays = [] } = useSalonHolidays(salonId)
   const addHolidays = useAddHolidays(salonId)
   const deleteHoliday = useDeleteHoliday(salonId)
   const deleteByCountry = useDeleteHolidaysByCountry(salonId)
 
-  const [hours, setHours] = useState<OpeningHours>(DEFAULT_OPENING_HOURS)
   const [holidayDate, setHolidayDate] = useState('')
   const [holidayLabel, setHolidayLabel] = useState('')
   const [selectedCountry, setSelectedCountry] = useState<string>('PL')
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
-
-  useEffect(() => {
-    if (salon?.opening_hours) {
-      setHours(salon.opening_hours as OpeningHours)
-    } else {
-      setHours(DEFAULT_OPENING_HOURS)
-    }
-  }, [salon])
 
   const installedCountries = useMemo(() => {
     const set = new Set<string>()
     for (const h of holidays) if (h.country_code) set.add(h.country_code)
     return set
   }, [holidays])
-
-  function patchDay(day: DayKey, patch: Partial<OpeningHours[DayKey]>) {
-    setHours((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }))
-  }
-
-  function saveHours() {
-    if (!salonId) return
-    update.mutate(
-      { id: salonId, opening_hours: hours },
-      {
-        onSuccess: () => toast.success(t('settings.opening_hours.toast_saved')),
-        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-      },
-    )
-  }
 
   function addOneHoliday() {
     const date = holidayDate.trim()
@@ -138,83 +94,14 @@ export function OpeningHoursCard() {
   }
 
   return (
-    <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+    <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
       <div className="mb-4 flex items-center gap-2">
-        <Clock className="text-brand-teal size-5" strokeWidth={1.8} />
+        <Calendar className="text-brand-teal size-5" strokeWidth={1.8} />
         <h2 className="text-brand-navy text-base font-bold tracking-tight">
-          {t('settings.opening_hours.title')}
+          {t('settings.opening_hours.holidays_title')}
         </h2>
       </div>
-      <p className="text-muted-foreground mb-4 text-sm">{t('settings.opening_hours.subtitle')}</p>
-
-      {/* Часы по дням недели */}
-      <div className="border-border bg-muted/10 mb-5 overflow-hidden rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="border-border border-b">
-            <tr className="text-muted-foreground text-left text-[11px] font-semibold uppercase tracking-wider">
-              <th className="w-16 px-3 py-2">{t('settings.opening_hours.col_day')}</th>
-              <th className="px-3 py-2 text-center">{t('settings.opening_hours.col_closed')}</th>
-              <th className="px-3 py-2">{t('settings.opening_hours.col_open')}</th>
-              <th className="px-3 py-2">{t('settings.opening_hours.col_close')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-border divide-y">
-            {DAY_KEYS_ORDERED.map((day) => {
-              const cfg = hours[day] ?? {}
-              const closed = !!cfg.closed
-              return (
-                <tr key={day} className={closed ? 'bg-muted/20 opacity-60' : ''}>
-                  <td className="text-foreground px-3 py-2 text-sm font-bold">{DAY_LABELS[day]}</td>
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={closed}
-                      onChange={(e) =>
-                        patchDay(day, e.target.checked ? { closed: true } : { closed: false })
-                      }
-                      className="size-4 accent-amber-500"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      type="time"
-                      value={cfg.open ?? '09:00'}
-                      onChange={(e) => patchDay(day, { open: e.target.value })}
-                      disabled={closed}
-                      className="num h-9 max-w-[140px]"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      type="time"
-                      value={cfg.close ?? '20:00'}
-                      onChange={(e) => patchDay(day, { close: e.target.value })}
-                      disabled={closed}
-                      className="num h-9 max-w-[140px]"
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mb-6 flex justify-end">
-        <Button onClick={saveHours} disabled={update.isPending}>
-          {update.isPending ? <Loader2 className="size-4 animate-spin" strokeWidth={2} /> : null}
-          {t('settings.opening_hours.save_hours')}
-        </Button>
-      </div>
-
-      {/* Праздники / выходные */}
-      <div className="border-border mb-4 flex items-center gap-2 border-t pt-4">
-        <Calendar className="text-brand-teal size-5" strokeWidth={1.8} />
-        <h3 className="text-foreground text-sm font-bold">
-          {t('settings.opening_hours.holidays_title')}
-        </h3>
-      </div>
-      <p className="text-muted-foreground mb-4 text-xs">
+      <p className="text-muted-foreground mb-4 text-sm">
         {t('settings.opening_hours.holidays_hint')}
       </p>
 

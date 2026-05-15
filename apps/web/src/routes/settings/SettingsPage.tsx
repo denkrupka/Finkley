@@ -1,5 +1,7 @@
 import {
+  Calendar,
   ChevronRight,
+  Clock,
   Coins,
   CreditCard,
   Download,
@@ -53,8 +55,10 @@ import { Link } from 'react-router-dom'
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
+import { PageTabsNav } from '@/components/ui/PageTabsNav'
 import { ApiKeysCard } from './ApiKeysCard'
-import { OpeningHoursCard } from './OpeningHoursCard'
+import { SalonHoursCard } from './SalonHoursCard'
+import { SalonHolidaysCard } from './SalonHolidaysCard'
 // SegmentationCard перенесён в /staff (Справочник мастеров).
 import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
@@ -379,9 +383,8 @@ export function SettingsPage() {
             </div>
           </section>
 
-          {/* График работы салона + государственные праздники + индивидуальные
-              выходные. Подхватывается календарём резерваций для штриховки. */}
-          <OpeningHoursCard />
+          {/* График работы и праздники переехали в Settings → «График работы»
+              (image #71) — две подвкладки: SalonHoursCard и SalonHolidaysCard. */}
 
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
           <TelegramLinkCard />
@@ -548,6 +551,8 @@ export function SettingsPage() {
           </section>
         </>
       )}
+
+      {activeTab === 'schedule' && <ScheduleTab />}
 
       {activeTab === 'notifications' && (
         <>
@@ -790,6 +795,47 @@ export function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+/**
+ * Settings → График работы. Две подвкладки:
+ *   - schedule.hours    — SalonHoursCard (часы по дням недели)
+ *   - schedule.holidays — SalonHolidaysCard (праздники, госвыходные)
+ *
+ * Активная подвкладка хранится в URL (?sub=...), чтобы deep-link был
+ * стабилен и переключение не сбрасывало другие параметры.
+ */
+function ScheduleTab() {
+  const { t } = useTranslation()
+  const [params, setParams] = useSearchParams()
+  const sub = (params.get('sub') as 'hours' | 'holidays' | null) ?? 'hours'
+  function setSub(next: 'hours' | 'holidays') {
+    const p = new URLSearchParams(params)
+    p.set('sub', next)
+    setParams(p, { replace: true })
+  }
+  return (
+    <div>
+      <PageTabsNav
+        tabs={[
+          {
+            id: 'hours' as const,
+            labelKey: 'settings.schedule.tabs.hours',
+            icon: Clock,
+          },
+          {
+            id: 'holidays' as const,
+            labelKey: 'settings.schedule.tabs.holidays',
+            icon: Calendar,
+          },
+        ]}
+        active={sub}
+        onChange={setSub}
+        t={t}
+      />
+      <div className="mt-4">{sub === 'hours' ? <SalonHoursCard /> : <SalonHolidaysCard />}</div>
     </div>
   )
 }

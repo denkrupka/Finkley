@@ -1826,6 +1826,7 @@
       "profile": "Профиль",
       "catalogs": "Справочники",
       "parameters": "Параметры",
+      "schedule": "График работы",
       "notifications": "Уведомления",
       "api": "API",
       "billing": "Биллинг",
@@ -1834,6 +1835,12 @@
       "security": "Безопасность",
       "appearance": "Внешний вид",
       "help": "Помощь"
+    },
+    "schedule": {
+      "tabs": {
+        "hours": "График работы салона",
+        "holidays": "Праздничные выходные"
+      }
     },
     "catalogs": {
       "title": "Справочники",
