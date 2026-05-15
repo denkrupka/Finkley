@@ -226,37 +226,37 @@ function DetailView({
   onClose,
   t,
 }: DetailViewProps) {
-  const headerBg = allPaid ? 'bg-emerald-500' : 'bg-sky-600'
   const headerLabel = allPaid ? t('visits.detail.status_paid') : t('visits.detail.status_confirmed')
   const dateLabel = format(new Date(visit.visit_at), 'EEEE, d MMMM', { locale: ru })
 
   return (
     <div className="flex max-h-[85vh] flex-col">
-      <header className={cn('text-white', headerBg)}>
-        <div className="flex items-center justify-between px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-white/90 hover:text-white"
-            aria-label={t('common.close')}
-          >
-            ✕
-          </button>
-          <p className="text-sm font-bold uppercase tracking-wider">{headerLabel}</p>
-          <span />
-        </div>
-      </header>
-
-      {/* Клиент */}
-      <div className="border-border flex items-center gap-3 border-b px-5 py-3">
-        <span className="bg-muted text-muted-foreground grid size-10 place-items-center rounded-full">
+      {/* Шапка в стиле остальных модалок портала (image #75): без яркой
+          цветной плашки и без второй X-кнопки (Radix DialogContent уже
+          рендерит свой close-крестик в правом верхнем углу). Статус
+          вынесен в pill рядом с именем клиента, окрашен брендовыми
+          токенами sage (paid) / teal (confirmed). */}
+      <div className="border-border flex items-center gap-3 border-b px-5 py-4 pr-12">
+        <span className="bg-muted text-muted-foreground grid size-10 shrink-0 place-items-center rounded-full">
           <User className="size-5" strokeWidth={1.7} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-foreground truncate text-sm font-semibold">
-            {client?.name ?? t('visits.detail.no_client')}
-          </p>
-          <p className="text-muted-foreground text-xs">{dateLabel}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-brand-navy truncate text-base font-bold">
+              {client?.name ?? t('visits.detail.no_client')}
+            </p>
+            <span
+              className={cn(
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                allPaid
+                  ? 'bg-brand-sage-soft text-brand-sage-deep'
+                  : 'bg-brand-teal-soft text-brand-teal-deep',
+              )}
+            >
+              {headerLabel}
+            </span>
+          </div>
+          <p className="text-muted-foreground mt-0.5 text-xs">{dateLabel}</p>
         </div>
       </div>
 

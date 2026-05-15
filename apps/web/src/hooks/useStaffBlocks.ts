@@ -60,6 +60,26 @@ export function useCreateStaffBlock(salonId: string | undefined) {
   })
 }
 
+export function useUpdateStaffBlock(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      id: string
+      staff_id?: string
+      starts_at?: string
+      ends_at?: string
+      label?: string | null
+    }) => {
+      const { id, ...patch } = input
+      const { error } = await supabase.from('staff_time_blocks').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
+    },
+  })
+}
+
 export function useDeleteStaffBlock(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

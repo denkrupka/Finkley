@@ -64,11 +64,9 @@ const schema = z.object({
   start_time: z.string().min(1, 'visits.errors.start_time_required'),
   end_time: z.string().min(1, 'visits.errors.end_time_required'),
   staff_id: z.string().min(1, 'visits.errors.staff_required'),
-  // Клиент — обязательное поле по новому ТЗ (раньше можно было «без клиента»).
-  client_id: z
-    .string()
-    .nullable()
-    .refine((v) => !!v && v.length > 0, 'visits.errors.client_required'),
+  // Клиент опционален (image #74): запись «без клиента» бывает нужна для
+  // блокировки слота под условного клиента, который ещё не зарегистрирован.
+  client_id: z.string().nullable().optional().default(null),
   comment: z.string().max(500).optional().default(''),
 })
 
@@ -408,26 +406,22 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
-          {/* Клиент — самый верх (image #68). Сначала выбираем кому записываем,
-              потом — что именно. */}
+          {/* Клиент — самый верх (image #68). Опциональное поле (image #74):
+              запись «без клиента» допустима — например, чтобы заранее
+              забронировать слот под клиента, которого ещё не вносили в базу. */}
           <Controller
             name="client_id"
             control={form.control}
             render={({ field }) => (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="qe-client">{t('visits.form.client_label')} *</Label>
+                <Label htmlFor="qe-client">{t('visits.form.client_label')}</Label>
                 <ClientPicker
                   salonId={salonId}
-                  value={field.value}
+                  value={field.value ?? null}
                   onChange={field.onChange}
                   placeholder={t('clients.picker.no_client')}
                   testId="qe-client"
                 />
-                {form.formState.errors.client_id ? (
-                  <p className="text-destructive text-xs font-medium" role="alert">
-                    {t(form.formState.errors.client_id.message ?? '')}
-                  </p>
-                ) : null}
               </div>
             )}
           />

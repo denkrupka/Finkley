@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -24,7 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useCreateStaffBlock } from '@/hooks/useStaffBlocks'
+import {
+  useCreateStaffBlock,
+  useDeleteStaffBlock,
+  useUpdateStaffBlock,
+  type StaffBlockRow,
+} from '@/hooks/useStaffBlocks'
 import { useStaff } from '@/hooks/useStaff'
 
 type FormValues = {
@@ -47,21 +52,29 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   salonId: string
+  /** Префилл для создания (из popover'а в календаре). null при редактировании. */
   prefill: { staffId: string; when: string; endAt?: string } | null
+  /** Существующий блок для редактирования/удаления. null при создании. */
+  block?: StaffBlockRow | null
 }
 
 /**
- * ReservationModal — создание блока времени мастера (kind='reservation').
+ * ReservationModal — резерв времени мастера (kind='reservation' в БД).
  *
- * Открывается из VisitsCalendarView когда юзер выбрал «Резерв времени» в
- * popover'е субслота (одиночный клик или диапазон через drag-select).
- * Поля: дата, время от/до, мастер, повод. Без поля «Оборудование» (sprzęt)
- * по запросу владельца — этот атрибут пока не моделируется в Finkley.
+ * Два режима:
+ *   - create — открывается из popover'а календаря, prefill даёт время/мастера.
+ *   - edit   — открывается кликом по существующему резерву на сетке.
+ *              Та же форма, плюс кнопка «Удалить» слева в футере.
+ *
+ * Поле «Sprzęt» (оборудование) намеренно не моделируется в Finkley.
  */
-export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props) {
+export function ReservationModal({ open, onOpenChange, salonId, prefill, block }: Props) {
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const createBlock = useCreateStaffBlock(salonId)
+  const updateBlock = useUpdateStaffBlock(salonId)
+  const deleteBlock = useDeleteStaffBlock(salonId)
+  const isEdit = !!block
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -76,6 +89,20 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
 
   useEffect(() => {
     if (!open) return
+    // Edit-режим имеет приоритет: если передан block, ресетим форму из него
+    // (даже если prefill случайно тоже задан).
+    if (block) {
+      const starts = new Date(block.starts_at)
+      const ends = new Date(block.ends_at)
+      form.reset({
+        visit_date: format(starts, 'yyyy-MM-dd'),
+        start_time: format(starts, 'HH:mm'),
+        end_time: format(ends, 'HH:mm'),
+        staff_id: block.staff_id,
+        reason: block.label ?? '',
+      })
+      return
+    }
     if (!prefill) return
     const when = new Date(prefill.when)
     const endAt = prefill.endAt ? new Date(prefill.endAt) : new Date(when.getTime() + 30 * 60_000)
@@ -87,7 +114,17 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
       reason: '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, prefill?.staffId, prefill?.when, prefill?.endAt])
+  }, [
+    open,
+    block?.id,
+    block?.starts_at,
+    block?.ends_at,
+    block?.staff_id,
+    block?.label,
+    prefill?.staffId,
+    prefill?.when,
+    prefill?.endAt,
+  ])
 
   async function onSubmit(values: FormValues) {
     const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
@@ -97,6 +134,26 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
     const ends = new Date(yyyy ?? 1970, (mm ?? 1) - 1, dd ?? 1, eh ?? 0, em ?? 0, 0, 0)
     if (ends.getTime() <= starts.getTime()) {
       toast.error(t('visits.errors.end_before_start'))
+      return
+    }
+
+    if (isEdit && block) {
+      updateBlock.mutate(
+        {
+          id: block.id,
+          staff_id: values.staff_id,
+          starts_at: starts.toISOString(),
+          ends_at: ends.toISOString(),
+          label: values.reason.trim() || null,
+        },
+        {
+          onSuccess: () => {
+            toast.success(t('visits.reservation.toast_updated'))
+            onOpenChange(false)
+          },
+          onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+        },
+      )
       return
     }
 
@@ -118,11 +175,27 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
     )
   }
 
+  function handleDelete() {
+    if (!block) return
+    if (!window.confirm(t('visits.calendar.confirm_remove_reservation'))) return
+    deleteBlock.mutate(block.id, {
+      onSuccess: () => {
+        toast.success(t('visits.calendar.toast_block_removed'))
+        onOpenChange(false)
+      },
+      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+    })
+  }
+
+  const isPending = createBlock.isPending || updateBlock.isPending || deleteBlock.isPending
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:!w-[520px] sm:!max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>{t('visits.reservation.title')}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? t('visits.reservation.title_edit') : t('visits.reservation.title')}
+          </DialogTitle>
           <DialogDescription>{t('visits.reservation.subtitle')}</DialogDescription>
         </DialogHeader>
 
@@ -131,7 +204,6 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
-          {/* Дата + Начало + Конец */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="rs-date">{t('visits.form.date_label')} *</Label>
@@ -182,7 +254,6 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
             </div>
           </div>
 
-          {/* Мастер */}
           <Controller
             name="staff_id"
             control={form.control}
@@ -210,7 +281,6 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
             )}
           />
 
-          {/* Повод (необязательно) */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="rs-reason">{t('visits.reservation.reason_label')}</Label>
             <textarea
@@ -223,24 +293,43 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill }: Props
           </div>
         </form>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={() => onOpenChange(false)}
-            disabled={createBlock.isPending}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={createBlock.isPending}
-          >
-            {createBlock.isPending ? t('common.loading') : t('common.save')}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          {/* В edit-режиме слева — деструктивная кнопка «Удалить»; в create —
+              этот слот пуст, чтобы Сохранить/Отмена остались справа. */}
+          {isEdit ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={handleDelete}
+              disabled={isPending}
+              className="text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="size-4" strokeWidth={2} />
+              {t('common.delete')}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              onClick={form.handleSubmit(onSubmit)}
+              disabled={isPending}
+            >
+              {isPending ? t('common.loading') : t('common.save')}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

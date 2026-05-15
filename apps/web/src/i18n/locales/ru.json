@@ -1399,6 +1399,15 @@
       "confirm_remove_absence": "Убрать отсутствие?",
       "toast_block_removed": "Удалено"
     },
+    "move": {
+      "title": "Сохранить изменения в визите?",
+      "was": "Было",
+      "now": "Стало",
+      "staff_changed": "новый мастер",
+      "confirm": "Сохранить изменения",
+      "cancel": "Отменить",
+      "toast_saved": "Визит перенесён"
+    },
     "status_paid": "Оплачено",
     "reservation": {
       "title": "Резерв времени",

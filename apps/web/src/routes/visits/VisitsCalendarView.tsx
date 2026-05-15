@@ -6,14 +6,21 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
 import { useSalonHolidays } from '@/hooks/useSalonHours'
 import { useServices } from '@/hooks/useServices'
-import { useDeleteStaffBlock, useStaffBlocks } from '@/hooks/useStaffBlocks'
+import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
-import { useVisits, type VisitRow } from '@/hooks/useVisits'
+import { useUpdateVisit, useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
 import { VisitDetailModal } from './VisitDetailModal'
@@ -107,12 +114,31 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
     endAt: Date | null
     rect: { top: number; left: number }
   } | null>(null)
-  // Модалка «Резерв времени» — открывается из popover'а.
+  // Модалка «Резерв времени» — открывается из popover'а (create) или
+  // кликом по существующему резерву (edit). В edit-режиме prefill=null,
+  // form ресетится из block. См. ReservationModal.
   const [reservationPrefill, setReservationPrefill] = useState<{
     staffId: string
     when: string
     endAt?: string
   } | null>(null)
+  const [editingBlock, setEditingBlock] = useState<StaffBlockRow | null>(null)
+  /**
+   * Drag-and-drop: перенос визита на другой слот/мастера.
+   *   - dragStart на карточке визита → запоминаем visit_id + offset курсора
+   *     внутри карточки (чтобы при drop посчитать корректное start).
+   *   - dragOver на subslot button → highlight (через state hoverTarget).
+   *   - drop → формируем pendingMove с (visit, target staff, target visit_at),
+   *     открываем confirmation-модалку. На «Сохранить» — UPDATE через
+   *     useUpdateVisit; на «Отмена» — сбрасываем pendingMove.
+   */
+  const [draggingVisit, setDraggingVisit] = useState<VisitRow | null>(null)
+  const [pendingMove, setPendingMove] = useState<{
+    visit: VisitRow
+    targetStaffId: string | null
+    targetVisitAt: string
+  } | null>(null)
+  const updateVisit = useUpdateVisit(salonId)
   /**
    * Drag-select на сетке: пользователь зажимает левую кнопку на стартовом
    * 15-мин субслоте и тянет вниз. На каждый mouseenter в субслот того же
@@ -545,6 +571,28 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                               if (dragState.currentIdx === idx) return
                               setDragState({ ...dragState, currentIdx: idx })
                             }}
+                            onDragOver={(e) => {
+                              // Разрешаем drop на этот слот только если идёт
+                              // перенос визита (draggingVisit != null).
+                              if (draggingVisit) e.preventDefault()
+                            }}
+                            onDrop={(e) => {
+                              if (!draggingVisit) return
+                              e.preventDefault()
+                              const newVisitAt = new Date(dayStart)
+                              newVisitAt.setHours(0, 0, 0, 0)
+                              newVisitAt.setMinutes(minFromMidnight)
+                              const newIso = newVisitAt.toISOString()
+                              const sameTime = newIso === draggingVisit.visit_at
+                              const sameStaff = s.id === draggingVisit.staff_id
+                              if (sameTime && sameStaff) return // ничего не изменилось
+                              setPendingMove({
+                                visit: draggingVisit,
+                                targetStaffId: s.id,
+                                targetVisitAt: newIso,
+                              })
+                              setDraggingVisit(null)
+                            }}
                             className="hover:bg-foreground/[0.03] absolute inset-x-0 cursor-pointer transition-colors"
                             style={{
                               top: pxTopForMinutes(minFromMidnight),
@@ -601,13 +649,29 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                         <button
                           key={v.id}
                           type="button"
+                          draggable
+                          onDragStart={(e) => {
+                            // Не запускаем DnD на отменённых визитах.
+                            if (v.status === 'cancelled') {
+                              e.preventDefault()
+                              return
+                            }
+                            e.dataTransfer.effectAllowed = 'move'
+                            // Тянем сам id, остальное держим в state.
+                            e.dataTransfer.setData('text/finkley-visit-id', v.id)
+                            setDraggingVisit(v)
+                          }}
+                          onDragEnd={() => {
+                            setDraggingVisit(null)
+                          }}
                           onClick={(e) => {
                             e.stopPropagation()
                             setEditingVisit(v)
                           }}
                           className={cn(
-                            'group absolute inset-x-1 z-[5] cursor-pointer overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md',
+                            'group absolute inset-x-1 z-[5] cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md active:cursor-grabbing',
                             v.status === 'cancelled' && 'opacity-50',
+                            draggingVisit?.id === v.id && 'ring-primary opacity-50 ring-2',
                           )}
                           style={{
                             top,
@@ -670,16 +734,16 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                             key={b.id}
                             type="button"
                             onClick={() => {
-                              if (
-                                !confirm(
-                                  t(
-                                    isReservation
-                                      ? 'visits.calendar.confirm_remove_reservation'
-                                      : 'visits.calendar.confirm_remove_absence',
-                                  ),
-                                )
-                              )
+                              if (isReservation) {
+                                // Резерв открывается на редактирование/удаление
+                                // в той же модалке, что и создание.
+                                setEditingBlock(b)
                                 return
+                              }
+                              // Старые блоки «Отсутствие» (тип удалён из UI,
+                              // но в БД могут оставаться) — клик удаляет с
+                              // подтверждением, как раньше.
+                              if (!confirm(t('visits.calendar.confirm_remove_absence'))) return
                               deleteBlock.mutate(b.id, {
                                 onSuccess: () =>
                                   toast.success(t('visits.calendar.toast_block_removed')),
@@ -799,13 +863,99 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
       ) : null}
 
       <ReservationModal
-        open={!!reservationPrefill}
+        open={!!reservationPrefill || !!editingBlock}
         onOpenChange={(v) => {
-          if (!v) setReservationPrefill(null)
+          if (!v) {
+            setReservationPrefill(null)
+            setEditingBlock(null)
+          }
         }}
         salonId={salonId}
         prefill={reservationPrefill}
+        block={editingBlock}
       />
+
+      {/* Confirmation после drag-drop переноса визита. Показывает старое
+          и новое значение (мастер + время), даёт сохранить или откатить. */}
+      <Dialog
+        open={!!pendingMove}
+        onOpenChange={(o) => {
+          if (!o) setPendingMove(null)
+        }}
+      >
+        <DialogContent className="sm:!w-[480px] sm:!max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{t('visits.move.title')}</DialogTitle>
+          </DialogHeader>
+          {pendingMove ? (
+            <div className="flex flex-col gap-3 px-5 pb-2 pt-1 text-sm">
+              {(() => {
+                const oldStaff = staff.find((s) => s.id === pendingMove.visit.staff_id)
+                const newStaff = staff.find((s) => s.id === pendingMove.targetStaffId)
+                const oldTime = format(new Date(pendingMove.visit.visit_at), 'd MMM, HH:mm', {
+                  locale: ru,
+                })
+                const newTime = format(new Date(pendingMove.targetVisitAt), 'd MMM, HH:mm', {
+                  locale: ru,
+                })
+                const staffChanged = pendingMove.visit.staff_id !== pendingMove.targetStaffId
+                return (
+                  <ul className="flex flex-col gap-1.5 text-xs">
+                    <li className="text-muted-foreground">
+                      <span className="font-semibold">{t('visits.move.was')}:</span>{' '}
+                      <span className="num">{oldTime}</span>
+                      {oldStaff ? ` · ${oldStaff.full_name}` : ''}
+                    </li>
+                    <li className="text-foreground">
+                      <span className="font-semibold">{t('visits.move.now')}:</span>{' '}
+                      <span className="num">{newTime}</span>
+                      {newStaff ? ` · ${newStaff.full_name}` : ''}
+                      {staffChanged ? (
+                        <span className="text-secondary ml-1 text-[10px] font-bold uppercase">
+                          {t('visits.move.staff_changed')}
+                        </span>
+                      ) : null}
+                    </li>
+                  </ul>
+                )
+              })()}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setPendingMove(null)}
+              disabled={updateVisit.isPending}
+            >
+              {t('visits.move.cancel')}
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => {
+                if (!pendingMove) return
+                updateVisit.mutate(
+                  {
+                    id: pendingMove.visit.id,
+                    staff_id: pendingMove.targetStaffId,
+                    visit_at: pendingMove.targetVisitAt,
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success(t('visits.move.toast_saved'))
+                      setPendingMove(null)
+                    },
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  },
+                )
+              }}
+              disabled={updateVisit.isPending}
+            >
+              {updateVisit.isPending ? t('common.loading') : t('visits.move.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
