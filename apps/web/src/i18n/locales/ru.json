@@ -1511,6 +1511,8 @@
       "subtitle": "Запишется в книгу за пару секунд",
       "date_label": "Дата",
       "today_pill": "сегодня",
+      "start_time_label": "Начало",
+      "end_time_label": "Конец",
       "staff_label": "Мастер",
       "staff_placeholder": "Кто принимал?",
       "client_label": "Клиент",
@@ -1548,6 +1550,8 @@
     },
     "errors": {
       "date_required": "Выбери дату",
+      "start_time_required": "Укажи время начала",
+      "end_time_required": "Укажи время конца",
       "staff_required": "Выбери мастера",
       "amount_required": "Укажи сумму",
       "amount_positive": "Сумма должна быть больше нуля",

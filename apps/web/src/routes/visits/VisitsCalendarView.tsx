@@ -117,6 +117,24 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
     when: Date
     rect: { top: number; left: number }
   } | null>(null)
+  /**
+   * Drag-select на сетке: пользователь зажимает левую кнопку на стартовом
+   * 15-мин субслоте и тянет вниз. На каждый mouseenter в субслот того же
+   * мастера расширяем диапазон. На mouseup:
+   *   - если currentIdx === startIdx (клик без перетаскивания) → открываем
+   *     обычный subslot-popover (как было раньше);
+   *   - если currentIdx > startIdx (реальный drag) → диспатчим событие
+   *     `finsalon:open-quick-entry` с `endAt`, чтобы QuickEntry открылся
+   *     с предзаполненным временем от/до.
+   * startRect — bounding rect стартового субслота, нужен только для
+   * позиционирования popover'а в single-click ветке.
+   */
+  const [dragState, setDragState] = useState<{
+    staffId: string
+    startIdx: number
+    currentIdx: number
+    startRect: { top: number; left: number; bottom: number }
+  } | null>(null)
   /** Fullscreen-overlay: разворачиваем календарь во весь viewport. Сделано через
    *  fixed-positioning + z-index, а не через Fullscreen API — это надёжнее
    *  кросс-браузерно (iOS Safari не поддерживает Fullscreen API на iPhone) и
@@ -198,6 +216,51 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   }, [staff, dayKey])
 
   const TOTAL_MIN = (HOUR_END - HOUR_START) * 60
+
+  // Глобальный mouseup — завершает drag-select (или регистрирует single-click).
+  useEffect(() => {
+    if (!dragState) return
+    function onUp() {
+      if (!dragState) return
+      const [a, b] = [dragState.startIdx, dragState.currentIdx].sort((x, y) => x - y)
+      const startMin = HOUR_START * 60 + a! * SUBSLOT_MIN
+      const endMin = HOUR_START * 60 + (b! + 1) * SUBSLOT_MIN
+      const when = new Date(dayStart)
+      when.setHours(0, 0, 0, 0)
+      when.setMinutes(startMin)
+      const endAt = new Date(dayStart)
+      endAt.setHours(0, 0, 0, 0)
+      endAt.setMinutes(endMin)
+      if (a !== b) {
+        window.dispatchEvent(
+          new CustomEvent('finsalon:open-quick-entry', {
+            detail: {
+              staffId: dragState.staffId,
+              when: when.toISOString(),
+              endAt: endAt.toISOString(),
+            },
+          }),
+        )
+      } else {
+        const POPOVER_W = 240
+        const POPOVER_H = 180
+        const padding = 8
+        const rect = dragState.startRect
+        const leftClamped = Math.min(rect.left, window.innerWidth - POPOVER_W - padding)
+        const spaceBelow = window.innerHeight - rect.bottom
+        const topRaw = spaceBelow >= POPOVER_H ? rect.bottom : rect.top - POPOVER_H
+        setSubslotMenu({
+          staffId: dragState.staffId,
+          when,
+          rect: { top: topRaw, left: Math.max(padding, leftClamped) },
+        })
+      }
+      setDragState(null)
+    }
+    window.addEventListener('mouseup', onUp)
+    return () => window.removeEventListener('mouseup', onUp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- замыкание актуально на лайфтайм текущего dragState
+  }, [dragState, HOUR_START, dayStart.getTime()])
 
   // PX_PER_MIN адаптируется под доступную высоту, чтобы всё умещалось без
   // вертикального скролла. Резерв 64px на header-row с аватарами + 16px паддинг.
@@ -469,7 +532,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                       },
                     )}
 
-                    {/* Кликабельный overlay подслотов — каждые 15 минут */}
+                    {/* Кликабельный overlay подслотов — каждые 15 минут.
+                        Поддерживает drag-select: mousedown → mouseenter+ →
+                        mouseup. Single-click обрабатывается в global mouseup. */}
                     {Array.from(
                       { length: (HOUR_END - HOUR_START) * (60 / SUBSLOT_MIN) },
                       (_, idx) => {
@@ -479,31 +544,28 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                             key={`hit-${idx}`}
                             type="button"
                             aria-label={t('visits.calendar.new_at_time')}
-                            onClick={(e) => {
+                            onMouseDown={(e) => {
+                              // Только левая кнопка — правая открыла бы контекстное меню.
+                              if (e.button !== 0) return
+                              e.preventDefault()
                               const rect = (
                                 e.currentTarget as HTMLButtonElement
                               ).getBoundingClientRect()
-                              const when = new Date(dayStart)
-                              when.setHours(0, 0, 0, 0)
-                              when.setMinutes(minFromMidnight)
-                              const POPOVER_W = 240
-                              const POPOVER_H = 180
-                              const padding = 8
-                              // Popover у нас position:fixed → координаты viewport,
-                              // window.scrollY НЕ добавляем (иначе уезжает вниз при
-                              // любом скролле страницы).
-                              const leftClamped = Math.min(
-                                rect.left,
-                                window.innerWidth - POPOVER_W - padding,
-                              )
-                              const spaceBelow = window.innerHeight - rect.bottom
-                              const topRaw =
-                                spaceBelow >= POPOVER_H ? rect.bottom : rect.top - POPOVER_H
-                              setSubslotMenu({
+                              setDragState({
                                 staffId: s.id,
-                                when,
-                                rect: { top: topRaw, left: Math.max(padding, leftClamped) },
+                                startIdx: idx,
+                                currentIdx: idx,
+                                startRect: {
+                                  top: rect.top,
+                                  left: rect.left,
+                                  bottom: rect.bottom,
+                                },
                               })
+                            }}
+                            onMouseEnter={() => {
+                              if (!dragState || dragState.staffId !== s.id) return
+                              if (dragState.currentIdx === idx) return
+                              setDragState({ ...dragState, currentIdx: idx })
                             }}
                             className="hover:bg-foreground/[0.03] absolute inset-x-0 cursor-pointer transition-colors"
                             style={{
@@ -514,6 +576,34 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                         )
                       },
                     )}
+
+                    {/* Подсветка диапазона drag-select для текущей колонки */}
+                    {dragState && dragState.staffId === s.id
+                      ? (() => {
+                          const [a, b] = [dragState.startIdx, dragState.currentIdx].sort(
+                            (x, y) => x - y,
+                          )
+                          const startMin = HOUR_START * 60 + a! * SUBSLOT_MIN
+                          const endMin = HOUR_START * 60 + (b! + 1) * SUBSLOT_MIN
+                          return (
+                            <div
+                              className="border-secondary bg-secondary/15 pointer-events-none absolute inset-x-1 z-[6] rounded-md border-2 border-dashed"
+                              style={{
+                                top: pxTopForMinutes(startMin),
+                                height: (endMin - startMin) * PX_PER_MIN,
+                              }}
+                            >
+                              <span className="num text-secondary absolute left-1 top-0.5 text-[10px] font-bold">
+                                {String(Math.floor(startMin / 60)).padStart(2, '0')}:
+                                {String(startMin % 60).padStart(2, '0')}
+                                {' – '}
+                                {String(Math.floor(endMin / 60)).padStart(2, '0')}:
+                                {String(endMin % 60).padStart(2, '0')}
+                              </span>
+                            </div>
+                          )
+                        })()
+                      : null}
 
                     {/* Карточки визитов */}
                     {staffVisits.map((v) => {
