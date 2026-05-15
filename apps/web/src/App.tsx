@@ -117,6 +117,11 @@ const InvestmentsCatalogPage = lazyWithRetry(() =>
     default: m.InvestmentsCatalogPage,
   })),
 )
+const CounterpartiesCatalogPage = lazyWithRetry(() =>
+  import('@/routes/settings/counterparties/CounterpartiesCatalogPage').then((m) => ({
+    default: m.CounterpartiesCatalogPage,
+  })),
+)
 const AdminMediaPage = lazyWithRetry(() =>
   import('@/routes/admin/AdminMediaPage').then((m) => ({ default: m.AdminMediaPage })),
 )
@@ -285,6 +290,7 @@ function App() {
         <Route path="settings/income-categories" element={lazyRoute(<IncomeCategoriesPage />)} />
         <Route path="settings/expenses-catalog" element={lazyRoute(<ExpensesCatalogPage />)} />
         <Route path="settings/cash-registers" element={lazyRoute(<CashRegistersCatalogPage />)} />
+        <Route path="settings/counterparties" element={lazyRoute(<CounterpartiesCatalogPage />)} />
         <Route
           path="settings/investments-catalog"
           element={lazyRoute(<InvestmentsCatalogPage />)}

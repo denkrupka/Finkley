@@ -47,15 +47,19 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
   fakturownia: 'Fakturownia',
   infakt: 'inFakt',
 }
+import { useCounterparties } from '@/hooks/useCounterparties'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
+import { CounterpartyEditModal } from '@/routes/settings/counterparties/CounterpartyEditModal'
 
 type FormValues = {
   expense_at: string
   /** Image #94: обязательное короткое описание (раньше эту роль играл comment). */
   description: string
   category_id: string
+  /** FK на counterparties (image #93). Опциональное. */
+  counterparty_id: string
   amount: string
   payment_method: PaymentMethod | ''
   /** Номер фактуры/чека (image #93). Опциональное. */
@@ -76,6 +80,7 @@ const schema = z.object({
     .min(1, 'expenses.errors.description_required')
     .max(200, 'expenses.errors.description_too_long'),
   category_id: z.string().min(1, 'expenses.errors.category_required'),
+  counterparty_id: z.string().optional().default(''),
   amount: z
     .string()
     .min(1, 'expenses.errors.amount_required')
@@ -151,6 +156,8 @@ export function ExpenseFormModal({
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
+  const { data: counterparties = [] } = useCounterparties(salonId)
+  const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
@@ -181,6 +188,7 @@ export function ExpenseFormModal({
       expense_at: today,
       description: '',
       category_id: defaultCategoryId ?? '',
+      counterparty_id: '',
       amount: '',
       payment_method: '',
       document_number: '',
@@ -206,6 +214,7 @@ export function ExpenseFormModal({
         expense_at: expense.expense_at.slice(0, 10),
         description: expense.description ?? '',
         category_id: expense.category_id ?? '',
+        counterparty_id: expense.counterparty_id ?? '',
         amount: ((expense.amount_cents ?? 0) / 100).toFixed(2),
         payment_method: (expense.payment_method as PaymentMethod) ?? '',
         document_number: expense.document_number ?? '',
@@ -221,6 +230,7 @@ export function ExpenseFormModal({
         expense_at: today,
         description: '',
         category_id: defaultCategoryId ?? '',
+        counterparty_id: '',
         amount: '',
         payment_method: '',
         document_number: '',
@@ -262,6 +272,7 @@ export function ExpenseFormModal({
           expense_at: values.expense_at,
           description: values.description.trim(),
           category_id: values.category_id || null,
+          counterparty_id: values.counterparty_id || null,
           amount_cents: amountCents,
           payment_method: values.payment_method || null,
           document_number: values.document_number.trim() || null,
@@ -306,6 +317,7 @@ export function ExpenseFormModal({
         expense_at: values.expense_at,
         description: values.description.trim(),
         category_id: values.category_id || null,
+        counterparty_id: values.counterparty_id || null,
         amount_cents: amountCents,
         payment_method: values.payment_method || null,
         document_number: values.document_number.trim() || null,
@@ -323,6 +335,7 @@ export function ExpenseFormModal({
             expense_at: today,
             description: '',
             category_id: defaultCategoryId ?? '',
+            counterparty_id: '',
             amount: '',
             payment_method: '',
             document_number: '',
@@ -638,6 +651,49 @@ export function ExpenseFormModal({
             />
           </div>
 
+          {/* Image #93: контрагент — выпадающий список + кнопка inline-добавления.
+              Скрываем для payroll-категорий (там получатель — мастер из payroll-блока). */}
+          {isPayrollCategory ? null : (
+            <Controller
+              name="counterparty_id"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="exp-counterparty">{t('expenses.form.counterparty_label')}</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={field.value || '__none__'}
+                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger id="exp-counterparty" className="flex-1">
+                        <SelectValue placeholder={t('expenses.form.counterparty_placeholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          {t('expenses.form.counterparty_none')}
+                        </SelectItem>
+                        {counterparties.map((cp) => (
+                          <SelectItem key={cp.id} value={cp.id}>
+                            {cp.name}
+                            {cp.nip ? ` · ${cp.nip}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCounterpartyModalOpen(true)}
+                      title={t('counterparties.add')}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+
           {/* Image #93: номер документа (фактура/чек) — опциональное поле,
               заполняется руками либо подтягивается OCR'ом с фото чека. Для
               payroll-категорий скрываем — там документа в этом смысле нет. */}
@@ -771,6 +827,20 @@ export function ExpenseFormModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Inline-добавление контрагента (image #93). При сохранении —
+          counterparty_id автоматически выставляется в форме расхода. */}
+      <CounterpartyEditModal
+        open={counterpartyModalOpen}
+        onOpenChange={setCounterpartyModalOpen}
+        salonId={salonId}
+        onSaved={(cp) =>
+          form.setValue('counterparty_id', cp.id, {
+            shouldDirty: true,
+            shouldValidate: false,
+          })
+        }
+      />
     </Dialog>
   )
 }

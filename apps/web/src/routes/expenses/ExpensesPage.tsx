@@ -1,5 +1,5 @@
 import { CheckCircle2, FileText, Loader2, Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -40,6 +40,7 @@ import {
   useSalonIntegrations,
   useWfirmaPushExpense,
 } from '@/hooks/useIntegrations'
+import { useCounterparties } from '@/hooks/useCounterparties'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
@@ -88,6 +89,12 @@ export function ExpensesPage() {
 
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)
+  // Контрагенты для колонки «Контрагент» в списке расходов (image #93/#59).
+  const { data: counterparties = [] } = useCounterparties(salonId, { includeArchived: true })
+  const counterpartyById = useMemo(
+    () => new Map(counterparties.map((c) => [c.id, c])),
+    [counterparties],
+  )
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
     categoryId: categoryFilter || null,
@@ -260,9 +267,11 @@ export function ExpensesPage() {
                       {formatExpenseDate(e.expense_at)}
                     </span>
                     <span className="min-w-0">
+                      {/* Описание (image #94) — приоритетно. Если не задано —
+                          fallback на comment, потом на имя категории. */}
                       <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
                         <span className="truncate">
-                          {e.comment || cat?.name || t('expenses.no_category')}
+                          {e.description || e.comment || cat?.name || t('expenses.no_category')}
                         </span>
                         {e.recurrence && e.recurrence !== 'none' ? (
                           <Repeat
@@ -283,9 +292,27 @@ export function ExpensesPage() {
                           </button>
                         ) : null}
                       </span>
-                      {cat ? (
-                        <span className="text-brand-text-faint block text-[11px]">{cat.name}</span>
-                      ) : null}
+                      {/* Sub-line: Категория · Контрагент · Касса/payment.
+                          Image #93/#59: показываем эти поля прямо в строке списка. */}
+                      <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {cat ? <span>{cat.name}</span> : null}
+                        {e.counterparty_id ? (
+                          <>
+                            {cat ? <span aria-hidden>·</span> : null}
+                            <span>{counterpartyById.get(e.counterparty_id)?.name ?? '—'}</span>
+                          </>
+                        ) : null}
+                        {e.payment_method ? (
+                          <>
+                            {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
+                            <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
+                              {t(`payment_methods.${e.payment_method}`, {
+                                defaultValue: e.payment_method,
+                              })}
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
                     </span>
                     <span className="num text-destructive text-right text-sm font-bold">
                       −{formatCurrency(e.amount_cents, currency)}

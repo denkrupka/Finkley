@@ -532,6 +532,12 @@ export function SettingsPage() {
               title={t('settings.catalogs.items.investments.title')}
               subtitle={t('settings.catalogs.items.investments.subtitle')}
             />
+            <CatalogCard
+              to={`/${salonId}/settings/counterparties`}
+              icon={Users}
+              title={t('settings.catalogs.items.counterparties.title')}
+              subtitle={t('settings.catalogs.items.counterparties.subtitle')}
+            />
             {/* «Склад» удалён отсюда — он на своей странице /inventory. */}
           </div>
         </section>
