@@ -4,6 +4,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { cn } from '@/lib/utils/cn'
 
+import { ExportVisitsButton } from './ExportVisitsButton'
+
 /**
  * Action-кнопки страницы Визитов: Импорт CSV / переключатель Список|Календарь.
  * Вынесено из VisitsPage в отдельный компонент чтобы можно было рендерить
@@ -25,6 +27,7 @@ export function VisitsActionsBar() {
 
   return (
     <div className="flex items-center gap-2">
+      <ExportVisitsButton />
       <Link
         to={`/${salonId}/settings/import`}
         className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors"
