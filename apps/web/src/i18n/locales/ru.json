@@ -2775,6 +2775,7 @@
       "col_avg_check": "Ср. чек",
       "col_last_visit": "Был",
       "open_full_list": "Открыть полную базу клиентов",
+      "contacts_hidden": "контакты скрыты по роли",
       "tabs": {
         "top": "Топ клиентов",
         "params": "Параметры"

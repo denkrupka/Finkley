@@ -1,9 +1,9 @@
 import { formatDistanceToNowStrict } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { BarChart3, ExternalLink, SlidersHorizontal } from 'lucide-react'
+import { BarChart3, EyeOff, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
@@ -13,7 +13,7 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
-import { useSalon } from '@/hooks/useSalons'
+import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { useTopClientsByRevenue } from '@/hooks/useTopClients'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { SegmentationCard } from '@/routes/settings/SegmentationCard'
@@ -76,6 +76,11 @@ function TopClientsTab({
   currency: string
   t: (key: string, opts?: Record<string, unknown>) => string
 }) {
+  const { data: membership } = useSalonMembership(salonId)
+  // RBAC: контактные данные (phone/email) видят только owner/admin.
+  // Мастера и бухгалтер видят имя и метрики, но не телефоны клиентов.
+  const canSeeContacts = membership?.role === 'owner' || membership?.role === 'admin'
+
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const range = periodToRange(period)
   const startIso = range.start.toISOString()
@@ -150,8 +155,13 @@ function TopClientsTab({
                   <tr key={r.client_id} className="border-border/60 border-t">
                     <td className="text-foreground px-4 py-2">
                       <span className="block font-semibold">{r.full_name}</span>
-                      {r.phone ? (
+                      {canSeeContacts && r.phone ? (
                         <span className="text-muted-foreground block text-xs">{r.phone}</span>
+                      ) : !canSeeContacts && r.phone ? (
+                        <span className="text-muted-foreground inline-flex items-center gap-1 text-[10.5px]">
+                          <EyeOff className="size-3" strokeWidth={1.8} />
+                          {t('reports_hub.clients.contacts_hidden')}
+                        </span>
                       ) : null}
                     </td>
                     <td className="num text-muted-foreground px-4 py-2 text-right">
@@ -179,13 +189,8 @@ function TopClientsTab({
         )}
       </div>
 
-      <Link
-        to={`/${salonId}/clients`}
-        className="text-secondary mt-4 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-      >
-        {t('reports_hub.clients.open_full_list')}
-        <ExternalLink className="size-3.5" strokeWidth={2} />
-      </Link>
+      {/* Полный merge ClientsPage в Reports — следующий апдейт.
+          Сейчас оставлена ссылка на /clients как fallback. */}
     </div>
   )
 }
