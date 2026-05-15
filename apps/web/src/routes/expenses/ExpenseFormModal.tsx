@@ -381,13 +381,16 @@ export function ExpenseFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* Image #65: расширил модалку до 720px и сократил вертикальные
+          паддинги — типичная форма расхода теперь умещается без скролла
+          (особенно payroll-кейс, где основное содержимое — поля выплаты). */}
+      <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>{t('expenses.form.title_new')}</DialogTitle>
         </DialogHeader>
 
         <form
-          className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-4"
+          className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 pb-2 pt-3"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -597,118 +600,102 @@ export function ExpenseFormModal({
             />
           </div>
 
-          {/* Фото чека (опционально). Если фото — auto-OCR через Claude Haiku */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
-            {receiptFile ? (
-              <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                <span className="flex items-center gap-2 truncate">
-                  {ocr.isPending ? (
-                    <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
-                  ) : (
-                    <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
-                  )}
-                  <span className="truncate">
-                    {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
+          {/* Фото чека (опционально). Если фото — auto-OCR через Claude Haiku.
+              Image #65: для зарплатных категорий чека по смыслу не бывает —
+              скрываем блок целиком, чтобы не сбивать с толку. */}
+          {isPayrollCategory ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
+              {receiptFile ? (
+                <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2 truncate">
+                    {ocr.isPending ? (
+                      <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
+                    ) : (
+                      <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
+                    )}
+                    <span className="truncate">
+                      {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
+                    </span>
                   </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReceiptFile(null)
-                    setOcrNips({ buyer_nip: null, vendor_nip: null })
-                  }}
-                  className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
-                  aria-label={t('expenses.form.receipt_remove')}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptFile(null)
+                      setOcrNips({ buyer_nip: null, vendor_nip: null })
+                    }}
+                    className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
+                    aria-label={t('expenses.form.receipt_remove')}
+                  >
+                    <X className="size-4" strokeWidth={1.7} />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="exp-receipt"
+                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
                 >
-                  <X className="size-4" strokeWidth={1.7} />
-                </button>
-              </div>
-            ) : (
-              <label
-                htmlFor="exp-receipt"
-                className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
-              >
-                <Camera className="size-4" strokeWidth={1.7} />
-                <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
-              </label>
-            )}
-            <input
-              id="exp-receipt"
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              data-testid="exp-receipt"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null
-                if (file && file.size > 10 * 1024 * 1024) {
-                  toast.error(t('expenses.form.receipt_too_big'))
-                  return
-                }
-                setReceiptFile(file)
-                setOcrNips({ buyer_nip: null, vendor_nip: null })
-                // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
-                if (file && file.type.startsWith('image/')) {
-                  ocr.mutate(file, {
-                    onSuccess: (parsed) => {
-                      // Предзаполняем поля: только если они пусты или дефолтные.
-                      // Юзер редактируемые значения не теряет.
-                      if (parsed.amount && !form.getValues('amount')) {
-                        form.setValue('amount', String(parsed.amount), { shouldDirty: true })
-                      }
-                      if (parsed.expense_at) {
-                        form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
-                      }
-                      const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
-                      if (matchedCat && !form.getValues('category_id')) {
-                        form.setValue('category_id', matchedCat, { shouldDirty: true })
-                      }
-                      if (parsed.vendor && !form.getValues('comment')) {
-                        form.setValue('comment', parsed.vendor, { shouldDirty: true })
-                      }
-                      // NIP'ы — для wFirma auto-push (см. ADR-012).
-                      // Сами поля юзеру не показываем — это служебная мета.
-                      setOcrNips({
-                        buyer_nip: parsed.buyer_nip,
-                        vendor_nip: parsed.vendor_nip,
-                      })
-                      toast.success(t('expenses.form.ocr_done'))
-                    },
-                    onError: () => {
-                      // Юзер заполнит сам, фото остаётся прикреплённым
-                      toast.error(t('expenses.form.ocr_failed'))
-                    },
-                  })
-                }
-              }}
-            />
-          </div>
+                  <Camera className="size-4" strokeWidth={1.7} />
+                  <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
+                </label>
+              )}
+              <input
+                id="exp-receipt"
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                data-testid="exp-receipt"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  if (file && file.size > 10 * 1024 * 1024) {
+                    toast.error(t('expenses.form.receipt_too_big'))
+                    return
+                  }
+                  setReceiptFile(file)
+                  setOcrNips({ buyer_nip: null, vendor_nip: null })
+                  // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
+                  if (file && file.type.startsWith('image/')) {
+                    ocr.mutate(file, {
+                      onSuccess: (parsed) => {
+                        // Предзаполняем поля: только если они пусты или дефолтные.
+                        // Юзер редактируемые значения не теряет.
+                        if (parsed.amount && !form.getValues('amount')) {
+                          form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+                        }
+                        if (parsed.expense_at) {
+                          form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
+                        }
+                        const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
+                        if (matchedCat && !form.getValues('category_id')) {
+                          form.setValue('category_id', matchedCat, { shouldDirty: true })
+                        }
+                        if (parsed.vendor && !form.getValues('comment')) {
+                          form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                        }
+                        // NIP'ы — для wFirma auto-push (см. ADR-012).
+                        // Сами поля юзеру не показываем — это служебная мета.
+                        setOcrNips({
+                          buyer_nip: parsed.buyer_nip,
+                          vendor_nip: parsed.vendor_nip,
+                        })
+                        toast.success(t('expenses.form.ocr_done'))
+                      },
+                      onError: () => {
+                        // Юзер заполнит сам, фото остаётся прикреплённым
+                        toast.error(t('expenses.form.ocr_failed'))
+                      },
+                    })
+                  }
+                }}
+              />
+            </div>
+          )}
 
-          {/* Повторение */}
-          <Controller
-            name="recurrence"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="exp-recurrence">{t('expenses.form.recurrence_label')}</Label>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="exp-recurrence" data-testid="exp-recurrence">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t('expenses.form.recurrence.none')}</SelectItem>
-                    <SelectItem value="weekly">{t('expenses.form.recurrence.weekly')}</SelectItem>
-                    <SelectItem value="monthly">{t('expenses.form.recurrence.monthly')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {field.value !== 'none' ? (
-                  <p className="text-muted-foreground text-xs">
-                    {t('expenses.form.recurrence_hint')}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          />
+          {/* Image #65: блок «Повторение» (weekly/monthly) удалён по запросу
+              владельца — почти не использовался, занимал место. Поле
+              `recurrence` остаётся в Zod-схеме с дефолтом 'none', чтобы
+              существующие записи не сломались; новые расходы создаются
+              как одноразовые. */}
         </form>
 
         <DialogFooter>

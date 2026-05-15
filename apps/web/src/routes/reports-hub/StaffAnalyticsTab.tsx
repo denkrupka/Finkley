@@ -84,14 +84,14 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-          {t('reports_hub.staff.title')}
-        </h2>
+      {/* Image #64: заголовок «Эффективность мастеров» убран — табы Reports
+          уже сообщают, на каком отчёте мы. PeriodPicker переехал под
+          AI-плашку (как в Reports → Услуги). */}
+      <AiInsightsPanel kind="staff" payload={aiPayload} />
+
+      <div className="mb-4 flex items-center justify-end">
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
-
-      <AiInsightsPanel kind="staff" payload={aiPayload} />
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {
