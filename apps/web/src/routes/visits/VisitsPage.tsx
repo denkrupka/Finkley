@@ -36,16 +36,20 @@ import { formatVisitDayHeading, groupByDay } from '@/lib/utils/format-date'
 
 const STAFF_PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#FBE5C0']
 
+// Bug ccbd0e5a: раньше `cash`/`online`/`mixed` использовали хардкодные
+// светлые hex (#EFEEF5 / #E5F0F4 / #EEE), которые в тёмной теме сливались
+// с фоном — текст становился нечитаемым. Перевели всё на CSS-переменные
+// из дизайн-токенов, которые сами переключаются в dark mode.
 const PAY_LABEL: Record<PaymentMethod, { label: string; bg: string; fg: string }> = {
-  cash: { label: 'cash', bg: '#EFEEF5', fg: 'hsl(var(--brand-navy))' },
+  cash: { label: 'cash', bg: 'hsl(var(--muted))', fg: 'hsl(var(--foreground))' },
   card: { label: 'card', bg: 'hsl(var(--brand-teal-soft))', fg: 'hsl(var(--brand-teal-deep))' },
   transfer: {
     label: 'transfer',
     bg: 'hsl(var(--brand-sage-soft))',
     fg: 'hsl(var(--brand-sage))',
   },
-  online: { label: 'online', bg: '#E5F0F4', fg: 'hsl(var(--brand-teal))' },
-  mixed: { label: 'mixed', bg: '#EEE', fg: 'hsl(var(--brand-navy))' },
+  online: { label: 'online', bg: 'hsl(var(--brand-teal-soft))', fg: 'hsl(var(--brand-teal))' },
+  mixed: { label: 'mixed', bg: 'hsl(var(--muted))', fg: 'hsl(var(--muted-foreground))' },
 }
 
 type VisitsPageProps = {
