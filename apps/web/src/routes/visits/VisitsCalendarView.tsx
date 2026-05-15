@@ -19,6 +19,12 @@ import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
 import { useSalonHolidays } from '@/hooks/useSalonHours'
 import { useServices } from '@/hooks/useServices'
+import {
+  useCreateStaffBlock,
+  useDeleteStaffBlock,
+  useStaffBlocks,
+  type StaffBlockKind,
+} from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -86,6 +92,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: services = [] } = useServices(salonId)
   const { data: clients = [] } = useClients(salonId)
   const { data: holidays = [] } = useSalonHolidays(salonId)
+  const { data: blocks = [] } = useStaffBlocks(salonId, range)
+  const createBlock = useCreateStaffBlock(salonId)
+  const deleteBlock = useDeleteStaffBlock(salonId)
 
   // Если текущий день — праздник, показываем поверх grid'а полупрозрачную
   // плашку с надписью «Выходной: <name>». Не блокируем создание визитов
@@ -123,6 +132,35 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [isFullscreen])
+
+  /**
+   * Создаёт staff_time_block из текущего subslotMenu. Дефолтная длительность —
+   * 30 минут (можно отредактировать руками после создания).
+   */
+  function createTimeBlock(kind: StaffBlockKind) {
+    if (!subslotMenu) return
+    const starts = subslotMenu.when
+    const ends = new Date(starts.getTime() + 30 * 60 * 1000)
+    createBlock.mutate(
+      {
+        staff_id: subslotMenu.staffId,
+        kind,
+        starts_at: starts.toISOString(),
+        ends_at: ends.toISOString(),
+        label: null,
+      },
+      {
+        onSuccess: () =>
+          toast.success(
+            kind === 'reservation'
+              ? t('visits.calendar.subslot.toast_reserved')
+              : t('visits.calendar.subslot.toast_absence'),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+    setSubslotMenu(null)
+  }
 
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services])
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
@@ -539,6 +577,74 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                       )
                     })}
 
+                    {/* Staff-blocks (резервы и отсутствия) — отрисовка поверх
+                        ячеек со штриховкой. По клику — удаляются. */}
+                    {blocks
+                      .filter((b) => b.staff_id === s.id)
+                      .map((b) => {
+                        const blockStart = parseISO(b.starts_at)
+                        const blockEnd = parseISO(b.ends_at)
+                        const startMin = minutesFromMidnight(blockStart)
+                        const endMin = minutesFromMidnight(blockEnd)
+                        if (
+                          !isSameDay(blockStart, cursor) ||
+                          endMin <= HOUR_START * 60 ||
+                          startMin >= HOUR_END * 60
+                        )
+                          return null
+                        const visibleStart = Math.max(startMin, HOUR_START * 60)
+                        const visibleEnd = Math.min(endMin, HOUR_END * 60)
+                        const top = pxTopForMinutes(visibleStart)
+                        const height = Math.max(16, (visibleEnd - visibleStart) * PX_PER_MIN)
+                        const isReservation = b.kind === 'reservation'
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => {
+                              if (
+                                !confirm(
+                                  t(
+                                    isReservation
+                                      ? 'visits.calendar.confirm_remove_reservation'
+                                      : 'visits.calendar.confirm_remove_absence',
+                                  ),
+                                )
+                              )
+                                return
+                              deleteBlock.mutate(b.id, {
+                                onSuccess: () =>
+                                  toast.success(t('visits.calendar.toast_block_removed')),
+                              })
+                            }}
+                            className="absolute inset-x-1 z-10 rounded-md border border-dashed text-left text-[10px] font-semibold"
+                            style={{
+                              top,
+                              height,
+                              borderColor: isReservation ? '#94a3b8' : '#f59e0b',
+                              background: isReservation
+                                ? 'repeating-linear-gradient(45deg, rgba(148,163,184,0.18), rgba(148,163,184,0.18) 6px, rgba(148,163,184,0.05) 6px, rgba(148,163,184,0.05) 12px)'
+                                : 'repeating-linear-gradient(45deg, rgba(245,158,11,0.22), rgba(245,158,11,0.22) 6px, rgba(245,158,11,0.06) 6px, rgba(245,158,11,0.06) 12px)',
+                              color: isReservation ? '#475569' : '#92400e',
+                            }}
+                            title={
+                              b.label ??
+                              t(
+                                isReservation
+                                  ? 'visits.calendar.subslot.reserve_time'
+                                  : 'visits.calendar.subslot.absence',
+                              )
+                            }
+                          >
+                            <span className="block truncate px-1 py-0.5">
+                              {isReservation
+                                ? t('visits.calendar.subslot.reserve_time')
+                                : t('visits.calendar.subslot.absence')}
+                            </span>
+                          </button>
+                        )
+                      })}
+
                     {/* Текущее время — красная линия */}
                     {nowInsideGrid ? (
                       <div
@@ -603,8 +709,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <button
               type="button"
               onClick={() => {
-                toast.info(t('visits.calendar.subslot.coming_soon'))
-                setSubslotMenu(null)
+                createTimeBlock('reservation')
               }}
               className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
             >
@@ -614,8 +719,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <button
               type="button"
               onClick={() => {
-                toast.info(t('visits.calendar.subslot.coming_soon'))
-                setSubslotMenu(null)
+                createTimeBlock('absence')
               }}
               className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
             >

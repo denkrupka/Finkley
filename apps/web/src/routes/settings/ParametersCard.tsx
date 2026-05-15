@@ -133,7 +133,27 @@ function isSectionKey(v: string | null): v is SectionKey {
 
 const PERIOD_OPTIONS: ParamPeriod[] = ['day', 'month', '2months', 'quarter', 'year']
 
-export function ParametersCard() {
+/**
+ * Универсальный редактор финансовых параметров. Раньше показывал все 7
+ * секций как sub-tabs. После рефактора Image #45 разнесён по справочникам:
+ *   - /settings/expenses-catalog → fixed + variable + taxes
+ *   - /settings/cash-registers → cash_registers
+ *   - /settings/investments-catalog → investments
+ *   - /finance ?tab=income_plans → other_income
+ *   - flows (распределение денег) — удалено
+ *
+ * Если передан `sectionKeys` — рендерятся только эти секции (+ sub-tabs
+ * только если их больше одного). Если не передан — поведение как раньше
+ * (все секции), используется в legacy-страницах.
+ */
+type ParametersCardProps = {
+  /** Подмножество секций для рендера. Если не передано — все 7. */
+  sectionKeys?: SectionKey[]
+  /** URL search-param для запоминания активной sub-секции. Default: 'param'. */
+  urlKey?: string
+}
+
+export function ParametersCard({ sectionKeys, urlKey = 'param' }: ParametersCardProps = {}) {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const { data: salon } = useSalon(salonId)
@@ -141,18 +161,32 @@ export function ParametersCard() {
   const { data: settings = DEFAULT_FINANCIAL_SETTINGS, isLoading } = useFinancialSettings(salonId)
   const save = useUpdateFinancialSettings(salonId)
 
+  const visibleSections = useMemo(
+    () =>
+      sectionKeys && sectionKeys.length > 0
+        ? SECTIONS.filter((s) => sectionKeys.includes(s.key))
+        : SECTIONS,
+    [sectionKeys],
+  )
+  const visibleSubTabs = useMemo(
+    () => SUB_TABS.filter((t) => visibleSections.some((s) => s.key === t.id)),
+    [visibleSections],
+  )
+
   const [draft, setDraft] = useState<FinancialSettings>(settings)
   const [showArchived, setShowArchived] = useState(false)
   const [params, setParams] = useSearchParams()
-  // Sub-tab внутри вкладки Параметры (которая сама — финансы?tab=parameters).
-  // Используем `?param=...` чтобы не конфликтовать с парент-`tab=parameters`.
-  const subParam = params.get('param')
-  const activeSection: SectionKey = isSectionKey(subParam) ? subParam : 'cash_registers'
+  const subParam = params.get(urlKey)
+  const firstSectionKey = visibleSections[0]?.key ?? 'cash_registers'
+  const activeSection: SectionKey =
+    isSectionKey(subParam) && visibleSections.some((s) => s.key === subParam)
+      ? subParam
+      : firstSectionKey
   const sectionDef = SECTIONS.find((s) => s.key === activeSection)!
 
   function setActiveSection(id: SectionKey) {
     const next = new URLSearchParams(params)
-    next.set('param', id)
+    next.set(urlKey, id)
     setParams(next, { replace: true })
   }
 
@@ -188,18 +222,17 @@ export function ParametersCard() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
-      {/* Image #60: чекбокс «Показать архивные» переехал внутрь header'а каждой
-          секции (рядом с «+ Добавить позицию»), а PageTabsNav теперь wrap+sm —
-          7 вкладок переносятся на 2 строки на узких экранах, без горизонтального
-          скролла. */}
-      <PageTabsNav
-        tabs={SUB_TABS}
-        active={activeSection}
-        onChange={setActiveSection}
-        t={t}
-        wrap
-        size="sm"
-      />
+      {/* Sub-tabs рендерим только если секций больше одной. */}
+      {visibleSubTabs.length > 1 ? (
+        <PageTabsNav
+          tabs={visibleSubTabs}
+          active={activeSection}
+          onChange={setActiveSection}
+          t={t}
+          wrap
+          size="sm"
+        />
+      ) : null}
 
       <SectionTable
         key={sectionDef.key}

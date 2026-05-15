@@ -105,6 +105,21 @@ const IncomeCategoriesPage = lazyWithRetry(() =>
     default: m.IncomeCategoriesPage,
   })),
 )
+const ExpensesCatalogPage = lazyWithRetry(() =>
+  import('@/routes/settings/ExpensesCatalogPage').then((m) => ({
+    default: m.ExpensesCatalogPage,
+  })),
+)
+const CashRegistersCatalogPage = lazyWithRetry(() =>
+  import('@/routes/settings/CashRegistersCatalogPage').then((m) => ({
+    default: m.CashRegistersCatalogPage,
+  })),
+)
+const InvestmentsCatalogPage = lazyWithRetry(() =>
+  import('@/routes/settings/InvestmentsCatalogPage').then((m) => ({
+    default: m.InvestmentsCatalogPage,
+  })),
+)
 const AdminMediaPage = lazyWithRetry(() =>
   import('@/routes/admin/AdminMediaPage').then((m) => ({ default: m.AdminMediaPage })),
 )
@@ -259,6 +274,12 @@ function App() {
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
         <Route path="settings/income-categories" element={lazyRoute(<IncomeCategoriesPage />)} />
+        <Route path="settings/expenses-catalog" element={lazyRoute(<ExpensesCatalogPage />)} />
+        <Route path="settings/cash-registers" element={lazyRoute(<CashRegistersCatalogPage />)} />
+        <Route
+          path="settings/investments-catalog"
+          element={lazyRoute(<InvestmentsCatalogPage />)}
+        />
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>

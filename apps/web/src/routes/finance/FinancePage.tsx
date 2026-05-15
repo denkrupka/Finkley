@@ -1,4 +1,4 @@
-import { CalendarClock, FileBarChart, LineChart, SlidersHorizontal, Wallet } from 'lucide-react'
+import { CalendarClock, Coins, FileBarChart, LineChart, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
@@ -10,18 +10,20 @@ import { CashFlowTab } from './CashFlowTab'
 import { FinancialReportTab } from './FinancialReportTab'
 import { PaymentsTab } from './PaymentsTab'
 
-type FinanceTab = 'pnl' | 'cashflow' | 'report' | 'payments' | 'parameters'
+type FinanceTab = 'pnl' | 'cashflow' | 'report' | 'payments' | 'income_plans'
 
 const TABS: PageTab<FinanceTab>[] = [
   { id: 'pnl', labelKey: 'finance.tabs.pnl', icon: LineChart },
   { id: 'cashflow', labelKey: 'finance.tabs.cashflow', icon: Wallet },
   { id: 'report', labelKey: 'finance.tabs.report', icon: FileBarChart },
   { id: 'payments', labelKey: 'finance.tabs.payments', icon: CalendarClock },
-  { id: 'parameters', labelKey: 'finance.tabs.parameters', icon: SlidersHorizontal },
+  { id: 'income_plans', labelKey: 'finance.tabs.income_plans', icon: Coins },
 ]
 
 function isFinanceTab(v: string | null): v is FinanceTab {
-  return v === 'pnl' || v === 'cashflow' || v === 'report' || v === 'payments' || v === 'parameters'
+  return (
+    v === 'pnl' || v === 'cashflow' || v === 'report' || v === 'payments' || v === 'income_plans'
+  )
 }
 
 /**
@@ -60,10 +62,11 @@ export function FinancePage() {
         <CashFlowTab salonId={salonId} />
       ) : active === 'report' ? (
         <FinancialReportTab salonId={salonId} />
-      ) : active === 'parameters' ? (
-        <ParametersCard />
-      ) : (
+      ) : active === 'payments' ? (
         <PaymentsTab salonId={salonId} />
+      ) : (
+        // income_plans — только секция other_income из financial_settings
+        <ParametersCard sectionKeys={['other_income']} urlKey="plan" />
       )}
     </div>
   )

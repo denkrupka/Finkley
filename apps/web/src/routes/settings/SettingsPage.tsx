@@ -1,12 +1,15 @@
 import {
   ChevronRight,
   Coins,
+  CreditCard,
   Download,
   History,
   Mail,
   Scissors,
   Sparkles,
+  Sprout,
   Users,
+  Wallet,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -470,8 +473,25 @@ export function SettingsPage() {
               title={t('settings.catalogs.items.income.title')}
               subtitle={t('settings.catalogs.items.income.subtitle')}
             />
-            {/* «Склад» и «Категории расходов» удалены отсюда по требованию
-                владельца — управляются на своих страницах (/inventory, /expenses). */}
+            <CatalogCard
+              to={`/${salonId}/settings/expenses-catalog`}
+              icon={Wallet}
+              title={t('settings.catalogs.items.expenses.title')}
+              subtitle={t('settings.catalogs.items.expenses.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/settings/cash-registers`}
+              icon={CreditCard}
+              title={t('settings.catalogs.items.cash.title')}
+              subtitle={t('settings.catalogs.items.cash.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/settings/investments-catalog`}
+              icon={Sprout}
+              title={t('settings.catalogs.items.investments.title')}
+              subtitle={t('settings.catalogs.items.investments.subtitle')}
+            />
+            {/* «Склад» удалён отсюда — он на своей странице /inventory. */}
           </div>
         </section>
       )}
