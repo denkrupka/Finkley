@@ -1,22 +1,12 @@
-import {
-  Calculator,
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  List,
-  Pencil,
-  Trash2,
-  Upload,
-} from 'lucide-react'
+import { Calculator, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { Link } from 'react-router-dom'
-
 import { EditVisitModal } from './EditVisitModal'
 import { FreeSlotsPanel } from './FreeSlotsPanel'
+import { VisitsActionsBar } from './VisitsActionsBar'
 import { VisitsCalendarView } from './VisitsCalendarView'
 
 import {
@@ -125,27 +115,16 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const totalRevenue = visits.reduce((acc, v) => acc + v.amount_cents, 0)
   const grouped = groupByDay(visits)
 
-  function setView(v: 'list' | 'calendar') {
-    const next = new URLSearchParams(params)
-    if (v === 'list') next.set('view', 'list')
-    else next.delete('view')
-    setParams(next, { replace: true })
-  }
-
   // Когда VisitsPage встроен в IncomePage (forcedKind задан) — обёрточные
-  // отступы и заголовок уже даёт родитель. Не дублируем.
+  // отступы и заголовок уже даёт родитель. Actions-кнопки тоже рендерятся
+  // в rightSlot PageTabsNav родителя (см. Image #54), не дублируем.
   const embedded = !!forcedKind
 
   return (
     <div className={cn('flex flex-1 flex-col', embedded ? '' : 'px-5 py-7 sm:px-8 lg:pb-12')}>
-      {/* Header — скрыт когда встроен в IncomePage */}
-      <div
-        className={cn(
-          'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between',
-          embedded ? 'mb-2 justify-end' : 'mb-5',
-        )}
-      >
-        {!embedded ? (
+      {/* Header — только для standalone (/visits). В embedded actions выше в табах. */}
+      {!embedded ? (
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
               {t('visits.title')}
@@ -157,47 +136,9 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
               })}
             </p>
           </div>
-        ) : null}
-        {/* View toggle: список / календарь + CSV import */}
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/${salonId}/settings/import`}
-            className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors"
-            title={t('visits.import_csv')}
-          >
-            <Upload className="size-3.5" strokeWidth={1.8} />
-            {t('visits.import_csv')}
-          </Link>
-          <div className="border-border bg-card inline-flex rounded-md border p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
-                view === 'list'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <List className="size-3.5" strokeWidth={1.8} />
-              {t('visits.view.list')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('calendar')}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors',
-                view === 'calendar'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <CalendarDays className="size-3.5" strokeWidth={1.8} />
-              {t('visits.view.calendar')}
-            </button>
-          </div>
+          <VisitsActionsBar />
         </div>
-      </div>
+      ) : null}
 
       {view === 'calendar' ? (
         <div className="border-border bg-card shadow-finsm flex-1 overflow-hidden rounded-lg border">

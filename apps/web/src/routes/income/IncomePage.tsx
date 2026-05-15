@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { VisitsActionsBar } from '@/routes/visits/VisitsActionsBar'
 import { VisitsPage } from '@/routes/visits/VisitsPage'
 
 import { OtherIncomeTab } from './OtherIncomeTab'
@@ -21,12 +22,10 @@ function isIncomeTab(v: string | null): v is IncomeTab {
 }
 
 /**
- * Страница «Доходы» — таб-обёртка над тремя источниками выручки:
- *   - Визиты (услуги)   — текущая VisitsPage
- *   - Продажи (товары)  — TODO: фильтр визитов по kind=retail (TASK-54-related)
- *   - Прочие доходы      — TODO: новая таблица other_incomes (TASK-54)
- *
- * Активный таб — в URL `?tab=visits|sales|other`.
+ * Страница «Доходы» — таб-обёртка над тремя источниками выручки.
+ * Image #54: убран h1+subtitle (дублировали навигационную хлебную крошку и
+ * занимали место). Action-кнопки таба «Визиты» (Импорт CSV / list|calendar)
+ * вынесены в rightSlot PageTabsNav.
  */
 export function IncomePage() {
   const { t } = useTranslation()
@@ -46,12 +45,13 @@ export function IncomePage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      <div className="mb-5">
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('income.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('income.subtitle')}</p>
-      </div>
-
-      <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
+      <PageTabsNav
+        tabs={TABS}
+        active={active}
+        onChange={setActive}
+        t={t}
+        rightSlot={active === 'visits' ? <VisitsActionsBar /> : null}
+      />
 
       {active === 'visits' ? (
         <VisitsPage forcedKind="visit" />

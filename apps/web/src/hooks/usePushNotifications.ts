@@ -142,6 +142,23 @@ export function useUnsubscribePush() {
 export function useTestPush() {
   return useMutation({
     mutationFn: async () => {
+      // Image #44: сначала проверим, что у браузера реально есть подписка.
+      // Раньше юзер мог нажать «Тест» при отсутствии подписки (например, после
+      // unsubscribe или если permission revoke'нут) — получал generic
+      // «Failed to send a request» от supabase-js. Теперь — понятный текст.
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('push_unsupported')
+      }
+      try {
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.getSubscription()
+        if (!sub) throw new Error('no_subscriptions')
+      } catch (e) {
+        // .ready может зависать если SW ещё не зарегистрирован, или getSubscription
+        // выкинул — оба случая означают «нет рабочей подписки».
+        if (e instanceof Error && e.message === 'no_subscriptions') throw e
+      }
+
       const { data, error } = await supabase.functions.invoke('send-push', {
         body: { action: 'test' },
       })
@@ -156,6 +173,12 @@ export function useTestPush() {
           } catch (parseErr) {
             if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr
           }
+        }
+        // FunctionsFetchError без context — обычно CORS или функция не задеплоена.
+        // Дадим diagnostic подсказку (а не голое "Failed to send a request").
+        const msg = error.message || String(error)
+        if (msg.toLowerCase().includes('failed to send')) {
+          throw new Error('push_function_unreachable')
         }
         throw error
       }

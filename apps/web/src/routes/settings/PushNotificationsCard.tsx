@@ -80,7 +80,18 @@ export function PushNotificationsCard() {
               onClick={() =>
                 test.mutate(undefined, {
                   onSuccess: (n) => toast.success(t('settings.push.toast_test_sent', { count: n })),
-                  onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  onError: (err) => {
+                    const msg = err instanceof Error ? err.message : String(err)
+                    // Маппим server-side codes в понятный i18n-текст. Раньше
+                    // отдавали raw message → "Failed to send a request" пугало.
+                    if (msg === 'no_subscriptions') toast.error(t('settings.push.no_subscriptions'))
+                    else if (msg === 'vapid_not_configured')
+                      toast.error(t('settings.push.vapid_missing'))
+                    else if (msg === 'push_function_unreachable')
+                      toast.error(t('settings.push.function_unreachable'))
+                    else if (msg === 'push_unsupported') toast.error(t('settings.push.unsupported'))
+                    else toast.error(msg)
+                  },
                 })
               }
               disabled={test.isPending}

@@ -40,7 +40,15 @@ export function SalonLayout() {
   const location = useLocation()
   // Скрываем FAB «+Визит» на страницах-«рабочих столах» где он мешает
   // основному CTA (мессенджер имеет свою кнопку «Создать визит» в шапке чата).
-  const hideFab = location.pathname.endsWith('/messenger')
+  // Image #53: на /finance кнопка +Визит не релевантна — это страница для
+  // P&L/ДДС/налогов, а не для записи. Также скрываем на /reports (аналитика —
+  // отдельный flow) и /settings (конфигурация — там FAB только мешает).
+  const path = location.pathname
+  const hideFab =
+    path.endsWith('/messenger') ||
+    path.endsWith('/finance') ||
+    path.endsWith('/reports') ||
+    path.includes('/settings')
   const { user } = useAuth()
   const { data: salons, isLoading } = useMySalons()
   const [drawerOpen, setDrawerOpen] = useState(false)

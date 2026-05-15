@@ -44,14 +44,6 @@ export function TelegramLinkCard() {
   const unlink = useUnlinkTelegram()
   const widgetRef = useRef<HTMLDivElement>(null)
   const [linking, setLinking] = useState(false)
-  /**
-   * Состояние загрузки виджета — нужно для fallback:
-   *   - 'loading'  — скрипт всё ещё грузится
-   *   - 'ready'    — виджет отрисовал iframe (DOM contains iframe)
-   *   - 'blocked'  — через 4 сек iframe не появился (AdBlock, бот без
-   *                  /setdomain в BotFather, недоступен telegram.org/js)
-   */
-  const [widgetState, setWidgetState] = useState<'loading' | 'ready' | 'blocked'>('loading')
 
   const isLinked = !!profile?.telegram_id
 
@@ -90,7 +82,10 @@ export function TelegramLinkCard() {
     }
 
     // Рендерим официальный виджет от Telegram. Скрипт сам вставляет <iframe>.
-    setWidgetState('loading')
+    // Image #58/59: убран авто-детект "blocked"-состояния. Telegram-widget.js
+    // вставляет iframe асинхронно, часто после 6-секундного таймаута, что давало
+    // ложное срабатывание "виджет заблокирован" хотя кнопка показывалась.
+    // Теперь fallback-ссылка "Открыть бота" видна всегда — пользователь выбирает.
     const host = widgetRef.current
     host.innerHTML = ''
     const script = document.createElement('script')
@@ -104,34 +99,8 @@ export function TelegramLinkCard() {
     script.setAttribute('data-request-access', 'write')
     host.appendChild(script)
 
-    // Reactive readiness: MutationObserver следит за тем, чтобы как
-    // только Telegram вставил iframe — мы тут же ставим 'ready' и
-    // отменяем "blocked"-таймер. Без observer'а после успешной отрисовки
-    // мы всё равно показывали бы warning (если timeout уже сработал).
-    let timeoutId = 0
-    const observer = new MutationObserver(() => {
-      const iframe = host.querySelector('iframe')
-      if (iframe) {
-        setWidgetState('ready')
-        window.clearTimeout(timeoutId)
-        observer.disconnect()
-      }
-    })
-    observer.observe(host, { childList: true, subtree: true })
-
-    // Проверяем через 6 сек: если iframe всё ещё нет — fallback.
-    // Этот fallback нужен если AdBlock полностью прибил telegram.org/js
-    // или у бота не задан /setdomain в BotFather.
-    timeoutId = window.setTimeout(() => {
-      const iframe = host.querySelector('iframe')
-      if (!iframe) setWidgetState('blocked')
-      else setWidgetState('ready')
-    }, 6000)
-
     return () => {
       delete window.onTelegramLinkAuth
-      window.clearTimeout(timeoutId)
-      observer.disconnect()
     }
   }, [isLinked, refetch, t])
 
@@ -197,10 +166,6 @@ export function TelegramLinkCard() {
           {/* Контейнер для скрипта Telegram Login Widget. */}
           <div ref={widgetRef} aria-label={t('settings.telegram.widget_label')} />
 
-          {widgetState === 'loading' ? (
-            <p className="text-muted-foreground text-xs">{t('common.loading')}</p>
-          ) : null}
-
           {/* Альтернативная ссылка «Открыть бота» — показываем всегда (даже
               когда виджет работает) как удобный fallback. Раньше тут был
               предупредительный AdBlock-warning, но он смущал юзеров когда
@@ -218,9 +183,6 @@ export function TelegramLinkCard() {
               </svg>
               {t('settings.telegram.open_bot')}
             </a>
-            {widgetState === 'blocked' ? (
-              <span className="text-amber-700">{t('settings.telegram.widget_blocked_inline')}</span>
-            ) : null}
           </div>
 
           {linking ? (

@@ -1,4 +1,4 @@
-import { Archive, Loader2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Archive, FlaskConical, Loader2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -35,6 +35,8 @@ import {
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
+
+import { ServiceRecipeDialog } from './ServiceRecipeDialog'
 
 /**
  * /{salonId}/services — каталог услуг.
@@ -292,6 +294,7 @@ function ServiceDetailModal({
 }) {
   const { t } = useTranslation()
   const update = useUpdateService(salonId)
+  const createCategory = useCreateServiceCategory(salonId)
 
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
@@ -301,6 +304,11 @@ function ServiceDetailModal({
   const [workstations, setWorkstations] = useState(1)
   const [materialsStr, setMaterialsStr] = useState('')
   const [staffPctStr, setStaffPctStr] = useState('')
+  /** Image #47: inline-создание новой категории (как в NewServiceModal). */
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  /** Image #47: открыть рецепт материалов для услуги. */
+  const [recipeOpen, setRecipeOpen] = useState(false)
 
   useEffect(() => {
     if (!service) return
@@ -312,7 +320,26 @@ function ServiceDetailModal({
     setWorkstations(service.staff_count_required ?? 1)
     setMaterialsStr(service.materials_pct > 0 ? String(service.materials_pct) : '')
     setStaffPctStr(service.staff_payout_pct > 0 ? String(service.staff_payout_pct) : '')
+    setAddingCategory(false)
+    setNewCategoryName('')
   }, [service])
+
+  function submitNewCategory() {
+    const trimmed = newCategoryName.trim()
+    if (trimmed.length < 1) return
+    createCategory.mutate(
+      { name: trimmed },
+      {
+        onSuccess: (id) => {
+          setCategoryId(id)
+          setAddingCategory(false)
+          setNewCategoryName('')
+          toast.success(t('services_page.toast_category_created'))
+        },
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+  }
 
   if (!service) return null
 
@@ -388,19 +415,70 @@ function ServiceDetailModal({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="svc-cat">{t('services_page.cols.category')}</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger id="svc-cat">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">{t('services_page.no_category')}</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {addingCategory ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder={t('services_page.new.category_placeholder')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      submitNewCategory()
+                    }
+                  }}
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={submitNewCategory}
+                  disabled={createCategory.isPending}
+                >
+                  {createCategory.isPending ? (
+                    <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <Plus className="size-4" strokeWidth={2} />
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingCategory(false)
+                    setNewCategoryName('')
+                  }}
+                  className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+                  aria-label={t('common.cancel')}
+                >
+                  <X className="size-4" strokeWidth={1.8} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger id="svc-cat" className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('services_page.no_category')}</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddingCategory(true)}
+                  title={t('services_page.new.add_category')}
+                >
+                  <Plus className="size-4" strokeWidth={2} />
+                </Button>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -469,6 +547,27 @@ function ServiceDetailModal({
               />
             </div>
           </div>
+          {/* Image #47: блок управления составом материалов услуги.
+              Кнопка открывает ServiceRecipeDialog где владелец выбирает
+              позиции из inventory + указывает количество расхода на одну
+              услугу. При следующей оплате визита материалы списываются
+              автоматически через trg_visits_consume_materials. */}
+          <div className="border-border/60 bg-muted/10 flex items-center justify-between gap-3 rounded-md border px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <FlaskConical className="text-brand-teal size-4 shrink-0" strokeWidth={1.8} />
+              <div className="min-w-0">
+                <p className="text-foreground truncate text-sm font-semibold">
+                  {t('services_page.recipe.section_title')}
+                </p>
+                <p className="text-muted-foreground truncate text-[11px]">
+                  {t('services_page.recipe.section_hint')}
+                </p>
+              </div>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setRecipeOpen(true)}>
+              {t('services_page.recipe.open_button')}
+            </Button>
+          </div>
           <p className="text-muted-foreground text-xs">{t('services_page.detail.hint')}</p>
         </div>
         <DialogFooter className="flex-row justify-between gap-2 px-5">
@@ -496,6 +595,12 @@ function ServiceDetailModal({
           </div>
         </DialogFooter>
       </DialogContent>
+      <ServiceRecipeDialog
+        open={recipeOpen}
+        onClose={() => setRecipeOpen(false)}
+        salonId={salonId}
+        service={{ id: service.id, name: service.name }}
+      />
     </Dialog>
   )
 }

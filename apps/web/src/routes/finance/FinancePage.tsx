@@ -50,11 +50,8 @@ export function FinancePage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      <div className="mb-5">
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('finance.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('finance.subtitle')}</p>
-      </div>
-
+      {/* Image #62: header «P&L, ДДС, счета на оплату» убран — он дублировал
+          навигацию sidebar'а и съедал место когда у Финансов 5 табов. */}
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
 
       {active === 'pnl' ? (

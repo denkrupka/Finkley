@@ -188,24 +188,18 @@ export function ParametersCard() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
-      {/* Image #53: header "Параметры салона" удалён — он дублировал
-          h1 родительской страницы /finance + занимал место когда вкладок
-          много и они переносились. Чекбокс «архив» переехал на правую
-          сторону строки sub-tabs ниже. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1 overflow-x-auto">
-          <PageTabsNav tabs={SUB_TABS} active={activeSection} onChange={setActiveSection} t={t} />
-        </div>
-        <label className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-            className="size-3.5"
-          />
-          {t('settings.parameters.show_archived')}
-        </label>
-      </div>
+      {/* Image #60: чекбокс «Показать архивные» переехал внутрь header'а каждой
+          секции (рядом с «+ Добавить позицию»), а PageTabsNav теперь wrap+sm —
+          7 вкладок переносятся на 2 строки на узких экранах, без горизонтального
+          скролла. */}
+      <PageTabsNav
+        tabs={SUB_TABS}
+        active={activeSection}
+        onChange={setActiveSection}
+        t={t}
+        wrap
+        size="sm"
+      />
 
       <SectionTable
         key={sectionDef.key}
@@ -213,6 +207,7 @@ export function ParametersCard() {
         items={draft[sectionDef.key].items}
         currency={currency}
         showArchived={showArchived}
+        onShowArchivedChange={setShowArchived}
         onChange={(updater) => updateSection(sectionDef.key, updater)}
       />
 
@@ -231,10 +226,18 @@ type SectionTableProps = {
   items: ParameterItem[]
   currency: string
   showArchived: boolean
+  onShowArchivedChange: (value: boolean) => void
   onChange: (updater: (items: ParameterItem[]) => ParameterItem[]) => void
 }
 
-function SectionTable({ def, items, currency, showArchived, onChange }: SectionTableProps) {
+function SectionTable({
+  def,
+  items,
+  currency,
+  showArchived,
+  onShowArchivedChange,
+  onChange,
+}: SectionTableProps) {
   const { t } = useTranslation()
 
   const visibleItems = useMemo(() => {
@@ -314,7 +317,7 @@ function SectionTable({ def, items, currency, showArchived, onChange }: SectionT
             <p className="text-muted-foreground mt-0.5 text-xs">{t(def.subtitleKey)}</p>
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {def.kind === 'money' && def.showPeriod ? (
             <span className="text-muted-foreground text-xs">
               {t('settings.parameters.section_monthly_total')}:{' '}
@@ -323,6 +326,16 @@ function SectionTable({ def, items, currency, showArchived, onChange }: SectionT
               </span>
             </span>
           ) : null}
+          {/* Image #60: чекбокс архива — на уровне каждой секции. */}
+          <label className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => onShowArchivedChange(e.target.checked)}
+              className="size-3.5"
+            />
+            {t('settings.parameters.show_archived')}
+          </label>
           <Button type="button" variant="outline" size="sm" onClick={addRoot}>
             <Plus className="size-3.5" strokeWidth={2} />
             {t('settings.parameters.add_item')}

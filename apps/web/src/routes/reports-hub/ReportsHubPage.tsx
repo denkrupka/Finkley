@@ -49,13 +49,8 @@ export function ReportsHubPage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      <div className="mb-5">
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('reports_hub.title')}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('reports_hub.subtitle')}</p>
-      </div>
-
+      {/* Image #61: header «Аналитика по справочникам...» убран — он дублировал
+          навигацию и занимал лишнее место. Активный таб уже самодокументируется. */}
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
 
       {active === 'services' ? (

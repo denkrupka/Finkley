@@ -18,6 +18,9 @@ export function PageTabsNav<TId extends string>({
   active,
   onChange,
   t,
+  rightSlot,
+  wrap = false,
+  size = 'md',
 }: {
   tabs: PageTab<TId>[]
   active: TId
@@ -25,13 +28,27 @@ export function PageTabsNav<TId extends string>({
   /** i18n translator function — оставлен injectable чтобы избежать
    *  пересоздания этого компонента при каждой смене языка. */
   t: (key: string) => string
+  /** Опциональный контент справа от вкладок (например, action-кнопки
+   *  типа Импорт CSV / Список / Календарь на странице Доходы). */
+  rightSlot?: React.ReactNode
+  /** Если true — табы переносятся на новую строку, без горизонтального
+   *  скролла. Используется когда вкладок 6+ (Image #60 Финансы → Параметры). */
+  wrap?: boolean
+  /** 'md' — стандарт; 'sm' — ужатые табы (px+text), помогает влезать
+   *  большему количеству вкладок в одну строку (Image #60). */
+  size?: 'md' | 'sm'
 }) {
+  const navClass = wrap
+    ? '-mx-1.5 flex flex-1 flex-wrap gap-1 px-1.5'
+    : '-mx-1.5 flex flex-1 gap-1 overflow-x-auto px-1.5 sm:overflow-visible'
+  const tabPad = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'
+  const iconSize = size === 'sm' ? 'size-3.5' : 'size-4'
   return (
     <div
-      className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-1.5 print:hidden"
+      className="border-border bg-card shadow-finsm mb-6 flex items-center gap-2 rounded-lg border p-1.5 print:hidden"
       data-print-hide
     >
-      <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5 sm:overflow-visible">
+      <nav className={navClass}>
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = active === tab.id
@@ -40,18 +57,19 @@ export function PageTabsNav<TId extends string>({
               key={tab.id}
               type="button"
               onClick={() => onChange(tab.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-2 rounded-md font-semibold transition-colors ${tabPad} ${
                 isActive
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
               }`}
             >
-              <Icon className="size-4" strokeWidth={1.8} />
+              <Icon className={iconSize} strokeWidth={1.8} />
               {t(tab.labelKey)}
             </button>
           )
         })}
       </nav>
+      {rightSlot ? <div className="flex shrink-0 items-center gap-2">{rightSlot}</div> : null}
     </div>
   )
 }
