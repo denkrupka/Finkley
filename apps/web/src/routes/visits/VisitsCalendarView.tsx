@@ -133,6 +133,14 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
    *     useUpdateVisit; на «Отмена» — сбрасываем pendingMove.
    */
   const [draggingVisit, setDraggingVisit] = useState<VisitRow | null>(null)
+  // Magnet-preview (image #84): пока пользователь тянет визит над сеткой,
+  // показываем «ghost» на 15-мин субслоте под курсором, чтобы было видно
+  // куда визит примагнитится при drop. На drop pendingMove заполняется
+  // этим же значением → confirmation-модалка показывает старое/новое.
+  const [dragHover, setDragHover] = useState<{
+    staffId: string
+    visitAtMs: number
+  } | null>(null)
   const [pendingMove, setPendingMove] = useState<{
     visit: VisitRow
     targetStaffId: string | null
@@ -579,7 +587,22 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                             onDragOver={(e) => {
                               // Разрешаем drop на этот слот только если идёт
                               // перенос визита (draggingVisit != null).
-                              if (draggingVisit) e.preventDefault()
+                              if (!draggingVisit) return
+                              e.preventDefault()
+                              // Magnet-preview (image #84): обновляем
+                              // hover-target — ghost-карточка визита будет
+                              // отрисована на этом subslot'е.
+                              const newVisitAt = new Date(dayStart)
+                              newVisitAt.setHours(0, 0, 0, 0)
+                              newVisitAt.setMinutes(minFromMidnight)
+                              const ms = newVisitAt.getTime()
+                              if (
+                                !dragHover ||
+                                dragHover.staffId !== s.id ||
+                                dragHover.visitAtMs !== ms
+                              ) {
+                                setDragHover({ staffId: s.id, visitAtMs: ms })
+                              }
                             }}
                             onDrop={(e) => {
                               if (!draggingVisit) return
@@ -590,7 +613,11 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                               const newIso = newVisitAt.toISOString()
                               const sameTime = newIso === draggingVisit.visit_at
                               const sameStaff = s.id === draggingVisit.staff_id
-                              if (sameTime && sameStaff) return // ничего не изменилось
+                              setDragHover(null)
+                              if (sameTime && sameStaff) {
+                                setDraggingVisit(null)
+                                return // ничего не изменилось
+                              }
                               setPendingMove({
                                 visit: draggingVisit,
                                 targetStaffId: s.id,
@@ -636,6 +663,39 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                         })()
                       : null}
 
+                    {/* Magnet-preview (image #84): ghost-карточка под курсором
+                        пока тянем визит. Длина = duration оригинального визита;
+                        позиция = текущий subslot под курсором. Pointer-events
+                        none, чтобы dragOver на subslot'ах продолжал работать. */}
+                    {draggingVisit && dragHover && dragHover.staffId === s.id
+                      ? (() => {
+                          const ghostStart = new Date(dragHover.visitAtMs)
+                          const ghostStartMin = minutesFromMidnight(ghostStart)
+                          const ghostDur = durationFor(draggingVisit)
+                          const visibleStart = Math.max(ghostStartMin, HOUR_START * 60)
+                          const visibleEnd = Math.min(ghostStartMin + ghostDur, HOUR_END * 60)
+                          if (visibleEnd <= visibleStart) return null
+                          const ghostTop = pxTopForMinutes(visibleStart)
+                          const ghostHeight = Math.max(16, (visibleEnd - visibleStart) * PX_PER_MIN)
+                          return (
+                            <div
+                              className="border-primary bg-primary/10 pointer-events-none absolute inset-x-1 z-[7] rounded-md border-2 border-dashed"
+                              style={{ top: ghostTop, height: ghostHeight }}
+                            >
+                              <span className="num text-primary absolute left-1 top-0.5 text-[10px] font-bold">
+                                {format(ghostStart, 'HH:mm', { locale: ru })}
+                                {' – '}
+                                {format(
+                                  new Date(dragHover.visitAtMs + ghostDur * 60_000),
+                                  'HH:mm',
+                                  { locale: ru },
+                                )}
+                              </span>
+                            </div>
+                          )
+                        })()
+                      : null}
+
                     {/* Карточки визитов */}
                     {staffVisits.map((v) => {
                       const visitDate = parseISO(v.visit_at)
@@ -668,6 +728,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                           }}
                           onDragEnd={() => {
                             setDraggingVisit(null)
+                            setDragHover(null)
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
