@@ -177,6 +177,35 @@ export function RetailSaleWizard({
     ])
   }
 
+  /**
+   * Ручной ввод retail-позиции, когда товара нет в /inventory.
+   * Создаёт SaleLine с kind='retail' и inventoryItemId=null — на submit
+   * это даст visit kind='retail' без списания со склада (inventory_apply_tx
+   * пропускается через `if (l.inventoryItemId)`).
+   *
+   * Bug bf 37daad51: владелец застряла в «Товар со склада» когда товара
+   * ещё не было в инвентаре. Теперь можно ввести название и цену прямо
+   * в форме без предварительного создания товара в справочнике.
+   */
+  function addManualRetailLine(input: { name: string; priceCents: number }) {
+    setLines((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        kind: 'retail',
+        inventoryItemId: null,
+        otherCategoryId: null,
+        name: input.name.trim(),
+        code: null,
+        manufacturer: null,
+        unit: null,
+        quantity: 1,
+        unitPriceCents: input.priceCents,
+        lineDiscountCents: 0,
+      },
+    ])
+  }
+
   function patchLine(id: string, patch: Partial<SaleLine>) {
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   }
@@ -287,6 +316,7 @@ export function RetailSaleWizard({
             tab={addTab}
             onTabChange={setAddTab}
             onAddFromInventory={addLineFromInventory}
+            onAddManualRetail={addManualRetailLine}
             onAddOtherIncome={addOtherIncomeLine}
             onPatchLine={patchLine}
             onRemoveLine={removeLine}
@@ -449,6 +479,7 @@ function Step1({
   tab,
   onTabChange,
   onAddFromInventory,
+  onAddManualRetail,
   onAddOtherIncome,
   onPatchLine,
   onRemoveLine,
@@ -462,6 +493,7 @@ function Step1({
   tab: 'inventory' | 'other'
   onTabChange: (t: 'inventory' | 'other') => void
   onAddFromInventory: (itemId: string) => void
+  onAddManualRetail: (input: { name: string; priceCents: number }) => void
   onAddOtherIncome: (input: { name: string; priceCents: number; categoryId: string | null }) => void
   onPatchLine: (id: string, patch: Partial<SaleLine>) => void
   onRemoveLine: (id: string) => void
@@ -476,6 +508,10 @@ function Step1({
   const [otherCategoryId, setOtherCategoryId] = useState<string>('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryDraft, setNewCategoryDraft] = useState('')
+  // Ручной ввод retail-позиции внутри inventory-вкладки — для случая когда
+  // товара ещё нет в /inventory, а продажу записать надо. См. bug 37daad51.
+  const [manualName, setManualName] = useState('')
+  const [manualPrice, setManualPrice] = useState('')
 
   const options = useMemo(
     () =>
@@ -507,6 +543,16 @@ function Step1({
     setOtherName('')
     setOtherPrice('')
     // Категорию запоминаем — обычно несколько подряд одной категории.
+  }
+
+  function addManual() {
+    const trimmed = manualName.trim()
+    if (!trimmed) return
+    const priceCents = Math.round(parseDecimal(manualPrice) * 100)
+    if (priceCents <= 0) return
+    onAddManualRetail({ name: trimmed, priceCents })
+    setManualName('')
+    setManualPrice('')
   }
 
   async function submitNewCategory() {
@@ -555,24 +601,74 @@ function Step1({
       </div>
 
       {tab === 'inventory' ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
-              {t('retail_wizard.pick_item')}
-            </Label>
-            <SearchableSelect
-              value={selectedItemId}
-              onChange={setSelectedItemId}
-              options={options}
-              placeholder={t('retail_wizard.pick_item_placeholder')}
-              searchPlaceholder={t('retail_wizard.search_inventory')}
-              emptyText={t('common.no_results')}
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
+                {t('retail_wizard.pick_item')}
+              </Label>
+              <SearchableSelect
+                value={selectedItemId}
+                onChange={setSelectedItemId}
+                options={options}
+                placeholder={t('retail_wizard.pick_item_placeholder')}
+                searchPlaceholder={t('retail_wizard.search_inventory')}
+                emptyText={t('common.no_results')}
+                disabled={options.length === 0}
+              />
+            </div>
+            <Button onClick={addFromInventory} disabled={!selectedItemId} size="md">
+              <Plus className="size-4" strokeWidth={2} />
+              {t('retail_wizard.add')}
+            </Button>
           </div>
-          <Button onClick={addFromInventory} disabled={!selectedItemId} size="md">
-            <Plus className="size-4" strokeWidth={2} />
-            {t('retail_wizard.add')}
-          </Button>
+
+          {/* Ручной ввод товара — на случай если позиции ещё нет в /inventory.
+              Создаёт retail-линию без списания со склада. */}
+          <div className="border-border bg-muted/20 rounded-md border border-dashed p-3">
+            <p className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
+              {options.length === 0
+                ? t('retail_wizard.manual_inventory_empty_hint')
+                : t('retail_wizard.manual_inventory_hint')}
+            </p>
+            <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_140px_auto] sm:items-end">
+              <Input
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                placeholder={t('retail_wizard.manual_name_placeholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addManual()
+                  }
+                }}
+                data-testid="rw-manual-name"
+              />
+              <Input
+                inputMode="decimal"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder={t('retail_wizard.manual_price_placeholder', { currency })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addManual()
+                  }
+                }}
+                data-testid="rw-manual-price"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addManual}
+                disabled={!manualName.trim() || parseDecimal(manualPrice) <= 0}
+                size="md"
+              >
+                <Plus className="size-4" strokeWidth={2} />
+                {t('retail_wizard.add')}
+              </Button>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

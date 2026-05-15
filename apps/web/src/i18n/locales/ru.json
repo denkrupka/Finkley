@@ -1330,6 +1330,11 @@
       "what_to_improve": "Что можно улучшить, чтобы поднять выручку?"
     }
   },
+  "fab": {
+    "add": "Добавить",
+    "action_visit": "Визит",
+    "action_expense": "Расход"
+  },
   "visits": {
     "title": "Визиты",
     "fab_label": "Визит",
@@ -2628,6 +2633,10 @@
     "pick_item": "Товар",
     "pick_item_placeholder": "Выбери товар…",
     "search_inventory": "Поиск по названию, коду или производителю…",
+    "manual_inventory_hint": "Или ввести вручную, если товара нет в списке",
+    "manual_inventory_empty_hint": "На складе пока пусто — введи название и цену вручную",
+    "manual_name_placeholder": "Название товара",
+    "manual_price_placeholder": "Цена ({{currency}})",
     "other_name": "Название",
     "other_name_placeholder": "Например: Услуга подарочный сертификат",
     "other_price": "Цена ({{currency}})",
@@ -3038,6 +3047,7 @@
       "payroll_kind_final": "Окончательный расчёт",
       "payroll_period_start": "Период с",
       "payroll_period_end": "Период по",
+      "payroll_month": "Период (месяц)",
       "receipt_label": "Чек (фото или PDF)",
       "receipt_placeholder": "Прикрепить чек — JPG, PNG, PDF (до 10 МБ)",
       "receipt_placeholder_ocr": "📷 Сфоткай чек — заполню форму автоматически",
