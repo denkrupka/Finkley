@@ -13,6 +13,7 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
 import {
   useClosePayoutPeriod,
@@ -49,17 +50,24 @@ export function PayoutsPage() {
   const { data: rows = [], isLoading } = usePayoutsPreview(salonId, periodStart, periodEnd)
   const { data: isClosed = false } = useIsPeriodClosed(salonId, periodStart, periodEnd)
   const { data: history = [] } = usePayoutsHistory(salonId)
+  const { data: advancesByStaff = new Map<string, number>() } = usePayrollAdvances(
+    salonId,
+    periodStart,
+    periodEnd,
+  )
   const close = useClosePayoutPeriod(salonId)
 
   const totals = useMemo(() => {
     let revenue = 0
     let payout = 0
+    let advances = 0
     for (const r of rows) {
       revenue += r.revenue_cents
       payout += r.payout_cents
+      advances += advancesByStaff.get(r.staff_id) ?? 0
     }
-    return { revenue, payout }
-  }, [rows])
+    return { revenue, payout, advances, remaining: payout - advances }
+  }, [rows, advancesByStaff])
 
   // Период закрывать можно только если он завершился (последний день < сегодня)
   const isPeriodFinished = useMemo(() => {
@@ -128,49 +136,73 @@ export function PayoutsPage() {
         })}
       </div>
 
-      <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
-        <div className="text-muted-foreground grid grid-cols-[1.6fr_1.4fr_1fr_1fr] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        <div className="text-muted-foreground grid min-w-[760px] grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
           <div>{t('payouts.col.staff')}</div>
           <div>{t('payouts.col.scheme')}</div>
           <div className="text-right">{t('payouts.col.revenue')}</div>
           <div className="text-right">{t('payouts.col.payout')}</div>
+          <div className="text-right">{t('payouts.col.advances')}</div>
+          <div className="text-right">{t('payouts.col.remaining')}</div>
         </div>
-        <div className="divide-border divide-y">
+        <div className="divide-border min-w-[760px] divide-y">
           {isLoading ? (
             <div className="text-muted-foreground px-5 py-6 text-sm">{t('common.loading')}</div>
           ) : rows.length === 0 ? (
             <div className="text-muted-foreground px-5 py-6 text-sm">{t('payouts.empty')}</div>
           ) : (
-            rows.map((r) => (
-              <div
-                key={r.staff_id}
-                className="grid grid-cols-[1.6fr_1.4fr_1fr_1fr] items-center gap-3 px-4 py-3 sm:px-5"
-              >
-                <div className="text-brand-navy truncate text-sm font-bold">{r.full_name}</div>
-                <div className="text-muted-foreground truncate text-xs">
-                  {t(SCHEME_KEY[r.payout_scheme])}
-                  <span className="ml-1 opacity-70">
-                    · {t('payouts.visits_count', { count: r.visit_count })}
-                  </span>
-                </div>
-                <div className="num text-right text-sm">
-                  {formatCurrency(r.revenue_cents, currency)}
-                </div>
+            rows.map((r) => {
+              const advance = advancesByStaff.get(r.staff_id) ?? 0
+              const remaining = r.payout_cents - advance
+              return (
                 <div
-                  className={`num text-right text-sm font-bold ${r.payout_cents < 0 ? 'text-destructive' : 'text-brand-navy'}`}
+                  key={r.staff_id}
+                  className="grid min-w-[760px] grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 sm:px-5"
                 >
-                  {formatCurrency(r.payout_cents, currency)}
+                  <div className="text-brand-navy truncate text-sm font-bold">{r.full_name}</div>
+                  <div className="text-muted-foreground truncate text-xs">
+                    {t(SCHEME_KEY[r.payout_scheme])}
+                    <span className="ml-1 opacity-70">
+                      · {t('payouts.visits_count', { count: r.visit_count })}
+                    </span>
+                  </div>
+                  <div className="num text-right text-sm">
+                    {formatCurrency(r.revenue_cents, currency)}
+                  </div>
+                  <div
+                    className={`num text-right text-sm font-bold ${r.payout_cents < 0 ? 'text-destructive' : 'text-brand-navy'}`}
+                  >
+                    {formatCurrency(r.payout_cents, currency)}
+                  </div>
+                  <div className="num text-right text-sm text-amber-700">
+                    {advance > 0 ? `−${formatCurrency(advance, currency)}` : '—'}
+                  </div>
+                  <div
+                    className={`num text-right text-sm font-bold ${
+                      remaining < 0 ? 'text-destructive' : 'text-brand-sage-deep'
+                    }`}
+                  >
+                    {formatCurrency(remaining, currency)}
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
         {rows.length > 0 ? (
-          <div className="border-border bg-muted/30 grid grid-cols-[1.6fr_1.4fr_1fr_1fr] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
+          <div className="border-border bg-muted/30 grid min-w-[760px] grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
             <div className="text-brand-navy col-span-2">{t('payouts.total')}</div>
             <div className="num text-right">{formatCurrency(totals.revenue, currency)}</div>
             <div className="num text-brand-navy text-right">
               {formatCurrency(totals.payout, currency)}
+            </div>
+            <div className="num text-right text-amber-700">
+              {totals.advances > 0 ? `−${formatCurrency(totals.advances, currency)}` : '—'}
+            </div>
+            <div
+              className={`num text-right ${totals.remaining < 0 ? 'text-destructive' : 'text-brand-sage-deep'}`}
+            >
+              {formatCurrency(totals.remaining, currency)}
             </div>
           </div>
         ) : null}
