@@ -60,24 +60,27 @@ export function VisitDetailModal({
   salonId,
   currency,
   onClose,
+  initialView,
 }: {
   visit: VisitRow | null
   salonId: string
   currency: string
   onClose: () => void
+  /** Image #87: при открытии из QuickEntry-edit «Рассчитать» сразу прыгаем в charge. */
+  initialView?: 'detail' | 'charge' | 'document'
 }) {
   const { t } = useTranslation()
-  const [view, setView] = useState<'detail' | 'charge' | 'document'>('detail')
+  const [view, setView] = useState<'detail' | 'charge' | 'document'>(initialView ?? 'detail')
   const [tab, setTab] = useState<'wizyta' | 'info'>('wizyta')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
 
   useEffect(() => {
     if (visit) {
-      setView('detail')
+      setView(initialView ?? 'detail')
       setTab('wizyta')
       setEditingLineId(null)
     }
-  }, [visit])
+  }, [visit, initialView])
 
   // Все связанные визиты (по group_key или только сам visit).
   // Используем useVisits с дневным диапазоном — он уже кешируется в react-query.

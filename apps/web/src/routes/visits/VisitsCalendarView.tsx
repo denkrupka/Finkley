@@ -23,6 +23,7 @@ import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
 import { useUpdateVisit, useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
+import { QuickEntryModal } from './QuickEntryModal'
 import { VisitDetailModal } from './VisitDetailModal'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
 import { ReservationModal } from './ReservationModal'
@@ -105,6 +106,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: visits = [] } = useVisits(salonId, range, { kind: 'visit' })
 
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  // Image #87: для одиночных визитов (group_key=null) клик открывает не
+  // VisitDetailModal, а QuickEntryModal в edit-mode. quickEditVisit держит
+  // активный визит. После «Рассчитать» → setChargeVisit вместо edit, что
+  // переоткроет VisitDetailModal в charge-view.
+  const [quickEditVisit, setQuickEditVisit] = useState<VisitRow | null>(null)
+  const [chargeVisit, setChargeVisit] = useState<VisitRow | null>(null)
   // Клик/drag по подслоту → popover с действиями (Новый визит / Резерв времени).
   // `endAt` присутствует только когда юзер выделил диапазон через drag-select —
   // тогда «Новый визит» и «Резерв времени» получают и start, и end.
@@ -732,7 +739,11 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setEditingVisit(v)
+                            // Image #87: одиночные визиты → QuickEntry в edit-mode;
+                            // multi-line группы (group_key != null) → старая
+                            // VisitDetailModal с list+charge (там удобнее).
+                            if (v.group_key) setEditingVisit(v)
+                            else setQuickEditVisit(v)
                           }}
                           className={cn(
                             'group absolute inset-x-1 z-[5] cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md active:cursor-grabbing',
@@ -863,10 +874,32 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
       )}
 
       <VisitDetailModal
-        visit={editingVisit}
-        onClose={() => setEditingVisit(null)}
+        visit={editingVisit ?? chargeVisit}
+        onClose={() => {
+          setEditingVisit(null)
+          setChargeVisit(null)
+        }}
         salonId={salonId}
         currency={salon?.currency ?? 'PLN'}
+        initialView={chargeVisit ? 'charge' : undefined}
+      />
+
+      {/* Image #87: QuickEntryModal в edit-mode — клик по одиночному визиту.
+          После «Рассчитать» — закрывается + открывается VisitDetailModal в
+          ChargeView для этого визита. */}
+      <QuickEntryModal
+        open={!!quickEditVisit}
+        onOpenChange={(o) => {
+          if (!o) setQuickEditVisit(null)
+        }}
+        salonId={salonId}
+        currency={salon?.currency ?? 'PLN'}
+        editVisit={quickEditVisit}
+        onChargeRequest={(visitId) => {
+          const v = visits.find((x) => x.id === visitId)
+          setQuickEditVisit(null)
+          if (v) setChargeVisit(v)
+        }}
       />
 
       {/* Popover для клика/drag по подслоту. Одиночный клик → when, без endAt.

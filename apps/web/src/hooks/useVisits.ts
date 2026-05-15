@@ -179,6 +179,8 @@ export type UpdateVisitInput = {
   payment_method?: PaymentMethod
   status?: VisitStatus
   comment?: string | null
+  /** Длительность визита в минутах (image #85). */
+  duration_min?: number | null
 }
 
 export function useUpdateVisit(salonId: string | undefined) {

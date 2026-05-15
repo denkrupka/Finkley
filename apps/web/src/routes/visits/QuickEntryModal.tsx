@@ -29,7 +29,13 @@ import { supabase } from '@/lib/supabase/client'
 import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useSuggestedStaffForClientService } from '@/hooks/useStaffSuggestion'
-import { useCreateVisit, useDeleteVisit, useRestoreVisit } from '@/hooks/useVisits'
+import {
+  useCreateVisit,
+  useDeleteVisit,
+  useRestoreVisit,
+  useUpdateVisit,
+  type VisitRow,
+} from '@/hooks/useVisits'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -81,6 +87,22 @@ type Props = {
    * желаемое время конца; используем как fallback пока юзер не выбрал услуги.
    */
   prefill?: { staffId: string; when: string; clientId?: string; endAt?: string } | null
+  /**
+   * Image #87: режим редактирования существующего визита. Если задан —
+   * форма префиллится данными визита, на submit выполняется UPDATE
+   * (одна row, без создания N новых), footer показывает «Удалить» +
+   * «Рассчитать» вместо «Сохранить визит».
+   *
+   * Не поддерживает редактирование multi-line групп (group_key != null) —
+   * для них VisitsCalendarView роутит клик в VisitDetailModal как раньше.
+   */
+  editVisit?: VisitRow | null
+  /**
+   * Колбэк после успешного сохранения в edit-mode когда юзер нажал
+   * «Рассчитать». Передаётся visit id; родитель должен открыть
+   * VisitDetailModal в ChargeView для этого визита.
+   */
+  onChargeRequest?: (visitId: string) => void
 }
 
 /**
@@ -98,15 +120,25 @@ type Props = {
  *     `pending`. Реальный payment_method выбирается в карточке визита при
  *     нажатии «Рассчитать» (см. VisitDetailModal → ChargeView).
  */
-export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill }: Props) {
+export function QuickEntryModal({
+  open,
+  onOpenChange,
+  salonId,
+  currency,
+  prefill,
+  editVisit,
+  onChargeRequest,
+}: Props) {
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const createVisit = useCreateVisit(salonId)
+  const updateVisit = useUpdateVisit(salonId)
   const deleteVisit = useDeleteVisit(salonId)
   const reserveBooksy = useCreateBooksyReservation()
   const restoreVisit = useRestoreVisit(salonId)
+  const isEdit = !!editVisit
 
   const today = useMemo(() => new Date(), [])
   const todayIso = useMemo(() => format(today, 'yyyy-MM-dd'), [today])
@@ -134,9 +166,40 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     },
   })
 
-  // Префилл при открытии: дата/время/мастер/клиент из календаря (drag-select).
+  // Префилл при открытии: либо из editVisit (правка существующего, image #87),
+  // либо из календаря (создание нового через subslot/drag-select).
   useEffect(() => {
     if (!open) return
+    if (editVisit) {
+      // Edit-mode: одна row, восстанавливаем services-line из service_id/snapshot.
+      const start = new Date(editVisit.visit_at)
+      const dur =
+        editVisit.duration_min ??
+        (editVisit.service_id
+          ? (services.find((s) => s.id === editVisit.service_id)?.default_duration_min ?? 60)
+          : 60)
+      const end = new Date(start.getTime() + dur * 60_000)
+      const svc = editVisit.service_id ? services.find((s) => s.id === editVisit.service_id) : null
+      const line: ServiceLine = {
+        uid: crypto.randomUUID(),
+        service_id: editVisit.service_id ?? '',
+        name: svc?.name ?? editVisit.service_name_snapshot ?? '—',
+        price_cents: editVisit.amount_cents,
+        duration_min: dur,
+      }
+      form.reset({
+        visit_date: format(start, 'yyyy-MM-dd'),
+        start_time: format(start, 'HH:mm'),
+        end_time: format(end, 'HH:mm'),
+        staff_id: editVisit.staff_id ?? '',
+        client_id: editVisit.client_id ?? null,
+        comment: editVisit.comment ?? '',
+      })
+      setLines([line])
+      setPendingServiceId('')
+      setLinesTouched(false)
+      return
+    }
     const lastStaffValid = staff.some((s) => s.id === initialStaff)
     const prefillDate = prefill ? format(new Date(prefill.when), 'yyyy-MM-dd') : todayIso
     const prefillStaff =
@@ -164,7 +227,15 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     setPendingServiceId('')
     setLinesTouched(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, prefill?.staffId, prefill?.when, prefill?.endAt, prefill?.clientId])
+  }, [
+    open,
+    editVisit?.id,
+    editVisit?.visit_at,
+    prefill?.staffId,
+    prefill?.when,
+    prefill?.endAt,
+    prefill?.clientId,
+  ])
 
   // Догрузка staff после открытия — выставляем дефолт, если ещё не выбран.
   useEffect(() => {
@@ -247,7 +318,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
   const totalAmountCents = lines.reduce((s, l) => s + l.price_cents, 0)
   const watchedStaffId = form.watch('staff_id')
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues, opts?: { thenCharge?: boolean }) {
     if (lines.length === 0) {
       setLinesTouched(true)
       toast.error(t('visits.errors.services_required'))
@@ -271,6 +342,37 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       Number.isFinite(sh) && Number.isFinite(eh) ? eh! * 60 + (em ?? 0) - (sh! * 60 + (sm ?? 0)) : 0
     const totalDurationMin =
       formDur > 0 ? formDur : lines.reduce((s, l) => s + (l.duration_min ?? 60), 0)
+
+    // ── Edit-mode (image #87): UPDATE одной row, без conflict-detection
+    // (юзер уже видит конфликты на календаре). После save callback на charge.
+    if (isEdit && editVisit) {
+      const firstLine = lines[0]!
+      const newDur = lines.length === 1 && formDur > 0 ? formDur : (firstLine.duration_min ?? 60)
+      try {
+        await updateVisit.mutateAsync({
+          id: editVisit.id,
+          staff_id: values.staff_id || null,
+          client_id: values.client_id || null,
+          service_id: firstLine.service_id || null,
+          service_name_snapshot: firstLine.name,
+          visit_at: visitAt,
+          amount_cents: firstLine.price_cents,
+          comment: values.comment || null,
+          duration_min: newDur,
+        })
+        toast.success(t('visits.toast_updated'))
+        if (opts?.thenCharge) {
+          onChargeRequest?.(editVisit.id)
+        } else {
+          onOpenChange(false)
+        }
+      } catch (err) {
+        toast.error(t('visits.toast_error'), {
+          description: err instanceof Error ? err.message : String(err),
+        })
+      }
+      return
+    }
 
     // Conflict-detection — проверяем перекрытие со всеми визитами того же
     // мастера в этот день в диапазоне [start, start+totalDuration).
@@ -436,12 +538,14 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             overflow-y-auto — на ноутбучных экранах <800px она схлопнется
             корректно, но в обычном кейсе скролла не будет. */}
         <DialogHeader>
-          <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? t('visits.form.title_edit') : t('visits.form.title_new')}
+          </DialogTitle>
         </DialogHeader>
 
         <form
           className="flex min-h-0 flex-col gap-2 overflow-y-auto px-5 pb-2 pt-1"
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={form.handleSubmit((v) => onSubmit(v))}
           noValidate
         >
           {/* Клиент — самый верх (image #68). Опциональное поле (image #74):
@@ -684,16 +788,49 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           </div>
         </form>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            size="lg"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={createVisit.isPending}
-            data-testid="qe-submit"
-          >
-            {createVisit.isPending ? t('common.loading') : t('visits.form.submit')}
-          </Button>
+        <DialogFooter className={isEdit ? 'sm:justify-between' : undefined}>
+          {isEdit && editVisit ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                disabled={deleteVisit.isPending}
+                onClick={() => {
+                  if (!window.confirm(t('visits.confirm_delete'))) return
+                  deleteVisit.mutate(editVisit.id, {
+                    onSuccess: () => {
+                      toast.success(t('visits.toast_deleted'))
+                      onOpenChange(false)
+                    },
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                className="text-destructive hover:bg-destructive/10"
+              >
+                {t('common.delete')}
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))}
+                disabled={updateVisit.isPending || deleteVisit.isPending}
+                data-testid="qe-charge"
+              >
+                {updateVisit.isPending ? t('common.loading') : t('visits.detail.charge')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              size="lg"
+              onClick={form.handleSubmit((v) => onSubmit(v))}
+              disabled={createVisit.isPending}
+              data-testid="qe-submit"
+            >
+              {createVisit.isPending ? t('common.loading') : t('visits.form.submit')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
