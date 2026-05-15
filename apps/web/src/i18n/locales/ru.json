@@ -2733,9 +2733,20 @@
     },
     "clients_placeholder": "Аналитика клиентов — раздел в разработке.",
     "staff": {
-      "title": "Выручка по мастерам",
+      "title": "Эффективность мастеров",
       "total": "Итого",
-      "empty": "За этот период визитов не было."
+      "empty": "За этот период визитов не было.",
+      "col_name": "Мастер",
+      "col_revenue": "Выручка",
+      "col_visits": "Визитов",
+      "col_clients": "Клиентов",
+      "col_rebook": "Возврат",
+      "col_utilization": "Загрузка",
+      "col_share": "Доля",
+      "visits_short": "виз",
+      "retail_short": "ритейл",
+      "returned_short": "вернулось",
+      "tenure": "{{years}} лет работы"
     },
     "services": {
       "title": "Выручка по услугам",
