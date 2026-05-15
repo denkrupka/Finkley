@@ -186,6 +186,25 @@ export function useCreateExpense(salonId: string | undefined) {
 }
 
 /**
+ * Image #49: редактирование существующего расхода.
+ * Принимает те же поля что и Create, но через UPDATE по id.
+ */
+export function useUpdateExpense(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string } & Partial<CreateExpenseInput>) => {
+      const { id, ...patch } = input
+      const { error } = await supabase.from('expenses').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: expensesKeys(salonId) })
+      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    },
+  })
+}
+
+/**
  * Загружает файл чека в Storage bucket `receipts`. Возвращает path внутри bucket'а
  * (e.g. "<salon_id>/<uuid>.jpg") — его сохраняем в expenses.receipt_url.
  *

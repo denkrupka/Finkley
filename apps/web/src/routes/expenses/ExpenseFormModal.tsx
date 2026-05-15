@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { addMonths, addWeeks, format } from 'date-fns'
 import { Camera, Loader2, Paperclip, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -28,8 +28,10 @@ import {
   uploadReceipt,
   useCreateExpense,
   useExpenseCategories,
+  useUpdateExpense,
   type ExpenseCategoryRow,
   type ExpenseRecurrence,
+  type ExpenseRow,
 } from '@/hooks/useExpenses'
 import {
   pickActiveAccountingProvider,
@@ -110,6 +112,9 @@ type Props = {
   currency: string
   /** Если передано — преселектируем эту категорию */
   defaultCategoryId?: string | null
+  /** Image #49: если передано — модалка работает в режиме редактирования
+   *  существующего расхода (UPDATE вместо INSERT). Поля префиллятся. */
+  expense?: ExpenseRow | null
 }
 
 export function ExpenseFormModal({
@@ -118,12 +123,15 @@ export function ExpenseFormModal({
   salonId,
   currency,
   defaultCategoryId,
+  expense,
 }: Props) {
   const { t } = useTranslation()
+  const isEdit = !!expense
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const createExpense = useCreateExpense(salonId)
+  const updateExpense = useUpdateExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
   const ocr = useOcrReceipt()
 
@@ -158,8 +166,57 @@ export function ExpenseFormModal({
     },
   })
 
+  // При открытии в edit-mode — префиллим форму данными существующего расхода.
+  useEffect(() => {
+    if (!open) return
+    if (expense) {
+      form.reset({
+        expense_at: expense.expense_at.slice(0, 10),
+        category_id: expense.category_id ?? '',
+        amount: ((expense.amount_cents ?? 0) / 100).toFixed(2),
+        payment_method: (expense.payment_method as PaymentMethod) ?? '',
+        comment: expense.comment ?? '',
+        recurrence: (expense.recurrence as ExpenseRecurrence) ?? 'none',
+      })
+    } else {
+      form.reset({
+        expense_at: today,
+        category_id: defaultCategoryId ?? '',
+        amount: '',
+        payment_method: '',
+        comment: '',
+        recurrence: 'none',
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
+  }, [open, expense?.id])
+
   async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+
+    // Edit-mode: простое UPDATE без OCR/auto-push/upload (этого хватает для
+    // правки уже-созданного расхода — поля те же, что при создании).
+    if (isEdit && expense) {
+      updateExpense.mutate(
+        {
+          id: expense.id,
+          expense_at: values.expense_at,
+          category_id: values.category_id || null,
+          amount_cents: amountCents,
+          payment_method: values.payment_method || null,
+          comment: values.comment || null,
+          recurrence: values.recurrence,
+        },
+        {
+          onSuccess: () => {
+            toast.success(t('expenses.toast_updated'))
+            onOpenChange(false)
+          },
+          onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+        },
+      )
+      return
+    }
 
     let receiptUrl: string | null = null
     if (receiptFile) {

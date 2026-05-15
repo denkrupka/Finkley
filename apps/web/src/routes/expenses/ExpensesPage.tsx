@@ -20,12 +20,19 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
   getReceiptSignedUrl,
   useDeleteExpense,
   useExpenseCategories,
   useExpenses,
   type ExpenseRow,
 } from '@/hooks/useExpenses'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import {
   pickActiveAccountingProvider,
@@ -33,9 +40,7 @@ import {
   useSalonIntegrations,
   useWfirmaPushExpense,
 } from '@/hooks/useIntegrations'
-import { BudgetsCard } from './BudgetsCard'
 import { useSalon } from '@/hooks/useSalons'
-import { getDatePeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { ExpenseFormModal } from './ExpenseFormModal'
@@ -62,10 +67,17 @@ export function ExpensesPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params, setParams] = useSearchParams()
-  const period = (params.get('period') ?? 'month') as PeriodKey
   const categoryFilter = params.get('cat') || ''
   const payFilter = (params.get('pay') || '') as PaymentMethod | ''
-  const range = getDatePeriodRange(period, new Date(), readCustomFromParams(params))
+  // PeriodPickerPopover как в отчётах — выбор пресета/диапазона дат.
+  // useExpenses ждёт диапазон дат в формате 'YYYY-MM-DD' (без времени),
+  // потому что у expenses.expense_at колонка типа date, не timestamp.
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const r = periodToRange(period)
+  const range = {
+    start: r.start.toISOString().slice(0, 10),
+    end: r.end.toISOString().slice(0, 10),
+  }
 
   function setFilter(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -76,6 +88,7 @@ export function ExpensesPage() {
 
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
     categoryId: categoryFilter || null,
     paymentMethod: payFilter || null,
@@ -94,6 +107,9 @@ export function ExpensesPage() {
   )
 
   const [formOpen, setFormOpen] = useState(false)
+  // Edit-режим: клик по строке расхода → ExpenseFormModal в edit mode
+  // (Image #49). null = создание нового. ExpenseFormModal сам различает.
+  const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [receiptError, setReceiptError] = useState<string | null>(null)
 
@@ -120,12 +136,6 @@ export function ExpensesPage() {
   }
   const total = expenses.reduce((acc, e) => acc + e.amount_cents, 0)
 
-  const summaryCategories = categories.slice(0, 4).map((c, i) => ({
-    ...c,
-    color: CATEGORY_COLORS[i] ?? '#9A9A9A',
-    total_cents: totalsByCategory.get(c.id) ?? 0,
-  }))
-
   const structureCategories = categories
     .map((c, i) => ({
       ...c,
@@ -150,15 +160,18 @@ export function ExpensesPage() {
             </span>
           </p>
         </div>
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => setFormOpen(true)}
-          data-testid="add-expense"
-        >
-          <Plus className="size-4" strokeWidth={2.4} />
-          {t('expenses.add')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setFormOpen(true)}
+            data-testid="add-expense"
+          >
+            <Plus className="size-4" strokeWidth={2.4} />
+            {t('expenses.add')}
+          </Button>
+        </div>
       </div>
 
       {/* Подвкладки «Расходы / Поступления» убраны по запросу owner 2026-05-12.
@@ -192,33 +205,20 @@ export function ExpensesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
-            {(['cash', 'card', 'transfer'] as const).map((p) => (
-              <SelectItem key={p} value={p}>
-                {t(`payment_methods.${p}`)}
+            {paymentMethods.map((m) => (
+              <SelectItem key={m.id} value={m.code}>
+                {m.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Summary cards 4-в-ряд */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {summaryCategories.map((c) => (
-          <div
-            key={c.id}
-            className="border-border bg-card shadow-finsm rounded-lg border p-4"
-            style={{ borderLeftWidth: 4, borderLeftColor: c.color }}
-          >
-            <div className="text-muted-foreground text-xs font-semibold">{c.name}</div>
-            <div className="num text-foreground mt-2 text-xl font-bold tracking-tight">
-              {formatCurrency(c.total_cents, currency)}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Image #47: KPI-плитки (Аренда/Зарплата/Материалы/Реклама) и
+          BudgetsCard перенесены в /finance → Бюджеты → Плановые расходы.
+          На странице расходов остался только список + структура. */}
 
-      {/* 2-column body */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
         {/* List */}
         <div className="border-border bg-card shadow-finsm rounded-lg border">
           <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
@@ -251,7 +251,8 @@ export function ExpensesPage() {
                 return (
                   <li
                     key={e.id}
-                    className="border-border grid grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0"
+                    onClick={() => setEditingExpense(e)}
+                    className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
                     style={{ borderLeftWidth: 3, borderLeftColor: color }}
                     data-testid="expense-row"
                   >
@@ -431,9 +432,8 @@ export function ExpensesPage() {
           )}
         </div>
 
-        {/* Structure + Budgets */}
+        {/* Structure (BudgetsCard перенесена в /finance → Бюджеты) */}
         <div className="flex flex-col gap-4">
-          <BudgetsCard salonId={salonId} currency={currency} />
           <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
             <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
               {t('expenses.structure_title')}
@@ -475,6 +475,14 @@ export function ExpensesPage() {
         onOpenChange={setFormOpen}
         salonId={salonId}
         currency={currency}
+      />
+
+      <ExpenseFormModal
+        open={!!editingExpense}
+        onOpenChange={(o) => !o && setEditingExpense(null)}
+        salonId={salonId}
+        currency={currency}
+        expense={editingExpense}
       />
 
       {/* Просмотр чека */}
