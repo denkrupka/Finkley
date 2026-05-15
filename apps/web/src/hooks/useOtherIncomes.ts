@@ -31,21 +31,82 @@ export type OtherIncomeCategoryRow = {
   sort_order: number
 }
 
-export function useOtherIncomeCategories(salonId: string | undefined) {
+export function useOtherIncomeCategories(
+  salonId: string | undefined,
+  opts: { includeArchived?: boolean } = {},
+) {
   return useQuery<OtherIncomeCategoryRow[]>({
-    queryKey: ['other-income-categories', salonId],
+    queryKey: ['other-income-categories', salonId, opts.includeArchived ?? false],
     queryFn: async () => {
       if (!salonId) return []
-      const { data, error } = await supabase
+      let q = supabase
         .from('other_income_categories')
         .select('id, salon_id, name, is_archived, is_system, sort_order')
         .eq('salon_id', salonId)
-        .eq('is_archived', false)
         .order('sort_order')
+      if (!opts.includeArchived) q = q.eq('is_archived', false)
+      const { data, error } = await q
       if (error) throw error
       return (data ?? []) as OtherIncomeCategoryRow[]
     },
     enabled: !!salonId,
+  })
+}
+
+export function useCreateOtherIncomeCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { name: string; sort_order?: number }) => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase
+        .from('other_income_categories')
+        .insert({
+          salon_id: salonId,
+          name: input.name.trim(),
+          sort_order: input.sort_order ?? 100,
+          is_archived: false,
+          is_system: false,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data as { id: string }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['other-income-categories', salonId] })
+    },
+  })
+}
+
+export function useUpdateOtherIncomeCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      id: string
+      name?: string
+      is_archived?: boolean
+      sort_order?: number
+    }) => {
+      const { id, ...patch } = input
+      const { error } = await supabase.from('other_income_categories').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['other-income-categories', salonId] })
+    },
+  })
+}
+
+export function useDeleteOtherIncomeCategory(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('other_income_categories').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['other-income-categories', salonId] })
+    },
   })
 }
 

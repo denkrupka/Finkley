@@ -1,4 +1,13 @@
-import { ChevronRight, Download, History, Mail, Scissors, Sparkles, Users } from 'lucide-react'
+import {
+  ChevronRight,
+  Coins,
+  Download,
+  History,
+  Mail,
+  Scissors,
+  Sparkles,
+  Users,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -449,6 +458,12 @@ export function SettingsPage() {
               icon={Users}
               title={t('settings.catalogs.items.clients.title')}
               subtitle={t('settings.catalogs.items.clients.subtitle')}
+            />
+            <CatalogCard
+              to={`/${salonId}/settings/income-categories`}
+              icon={Coins}
+              title={t('settings.catalogs.items.income.title')}
+              subtitle={t('settings.catalogs.items.income.subtitle')}
             />
             {/* «Склад» и «Категории расходов» удалены отсюда по требованию
                 владельца — управляются на своих страницах (/inventory, /expenses). */}
