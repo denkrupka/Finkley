@@ -1,14 +1,6 @@
 import { addDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import {
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Maximize2,
-  Minimize2,
-  UserX,
-} from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, Maximize2, Minimize2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -19,18 +11,14 @@ import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
 import { useSalonHolidays } from '@/hooks/useSalonHours'
 import { useServices } from '@/hooks/useServices'
-import {
-  useCreateStaffBlock,
-  useDeleteStaffBlock,
-  useStaffBlocks,
-  type StaffBlockKind,
-} from '@/hooks/useStaffBlocks'
+import { useDeleteStaffBlock, useStaffBlocks } from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
 import { VisitDetailModal } from './VisitDetailModal'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
+import { ReservationModal } from './ReservationModal'
 
 // =============================================================================
 // Конфиг сетки
@@ -93,7 +81,6 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: clients = [] } = useClients(salonId)
   const { data: holidays = [] } = useSalonHolidays(salonId)
   const { data: blocks = [] } = useStaffBlocks(salonId, range)
-  const createBlock = useCreateStaffBlock(salonId)
   const deleteBlock = useDeleteStaffBlock(salonId)
 
   // Если текущий день — праздник, показываем поверх grid'а полупрозрачную
@@ -111,11 +98,20 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: visits = [] } = useVisits(salonId, range, { kind: 'visit' })
 
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
-  // Клик по 15-мин подслоту — открываем popover с 3 действиями.
+  // Клик/drag по подслоту → popover с действиями (Новый визит / Резерв времени).
+  // `endAt` присутствует только когда юзер выделил диапазон через drag-select —
+  // тогда «Новый визит» и «Резерв времени» получают и start, и end.
   const [subslotMenu, setSubslotMenu] = useState<{
     staffId: string
     when: Date
+    endAt: Date | null
     rect: { top: number; left: number }
+  } | null>(null)
+  // Модалка «Резерв времени» — открывается из popover'а.
+  const [reservationPrefill, setReservationPrefill] = useState<{
+    staffId: string
+    when: string
+    endAt?: string
   } | null>(null)
   /**
    * Drag-select на сетке: пользователь зажимает левую кнопку на стартовом
@@ -151,34 +147,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [isFullscreen])
 
-  /**
-   * Создаёт staff_time_block из текущего subslotMenu. Дефолтная длительность —
-   * 30 минут (можно отредактировать руками после создания).
-   */
-  function createTimeBlock(kind: StaffBlockKind) {
-    if (!subslotMenu) return
-    const starts = subslotMenu.when
-    const ends = new Date(starts.getTime() + 30 * 60 * 1000)
-    createBlock.mutate(
-      {
-        staff_id: subslotMenu.staffId,
-        kind,
-        starts_at: starts.toISOString(),
-        ends_at: ends.toISOString(),
-        label: null,
-      },
-      {
-        onSuccess: () =>
-          toast.success(
-            kind === 'reservation'
-              ? t('visits.calendar.subslot.toast_reserved')
-              : t('visits.calendar.subslot.toast_absence'),
-          ),
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-      },
-    )
-    setSubslotMenu(null)
-  }
+  // «Отсутствие» как тип блока удалено из UI календаря: владелец оставил
+  // только «Новый визит» и «Резерв времени». Тип 'absence' в enum БД пока
+  // оставлен для совместимости с уже созданными блоками, но новые из UI
+  // не создаются.
 
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services])
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
@@ -217,7 +189,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
 
   const TOTAL_MIN = (HOUR_END - HOUR_START) * 60
 
-  // Глобальный mouseup — завершает drag-select (или регистрирует single-click).
+  // Глобальный mouseup — завершает drag-select. И одиночный клик, и реальный
+  // drag открывают один и тот же popover (Новый визит / Резерв времени);
+  // разница в том, что drag передаёт также `endAt`, а single-click — null.
   useEffect(() => {
     if (!dragState) return
     function onUp() {
@@ -228,33 +202,24 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
       const when = new Date(dayStart)
       when.setHours(0, 0, 0, 0)
       when.setMinutes(startMin)
-      const endAt = new Date(dayStart)
-      endAt.setHours(0, 0, 0, 0)
-      endAt.setMinutes(endMin)
-      if (a !== b) {
-        window.dispatchEvent(
-          new CustomEvent('finsalon:open-quick-entry', {
-            detail: {
-              staffId: dragState.staffId,
-              when: when.toISOString(),
-              endAt: endAt.toISOString(),
-            },
-          }),
-        )
-      } else {
-        const POPOVER_W = 240
-        const POPOVER_H = 180
-        const padding = 8
-        const rect = dragState.startRect
-        const leftClamped = Math.min(rect.left, window.innerWidth - POPOVER_W - padding)
-        const spaceBelow = window.innerHeight - rect.bottom
-        const topRaw = spaceBelow >= POPOVER_H ? rect.bottom : rect.top - POPOVER_H
-        setSubslotMenu({
-          staffId: dragState.staffId,
-          when,
-          rect: { top: topRaw, left: Math.max(padding, leftClamped) },
-        })
+      const endAt = a !== b ? new Date(dayStart) : null
+      if (endAt) {
+        endAt.setHours(0, 0, 0, 0)
+        endAt.setMinutes(endMin)
       }
+      const POPOVER_W = 240
+      const POPOVER_H = 180
+      const padding = 8
+      const rect = dragState.startRect
+      const leftClamped = Math.min(rect.left, window.innerWidth - POPOVER_W - padding)
+      const spaceBelow = window.innerHeight - rect.bottom
+      const topRaw = spaceBelow >= POPOVER_H ? rect.bottom : rect.top - POPOVER_H
+      setSubslotMenu({
+        staffId: dragState.staffId,
+        when,
+        endAt,
+        rect: { top: topRaw, left: Math.max(padding, leftClamped) },
+      })
       setDragState(null)
     }
     window.addEventListener('mouseup', onUp)
@@ -774,9 +739,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         currency={salon?.currency ?? 'PLN'}
       />
 
-      {/* Popover для клика по 15-мин подслоту. Позиционируется абсолютно
-          относительно клика (boundingClientRect.bottom). Закрывается на
-          клик-вне. */}
+      {/* Popover для клика/drag по подслоту. Одиночный клик → when, без endAt.
+          Drag-select → when + endAt (диапазон). Обе ветки одинаково
+          предлагают «Новый визит» или «Резерв времени» — owner попросил
+          убрать «Отсутствие». */}
       {subslotMenu ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setSubslotMenu(null)} aria-hidden />
@@ -788,8 +754,11 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             }}
           >
             <p className="text-muted-foreground border-border mb-1.5 border-b px-2 pb-1.5 text-[11px] uppercase tracking-wider">
-              {format(subslotMenu.when, 'd MMM, HH:mm', { locale: ru })} ·{' '}
-              {staff.find((s) => s.id === subslotMenu.staffId)?.full_name ?? ''}
+              {format(subslotMenu.when, 'd MMM, HH:mm', { locale: ru })}
+              {subslotMenu.endAt
+                ? ` – ${format(subslotMenu.endAt, 'HH:mm', { locale: ru })}`
+                : ''}{' '}
+              · {staff.find((s) => s.id === subslotMenu.staffId)?.full_name ?? ''}
             </p>
             <button
               type="button"
@@ -799,6 +768,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                     detail: {
                       staffId: subslotMenu.staffId,
                       when: subslotMenu.when.toISOString(),
+                      ...(subslotMenu.endAt ? { endAt: subslotMenu.endAt.toISOString() } : {}),
                     },
                   }),
                 )
@@ -812,26 +782,30 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <button
               type="button"
               onClick={() => {
-                createTimeBlock('reservation')
+                setReservationPrefill({
+                  staffId: subslotMenu.staffId,
+                  when: subslotMenu.when.toISOString(),
+                  endAt: subslotMenu.endAt ? subslotMenu.endAt.toISOString() : undefined,
+                })
+                setSubslotMenu(null)
               }}
               className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
             >
               <Clock className="text-muted-foreground size-4" strokeWidth={2} />
               {t('visits.calendar.subslot.reserve_time')}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                createTimeBlock('absence')
-              }}
-              className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
-            >
-              <UserX className="text-muted-foreground size-4" strokeWidth={2} />
-              {t('visits.calendar.subslot.absence')}
-            </button>
           </div>
         </>
       ) : null}
+
+      <ReservationModal
+        open={!!reservationPrefill}
+        onOpenChange={(v) => {
+          if (!v) setReservationPrefill(null)
+        }}
+        salonId={salonId}
+        prefill={reservationPrefill}
+      />
     </div>
   )
 }
