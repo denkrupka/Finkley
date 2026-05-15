@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { EditVisitModal } from './EditVisitModal'
+import { VisitDetailModal } from './VisitDetailModal'
 import { FreeSlotsPanel } from './FreeSlotsPanel'
 import { VisitsActionsBar } from './VisitsActionsBar'
 import { VisitsCalendarView } from './VisitsCalendarView'
@@ -152,7 +152,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
           {/* Перенесённый ниже list-content внутри fragment чтобы Calendar
             бранч не рендерил его */}
 
-          <EditVisitModal
+          <VisitDetailModal
             visit={editingVisit}
             onClose={() => setEditingVisit(null)}
             salonId={salonId}

@@ -29,7 +29,7 @@ import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
-import { EditVisitModal } from './EditVisitModal'
+import { VisitDetailModal } from './VisitDetailModal'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
 
 // =============================================================================
@@ -664,7 +664,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         </div>
       )}
 
-      <EditVisitModal
+      <VisitDetailModal
         visit={editingVisit}
         onClose={() => setEditingVisit(null)}
         salonId={salonId}
