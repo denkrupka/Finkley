@@ -44,9 +44,8 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
   infakt: 'inFakt',
 }
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
-
-const PAYMENT_OPTIONS: PaymentMethod[] = ['cash', 'card', 'transfer']
 
 type FormValues = {
   expense_at: string
@@ -64,7 +63,10 @@ const schema = z.object({
     .string()
     .min(1, 'expenses.errors.amount_required')
     .refine((v) => Number(v.replace(',', '.')) > 0, 'expenses.errors.amount_positive'),
-  payment_method: z.enum(['cash', 'card', 'transfer', '']).optional().default(''),
+  payment_method: z
+    .enum(['cash', 'card', 'transfer', 'online', 'mixed', ''])
+    .optional()
+    .default(''),
   comment: z.string().max(500).optional().default(''),
   recurrence: z.enum(['none', 'weekly', 'monthly']).default('none'),
 })
@@ -120,6 +122,7 @@ export function ExpenseFormModal({
   const { t } = useTranslation()
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const createExpense = useCreateExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
   const ocr = useOcrReceipt()
@@ -365,21 +368,21 @@ export function ExpenseFormModal({
             name="payment_method"
             control={form.control}
             render={({ field }) => (
-              <div className="flex gap-2">
-                {PAYMENT_OPTIONS.map((p) => {
-                  const active = field.value === p
+              <div className="flex flex-wrap gap-2">
+                {paymentMethods.map((m) => {
+                  const active = field.value === m.code
                   return (
                     <button
                       type="button"
-                      key={p}
-                      onClick={() => field.onChange(active ? '' : p)}
-                      className={`flex h-10 flex-1 items-center justify-center rounded-full border-[1.5px] text-sm font-semibold transition-colors ${
+                      key={m.id}
+                      onClick={() => field.onChange(active ? '' : m.code)}
+                      className={`flex h-10 items-center justify-center rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors ${
                         active
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-card text-foreground hover:bg-accent/50'
                       }`}
                     >
-                      {t(`payment_methods.${p}`)}
+                      {m.label}
                     </button>
                   )
                 })}
