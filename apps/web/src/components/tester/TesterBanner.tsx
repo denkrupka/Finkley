@@ -27,7 +27,10 @@ export function TesterBanner() {
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-amber-300 bg-amber-100 px-4 py-2 text-amber-900 shadow-sm">
+      {/* z-[60] — выше Radix popover (z-50) и mobile Dialog overlay (z-40/50),
+          чтобы баннер «Тестировщик» всегда висел сверху даже когда открыт
+          dropdown языков, нотификаций, или sidebar-drawer на мобиле. */}
+      <div className="sticky top-0 z-[60] flex items-center justify-between gap-3 border-b border-amber-300 bg-amber-100 px-4 py-2 text-amber-900 shadow-sm">
         <div className="flex min-w-0 items-center gap-2">
           <FlaskConical className="size-4 shrink-0" strokeWidth={2} />
           <p className="truncate text-xs font-semibold sm:text-sm">{t('tester.banner.text')}</p>
