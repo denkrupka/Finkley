@@ -50,6 +50,27 @@ export function usePushPermission(): {
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
         if (mounted) setIsSubscribed(!!sub)
+        // Idempotent sync: если в браузере есть подписка — сразу же шлём её
+        // в БД (upsert по endpoint). Это лечит рассинхрон когда подписка
+        // удалена с сервера, но Service Worker всё ещё её помнит.
+        // send-push.subscribe — upsert, ничего не сломается если уже есть.
+        if (sub) {
+          const json = sub.toJSON() as {
+            endpoint: string
+            keys?: { p256dh?: string; auth?: string }
+          }
+          if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
+            void supabase.functions.invoke('send-push', {
+              body: {
+                action: 'subscribe',
+                endpoint: json.endpoint,
+                p256dh: json.keys.p256dh,
+                auth: json.keys.auth,
+                userAgent: navigator.userAgent,
+              },
+            })
+          }
+        }
       } catch {
         // ignore
       } finally {
@@ -134,57 +155,118 @@ export function useUnsubscribePush() {
   })
 }
 
+/**
+ * Принудительная пересинхронизация: разрывает текущую браузерную подписку
+ * (если есть) и подписывается заново с актуальным VAPID public key.
+ *
+ * Нужно когда сервер ротировал VAPID-пару — старые подписки в БД удалены,
+ * но Service Worker всё ещё помнит свою подписку с устаревшим publicKey.
+ * Push-сервис возвращает 410 на такие подписки.
+ */
+async function resubscribePushInternal(): Promise<void> {
+  if (!VAPID_PUBLIC_KEY) throw new Error('vapid_public_key_missing')
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('push_unsupported')
+  }
+  const reg = await navigator.serviceWorker.ready
+  // Разрываем старую (если есть). Не падаем если её нет.
+  const oldSub = await reg.pushManager.getSubscription()
+  if (oldSub) {
+    try {
+      await oldSub.unsubscribe()
+      await supabase.functions.invoke('send-push', {
+        body: { action: 'unsubscribe', endpoint: oldSub.endpoint },
+      })
+    } catch {
+      // не критично — следующий subscribe всё перезапишет
+    }
+  }
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') throw new Error('permission_denied')
+  const newSub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  })
+  const json = newSub.toJSON() as {
+    endpoint: string
+    keys?: { p256dh?: string; auth?: string }
+  }
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    throw new Error('subscription_incomplete')
+  }
+  const { error } = await supabase.functions.invoke('send-push', {
+    body: {
+      action: 'subscribe',
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      userAgent: navigator.userAgent,
+    },
+  })
+  if (error) throw error
+}
+
 /** Послать тестовое уведомление текущему юзеру (на все его устройства).
  *
  *  При ошибке вытаскиваем response.body — supabase-js по умолчанию выкидывает
  *  generic «Failed to send a request», что бесполезно для дебага.
+ *
+ *  При no_subscriptions от сервера (БД пуста, но в браузере подписка есть —
+ *  типичный случай после ротации VAPID-ключей) автоматически пересоздаёт
+ *  подписку и ретраит тест. Юзер не должен думать о ручном «Отключить →
+ *  Включить заново».
  */
 export function useTestPush() {
   return useMutation({
     mutationFn: async () => {
-      // Image #44: сначала проверим, что у браузера реально есть подписка.
-      // Раньше юзер мог нажать «Тест» при отсутствии подписки (например, после
-      // unsubscribe или если permission revoke'нут) — получал generic
-      // «Failed to send a request» от supabase-js. Теперь — понятный текст.
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         throw new Error('push_unsupported')
       }
-      try {
-        const reg = await navigator.serviceWorker.ready
-        const sub = await reg.pushManager.getSubscription()
-        if (!sub) throw new Error('no_subscriptions')
-      } catch (e) {
-        // .ready может зависать если SW ещё не зарегистрирован, или getSubscription
-        // выкинул — оба случая означают «нет рабочей подписки».
-        if (e instanceof Error && e.message === 'no_subscriptions') throw e
+
+      // 1-я попытка: тест по текущей подписке.
+      let result = await invokeSendPushTest()
+
+      // Если БД говорит «нет подписок» — типичный рассинхрон после rotate
+      // VAPID-пары. Заново регистрируем и ретраим.
+      if (result.errorCode === 'no_subscriptions') {
+        await resubscribePushInternal()
+        result = await invokeSendPushTest()
       }
 
-      const { data, error } = await supabase.functions.invoke('send-push', {
-        body: { action: 'test' },
-      })
-      if (error) {
-        // supabase-js v2: FunctionsHttpError имеет .context (Response). Парсим body
-        // чтобы юзер увидел реальную причину вместо «Failed to send a request».
-        const ctx = (error as { context?: Response }).context
-        if (ctx && typeof ctx.json === 'function') {
-          try {
-            const body = (await ctx.json()) as { error?: string }
-            if (body?.error) throw new Error(body.error)
-          } catch (parseErr) {
-            if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr
-          }
-        }
-        // FunctionsFetchError без context — обычно CORS или функция не задеплоена.
-        // Дадим diagnostic подсказку (а не голое "Failed to send a request").
-        const msg = error.message || String(error)
-        if (msg.toLowerCase().includes('failed to send')) {
-          throw new Error('push_function_unreachable')
-        }
-        throw error
-      }
-      const json = data as { ok: boolean; sent?: number; failed?: number; error?: string }
-      if (!json.ok) throw new Error(json.error ?? 'test_failed')
-      return json.sent ?? 0
+      if (result.errorCode) throw new Error(result.errorCode)
+      if (result.errorMessage) throw new Error(result.errorMessage)
+      return result.sent
     },
   })
+}
+
+type TestResult = {
+  sent: number
+  errorCode: string | null
+  errorMessage: string | null
+}
+
+async function invokeSendPushTest(): Promise<TestResult> {
+  const { data, error } = await supabase.functions.invoke('send-push', {
+    body: { action: 'test' },
+  })
+  if (error) {
+    const ctx = (error as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = (await ctx.json()) as { error?: string }
+        if (body?.error) return { sent: 0, errorCode: body.error, errorMessage: null }
+      } catch {
+        // ignore parse error — fall through
+      }
+    }
+    const msg = error.message || String(error)
+    if (msg.toLowerCase().includes('failed to send')) {
+      return { sent: 0, errorCode: 'push_function_unreachable', errorMessage: null }
+    }
+    return { sent: 0, errorCode: null, errorMessage: msg }
+  }
+  const json = data as { ok: boolean; sent?: number; failed?: number; error?: string }
+  if (!json.ok) return { sent: 0, errorCode: json.error ?? 'test_failed', errorMessage: null }
+  return { sent: json.sent ?? 0, errorCode: null, errorMessage: null }
 }
