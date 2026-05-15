@@ -1,4 +1,4 @@
-import { Briefcase, Coins, ShoppingBag } from 'lucide-react'
+import { Briefcase, ShoppingBag } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
@@ -6,19 +6,20 @@ import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { VisitsActionsBar } from '@/routes/visits/VisitsActionsBar'
 import { VisitsPage } from '@/routes/visits/VisitsPage'
 
-import { OtherIncomeTab } from './OtherIncomeTab'
 import { SalesTab } from './SalesTab'
 
-type IncomeTab = 'visits' | 'sales' | 'other'
+type IncomeTab = 'visits' | 'sales'
 
+// Image #42: tab «Прочие доходы» удалён — прочие доходы теперь добавляются
+// прямо в wizard Продажи (вкладка «Прочие доходы» вместо «Другое»). Список
+// прочих доходов виден в /finance → ДДС.
 const TABS: PageTab<IncomeTab>[] = [
   { id: 'visits', labelKey: 'income.tabs.visits', icon: Briefcase },
   { id: 'sales', labelKey: 'income.tabs.sales', icon: ShoppingBag },
-  { id: 'other', labelKey: 'income.tabs.other', icon: Coins },
 ]
 
 function isIncomeTab(v: string | null): v is IncomeTab {
-  return v === 'visits' || v === 'sales' || v === 'other'
+  return v === 'visits' || v === 'sales'
 }
 
 /**
@@ -53,13 +54,7 @@ export function IncomePage() {
         rightSlot={active === 'visits' ? <VisitsActionsBar /> : null}
       />
 
-      {active === 'visits' ? (
-        <VisitsPage forcedKind="visit" />
-      ) : active === 'sales' ? (
-        <SalesTab salonId={salonId} />
-      ) : (
-        <OtherIncomeTab salonId={salonId} />
-      )}
+      {active === 'visits' ? <VisitsPage forcedKind="visit" /> : <SalesTab salonId={salonId} />}
     </div>
   )
 }

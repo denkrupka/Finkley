@@ -22,6 +22,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useInventoryItems, type InventoryItemRow } from '@/hooks/useInventory'
+import {
+  useCreateOtherIncome,
+  useCreateOtherIncomeCategory,
+  useOtherIncomeCategories,
+} from '@/hooks/useOtherIncomes'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useCreateVisit, type PaymentMethod } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
@@ -70,8 +75,11 @@ export function RetailSaleWizard({
 }) {
   const { t } = useTranslation()
   const createVisit = useCreateVisit(salonId)
+  const createOtherIncome = useCreateOtherIncome(salonId)
+  const createOtherCategory = useCreateOtherIncomeCategory(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: false })
+  const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
 
   // ── State ──────────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
@@ -132,7 +140,9 @@ export function RetailSaleWizard({
       ...prev,
       {
         id: crypto.randomUUID(),
+        kind: 'retail',
         inventoryItemId: item.id,
+        otherCategoryId: null,
         name: item.name,
         code: item.sku ?? null,
         manufacturer: item.supplier ?? null,
@@ -144,12 +154,18 @@ export function RetailSaleWizard({
     ])
   }
 
-  function addOtherLine(input: { name: string; priceCents: number }) {
+  function addOtherIncomeLine(input: {
+    name: string
+    priceCents: number
+    categoryId: string | null
+  }) {
     setLines((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
+        kind: 'other_income',
         inventoryItemId: null,
+        otherCategoryId: input.categoryId,
         name: input.name.trim(),
         code: null,
         manufacturer: null,
@@ -195,6 +211,20 @@ export function RetailSaleWizard({
             ? Math.round((extraDiscountCents * (lineGross - l.lineDiscountCents)) / baseTotalCents)
             : 0
         const finalAmount = Math.max(0, lineGross - l.lineDiscountCents - shareOfExtra)
+
+        if (l.kind === 'other_income') {
+          // Прочий доход — пишем в other_incomes, а не в visits.
+          await createOtherIncome.mutateAsync({
+            salon_id: salonId,
+            income_at: new Date().toISOString().slice(0, 10),
+            amount_cents: finalAmount,
+            category_id: l.otherCategoryId,
+            payment_method: paymentMethod,
+            comment: [l.name, lineNotes].filter(Boolean).join(' · ') || null,
+          })
+          continue
+        }
+
         await createVisit.mutateAsync({
           salon_id: salonId,
           staff_id: staffId || null,
@@ -257,10 +287,15 @@ export function RetailSaleWizard({
             tab={addTab}
             onTabChange={setAddTab}
             onAddFromInventory={addLineFromInventory}
-            onAddOther={addOtherLine}
+            onAddOtherIncome={addOtherIncomeLine}
             onPatchLine={patchLine}
             onRemoveLine={removeLine}
             linesTotalCents={linesTotalCents}
+            otherCategories={otherCategories.map((c) => ({ id: c.id, name: c.name }))}
+            onCreateOtherCategory={async (name) => {
+              const res = await createOtherCategory.mutateAsync({ name })
+              return res.id
+            }}
           />
         ) : null}
         {step === 2 ? <Step2 staff={staff} staffId={staffId} onChange={setStaffId} /> : null}
@@ -327,7 +362,12 @@ export function RetailSaleWizard({
 
 type SaleLine = {
   id: string
+  /** 'retail' = товар со склада, создаёт visit kind=retail.
+   *  'other_income' = прочий доход (аренда, кэшбек, проценты), создаёт other_income. */
+  kind: 'retail' | 'other_income'
   inventoryItemId: string | null
+  /** Для 'other_income' — выбранная категория. */
+  otherCategoryId: string | null
   name: string
   code: string | null
   manufacturer: string | null
@@ -409,10 +449,12 @@ function Step1({
   tab,
   onTabChange,
   onAddFromInventory,
-  onAddOther,
+  onAddOtherIncome,
   onPatchLine,
   onRemoveLine,
   linesTotalCents,
+  otherCategories,
+  onCreateOtherCategory,
 }: {
   inventory: InventoryItemRow[]
   lines: SaleLine[]
@@ -420,15 +462,20 @@ function Step1({
   tab: 'inventory' | 'other'
   onTabChange: (t: 'inventory' | 'other') => void
   onAddFromInventory: (itemId: string) => void
-  onAddOther: (input: { name: string; priceCents: number }) => void
+  onAddOtherIncome: (input: { name: string; priceCents: number; categoryId: string | null }) => void
   onPatchLine: (id: string, patch: Partial<SaleLine>) => void
   onRemoveLine: (id: string) => void
   linesTotalCents: number
+  otherCategories: Array<{ id: string; name: string }>
+  onCreateOtherCategory: (name: string) => Promise<string>
 }) {
   const { t } = useTranslation()
   const [selectedItemId, setSelectedItemId] = useState<string>('')
   const [otherName, setOtherName] = useState('')
   const [otherPrice, setOtherPrice] = useState('')
+  const [otherCategoryId, setOtherCategoryId] = useState<string>('')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryDraft, setNewCategoryDraft] = useState('')
 
   const options = useMemo(
     () =>
@@ -452,9 +499,27 @@ function Step1({
     if (!trimmed) return
     const priceCents = Math.round(parseDecimal(otherPrice) * 100)
     if (priceCents <= 0) return
-    onAddOther({ name: trimmed, priceCents })
+    onAddOtherIncome({
+      name: trimmed,
+      priceCents,
+      categoryId: otherCategoryId || null,
+    })
     setOtherName('')
     setOtherPrice('')
+    // Категорию запоминаем — обычно несколько подряд одной категории.
+  }
+
+  async function submitNewCategory() {
+    const trimmed = newCategoryDraft.trim()
+    if (!trimmed) return
+    try {
+      const id = await onCreateOtherCategory(trimmed)
+      setOtherCategoryId(id)
+      setAddingCategory(false)
+      setNewCategoryDraft('')
+    } catch {
+      // toast уже выкинет хук — здесь silent
+    }
   }
 
   return (
@@ -510,48 +575,117 @@ function Step1({
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_140px_auto] sm:items-end">
+        <div className="flex flex-col gap-3">
+          {/* Категория прочих доходов с inline-добавлением */}
           <div>
             <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
-              {t('retail_wizard.other_name')}
+              {t('retail_wizard.other_category')}
             </Label>
-            <Input
-              value={otherName}
-              onChange={(e) => setOtherName(e.target.value)}
-              placeholder={t('retail_wizard.other_name_placeholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addOther()
-                }
-              }}
-            />
+            {addingCategory ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={newCategoryDraft}
+                  onChange={(e) => setNewCategoryDraft(e.target.value)}
+                  placeholder={t('retail_wizard.other_category_new_placeholder')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void submitNewCategory()
+                    } else if (e.key === 'Escape') {
+                      setAddingCategory(false)
+                      setNewCategoryDraft('')
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void submitNewCategory()}
+                  disabled={!newCategoryDraft.trim()}
+                >
+                  <Plus className="size-4" strokeWidth={2} />
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingCategory(false)
+                    setNewCategoryDraft('')
+                  }}
+                  className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                  aria-label={t('common.cancel')}
+                >
+                  <Trash2 className="size-4" strokeWidth={1.8} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <SearchableSelect
+                  value={otherCategoryId}
+                  onChange={setOtherCategoryId}
+                  options={otherCategories.map((c) => ({ value: c.id, label: c.name }))}
+                  placeholder={t('retail_wizard.other_category_placeholder')}
+                  searchPlaceholder={t('retail_wizard.other_category_search')}
+                  emptyText={t('common.no_results')}
+                  triggerClassName="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddingCategory(true)}
+                  title={t('retail_wizard.other_category_new')}
+                >
+                  <Plus className="size-4" strokeWidth={2} />
+                </Button>
+              </div>
+            )}
           </div>
-          <div>
-            <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
-              {t('retail_wizard.other_price', { currency })}
-            </Label>
-            <Input
-              inputMode="decimal"
-              value={otherPrice}
-              onChange={(e) => setOtherPrice(e.target.value)}
-              placeholder="0"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addOther()
-                }
-              }}
-            />
+
+          {/* Имя + цена + добавить */}
+          <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_140px_auto] sm:items-end">
+            <div>
+              <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
+                {t('retail_wizard.other_name')}
+              </Label>
+              <Input
+                value={otherName}
+                onChange={(e) => setOtherName(e.target.value)}
+                placeholder={t('retail_wizard.other_name_placeholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addOther()
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Label className="text-muted-foreground text-[11px] font-semibold uppercase">
+                {t('retail_wizard.other_price', { currency })}
+              </Label>
+              <Input
+                inputMode="decimal"
+                value={otherPrice}
+                onChange={(e) => setOtherPrice(e.target.value)}
+                placeholder="0"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addOther()
+                  }
+                }}
+              />
+            </div>
+            <Button
+              onClick={addOther}
+              disabled={!otherName.trim() || parseDecimal(otherPrice) <= 0}
+              size="md"
+            >
+              <Plus className="size-4" strokeWidth={2} />
+              {t('retail_wizard.add')}
+            </Button>
           </div>
-          <Button
-            onClick={addOther}
-            disabled={!otherName.trim() || parseDecimal(otherPrice) <= 0}
-            size="md"
-          >
-            <Plus className="size-4" strokeWidth={2} />
-            {t('retail_wizard.add')}
-          </Button>
         </div>
       )}
 
