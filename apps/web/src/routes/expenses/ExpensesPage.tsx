@@ -40,6 +40,7 @@ import {
   useSalonIntegrations,
   useWfirmaPushExpense,
 } from '@/hooks/useIntegrations'
+import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCounterparties } from '@/hooks/useCounterparties'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -94,6 +95,12 @@ export function ExpensesPage() {
   const counterpartyById = useMemo(
     () => new Map(counterparties.map((c) => [c.id, c])),
     [counterparties],
+  )
+  // Кассы — для отображения «чем оплачено» (image #82). Заменяет payment_method-пилюлю.
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
+  const cashRegisterById = useMemo(
+    () => new Map(cashRegisters.map((r) => [r.id, r.label])),
+    [cashRegisters],
   )
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
@@ -302,13 +309,18 @@ export function ExpensesPage() {
                             <span>{counterpartyById.get(e.counterparty_id)?.name ?? '—'}</span>
                           </>
                         ) : null}
-                        {e.payment_method ? (
+                        {/* Image #82: касса вместо payment_method-пилюли.
+                            Fallback на старый payment_method если cash_register_id
+                            ещё не проставлен (исторические строки). */}
+                        {e.cash_register_id || e.payment_method ? (
                           <>
                             {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
                             <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
-                              {t(`payment_methods.${e.payment_method}`, {
-                                defaultValue: e.payment_method,
-                              })}
+                              {e.cash_register_id
+                                ? (cashRegisterById.get(e.cash_register_id) ?? '—')
+                                : t(`payment_methods.${e.payment_method}`, {
+                                    defaultValue: e.payment_method as string,
+                                  })}
                             </span>
                           </>
                         ) : null}

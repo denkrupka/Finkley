@@ -29,6 +29,8 @@ export type VisitRow = {
    * QuickEntryModal на основе end_time-start_time.
    */
   duration_min: number | null
+  /** ID кассы (financial_settings.cash_registers.items[]) — image #82. */
+  cash_register_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -101,6 +103,8 @@ export type CreateVisitInput = {
   /** Длительность визита в минутах (end_time − start_time из QuickEntry).
    *  Если null — на UI fallback на service.default_duration_min. */
   duration_min?: number | null
+  /** ID кассы из financial_settings.cash_registers.items[] (image #82). */
+  cash_register_id?: string | null
 }
 
 export function useCreateVisit(salonId: string | undefined) {
@@ -141,6 +145,7 @@ export function useCreateVisit(salonId: string | undefined) {
         group_key: null,
         kind: input.kind ?? 'visit',
         duration_min: input.duration_min ?? null,
+        cash_register_id: input.cash_register_id ?? null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -181,6 +186,8 @@ export type UpdateVisitInput = {
   comment?: string | null
   /** Длительность визита в минутах (image #85). */
   duration_min?: number | null
+  /** ID кассы (image #82). */
+  cash_register_id?: string | null
 }
 
 export function useUpdateVisit(salonId: string | undefined) {

@@ -22,6 +22,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useClients } from '@/hooks/useClients'
+import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
@@ -115,6 +116,7 @@ export function VisitDetailModal({
   const { data: staff = [] } = useStaff(salonId)
   const { data: clients = [] } = useClients(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
 
   const update = useUpdateVisit(salonId)
   const remove = useDeleteVisit(salonId)
@@ -166,7 +168,7 @@ export function VisitDetailModal({
           <ChargeView
             salonId={salonId}
             groupLines={groupLines}
-            paymentMethods={paymentMethods}
+            cashRegisters={cashRegisters}
             currency={currency}
             onBack={() => setView('detail')}
             onCharged={() => setView('document')}
@@ -490,7 +492,7 @@ const TIP_PRESETS = [
 function ChargeView({
   salonId,
   groupLines,
-  paymentMethods,
+  cashRegisters,
   currency,
   onBack,
   onCharged,
@@ -498,7 +500,10 @@ function ChargeView({
 }: {
   salonId: string
   groupLines: VisitRow[]
-  paymentMethods: Array<{ code: PaymentMethod; label: string }>
+  /** Image #82: вместо paymentMethods — список касс. ID кассы пишется
+   *  в visits.cash_register_id, payment_method остаётся 'card' для
+   *  обратной совместимости (старая аналитика). */
+  cashRegisters: Array<{ id: string; label: string }>
   currency: string
   onBack: () => void
   onCharged: () => void
@@ -508,9 +513,7 @@ function ChargeView({
   const baseTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents - v.discount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
-    paymentMethods[0]?.code ?? 'cash',
-  )
+  const [cashRegisterId, setCashRegisterId] = useState<string>(cashRegisters[0]?.id ?? '')
   const [busy, setBusy] = useState(false)
 
   const customTipCents = Math.max(0, Math.round(Number(customTipStr.replace(',', '.')) * 100)) || 0
@@ -534,7 +537,7 @@ function ChargeView({
         const { error } = await supabase
           .from('visits')
           .update({
-            payment_method: paymentMethod,
+            cash_register_id: cashRegisterId || null,
             tip_cents: lineTip,
             status: 'paid',
           })
@@ -635,27 +638,33 @@ function ChargeView({
         ) : null}
 
         <Label className="text-muted-foreground mt-5 block text-[11px] font-bold uppercase tracking-wider">
-          {t('visits.charge.payment_method')}
+          {t('visits.charge.cash_register')}
         </Label>
         <div className="mt-2 flex flex-wrap gap-2">
-          {paymentMethods.map((m) => {
-            const active = paymentMethod === m.code
-            return (
-              <button
-                key={m.code}
-                type="button"
-                onClick={() => setPaymentMethod(m.code)}
-                className={cn(
-                  'h-10 rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors',
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card hover:bg-muted/40',
-                )}
-              >
-                {m.label}
-              </button>
-            )
-          })}
+          {cashRegisters.length === 0 ? (
+            <p className="text-muted-foreground text-xs">
+              {t('visits.charge.cash_register_empty')}
+            </p>
+          ) : (
+            cashRegisters.map((r) => {
+              const active = cashRegisterId === r.id
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setCashRegisterId(r.id)}
+                  className={cn(
+                    'h-10 rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card hover:bg-muted/40',
+                  )}
+                >
+                  {r.label}
+                </button>
+              )
+            })
+          )}
         </div>
       </div>
 

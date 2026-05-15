@@ -48,10 +48,10 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
   infakt: 'inFakt',
 }
 import { DictateButton } from '@/components/ui/DictateButton'
+import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCounterparties } from '@/hooks/useCounterparties'
 import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
-import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import { CounterpartyEditModal } from '@/routes/settings/counterparties/CounterpartyEditModal'
 
@@ -64,6 +64,8 @@ type FormValues = {
   counterparty_id: string
   amount: string
   payment_method: PaymentMethod | ''
+  /** ID кассы (image #82) — заменяет payment_method-pills в UI. */
+  cash_register_id: string
   /** Номер фактуры/чека (image #93). Опциональное. */
   document_number: string
   comment: string
@@ -91,6 +93,7 @@ const schema = z.object({
     .enum(['cash', 'card', 'transfer', 'online', 'mixed', ''])
     .optional()
     .default(''),
+  cash_register_id: z.string().optional().default(''),
   document_number: z.string().max(60).optional().default(''),
   comment: z.string().max(500).optional().default(''),
   recurrence: z.enum(['none', 'weekly', 'monthly']).default('none'),
@@ -156,7 +159,7 @@ export function ExpenseFormModal({
   const isEdit = !!expense
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
-  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   const { data: counterparties = [] } = useCounterparties(salonId)
   const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
@@ -244,6 +247,7 @@ export function ExpenseFormModal({
       counterparty_id: '',
       amount: '',
       payment_method: '',
+      cash_register_id: '',
       document_number: '',
       comment: '',
       recurrence: 'none',
@@ -270,6 +274,7 @@ export function ExpenseFormModal({
         counterparty_id: expense.counterparty_id ?? '',
         amount: ((expense.amount_cents ?? 0) / 100).toFixed(2),
         payment_method: (expense.payment_method as PaymentMethod) ?? '',
+        cash_register_id: expense.cash_register_id ?? '',
         document_number: expense.document_number ?? '',
         comment: expense.comment ?? '',
         recurrence: (expense.recurrence as ExpenseRecurrence) ?? 'none',
@@ -286,6 +291,7 @@ export function ExpenseFormModal({
         counterparty_id: '',
         amount: '',
         payment_method: '',
+        cash_register_id: '',
         document_number: '',
         comment: '',
         recurrence: 'none',
@@ -328,6 +334,7 @@ export function ExpenseFormModal({
           counterparty_id: values.counterparty_id || null,
           amount_cents: amountCents,
           payment_method: values.payment_method || null,
+          cash_register_id: values.cash_register_id || null,
           document_number: values.document_number.trim() || null,
           comment: values.comment || null,
           recurrence: values.recurrence,
@@ -693,28 +700,47 @@ export function ExpenseFormModal({
             ) : null}
           </div>
 
+          {/* Image #82: кассы (вместо payment_methods). Pills рендерятся из
+              financial_settings.cash_registers.items[] — конкретные кассы
+              салона, а не абстрактные cash/card/transfer. Если касс нет —
+              показываем подсказку со ссылкой на справочник. */}
           <Controller
-            name="payment_method"
+            name="cash_register_id"
             control={form.control}
             render={({ field }) => (
-              <div className="flex flex-wrap gap-2">
-                {paymentMethods.map((m) => {
-                  const active = field.value === m.code
-                  return (
-                    <button
-                      type="button"
-                      key={m.id}
-                      onClick={() => field.onChange(active ? '' : m.code)}
-                      className={`flex h-10 items-center justify-center rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors ${
-                        active
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-foreground hover:bg-accent/50'
-                      }`}
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('expenses.form.cash_register_label')}</Label>
+                {cashRegisters.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t('expenses.form.cash_register_empty')}{' '}
+                    <a
+                      href={`/${salonId}/settings/cash-registers`}
+                      className="text-primary font-semibold hover:underline"
                     >
-                      {m.label}
-                    </button>
-                  )
-                })}
+                      {t('expenses.form.cash_register_empty_link')}
+                    </a>
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {cashRegisters.map((r) => {
+                      const active = field.value === r.id
+                      return (
+                        <button
+                          type="button"
+                          key={r.id}
+                          onClick={() => field.onChange(active ? '' : r.id)}
+                          className={`flex h-10 items-center justify-center rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors ${
+                            active
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-card text-foreground hover:bg-accent/50'
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
           />
