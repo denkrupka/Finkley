@@ -21,9 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useUpdateVisit, type PaymentMethod, type VisitRow } from '@/hooks/useVisits'
+import { useParams } from 'react-router-dom'
 
-const PAYMENT_OPTIONS = ['cash', 'card', 'transfer', 'online', 'mixed'] as const
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { useUpdateVisit, type PaymentMethod, type VisitRow } from '@/hooks/useVisits'
 
 /**
  * Универсальная форма для двух сценариев:
@@ -47,6 +48,8 @@ export function EditVisitModal({
 }) {
   const { t } = useTranslation()
   const update = useUpdateVisit(salonId)
+  const { salonId: routeSalonId } = useParams<{ salonId: string }>()
+  const { data: paymentMethods = [] } = usePaymentMethods(routeSalonId ?? salonId)
 
   const [amount, setAmount] = useState('')
   const [tip, setTip] = useState('')
@@ -138,9 +141,9 @@ export function EditVisitModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PAYMENT_OPTIONS.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {t(`payment_methods.${p}`)}
+                {paymentMethods.map((m) => (
+                  <SelectItem key={m.id} value={m.code}>
+                    {m.label}
                   </SelectItem>
                 ))}
               </SelectContent>

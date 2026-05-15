@@ -27,6 +27,8 @@ import {
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -79,6 +81,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
   const { data: clients = [] } = useClients(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const {
     data: visits = [],
     isLoading,
@@ -185,30 +188,29 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('visits.filters.all_payments')}</SelectItem>
-                {(['cash', 'card', 'transfer'] as const).map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {t(`payment_methods.${p}`)}
+                {paymentMethods.map((m) => (
+                  <SelectItem key={m.id} value={m.code}>
+                    {m.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select
-              value={serviceFilter || 'all'}
-              onValueChange={(v) => setFilter('service', v === 'all' ? null : v)}
-            >
-              <SelectTrigger className="h-10 w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('visits.filters.all_services')}</SelectItem>
-                {services.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Услуги: используем searchable select — у владельца их много,
+                обычный Select требует скроллить. Опция «Все услуги» = пустая. */}
+            <div className="w-[220px]">
+              <SearchableSelect
+                value={serviceFilter || '__all__'}
+                onChange={(v) => setFilter('service', v === '__all__' ? null : v)}
+                options={[
+                  { value: '__all__', label: t('visits.filters.all_services') },
+                  ...services.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+                placeholder={t('visits.filters.all_services')}
+                searchPlaceholder={t('visits.filters.search_services')}
+                emptyText={t('common.no_results')}
+              />
+            </div>
           </div>
 
           {/* Свободные окна — раскрывающаяся панель над списком визитов */}

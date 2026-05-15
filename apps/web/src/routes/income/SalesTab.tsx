@@ -24,14 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useDeleteVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { RetailSaleForm } from '@/routes/visits/RetailSaleForm'
-
-const PAYMENT_OPTIONS: PaymentMethod[] = ['cash', 'card', 'transfer']
 
 /**
  * Таб «Продажи» под /income. Показывает товарные продажи (visits с kind=retail)
@@ -51,6 +50,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const range = { start: r.start.toISOString(), end: r.end.toISOString() }
 
   const { data: staff = [] } = useStaff(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const [staffFilter, setStaffFilter] = useState<string>('')
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -115,9 +115,9 @@ export function SalesTab({ salonId }: { salonId: string }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('income.sales.filters.all_payments')}</SelectItem>
-            {PAYMENT_OPTIONS.map((p) => (
-              <SelectItem key={p} value={p}>
-                {t(`payment_methods.${p}`)}
+            {paymentMethods.map((m) => (
+              <SelectItem key={m.id} value={m.code}>
+                {m.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -164,7 +164,8 @@ export function SalesTab({ salonId }: { salonId: string }) {
                       {stf?.full_name ?? '—'}
                     </td>
                     <td className="text-muted-foreground px-4 py-2 text-xs">
-                      {t(`payment_methods.${s.payment_method}`)}
+                      {paymentMethods.find((m) => m.code === s.payment_method)?.label ??
+                        t(`payment_methods.${s.payment_method}`)}
                     </td>
                     <td className="num text-brand-sage-deep px-4 py-2 text-right font-bold">
                       +{formatCurrency(s.amount_cents - s.discount_cents + s.tip_cents, currency)}

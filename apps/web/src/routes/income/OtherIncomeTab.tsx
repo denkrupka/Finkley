@@ -36,15 +36,14 @@ import {
   useOtherIncomeCategories,
   useOtherIncomes,
 } from '@/hooks/useOtherIncomes'
+import { usePaymentMethods, type PaymentMethodRow } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import { useSalon } from '@/hooks/useSalons'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 
-const PAYMENT_OPTIONS: PaymentMethod[] = ['cash', 'card', 'transfer']
-
 type FormValues = {
-  income_at: string
   category_id: string
   amount: string
   payment_method: PaymentMethod | ''
@@ -52,13 +51,15 @@ type FormValues = {
 }
 
 const schema = z.object({
-  income_at: z.string().min(1),
   category_id: z.string().min(1, 'income.other_form.errors.category_required'),
   amount: z
     .string()
     .min(1, 'income.other_form.errors.amount_required')
     .refine((v) => Number(v.replace(',', '.')) > 0, 'income.other_form.errors.amount_positive'),
-  payment_method: z.enum(['cash', 'card', 'transfer', '']).optional().default(''),
+  payment_method: z
+    .enum(['cash', 'card', 'transfer', 'online', 'mixed', ''])
+    .optional()
+    .default(''),
   comment: z.string().max(500).optional().default(''),
 })
 
@@ -75,6 +76,7 @@ export function OtherIncomeTab({ salonId }: { salonId: string }) {
   const range = periodToRange(period)
 
   const { data: categories = [] } = useOtherIncomeCategories(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: incomes = [], isLoading } = useOtherIncomes(salonId, range)
   const createIncome = useCreateOtherIncome(salonId)
   const deleteIncome = useDeleteOtherIncome(salonId)
@@ -161,6 +163,7 @@ export function OtherIncomeTab({ salonId }: { salonId: string }) {
         salonId={salonId}
         currency={currency}
         categories={categories}
+        paymentMethods={paymentMethods}
         onCreate={(input) =>
           createIncome.mutate(input, {
             onSuccess: () => {
@@ -185,6 +188,7 @@ function OtherIncomeFormModal({
   salonId,
   currency,
   categories,
+  paymentMethods,
   onCreate,
   isPending,
 }: {
@@ -193,6 +197,7 @@ function OtherIncomeFormModal({
   salonId: string
   currency: string
   categories: { id: string; name: string }[]
+  paymentMethods: PaymentMethodRow[]
   onCreate: (input: {
     salon_id: string
     income_at: string
@@ -204,12 +209,10 @@ function OtherIncomeFormModal({
   isPending: boolean
 }) {
   const { t } = useTranslation()
-  const today = format(new Date(), 'yyyy-MM-dd')
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      income_at: today,
       category_id: '',
       amount: '',
       payment_method: '',
@@ -219,16 +222,17 @@ function OtherIncomeFormModal({
 
   function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+    // Дата убрана из формы по UX-запросу — всегда «сегодня».
+    const todayIso = format(new Date(), 'yyyy-MM-dd')
     onCreate({
       salon_id: salonId,
-      income_at: values.income_at,
+      income_at: todayIso,
       category_id: values.category_id || null,
       amount_cents: amountCents,
       payment_method: (values.payment_method || null) as PaymentMethod | null,
       comment: values.comment || null,
     })
     form.reset({
-      income_at: today,
       category_id: '',
       amount: '',
       payment_method: '',
@@ -244,11 +248,6 @@ function OtherIncomeFormModal({
         </DialogHeader>
 
         <form className="flex flex-col gap-4 px-5 pb-2 pt-2" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="oi-date">{t('income.other_form.date')}</Label>
-            <Input id="oi-date" type="date" {...form.register('income_at')} />
-          </div>
-
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="oi-category">{t('income.other_form.category')}</Label>
             <Controller
@@ -293,24 +292,34 @@ function OtherIncomeFormModal({
             ) : null}
           </div>
 
+          {/* Метод оплаты как кнопки из справочника payment_methods.
+              Юзер кликает — мгновенно выбирает. Архивные не показываем. */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="oi-payment">{t('income.other_form.payment_method')}</Label>
+            <Label>{t('income.other_form.payment_method')}</Label>
             <Controller
               name="payment_method"
               control={form.control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="oi-payment">
-                    <SelectValue placeholder={t('income.other_form.payment_placeholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {t(`payment_methods.${p}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-1.5">
+                  {paymentMethods.map((m) => {
+                    const active = field.value === m.code
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => field.onChange(active ? '' : m.code)}
+                        className={cn(
+                          'border-border h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
+                          active
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'bg-card hover:bg-muted/40',
+                        )}
+                      >
+                        {m.label}
+                      </button>
+                    )
+                  })}
+                </div>
               )}
             />
           </div>

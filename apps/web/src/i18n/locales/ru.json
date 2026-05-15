@@ -453,7 +453,8 @@
     "confirm": "Подтвердить",
     "sign_out": "Выйти",
     "profile_aria": "Профиль и настройки",
-    "min": "мин"
+    "min": "мин",
+    "no_results": "Ничего не найдено"
   },
   "auth": {
     "or": "или",
@@ -1495,7 +1496,8 @@
     "filters": {
       "all_staff": "Все мастера",
       "all_payments": "Все типы оплаты",
-      "all_services": "Все услуги"
+      "all_services": "Все услуги",
+      "search_services": "Поиск по названию услуги…"
     },
     "errors": {
       "date_required": "Выбери дату",

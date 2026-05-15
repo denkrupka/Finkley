@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useCreateVisit } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
@@ -66,6 +67,7 @@ const LAST_PAYMENT_KEY = 'finkley:last-payment'
 export function RetailSaleForm({ salonId, currency, staff, onDone }: Props) {
   const { t } = useTranslation()
   const createVisit = useCreateVisit(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
 
   const today = useMemo(() => new Date(), [])
   const todayIso = useMemo(() => format(today, 'yyyy-MM-dd'), [today])
@@ -242,22 +244,22 @@ export function RetailSaleForm({ salonId, currency, staff, onDone }: Props) {
             name="payment_method"
             control={form.control}
             render={({ field }) => (
-              <div className="mt-1 grid grid-cols-3 gap-2">
-                {PAYMENT_OPTIONS.map((p) => {
-                  const active = field.value === p
+              <div className="mt-1 flex flex-wrap gap-2">
+                {paymentMethods.map((m) => {
+                  const active = field.value === m.code
                   return (
                     <button
                       type="button"
-                      key={p}
-                      onClick={() => field.onChange(p)}
+                      key={m.id}
+                      onClick={() => field.onChange(m.code as PaymentOption)}
                       className={cn(
-                        'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] px-2 text-sm font-semibold transition-colors',
+                        'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] px-3 text-sm font-semibold transition-colors',
                         active
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-card text-foreground hover:bg-accent/50',
                       )}
                     >
-                      <span className="truncate">{t(`payment_methods.${p}`)}</span>
+                      <span className="truncate">{m.label}</span>
                     </button>
                   )
                 })}

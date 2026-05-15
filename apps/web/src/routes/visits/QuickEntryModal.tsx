@@ -25,8 +25,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
+import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useCreateVisit, useDeleteVisit, useRestoreVisit } from '@/hooks/useVisits'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
@@ -95,6 +97,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const createVisit = useCreateVisit(salonId)
   const deleteVisit = useDeleteVisit(salonId)
@@ -431,33 +434,26 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
                 render={({ field }) => (
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="qe-service">{t('visits.form.service_label')}</Label>
-                    <Select
+                    {/* Searchable select — у владельца много услуг (десятки),
+                        обычный Select требует скроллить. Поиск по name. */}
+                    <SearchableSelect
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onChange={field.onChange}
                       disabled={services.length === 0}
-                    >
-                      <SelectTrigger id="qe-service" data-testid="qe-service">
-                        <SelectValue
-                          placeholder={
-                            services.length === 0
-                              ? t('visits.form.service_empty')
-                              : t('visits.form.service_placeholder')
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {services.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex w-full items-center justify-between gap-3">
-                              <span>{s.name}</span>
-                              <span className="num text-muted-foreground text-xs">
-                                ≈ {formatCurrency(s.default_price_cents, currency)}
-                              </span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={services.map((s) => ({
+                        value: s.id,
+                        label: s.name,
+                        hint: `≈ ${formatCurrency(s.default_price_cents, currency)}`,
+                      }))}
+                      placeholder={
+                        services.length === 0
+                          ? t('visits.form.service_empty')
+                          : t('visits.form.service_placeholder')
+                      }
+                      searchPlaceholder={t('visits.filters.search_services')}
+                      emptyText={t('common.no_results')}
+                      ariaLabel={t('visits.form.service_label')}
+                    />
                     {services.length === 0 ? (
                       <p className="text-muted-foreground text-xs">
                         {t('visits.form.service_empty_hint')}{' '}
@@ -497,27 +493,28 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
                 </p>
               ) : null}
 
-              {/* Payment pills под суммой */}
+              {/* Payment pills под суммой — из справочника payment_methods.
+                  Архивные не показываем. */}
               <Controller
                 name="payment_method"
                 control={form.control}
                 render={({ field }) => (
-                  <div className="mt-1 grid grid-cols-3 gap-2" data-testid="qe-payment">
-                    {PAYMENT_OPTIONS.map((p) => {
-                      const active = field.value === p
+                  <div className="mt-1 flex flex-wrap gap-2" data-testid="qe-payment">
+                    {paymentMethods.map((m) => {
+                      const active = field.value === m.code
                       return (
                         <button
                           type="button"
-                          key={p}
-                          onClick={() => field.onChange(p)}
+                          key={m.id}
+                          onClick={() => field.onChange(m.code as PaymentOption)}
                           className={cn(
-                            'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] px-2 text-sm font-semibold transition-colors',
+                            'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] px-3 text-sm font-semibold transition-colors',
                             active
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border bg-card text-foreground hover:bg-accent/50',
                           )}
                         >
-                          <span className="truncate">{t(`payment_methods.${p}`)}</span>
+                          <span className="truncate">{m.label}</span>
                         </button>
                       )
                     })}
