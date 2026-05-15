@@ -1318,7 +1318,11 @@
       "col_revenue": "Przychód",
       "col_avg_check": "Średni paragon",
       "col_last_visit": "Ostatnio",
-      "open_full_list": "Otwórz pełną bazę klientów"
+      "open_full_list": "Otwórz pełną bazę klientów",
+      "tabs": {
+        "top": "Top klienci",
+        "params": "Parametry"
+      }
     }
   },
   "finance": {

@@ -187,19 +187,24 @@ export function RetailSaleForm({ salonId, currency, staff, onDone }: Props) {
           ) : null}
         </div>
 
-        {/* Мастер (опционально) */}
+        {/* Мастер (опционально). Radix Select требует value != "" — иначе
+            падает с «Select.Item must have a value prop that is not an empty
+            string». Используем sentinel `__none__` и мапим в "" в onChange. */}
         <Controller
           name="staff_id"
           control={form.control}
           render={({ field }) => (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="rt-staff">{t('visits.retail.staff_label_optional')}</Label>
-              <Select value={field.value} onValueChange={field.onChange}>
+              <Select
+                value={field.value || '__none__'}
+                onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+              >
                 <SelectTrigger id="rt-staff">
                   <SelectValue placeholder={t('visits.retail.staff_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('visits.retail.staff_none')}</SelectItem>
+                  <SelectItem value="__none__">{t('visits.retail.staff_none')}</SelectItem>
                   {staff.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.full_name}

@@ -1317,7 +1317,11 @@
       "col_revenue": "Revenue",
       "col_avg_check": "Avg check",
       "col_last_visit": "Last seen",
-      "open_full_list": "Open full client database"
+      "open_full_list": "Open full client database",
+      "tabs": {
+        "top": "Top clients",
+        "params": "Parameters"
+      }
     }
   },
   "finance": {

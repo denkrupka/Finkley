@@ -1,6 +1,14 @@
 import { addDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, UserX } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Maximize2,
+  Minimize2,
+  UserX,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -87,6 +95,21 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
     when: Date
     rect: { top: number; left: number }
   } | null>(null)
+  /** Fullscreen-overlay: разворачиваем календарь во весь viewport. Сделано через
+   *  fixed-positioning + z-index, а не через Fullscreen API — это надёжнее
+   *  кросс-браузерно (iOS Safari не поддерживает Fullscreen API на iPhone) и
+   *  не запрещает работу остальных оверлеев типа sonner toasts/Radix dialogs. */
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // ESC выходит из fullscreen.
+  useEffect(() => {
+    if (!isFullscreen) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullscreen])
 
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services])
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients])
@@ -166,7 +189,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const hourLines = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i)
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div
+      className={cn(
+        'flex flex-col',
+        isFullscreen ? 'bg-background fixed inset-0 z-[60] flex-1' : 'flex-1',
+      )}
+    >
       {/* Шапка с навигацией по дням */}
       <div className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -190,7 +218,27 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         <h2 className="text-brand-navy text-base font-bold tracking-tight">
           {format(cursor, 'EEEE, d MMMM yyyy', { locale: ru })}
         </h2>
-        <div />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsFullscreen((v) => !v)}
+          title={
+            isFullscreen
+              ? t('visits.calendar.fullscreen_exit')
+              : t('visits.calendar.fullscreen_enter')
+          }
+          aria-label={
+            isFullscreen
+              ? t('visits.calendar.fullscreen_exit')
+              : t('visits.calendar.fullscreen_enter')
+          }
+        >
+          {isFullscreen ? (
+            <Minimize2 className="size-4" strokeWidth={2} />
+          ) : (
+            <Maximize2 className="size-4" strokeWidth={2} />
+          )}
+        </Button>
       </div>
 
       {staff.length === 0 ? (
