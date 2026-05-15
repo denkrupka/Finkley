@@ -8,8 +8,12 @@ export type OcrParsedReceipt = {
   expense_at: string | null
   vendor: string | null
   vendor_nip: string | null
+  /** Адрес продавца с фактуры — нужен для авто-создания контрагента (image #93). */
+  vendor_address: string | null
   buyer_nip: string | null
   category_guess: string | null
+  /** Номер документа (FV/.../..., paragon №...) — для expenses.document_number. */
+  document_number: string | null
   raw_text: string | null
 }
 

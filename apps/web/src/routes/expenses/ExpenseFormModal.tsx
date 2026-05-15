@@ -47,7 +47,9 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
   fakturownia: 'Fakturownia',
   infakt: 'inFakt',
 }
+import { DictateButton } from '@/components/ui/DictateButton'
 import { useCounterparties } from '@/hooks/useCounterparties'
+import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
@@ -158,10 +160,61 @@ export function ExpenseFormModal({
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   const { data: counterparties = [] } = useCounterparties(salonId)
   const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
+  const [dictationPrefillForNewCp, setDictationPrefillForNewCp] = useState<{
+    name?: string
+    nip?: string
+    address?: string
+  } | null>(null)
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
   const ocr = useOcrReceipt()
+  const dictate = useDictateExpense()
+
+  /**
+   * Применяет распарсенный по голосу результат к форме. Поля заполняются
+   * только если они пустые / дефолтные — юзер свои значения не теряет.
+   * vendor_guess: пытаемся match'нуть существующего контрагента по имени
+   * (case-insensitive includes). Если не нашли — открываем CounterpartyEditModal
+   * с префилом name, чтобы юзер мог быстро создать и подтвердить.
+   */
+  function applyDictation(
+    parsed: NonNullable<Awaited<ReturnType<typeof dictate.mutateAsync>>['parsed']>,
+  ) {
+    if (parsed.amount && !form.getValues('amount')) {
+      form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+    }
+    if (parsed.expense_at) {
+      form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
+    }
+    if (parsed.category_guess && !form.getValues('category_id')) {
+      const matched = findCategoryByGuess(parsed.category_guess, categories)
+      if (matched) form.setValue('category_id', matched, { shouldDirty: true })
+    }
+    if (parsed.document_number && !form.getValues('document_number')) {
+      form.setValue('document_number', parsed.document_number, { shouldDirty: true })
+    }
+    if (parsed.comment && !form.getValues('comment')) {
+      form.setValue('comment', parsed.comment, { shouldDirty: true })
+    }
+    if (parsed.vendor_guess && !form.getValues('description')) {
+      form.setValue('description', parsed.vendor_guess.slice(0, 200), { shouldDirty: true })
+    }
+    if (parsed.vendor_guess && !form.getValues('counterparty_id')) {
+      const lower = parsed.vendor_guess.toLowerCase()
+      const matchedCp = counterparties.find(
+        (cp) => cp.name.toLowerCase() === lower || cp.name.toLowerCase().includes(lower),
+      )
+      if (matchedCp) {
+        form.setValue('counterparty_id', matchedCp.id, { shouldDirty: true })
+      } else {
+        // Не нашли — показываем тост-намёк, что нужно подтвердить контрагента,
+        // и открываем модалку создания с префилом из надиктовки.
+        setDictationPrefillForNewCp({ name: parsed.vendor_guess })
+        setCounterpartyModalOpen(true)
+      }
+    }
+  }
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -428,6 +481,30 @@ export function ExpenseFormModal({
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
+          {/* Image #93: голосовая надиктовка. Юзер диктует расход — Whisper
+              + Llama расшифровывают и распарсивают, applyDictation подставит
+              в форму. */}
+          <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex items-center justify-between gap-3 rounded-md border p-2.5">
+            <div className="min-w-0">
+              <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
+                {t('dictate.title')}
+              </p>
+              <p className="text-brand-teal-deep/80 text-[10.5px]">{t('dictate.hint')}</p>
+            </div>
+            <DictateButton
+              pending={dictate.isPending}
+              onAudio={async (blob) => {
+                const res = await dictate.mutateAsync(blob)
+                if (!res.parsed) {
+                  toast.error(t('dictate.parse_failed'))
+                  return
+                }
+                applyDictation(res.parsed)
+                toast.success(t('dictate.toast_applied'))
+              }}
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
             <Input id="exp-date" type="date" {...form.register('expense_at')} />
@@ -789,6 +866,43 @@ export function ExpenseFormModal({
                             shouldDirty: true,
                           })
                         }
+                        // Image #93: номер документа из чека.
+                        if (parsed.document_number && !form.getValues('document_number')) {
+                          form.setValue('document_number', parsed.document_number, {
+                            shouldDirty: true,
+                          })
+                        }
+                        // Image #93: контрагент. Сначала пытаемся match по NIP
+                        // (надёжный ключ), потом по имени. Если не нашли —
+                        // открываем CounterpartyEditModal с префилом для
+                        // быстрого создания (юзер подтверждает данные).
+                        if (!form.getValues('counterparty_id') && parsed.vendor) {
+                          const byNip = parsed.vendor_nip
+                            ? counterparties.find(
+                                (cp) =>
+                                  cp.nip?.replace(/[^0-9]/g, '') ===
+                                  parsed.vendor_nip?.replace(/[^0-9]/g, ''),
+                              )
+                            : null
+                          const byName = byNip
+                            ? null
+                            : counterparties.find(
+                                (cp) => cp.name.toLowerCase() === parsed.vendor!.toLowerCase(),
+                              )
+                          const matched = byNip ?? byName
+                          if (matched) {
+                            form.setValue('counterparty_id', matched.id, { shouldDirty: true })
+                          } else {
+                            setDictationPrefillForNewCp({
+                              name: parsed.vendor,
+                              // CounterpartyEditModal принимает prefill { name, nip, address }
+                              // — дополняем доступными полями из OCR.
+                              ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
+                              ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
+                            } as { name: string; nip?: string; address?: string })
+                            setCounterpartyModalOpen(true)
+                          }
+                        }
                         // NIP'ы — для wFirma auto-push (см. ADR-012).
                         // Сами поля юзеру не показываем — это служебная мета.
                         setOcrNips({
@@ -829,11 +943,16 @@ export function ExpenseFormModal({
       </DialogContent>
 
       {/* Inline-добавление контрагента (image #93). При сохранении —
-          counterparty_id автоматически выставляется в форме расхода. */}
+          counterparty_id автоматически выставляется в форме расхода.
+          При надиктовке (image #93): открывается с префилом name=vendor_guess. */}
       <CounterpartyEditModal
         open={counterpartyModalOpen}
-        onOpenChange={setCounterpartyModalOpen}
+        onOpenChange={(v) => {
+          setCounterpartyModalOpen(v)
+          if (!v) setDictationPrefillForNewCp(null)
+        }}
         salonId={salonId}
+        prefill={dictationPrefillForNewCp}
         onSaved={(cp) =>
           form.setValue('counterparty_id', cp.id, {
             shouldDirty: true,

@@ -29,8 +29,10 @@ type OcrResult = {
   expense_at: string | null // YYYY-MM-DD
   vendor: string | null
   vendor_nip: string | null
+  vendor_address: string | null
   buyer_nip: string | null
   category_guess: string | null
+  document_number: string | null
   raw_text: string | null
 }
 
@@ -43,8 +45,10 @@ const SYSTEM_PROMPT = `Ты обрабатываешь фото бумажног
   "expense_at": "YYYY-MM-DD",
   "vendor": "<имя продавца / название магазина или организации>",
   "vendor_nip": "<NIP sprzedawcy/wystawcy — польский ИНН продавца, ровно 10 цифр без пробелов и дефисов; null если не указан>",
+  "vendor_address": "<полный адрес продавца как одна строка: улица, дом, индекс, город; null если не указан>",
   "buyer_nip": "<NIP nabywcy — польский ИНН покупателя, ровно 10 цифр без пробелов и дефисов; null если на чеке нет покупателя или это розничный paragon без NIP>",
   "category_guess": "<короткая категория расхода на русском, для салона красоты: Косметика и расходники, Аренда, Связь и интернет, Зарплата, Налоги, Маркетинг, Хозяйственные товары, Транспорт, Прочее>",
+  "document_number": "<номер документа: для фактуры — Numer faktury (FV/.../...); для paragon — Numer paragonu; null если не указан>",
   "raw_text": "<до 200 символов raw текста чека для дебага>"
 }
 
