@@ -28,10 +28,17 @@ import {
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
-import { useDeleteVisit, useVisits, visitsKeys, type PaymentMethod } from '@/hooks/useVisits'
+import {
+  useDeleteVisit,
+  useVisits,
+  visitsKeys,
+  type PaymentMethod,
+  type VisitRow,
+} from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatExpenseDate } from '@/lib/utils/format-date'
+import { formatVisitDate } from '@/lib/utils/format-date'
 import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
+import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
 
 /**
  * Таб «Продажи» под /income. Показывает товарные продажи (visits с kind=retail)
@@ -56,6 +63,9 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const [staffFilter, setStaffFilter] = useState<string>('')
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
+  // Image #98: клик по строке продажи → открыть карточку с возможностью
+  // редактировать любое поле (используем VisitDetailModal в режиме detail).
+  const [editingSale, setEditingSale] = useState<VisitRow | null>(null)
 
   const { data: sales = [], isLoading } = useVisits(salonId, range, {
     kind: 'retail',
@@ -152,9 +162,13 @@ export function SalesTab({ salonId }: { salonId: string }) {
               {sales.map((s) => {
                 const stf = staff.find((x) => x.id === s.staff_id)
                 return (
-                  <tr key={s.id} className="border-border/60 border-t">
+                  <tr
+                    key={s.id}
+                    className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
+                    onClick={() => setEditingSale(s)}
+                  >
                     <td className="num text-muted-foreground px-4 py-2 text-xs">
-                      {formatExpenseDate(s.visit_at)}
+                      {formatVisitDate(s.visit_at)}
                     </td>
                     <td className="text-foreground px-4 py-2 font-semibold">
                       {s.service_name_snapshot ?? '—'}
@@ -175,7 +189,8 @@ export function SalesTab({ salonId }: { salonId: string }) {
                     <td className="px-4 py-2 text-right">
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           if (!confirm(t('income.sales.confirm_delete'))) return
                           deleteVisit.mutate(s.id, {
                             onSuccess: () => toast.success(t('income.sales.toast_deleted')),
@@ -221,6 +236,13 @@ export function SalesTab({ salonId }: { salonId: string }) {
           />
         </DialogContent>
       </Dialog>
+
+      <VisitDetailModal
+        visit={editingSale}
+        onClose={() => setEditingSale(null)}
+        salonId={salonId}
+        currency={currency}
+      />
     </div>
   )
 }

@@ -100,13 +100,19 @@ export function CounterpartyEditModal({
     setLookupBusy(true)
     try {
       const res = await lookupNip(cleaned)
-      if (res) {
+      if (res && (res.name || res.address)) {
         if (res.name && !name) setName(res.name)
         if (res.address && !address) setAddress(res.address)
         toast.success(t('counterparties.nip_found'))
+      } else {
+        // Data PORT не вернул данных — нестрашно, юзер заполнит руками.
+        toast(t('counterparties.nip_not_found'))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
+      // Image #96: NIP lookup гасит ошибку тихим тостом — не блокирует
+      // создание контрагента, юзер сможет ввести name/address руками.
+      console.warn('NIP lookup failed', e)
+      toast(t('counterparties.nip_lookup_failed'))
     } finally {
       setLookupBusy(false)
     }
@@ -332,7 +338,12 @@ export function CounterpartyEditModal({
           >
             {t('common.cancel')}
           </Button>
-          <Button size="lg" onClick={handleSave} disabled={isPending || !name.trim()}>
+          <Button
+            size="lg"
+            onClick={handleSave}
+            disabled={isPending || !name.trim()}
+            title={!name.trim() ? t('counterparties.name_required') : undefined}
+          >
             {isPending ? t('common.loading') : t('common.save')}
           </Button>
         </DialogFooter>

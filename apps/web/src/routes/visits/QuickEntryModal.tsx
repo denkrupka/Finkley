@@ -660,6 +660,42 @@ export function QuickEntryModal({
             ) : null}
           </div>
 
+          {/* Мастер — сразу после услуги (image #86/#101). */}
+          <Controller
+            name="staff_id"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="qe-staff-top">{t('visits.form.staff_label')} *</Label>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="qe-staff-top" data-testid="qe-staff" className="h-11">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
+                        style={{ background: selectedStaffColor }}
+                      >
+                        {selectedStaffInitial}
+                      </span>
+                      <SelectValue placeholder={t('visits.form.staff_placeholder')} />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.staff_id ? (
+                  <p className="text-destructive text-xs font-medium" role="alert">
+                    {t(form.formState.errors.staff_id.message ?? '')}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          />
+
           {/* Дата + Время от/до */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
             <div className="flex flex-col gap-1.5">
@@ -718,42 +754,6 @@ export function QuickEntryModal({
               ) : null}
             </div>
           </div>
-
-          {/* Мастер */}
-          <Controller
-            name="staff_id"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="qe-staff">{t('visits.form.staff_label')} *</Label>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="qe-staff" data-testid="qe-staff" className="h-11">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
-                        style={{ background: selectedStaffColor }}
-                      >
-                        {selectedStaffInitial}
-                      </span>
-                      <SelectValue placeholder={t('visits.form.staff_placeholder')} />
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.staff_id ? (
-                  <p className="text-destructive text-xs font-medium" role="alert">
-                    {t(form.formState.errors.staff_id.message ?? '')}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          />
 
           {/* Сумма — автоматически из суммы услуг (read-only). Сжата с h-16
               до h-14 + text-2xl + убран hint снизу для экономии вертикали. */}
