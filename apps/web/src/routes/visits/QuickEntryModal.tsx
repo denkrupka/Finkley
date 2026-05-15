@@ -28,6 +28,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { supabase } from '@/lib/supabase/client'
 import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
+import { useSuggestedStaffForClientService } from '@/hooks/useStaffSuggestion'
 import { useCreateVisit, useDeleteVisit, useRestoreVisit } from '@/hooks/useVisits'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
@@ -177,6 +178,31 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, staff])
 
+  // Auto-suggest мастера (image #86): когда выбран клиент И первая услуга,
+  // смотрим историю — какой мастер чаще всего делал ему именно ЭТУ услугу.
+  // Если найден — подставляем в форму, перезаписывая last-staff default.
+  // Юзер может изменить вручную; повторный suggest не срабатывает в той же
+  // сессии (контролируется флагом suggestedRef).
+  const watchedClientId = form.watch('client_id')
+  const firstServiceId = lines[0]?.service_id ?? null
+  const { data: suggestedStaffId } = useSuggestedStaffForClientService(
+    salonId,
+    watchedClientId,
+    firstServiceId,
+  )
+  const [appliedSuggestionFor, setAppliedSuggestionFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!suggestedStaffId) return
+    if (!watchedClientId || !firstServiceId) return
+    const key = `${watchedClientId}:${firstServiceId}`
+    if (appliedSuggestionFor === key) return
+    // Применяем только если такой мастер реально активен у салона.
+    if (!staff.some((s) => s.id === suggestedStaffId)) return
+    form.setValue('staff_id', suggestedStaffId, { shouldValidate: false })
+    setAppliedSuggestionFor(key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedStaffId, watchedClientId, firstServiceId, staff, appliedSuggestionFor])
+
   // Пересчёт end_time из start_time + Σ длительностей всех выбранных услуг.
   // Если duration_min не задан у каких-то услуг — для них default 60 мин.
   const watchedStartTime = form.watch('start_time')
@@ -306,6 +332,14 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i]!
         const firstLine = i === 0
+        // duration_min на визите:
+        //   - если в группе ОДНА услуга — используем formDur (end_time-start_time
+        //     из формы) — даёт пользователю прямой контроль над длительностью
+        //     карточки в календаре, что и было запрошено (bug image #85);
+        //   - если услуг несколько — каждой кладём её собственную длительность
+        //     из услуги (или 60 как fallback); общая длительность группы пока
+        //     не моделируется как одна сущность.
+        const lineDuration = lines.length === 1 && formDur > 0 ? formDur : (l.duration_min ?? 60)
         const created = await createVisit.mutateAsync({
           salon_id: salonId,
           staff_id: values.staff_id || null,
@@ -325,6 +359,7 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
           comment: firstLine ? values.comment || null : null,
           status: 'pending',
           group_key: groupKey,
+          duration_min: lineDuration,
         })
         createdIds.push(created.id)
       }

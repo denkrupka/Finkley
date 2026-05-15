@@ -284,8 +284,13 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const nowInsideGrid =
     nowMinutes != null && nowMinutes >= HOUR_START * 60 && nowMinutes < HOUR_END * 60
 
-  // Хук-helper: возвращает duration в минутах для конкретного визита
+  // Длительность визита для рендера карточки.
+  // Приоритет: v.duration_min (поле, заданное в QuickEntry) → длительность
+  // услуги → DEFAULT_DURATION_MIN. До миграции 20260515000016 поле было
+  // null для всех визитов, бэкфилл проставил его из service.default_duration_min;
+  // новые визиты пишут end_time-start_time напрямую (image #85 fix).
   const durationFor = (v: VisitRow): number => {
+    if (v.duration_min != null && v.duration_min > 0) return v.duration_min
     if (!v.service_id) return DEFAULT_DURATION_MIN
     const svc = serviceById.get(v.service_id)
     return svc?.default_duration_min ?? DEFAULT_DURATION_MIN

@@ -23,6 +23,12 @@ export type VisitRow = {
   source: string
   group_key: string | null
   kind: VisitKind
+  /**
+   * Длительность визита в минутах. null = используется
+   * service.default_duration_min или 60-мин default. Заполняется
+   * QuickEntryModal на основе end_time-start_time.
+   */
+  duration_min: number | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -92,6 +98,9 @@ export type CreateVisitInput = {
   /** Группа связанных визитов (одна продажа из 2+ позиций, чаще всего
    *  retail-wizard). UI рендерит группу как раскрывающуюся строку. */
   group_key?: string | null
+  /** Длительность визита в минутах (end_time − start_time из QuickEntry).
+   *  Если null — на UI fallback на service.default_duration_min. */
+  duration_min?: number | null
 }
 
 export function useCreateVisit(salonId: string | undefined) {
@@ -131,6 +140,7 @@ export function useCreateVisit(salonId: string | undefined) {
         source: 'manual',
         group_key: null,
         kind: input.kind ?? 'visit',
+        duration_min: input.duration_min ?? null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

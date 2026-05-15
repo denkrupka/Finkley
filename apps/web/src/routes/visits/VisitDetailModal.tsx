@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -28,6 +29,7 @@ import {
   useDeleteVisit,
   useUpdateVisit,
   useVisits,
+  visitsKeys,
   type PaymentMethod,
   type VisitRow,
 } from '@/hooks/useVisits'
@@ -159,6 +161,7 @@ export function VisitDetailModal({
           />
         ) : view === 'charge' ? (
           <ChargeView
+            salonId={salonId}
             groupLines={groupLines}
             paymentMethods={paymentMethods}
             currency={currency}
@@ -482,6 +485,7 @@ const TIP_PRESETS = [
 ] as const
 
 function ChargeView({
+  salonId,
   groupLines,
   paymentMethods,
   currency,
@@ -489,6 +493,7 @@ function ChargeView({
   onCharged,
   t,
 }: {
+  salonId: string
   groupLines: VisitRow[]
   paymentMethods: Array<{ code: PaymentMethod; label: string }>
   currency: string
@@ -496,6 +501,7 @@ function ChargeView({
   onCharged: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
+  const qc = useQueryClient()
   const baseTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents - v.discount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
@@ -532,6 +538,12 @@ function ChargeView({
           .eq('id', v.id)
         if (error) throw error
       }
+      // Image #88: после расчёта инвалидируем visits + dashboard, чтобы
+      // галочка «оплачено» на календаре появилась сразу, без reload.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: visitsKeys(salonId) }),
+        qc.invalidateQueries({ queryKey: ['dashboard', salonId] }),
+      ])
       onCharged()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
