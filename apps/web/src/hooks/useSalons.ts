@@ -23,6 +23,8 @@ export type SalonRow = {
   opening_cash_balance_cents: number
   retention_window_days: number
   churn_window_days: number
+  /** Optional — миграция 20260515000011 может ещё не примениться. */
+  opening_hours?: Record<string, { open?: string; close?: string; closed?: boolean }>
   created_at: string
   /** Optional — миграция 20260514150000 может ещё не примениться. */
   blocked_at?: string | null

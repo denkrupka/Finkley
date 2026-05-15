@@ -13,6 +13,7 @@ export type UpdateSalonInput = {
   logo_url?: string | null
   retention_window_days?: number
   churn_window_days?: number
+  opening_hours?: Record<string, { open?: string; close?: string; closed?: boolean }>
 }
 
 export function useUpdateSalon() {

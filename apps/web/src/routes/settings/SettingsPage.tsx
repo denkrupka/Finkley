@@ -51,6 +51,7 @@ import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { ApiKeysCard } from './ApiKeysCard'
+import { OpeningHoursCard } from './OpeningHoursCard'
 // SegmentationCard перенесён в /staff (Справочник мастеров).
 import { MFACard } from './MFACard'
 import { PushNotificationsCard } from './PushNotificationsCard'
@@ -374,6 +375,10 @@ export function SettingsPage() {
               </div>
             </div>
           </section>
+
+          {/* График работы салона + государственные праздники + индивидуальные
+              выходные. Подхватывается календарём резерваций для штриховки. */}
+          <OpeningHoursCard />
 
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
           <TelegramLinkCard />
