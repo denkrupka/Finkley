@@ -11,7 +11,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
-import { TesterBanner } from '@/components/tester/TesterBanner'
 import { BottomNav } from './BottomNav'
 import { FAB } from './FAB'
 import { Sidebar } from './Sidebar'
@@ -152,7 +151,6 @@ export function SalonLayout() {
           onMenuClick={() => setDrawerOpen(true)}
         />
 
-        <TesterBanner />
         <SubscriptionBanner />
 
         <main className="relative flex min-h-0 flex-1 flex-col pb-24 lg:overflow-y-auto lg:pb-0">

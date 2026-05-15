@@ -1,4 +1,5 @@
-import { HelpCircle } from 'lucide-react'
+import { Bug, HelpCircle } from 'lucide-react'
+import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink } from 'react-router-dom'
 
@@ -7,6 +8,11 @@ import { ReferralButton } from '@/components/ui/ReferralButton'
 import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
+
+/** Лениво — html2canvas-pro весит ~80KB, грузим только когда юзер откроет. */
+const TesterBugModal = lazy(() =>
+  import('@/components/tester/TesterBugModal').then((m) => ({ default: m.TesterBugModal })),
+)
 
 type Props = {
   salonId: string
@@ -20,6 +26,7 @@ type Props = {
  */
 export function Sidebar({ salonId, onNavigate }: Props) {
   const { t } = useTranslation()
+  const [bugOpen, setBugOpen] = useState(false)
 
   return (
     <aside className="border-border bg-card flex h-screen w-[232px] flex-shrink-0 flex-col border-r px-3.5 pb-4 pt-5">
@@ -63,9 +70,20 @@ export function Sidebar({ salonId, onNavigate }: Props) {
         })}
       </nav>
 
-      {/* Footer: реферал + тема + help */}
+      {/* Footer: реферал + «Сообщить о баге» + тема + help. Кнопка-баг —
+          между ReferralButton и Help. Раньше эта кнопка жила только в
+          жёлтой ленте Tester'а (TesterBanner) и была доступна только
+          тестерам; теперь — всем юзерам по запросу владельца. */}
       <div className="border-border mt-3 flex flex-col gap-2 border-t pt-3">
         <ReferralButton variant="sidebar" />
+        <button
+          type="button"
+          onClick={() => setBugOpen(true)}
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-amber-500/15 px-2 text-[12px] font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
+        >
+          <Bug className="size-3.5" strokeWidth={2} />
+          {t('nav.report_bug')}
+        </button>
         <div className="flex items-center gap-2">
           <ThemeToggleButton variant="sidebar" />
           <Link
@@ -78,6 +96,12 @@ export function Sidebar({ salonId, onNavigate }: Props) {
           </Link>
         </div>
       </div>
+
+      {bugOpen ? (
+        <Suspense fallback={null}>
+          <TesterBugModal onClose={() => setBugOpen(false)} />
+        </Suspense>
+      ) : null}
     </aside>
   )
 }
