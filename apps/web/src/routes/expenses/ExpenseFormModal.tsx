@@ -509,15 +509,32 @@ export function ExpenseFormModal({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">{t('expenses.form.payroll_period_start')}</Label>
-                  <Input type="date" {...form.register('payroll_period_start')} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">{t('expenses.form.payroll_period_end')}</Label>
-                  <Input type="date" {...form.register('payroll_period_end')} />
-                </div>
+              {/* Image #55: владелец просит один селектор месяца вместо
+                  даты-с/даты-по. В БД храним полный диапазон (первое и
+                  последнее число месяца), а в UI — единый <input type="month">. */}
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t('expenses.form.payroll_month')}</Label>
+                <Input
+                  type="month"
+                  value={(form.watch('payroll_period_start') || '').slice(0, 7)}
+                  onChange={(e) => {
+                    const v = e.target.value // YYYY-MM
+                    if (!v) {
+                      form.setValue('payroll_period_start', '', { shouldValidate: false })
+                      form.setValue('payroll_period_end', '', { shouldValidate: false })
+                      return
+                    }
+                    const [yStr, mStr] = v.split('-')
+                    const y = Number(yStr)
+                    const m = Number(mStr)
+                    if (!Number.isFinite(y) || !Number.isFinite(m)) return
+                    const lastDay = new Date(y, m, 0).getDate() // m=1..12 → последний день
+                    const start = `${v}-01`
+                    const end = `${v}-${String(lastDay).padStart(2, '0')}`
+                    form.setValue('payroll_period_start', start, { shouldValidate: false })
+                    form.setValue('payroll_period_end', end, { shouldValidate: false })
+                  }}
+                />
               </div>
             </div>
           ) : null}
