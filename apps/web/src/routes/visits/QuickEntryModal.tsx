@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -396,13 +395,17 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:!w-[640px] sm:!max-w-[640px]">
+        {/* Image #76: чтобы модалка влазила без скролла на типичном
+            desktop-разрешении, убрал DialogDescription («Запишется в книгу...»),
+            сжал form-gap до gap-2 и pt-2 → pt-1. Сама форма всё ещё
+            overflow-y-auto — на ноутбучных экранах <800px она схлопнется
+            корректно, но в обычном кейсе скролла не будет. */}
         <DialogHeader>
           <DialogTitle>{t('visits.form.title_new')}</DialogTitle>
-          <DialogDescription>{t('visits.form.subtitle')}</DialogDescription>
         </DialogHeader>
 
         <form
-          className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-5 pb-2 pt-2"
+          className="flex min-h-0 flex-col gap-2 overflow-y-auto px-5 pb-2 pt-1"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -613,14 +616,15 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
             )}
           />
 
-          {/* Сумма — автоматически из суммы услуг (read-only). */}
-          <div className="flex flex-col gap-1.5">
+          {/* Сумма — автоматически из суммы услуг (read-only). Сжата с h-16
+              до h-14 + text-2xl + убран hint снизу для экономии вертикали. */}
+          <div className="flex flex-col gap-1">
             <Label>{t('visits.form.amount_label')}</Label>
-            <div className="border-brand-yellow-deep bg-brand-yellow flex h-16 items-center gap-2 rounded-md border-[1.5px] px-4">
-              <span className="num text-brand-navy text-3xl font-bold">{currencySymbol}</span>
+            <div className="border-brand-yellow-deep bg-brand-yellow flex h-14 items-center gap-2 rounded-md border-[1.5px] px-4">
+              <span className="num text-brand-navy text-2xl font-bold">{currencySymbol}</span>
               <span
                 className={cn(
-                  'num text-brand-navy h-full min-w-0 flex-1 self-center text-3xl font-bold tracking-tight',
+                  'num text-brand-navy h-full min-w-0 flex-1 self-center text-2xl font-bold tracking-tight',
                   totalAmountCents === 0 && 'text-brand-navy/30',
                 )}
                 data-testid="qe-amount-display"
@@ -628,9 +632,6 @@ export function QuickEntryModal({ open, onOpenChange, salonId, currency, prefill
                 {(totalAmountCents / 100).toFixed(2)}
               </span>
             </div>
-            <p className="text-muted-foreground text-[10.5px]">
-              {t('visits.form.amount_auto_hint')}
-            </p>
           </div>
 
           {/* Чаевые и скидка на создании визита больше не показываются
