@@ -47,11 +47,6 @@ export function AdminOverviewPage() {
     () => (data?.charts.users_by_month ?? []).map((p) => ({ ...p, label: monthLabel(p.month) })),
     [data],
   )
-  const visitChartData = useMemo(
-    () => (data?.charts.visits_by_month ?? []).map((p) => ({ ...p, label: monthLabel(p.month) })),
-    [data],
-  )
-
   if (isLoading) {
     return (
       <div className="p-8">
@@ -173,18 +168,9 @@ export function AdminOverviewPage() {
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
-
-        <ChartCard title={t('admin.overview.chart_visits')} wide>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={visitChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-              <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        {/* «Визиты по месяцам» удалён — на админ-обзоре эта метрика
+            бесполезна (она не отражает рост платформы и путает с
+            продакт-метриками; удалено по запросу владельца). */}
       </section>
     </div>
   )
