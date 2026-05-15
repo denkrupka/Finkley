@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, Medal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -10,12 +11,44 @@ import {
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useRevenueByService } from '@/hooks/useAnalytics'
 import { useSalon } from '@/hooks/useSalons'
+import { useServiceCategories, useServices } from '@/hooks/useServices'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 /**
- * Reports → Услуги. Топ услуг по выручке + visits count + маржа (если в
- * services.cost_cents задана себестоимость).
+ * Reports → Услуги.
+ *
+ * Иерархия: услуги сгруппированы по category (групповая шапка collapsible).
+ * Группы отсортированы по обороту desc. Внутри группы — услуги отсортированы
+ * по обороту desc.
+ *
+ * Топ-3 услуг в группе получают медальки (🥇/🥈/🥉).
+ * Топ-20% услуг в группе подсвечены зелёным фоном.
+ *
+ * Новые колонки: Время услуги (duration_min) и Стоимость часа работы
+ * (revenue / duration * 60).
  */
+type EnrichedRow = {
+  service_id: string
+  service_name: string
+  revenue_cents: number
+  visits_count: number
+  margin_cents: number | null
+  margin_pct: number | null
+  duration_min: number | null
+  hourly_cents: number | null
+  category_id: string | null
+  category_name: string
+}
+
+type Group = {
+  category_id: string | null
+  category_name: string
+  total_revenue: number
+  total_visits: number
+  rows: EnrichedRow[]
+}
+
 export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
@@ -26,27 +59,95 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
   const startIso = range.start.toISOString()
   const endIso = range.end.toISOString()
   const { data: rows = [], isLoading } = useRevenueByService(salonId, startIso, endIso)
+  const { data: services = [] } = useServices(salonId)
+  const { data: categories = [] } = useServiceCategories(salonId)
 
-  const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
+  // Свернутые группы
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  function toggleGroup(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
-  // Payload для AI: только структурированный summary, не raw rows целиком —
-  // экономим на токенах + защита от утечки внутренних id.
+  // Enrichment: к каждой row из RPC прицепляем category + duration_min
+  // через клиентский join (использует useServices, который и так в кэше).
+  const enriched: EnrichedRow[] = useMemo(() => {
+    const serviceById = new Map(services.map((s) => [s.id, s]))
+    const categoryById = new Map(categories.map((c) => [c.id, c]))
+    const fallback = t('reports_hub.services.no_category')
+    return rows.map((r) => {
+      const svc = serviceById.get(r.service_id)
+      const dur = svc?.default_duration_min ?? null
+      const hourly = dur && dur > 0 ? Math.round((r.revenue_cents / dur) * 60) : null
+      const cat = svc?.category_id ? categoryById.get(svc.category_id) : null
+      return {
+        service_id: r.service_id,
+        service_name: r.service_name,
+        revenue_cents: r.revenue_cents,
+        visits_count: r.visits_count,
+        margin_cents: r.margin_cents,
+        margin_pct: r.margin_pct,
+        duration_min: dur,
+        hourly_cents: hourly,
+        category_id: svc?.category_id ?? null,
+        category_name: cat?.name ?? fallback,
+      }
+    })
+  }, [rows, services, categories, t])
+
+  // Группировка по category + сортировка
+  const groups: Group[] = useMemo(() => {
+    const map = new Map<string, Group>()
+    for (const r of enriched) {
+      const key = r.category_id ?? '__none__'
+      if (!map.has(key)) {
+        map.set(key, {
+          category_id: r.category_id,
+          category_name: r.category_name,
+          total_revenue: 0,
+          total_visits: 0,
+          rows: [],
+        })
+      }
+      const g = map.get(key)!
+      g.total_revenue += r.revenue_cents
+      g.total_visits += r.visits_count
+      g.rows.push(r)
+    }
+    const arr = Array.from(map.values())
+    for (const g of arr) g.rows.sort((a, b) => b.revenue_cents - a.revenue_cents)
+    arr.sort((a, b) => b.total_revenue - a.total_revenue)
+    return arr
+  }, [enriched])
+
+  const totalRevenue = enriched.reduce((s, r) => s + r.revenue_cents, 0)
+
+  // AI payload — отправляем структурированно по группам.
   const aiPayload = useMemo(() => {
-    if (rows.length === 0) return null
+    if (groups.length === 0) return null
     return {
       period: { start: startIso.slice(0, 10), end: endIso.slice(0, 10) },
       currency,
-      total_revenue_cents: total,
-      services: rows.slice(0, 30).map((r) => ({
-        name: r.service_name,
-        visits: r.visits_count,
-        revenue_cents: r.revenue_cents,
-        margin_cents: r.margin_cents,
-        margin_pct: r.margin_pct,
-        share_pct: total > 0 ? Number(((r.revenue_cents / total) * 100).toFixed(1)) : 0,
+      total_revenue_cents: totalRevenue,
+      groups: groups.map((g) => ({
+        category: g.category_name,
+        total_revenue_cents: g.total_revenue,
+        total_visits: g.total_visits,
+        services: g.rows.slice(0, 10).map((r) => ({
+          name: r.service_name,
+          visits: r.visits_count,
+          revenue_cents: r.revenue_cents,
+          duration_min: r.duration_min,
+          hourly_rate_cents: r.hourly_cents,
+          margin_pct: r.margin_pct,
+        })),
       })),
     }
-  }, [rows, total, startIso, endIso, currency])
+  }, [groups, totalRevenue, startIso, endIso, currency])
 
   return (
     <div>
@@ -59,70 +160,56 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
 
       {aiPayload ? <AiInsightsPanel kind="services" payload={aiPayload} /> : null}
 
-      <p className="text-muted-foreground mb-3 hidden text-sm print:block">
-        {t('common.print_period', {
-          start: startIso.slice(0, 10),
-          end: endIso.slice(0, 10),
-        })}
-      </p>
-
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (
           <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
-        ) : rows.length === 0 ? (
+        ) : groups.length === 0 ? (
           <p className="text-muted-foreground p-6 text-sm">{t('reports_hub.services.empty')}</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-muted-foreground text-xs uppercase tracking-wider">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="px-4 py-2 text-left font-semibold">
+                <th className="px-4 py-3 text-left font-semibold">
                   {t('reports_hub.services.col_name')}
                 </th>
-                <th className="px-4 py-2 text-right font-semibold">
+                <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_visits')}
                 </th>
-                <th className="px-4 py-2 text-right font-semibold">
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.services.col_duration')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.services.col_hourly')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_revenue')}
                 </th>
-                <th className="px-4 py-2 text-right font-semibold">
+                <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_margin')}
                 </th>
-                <th className="px-4 py-2 text-right font-semibold">
+                <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_share')}
                 </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
-                const share = total > 0 ? (r.revenue_cents / total) * 100 : 0
+              {groups.map((g) => {
+                const groupKey = g.category_id ?? '__none__'
+                const isCollapsed = collapsed.has(groupKey)
+                const topCount = Math.max(1, Math.ceil(g.rows.length * 0.2))
+                const groupShare = totalRevenue > 0 ? (g.total_revenue / totalRevenue) * 100 : 0
                 return (
-                  <tr key={r.service_id} className="border-border/60 border-t">
-                    <td className="text-foreground px-4 py-2">{r.service_name}</td>
-                    <td className="num text-muted-foreground px-4 py-2 text-right">
-                      {r.visits_count}
-                    </td>
-                    <td className="num text-foreground px-4 py-2 text-right font-semibold">
-                      {formatCurrency(r.revenue_cents, currency)}
-                    </td>
-                    <td
-                      className={`num px-4 py-2 text-right font-semibold ${
-                        r.margin_pct == null
-                          ? 'text-muted-foreground'
-                          : r.margin_pct >= 50
-                            ? 'text-brand-sage-deep'
-                            : r.margin_pct >= 35
-                              ? 'text-amber-700'
-                              : 'text-destructive'
-                      }`}
-                    >
-                      {r.margin_pct == null
-                        ? '—'
-                        : `${formatCurrency(r.margin_cents ?? 0, currency)} (${r.margin_pct.toFixed(0)}%)`}
-                    </td>
-                    <td className="num text-muted-foreground px-4 py-2 text-right">
-                      {share.toFixed(1)}%
-                    </td>
-                  </tr>
+                  <GroupBlock
+                    key={groupKey}
+                    group={g}
+                    isCollapsed={isCollapsed}
+                    onToggle={() => toggleGroup(groupKey)}
+                    topCount={topCount}
+                    groupShare={groupShare}
+                    totalRevenue={totalRevenue}
+                    currency={currency}
+                    t={t}
+                  />
                 )
               })}
             </tbody>
@@ -130,5 +217,127 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
         )}
       </div>
     </div>
+  )
+}
+
+function GroupBlock({
+  group,
+  isCollapsed,
+  onToggle,
+  topCount,
+  groupShare,
+  totalRevenue,
+  currency,
+  t,
+}: {
+  group: Group
+  isCollapsed: boolean
+  onToggle: () => void
+  topCount: number
+  groupShare: number
+  totalRevenue: number
+  currency: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  return (
+    <>
+      <tr
+        onClick={onToggle}
+        className="border-border bg-muted/20 hover:bg-muted/40 cursor-pointer border-t"
+      >
+        <td className="px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            {isCollapsed ? (
+              <ChevronRight className="text-muted-foreground size-4" strokeWidth={2} />
+            ) : (
+              <ChevronDown className="text-muted-foreground size-4" strokeWidth={2} />
+            )}
+            <span className="text-brand-navy text-sm font-bold">{group.category_name}</span>
+            <span className="text-muted-foreground text-[10.5px]">
+              {t('reports_hub.services.group_count', { count: group.rows.length })}
+            </span>
+          </div>
+        </td>
+        <td className="num text-muted-foreground px-3 py-2.5 text-right text-xs">
+          {group.total_visits}
+        </td>
+        <td className="px-3 py-2.5" />
+        <td className="px-3 py-2.5" />
+        <td className="num text-brand-sage-deep px-3 py-2.5 text-right text-sm font-bold">
+          {formatCurrency(group.total_revenue, currency)}
+        </td>
+        <td className="px-3 py-2.5" />
+        <td className="num text-muted-foreground px-3 py-2.5 text-right text-xs">
+          {groupShare.toFixed(1)}%
+        </td>
+      </tr>
+      {!isCollapsed
+        ? group.rows.map((r, idx) => {
+            const isTop3 = idx < 3
+            const isTop20pct = idx < topCount
+            const share = totalRevenue > 0 ? (r.revenue_cents / totalRevenue) * 100 : 0
+            return (
+              <tr
+                key={r.service_id}
+                className={cn(
+                  'border-border/40 border-t',
+                  isTop20pct ? 'bg-brand-sage-soft/20' : '',
+                )}
+              >
+                <td className="px-4 py-2 pl-10">
+                  <div className="flex items-center gap-2">
+                    {isTop3 ? (
+                      <Medal
+                        className={cn(
+                          'size-4 shrink-0',
+                          idx === 0
+                            ? 'text-yellow-500'
+                            : idx === 1
+                              ? 'text-slate-400'
+                              : 'text-amber-700',
+                        )}
+                        strokeWidth={2}
+                        aria-label={t(`reports_hub.services.medal_${idx + 1}`)}
+                      />
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
+                    <span className="text-foreground text-sm">{r.service_name}</span>
+                  </div>
+                </td>
+                <td className="num text-muted-foreground px-3 py-2 text-right">{r.visits_count}</td>
+                <td className="num text-muted-foreground px-3 py-2 text-right text-xs">
+                  {r.duration_min ? `${r.duration_min} ${t('common.min')}` : '—'}
+                </td>
+                <td className="num text-muted-foreground px-3 py-2 text-right text-xs">
+                  {r.hourly_cents != null ? formatCurrency(r.hourly_cents, currency) : '—'}
+                </td>
+                <td className="num text-foreground px-3 py-2 text-right font-semibold">
+                  {formatCurrency(r.revenue_cents, currency)}
+                </td>
+                <td
+                  className={cn(
+                    'num px-3 py-2 text-right text-xs font-semibold',
+                    r.margin_pct == null
+                      ? 'text-muted-foreground'
+                      : r.margin_pct >= 50
+                        ? 'text-brand-sage-deep'
+                        : r.margin_pct >= 35
+                          ? 'text-amber-700'
+                          : 'text-destructive',
+                  )}
+                >
+                  {r.margin_pct == null
+                    ? '—'
+                    : `${formatCurrency(r.margin_cents ?? 0, currency)} (${r.margin_pct.toFixed(0)}%)`}
+                </td>
+                <td className="num text-muted-foreground px-3 py-2 text-right text-xs">
+                  {share.toFixed(1)}%
+                </td>
+              </tr>
+            )
+          })
+        : null}
+    </>
   )
 }

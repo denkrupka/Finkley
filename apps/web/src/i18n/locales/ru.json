@@ -2749,13 +2749,22 @@
       "tenure": "{{years}} лет работы"
     },
     "services": {
-      "title": "Выручка по услугам",
+      "title": "Услуги по группам",
       "empty": "За этот период оказанных услуг не было.",
+      "no_category": "Без категории",
+      "group_count_one": "{{count}} услуга",
+      "group_count_few": "{{count}} услуги",
+      "group_count_many": "{{count}} услуг",
       "col_name": "Услуга",
       "col_visits": "Визитов",
+      "col_duration": "Время",
+      "col_hourly": "₽/час",
       "col_revenue": "Выручка",
       "col_margin": "Маржа",
-      "col_share": "Доля"
+      "col_share": "Доля",
+      "medal_1": "🥇 1 место",
+      "medal_2": "🥈 2 место",
+      "medal_3": "🥉 3 место"
     },
     "clients": {
       "title": "Топ клиентов по выручке",
