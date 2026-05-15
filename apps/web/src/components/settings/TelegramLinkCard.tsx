@@ -1,4 +1,4 @@
-import { CheckCircle2, Link2, Send } from 'lucide-react'
+import { CheckCircle2, Link2, Loader2, Send } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -9,6 +9,13 @@ import { supabase } from '@/lib/supabase/client'
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+/**
+ * Бот-багрепортер. Именно он имеет webhook telegram-bug-collector, поэтому
+ * deep-link привязка идёт через него (а не через @finkley_tg_bot, который —
+ * чисто Login Widget без webhook). См. VITE_BUG_BOT_USERNAME если будет
+ * нужна параметризация, пока хардкодим.
+ */
+const BUG_BOT_USERNAME = 'finklay_dev_bot'
 
 declare global {
   interface Window {
@@ -29,13 +36,17 @@ type TelegramUser = {
 /**
  * Карточка «Telegram» в Settings → Profile.
  *
- * - Если у юзера telegram_id уже сохранён в profiles → показываем «привязано:
- *   @username» + кнопку «Отвязать»
- * - Если нет → рендерим официальный виджет Telegram Login Widget, callback
- *   шлёт payload в edge function telegram-link (HMAC-валидация + UPDATE
- *   profiles.telegram_id для текущего юзера)
+ * Два пути привязки:
+ *   1. **Deep-link через бота** (основной, надёжный). Frontend дёргает RPC
+ *      create_telegram_link_code() → получает 8-символьный код → открывает
+ *      t.me/<bug_bot>?start=link_<код>. Бот через webhook видит код, привязывает
+ *      profiles.telegram_id и отвечает «✅ Telegram привязан». Этот путь
+ *      обходит блокировку Telegram Login Widget (AdBlock / /setdomain).
+ *   2. **Telegram Login Widget** (fallback). Скрипт telegram.org/js рендерит
+ *      кнопку, callback шлёт payload в telegram-link с HMAC-валидацией.
+ *      Часто блокируется AdBlock — поэтому это уже не primary.
  *
- * Привязка нужна чтобы клиент мог писать баги в @finklay_dev_bot из личного
+ * Привязка нужна чтобы юзер мог писать о багах в @finklay_dev_bot из личного
  * чата — gate проверяет profiles.telegram_id (см. telegram-bug-collector).
  */
 export function TelegramLinkCard() {
@@ -44,8 +55,54 @@ export function TelegramLinkCard() {
   const unlink = useUnlinkTelegram()
   const widgetRef = useRef<HTMLDivElement>(null)
   const [linking, setLinking] = useState(false)
+  const [generatingCode, setGeneratingCode] = useState(false)
 
   const isLinked = !!profile?.telegram_id
+
+  /**
+   * Генерирует одноразовый код привязки и открывает Telegram-бот с этим кодом.
+   * После клика юзер попадает в чат с ботом и видит preset кнопку «Start» —
+   * по нажатию бот получает /start link_<код> и привязывает аккаунт автоматом.
+   * Возвращаемся в SPA — спустя несколько секунд жмём «Проверить статус» или
+   * сам refetch покажет привязку.
+   */
+  async function openBotWithLinkCode() {
+    setGeneratingCode(true)
+    try {
+      const { data, error } = await supabase.rpc('create_telegram_link_code')
+      if (error) throw error
+      const code = data as string
+      if (!code) throw new Error('empty_code')
+      // Открываем в новой вкладке. На мобильном откроется приложение Telegram.
+      window.open(
+        `https://t.me/${BUG_BOT_USERNAME}?start=link_${code}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
+      toast.info(t('settings.telegram.code_generated_hint'))
+      // Поллим статус привязки 30 сек — типичное время на подтверждение в боте.
+      pollLinkStatus()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGeneratingCode(false)
+    }
+  }
+
+  /** Поллим refetch профиля 30 сек, выходим как только telegram_id появился. */
+  function pollLinkStatus() {
+    let elapsed = 0
+    const id = window.setInterval(async () => {
+      elapsed += 2
+      const { data } = await refetch()
+      if (data?.telegram_id) {
+        window.clearInterval(id)
+        toast.success(t('settings.telegram.toast_linked'))
+        return
+      }
+      if (elapsed >= 30) window.clearInterval(id)
+    }, 2000)
+  }
 
   useEffect(() => {
     if (isLinked || !BOT_USERNAME || !widgetRef.current) return
@@ -81,18 +138,15 @@ export function TelegramLinkCard() {
       }
     }
 
-    // Рендерим официальный виджет от Telegram. Скрипт сам вставляет <iframe>.
-    // Image #58/59: убран авто-детект "blocked"-состояния. Telegram-widget.js
-    // вставляет iframe асинхронно, часто после 6-секундного таймаута, что давало
-    // ложное срабатывание "виджет заблокирован" хотя кнопка показывалась.
-    // Теперь fallback-ссылка "Открыть бота" видна всегда — пользователь выбирает.
+    // Рендерим официальный виджет от Telegram. Это fallback-путь для тех,
+    // кто использует @finkley_tg_bot и у кого /setdomain настроен.
     const host = widgetRef.current
     host.innerHTML = ''
     const script = document.createElement('script')
     script.src = 'https://telegram.org/js/telegram-widget.js?22'
     script.async = true
     script.setAttribute('data-telegram-login', BOT_USERNAME)
-    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-size', 'medium')
     script.setAttribute('data-radius', '8')
     script.setAttribute('data-userpic', 'false')
     script.setAttribute('data-onauth', 'onTelegramLinkAuth(user)')
@@ -144,12 +198,8 @@ export function TelegramLinkCard() {
             {t('settings.telegram.unlink')}
           </Button>
         </div>
-      ) : !BOT_USERNAME ? (
-        <p className="text-muted-foreground text-xs">{t('settings.telegram.bot_not_configured')}</p>
       ) : (
         <div className="border-border flex flex-col gap-3 rounded-md border p-4">
-          {/* Статус: не привязано — раньше не показывали, юзер не понимал
-              текущее состояние и думал что что-то сломано. */}
           <div className="flex items-center gap-2">
             <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-100 px-2.5 text-[11px] font-semibold text-amber-900">
               <span className="size-1.5 rounded-full bg-amber-500" />
@@ -163,27 +213,40 @@ export function TelegramLinkCard() {
             </p>
           </div>
 
-          {/* Контейнер для скрипта Telegram Login Widget. */}
-          <div ref={widgetRef} aria-label={t('settings.telegram.widget_label')} />
-
-          {/* Альтернативная ссылка «Открыть бота» — показываем всегда (даже
-              когда виджет работает) как удобный fallback. Раньше тут был
-              предупредительный AdBlock-warning, но он смущал юзеров когда
-              виджет на самом деле работал. */}
-          <div className="border-border/40 flex flex-wrap items-center gap-2 border-t pt-3 text-xs">
-            <span className="text-muted-foreground">{t('settings.telegram.or')}</span>
-            <a
-              href={`https://t.me/${BOT_USERNAME}?start=link`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#229ED9] px-3 font-semibold text-[#229ED9] hover:bg-[#229ED9]/10"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+          {/* PRIMARY способ: deep-link через бот с одноразовым кодом.
+              Работает даже если AdBlock блокирует telegram.org/js. */}
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={openBotWithLinkCode}
+            disabled={generatingCode}
+            className="!bg-[#229ED9] hover:!bg-[#1f8fc4]"
+          >
+            {generatingCode ? (
+              <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
                 <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
               </svg>
-              {t('settings.telegram.open_bot')}
-            </a>
-          </div>
+            )}
+            {t('settings.telegram.link_via_bot')}
+          </Button>
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            {t('settings.telegram.link_via_bot_hint')}
+          </p>
+
+          {/* FALLBACK: Telegram Login Widget. Если бот @finkley_tg_bot
+              корректно настроен (/setdomain) и AdBlock не блокирует — здесь
+              появится официальная кнопка «Войти через Telegram». */}
+          {BOT_USERNAME ? (
+            <div className="border-border/40 flex flex-col gap-2 border-t pt-3">
+              <p className="text-muted-foreground text-[11px]">
+                {t('settings.telegram.or_widget')}
+              </p>
+              <div ref={widgetRef} aria-label={t('settings.telegram.widget_label')} />
+            </div>
+          ) : null}
 
           {linking ? (
             <p className="text-muted-foreground text-xs">{t('settings.telegram.linking')}</p>

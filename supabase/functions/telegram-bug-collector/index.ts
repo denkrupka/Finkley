@@ -813,6 +813,78 @@ const NOT_AUTHORIZED_MESSAGE =
   '4️⃣ Возвращайтесь сюда — пишите что не работает, мы получим и разберёмся 🐛\n\n' +
   '_Если уже зарегистрированы — проверьте что Telegram-аккаунт привязан в настройках профиля._'
 
+/**
+ * Привязывает telegram_id отправителя к user_id, владеющему одноразовым кодом.
+ * Код создаётся в SPA через RPC create_telegram_link_code(), TTL 10 мин.
+ * Если у этого Telegram-аккаунта уже есть привязка к другому профилю — отказ.
+ */
+async function handleLinkCode(
+  admin: ReturnType<typeof createClient>,
+  msg: TgMessage,
+  code: string,
+  senderId: number,
+): Promise<void> {
+  const { data: row, error: findErr } = await admin
+    .from('telegram_link_codes')
+    .select('user_id, expires_at, used_at')
+    .eq('code', code)
+    .maybeSingle()
+
+  if (findErr || !row) {
+    await tgSend(
+      msg.chat.id,
+      '❌ Код не найден или истёк. Сгенерируй новый в Finkley → Настройки → Профиль.',
+    )
+    return
+  }
+  const r = row as { user_id: string; expires_at: string; used_at: string | null }
+  if (r.used_at) {
+    await tgSend(msg.chat.id, '❌ Этот код уже использован. Сгенерируй новый в приложении.')
+    return
+  }
+  if (new Date(r.expires_at).getTime() < Date.now()) {
+    await tgSend(msg.chat.id, '❌ Код истёк (живёт 10 минут). Сгенерируй новый в приложении.')
+    return
+  }
+
+  // Проверим, не привязан ли этот telegram_id уже к другому user_id.
+  const { data: existing } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('telegram_id', senderId)
+    .maybeSingle()
+  if (existing && (existing as { id: string }).id !== r.user_id) {
+    await tgSend(
+      msg.chat.id,
+      '❌ Этот Telegram уже привязан к другому аккаунту Finkley. Отвяжи его в том аккаунте, потом попробуй снова.',
+    )
+    return
+  }
+
+  const { error: updErr } = await admin
+    .from('profiles')
+    .update({
+      telegram_id: senderId,
+      telegram_username: msg.from?.username ?? null,
+    })
+    .eq('id', r.user_id)
+
+  if (updErr) {
+    await tgSend(msg.chat.id, `❌ Ошибка привязки: ${updErr.message}`)
+    return
+  }
+
+  await admin
+    .from('telegram_link_codes')
+    .update({ used_at: new Date().toISOString() })
+    .eq('code', code)
+
+  await tgSend(
+    msg.chat.id,
+    '✅ *Telegram привязан!*\n\nТеперь можешь писать сюда о багах и предложениях — мы получим и разберёмся.',
+  )
+}
+
 async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMessage) {
   const text = (msg.text ?? msg.caption ?? '').trim()
   const threadId = msg.message_thread_id
@@ -827,6 +899,20 @@ async function handleMessage(admin: ReturnType<typeof createClient>, msg: TgMess
   if (!isTeamChat && !isPrivate) {
     console.warn('rejected unauthorized chat', msg.chat.id, msg.chat.type)
     return
+  }
+
+  // Deep-link привязка: `/start link_<CODE>` ловим ДО auth-check, так как
+  // именно этот flow и нужен незарегистрированным с точки зрения Telegram
+  // пользователям. Виджет Telegram Login часто блокируется AdBlock или
+  // /setdomain не настроен — этот путь обходит обе проблемы.
+  if (isPrivate && isCommand) {
+    const linkMatch = text.match(/^\/start(?:@\S+)?\s+link_([A-Z0-9]{4,16})$/i)
+    if (linkMatch) {
+      const senderId = msg.from?.id
+      if (!senderId) return
+      await handleLinkCode(admin, msg, linkMatch[1]!.toUpperCase(), senderId)
+      return
+    }
   }
 
   // В private chat — проверяем что отправитель ранее авторизовался в Finkley
