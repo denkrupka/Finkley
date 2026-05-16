@@ -440,6 +440,7 @@
     }
   },
   "common": {
+    "of": "из",
     "print_period": "Период: {{start}} — {{end}}",
     "save": "Сохранить",
     "cancel": "Отменить",

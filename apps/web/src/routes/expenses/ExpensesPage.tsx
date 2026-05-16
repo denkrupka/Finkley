@@ -8,7 +8,7 @@ import {
   Repeat,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -145,6 +145,13 @@ export function ExpensesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const { hasOpenShift, disciplineEnabled } = useRequireCashShift(salonId)
   const showShiftBanner = disciplineEnabled && !hasOpenShift
+  // Пагинация по 25 — как на /clients. Сброс на 1-ю страницу при смене
+  // периода / фильтра.
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
+  useEffect(() => {
+    setPage(1)
+  }, [period, categoryFilter, payFilter])
   // Edit-режим: клик по строке расхода → ExpenseFormModal в edit mode
   // (Image #49). null = создание нового. ExpenseFormModal сам различает.
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
@@ -173,6 +180,9 @@ export function ExpensesPage() {
     totalsByCategory.set(e.category_id, (totalsByCategory.get(e.category_id) ?? 0) + e.amount_cents)
   }
   const total = expenses.reduce((acc, e) => acc + e.amount_cents, 0)
+
+  const totalPages = Math.max(1, Math.ceil(expenses.length / PAGE_SIZE))
+  const pagedExpenses = expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const structureCategories = categories
     .map((c, i) => ({
@@ -310,7 +320,7 @@ export function ExpensesPage() {
             </div>
           ) : (
             <ul>
-              {expenses.map((e: ExpenseRow) => {
+              {pagedExpenses.map((e: ExpenseRow) => {
                 const cat = e.category_id ? categoryById.get(e.category_id) : null
                 const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
                 const color =
@@ -555,6 +565,36 @@ export function ExpensesPage() {
               })}
             </ul>
           )}
+          {/* Пагинация по 25 (#9). Скрываем когда страница одна. */}
+          {!isLoading && totalPages > 1 ? (
+            <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
+              <p className="text-muted-foreground text-xs">
+                {(page - 1) * PAGE_SIZE + 1}—{Math.min(page * PAGE_SIZE, expenses.length)}{' '}
+                {t('common.of')} {expenses.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ‹
+                </button>
+                <span className="text-muted-foreground px-2 text-xs">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page === totalPages}
+                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Structure (BudgetsCard перенесена в /finance → Бюджеты) */}

@@ -161,7 +161,7 @@ export function useCloseShift(salonId: string | undefined) {
  */
 export type ShiftTxn = {
   id: string
-  kind: 'visit' | 'expense'
+  kind: 'visit' | 'expense' | 'other_income'
   at: string
   amount_cents: number // знак: + для дохода, − для расхода
   payment_method: string | null
@@ -187,7 +187,7 @@ export function useShiftTransactions(salonId: string | undefined, shift: CashShi
       // это намеренное поведение, такие записи не относятся к смене.
       const userId = shift.opened_by_user_id
 
-      const [visitsResp, expensesResp] = await Promise.all([
+      const [visitsResp, expensesResp, otherResp] = await Promise.all([
         (() => {
           let q = supabase
             .from('visits')
@@ -207,6 +207,22 @@ export function useShiftTransactions(salonId: string | undefined, shift: CashShi
             .from('expenses')
             .select(
               'id, expense_at, amount_cents, payment_method, cash_register_id, description, comment, category_id, created_by, created_at',
+            )
+            .eq('salon_id', salonId)
+            .is('deleted_at', null)
+            .gte('created_at', startIso)
+            .lte('created_at', endIso)
+          if (userId) q = q.eq('created_by', userId)
+          return q.order('created_at', { ascending: false }).limit(500)
+        })(),
+        // Прочие доходы: wizard-таб «Прочие доходы» пишет сюда (а не в
+        // visits). Раньше эти суммы в Кассе не учитывались. Теперь
+        // тоже фильтруем по created_by если задан.
+        (() => {
+          let q = supabase
+            .from('other_incomes')
+            .select(
+              'id, income_at, amount_cents, payment_method, category_id, comment, created_by, created_at',
             )
             .eq('salon_id', salonId)
             .is('deleted_at', null)
@@ -267,6 +283,31 @@ export function useShiftTransactions(salonId: string | undefined, shift: CashShi
           staff_id: null,
           category_id: e.category_id,
           created_by: e.created_by,
+        })
+      }
+      for (const o of (otherResp.data ?? []) as Array<{
+        id: string
+        income_at: string
+        amount_cents: number
+        payment_method: string | null
+        category_id: string | null
+        comment: string | null
+        created_by: string | null
+        created_at: string
+      }>) {
+        txns.push({
+          id: o.id,
+          kind: 'other_income',
+          at: o.created_at,
+          amount_cents: o.amount_cents,
+          payment_method: o.payment_method,
+          // У other_incomes нет cash_register_id — classifyChannel будет
+          // ориентироваться только на payment_method.
+          cash_register_id: null,
+          label: o.comment || '—',
+          staff_id: null,
+          category_id: o.category_id,
+          created_by: o.created_by,
         })
       }
       // По убыванию времени.

@@ -1,15 +1,11 @@
 name: Deploy Supabase (Migrations + Functions)
 
-# Двухступенчатый pipeline: сначала staging, потом prod через GitHub Environment
-# с required reviewers (manual approval). Если staging упадёт — prod не
-# поедет. Если staging-deploy зелёный, нажимаешь Approve в Actions UI и prod
-# получает то же самое.
-#
-# Для активации manual approval:
-# Repo Settings → Environments → New environment "production" →
-#   Required reviewers: добавить владельца (denkrupka).
-# Без reviewers job просто пройдёт без паузы — это не ломает workflow,
-# но лишает страховки. Настройка — за владельцем.
+# Двухступенчатый pipeline: staging → prod. Раньше prod требовал manual
+# approval через GitHub Environment "production" — это было консервативно
+# и приводило к застреванию runs'ов на часы. Сейчас approval gate снят
+# (см. ниже): staging должен быть зелёным, и тогда prod деплоится сразу.
+# Если staging упадёт — prod не поедет. Чтобы вернуть approval-gate,
+# Repo Settings → Environments → production → Required reviewers.
 
 on:
   push:
@@ -87,8 +83,11 @@ jobs:
     needs: deploy_staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: production
+    # environment.name 'production' убран чтобы не висеть на approval gate.
+    # Если нужно вернуть ручное одобрение — раскомментируй ниже и заведи
+    # Required reviewers в Settings → Environments → production.
+    # environment:
+    #   name: production
 
     steps:
       - uses: actions/checkout@v4

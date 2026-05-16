@@ -4,8 +4,8 @@ import { useSearchParams } from 'react-router-dom'
 
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { useSalon } from '@/hooks/useSalons'
-import { FinancialSectionBudgetsCard } from '@/routes/finance/FinancialSectionBudgetsCard'
 import { IncomeBudgetsCard } from '@/routes/finance/IncomeBudgetsCard'
+import { UnifiedBudgetsCard } from '@/routes/finance/UnifiedBudgetsCard'
 
 type BudgetSub = 'expenses' | 'incomes'
 
@@ -45,29 +45,11 @@ export function BudgetsTab({ salonId }: { salonId: string }) {
       <PageTabsNav tabs={SUB_TABS} active={active} onChange={setActive} t={t} />
       {active === 'expenses' ? (
         <>
-          {/* Image #128: список категорий тянется из Справочников
-              (financial_settings.fixed/variable). Постоянные — в деньгах,
-              переменные — в процентах. */}
-          <FinancialSectionBudgetsCard
-            salonId={salonId}
-            currency={currency}
-            section="fixed"
-            kind="money"
-            title={t('finance.section_budgets.fixed_title')}
-            emptyHint={t('finance.section_budgets.fixed_empty')}
-            addLabel={t('finance.section_budgets.fixed_add')}
-            addPlaceholder={t('finance.section_budgets.fixed_add_placeholder')}
-          />
-          <FinancialSectionBudgetsCard
-            salonId={salonId}
-            currency={currency}
-            section="variable"
-            kind="pct"
-            title={t('finance.section_budgets.variable_title')}
-            emptyHint={t('finance.section_budgets.variable_empty')}
-            addLabel={t('finance.section_budgets.variable_add')}
-            addPlaceholder={t('finance.section_budgets.variable_add_placeholder')}
-          />
+          {/* #6/#7: единый источник — expense_categories с kind/budget.
+              Те же категории видны в форме расхода и в Бюджетах. Progress
+              показывает факт vs план за текущий месяц. */}
+          <UnifiedBudgetsCard salonId={salonId} currency={currency} kind="fixed" />
+          <UnifiedBudgetsCard salonId={salonId} currency={currency} kind="variable" />
         </>
       ) : (
         <IncomeBudgetsCard salonId={salonId} currency={currency} />
