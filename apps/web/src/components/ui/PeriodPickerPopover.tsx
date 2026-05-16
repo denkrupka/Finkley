@@ -106,8 +106,27 @@ export function PeriodPickerPopover({
           {periodLabel(value)}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[480px] p-0">
+      {/* Image #129: popover вылазил за правый край экрана при триггере у
+          правого края (align="end" недостаточно — фактическая ширина 480px
+          могла превысить расстояние от триггера до левого края). Меняем
+          поведение: collisionPadding=16 чтобы Radix сам подвинул popover,
+          ширину делаем 92vw на узких экранах с max 480px на широких. */}
+      <PopoverContent align="end" collisionPadding={16} className="w-[92vw] max-w-[480px] p-0">
         <div className="border-border flex flex-wrap gap-1.5 border-b p-2">
+          {/* Image #130: «За все время» — preset на максимально широкий
+              диапазон. Используем range 2000-01-01 → текущий день: для
+              всех визитов это эквивалент «всё». */}
+          <QuickChip
+            label={t('period.quick.all_time', { defaultValue: 'За все время' })}
+            onClick={() => {
+              onChange({
+                kind: 'range',
+                from: '2000-01-01',
+                to: format(today, 'yyyy-MM-dd'),
+              })
+              setOpen(false)
+            }}
+          />
           <QuickChip
             label={t('period.quick.today')}
             onClick={() => {

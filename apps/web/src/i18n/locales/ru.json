@@ -427,6 +427,7 @@
       "365": "Последний год"
     },
     "quick": {
+      "all_time": "За все время",
       "today": "Сегодня",
       "this_week": "Эта неделя",
       "last_week": "Прошлая неделя",
@@ -1646,6 +1647,9 @@
     "subtitle_many": "{{count}} клиентов",
     "subtitle": "Всего: {{count}}",
     "list_title": "Все клиенты",
+    "pagination": {
+      "summary": "{{from}}—{{to}} из {{total}}"
+    },
     "templates": {
       "title": "Постоянные визиты",
       "add": "Добавить",

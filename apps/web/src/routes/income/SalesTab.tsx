@@ -228,8 +228,13 @@ export function SalesTab({ salonId }: { salonId: string }) {
             onDone={() => {
               // Image #92: после оформления продажи кэш visits не
               // обновлялся, и список «Продажи» был пустой до reload.
-              // Инвалидируем явно (RetailSaleWizard сам не дёргает qc).
-              void qc.invalidateQueries({ queryKey: visitsKeys(salonId) })
+              // Image #127: добавил refetchType:'all' — без него фоновые
+              // (или не-observed) подвыборки SalesTab не подхватывали свежие
+              // данные, и продажа со «skip document» не появлялась в списке.
+              void qc.invalidateQueries({
+                queryKey: visitsKeys(salonId),
+                refetchType: 'all',
+              })
               void qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
               setCreateOpen(false)
             }}

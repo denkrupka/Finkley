@@ -120,10 +120,23 @@ function ClientsListTab({
   const isAdmin = role === 'admin'
 
   const [search, setSearch] = useState('')
+  // Image #131: debounce поиска, чтобы фильтр не дёргался на каждое
+  // нажатие клавиши — uesClients посылает запрос только когда юзер
+  // закончил вводить (200 ms тишины). Это убирает «долго обновляются
+  // фильтры» при быстром наборе.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200)
+    return () => clearTimeout(t)
+  }, [search])
   const [sort, setSort] = useState<ClientSort>('last_visit')
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
   const [createOpen, setCreateOpen] = useState(false)
   const [drawerClient, setDrawerClient] = useState<ClientRow | null>(null)
+  // Image #131: пагинация по 25 записей. При смене фильтра/поиска/сегмента
+  // сбрасываем на первую страницу.
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
   // Image #113: фильтр по периоду визитов. null = «все время» (default —
   // юзер хочет видеть всю базу сразу, без сюрприза «потерянных» клиентов).
   // При выборе периода фильтруем клиентов: только те, у кого был визит в
@@ -135,7 +148,10 @@ function ClientsListTab({
     return { start: r.start.toISOString(), end: r.end.toISOString() }
   }, [period])
 
-  const { data: allClients = [], isLoading } = useClients(salonId, { search, sort })
+  const { data: allClients = [], isLoading } = useClients(salonId, {
+    search: debouncedSearch,
+    sort,
+  })
   const { data: nextVisitsByClient = new Map<string, string>() } = useNextVisitsByClient(salonId)
   const { data: clientsInPeriod = null } = useClientIdsWithVisitsInPeriod(salonId, periodRangeIso)
 
@@ -160,6 +176,21 @@ function ClientsListTab({
     if (period && clientsInPeriod) list = list.filter((c) => clientsInPeriod.has(c.id))
     return list
   }, [segmented, segmentFilter, period, clientsInPeriod])
+
+  // Image #131: пагинация. При изменении количества клиентов или сброса
+  // фильтра нормализуем page (если ушли за пределы) и обновляем total.
+  const totalPages = Math.max(1, Math.ceil(clients.length / PAGE_SIZE))
+  useEffect(() => {
+    if (page > totalPages) setPage(1)
+  }, [page, totalPages])
+  // При смене фильтра/поиска/периода/сегмента — на первую страницу.
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, sort, segmentFilter, period])
+  const pagedClients = useMemo(
+    () => clients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [clients, page],
+  )
 
   // Privacy alert: admin загрузил список с контактами >50 клиентов.
   // Sticky-флаг в sessionStorage — чтобы не пинговать функцию каждый раз,
@@ -351,7 +382,7 @@ function ClientsListTab({
               </tr>
             </thead>
             <tbody>
-              {clients.map((c) => {
+              {pagedClients.map((c) => {
                 const badge = SEGMENT_BADGE[c.segment]
                 const bdDays = daysToBirthday(c.birthday)
                 const avg =
@@ -420,11 +451,12 @@ function ClientsListTab({
                     <td className="num text-muted-foreground px-3 py-2.5 text-right">
                       {c.visit_count}
                     </td>
-                    {/* Image #112: одинаковый стиль для «Последний визит» и
-                        «След. визит» — один цвет/шрифт/размер, цифры в num.
-                        Различие только в формате: прошлый визит — только дата
-                        (день/месяц/год), будущий — дата + время записи. */}
-                    <td className="text-muted-foreground px-3 py-2.5 text-right">
+                    {/* Image #112/#131: одинаковый стиль для «Последний» и
+                        «След. визит» — единый цвет (text-foreground), один
+                        шрифт num text-xs font-medium. Различие только в
+                        формате: прошлый — только дата (день/месяц/год),
+                        будущий — дата + время. — */}
+                    <td className="px-3 py-2.5 text-right">
                       {c.last_visit_at ? (
                         <span className="num text-foreground text-xs font-medium">
                           {format(parseISO(c.last_visit_at), 'd MMM yyyy', { locale: ru })}
@@ -435,7 +467,7 @@ function ClientsListTab({
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       {nextVisit ? (
-                        <span className="num text-secondary text-xs font-medium">
+                        <span className="num text-foreground text-xs font-medium">
                           {format(parseISO(nextVisit), 'd MMM yyyy, HH:mm', { locale: ru })}
                         </span>
                       ) : (
@@ -449,6 +481,80 @@ function ClientsListTab({
           </table>
         )}
       </div>
+
+      {/* Image #131: пагинация по 25 записей. Скрываем когда страница одна. */}
+      {!isLoading && totalPages > 1 ? (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-xs">
+            {t('clients.pagination.summary', {
+              from: (page - 1) * PAGE_SIZE + 1,
+              to: Math.min(page * PAGE_SIZE, clients.length),
+              total: clients.length,
+              defaultValue: '{{from}}—{{to}} из {{total}}',
+            })}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              ‹
+            </button>
+            {/* Окно из 5 страниц вокруг текущей. На больших списках не плодим
+                все кнопки — показываем … где нужно. */}
+            {(() => {
+              const pages: (number | 'gap')[] = []
+              const push = (p: number) => {
+                if (!pages.includes(p)) pages.push(p)
+              }
+              push(1)
+              for (let p = Math.max(2, page - 2); p <= Math.min(totalPages - 1, page + 2); p++) {
+                push(p)
+              }
+              if (totalPages > 1) push(totalPages)
+              const withGaps: (number | 'gap')[] = []
+              let last: number | null = null
+              for (const p of pages) {
+                if (typeof p === 'number') {
+                  if (last != null && p - last > 1) withGaps.push('gap')
+                  withGaps.push(p)
+                  last = p
+                }
+              }
+              return withGaps.map((p, i) =>
+                p === 'gap' ? (
+                  <span key={`gap-${i}`} className="text-muted-foreground px-1 text-xs">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-md border px-2 text-xs font-semibold transition-colors ${
+                      page === p
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )
+            })()}
+            <button
+              type="button"
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <ClientFormModal open={createOpen} onOpenChange={setCreateOpen} salonId={salonId} />
       <ClientDrawer

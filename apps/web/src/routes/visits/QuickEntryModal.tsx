@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { CalendarDays, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -288,25 +288,8 @@ export function QuickEntryModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, watchedStartTime])
 
-  function addService() {
-    if (!pendingServiceId) return
-    const svc = services.find((s) => s.id === pendingServiceId)
-    if (!svc) return
-    const defaultStaff = pickDefaultStaffForNewLine()
-    setLines((prev) => [
-      ...prev,
-      {
-        uid: crypto.randomUUID(),
-        service_id: svc.id,
-        name: svc.name,
-        price_cents: svc.default_price_cents,
-        duration_min: svc.default_duration_min,
-        staff_id: defaultStaff,
-      },
-    ])
-    setPendingServiceId('')
-    setLinesTouched(true)
-  }
+  // Image #124: addService удалена — услуга добавляется сразу при выборе из
+  // dropdown'а (логика инлайнена в onChange SearchableSelect ниже).
 
   function removeLine(uid: string) {
     setLines((prev) => prev.filter((l) => l.uid !== uid))
@@ -315,6 +298,21 @@ export function QuickEntryModal({
   /** Меняет мастера у конкретной строки (image #104). */
   function setLineStaff(uid: string, staffId: string) {
     setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, staff_id: staffId } : l)))
+  }
+
+  /** Перемещает строку вверх/вниз (image #125). Меняет порядок услуг в
+   *  списке — порядок влияет на cumulative start/end times каждой строки. */
+  function moveLine(uid: string, direction: -1 | 1) {
+    setLines((prev) => {
+      const idx = prev.findIndex((l) => l.uid === uid)
+      if (idx < 0) return prev
+      const newIdx = idx + direction
+      if (newIdx < 0 || newIdx >= prev.length) return prev
+      const next = [...prev]
+      const [item] = next.splice(idx, 1)
+      next.splice(newIdx, 0, item!)
+      return next
+    })
   }
 
   const totalAmountCents = lines.reduce((s, l) => s + l.price_cents, 0)
@@ -590,44 +588,57 @@ export function QuickEntryModal({
             )}
           />
 
-          {/* Услуги — после клиента. Можно добавить несколько. */}
+          {/* Услуги — после клиента. Можно добавить несколько.
+              Image #124: убрали кнопку «Добавить» — после выбора услуги из
+              dropdown'а она сразу добавляется в список (один клик вместо
+              двух). Селект очищается, юзер может выбрать следующую. */}
           <div className="flex flex-col gap-1.5">
             <Label>{t('visits.form.service_label')} *</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="min-w-0 flex-1">
-                <SearchableSelect
-                  value={pendingServiceId}
-                  onChange={setPendingServiceId}
-                  disabled={services.length === 0}
-                  options={services.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    hint: `≈ ${formatCurrency(s.default_price_cents, currency)}${
-                      s.default_duration_min
-                        ? ` · ${s.default_duration_min} ${t('common.min')}`
-                        : ''
-                    }`,
-                  }))}
-                  placeholder={
-                    services.length === 0
-                      ? t('visits.form.service_empty')
-                      : t('visits.form.service_placeholder')
+            <div className="min-w-0">
+              <SearchableSelect
+                value={pendingServiceId}
+                onChange={(v) => {
+                  if (!v) {
+                    setPendingServiceId('')
+                    return
                   }
-                  searchPlaceholder={t('visits.filters.search_services')}
-                  emptyText={t('common.no_results')}
-                  ariaLabel={t('visits.form.service_label')}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addService}
-                disabled={!pendingServiceId}
-                size="md"
-              >
-                <Plus className="size-4" strokeWidth={2} />
-                {t('visits.form.add_service')}
-              </Button>
+                  // Авто-добавление: ставим pending → сразу добавляем линию →
+                  // очищаем (addService использует pendingServiceId).
+                  setPendingServiceId(v)
+                  const svc = services.find((s) => s.id === v)
+                  if (!svc) return
+                  const defaultStaff = pickDefaultStaffForNewLine()
+                  setLines((prev) => [
+                    ...prev,
+                    {
+                      uid: crypto.randomUUID(),
+                      service_id: svc.id,
+                      name: svc.name,
+                      price_cents: svc.default_price_cents,
+                      duration_min: svc.default_duration_min,
+                      staff_id: defaultStaff,
+                    },
+                  ])
+                  setPendingServiceId('')
+                  setLinesTouched(true)
+                }}
+                disabled={services.length === 0}
+                options={services.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  hint: `≈ ${formatCurrency(s.default_price_cents, currency)}${
+                    s.default_duration_min ? ` · ${s.default_duration_min} ${t('common.min')}` : ''
+                  }`,
+                }))}
+                placeholder={
+                  services.length === 0
+                    ? t('visits.form.service_empty')
+                    : t('visits.form.service_placeholder')
+                }
+                searchPlaceholder={t('visits.filters.search_services')}
+                emptyText={t('common.no_results')}
+                ariaLabel={t('visits.form.service_label')}
+              />
             </div>
             {services.length === 0 ? (
               <p className="text-muted-foreground text-xs">
@@ -642,13 +653,31 @@ export function QuickEntryModal({
             ) : null}
 
             {/* Список выбранных услуг. Image #104: рядом с каждой услугой —
-                свой селектор мастера. Подсветка красной рамкой если строка
-                без мастера и юзер уже пытался сохранить. */}
+                свой селектор мастера. Image #125: дополнительно показываем
+                время начала/конца этой услуги (computed) и стрелки для
+                реордера строк. Подсветка красной рамкой если строка без
+                мастера и юзер уже пытался сохранить. */}
             {lines.length > 0 ? (
               <ul className="border-border bg-card divide-border/60 mt-1 flex flex-col divide-y rounded-md border">
-                {lines.map((l) => {
+                {lines.map((l, lineIdx) => {
                   const av = staffAvatar(l.staff_id)
                   const missingStaff = lineStaffError && !l.staff_id
+                  // Image #125: cumulative start/end. Старт первой строки =
+                  // form.start_time, далее каждая следующая стартует там же,
+                  // где закончилась предыдущая. Длительность по-умолчанию 60.
+                  const baseStart = form.watch('start_time') || '10:00'
+                  const [bh, bm] = baseStart.split(':').map(Number)
+                  const baseMin = (bh ?? 10) * 60 + (bm ?? 0)
+                  const cumBefore = lines
+                    .slice(0, lineIdx)
+                    .reduce((s, ln) => s + (ln.duration_min ?? 60), 0)
+                  const lineStartMin = baseMin + cumBefore
+                  const lineEndMin = lineStartMin + (l.duration_min ?? 60)
+                  const fmtTime = (m: number) => {
+                    const hh = Math.floor((m / 60) % 24)
+                    const mm = m % 60
+                    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+                  }
                   return (
                     <li
                       key={l.uid}
@@ -660,7 +689,11 @@ export function QuickEntryModal({
                       <div className="min-w-0 flex-1">
                         <p className="text-foreground truncate text-sm font-semibold">{l.name}</p>
                         <p className="text-muted-foreground text-[11px]">
-                          {/* Image #67: длительность показываем ВСЕГДА. */}
+                          {/* Image #125: время начала и конца услуги. */}
+                          <span className="num text-secondary font-semibold">
+                            {fmtTime(lineStartMin)} — {fmtTime(lineEndMin)}
+                          </span>
+                          {' · '}
                           <span className="num">
                             {l.duration_min
                               ? `${l.duration_min} ${t('common.min')}`
@@ -670,10 +703,26 @@ export function QuickEntryModal({
                           <span className="num">{formatCurrency(l.price_cents, currency)}</span>
                         </p>
                       </div>
-                      {/* Image #104: per-line staff picker — компактный select
-                          рядом с услугой. Юзер видит «маникюр у Оли, брови у
-                          Алины» в одном списке. */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {/* Image #125: стрелки реордера. Disabled на крайних строках. */}
+                        <button
+                          type="button"
+                          onClick={() => moveLine(l.uid, -1)}
+                          disabled={lineIdx === 0}
+                          aria-label={t('visits.form.move_up', { defaultValue: 'Вверх' })}
+                          className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <ArrowUp className="size-3.5" strokeWidth={1.8} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveLine(l.uid, 1)}
+                          disabled={lineIdx === lines.length - 1}
+                          aria-label={t('visits.form.move_down', { defaultValue: 'Вниз' })}
+                          className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <ArrowDown className="size-3.5" strokeWidth={1.8} />
+                        </button>
                         <Select
                           value={l.staff_id ?? ''}
                           onValueChange={(v) => setLineStaff(l.uid, v)}
@@ -791,15 +840,21 @@ export function QuickEntryModal({
             </div>
           </div>
 
-          {/* Сумма — автоматически из суммы услуг (read-only). Сжата с h-16
-              до h-14 + text-2xl + убран hint снизу для экономии вертикали. */}
+          {/* Сумма — автоматически из суммы услуг (read-only).
+              Image #126: «PLN» и цифра расходились вертикально (одна выше
+              другой). Виноват был h-full + self-center на span'е с цифрой —
+              у него получалась другая baseline. Решение: items-baseline на
+              контейнере + убрать h-full/self-center у цифры. Теперь оба
+              текста стоят на одной базовой линии. */}
           <div className="flex flex-col gap-1">
             <Label>{t('visits.form.amount_label')}</Label>
-            <div className="border-brand-yellow-deep bg-brand-yellow flex h-14 items-center gap-2 rounded-md border-[1.5px] px-4">
-              <span className="num text-brand-navy text-2xl font-bold">{currencySymbol}</span>
+            <div className="border-brand-yellow-deep bg-brand-yellow flex h-14 items-baseline gap-2 rounded-md border-[1.5px] px-4 py-3">
+              <span className="num text-brand-navy text-2xl font-bold leading-none">
+                {currencySymbol}
+              </span>
               <span
                 className={cn(
-                  'num text-brand-navy h-full min-w-0 flex-1 self-center text-2xl font-bold tracking-tight',
+                  'num text-brand-navy min-w-0 flex-1 text-2xl font-bold leading-none tracking-tight',
                   totalAmountCents === 0 && 'text-brand-navy/30',
                 )}
                 data-testid="qe-amount-display"

@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Medal, Trophy } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
@@ -62,8 +62,13 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
   const { data: services = [] } = useServices(salonId)
   const { data: categories = [] } = useServiceCategories(salonId)
 
-  // Свернутые группы
+  // Image #132: при открытии вкладки все категории должны быть свёрнуты
+  // изначально. Хранится Set ключей свёрнутых групп; «развёрнуто» = ключа
+  // в Set нет. Изначально пусто, и `initializedRef` ниже заполняет Set
+  // ключами всех групп при первом успешном fetch'е, чтобы дефолт был
+  // «свёрнуто», а не «развёрнуто».
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const initializedRef = useRef(false)
   function toggleGroup(key: string) {
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -125,6 +130,16 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
   }, [enriched])
 
   const totalRevenue = enriched.reduce((s, r) => s + r.revenue_cents, 0)
+
+  // Image #132: один раз при первом fetch'е помечаем ВСЕ группы как
+  // свёрнутые. Без этого default-состояние был «всё развёрнуто», и юзер
+  // видел кучу строк сразу при открытии вкладки.
+  useEffect(() => {
+    if (initializedRef.current) return
+    if (groups.length === 0) return
+    setCollapsed(new Set(groups.map((g) => g.category_id ?? '__none__')))
+    initializedRef.current = true
+  }, [groups])
 
   // AI payload — отправляем структурированно по группам. Генерируется
   // всегда, даже при пустых данных, чтобы плашка «AI-выводы» с opt-in
