@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
@@ -72,9 +73,41 @@ export function SalesTab({ salonId }: { salonId: string }) {
     staffId: staffFilter || null,
     paymentMethod: payFilter || null,
   })
+  // Image #127: продажи через wizard'овский таб «Прочие доходы» (kind=
+  // 'other_income') попадают в other_incomes, не в visits — раньше они
+  // не показывались в SalesTab вообще. Тянем их тут и мержим в общий
+  // список, чтобы юзер видел все продажи в одном месте независимо от
+  // того, какую вкладку wizard'а использовал.
+  const { data: otherIncomes = [] } = useOtherIncomes(salonId, {
+    start: r.start,
+    end: r.end,
+  })
+  const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
+  const otherCategoriesById = useMemo(
+    () => new Map(otherCategories.map((c) => [c.id, c.name])),
+    [otherCategories],
+  )
+
+  // Применяем те же фильтры (payment_method) к other_incomes. staffFilter
+  // к ним не применим — у других доходов нет мастера.
+  const filteredOtherIncomes = useMemo(() => {
+    let list = otherIncomes
+    if (payFilter) list = list.filter((o) => o.payment_method === payFilter)
+    // Если включён фильтр по мастеру — other_incomes исключаем целиком
+    // (у них staff_id нет, показывать их в «выборке по мастеру» странно).
+    if (staffFilter) list = []
+    return list
+  }, [otherIncomes, payFilter, staffFilter])
+
   const deleteVisit = useDeleteVisit(salonId)
 
-  const total = sales.reduce((acc, s) => acc + s.amount_cents - s.discount_cents + s.tip_cents, 0)
+  const salesTotal = sales.reduce(
+    (acc, s) => acc + s.amount_cents - s.discount_cents + s.tip_cents,
+    0,
+  )
+  const otherTotal = filteredOtherIncomes.reduce((acc, o) => acc + o.amount_cents, 0)
+  const total = salesTotal + otherTotal
+  const totalCount = sales.length + filteredOtherIncomes.length
 
   return (
     <div>
@@ -86,7 +119,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
             {t('income.sales.subtitle_total', {
-              count: sales.length,
+              count: totalCount,
               revenue: formatCurrency(total, currency),
             })}
           </p>
@@ -140,7 +173,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         {isLoading ? (
           <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
-        ) : sales.length === 0 ? (
+        ) : totalCount === 0 ? (
           <p className="text-muted-foreground p-6 text-sm">{t('income.sales.empty')}</p>
         ) : (
           <table className="w-full text-sm">
@@ -159,6 +192,36 @@ export function SalesTab({ salonId }: { salonId: string }) {
               </tr>
             </thead>
             <tbody>
+              {/* Image #127: товары (retail visits) + прочие доходы рисуем
+                  в одной таблице. Прочие доходы помечены пилюлей-бейджем,
+                  чтобы юзер сразу видел тип. */}
+              {filteredOtherIncomes.map((o) => (
+                <tr key={`oi-${o.id}`} className="border-border/60 hover:bg-muted/30 border-t">
+                  <td className="num text-muted-foreground px-4 py-2 text-xs">
+                    {formatVisitDate(o.income_at)}
+                  </td>
+                  <td className="text-foreground px-4 py-2">
+                    <span className="font-semibold">
+                      {o.category_id ? (otherCategoriesById.get(o.category_id) ?? '—') : '—'}
+                    </span>
+                    <span className="bg-brand-teal-soft text-brand-teal-deep ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                      {t('income.sales.tag_other')}
+                    </span>
+                    {o.comment ? (
+                      <span className="text-muted-foreground ml-2 text-xs">· {o.comment}</span>
+                    ) : null}
+                  </td>
+                  <td className="text-muted-foreground px-4 py-2 text-xs">—</td>
+                  <td className="text-muted-foreground px-4 py-2 text-xs">
+                    {paymentMethods.find((m) => m.code === o.payment_method)?.label ??
+                      (o.payment_method ? t(`payment_methods.${o.payment_method}`) : '—')}
+                  </td>
+                  <td className="num text-brand-sage-deep px-4 py-2 text-right font-bold">
+                    +{formatCurrency(o.amount_cents, currency)}
+                  </td>
+                  <td className="px-4 py-2" />
+                </tr>
+              ))}
               {sales.map((s) => {
                 const stf = staff.find((x) => x.id === s.staff_id)
                 return (

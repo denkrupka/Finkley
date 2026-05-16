@@ -176,7 +176,7 @@ export function CashTab({ salonId }: { salonId: string }) {
               </span>
               <Button size="md" onClick={() => setOpenDialogShown(true)}>
                 <Unlock className="size-4" strokeWidth={2} />
-                {t('cash.open_shift')}
+                {isClosedToday(lastClosed) ? t('cash.open_new_shift') : t('cash.open_shift')}
               </Button>
             </>
           )}
@@ -229,6 +229,8 @@ export function CashTab({ salonId }: { salonId: string }) {
           userNameById={userNameById}
           cashRegisters={cashRegisters}
         />
+      ) : isClosedToday(lastClosed) ? (
+        <ClosedTodayCard shift={lastClosed!} currency={currency} userNameById={userNameById} />
       ) : (
         <div className="border-border bg-card shadow-finsm rounded-lg border p-6 text-center">
           <Wallet className="text-muted-foreground mx-auto size-8" strokeWidth={1.5} />
@@ -273,6 +275,87 @@ export function CashTab({ salonId }: { salonId: string }) {
         currency={currency}
         userNameById={userNameById}
       />
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+
+/** True если смена закрыта и closed_at попадает на сегодняшний день
+ *  в локальном таймзоне юзера. Используется чтобы показать «итоги дня»
+ *  сразу после закрытия (Состояние 4 спеки). */
+function isClosedToday(shift: CashShift | null | undefined): boolean {
+  if (!shift || !shift.closed_at) return false
+  const closed = new Date(shift.closed_at)
+  const today = new Date()
+  return (
+    closed.getFullYear() === today.getFullYear() &&
+    closed.getMonth() === today.getMonth() &&
+    closed.getDate() === today.getDate()
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Closed-today card (Состояние 4 спеки)
+
+function ClosedTodayCard({
+  shift,
+  currency,
+  userNameById,
+}: {
+  shift: CashShift
+  currency: string
+  userNameById: Map<string, string>
+}) {
+  const { t } = useTranslation()
+  const closerName = shift.closed_by_user_id
+    ? (userNameById.get(shift.closed_by_user_id) ?? '—')
+    : '—'
+  return (
+    <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h3 className="text-foreground text-sm font-bold">{t('cash.closed_today_title')}</h3>
+        <span className="text-muted-foreground text-xs">
+          {t('cash.closed_today_meta', {
+            name: closerName,
+            time: shift.closed_at ? format(parseISO(shift.closed_at), 'HH:mm') : '—',
+          })}
+        </span>
+      </div>
+      <div className="border-border rounded-md border">
+        <ReconciliationRow
+          label={t('cash.row_cash')}
+          expected={shift.expected_cash_cents ?? 0}
+          actual={shift.actual_cash_cents ?? 0}
+          diff={shift.diff_cash_cents ?? 0}
+          currency={currency}
+        />
+        <div className="border-t" />
+        <ReconciliationRow
+          label={t('cash.row_card')}
+          expected={shift.expected_card_cents ?? 0}
+          actual={shift.actual_card_cents ?? 0}
+          diff={shift.diff_card_cents ?? 0}
+          currency={currency}
+        />
+      </div>
+      {shift.discrepancy_reason ? (
+        <div className="bg-muted/30 mt-3 rounded-md p-2 text-xs">
+          <span className="text-muted-foreground font-bold uppercase tracking-wider">
+            {t('cash.reason_label')}:{' '}
+          </span>
+          {shift.discrepancy_reason}
+        </div>
+      ) : null}
+      {shift.close_comment ? (
+        <div className="bg-muted/30 mt-2 rounded-md p-2 text-xs">
+          <span className="text-muted-foreground font-bold uppercase tracking-wider">
+            {t('cash.close_comment_label')}:{' '}
+          </span>
+          {shift.close_comment}
+        </div>
+      ) : null}
     </div>
   )
 }
