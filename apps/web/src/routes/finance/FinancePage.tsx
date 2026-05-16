@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { useSalon } from '@/hooks/useSalons'
 import { ReportsPage } from '@/routes/reports/ReportsPage'
 
 import { BudgetsTab } from './BudgetsTab'
@@ -13,7 +14,7 @@ import { PaymentsTab } from './PaymentsTab'
 
 type FinanceTab = 'pnl' | 'cashflow' | 'report' | 'payments' | 'budgets' | 'cash'
 
-const TABS: PageTab<FinanceTab>[] = [
+const ALL_TABS: PageTab<FinanceTab>[] = [
   { id: 'pnl', labelKey: 'finance.tabs.pnl', icon: LineChart },
   { id: 'cashflow', labelKey: 'finance.tabs.cashflow', icon: Wallet },
   { id: 'report', labelKey: 'finance.tabs.report', icon: FileBarChart },
@@ -45,9 +46,17 @@ export function FinancePage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params, setParams] = useSearchParams()
+  const { data: salon } = useSalon(salonId)
+  // Если кассовая дисциплина выключена — таб «Касса» скрываем целиком.
+  const TABS = salon?.cash_discipline_enabled
+    ? ALL_TABS
+    : ALL_TABS.filter((tab) => tab.id !== 'cash')
 
   const tabParam = params.get('tab')
-  const active: FinanceTab = isFinanceTab(tabParam) ? tabParam : 'pnl'
+  const requested: FinanceTab = isFinanceTab(tabParam) ? tabParam : 'pnl'
+  // Защита от ситуации «приходим по ссылке ?tab=cash, а флаг выключен».
+  const active: FinanceTab =
+    requested === 'cash' && !salon?.cash_discipline_enabled ? 'pnl' : requested
 
   function setActive(id: FinanceTab) {
     const next = new URLSearchParams(params)

@@ -56,6 +56,7 @@ import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
+import { CashDisciplineCard } from '@/routes/settings/CashDisciplineCard'
 import { PageTabsNav } from '@/components/ui/PageTabsNav'
 import { ApiKeysCard } from './ApiKeysCard'
 import { SalonHoursCard } from './SalonHoursCard'
@@ -428,6 +429,9 @@ export function SettingsPage() {
           {/* Бухгалтерия (image #122): юр. данные компании, налоговая
               схема, доставка документов бухгалтеру. */}
           {salonId ? <AccountingSettingsCard salonId={salonId} /> : null}
+
+          {/* Касса (опц.) — включатель кассового дня. */}
+          {salonId ? <CashDisciplineCard salonId={salonId} /> : null}
 
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
           <TelegramLinkCard />

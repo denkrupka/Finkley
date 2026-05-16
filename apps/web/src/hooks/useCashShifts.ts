@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
+import { useSalon } from '@/hooks/useSalons'
 
 export type CashShift = {
   id: string
@@ -312,19 +313,25 @@ export function classifyChannel(
 
 /**
  * useRequireCashShift — гейт для финансовых операций (расчёт визита,
- * создание расхода). Возвращает текущую открытую смену пользователя и
- * флаг готовности. Если null — UI должен заблокировать действие и
- * подсказать «открыть кассовый день».
+ * создание расхода). Учитывает флаг salons.cash_discipline_enabled:
+ *   - флаг выключен → гейт пропускает всех (hasOpenShift = true всегда),
+ *     словно смены не существует. Юзер работает как раньше.
+ *   - флаг включён → возвращает реальное состояние смены текущего юзера.
  *
- * Тонкий wrapper над useCurrentShift, чтобы в каждом месте не дублировать
- * проверку shift !== null + сообщение об ошибке.
+ * Так одни салоны могут жить с дисциплиной, а другие — без, без отдельных
+ * проверок в каждом гейт-месте.
  */
 export function useRequireCashShift(salonId: string | undefined) {
+  const { data: salon } = useSalon(salonId)
   const { data: shift, isLoading } = useCurrentShift(salonId)
+  const disciplineEnabled = salon?.cash_discipline_enabled === true
   return {
     shift: shift ?? null,
     isLoading,
-    hasOpenShift: !!shift,
+    /** Дисциплина включена в салоне. */
+    disciplineEnabled,
+    /** Действие разрешено: либо дисциплина выключена, либо смена открыта. */
+    hasOpenShift: !disciplineEnabled || !!shift,
   }
 }
 

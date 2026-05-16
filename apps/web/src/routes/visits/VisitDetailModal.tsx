@@ -118,6 +118,9 @@ export function VisitDetailModal({
   const { data: clients = [] } = useClients(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: cashRegisters = [] } = useCashRegisters(salonId)
+  // Per-user касса: гейт на «Рассчитать». Проверяем ДО открытия ChargeView,
+  // чтобы юзер сразу видел сообщение, а не вбивал суммы зря.
+  const { hasOpenShift: hasOpenShiftTop } = useRequireCashShift(salonId)
 
   const update = useUpdateVisit(salonId)
   const remove = useDeleteVisit(salonId)
@@ -161,7 +164,15 @@ export function VisitDetailModal({
                 onSuccess: () => toast.success(t('visits.toast_deleted')),
               })
             }}
-            onChargeClick={() => setView('charge')}
+            onChargeClick={() => {
+              if (!hasOpenShiftTop) {
+                toast.error(t('finance.cash.gate_required_title'), {
+                  description: t('finance.cash.gate_required_charge'),
+                })
+                return
+              }
+              setView('charge')
+            }}
             onClose={onClose}
             t={t}
           />

@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useCreateBooksyReservation } from '@/hooks/useBooksyReservation'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useSuggestedStaffForClientService } from '@/hooks/useStaffSuggestion'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import {
   useCreateVisit,
   useDeleteVisit,
@@ -138,6 +139,7 @@ export function QuickEntryModal({
   const { data: services = [] } = useServices(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const createVisit = useCreateVisit(salonId)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   const updateVisit = useUpdateVisit(salonId)
   const deleteVisit = useDeleteVisit(salonId)
   const reserveBooksy = useCreateBooksyReservation()
@@ -904,7 +906,18 @@ export function QuickEntryModal({
               <Button
                 type="button"
                 size="lg"
-                onClick={form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))}
+                onClick={() => {
+                  // Per-user касса: гейт ДО открытия ChargeView. Если смены
+                  // нет — toast'имся и не вызываем handleSubmit, чтобы юзер
+                  // не вбивал суммы зря.
+                  if (!hasOpenShift) {
+                    toast.error(t('finance.cash.gate_required_title'), {
+                      description: t('finance.cash.gate_required_charge'),
+                    })
+                    return
+                  }
+                  void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()
+                }}
                 disabled={updateVisit.isPending || deleteVisit.isPending}
                 data-testid="qe-charge"
               >

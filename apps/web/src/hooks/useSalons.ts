@@ -25,6 +25,9 @@ export type SalonRow = {
   churn_window_days: number
   /** Optional — миграция 20260515000011 может ещё не примениться. */
   opening_hours?: Record<string, { open?: string; close?: string; closed?: boolean }>
+  /** Optional — миграция 20260516000005 может ещё не примениться.
+   *  Включает ли салон логику «кассового дня». */
+  cash_discipline_enabled?: boolean
   created_at: string
   /** Optional — миграция 20260514150000 может ещё не примениться. */
   blocked_at?: string | null
@@ -47,7 +50,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at, blocked_at, blocked_reason',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -90,7 +93,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, created_at, blocked_at, blocked_reason',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason',
         )
         .eq('id', salonId)
         .maybeSingle()

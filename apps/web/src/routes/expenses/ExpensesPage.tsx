@@ -42,6 +42,7 @@ import {
 } from '@/hooks/useIntegrations'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCounterparties } from '@/hooks/useCounterparties'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useSalon } from '@/hooks/useSalons'
 import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -133,6 +134,7 @@ export function ExpensesPage() {
   )
 
   const [formOpen, setFormOpen] = useState(false)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   // Edit-режим: клик по строке расхода → ExpenseFormModal в edit mode
   // (Image #49). null = создание нового. ExpenseFormModal сам различает.
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
@@ -191,7 +193,18 @@ export function ExpensesPage() {
           <Button
             variant="secondary"
             size="md"
-            onClick={() => setFormOpen(true)}
+            onClick={() => {
+              // Per-user касса (если включена): нельзя добавить расход без
+              // открытой смены. Блокируем ОТКРЫТИЕ модалки — юзер сразу
+              // видит сообщение и не вводит данные зря.
+              if (!hasOpenShift) {
+                toast.error(t('finance.cash.gate_required_title'), {
+                  description: t('finance.cash.gate_required_expense'),
+                })
+                return
+              }
+              setFormOpen(true)
+            }}
             data-testid="add-expense"
           >
             <Plus className="size-4" strokeWidth={2.4} />
@@ -277,7 +290,15 @@ export function ExpensesPage() {
                 return (
                   <li
                     key={e.id}
-                    onClick={() => setEditingExpense(e)}
+                    onClick={() => {
+                      if (!hasOpenShift) {
+                        toast.error(t('finance.cash.gate_required_title'), {
+                          description: t('finance.cash.gate_required_expense'),
+                        })
+                        return
+                      }
+                      setEditingExpense(e)
+                    }}
                     className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
                     style={{ borderLeftWidth: 3, borderLeftColor: color }}
                     data-testid="expense-row"
