@@ -28,8 +28,11 @@ jobs:
     name: Stage 1 — Apply to staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: staging
+    # environment.name 'staging' тоже убран — он добавлял лишний gate.
+    # Если потребуется ручное одобрение для staging, раскомментируй
+    # и заведи Required reviewers в Settings → Environments → staging.
+    # environment:
+    #   name: staging
 
     steps:
       - uses: actions/checkout@v4
