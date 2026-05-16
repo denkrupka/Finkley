@@ -48,6 +48,7 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
   infakt: 'inFakt',
 }
 import { DictateButton } from '@/components/ui/DictateButton'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useCounterparties } from '@/hooks/useCounterparties'
@@ -241,6 +242,7 @@ export function ExpenseFormModal({
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   const { data: counterparties = [] } = useCounterparties(salonId)
   const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
+  const [gateOpen, setGateOpen] = useState(false)
   const [dictationPrefillForNewCp, setDictationPrefillForNewCp] = useState<{
     name?: string
     nip?: string
@@ -411,9 +413,7 @@ export function ExpenseFormModal({
     // Изменения существующего расхода (isEdit) — тоже за гейтом, иначе
     // можно «починить» прошлые цифры без смены.
     if (!hasOpenShift) {
-      toast.error(t('finance.cash.gate_required_title'), {
-        description: t('finance.cash.gate_required_expense'),
-      })
+      setGateOpen(true)
       return
     }
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
@@ -1106,6 +1106,13 @@ export function ExpenseFormModal({
             shouldValidate: false,
           })
         }
+      />
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="expense"
+        onShiftOpened={() => void form.handleSubmit(onSubmit)()}
       />
     </Dialog>
   )

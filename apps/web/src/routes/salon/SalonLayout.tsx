@@ -6,8 +6,8 @@ import { Suspense, useEffect, useState } from 'react'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
 
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMySalons } from '@/hooks/useSalons'
@@ -66,6 +66,7 @@ export function SalonLayout() {
     endAt?: string
   } | null>(null)
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
+  const [gateOpen, setGateOpen] = useState(false)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
   const { hasOpenShift } = useRequireCashShift(salonId)
@@ -185,9 +186,7 @@ export function SalonLayout() {
             // Per-user касса: «+Расход» из FAB — тот же гейт что в
             // ExpensesPage. Блокируем открытие модалки заранее.
             if (!hasOpenShift) {
-              toast.error(t('finance.cash.gate_required_title'), {
-                description: t('finance.cash.gate_required_expense'),
-              })
+              setGateOpen(true)
               return
             }
             setExpenseModalOpen(true)
@@ -221,6 +220,14 @@ export function SalonLayout() {
           />
         </Suspense>
       ) : null}
+
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salon.id}
+        action="expense"
+        onShiftOpened={() => setExpenseModalOpen(true)}
+      />
     </div>
   )
 }

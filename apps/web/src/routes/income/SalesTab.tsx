@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
@@ -65,6 +66,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const [staffFilter, setStaffFilter] = useState<string>('')
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [gateOpen, setGateOpen] = useState(false)
   const { hasOpenShift } = useRequireCashShift(salonId)
   // Пагинация по 25 — как на /expenses и /clients.
   const [page, setPage] = useState(1)
@@ -155,9 +157,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
               // Per-user касса: «+Продажа» — гейт ДО открытия wizard'а,
               // чтобы не проходить 4 шага зря.
               if (!hasOpenShift) {
-                toast.error(t('finance.cash.gate_required_title'), {
-                  description: t('finance.cash.gate_required_sale'),
-                })
+                setGateOpen(true)
                 return
               }
               setCreateOpen(true)
@@ -374,6 +374,14 @@ export function SalesTab({ salonId }: { salonId: string }) {
         onClose={() => setEditingSale(null)}
         salonId={salonId}
         currency={currency}
+      />
+
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="sale"
+        onShiftOpened={() => setCreateOpen(true)}
       />
     </div>
   )

@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useClients } from '@/hooks/useClients'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
@@ -73,6 +74,7 @@ export function VisitDetailModal({
 }) {
   const { t } = useTranslation()
   const [view, setView] = useState<'detail' | 'charge' | 'document'>(initialView ?? 'detail')
+  const [gateOpen, setGateOpen] = useState(false)
   const [tab, setTab] = useState<'wizyta' | 'info'>('wizyta')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
 
@@ -166,9 +168,7 @@ export function VisitDetailModal({
             }}
             onChargeClick={() => {
               if (!hasOpenShiftTop) {
-                toast.error(t('finance.cash.gate_required_title'), {
-                  description: t('finance.cash.gate_required_charge'),
-                })
+                setGateOpen(true)
                 return
               }
               setView('charge')
@@ -197,6 +197,13 @@ export function VisitDetailModal({
           />
         )}
       </DialogContent>
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="visit_charge"
+        onShiftOpened={() => setView('charge')}
+      />
     </Dialog>
   )
 }
@@ -526,6 +533,7 @@ function ChargeView({
   const baseTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents - v.discount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
+  const [chargeGateOpen, setChargeGateOpen] = useState(false)
   const [cashRegisterId, setCashRegisterId] = useState<string>(cashRegisters[0]?.id ?? '')
   const [busy, setBusy] = useState(false)
 
@@ -541,9 +549,7 @@ function ChargeView({
   async function chargeAll() {
     // Per-user касса: расчёт визита требует открытую смену текущего юзера.
     if (!hasOpenShift) {
-      toast.error(t('finance.cash.gate_required_title'), {
-        description: t('finance.cash.gate_required_charge'),
-      })
+      setChargeGateOpen(true)
       return
     }
     setBusy(true)
@@ -697,6 +703,13 @@ function ChargeView({
           {t('visits.charge.confirm')}
         </Button>
       </footer>
+      <CashGateRequiredDialog
+        open={chargeGateOpen}
+        onClose={() => setChargeGateOpen(false)}
+        salonId={salonId}
+        action="visit_charge"
+        onShiftOpened={() => void chargeAll()}
+      />
     </div>
   )
 }

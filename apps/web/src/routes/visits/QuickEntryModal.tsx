@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import {
   Select,
   SelectContent,
@@ -159,6 +160,7 @@ export function QuickEntryModal({
    * react-hook-form не валидирует `lines`, держим вне формы.
    */
   const [linesTouched, setLinesTouched] = useState(false)
+  const [gateOpen, setGateOpen] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -911,9 +913,7 @@ export function QuickEntryModal({
                   // нет — toast'имся и не вызываем handleSubmit, чтобы юзер
                   // не вбивал суммы зря.
                   if (!hasOpenShift) {
-                    toast.error(t('finance.cash.gate_required_title'), {
-                      description: t('finance.cash.gate_required_charge'),
-                    })
+                    setGateOpen(true)
                     return
                   }
                   void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()
@@ -937,6 +937,13 @@ export function QuickEntryModal({
           )}
         </DialogFooter>
       </DialogContent>
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="visit_charge"
+        onShiftOpened={() => void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()}
+      />
     </Dialog>
   )
 }

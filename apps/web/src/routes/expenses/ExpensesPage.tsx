@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
-  Lock,
   Paperclip,
   Plus,
   Repeat,
@@ -11,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -57,6 +56,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { CashTransferModal } from './CashTransferModal'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
@@ -146,8 +146,8 @@ export function ExpensesPage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
-  const { hasOpenShift, disciplineEnabled } = useRequireCashShift(salonId)
-  const showShiftBanner = disciplineEnabled && !hasOpenShift
+  const [gateOpen, setGateOpen] = useState(false)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   // Пагинация по 25 — как на /clients. Сброс на 1-ю страницу при смене
   // периода / фильтра.
   const [page, setPage] = useState(1)
@@ -198,26 +198,6 @@ export function ExpensesPage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      {/* Касса не открыта — баннер сверху, чтобы юзер не догадывался почему
-          кнопка «Добавить расход» отваливается. */}
-      {showShiftBanner ? (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <Lock className="mt-0.5 size-4 shrink-0 text-amber-700" strokeWidth={2} />
-          <div className="flex-1 text-sm">
-            <p className="font-semibold text-amber-900">{t('finance.cash.gate_required_title')}</p>
-            <p className="mt-0.5 text-xs text-amber-800">
-              {t('finance.cash.gate_required_expense')}{' '}
-              <Link
-                to={`/salon/${salonId}/finance?tab=cash`}
-                className="font-bold underline-offset-2 hover:underline"
-              >
-                {t('finance.cash.open_shift')} →
-              </Link>
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {/* Header */}
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
@@ -248,9 +228,7 @@ export function ExpensesPage() {
             size="md"
             onClick={() => {
               if (!hasOpenShift) {
-                toast.error(t('finance.cash.gate_required_title'), {
-                  description: t('finance.cash.gate_required_expense'),
-                })
+                setGateOpen(true)
                 return
               }
               setFormOpen(true)
@@ -342,9 +320,7 @@ export function ExpensesPage() {
                     key={e.id}
                     onClick={() => {
                       if (!hasOpenShift) {
-                        toast.error(t('finance.cash.gate_required_title'), {
-                          description: t('finance.cash.gate_required_expense'),
-                        })
+                        setGateOpen(true)
                         return
                       }
                       setEditingExpense(e)
@@ -664,6 +640,13 @@ export function ExpensesPage() {
         open={transferOpen}
         onClose={() => setTransferOpen(false)}
         salonId={salonId}
+      />
+
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="expense"
       />
 
       {/* Просмотр чека */}

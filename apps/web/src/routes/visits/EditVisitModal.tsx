@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import {
   Select,
   SelectContent,
@@ -58,6 +59,7 @@ export function EditVisitModal({
   const [discount, setDiscount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [comment, setComment] = useState('')
+  const [gateOpen, setGateOpen] = useState(false)
 
   useEffect(() => {
     if (!visit) return
@@ -82,9 +84,7 @@ export function EditVisitModal({
     // Per-user касса: pending → paid (расчёт) требует открытую смену.
     // Pure-update (без смены статуса) — пропускаем без гейта.
     if (isPending && !hasOpenShift) {
-      toast.error(t('finance.cash.gate_required_title'), {
-        description: t('finance.cash.gate_required_charge'),
-      })
+      setGateOpen(true)
       return
     }
     const amountCents = parseMoney(amount)
@@ -212,6 +212,13 @@ export function EditVisitModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <CashGateRequiredDialog
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        salonId={salonId}
+        action="visit_charge"
+        onShiftOpened={handleSubmit}
+      />
     </Dialog>
   )
 }
