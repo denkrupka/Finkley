@@ -97,24 +97,9 @@ const KnowledgePage = lazyWithRetry(() =>
 const SettingsPage = lazyWithRetry(() =>
   import('@/routes/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
-const IncomeCategoriesPage = lazyWithRetry(() =>
-  import('@/routes/settings/IncomeCategoriesPage').then((m) => ({
-    default: m.IncomeCategoriesPage,
-  })),
-)
-const ExpensesCatalogPage = lazyWithRetry(() =>
-  import('@/routes/settings/ExpensesCatalogPage').then((m) => ({
-    default: m.ExpensesCatalogPage,
-  })),
-)
-const CashRegistersCatalogPage = lazyWithRetry(() =>
-  import('@/routes/settings/CashRegistersCatalogPage').then((m) => ({
-    default: m.CashRegistersCatalogPage,
-  })),
-)
-const InvestmentsCatalogPage = lazyWithRetry(() =>
-  import('@/routes/settings/InvestmentsCatalogPage').then((m) => ({
-    default: m.InvestmentsCatalogPage,
+const FinanceCatalogPage = lazyWithRetry(() =>
+  import('@/routes/settings/FinanceCatalogPage').then((m) => ({
+    default: m.FinanceCatalogPage,
   })),
 )
 const CounterpartiesCatalogPage = lazyWithRetry(() =>
@@ -287,14 +272,25 @@ function App() {
         <Route path="settings/integrations-full" element={lazyRoute(<IntegrationsPage />)} />
         <Route path="settings/team" element={lazyRoute(<TeamPage />)} />
         <Route path="settings/audit" element={lazyRoute(<AuditLogPage />)} />
-        <Route path="settings/income-categories" element={lazyRoute(<IncomeCategoriesPage />)} />
-        <Route path="settings/expenses-catalog" element={lazyRoute(<ExpensesCatalogPage />)} />
-        <Route path="settings/cash-registers" element={lazyRoute(<CashRegistersCatalogPage />)} />
-        <Route path="settings/counterparties" element={lazyRoute(<CounterpartiesCatalogPage />)} />
+        <Route path="settings/finance-catalog" element={lazyRoute(<FinanceCatalogPage />)} />
+        {/* Backward-compat: старые 4 URL'а ведут на объединённую страницу с активным табом. */}
+        <Route
+          path="settings/expenses-catalog"
+          element={<Navigate to="../settings/finance-catalog?tab=expenses" replace />}
+        />
+        <Route
+          path="settings/income-categories"
+          element={<Navigate to="../settings/finance-catalog?tab=incomes" replace />}
+        />
         <Route
           path="settings/investments-catalog"
-          element={lazyRoute(<InvestmentsCatalogPage />)}
+          element={<Navigate to="../settings/finance-catalog?tab=incomes" replace />}
         />
+        <Route
+          path="settings/cash-registers"
+          element={<Navigate to="../settings/finance-catalog?tab=cash" replace />}
+        />
+        <Route path="settings/counterparties" element={lazyRoute(<CounterpartiesCatalogPage />)} />
         <Route path="help" element={lazyRoute(<HelpPage />)} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>

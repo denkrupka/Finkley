@@ -61,7 +61,7 @@ export function IncomeCategoriesPage() {
 // Sub-section: Categories
 // =============================================================================
 
-function CategoriesSection({ salonId }: { salonId: string }) {
+export function CategoriesSection({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const [showArchived, setShowArchived] = useState(false)
   const { data: categories = [], isLoading } = useOtherIncomeCategories(salonId, {

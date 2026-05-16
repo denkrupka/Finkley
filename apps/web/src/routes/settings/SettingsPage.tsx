@@ -2,14 +2,11 @@ import {
   Calendar,
   ChevronRight,
   Clock,
-  Coins,
-  CreditCard,
   Download,
   History,
   Mail,
   Scissors,
   Sparkles,
-  Sprout,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -518,28 +515,10 @@ export function SettingsPage() {
               subtitle={t('settings.catalogs.items.clients.subtitle')}
             />
             <CatalogCard
-              to={`/${salonId}/settings/income-categories`}
-              icon={Coins}
-              title={t('settings.catalogs.items.income.title')}
-              subtitle={t('settings.catalogs.items.income.subtitle')}
-            />
-            <CatalogCard
-              to={`/${salonId}/settings/expenses-catalog`}
+              to={`/${salonId}/settings/finance-catalog`}
               icon={Wallet}
-              title={t('settings.catalogs.items.expenses.title')}
-              subtitle={t('settings.catalogs.items.expenses.subtitle')}
-            />
-            <CatalogCard
-              to={`/${salonId}/settings/cash-registers`}
-              icon={CreditCard}
-              title={t('settings.catalogs.items.cash.title')}
-              subtitle={t('settings.catalogs.items.cash.subtitle')}
-            />
-            <CatalogCard
-              to={`/${salonId}/settings/investments-catalog`}
-              icon={Sprout}
-              title={t('settings.catalogs.items.investments.title')}
-              subtitle={t('settings.catalogs.items.investments.subtitle')}
+              title={t('settings.catalogs.items.finance.title')}
+              subtitle={t('settings.catalogs.items.finance.subtitle')}
             />
             <CatalogCard
               to={`/${salonId}/settings/counterparties`}
