@@ -401,7 +401,10 @@ function ServiceDetailModal({
 
   return (
     <Dialog open={!!service} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      {/* Image #117: расширили модалку до 720px и навесили min-w-0 на 3-col
+          гриды — теперь длинные ru-лейблы («Себестоимость (PLN)», «% мастера
+          (%)») умещаются без обрезки правой колонки и кнопки Сохранить. */}
+      <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>{t('services_page.detail.title')}</DialogTitle>
           <DialogDescription>

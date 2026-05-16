@@ -85,13 +85,11 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   return (
     <div>
       {/* Image #64: заголовок «Эффективность мастеров» убран — табы Reports
-          уже сообщают, на каком отчёте мы. PeriodPicker переехал под
-          AI-плашку (как в Reports → Услуги). */}
+          уже сообщают, на каком отчёте мы.
+          Image #116: PeriodPickerPopover больше не висит в отдельной строке
+          сверху — он перенесён в заголовок секции «Эффективность мастеров»
+          (передаётся как headerRight в StaffPerformanceSection ниже). */}
       <AiInsightsPanel kind="staff" payload={aiPayload} />
-
-      <div className="mb-4 flex items-center justify-end">
-        <PeriodPickerPopover value={period} onChange={setPeriod} />
-      </div>
 
       <p className="text-muted-foreground mb-3 hidden text-sm print:block">
         {t('common.print_period', {
@@ -100,14 +98,13 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
         })}
       </p>
 
-      {/* При пустых данных таблицу и плашку «За период визитов не было.»
-          не показываем — AI-плашка наверху уже всё объясняет, и второй
-          empty-state визуально мусорит. */}
-      {!isLoading && rows.length === 0 ? null : (
+      {/* Image #114/#115: убрали loading-плашку «Загрузка...» — она мелькала
+          при открытии страницы и потом пропадала, что визуально дребезжало.
+          Теперь во время загрузки RPC просто ничего не рисуем; таблица
+          появится сразу с данными (либо вообще не появится, если rows=0). */}
+      {!isLoading && rows.length > 0 ? (
         <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-          {isLoading ? (
-            <p className="text-muted-foreground p-6 text-sm">{t('common.loading')}</p>
-          ) : (
+          {
             <table className="w-full min-w-[820px] text-sm">
               <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
                 <tr>
@@ -278,12 +275,17 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                 </tfoot>
               ) : null}
             </table>
-          )}
+          }
         </div>
-      )}
+      ) : null}
 
       <div className="mt-6">
-        <StaffPerformanceSection salonId={salonId} staff={staffList} currency={currency} />
+        <StaffPerformanceSection
+          salonId={salonId}
+          staff={staffList}
+          currency={currency}
+          headerRight={<PeriodPickerPopover value={period} onChange={setPeriod} />}
+        />
       </div>
     </div>
   )

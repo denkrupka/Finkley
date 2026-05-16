@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Medal } from 'lucide-react'
+import { ChevronDown, ChevronRight, Medal, Trophy } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -195,7 +195,7 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
               </tr>
             </thead>
             <tbody>
-              {groups.map((g) => {
+              {groups.map((g, gIdx) => {
                 const groupKey = g.category_id ?? '__none__'
                 const isCollapsed = collapsed.has(groupKey)
                 const topCount = Math.max(1, Math.ceil(g.rows.length * 0.2))
@@ -204,6 +204,7 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
                   <GroupBlock
                     key={groupKey}
                     group={g}
+                    groupIdx={gIdx}
                     isCollapsed={isCollapsed}
                     onToggle={() => toggleGroup(groupKey)}
                     topCount={topCount}
@@ -224,6 +225,7 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
 
 function GroupBlock({
   group,
+  groupIdx,
   isCollapsed,
   onToggle,
   topCount,
@@ -233,6 +235,7 @@ function GroupBlock({
   t,
 }: {
   group: Group
+  groupIdx: number
   isCollapsed: boolean
   onToggle: () => void
   topCount: number
@@ -241,6 +244,12 @@ function GroupBlock({
   currency: string
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
+  // Image #118: ТОП-3 категории по обороту получают кубок (Trophy) — золото/
+  // серебро/бронза. Используем Trophy (а не Medal) чтобы визуально отличить
+  // от медалей у топ-услуг внутри группы.
+  const isTopGroup = groupIdx < 3
+  const trophyColor =
+    groupIdx === 0 ? 'text-yellow-500' : groupIdx === 1 ? 'text-slate-400' : 'text-amber-700'
   return (
     <>
       <tr
@@ -254,6 +263,13 @@ function GroupBlock({
             ) : (
               <ChevronDown className="text-muted-foreground size-4" strokeWidth={2} />
             )}
+            {isTopGroup ? (
+              <Trophy
+                className={cn('size-4 shrink-0', trophyColor)}
+                strokeWidth={2}
+                aria-label={t(`reports_hub.services.medal_${groupIdx + 1}`)}
+              />
+            ) : null}
             <span className="text-brand-navy text-sm font-bold">{group.category_name}</span>
             <span className="text-muted-foreground text-[10.5px]">
               {t('reports_hub.services.group_count', { count: group.rows.length })}

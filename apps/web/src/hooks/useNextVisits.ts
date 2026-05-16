@@ -40,3 +40,39 @@ export function useNextVisitsByClient(salonId: string | undefined) {
     staleTime: 60_000,
   })
 }
+
+/**
+ * Возвращает Set<client_id> — клиенты, у которых был хотя бы один визит в
+ * заданном диапазоне дат. Используется в Reports → Клиенты для фильтрации
+ * списка клиентов по выбранному периоду (image #113).
+ *
+ * Если range = null — запрос не делается, возвращаем `null` (фильтр выключен).
+ */
+export function useClientIdsWithVisitsInPeriod(
+  salonId: string | undefined,
+  range: { start: string; end: string } | null,
+) {
+  return useQuery<Set<string> | null>({
+    queryKey: ['client-ids-by-period', salonId, range],
+    queryFn: async () => {
+      if (!salonId || !range) return null
+      const set = new Set<string>()
+      const { data, error } = await supabase
+        .from('visits')
+        .select('client_id')
+        .eq('salon_id', salonId)
+        .gte('visit_at', range.start)
+        .lte('visit_at', range.end)
+        .is('deleted_at', null)
+        .not('client_id', 'is', null)
+        .limit(5000)
+      if (error) throw error
+      for (const r of (data ?? []) as { client_id: string | null }[]) {
+        if (r.client_id) set.add(r.client_id)
+      }
+      return set
+    },
+    enabled: !!salonId && !!range,
+    staleTime: 30_000,
+  })
+}

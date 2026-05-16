@@ -10,6 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,7 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
 import { useClients, type ClientSort } from '@/hooks/useClients'
-import { useNextVisitsByClient } from '@/hooks/useNextVisits'
+import { useClientIdsWithVisitsInPeriod, useNextVisitsByClient } from '@/hooks/useNextVisits'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -118,9 +124,20 @@ function ClientsListTab({
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
   const [createOpen, setCreateOpen] = useState(false)
   const [drawerClient, setDrawerClient] = useState<ClientRow | null>(null)
+  // Image #113: фильтр по периоду визитов. null = «все время» (default —
+  // юзер хочет видеть всю базу сразу, без сюрприза «потерянных» клиентов).
+  // При выборе периода фильтруем клиентов: только те, у кого был визит в
+  // выбранном диапазоне.
+  const [period, setPeriod] = useState<PeriodValue | null>(null)
+  const periodRangeIso = useMemo(() => {
+    if (!period) return null
+    const r = periodToRange(period)
+    return { start: r.start.toISOString(), end: r.end.toISOString() }
+  }, [period])
 
   const { data: allClients = [], isLoading } = useClients(salonId, { search, sort })
   const { data: nextVisitsByClient = new Map<string, string>() } = useNextVisitsByClient(salonId)
+  const { data: clientsInPeriod = null } = useClientIdsWithVisitsInPeriod(salonId, periodRangeIso)
 
   const thresholds = useMemo(
     () => ({
@@ -135,11 +152,14 @@ function ClientsListTab({
     [allClients, thresholds],
   )
 
-  const clients = useMemo(
-    () =>
-      segmentFilter === 'all' ? segmented : segmented.filter((c) => c.segment === segmentFilter),
-    [segmented, segmentFilter],
-  )
+  const clients = useMemo(() => {
+    let list = segmented
+    if (segmentFilter !== 'all') list = list.filter((c) => c.segment === segmentFilter)
+    // Image #113: дополнительный фильтр по периоду визитов. Применяем только
+    // когда период выбран И данные по визитам в этот период загружены.
+    if (period && clientsInPeriod) list = list.filter((c) => clientsInPeriod.has(c.id))
+    return list
+  }, [segmented, segmentFilter, period, clientsInPeriod])
 
   // Privacy alert: admin загрузил список с контактами >50 клиентов.
   // Sticky-флаг в sessionStorage — чтобы не пинговать функцию каждый раз,
@@ -200,25 +220,14 @@ function ClientsListTab({
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="text-brand-navy text-lg font-bold tracking-tight">
-          {t('reports_hub.clients.list_title')}
-        </h2>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setCreateOpen(true)}
-          data-testid="add-client-reports"
-        >
-          <Plus className="size-4" strokeWidth={2.4} />
-          {t('clients.add')}
-        </Button>
-      </div>
-
+      {/* Image #111: убрали заголовок «База клиентов» и кнопку «Добавить»
+          сверху — кнопка теперь живёт в одной строке с чипсами-сегментами
+          напротив них. */}
       <AiInsightsPanel kind="clients" payload={aiPayload} />
 
-      {/* Сегменты-чипсы. Клик переключает фильтр, повторный клик — сбрасывает. */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      {/* Сегменты-чипсы + кнопка «Добавить клиента» (image #111).
+          Клик по чипсу переключает фильтр, повторный клик — сбрасывает. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <SegmentPill
           label={`${t('clients.kpi.total')} · ${segmented.length}`}
           active={segmentFilter === 'all'}
@@ -242,6 +251,16 @@ function ClientsListTab({
             onClick={() => setSegmentFilter(segmentFilter === seg ? 'all' : seg)}
           />
         ))}
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => setCreateOpen(true)}
+          data-testid="add-client-reports"
+          className="ml-auto"
+        >
+          <Plus className="size-4" strokeWidth={2.4} />
+          {t('clients.add')}
+        </Button>
       </div>
 
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -268,6 +287,27 @@ function ClientsListTab({
             <SelectItem value="revenue">{t('clients.sort.revenue')}</SelectItem>
           </SelectContent>
         </Select>
+        {/* Image #113: PeriodPickerPopover как на вкладке Услуги. По клику
+            открывает календарь, выбранный период фильтрует список клиентов
+            до тех, у кого был визит в этот промежуток. Кнопка-крестик рядом
+            сбрасывает фильтр обратно в «все время». */}
+        <div className="flex items-center gap-1">
+          <PeriodPickerPopover
+            value={period ?? currentMonthPeriod()}
+            onChange={(p) => setPeriod(p)}
+          />
+          {period ? (
+            <button
+              type="button"
+              onClick={() => setPeriod(null)}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/40 grid size-9 place-items-center rounded-md text-sm"
+              aria-label={t('clients.period_clear', { defaultValue: 'Сбросить период' })}
+              title={t('clients.period_clear', { defaultValue: 'Сбросить период' })}
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
@@ -380,22 +420,26 @@ function ClientsListTab({
                     <td className="num text-muted-foreground px-3 py-2.5 text-right">
                       {c.visit_count}
                     </td>
-                    <td className="text-muted-foreground px-3 py-2.5 text-right text-xs">
+                    {/* Image #112: одинаковый стиль для «Последний визит» и
+                        «След. визит» — один цвет/шрифт/размер, цифры в num.
+                        Различие только в формате: прошлый визит — только дата
+                        (день/месяц/год), будущий — дата + время записи. */}
+                    <td className="text-muted-foreground px-3 py-2.5 text-right">
                       {c.last_visit_at ? (
-                        <span className="num">
+                        <span className="num text-foreground text-xs font-medium">
                           {format(parseISO(c.last_visit_at), 'd MMM yyyy', { locale: ru })}
                         </span>
                       ) : (
-                        '—'
+                        <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </td>
-                    <td className="text-right text-xs">
+                    <td className="px-3 py-2.5 text-right">
                       {nextVisit ? (
-                        <span className="text-secondary num font-semibold">
-                          {format(parseISO(nextVisit), 'd MMM, HH:mm', { locale: ru })}
+                        <span className="num text-secondary text-xs font-medium">
+                          {format(parseISO(nextVisit), 'd MMM yyyy, HH:mm', { locale: ru })}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </td>
                   </tr>
