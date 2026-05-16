@@ -182,7 +182,7 @@ as $$
       and expense_at <= p_at::date
   ),
   payouts_out as (
-    select coalesce(sum(amount_cents), 0) as v
+    select coalesce(sum(net_payout_cents), 0) as v
     from public.payouts
     where salon_id = p_salon_id
       and cash_register_id = p_register_id
