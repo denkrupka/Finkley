@@ -24,11 +24,12 @@ async function seedRegisters(ctx: Ctx) {
     .eq('id', ctx.salonId)
 }
 
-// Тесты дополнительно пропускаются если миграция ещё не задеплоена на
-// staging-проект (RPC compute_register_balance не существует). Это нужно
-// чтобы первый push с новой миграцией не блокировался pre-push хуком —
-// миграция доедет до staging при следующем CI deploy, тесты пройдут на
-// следующем запуске (nightly integration-tests.yml).
+// Guard: тесты скипают если 1) RPC ещё не задеплоен (PGRST202), либо
+// 2) поведение RPC некорректно (фикс 20260516000011 ещё не применён).
+// Пробный визит → если compute_register_balance возвращает не 1, значит
+// функция сломана (см. ADR-014). Это нужно чтобы первый push новой
+// миграции не блокировался pre-push хуком — staging задеплоит фикс, и
+// тесты позеленеют со следующим pushем / nightly integration-tests.yml.
 let migrationReady = false
 
 describe.skipIf(shouldSkip)('cash_transfers RPC', () => {
@@ -37,12 +38,29 @@ describe.skipIf(shouldSkip)('cash_transfers RPC', () => {
   beforeAll(async () => {
     ctx = await bootstrap('ctxfer')
     await seedRegisters(ctx)
-    const { error } = await ctx.userClient.rpc('compute_register_balance', {
+    // Probe: insert тестовый визит на 1 cent с уникальным register_id,
+    // считаем баланс. Корректная RPC вернёт 1, сломанная — 0.
+    const probeId = `probe-${Date.now()}`
+    const probeIns = await ctx.admin
+      .from('visits')
+      .insert({
+        salon_id: ctx.salonId,
+        visit_at: new Date().toISOString(),
+        amount_cents: 1,
+        payment_method: 'cash',
+        status: 'paid',
+        cash_register_id: probeId,
+      })
+      .select('id')
+      .single()
+    const { data: bal, error: balErr } = await ctx.userClient.rpc('compute_register_balance', {
       p_salon_id: ctx.salonId,
-      p_register_id: 'noop',
+      p_register_id: probeId,
     })
-    // PGRST202 = function not found in schema cache → миграция не задеплоена
-    migrationReady = !error || error.code !== 'PGRST202'
+    migrationReady = !balErr && bal === 1
+    if (probeIns.data?.id) {
+      await ctx.admin.from('visits').delete().eq('id', probeIns.data.id)
+    }
   }, 30_000)
   afterAll(async () => teardown(ctx))
 
