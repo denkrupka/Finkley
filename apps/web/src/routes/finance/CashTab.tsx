@@ -94,6 +94,25 @@ export function CashTab({ salonId }: { salonId: string }) {
   const cashNow = expected.expected_cash_cents
   const todayLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: ru })
 
+  /** Универсальный extractor описания ошибки. Supabase возвращает плейн-
+   *  объект {message,details,hint,code}, не Error instance — поэтому
+   *  String(err) даёт '[object Object]'. Тянем .message руками. */
+  function describeError(err: unknown): string {
+    if (err instanceof Error) return err.message
+    if (err && typeof err === 'object') {
+      const o = err as { message?: unknown; details?: unknown; hint?: unknown }
+      if (typeof o.message === 'string') return o.message
+      if (typeof o.details === 'string') return o.details
+      if (typeof o.hint === 'string') return o.hint
+      try {
+        return JSON.stringify(err)
+      } catch {
+        return String(err)
+      }
+    }
+    return String(err)
+  }
+
   function handleOpenShift(input: { opening_amount_cents: number; opening_comment?: string }) {
     openShift.mutate(input, {
       onSuccess: () => {
@@ -102,7 +121,7 @@ export function CashTab({ salonId }: { salonId: string }) {
       },
       onError: (err) =>
         toast.error(t('finance.cash.toast_open_error'), {
-          description: err instanceof Error ? err.message : String(err),
+          description: describeError(err),
         }),
     })
   }
@@ -128,7 +147,7 @@ export function CashTab({ salonId }: { salonId: string }) {
         },
         onError: (err) =>
           toast.error(t('finance.cash.toast_close_error'), {
-            description: err instanceof Error ? err.message : String(err),
+            description: describeError(err),
           }),
       },
     )
