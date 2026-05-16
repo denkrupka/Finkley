@@ -6,8 +6,10 @@ import { Suspense, useEffect, useState } from 'react'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { useAuth } from '@/hooks/useAuth'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
@@ -66,6 +68,7 @@ export function SalonLayout() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
+  const { hasOpenShift } = useRequireCashShift(salonId)
 
   useEffect(() => {
     if (salonId && salon) rememberLastSalon(salonId)
@@ -178,7 +181,17 @@ export function SalonLayout() {
             setQuickEntryPrefill(null)
             setQuickEntryOpen(true)
           }}
-          onExpense={() => setExpenseModalOpen(true)}
+          onExpense={() => {
+            // Per-user касса: «+Расход» из FAB — тот же гейт что в
+            // ExpensesPage. Блокируем открытие модалки заранее.
+            if (!hasOpenShift) {
+              toast.error(t('finance.cash.gate_required_title'), {
+                description: t('finance.cash.gate_required_expense'),
+              })
+              return
+            }
+            setExpenseModalOpen(true)
+          }}
         />
       )}
       <BottomNav salonId={salon.id} />
