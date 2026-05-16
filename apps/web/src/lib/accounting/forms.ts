@@ -182,3 +182,33 @@ export function getTaxForm(legal: string | null | undefined, tax: string | null 
   if (!lf || !tax) return null
   return lf.tax_forms.find((f) => f.value === tax) ?? null
 }
+
+/**
+ * Image #134: пытаемся определить правную форму по названию компании из
+ * MF White List API. Возвращает value из LEGAL_FORMS или null если не
+ * распознали (тогда юзер выберет руками).
+ *
+ * Логика — простой substring-match по характерным маркерам в названии:
+ *   «sp. z o.o.» / «spółka z ograniczoną odpowiedzialnością» → sp_zoo
+ *   «s.a.» / «spółka akcyjna»                                → s_a
+ *   «sp. j.» / «spółka jawna»                                 → sp_jawna
+ *   «sp.k.» / «spółka komandytowa»                            → sp_komandytowa
+ *   «fundacja»                                                → fundacja
+ *   ничего из перечисленного — null (юзер решит сам, обычно это JDG).
+ */
+export function inferLegalFormFromName(name: string | null | undefined): string | null {
+  if (!name) return null
+  const n = name.toLowerCase()
+  // Sp. z o.o. — ловим все распространённые написания
+  if (
+    /sp[óo]?[łl]ka z ogranicz/.test(n) ||
+    /\bsp\.?\s*z\s*o\.?\s*o\.?/.test(n) ||
+    /\bsp\s*z\s*oo\b/.test(n)
+  )
+    return 'sp_zoo'
+  if (/sp[óo]?[łl]ka akcyjna/.test(n) || /\bs\.?\s*a\.?\b/.test(n)) return 's_a'
+  if (/sp[óo]?[łl]ka komandytowa/.test(n) || /\bsp\.?\s*k\.?\b/.test(n)) return 'sp_komandytowa'
+  if (/sp[óo]?[łl]ka jawna/.test(n) || /\bsp\.?\s*j\.?\b/.test(n)) return 'sp_jawna'
+  if (/\bfundacja\b/.test(n)) return 'fundacja'
+  return null
+}

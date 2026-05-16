@@ -9,6 +9,18 @@ import { supabase } from '@/lib/supabase/client'
  * Все поля опциональны — заполняется по мере того, как юзер вводит данные
  * (NIP lookup автозаполняет name+address, остальное руками).
  */
+/**
+ * Расписание отправки документов бухгалтеру по email (image #135/#136).
+ * Сам email берётся из аккаунта-бухгалтера в `salon_members` — здесь
+ * указывается только частота. Адрес тут НЕ дублируем.
+ */
+export type EmailFrequency =
+  | { kind: 'immediate' }
+  | { kind: 'daily'; time: string }
+  | { kind: 'weekly'; time: string; day_of_week: number /* 1=Пн..7=Вс */ }
+  | { kind: 'monthly'; time: string; day_of_month: number /* 1..31 */ }
+  | { kind: 'next_month_start'; time: string; day_of_month: number }
+
 export type AccountingSettings = {
   nip?: string
   company_name?: string
@@ -23,7 +35,8 @@ export type AccountingSettings = {
   portal?: string
   /** Если portal='other' — название портала, написанное юзером. */
   portal_other_name?: string
-  accountant_email?: string
+  /** Частота отправки документов по email (image #135/#136). */
+  email_frequency?: EmailFrequency
 }
 
 export function useAccountingSettings(salonId: string | undefined) {

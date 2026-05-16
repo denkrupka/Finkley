@@ -21,7 +21,12 @@ import {
 } from '@/hooks/useAccountingSettings'
 import { lookupNip } from '@/hooks/useCounterparties'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
-import { LEGAL_FORMS, getLegalForm, getTaxForm } from '@/lib/accounting/forms'
+import {
+  LEGAL_FORMS,
+  getLegalForm,
+  getTaxForm,
+  inferLegalFormFromName,
+} from '@/lib/accounting/forms'
 
 /**
  * AccountingSettingsCard — блок «Бухгалтерия» во вкладке Settings → Профиль
@@ -103,11 +108,16 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
         toast.info(t('counterparties.nip_not_found'))
         return
       }
+      // Image #134: пытаемся также вытянуть правную форму из названия
+      // (MF не возвращает её отдельно). Заполняем только если у юзера
+      // ещё не выбрана форма руками — он сможет потом изменить.
+      const inferred = inferLegalFormFromName(res.name)
       setDraft((prev) => ({
         ...prev,
         nip,
         company_name: prev.company_name || res.name,
         address: prev.address || res.address,
+        legal_form: prev.legal_form || inferred || prev.legal_form,
       }))
       toast.success(t('counterparties.nip_found'))
     } catch (err) {
@@ -385,17 +395,12 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
           </>
         ) : null}
 
-        {/* Accountant email + hint */}
+        {/* Image #135/#136: email бухгалтера НЕ запрашиваем тут — он берётся
+            из аккаунта в «Пользователях». Только hint + CTA на создание акка.
+            При канале email/portal+email дополнительно спрашиваем частоту
+            отправки. */}
         {showEmailHint ? (
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="acc-email">{t('settings.accounting.accountant_email_label')}</Label>
-            <Input
-              id="acc-email"
-              type="email"
-              value={draft.accountant_email ?? ''}
-              onChange={(e) => patch('accountant_email', e.target.value)}
-              placeholder="ksiegowy@firma.pl"
-            />
+          <div className="flex flex-col gap-3 sm:col-span-2">
             <div className="bg-brand-teal-soft/40 border-brand-teal-soft rounded-md border p-3 text-xs">
               <p className="text-brand-teal-deep font-semibold">
                 {t('settings.accounting.team_hint_title')}
@@ -410,6 +415,11 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
                 {t('settings.accounting.team_hint_cta')}
               </Link>
             </div>
+
+            <EmailFrequencyPicker
+              value={draft.email_frequency}
+              onChange={(v) => patch('email_frequency', v)}
+            />
           </div>
         ) : null}
 
@@ -420,5 +430,141 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * EmailFrequencyPicker — image #135/#136. Спрашиваем как часто слать
+ * расходы бухгалтеру по email. Варианты:
+ *   • Сразу после добавления расхода (kind='immediate')
+ *   • 1 раз в день — время (kind='daily', time)
+ *   • 1 раз в неделю — день недели + время (kind='weekly')
+ *   • 1 раз в месяц — число + время (kind='monthly')
+ *   • В начале след. месяца — число + время (kind='next_month_start')
+ *
+ * Для month/next_month_start если число > длины месяца — отправка будет
+ * в последний день месяца (валидируется в edge-функции при отправке,
+ * здесь только подсказка).
+ */
+type EmailFrequencyPickerProps = {
+  value: AccountingSettings['email_frequency']
+  onChange: (next: AccountingSettings['email_frequency']) => void
+}
+
+function EmailFrequencyPicker({ value, onChange }: EmailFrequencyPickerProps) {
+  const { t } = useTranslation()
+  const kind = value?.kind ?? 'immediate'
+
+  function update(patch: Partial<NonNullable<AccountingSettings['email_frequency']>>) {
+    onChange({
+      ...(value as object),
+      ...(patch as object),
+    } as AccountingSettings['email_frequency'])
+  }
+
+  function setKind(nextKind: NonNullable<AccountingSettings['email_frequency']>['kind']) {
+    if (nextKind === 'immediate') onChange({ kind: 'immediate' })
+    else if (nextKind === 'daily') onChange({ kind: 'daily', time: '09:00' })
+    else if (nextKind === 'weekly') onChange({ kind: 'weekly', time: '09:00', day_of_week: 1 })
+    else if (nextKind === 'monthly') onChange({ kind: 'monthly', time: '09:00', day_of_month: 1 })
+    else if (nextKind === 'next_month_start')
+      onChange({ kind: 'next_month_start', time: '09:00', day_of_month: 5 })
+  }
+
+  const FREQ_OPTIONS = [
+    { value: 'immediate' as const, label: t('settings.accounting.freq.immediate') },
+    { value: 'daily' as const, label: t('settings.accounting.freq.daily') },
+    { value: 'weekly' as const, label: t('settings.accounting.freq.weekly') },
+    { value: 'monthly' as const, label: t('settings.accounting.freq.monthly') },
+    { value: 'next_month_start' as const, label: t('settings.accounting.freq.next_month_start') },
+  ]
+
+  const WEEKDAYS = [
+    { value: 1, label: t('settings.accounting.freq.weekday_1') },
+    { value: 2, label: t('settings.accounting.freq.weekday_2') },
+    { value: 3, label: t('settings.accounting.freq.weekday_3') },
+    { value: 4, label: t('settings.accounting.freq.weekday_4') },
+    { value: 5, label: t('settings.accounting.freq.weekday_5') },
+    { value: 6, label: t('settings.accounting.freq.weekday_6') },
+    { value: 7, label: t('settings.accounting.freq.weekday_7') },
+  ]
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Label>{t('settings.accounting.freq.label')}</Label>
+      <div className="flex flex-wrap gap-2">
+        {FREQ_OPTIONS.map((opt) => {
+          const active = kind === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setKind(opt.value)}
+              className={`h-10 rounded-md border-[1.5px] px-3 text-sm font-semibold transition-colors ${
+                active
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card hover:bg-muted/40'
+              }`}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Дополнительные параметры в зависимости от выбора. */}
+      {value && value.kind !== 'immediate' ? (
+        <div className="border-border bg-muted/10 grid grid-cols-1 gap-3 rounded-md border p-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t('settings.accounting.freq.time_label')}</Label>
+            <Input
+              type="time"
+              value={'time' in value ? value.time : '09:00'}
+              onChange={(e) => update({ time: e.target.value })}
+            />
+          </div>
+
+          {value.kind === 'weekly' ? (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">{t('settings.accounting.freq.day_of_week_label')}</Label>
+              <Select
+                value={String(value.day_of_week)}
+                onValueChange={(v) => update({ day_of_week: Number(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEEKDAYS.map((d) => (
+                    <SelectItem key={d.value} value={String(d.value)}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {value.kind === 'monthly' || value.kind === 'next_month_start' ? (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">{t('settings.accounting.freq.day_of_month_label')}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={value.day_of_month}
+                onChange={(e) => {
+                  const n = Math.max(1, Math.min(31, Number(e.target.value) || 1))
+                  update({ day_of_month: n })
+                }}
+              />
+              <p className="text-muted-foreground text-[10.5px]">
+                {t('settings.accounting.freq.day_of_month_hint')}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   )
 }

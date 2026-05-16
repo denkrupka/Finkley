@@ -559,14 +559,17 @@ export function ExpenseFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Image #65: расширил модалку до 720px и сократил вертикальные
           паддинги — типичная форма расхода теперь умещается без скролла
-          (особенно payroll-кейс, где основное содержимое — поля выплаты). */}
+          (особенно payroll-кейс, где основное содержимое — поля выплаты).
+          Image #133: ещё уплотнил — сократил form gap до 2, paddings до
+          pt-2/pb-1, и пакую парные поля в 2-колоночный grid (дата+категория,
+          контрагент+номер документа), чтобы вся форма умещалась без скролла. */}
       <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>{t('expenses.form.title_new')}</DialogTitle>
         </DialogHeader>
 
         <form
-          className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 pb-2 pt-3"
+          className="flex min-h-0 flex-col gap-2 overflow-y-auto px-5 pb-1 pt-2"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -729,12 +732,64 @@ export function ExpenseFormModal({
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
-            <Input id="exp-date" type="date" {...form.register('expense_at')} />
+          {/* Image #133: Дата + Категория в 2-колоночном grid'е — экономим
+              вертикаль. На мобиле остаётся одна колонка. */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
+              <Input id="exp-date" type="date" {...form.register('expense_at')} />
+            </div>
+
+            <Controller
+              name="category_id"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="exp-cat">{t('expenses.form.category_label')}</Label>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={categories.length === 0}
+                  >
+                    <SelectTrigger id="exp-cat" data-testid="exp-cat">
+                      <SelectValue
+                        placeholder={
+                          categories.length === 0
+                            ? t('expenses.form.category_empty')
+                            : t('expenses.form.category_placeholder')
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c: ExpenseCategoryRow) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {categories.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t('expenses.form.category_empty_hint')}{' '}
+                      <a
+                        href={`/salon/${salonId}/services`}
+                        className="text-primary font-semibold hover:underline"
+                      >
+                        {t('expenses.form.category_empty_link')}
+                      </a>
+                    </p>
+                  ) : null}
+                  {form.formState.errors.category_id ? (
+                    <p className="text-destructive text-xs font-medium" role="alert">
+                      {t(form.formState.errors.category_id.message ?? '')}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            />
           </div>
 
-          {/* Image #94: новое обязательное поле «Описание» — над категорией. */}
+          {/* Image #94: обязательное поле «Описание». */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-description">{t('expenses.form.description_label')} *</Label>
             <Input
@@ -750,54 +805,6 @@ export function ExpenseFormModal({
               </p>
             ) : null}
           </div>
-
-          <Controller
-            name="category_id"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="exp-cat">{t('expenses.form.category_label')}</Label>
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  disabled={categories.length === 0}
-                >
-                  <SelectTrigger id="exp-cat" data-testid="exp-cat">
-                    <SelectValue
-                      placeholder={
-                        categories.length === 0
-                          ? t('expenses.form.category_empty')
-                          : t('expenses.form.category_placeholder')
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c: ExpenseCategoryRow) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {categories.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
-                    {t('expenses.form.category_empty_hint')}{' '}
-                    <a
-                      href={`/salon/${salonId}/services`}
-                      className="text-primary font-semibold hover:underline"
-                    >
-                      {t('expenses.form.category_empty_link')}
-                    </a>
-                  </p>
-                ) : null}
-                {form.formState.errors.category_id ? (
-                  <p className="text-destructive text-xs font-medium" role="alert">
-                    {t(form.formState.errors.category_id.message ?? '')}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          />
 
           {/* Payroll-блок: показываем только если выбранная категория
               is_payroll=true. Поля: мастер / аванс или окончательный / период. */}
@@ -971,63 +978,64 @@ export function ExpenseFormModal({
             />
           </div>
 
-          {/* Image #93: контрагент — выпадающий список + кнопка inline-добавления.
-              Скрываем для payroll-категорий (там получатель — мастер из payroll-блока). */}
+          {/* Image #133: Контрагент + Номер документа в 2-колоночном grid'е.
+              Image #93: контрагент — выпадающий список + кнопка inline-add.
+              Скрываем для payroll-категорий (получатель — мастер из payroll). */}
           {isPayrollCategory ? null : (
-            <Controller
-              name="counterparty_id"
-              control={form.control}
-              render={({ field }) => (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="exp-counterparty">{t('expenses.form.counterparty_label')}</Label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={field.value || '__none__'}
-                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
-                    >
-                      <SelectTrigger id="exp-counterparty" className="flex-1">
-                        <SelectValue placeholder={t('expenses.form.counterparty_placeholder')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          {t('expenses.form.counterparty_none')}
-                        </SelectItem>
-                        {counterparties.map((cp) => (
-                          <SelectItem key={cp.id} value={cp.id}>
-                            {cp.name}
-                            {cp.nip ? ` · ${cp.nip}` : ''}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Controller
+                name="counterparty_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="exp-counterparty">
+                      {t('expenses.form.counterparty_label')}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={field.value || '__none__'}
+                        onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                      >
+                        <SelectTrigger id="exp-counterparty" className="flex-1">
+                          <SelectValue placeholder={t('expenses.form.counterparty_placeholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            {t('expenses.form.counterparty_none')}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setCounterpartyModalOpen(true)}
-                      title={t('counterparties.add')}
-                    >
-                      +
-                    </Button>
+                          {counterparties.map((cp) => (
+                            <SelectItem key={cp.id} value={cp.id}>
+                              {cp.name}
+                              {cp.nip ? ` · ${cp.nip}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setCounterpartyModalOpen(true)}
+                        title={t('counterparties.add')}
+                      >
+                        +
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
-            />
-          )}
-
-          {/* Image #93: номер документа (фактура/чек) — опциональное поле,
-              заполняется руками либо подтягивается OCR'ом с фото чека. Для
-              payroll-категорий скрываем — там документа в этом смысле нет. */}
-          {isPayrollCategory ? null : (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="exp-document-number">
-                {t('expenses.form.document_number_label')}
-              </Label>
-              <Input
-                id="exp-document-number"
-                {...form.register('document_number')}
-                placeholder={t('expenses.form.document_number_placeholder')}
-                maxLength={60}
+                )}
               />
+
+              {/* Image #93: номер документа (фактура/чек) — рядом с контрагентом. */}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="exp-document-number">
+                  {t('expenses.form.document_number_label')}
+                </Label>
+                <Input
+                  id="exp-document-number"
+                  {...form.register('document_number')}
+                  placeholder={t('expenses.form.document_number_placeholder')}
+                  maxLength={60}
+                />
+              </div>
             </div>
           )}
 
