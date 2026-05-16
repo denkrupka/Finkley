@@ -10,6 +10,9 @@ export type OtherIncomeRow = {
   income_at: string
   amount_cents: number
   payment_method: PaymentMethod | null
+  /** Конкретная касса salon'а (из financial_settings.cash_registers.items[]).
+   *  Нужна для per-register балансов в модалке «Перестановка средств» (ADR-014). */
+  cash_register_id: string | null
   comment: string | null
   receipt_url: string | null
   source: string
@@ -150,6 +153,7 @@ export type CreateOtherIncomeInput = {
   amount_cents: number
   category_id: string | null
   payment_method: PaymentMethod | null
+  cash_register_id?: string | null
   comment: string | null
 }
 

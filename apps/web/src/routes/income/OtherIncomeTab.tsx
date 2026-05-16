@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useCashRegisters, type CashRegisterOption } from '@/hooks/useCashRegisters'
 import {
   useCreateOtherIncome,
   useDeleteOtherIncome,
@@ -47,6 +48,7 @@ type FormValues = {
   category_id: string
   amount: string
   payment_method: PaymentMethod | ''
+  cash_register_id: string
   comment: string
 }
 
@@ -60,6 +62,7 @@ const schema = z.object({
     .enum(['cash', 'card', 'transfer', 'online', 'mixed', ''])
     .optional()
     .default(''),
+  cash_register_id: z.string().optional().default(''),
   comment: z.string().max(500).optional().default(''),
 })
 
@@ -204,11 +207,13 @@ function OtherIncomeFormModal({
     amount_cents: number
     category_id: string | null
     payment_method: PaymentMethod | null
+    cash_register_id: string | null
     comment: string | null
   }) => void
   isPending: boolean
 }) {
   const { t } = useTranslation()
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -216,6 +221,7 @@ function OtherIncomeFormModal({
       category_id: '',
       amount: '',
       payment_method: '',
+      cash_register_id: '',
       comment: '',
     },
   })
@@ -230,12 +236,14 @@ function OtherIncomeFormModal({
       category_id: values.category_id || null,
       amount_cents: amountCents,
       payment_method: (values.payment_method || null) as PaymentMethod | null,
+      cash_register_id: values.cash_register_id || null,
       comment: values.comment || null,
     })
     form.reset({
       category_id: '',
       amount: '',
       payment_method: '',
+      cash_register_id: '',
       comment: '',
     })
   }
@@ -323,6 +331,41 @@ function OtherIncomeFormModal({
               )}
             />
           </div>
+
+          {/* Конкретная касса salon'а (ADR-014). Нужна для per-register
+              балансов в модалке «Перестановка средств». Без неё доход
+              не попадёт в баланс конкретной кассы. */}
+          {cashRegisters.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <Label>{t('income.other_form.cash_register')}</Label>
+              <Controller
+                name="cash_register_id"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-1.5">
+                    {cashRegisters.map((r: CashRegisterOption) => {
+                      const active = field.value === r.id
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => field.onChange(active ? '' : r.id)}
+                          className={cn(
+                            'border-border h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
+                            active
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'bg-card hover:bg-muted/40',
+                          )}
+                        >
+                          {r.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="oi-comment">{t('income.other_form.comment')}</Label>

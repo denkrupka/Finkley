@@ -2877,6 +2877,7 @@
       "amount": "Сумма",
       "payment_method": "Способ оплаты",
       "payment_placeholder": "Не указан",
+      "cash_register": "На какую кассу зачислен",
       "comment": "Комментарий",
       "comment_placeholder": "Например: аренда кресла за май",
       "errors": {

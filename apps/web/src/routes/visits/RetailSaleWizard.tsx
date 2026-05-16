@@ -283,6 +283,7 @@ export function RetailSaleWizard({
             amount_cents: finalAmount,
             category_id: l.otherCategoryId,
             payment_method: paymentMethod,
+            cash_register_id: cashRegisterId || null,
             comment: [l.name, lineNotes].filter(Boolean).join(' · ') || null,
           })
           continue
