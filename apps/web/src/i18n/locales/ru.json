@@ -1337,6 +1337,7 @@
   "fab": {
     "add": "Добавить",
     "action_visit": "Визит",
+    "action_sale": "Продажа",
     "action_expense": "Расход"
   },
   "visits": {
@@ -2867,7 +2868,12 @@
       "confirm_delete": "Удалить эту запись о доходе?",
       "toast_added": "Доход добавлен",
       "toast_deleted": "Запись удалена",
+      "toast_updated": "Запись обновлена",
       "toast_error": "Не удалось сохранить"
+    },
+    "other_edit": {
+      "title": "Редактировать прочий доход",
+      "date": "Дата операции"
     },
     "other_form": {
       "title": "Новый прочий доход",

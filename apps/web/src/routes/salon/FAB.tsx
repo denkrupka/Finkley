@@ -1,4 +1,4 @@
-import { CalendarPlus, Plus, Receipt } from 'lucide-react'
+import { CalendarPlus, Plus, Receipt, ShoppingBag } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -15,8 +15,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
  *
  * - `onVisit` — открывает QuickEntryModal.
  * - `onExpense` — открывает ExpenseFormModal.
+ * - `onSale` — открывает RetailSaleWizard в модалке «Новая продажа».
  */
-export function FAB({ onVisit, onExpense }: { onVisit: () => void; onExpense: () => void }) {
+export function FAB({
+  onVisit,
+  onExpense,
+  onSale,
+}: {
+  onVisit: () => void
+  onExpense: () => void
+  onSale: () => void
+}) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -28,6 +37,11 @@ export function FAB({ onVisit, onExpense }: { onVisit: () => void; onExpense: ()
   function handleExpense() {
     setOpen(false)
     onExpense()
+  }
+
+  function handleSale() {
+    setOpen(false)
+    onSale()
   }
 
   return (
@@ -67,6 +81,15 @@ export function FAB({ onVisit, onExpense }: { onVisit: () => void; onExpense: ()
         >
           <CalendarPlus className="text-secondary size-4" strokeWidth={2} />
           {t('fab.action_visit')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSale}
+          className="text-foreground hover:bg-muted/50 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold"
+          data-testid="fab-action-sale"
+        >
+          <ShoppingBag className="text-secondary size-4" strokeWidth={2} />
+          {t('fab.action_sale')}
         </button>
         <button
           type="button"

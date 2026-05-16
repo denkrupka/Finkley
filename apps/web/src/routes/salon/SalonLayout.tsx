@@ -8,9 +8,17 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import {
+  DialogContent as DialogContentUi,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Dialog as DialogUi,
+} from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
-import { useMySalons } from '@/hooks/useSalons'
+import { useMySalons, useSalon } from '@/hooks/useSalons'
+import { useStaff } from '@/hooks/useStaff'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
 import { BottomNav } from './BottomNav'
@@ -27,6 +35,11 @@ const QuickEntryModal = lazyWithRetry(() =>
 // и subcategories, нужна только когда FAB → «Расход».
 const ExpenseFormModal = lazyWithRetry(() =>
   import('@/routes/expenses/ExpenseFormModal').then((m) => ({ default: m.ExpenseFormModal })),
+)
+// RetailSaleWizard — wizard на 4 шага с inventory/categories, лениво по
+// аналогичной причине; нужен только когда FAB → «Продажа».
+const RetailSaleWizard = lazyWithRetry(() =>
+  import('@/routes/visits/RetailSaleWizard').then((m) => ({ default: m.RetailSaleWizard })),
 )
 
 /**
@@ -66,9 +79,13 @@ export function SalonLayout() {
     endAt?: string
   } | null>(null)
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
+  const [saleModalOpen, setSaleModalOpen] = useState(false)
   const [gateOpen, setGateOpen] = useState(false)
+  const [gateAction, setGateAction] = useState<'expense' | 'sale'>('expense')
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
+  const { data: salonFull } = useSalon(salonId)
+  const { data: staff = [] } = useStaff(salonId)
   const { hasOpenShift } = useRequireCashShift(salonId)
 
   useEffect(() => {
@@ -186,10 +203,19 @@ export function SalonLayout() {
             // Per-user касса: «+Расход» из FAB — тот же гейт что в
             // ExpensesPage. Блокируем открытие модалки заранее.
             if (!hasOpenShift) {
+              setGateAction('expense')
               setGateOpen(true)
               return
             }
             setExpenseModalOpen(true)
+          }}
+          onSale={() => {
+            if (!hasOpenShift) {
+              setGateAction('sale')
+              setGateOpen(true)
+              return
+            }
+            setSaleModalOpen(true)
           }}
         />
       )}
@@ -221,12 +247,35 @@ export function SalonLayout() {
         </Suspense>
       ) : null}
 
+      <DialogUi open={saleModalOpen} onOpenChange={setSaleModalOpen}>
+        <DialogContentUi className="w-[96vw] gap-0 p-0 sm:!w-[760px] sm:!max-w-[760px]">
+          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+            <DialogHeader>
+              <DialogTitle>{t('income.sales.create_title')}</DialogTitle>
+              <DialogDescription>{t('income.sales.create_subtitle')}</DialogDescription>
+            </DialogHeader>
+          </div>
+          {saleModalOpen ? (
+            <Suspense fallback={null}>
+              <RetailSaleWizard
+                salonId={salon.id}
+                currency={salonFull?.currency ?? salon.currency}
+                staff={staff}
+                onDone={() => setSaleModalOpen(false)}
+              />
+            </Suspense>
+          ) : null}
+        </DialogContentUi>
+      </DialogUi>
+
       <CashGateRequiredDialog
         open={gateOpen}
         onClose={() => setGateOpen(false)}
         salonId={salon.id}
-        action="expense"
-        onShiftOpened={() => setExpenseModalOpen(true)}
+        action={gateAction}
+        onShiftOpened={() =>
+          gateAction === 'sale' ? setSaleModalOpen(true) : setExpenseModalOpen(true)
+        }
       />
     </div>
   )

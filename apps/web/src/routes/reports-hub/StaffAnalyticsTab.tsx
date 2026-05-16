@@ -284,6 +284,7 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
           salonId={salonId}
           staff={staffList}
           currency={currency}
+          period={period}
           headerRight={<PeriodPickerPopover value={period} onChange={setPeriod} />}
         />
       </div>

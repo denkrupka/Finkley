@@ -175,6 +175,31 @@ export function useCreateOtherIncome(salonId: string | undefined) {
   })
 }
 
+export type UpdateOtherIncomeInput = {
+  id: string
+  income_at?: string
+  amount_cents?: number
+  category_id?: string | null
+  payment_method?: PaymentMethod | null
+  cash_register_id?: string | null
+  comment?: string | null
+}
+
+export function useUpdateOtherIncome(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: UpdateOtherIncomeInput) => {
+      const { id, ...patch } = input
+      const { error } = await supabase.from('other_incomes').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['other-incomes', salonId] })
+      qc.invalidateQueries({ queryKey: ['register-balances', salonId] })
+    },
+  })
+}
+
 export function useDeleteOtherIncome(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

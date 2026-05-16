@@ -27,7 +27,12 @@ import {
 } from '@/components/ui/select'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
-import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
+import {
+  useOtherIncomeCategories,
+  useOtherIncomes,
+  type OtherIncomeRow,
+} from '@/hooks/useOtherIncomes'
+import { OtherIncomeEditModal } from '@/routes/income/OtherIncomeEditModal'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
@@ -77,6 +82,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   // Image #98: клик по строке продажи → открыть карточку с возможностью
   // редактировать любое поле (используем VisitDetailModal в режиме detail).
   const [editingSale, setEditingSale] = useState<VisitRow | null>(null)
+  const [editingOther, setEditingOther] = useState<OtherIncomeRow | null>(null)
 
   const { data: sales = [], isLoading } = useVisits(salonId, range, {
     kind: 'retail',
@@ -232,7 +238,11 @@ export function SalesTab({ salonId }: { salonId: string }) {
                   в одной таблице. Прочие доходы помечены пилюлей-бейджем,
                   чтобы юзер сразу видел тип. */}
               {pagedOther.map((o) => (
-                <tr key={`oi-${o.id}`} className="border-border/60 hover:bg-muted/30 border-t">
+                <tr
+                  key={`oi-${o.id}`}
+                  className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
+                  onClick={() => setEditingOther(o)}
+                >
                   <td className="num text-muted-foreground px-4 py-2 text-xs">
                     {formatVisitDate(o.income_at)}
                   </td>
@@ -374,6 +384,14 @@ export function SalesTab({ salonId }: { salonId: string }) {
         onClose={() => setEditingSale(null)}
         salonId={salonId}
         currency={currency}
+      />
+
+      <OtherIncomeEditModal
+        open={editingOther !== null}
+        onClose={() => setEditingOther(null)}
+        salonId={salonId}
+        currency={currency}
+        income={editingOther}
       />
 
       <CashGateRequiredDialog

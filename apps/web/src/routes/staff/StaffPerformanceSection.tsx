@@ -2,6 +2,7 @@ import { Medal } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { periodToRange, type PeriodValue } from '@/components/ui/period-picker-utils'
 import { useSalon } from '@/hooks/useSalons'
 import { useVisits } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -19,11 +20,11 @@ type Props = {
   }>
   currency: string
   /**
-   * Image #116: слот для PeriodPickerPopover (или другого UI), который
-   * рендерится справа от заголовка секции «Эффективность мастеров». Контент
-   * фактического отчёта пока использует salon retention-window (не period),
-   * поэтому слот просто визуальный — но он на месте, как и попросил владелец.
+   * Период из родителя — фильтр визитов + окно для KPI. Если не задан,
+   * fallback на retention_window_days мастера/салона (старое поведение).
    */
+  period?: PeriodValue
+  /** Слот для PeriodPickerPopover справа от заголовка. */
   headerRight?: ReactNode
 }
 
@@ -38,10 +39,14 @@ type Props = {
  * период. Это не совсем то же что «вернулся ли клиент к этому мастеру»,
  * но близкая прокси и не требует полной visit-истории.
  */
-export function StaffPerformanceSection({ salonId, staff, currency, headerRight }: Props) {
+export function StaffPerformanceSection({ salonId, staff, currency, period, headerRight }: Props) {
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
   const salonWindow = salon?.retention_window_days ?? 60
+
+  // Если период задан — используем его как окно для всех мастеров (общая
+  // фильтрация). Иначе fallback на retention_window_days мастеров/салона.
+  const periodRange = useMemo(() => (period ? periodToRange(period) : null), [period])
 
   // Берём максимальное окно ретеншна по всем мастерам (или дефолт салона) —
   // тянем visits за этот период; per-master ретеншн считаем уже из этого
@@ -51,10 +56,13 @@ export function StaffPerformanceSection({ salonId, staff, currency, headerRight 
     [salonWindow, staff],
   )
   const range = useMemo(() => {
+    if (periodRange) {
+      return { start: periodRange.start.toISOString(), end: periodRange.end.toISOString() }
+    }
     const end = new Date()
     const start = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
     return { start: start.toISOString(), end: end.toISOString() }
-  }, [lookbackDays])
+  }, [periodRange, lookbackDays])
   const { data: visits = [], isLoading } = useVisits(salonId, range)
 
   // Группируем визиты по staff_id; KPI считаем внутри render с учётом
@@ -71,10 +79,16 @@ export function StaffPerformanceSection({ salonId, staff, currency, headerRight 
   }, [visits])
 
   function statsFor(staffId: string, windowDays: number) {
-    const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000
-    const inWindow = (visitsByStaff.get(staffId) ?? []).filter(
-      (v) => new Date(v.visit_at).getTime() >= cutoff,
-    )
+    // Если задан period — фильтрация по нему общая для всех мастеров.
+    // Иначе — по индивидуальному retention-окну (старое поведение).
+    const startMs = periodRange
+      ? periodRange.start.getTime()
+      : Date.now() - windowDays * 24 * 60 * 60 * 1000
+    const endMs = periodRange ? periodRange.end.getTime() : Date.now()
+    const inWindow = (visitsByStaff.get(staffId) ?? []).filter((v) => {
+      const t = new Date(v.visit_at).getTime()
+      return t >= startMs && t <= endMs
+    })
     const clientVisitCount = new Map<string, number>()
     let revenueCents = 0
     for (const v of inWindow) {

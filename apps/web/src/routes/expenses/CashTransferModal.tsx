@@ -141,17 +141,17 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="w-[96vw] gap-0 p-0 sm:!w-[760px] sm:!max-w-[760px]">
-        <div className="px-5 pt-5">
+        <div className="px-5 pt-4">
           <DialogHeader>
             <DialogTitle>{t('cash_transfer.title')}</DialogTitle>
             <DialogDescription>{t('cash_transfer.subtitle')}</DialogDescription>
           </DialogHeader>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-5 pb-5 pt-4">
+        <div className="max-h-[88vh] overflow-y-auto px-5 pb-4 pt-3">
           {/* Block 1 — Карточки касс */}
-          <div className="mb-5">
-            <h3 className="text-muted-foreground mb-2 text-xs font-bold uppercase tracking-wider">
+          <div className="mb-3">
+            <h3 className="text-muted-foreground mb-1.5 text-xs font-bold uppercase tracking-wider">
               {t('cash_transfer.cards_title')}
             </h3>
             {loadingBalances ? (
@@ -159,7 +159,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
             ) : registers.length === 0 ? (
               <p className="text-muted-foreground text-sm">{t('cash_transfer.no_registers')}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {registers.map((r) => {
                   const bal = balanceById.get(r.id) ?? 0
                   const isFrom = r.id === from
@@ -167,7 +167,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                   return (
                     <div
                       key={r.id}
-                      className={`border-border bg-card rounded-md border p-3 transition-all ${
+                      className={`border-border bg-card rounded-md border p-2 transition-all ${
                         isFrom ? 'border-amber-400 ring-1 ring-amber-300' : ''
                       } ${isTo ? 'border-brand-sage-deep ring-brand-sage ring-1' : ''}`}
                     >
@@ -194,12 +194,12 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
 
           {/* Block 2 — Форма / Confirm */}
           {step === 'form' ? (
-            <div className="border-border bg-muted/20 rounded-lg border p-4">
-              <h3 className="text-brand-navy mb-3 text-sm font-bold">
+            <div className="border-border bg-muted/20 rounded-lg border p-3">
+              <h3 className="text-brand-navy mb-2 text-sm font-bold">
                 {t('cash_transfer.form_title')}
               </h3>
 
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <label className="text-muted-foreground mb-1 block text-xs font-semibold">
                     {t('cash_transfer.from')}
@@ -245,7 +245,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                 </div>
               </div>
 
-              <div className="mb-3">
+              <div className="mb-2">
                 <label className="text-muted-foreground mb-1 block text-xs font-semibold">
                   {t('cash_transfer.amount')}
                 </label>
@@ -256,9 +256,9 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                     value={amountInput}
                     onChange={(e) => setAmountInput(e.target.value.replace(/[^\d.,]/g, ''))}
                     placeholder="0,00"
-                    className="num h-14 pr-12 font-mono text-2xl font-bold tabular-nums sm:text-3xl"
+                    className="num h-11 pr-12 font-mono text-xl font-bold tabular-nums sm:text-2xl"
                   />
-                  <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-xl font-semibold">
+                  <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold">
                     {currency}
                   </span>
                 </div>
@@ -271,7 +271,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                 ) : null}
               </div>
 
-              <div className="mb-3">
+              <div className="mb-2">
                 <label className="text-muted-foreground mb-1 block text-xs font-semibold">
                   {t('cash_transfer.comment')}
                 </label>
@@ -282,7 +282,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                 />
               </div>
 
-              <div className="mb-3">
+              <div className="mb-2">
                 <label className="text-muted-foreground mb-1 block text-xs font-semibold">
                   {t('cash_transfer.date')}
                 </label>
@@ -300,7 +300,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
 
               {/* Превью */}
               {from && to && amountCents > 0 ? (
-                <div className="border-border bg-card mb-3 grid grid-cols-2 gap-2 rounded-md border p-3">
+                <div className="border-border bg-card mb-2 grid grid-cols-2 gap-2 rounded-md border p-2.5">
                   <div>
                     <p className="text-muted-foreground text-[10px] font-bold uppercase">
                       {t('cash_transfer.preview_from')}
@@ -341,11 +341,11 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
               </Button>
             </div>
           ) : (
-            <div className="border-brand-navy bg-card rounded-lg border p-4">
-              <h3 className="text-brand-navy mb-3 text-sm font-bold">
+            <div className="border-brand-navy bg-card rounded-lg border p-3">
+              <h3 className="text-brand-navy mb-2 text-sm font-bold">
                 {t('cash_transfer.confirm_title')}
               </h3>
-              <div className="bg-muted/20 mb-4 rounded-md p-3">
+              <div className="bg-muted/20 mb-3 rounded-md p-2.5">
                 <p className="text-foreground mb-2 text-sm">
                   {t('cash_transfer.confirm_summary', {
                     amount: formatCurrency(amountCents, currency),
@@ -412,7 +412,7 @@ function AnimatedAmount({ cents, currency }: { cents: number; currency: string }
   }, [cents])
   return (
     <p
-      className={`num mt-1 text-base font-bold tabular-nums transition-colors duration-700 ${
+      className={`num mt-0.5 text-sm font-bold tabular-nums transition-colors duration-700 ${
         flash === 'up'
           ? 'text-brand-sage-deep'
           : flash === 'down'

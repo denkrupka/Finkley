@@ -16,7 +16,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
-import { useSalonHolidays } from '@/hooks/useSalonHours'
 import { useServices } from '@/hooks/useServices'
 import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
@@ -87,20 +86,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
   const { data: clients = [] } = useClients(salonId)
-  const { data: holidays = [] } = useSalonHolidays(salonId)
   const { data: blocks = [] } = useStaffBlocks(salonId, range)
   const deleteBlock = useDeleteStaffBlock(salonId)
 
-  // Если текущий день — праздник, показываем поверх grid'а полупрозрачную
-  // плашку с надписью «Выходной: <name>». Не блокируем создание визитов
-  // программно (юзер может всё равно записать клиента) — только визуально.
-  const todayIso =
-    cursor.getFullYear() +
-    '-' +
-    String(cursor.getMonth() + 1).padStart(2, '0') +
-    '-' +
-    String(cursor.getDate()).padStart(2, '0')
-  const holidayToday = holidays.find((h) => h.date === todayIso)
   // Календарь — это про услуги (kind='visit'). Retail-продажи у нас в /income → Sales
   // и не имеют времени визита по смыслу — их в календарь рисовать не надо.
   const { data: visits = [] } = useVisits(salonId, range, { kind: 'visit' })
@@ -378,14 +366,6 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
           )}
         </Button>
       </div>
-
-      {holidayToday ? (
-        <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-amber-900">
-          <span className="text-sm font-semibold">
-            {t('visits.calendar.holiday_today', { label: holidayToday.label })}
-          </span>
-        </div>
-      ) : null}
 
       {staff.length === 0 ? (
         <div className="p-6">

@@ -1,10 +1,8 @@
-import { format, startOfMonth } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import { Lock, Printer } from 'lucide-react'
+import { format } from 'date-fns'
+import { Printer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -13,18 +11,9 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
 import {
-  useClosePayoutPeriod,
   useIsPeriodClosed,
   usePayoutsHistory,
   usePayoutsPreview,
@@ -50,8 +39,6 @@ export function PayoutsPage() {
   // Закрытие периода работает только когда период полностью завершён.
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const range = periodToRange(period)
-  // Для UI cursor (метка «Июль 2026») и подписи периода используем start
-  const cursor = startOfMonth(range.start)
   const periodStart = format(range.start, 'yyyy-MM-dd')
   const periodEnd = format(range.end, 'yyyy-MM-dd')
 
@@ -63,10 +50,6 @@ export function PayoutsPage() {
     periodStart,
     periodEnd,
   )
-  const close = useClosePayoutPeriod(salonId)
-  const { data: cashRegisters = [] } = useCashRegisters(salonId)
-  const [cashRegisterId, setCashRegisterId] = useState<string>('')
-
   const totals = useMemo(() => {
     let revenue = 0
     let payout = 0
@@ -85,46 +68,6 @@ export function PayoutsPage() {
     return range.end < new Date(today.getFullYear(), today.getMonth(), today.getDate())
   }, [range.end])
 
-  function onClose() {
-    if (!salonId) return
-    if (
-      !confirm(
-        t('payouts.confirm_close', {
-          period: format(cursor, 'LLLL yyyy', { locale: ru }),
-          total: formatCurrency(totals.payout, currency),
-        }),
-      )
-    )
-      return
-    close.mutate(
-      {
-        period_start: periodStart,
-        period_end: periodEnd,
-        cash_register_id: cashRegisterId || null,
-      },
-      {
-        onSuccess: (data) => {
-          toast.success(
-            t('payouts.toast_closed', {
-              count: data.payouts_created,
-              total: formatCurrency(Number(data.total_expense_cents), currency),
-            }),
-          )
-        },
-        onError: (err) => {
-          const msg = err instanceof Error ? err.message : String(err)
-          toast.error(
-            msg.includes('period_already_closed')
-              ? t('payouts.errors.already_closed')
-              : msg.includes('period_not_finished')
-                ? t('payouts.errors.not_finished')
-                : msg,
-          )
-        },
-      },
-    )
-  }
-
   if (!salonId) return null
 
   return (
@@ -138,6 +81,10 @@ export function PayoutsPage() {
         </div>
 
         <div className="flex items-center gap-2 print:hidden">
+          <Button variant="outline" onClick={() => window.print()} disabled={rows.length === 0}>
+            <Printer className="size-4" strokeWidth={2} />
+            {t('payouts.print')}
+          </Button>
           <PeriodPickerPopover value={period} onChange={setPeriod} />
         </div>
       </div>
@@ -222,8 +169,8 @@ export function PayoutsPage() {
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
-        {/* Подсказка о статусе периода — чтобы юзер понимал почему кнопка disabled */}
+      <div className="mt-4 print:hidden">
+        {/* Подсказка о статусе периода */}
         <p className="text-muted-foreground text-xs">
           {isClosed
             ? t('payouts.status_closed')
@@ -231,44 +178,6 @@ export function PayoutsPage() {
               ? t('payouts.status_active')
               : t('payouts.status_ready')}
         </p>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          {cashRegisters.length > 0 && !isClosed ? (
-            <Select
-              value={cashRegisterId || 'none'}
-              onValueChange={(v) => setCashRegisterId(v === 'none' ? '' : v)}
-            >
-              <SelectTrigger className="h-10 w-[200px]">
-                <SelectValue placeholder={t('payouts.cash_register_placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('payouts.cash_register_none')}</SelectItem>
-                {cashRegisters.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          <Button variant="outline" onClick={() => window.print()} disabled={rows.length === 0}>
-            <Printer className="size-4" strokeWidth={2} />
-            {t('payouts.print')}
-          </Button>
-          <Button
-            onClick={onClose}
-            disabled={close.isPending || isClosed || !isPeriodFinished || rows.length === 0}
-            title={
-              isClosed
-                ? t('payouts.errors.already_closed')
-                : !isPeriodFinished
-                  ? t('payouts.errors.not_finished')
-                  : undefined
-            }
-          >
-            <Lock className="size-4" strokeWidth={2} />
-            {isClosed ? t('payouts.closed_label') : t('payouts.close_button')}
-          </Button>
-        </div>
       </div>
 
       {history.length > 0 ? (

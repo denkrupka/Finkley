@@ -145,7 +145,6 @@ function TransfersHistoryBlock({ salonId, currency }: { salonId: string; currenc
     <div className="border-border bg-card shadow-finsm rounded-lg border">
       <div className="border-border border-b p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <PeriodPickerPopover value={period} onChange={setPeriod} />
           <Select
             value={fromFilter || 'all'}
             onValueChange={(v) => setFromFilter(v === 'all' ? '' : v)}
@@ -220,6 +219,9 @@ function TransfersHistoryBlock({ salonId, currency }: { salonId: string; currenc
               {t('cash_transfer.filter_reset')}
             </Button>
           ) : null}
+          <div className="ml-auto">
+            <PeriodPickerPopover value={period} onChange={setPeriod} />
+          </div>
         </div>
       </div>
 
