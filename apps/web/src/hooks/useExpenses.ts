@@ -52,6 +52,8 @@ export type ExpenseRow = {
   contractor_name: string | null
   /** Под-статья — иерархическая детализация внутри category. */
   sub_article: string | null
+  /** Кто внёс расход (auth.users.id). null для системных импортов. */
+  created_by: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -147,7 +149,7 @@ export function useExpenses(
       let q = supabase
         .from('expenses')
         .select(
-          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end',
+          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_by, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end',
         )
         .eq('salon_id', salonId)
         .is('deleted_at', null)

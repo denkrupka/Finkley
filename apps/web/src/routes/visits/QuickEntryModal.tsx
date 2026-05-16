@@ -54,13 +54,18 @@ type ServiceLine = {
   name: string
   price_cents: number
   duration_min: number | null
+  /**
+   * Image #104: мастер per-услуга. Например, маникюр у Оли, брови у Алины.
+   * Если null — для submit считаем что мастер не выбран (валидация
+   * `linesNeedStaff` ниже).
+   */
+  staff_id: string | null
 }
 
 type FormValues = {
   visit_date: string // YYYY-MM-DD
   start_time: string // HH:MM
   end_time: string // HH:MM
-  staff_id: string
   client_id: string | null
   comment: string
 }
@@ -69,7 +74,6 @@ const schema = z.object({
   visit_date: z.string().min(1, 'visits.errors.date_required'),
   start_time: z.string().min(1, 'visits.errors.start_time_required'),
   end_time: z.string().min(1, 'visits.errors.end_time_required'),
-  staff_id: z.string().min(1, 'visits.errors.staff_required'),
   // Клиент опционален (image #74): запись «без клиента» бывает нужна для
   // блокировки слота под условного клиента, который ещё не зарегистрирован.
   client_id: z.string().nullable().optional().default(null),
@@ -160,7 +164,6 @@ export function QuickEntryModal({
       visit_date: todayIso,
       start_time: '10:00',
       end_time: '11:00',
-      staff_id: '',
       client_id: null,
       comment: '',
     },
@@ -186,12 +189,12 @@ export function QuickEntryModal({
         name: svc?.name ?? editVisit.service_name_snapshot ?? '—',
         price_cents: editVisit.amount_cents,
         duration_min: dur,
+        staff_id: editVisit.staff_id ?? null,
       }
       form.reset({
         visit_date: format(start, 'yyyy-MM-dd'),
         start_time: format(start, 'HH:mm'),
         end_time: format(end, 'HH:mm'),
-        staff_id: editVisit.staff_id ?? '',
         client_id: editVisit.client_id ?? null,
         comment: editVisit.comment ?? '',
       })
@@ -200,14 +203,7 @@ export function QuickEntryModal({
       setLinesTouched(false)
       return
     }
-    const lastStaffValid = staff.some((s) => s.id === initialStaff)
     const prefillDate = prefill ? format(new Date(prefill.when), 'yyyy-MM-dd') : todayIso
-    const prefillStaff =
-      prefill && staff.some((s) => s.id === prefill.staffId)
-        ? prefill.staffId
-        : lastStaffValid
-          ? initialStaff
-          : (staff[0]?.id ?? '')
     const prefillStart = prefill ? format(new Date(prefill.when), 'HH:mm') : '10:00'
     const prefillEnd = prefill?.endAt
       ? format(new Date(prefill.endAt), 'HH:mm')
@@ -219,7 +215,6 @@ export function QuickEntryModal({
       visit_date: prefillDate,
       start_time: prefillStart,
       end_time: prefillEnd,
-      staff_id: prefillStaff,
       client_id: prefill?.clientId ?? null,
       comment: '',
     })
@@ -237,23 +232,24 @@ export function QuickEntryModal({
     prefill?.clientId,
   ])
 
-  // Догрузка staff после открытия — выставляем дефолт, если ещё не выбран.
-  useEffect(() => {
-    if (!open) return
-    if (!form.getValues('staff_id') && staff.length > 0) {
-      const lastStaffValid = staff.some((s) => s.id === initialStaff)
-      form.setValue('staff_id', lastStaffValid ? initialStaff : staff[0]!.id, {
-        shouldValidate: false,
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, staff])
+  // Image #104: дефолт мастера для новой строки — берём (1) staff_id из
+  // предыдущей строки (юзер обычно добавляет несколько услуг к одному
+  // мастеру), (2) prefill.staffId (если открыли из календаря на конкретном
+  // мастере), (3) localStorage last-staff, (4) первого мастера в списке.
+  function pickDefaultStaffForNewLine(): string | null {
+    const lastInLines = lines[lines.length - 1]?.staff_id
+    if (lastInLines) return lastInLines
+    if (prefill?.staffId && staff.some((s) => s.id === prefill.staffId)) return prefill.staffId
+    if (initialStaff && staff.some((s) => s.id === initialStaff)) return initialStaff
+    return staff[0]?.id ?? null
+  }
 
   // Auto-suggest мастера (image #86): когда выбран клиент И первая услуга,
   // смотрим историю — какой мастер чаще всего делал ему именно ЭТУ услугу.
-  // Если найден — подставляем в форму, перезаписывая last-staff default.
-  // Юзер может изменить вручную; повторный suggest не срабатывает в той же
-  // сессии (контролируется флагом suggestedRef).
+  // Если найден — подставляем на ПЕРВУЮ строку (image #104: мастер per-услуга,
+  // глобального больше нет). Перезаписываем только если юзер ещё не выбрал
+  // мастера руками для этой строки. Флаг appliedSuggestionFor не даёт
+  // зациклиться.
   const watchedClientId = form.watch('client_id')
   const firstServiceId = lines[0]?.service_id ?? null
   const { data: suggestedStaffId } = useSuggestedStaffForClientService(
@@ -265,14 +261,13 @@ export function QuickEntryModal({
   useEffect(() => {
     if (!suggestedStaffId) return
     if (!watchedClientId || !firstServiceId) return
+    if (lines.length === 0) return
     const key = `${watchedClientId}:${firstServiceId}`
     if (appliedSuggestionFor === key) return
-    // Применяем только если такой мастер реально активен у салона.
     if (!staff.some((s) => s.id === suggestedStaffId)) return
-    form.setValue('staff_id', suggestedStaffId, { shouldValidate: false })
+    setLines((prev) => prev.map((l, i) => (i === 0 ? { ...l, staff_id: suggestedStaffId } : l)))
     setAppliedSuggestionFor(key)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedStaffId, watchedClientId, firstServiceId, staff, appliedSuggestionFor])
+  }, [suggestedStaffId, watchedClientId, firstServiceId, staff, appliedSuggestionFor, lines.length])
 
   // Пересчёт end_time из start_time + Σ длительностей всех выбранных услуг.
   // Если duration_min не задан у каких-то услуг — для них default 60 мин.
@@ -297,6 +292,7 @@ export function QuickEntryModal({
     if (!pendingServiceId) return
     const svc = services.find((s) => s.id === pendingServiceId)
     if (!svc) return
+    const defaultStaff = pickDefaultStaffForNewLine()
     setLines((prev) => [
       ...prev,
       {
@@ -305,6 +301,7 @@ export function QuickEntryModal({
         name: svc.name,
         price_cents: svc.default_price_cents,
         duration_min: svc.default_duration_min,
+        staff_id: defaultStaff,
       },
     ])
     setPendingServiceId('')
@@ -315,8 +312,15 @@ export function QuickEntryModal({
     setLines((prev) => prev.filter((l) => l.uid !== uid))
   }
 
+  /** Меняет мастера у конкретной строки (image #104). */
+  function setLineStaff(uid: string, staffId: string) {
+    setLines((prev) => prev.map((l) => (l.uid === uid ? { ...l, staff_id: staffId } : l)))
+  }
+
   const totalAmountCents = lines.reduce((s, l) => s + l.price_cents, 0)
-  const watchedStaffId = form.watch('staff_id')
+  /** Все ли строки имеют выбранного мастера. Используется в валидации
+   *  submit и для подсветки строк без мастера. */
+  const linesWithoutStaff = lines.filter((l) => !l.staff_id)
 
   async function onSubmit(values: FormValues, opts?: { thenCharge?: boolean }) {
     if (lines.length === 0) {
@@ -324,12 +328,18 @@ export function QuickEntryModal({
       toast.error(t('visits.errors.services_required'))
       return
     }
+    // Image #104: мастер обязателен на каждой строке. Если хотя бы одна
+    // строка без мастера — submit не идёт, юзер видит подсветку строки.
+    if (linesWithoutStaff.length > 0) {
+      setLinesTouched(true)
+      toast.error(t('visits.errors.staff_required'))
+      return
+    }
 
     // Чаевые и скидку на этапе создания не вводим — задаются позже при
     // нажатии «Рассчитать» в карточке визита. Здесь фиксируем 0.
     const tipCentsTotal = 0
     const discountCentsTotal = 0
-    const stf = staff.find((s) => s.id === values.staff_id)
 
     const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
     const [sh, sm] = values.start_time.split(':').map(Number)
@@ -351,7 +361,7 @@ export function QuickEntryModal({
       try {
         await updateVisit.mutateAsync({
           id: editVisit.id,
-          staff_id: values.staff_id || null,
+          staff_id: firstLine.staff_id,
           client_id: values.client_id || null,
           service_id: firstLine.service_id || null,
           service_name_snapshot: firstLine.name,
@@ -374,20 +384,24 @@ export function QuickEntryModal({
       return
     }
 
-    // Conflict-detection — проверяем перекрытие со всеми визитами того же
-    // мастера в этот день в диапазоне [start, start+totalDuration).
+    // Conflict-detection — image #104: проверяем перекрытие для каждого
+    // уникального мастера, который участвует в визите. Юзер подтверждает
+    // или отменяет один раз (первый найденный конфликт).
     const newStartMs = visitDate.getTime()
     const newEndMs = newStartMs + totalDurationMin * 60_000
-    if (values.staff_id) {
-      const dayStart = new Date(visitDate)
-      dayStart.setHours(0, 0, 0, 0)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayEnd.getDate() + 1)
+    const uniqueStaffIds = Array.from(
+      new Set(lines.map((l) => l.staff_id).filter((s): s is string => !!s)),
+    )
+    const dayStart = new Date(visitDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+    for (const staffId of uniqueStaffIds) {
       const { data: sameDayVisits } = await supabase
         .from('visits')
         .select('id, visit_at, service_id, service_name_snapshot, payment_method, status')
         .eq('salon_id', salonId)
-        .eq('staff_id', values.staff_id)
+        .eq('staff_id', staffId)
         .gte('visit_at', dayStart.toISOString())
         .lt('visit_at', dayEnd.toISOString())
       const conflict = (sameDayVisits ?? []).find(
@@ -417,6 +431,7 @@ export function QuickEntryModal({
           t('visits.errors.conflict', { time: conflictTime, service: conflictSvc }),
         )
         if (!ok) return
+        break
       }
     }
 
@@ -434,27 +449,16 @@ export function QuickEntryModal({
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i]!
         const firstLine = i === 0
-        // duration_min на визите:
-        //   - если в группе ОДНА услуга — используем formDur (end_time-start_time
-        //     из формы) — даёт пользователю прямой контроль над длительностью
-        //     карточки в календаре, что и было запрошено (bug image #85);
-        //   - если услуг несколько — каждой кладём её собственную длительность
-        //     из услуги (или 60 как fallback); общая длительность группы пока
-        //     не моделируется как одна сущность.
         const lineDuration = lines.length === 1 && formDur > 0 ? formDur : (l.duration_min ?? 60)
         const created = await createVisit.mutateAsync({
           salon_id: salonId,
-          staff_id: values.staff_id || null,
+          // Image #104: мастер у каждой строки свой.
+          staff_id: l.staff_id,
           client_id: values.client_id || null,
           service_id: l.service_id,
           service_name_snapshot: l.name,
-          // Все услуги в группе делим один и тот же visit_at — это одна
-          // запись с несколькими услугами, не последовательные визиты.
           visit_at: visitAt,
           amount_cents: l.price_cents,
-          // Tip/discount навешиваем на первую строку группы — упрощённо;
-          // при «Рассчитать» юзер увидит общую сумму группы и сможет
-          // перераспределить, если нужно.
           tip_cents: firstLine ? tipCentsTotal : 0,
           discount_cents: firstLine ? discountCentsTotal : 0,
           payment_method: defaultPayment as 'cash' | 'card' | 'transfer' | 'online' | 'mixed',
@@ -465,10 +469,14 @@ export function QuickEntryModal({
         })
         createdIds.push(created.id)
       }
-      window.localStorage.setItem(LAST_STAFF_KEY, values.staff_id)
+      // Запоминаем мастера ПЕРВОЙ строки как last-staff (используем как
+      // дефолт для следующей записи).
+      const firstStaff = lines[0]?.staff_id
+      if (firstStaff) window.localStorage.setItem(LAST_STAFF_KEY, firstStaff)
 
+      const firstStf = staff.find((s) => s.id === firstStaff)
       toast.success(t('visits.toast_added'), {
-        description: `${stf?.full_name ?? ''} · ${formatCurrency(
+        description: `${firstStf?.full_name ?? ''} · ${formatCurrency(
           totalAmountCents - discountCentsTotal + tipCentsTotal,
           currency,
         )}`,
@@ -491,22 +499,31 @@ export function QuickEntryModal({
         },
       })
 
-      // Booksy reverse-sync — резервируем слот на длительность всей записи.
+      // Booksy reverse-sync — резервируем слот для каждого УНИКАЛЬНОГО
+      // мастера на длительность всей записи (несколько услуг у разных
+      // мастеров → несколько reservation-объектов в Booksy).
       const booksyConnected = integrations.some(
         (i) => i.provider === 'booksy' && i.status === 'connected',
       )
-      const stfExternal =
-        stf?.external_source === 'booksy' && stf.external_id ? stf.external_id : null
-      if (booksyConnected && stfExternal && totalDurationMin > 0) {
+      if (booksyConnected && totalDurationMin > 0) {
         const startAt = new Date(visitAt)
         const endAt = new Date(startAt.getTime() + totalDurationMin * 60000)
-        reserveBooksy.mutate({
-          salonId,
-          staffIdExternal: stfExternal,
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-          title: lines.map((l) => l.name).join(', '),
-        })
+        for (const staffId of uniqueStaffIds) {
+          const stf = staff.find((s) => s.id === staffId)
+          const stfExternal =
+            stf?.external_source === 'booksy' && stf.external_id ? stf.external_id : null
+          if (!stfExternal) continue
+          reserveBooksy.mutate({
+            salonId,
+            staffIdExternal: stfExternal,
+            startAt: startAt.toISOString(),
+            endAt: endAt.toISOString(),
+            title: lines
+              .filter((ln) => ln.staff_id === staffId)
+              .map((ln) => ln.name)
+              .join(', '),
+          })
+        }
       }
 
       onOpenChange(false)
@@ -517,17 +534,22 @@ export function QuickEntryModal({
     }
   }
 
-  const selectedStaffIndex = staff.findIndex((s) => s.id === watchedStaffId)
-  const selectedStaffColor =
-    selectedStaffIndex >= 0 ? STAFF_PALETTE[selectedStaffIndex % STAFF_PALETTE.length]! : '#E8E5DF'
-  const selectedStaffInitial =
-    staff
-      .find((s) => s.id === watchedStaffId)
-      ?.full_name.charAt(0)
-      .toUpperCase() ?? '?'
+  // Image #104: палитра кружков-аватарок мастеров для рендера в строке услуги.
+  function staffAvatar(staffId: string | null): { color: string; initial: string } {
+    if (!staffId) return { color: '#E8E5DF', initial: '?' }
+    const idx = staff.findIndex((s) => s.id === staffId)
+    const color = idx >= 0 ? STAFF_PALETTE[idx % STAFF_PALETTE.length]! : '#E8E5DF'
+    const initial =
+      staff
+        .find((s) => s.id === staffId)
+        ?.full_name.charAt(0)
+        .toUpperCase() ?? '?'
+    return { color, initial }
+  }
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency
   const linesError = linesTouched && lines.length === 0
+  const lineStaffError = linesTouched && linesWithoutStaff.length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -619,38 +641,80 @@ export function QuickEntryModal({
               </p>
             ) : null}
 
-            {/* Список выбранных услуг */}
+            {/* Список выбранных услуг. Image #104: рядом с каждой услугой —
+                свой селектор мастера. Подсветка красной рамкой если строка
+                без мастера и юзер уже пытался сохранить. */}
             {lines.length > 0 ? (
               <ul className="border-border bg-card divide-border/60 mt-1 flex flex-col divide-y rounded-md border">
-                {lines.map((l) => (
-                  <li key={l.uid} className="flex items-center justify-between gap-2 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-foreground truncate text-sm font-semibold">{l.name}</p>
-                      <p className="text-muted-foreground text-[11px]">
-                        {/* Image #67: длительность показываем ВСЕГДА. Если у
-                            услуги duration_min не задан в /services — пишем
-                            «60 мин (по умолчанию)», чтобы было ясно, что
-                            время визита считается по дефолту, а не по
-                            прописанному значению. */}
-                        <span className="num">
-                          {l.duration_min
-                            ? `${l.duration_min} ${t('common.min')}`
-                            : `60 ${t('common.min')} (${t('visits.form.duration_default')})`}
-                        </span>
-                        {' · '}
-                        <span className="num">{formatCurrency(l.price_cents, currency)}</span>
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeLine(l.uid)}
-                      aria-label={t('common.remove')}
-                      className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+                {lines.map((l) => {
+                  const av = staffAvatar(l.staff_id)
+                  const missingStaff = lineStaffError && !l.staff_id
+                  return (
+                    <li
+                      key={l.uid}
+                      className={cn(
+                        'flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center',
+                        missingStaff && 'bg-destructive/5',
+                      )}
                     >
-                      <Trash2 className="size-3.5" strokeWidth={1.8} />
-                    </button>
-                  </li>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground truncate text-sm font-semibold">{l.name}</p>
+                        <p className="text-muted-foreground text-[11px]">
+                          {/* Image #67: длительность показываем ВСЕГДА. */}
+                          <span className="num">
+                            {l.duration_min
+                              ? `${l.duration_min} ${t('common.min')}`
+                              : `60 ${t('common.min')} (${t('visits.form.duration_default')})`}
+                          </span>
+                          {' · '}
+                          <span className="num">{formatCurrency(l.price_cents, currency)}</span>
+                        </p>
+                      </div>
+                      {/* Image #104: per-line staff picker — компактный select
+                          рядом с услугой. Юзер видит «маникюр у Оли, брови у
+                          Алины» в одном списке. */}
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={l.staff_id ?? ''}
+                          onValueChange={(v) => setLineStaff(l.uid, v)}
+                        >
+                          <SelectTrigger
+                            data-testid="qe-line-staff"
+                            className={cn(
+                              'h-9 w-[180px] text-sm',
+                              missingStaff && 'border-destructive',
+                            )}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="text-brand-navy grid size-5 place-items-center rounded-full text-[10px] font-bold"
+                                style={{ background: av.color }}
+                              >
+                                {av.initial}
+                              </span>
+                              <SelectValue placeholder={t('visits.form.staff_placeholder')} />
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {staff.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <button
+                          type="button"
+                          onClick={() => removeLine(l.uid)}
+                          aria-label={t('common.remove')}
+                          className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+                        >
+                          <Trash2 className="size-3.5" strokeWidth={1.8} />
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             ) : null}
             {linesError ? (
@@ -658,43 +722,15 @@ export function QuickEntryModal({
                 {t('visits.errors.services_required')}
               </p>
             ) : null}
+            {lineStaffError ? (
+              <p className="text-destructive text-xs font-medium" role="alert">
+                {t('visits.errors.staff_required')}
+              </p>
+            ) : null}
           </div>
 
-          {/* Мастер — сразу после услуги (image #86/#101). */}
-          <Controller
-            name="staff_id"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="qe-staff-top">{t('visits.form.staff_label')} *</Label>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="qe-staff-top" data-testid="qe-staff" className="h-11">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
-                        style={{ background: selectedStaffColor }}
-                      >
-                        {selectedStaffInitial}
-                      </span>
-                      <SelectValue placeholder={t('visits.form.staff_placeholder')} />
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.staff_id ? (
-                  <p className="text-destructive text-xs font-medium" role="alert">
-                    {t(form.formState.errors.staff_id.message ?? '')}
-                  </p>
-                ) : null}
-              </div>
-            )}
-          />
+          {/* Image #104: глобальный селектор мастера удалён — выбор теперь
+              рядом с каждой услугой в списке выше. */}
 
           {/* Дата + Время от/до */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">

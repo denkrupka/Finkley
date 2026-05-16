@@ -3094,6 +3094,7 @@
     "structure_title": "Структура расходов",
     "structure_empty": "Нет расходов в этом периоде",
     "records": "записей",
+    "created_by_short": "внёс {{name}}",
     "tabs": {
       "expenses": "Расходы",
       "inflows": "Поступления"

@@ -163,15 +163,26 @@ export function useArchiveCounterparty(salonId: string | undefined) {
 }
 
 /**
- * Поиск компании по NIP через Data PORT (edge function). Возвращает name +
- * address, остальные поля можно заполнить вручную при создании контрагента.
+ * Поиск компании по NIP через публичное API Минфина РП (wl-api.mf.gov.pl).
+ * Возвращает name + address, остальные поля можно заполнить вручную при
+ * создании контрагента.
+ *
+ * Если subject не найден в реестре — возвращает null, чтобы фронт показал
+ * подходящий тост и юзер заполнил поля руками.
  */
 export async function lookupNip(nip: string): Promise<{ name: string; address: string } | null> {
   const { data, error } = await supabase.functions.invoke('dataport-nip-lookup', {
     body: { nip },
   })
   if (error) throw error
-  const res = data as { ok?: boolean; name?: string; address?: string; error?: string }
+  const res = data as {
+    ok?: boolean
+    name?: string
+    address?: string
+    not_found?: boolean
+    error?: string
+  }
+  if (res?.not_found) return null
   if (!res?.ok) throw new Error(res?.error ?? 'lookup_failed')
   return { name: res.name ?? '', address: res.address ?? '' }
 }

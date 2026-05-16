@@ -117,6 +117,82 @@ function nextOccurrence(expenseAt: string, recurrence: ExpenseRecurrence): strin
  * слова из guess (или наоборот). Возвращает id первой найденной или null.
  * Не пытается быть умнее — лучше пусто, чем неправильная категория.
  */
+/**
+ * Транслитерация русской кириллицы в латиницу для cross-language matching
+ * контрагентов: «Лидл» → «lidl», «Икея» → «ikea». Это не academic translit,
+ * а pragmatic mapping чтобы Whisper-вывод на русском совпадал с польским
+ * названием в базе.
+ */
+function translitRuToLat(s: string): string {
+  const map: Record<string, string> = {
+    а: 'a',
+    б: 'b',
+    в: 'v',
+    г: 'g',
+    д: 'd',
+    е: 'e',
+    ё: 'e',
+    ж: 'zh',
+    з: 'z',
+    и: 'i',
+    й: 'i',
+    к: 'k',
+    л: 'l',
+    м: 'm',
+    н: 'n',
+    о: 'o',
+    п: 'p',
+    р: 'r',
+    с: 's',
+    т: 't',
+    у: 'u',
+    ф: 'f',
+    х: 'h',
+    ц: 'c',
+    ч: 'ch',
+    ш: 'sh',
+    щ: 'sh',
+    ъ: '',
+    ы: 'y',
+    ь: '',
+    э: 'e',
+    ю: 'yu',
+    я: 'ya',
+  }
+  return s
+    .toLowerCase()
+    .split('')
+    .map((ch) => (ch in map ? map[ch] : ch))
+    .join('')
+}
+
+/**
+ * Нормализует имя контрагента для fuzzy match: lowercase + транслит +
+ * убираем правовые формы (sp. z o.o., ООО, ИП и т.д.) и не-буквенные знаки.
+ */
+function normalizeCounterpartyName(s: string): string {
+  return translitRuToLat(s)
+    .replace(/\b(sp\.? z o\.? o\.?|spolka z o ?o ?o|ooo|ип|tov|too|llc|ltd|inc|gmbh)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim()
+}
+
+/**
+ * Cross-language search контрагента по имени. «Лидл» матчится на «Lidl
+ * Sp. z o.o.» через транслит. Возвращает первое подходящее значение или null.
+ */
+function findCounterpartyFuzzy<T extends { name: string }>(vendor: string, list: T[]): T | null {
+  const target = normalizeCounterpartyName(vendor)
+  if (!target) return null
+  for (const cp of list) {
+    const norm = normalizeCounterpartyName(cp.name)
+    if (!norm) continue
+    if (norm === target) return cp
+    if (norm.includes(target) || target.includes(norm)) return cp
+  }
+  return null
+}
+
 function findCategoryByGuess(
   guess: string | null,
   categories: ExpenseCategoryRow[],
@@ -176,10 +252,20 @@ export function ExpenseFormModal({
 
   /**
    * Применяет распарсенный по голосу результат к форме. Поля заполняются
-   * только если они пустые / дефолтные — юзер свои значения не теряет.
-   * vendor_guess: пытаемся match'нуть существующего контрагента по имени
-   * (case-insensitive includes). Если не нашли — открываем CounterpartyEditModal
-   * с префилом name, чтобы юзер мог быстро создать и подтвердить.
+   * только если они пустые — юзер свои значения не теряет.
+   *
+   * Image #108: владелец сказал «Купил кофе и воду за 1120 zł в Лидле»,
+   * ожидал: Описание = «Кофе и вода» (что купили), Контрагент = «Лидл».
+   * До правки: «Кофе и вода» попадало в Комментарий, Описание оставалось
+   * пустым; контрагент не подставлялся (база на польском «Lidl», голос
+   * на русском «Лидл»). Теперь:
+   *   - description ← parsed.comment (краткое описание того, что купили);
+   *     vendor_guess НЕ пишем в description — это название магазина.
+   *   - counterparty matching стал толерантнее (нормализуем оба имени:
+   *     lowercase + убираем ООО/Sp. z o.o./пробелы/знаки препинания +
+   *     транслитерируем кириллицу в латиницу) → «Лидл» ↔ «Lidl Sp. z o.o.».
+   *   - Если matching не нашёл — обязательно открываем CounterpartyEditModal
+   *     с префилом name, чтобы юзер создал нового контрагента одним кликом.
    */
   function applyDictation(
     parsed: NonNullable<Awaited<ReturnType<typeof dictate.mutateAsync>>['parsed']>,
@@ -197,22 +283,18 @@ export function ExpenseFormModal({
     if (parsed.document_number && !form.getValues('document_number')) {
       form.setValue('document_number', parsed.document_number, { shouldDirty: true })
     }
-    if (parsed.comment && !form.getValues('comment')) {
-      form.setValue('comment', parsed.comment, { shouldDirty: true })
-    }
-    if (parsed.vendor_guess && !form.getValues('description')) {
-      form.setValue('description', parsed.vendor_guess.slice(0, 200), { shouldDirty: true })
+    // Описание = что купили (LLM возвращает в comment) — приоритетно,
+    // потом fallback на vendor_guess если comment пуст.
+    const descCandidate = parsed.comment ?? parsed.vendor_guess ?? null
+    if (descCandidate && !form.getValues('description')) {
+      form.setValue('description', descCandidate.slice(0, 200), { shouldDirty: true })
     }
     if (parsed.vendor_guess && !form.getValues('counterparty_id')) {
-      const lower = parsed.vendor_guess.toLowerCase()
-      const matchedCp = counterparties.find(
-        (cp) => cp.name.toLowerCase() === lower || cp.name.toLowerCase().includes(lower),
-      )
+      const matchedCp = findCounterpartyFuzzy(parsed.vendor_guess, counterparties)
       if (matchedCp) {
         form.setValue('counterparty_id', matchedCp.id, { shouldDirty: true })
       } else {
-        // Не нашли — показываем тост-намёк, что нужно подтвердить контрагента,
-        // и открываем модалку создания с префилом из надиктовки.
+        // Не нашли — открываем модалку создания с префилом name из голоса.
         setDictationPrefillForNewCp({ name: parsed.vendor_guess })
         setCounterpartyModalOpen(true)
       }
@@ -512,6 +594,141 @@ export function ExpenseFormModal({
             />
           </div>
 
+          {/* Image #109: блок чек (фото или PDF) перенесён сразу под голосовую
+              надиктовку — оба способа быстрого ввода стоят рядом наверху формы.
+              Image #65: для зарплатных категорий чека по смыслу не бывает —
+              скрываем блок целиком, чтобы не сбивать с толку. */}
+          {isPayrollCategory ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
+              {receiptFile ? (
+                <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2 truncate">
+                    {ocr.isPending ? (
+                      <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
+                    ) : (
+                      <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
+                    )}
+                    <span className="truncate">
+                      {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptFile(null)
+                      setOcrNips({ buyer_nip: null, vendor_nip: null })
+                    }}
+                    className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
+                    aria-label={t('expenses.form.receipt_remove')}
+                  >
+                    <X className="size-4" strokeWidth={1.7} />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="exp-receipt"
+                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
+                >
+                  <Camera className="size-4" strokeWidth={1.7} />
+                  <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
+                </label>
+              )}
+              <input
+                id="exp-receipt"
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                data-testid="exp-receipt"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  if (file && file.size > 10 * 1024 * 1024) {
+                    toast.error(t('expenses.form.receipt_too_big'))
+                    return
+                  }
+                  setReceiptFile(file)
+                  setOcrNips({ buyer_nip: null, vendor_nip: null })
+                  // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
+                  if (file && file.type.startsWith('image/')) {
+                    ocr.mutate(file, {
+                      onSuccess: (parsed) => {
+                        // Предзаполняем поля: только если они пусты или дефолтные.
+                        // Юзер редактируемые значения не теряет.
+                        if (parsed.amount && !form.getValues('amount')) {
+                          form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+                        }
+                        if (parsed.expense_at) {
+                          form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
+                        }
+                        const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
+                        if (matchedCat && !form.getValues('category_id')) {
+                          form.setValue('category_id', matchedCat, { shouldDirty: true })
+                        }
+                        if (parsed.vendor && !form.getValues('comment')) {
+                          form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                        }
+                        // Описание (image #94) — auto-fill из vendor если пусто.
+                        if (parsed.vendor && !form.getValues('description')) {
+                          form.setValue('description', parsed.vendor.slice(0, 200), {
+                            shouldDirty: true,
+                          })
+                        }
+                        // Image #93: номер документа из чека.
+                        if (parsed.document_number && !form.getValues('document_number')) {
+                          form.setValue('document_number', parsed.document_number, {
+                            shouldDirty: true,
+                          })
+                        }
+                        // Image #93: контрагент. Сначала пытаемся match по NIP
+                        // (надёжный ключ), потом по имени. Если не нашли —
+                        // открываем CounterpartyEditModal с префилом для
+                        // быстрого создания (юзер подтверждает данные).
+                        if (!form.getValues('counterparty_id') && parsed.vendor) {
+                          const byNip = parsed.vendor_nip
+                            ? counterparties.find(
+                                (cp) =>
+                                  cp.nip?.replace(/[^0-9]/g, '') ===
+                                  parsed.vendor_nip?.replace(/[^0-9]/g, ''),
+                              )
+                            : null
+                          const byName = byNip
+                            ? null
+                            : counterparties.find(
+                                (cp) => cp.name.toLowerCase() === parsed.vendor!.toLowerCase(),
+                              )
+                          const matched = byNip ?? byName
+                          if (matched) {
+                            form.setValue('counterparty_id', matched.id, { shouldDirty: true })
+                          } else {
+                            setDictationPrefillForNewCp({
+                              name: parsed.vendor,
+                              // CounterpartyEditModal принимает prefill { name, nip, address }
+                              // — дополняем доступными полями из OCR.
+                              ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
+                              ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
+                            } as { name: string; nip?: string; address?: string })
+                            setCounterpartyModalOpen(true)
+                          }
+                        }
+                        // NIP'ы — для wFirma auto-push (см. ADR-012).
+                        // Сами поля юзеру не показываем — это служебная мета.
+                        setOcrNips({
+                          buyer_nip: parsed.buyer_nip,
+                          vendor_nip: parsed.vendor_nip,
+                        })
+                        toast.success(t('expenses.form.ocr_done'))
+                      },
+                      onError: () => {
+                        // Юзер заполнит сам, фото остаётся прикреплённым
+                        toast.error(t('expenses.form.ocr_failed'))
+                      },
+                    })
+                  }
+                }}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
             <Input id="exp-date" type="date" {...form.register('expense_at')} />
@@ -810,140 +1027,6 @@ export function ExpenseFormModal({
                 {...form.register('document_number')}
                 placeholder={t('expenses.form.document_number_placeholder')}
                 maxLength={60}
-              />
-            </div>
-          )}
-
-          {/* Фото чека (опционально). Если фото — auto-OCR через Claude Haiku.
-              Image #65: для зарплатных категорий чека по смыслу не бывает —
-              скрываем блок целиком, чтобы не сбивать с толку. */}
-          {isPayrollCategory ? null : (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
-              {receiptFile ? (
-                <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2 truncate">
-                    {ocr.isPending ? (
-                      <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
-                    ) : (
-                      <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
-                    )}
-                    <span className="truncate">
-                      {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReceiptFile(null)
-                      setOcrNips({ buyer_nip: null, vendor_nip: null })
-                    }}
-                    className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
-                    aria-label={t('expenses.form.receipt_remove')}
-                  >
-                    <X className="size-4" strokeWidth={1.7} />
-                  </button>
-                </div>
-              ) : (
-                <label
-                  htmlFor="exp-receipt"
-                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
-                >
-                  <Camera className="size-4" strokeWidth={1.7} />
-                  <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
-                </label>
-              )}
-              <input
-                id="exp-receipt"
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                data-testid="exp-receipt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null
-                  if (file && file.size > 10 * 1024 * 1024) {
-                    toast.error(t('expenses.form.receipt_too_big'))
-                    return
-                  }
-                  setReceiptFile(file)
-                  setOcrNips({ buyer_nip: null, vendor_nip: null })
-                  // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
-                  if (file && file.type.startsWith('image/')) {
-                    ocr.mutate(file, {
-                      onSuccess: (parsed) => {
-                        // Предзаполняем поля: только если они пусты или дефолтные.
-                        // Юзер редактируемые значения не теряет.
-                        if (parsed.amount && !form.getValues('amount')) {
-                          form.setValue('amount', String(parsed.amount), { shouldDirty: true })
-                        }
-                        if (parsed.expense_at) {
-                          form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
-                        }
-                        const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
-                        if (matchedCat && !form.getValues('category_id')) {
-                          form.setValue('category_id', matchedCat, { shouldDirty: true })
-                        }
-                        if (parsed.vendor && !form.getValues('comment')) {
-                          form.setValue('comment', parsed.vendor, { shouldDirty: true })
-                        }
-                        // Описание (image #94) — auto-fill из vendor если пусто.
-                        if (parsed.vendor && !form.getValues('description')) {
-                          form.setValue('description', parsed.vendor.slice(0, 200), {
-                            shouldDirty: true,
-                          })
-                        }
-                        // Image #93: номер документа из чека.
-                        if (parsed.document_number && !form.getValues('document_number')) {
-                          form.setValue('document_number', parsed.document_number, {
-                            shouldDirty: true,
-                          })
-                        }
-                        // Image #93: контрагент. Сначала пытаемся match по NIP
-                        // (надёжный ключ), потом по имени. Если не нашли —
-                        // открываем CounterpartyEditModal с префилом для
-                        // быстрого создания (юзер подтверждает данные).
-                        if (!form.getValues('counterparty_id') && parsed.vendor) {
-                          const byNip = parsed.vendor_nip
-                            ? counterparties.find(
-                                (cp) =>
-                                  cp.nip?.replace(/[^0-9]/g, '') ===
-                                  parsed.vendor_nip?.replace(/[^0-9]/g, ''),
-                              )
-                            : null
-                          const byName = byNip
-                            ? null
-                            : counterparties.find(
-                                (cp) => cp.name.toLowerCase() === parsed.vendor!.toLowerCase(),
-                              )
-                          const matched = byNip ?? byName
-                          if (matched) {
-                            form.setValue('counterparty_id', matched.id, { shouldDirty: true })
-                          } else {
-                            setDictationPrefillForNewCp({
-                              name: parsed.vendor,
-                              // CounterpartyEditModal принимает prefill { name, nip, address }
-                              // — дополняем доступными полями из OCR.
-                              ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
-                              ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
-                            } as { name: string; nip?: string; address?: string })
-                            setCounterpartyModalOpen(true)
-                          }
-                        }
-                        // NIP'ы — для wFirma auto-push (см. ADR-012).
-                        // Сами поля юзеру не показываем — это служебная мета.
-                        setOcrNips({
-                          buyer_nip: parsed.buyer_nip,
-                          vendor_nip: parsed.vendor_nip,
-                        })
-                        toast.success(t('expenses.form.ocr_done'))
-                      },
-                      onError: () => {
-                        // Юзер заполнит сам, фото остаётся прикреплённым
-                        toast.error(t('expenses.form.ocr_failed'))
-                      },
-                    })
-                  }
-                }}
               />
             </div>
           )}

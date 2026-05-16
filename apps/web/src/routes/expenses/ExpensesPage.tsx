@@ -43,6 +43,7 @@ import {
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCounterparties } from '@/hooks/useCounterparties'
 import { useSalon } from '@/hooks/useSalons'
+import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { ExpenseFormModal } from './ExpenseFormModal'
@@ -102,6 +103,17 @@ export function ExpensesPage() {
     () => new Map(cashRegisters.map((r) => [r.id, r.label])),
     [cashRegisters],
   )
+  // Image #110: для отображения «кто внёс расход» в строке списка — резолвим
+  // created_by (auth.users.id) → ФИО/email через salon_members + RPC.
+  const { data: teamMembers = [] } = useTeamMembers(salonId)
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of teamMembers) {
+      if (!m.user_id) continue
+      map.set(m.user_id, m.full_name || m.email || '—')
+    }
+    return map
+  }, [teamMembers])
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
     categoryId: categoryFilter || null,
@@ -299,8 +311,10 @@ export function ExpensesPage() {
                           </button>
                         ) : null}
                       </span>
-                      {/* Sub-line: Категория · Контрагент · Касса/payment.
-                          Image #93/#59: показываем эти поля прямо в строке списка. */}
+                      {/* Sub-line: Категория · Контрагент · № документа · Касса · Кто внёс.
+                          Image #93/#59: категория/контрагент в строке списка.
+                          Image #110: + номер документа (фактуры/чека) и кто
+                          именно внёс расход (видно сразу, без открытия карточки). */}
                       <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                         {cat ? <span>{cat.name}</span> : null}
                         {e.counterparty_id ? (
@@ -309,18 +323,39 @@ export function ExpensesPage() {
                             <span>{counterpartyById.get(e.counterparty_id)?.name ?? '—'}</span>
                           </>
                         ) : null}
+                        {/* Image #110: номер документа — рядом с контрагентом. */}
+                        {e.document_number ? (
+                          <>
+                            {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
+                            <span className="num">№ {e.document_number}</span>
+                          </>
+                        ) : null}
                         {/* Image #82: касса вместо payment_method-пилюли.
                             Fallback на старый payment_method если cash_register_id
                             ещё не проставлен (исторические строки). */}
                         {e.cash_register_id || e.payment_method ? (
                           <>
-                            {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
+                            {cat || e.counterparty_id || e.document_number ? (
+                              <span aria-hidden>·</span>
+                            ) : null}
                             <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
                               {e.cash_register_id
                                 ? (cashRegisterById.get(e.cash_register_id) ?? '—')
                                 : t(`payment_methods.${e.payment_method}`, {
                                     defaultValue: e.payment_method as string,
                                   })}
+                            </span>
+                          </>
+                        ) : null}
+                        {/* Image #110: кто внёс расход. ФИО/email из salon_members. */}
+                        {e.created_by && userNameById.get(e.created_by) ? (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span className="text-muted-foreground">
+                              {t('expenses.created_by_short', {
+                                name: userNameById.get(e.created_by),
+                                defaultValue: `внёс ${userNameById.get(e.created_by)}`,
+                              })}
                             </span>
                           </>
                         ) : null}

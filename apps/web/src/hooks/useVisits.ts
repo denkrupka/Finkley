@@ -163,10 +163,14 @@ export function useCreateVisit(salonId: string | undefined) {
     onError: (_err, _input, ctx) => {
       ctx?.prevSnapshots.forEach(({ key, data }) => qc.setQueryData(key, data))
     },
-    onSuccess: () => {
-      // Свежий список + KPI должны перерисоваться.
-      qc.invalidateQueries({ queryKey: visitsKeys(salonId) })
-      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    onSuccess: async () => {
+      // Image #105: refetchType:'all' гарантирует что фоновые SalesTab /
+      // VisitsCalendarView сразу подтянут новый визит — иначе после
+      // retail wizard'а продажа не появляется в списке до reload.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: visitsKeys(salonId), refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['dashboard', salonId] }),
+      ])
     },
   })
 }
@@ -204,9 +208,11 @@ export function useUpdateVisit(salonId: string | undefined) {
       if (error) throw error
       return data as VisitRow
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: visitsKeys(salonId) })
-      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: visitsKeys(salonId), refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['dashboard', salonId] }),
+      ])
     },
   })
 }
