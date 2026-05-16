@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
@@ -66,6 +66,12 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
   const { hasOpenShift } = useRequireCashShift(salonId)
+  // Пагинация по 25 — как на /expenses и /clients.
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
+  useEffect(() => {
+    setPage(1)
+  }, [period, staffFilter, payFilter])
   // Image #98: клик по строке продажи → открыть карточку с возможностью
   // редактировать любое поле (используем VisitDetailModal в режиме detail).
   const [editingSale, setEditingSale] = useState<VisitRow | null>(null)
@@ -110,6 +116,20 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const otherTotal = filteredOtherIncomes.reduce((acc, o) => acc + o.amount_cents, 0)
   const total = salesTotal + otherTotal
   const totalCount = sales.length + filteredOtherIncomes.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  // Объединённый отсортированный список (other_incomes сверху как у меня
+  // сейчас) — пагинацию делаем по нему. Без mergesort: пейджим по двум
+  // источникам через единый offset.
+  const pageStart = (page - 1) * PAGE_SIZE
+  const pageEnd = page * PAGE_SIZE
+  const otherCount = filteredOtherIncomes.length
+  const pagedOther =
+    pageStart < otherCount
+      ? filteredOtherIncomes.slice(pageStart, Math.min(pageEnd, otherCount))
+      : []
+  const visitsOffset = Math.max(0, pageStart - otherCount)
+  const visitsLimit = Math.max(0, pageEnd - Math.max(pageStart, otherCount))
+  const pagedSales = sales.slice(visitsOffset, visitsOffset + visitsLimit)
 
   return (
     <div>
@@ -211,7 +231,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
               {/* Image #127: товары (retail visits) + прочие доходы рисуем
                   в одной таблице. Прочие доходы помечены пилюлей-бейджем,
                   чтобы юзер сразу видел тип. */}
-              {filteredOtherIncomes.map((o) => (
+              {pagedOther.map((o) => (
                 <tr key={`oi-${o.id}`} className="border-border/60 hover:bg-muted/30 border-t">
                   <td className="num text-muted-foreground px-4 py-2 text-xs">
                     {formatVisitDate(o.income_at)}
@@ -238,7 +258,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
                   <td className="px-4 py-2" />
                 </tr>
               ))}
-              {sales.map((s) => {
+              {pagedSales.map((s) => {
                 const stf = staff.find((x) => x.id === s.staff_id)
                 return (
                   <tr
@@ -287,6 +307,34 @@ export function SalesTab({ salonId }: { salonId: string }) {
             </tbody>
           </table>
         )}
+        {!isLoading && totalPages > 1 ? (
+          <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
+            <p className="text-muted-foreground text-xs">
+              {pageStart + 1}—{Math.min(pageEnd, totalCount)} {t('common.of')} {totalCount}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ‹
+              </button>
+              <span className="text-muted-foreground px-2 text-xs">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

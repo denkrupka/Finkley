@@ -18,6 +18,21 @@ export function CashDisciplineCard({ salonId }: { salonId: string }) {
   const { data: salon, isLoading } = useSalon(salonId)
 
   async function toggle(next: boolean) {
+    // Перед выключением проверяем что нет открытых смен — иначе они
+    // окажутся «в подвешенном состоянии» (auto-close их закроет позже).
+    if (!next) {
+      const { count } = await supabase
+        .from('cash_shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('salon_id', salonId)
+        .eq('status', 'open')
+      if (count && count > 0) {
+        const ok = window.confirm(
+          t('settings.cash_discipline.confirm_disable_with_open', { count }),
+        )
+        if (!ok) return
+      }
+    }
     const { error } = await supabase
       .from('salons')
       .update({ cash_discipline_enabled: next })
