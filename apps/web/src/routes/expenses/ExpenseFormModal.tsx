@@ -49,6 +49,7 @@ const PORTAL_DISPLAY_NAME: Record<string, string> = {
 }
 import { DictateButton } from '@/components/ui/DictateButton'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useCounterparties } from '@/hooks/useCounterparties'
 import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
@@ -236,6 +237,7 @@ export function ExpenseFormModal({
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const { data: cashRegisters = [] } = useCashRegisters(salonId)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   const { data: counterparties = [] } = useCounterparties(salonId)
   const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
@@ -405,6 +407,15 @@ export function ExpenseFormModal({
   }
 
   async function onSubmit(values: FormValues) {
+    // Per-user касса: создание/редактирование расхода требует открытую смену.
+    // Изменения существующего расхода (isEdit) — тоже за гейтом, иначе
+    // можно «починить» прошлые цифры без смены.
+    if (!hasOpenShift) {
+      toast.error(t('finance.cash.gate_required_title'), {
+        description: t('finance.cash.gate_required_expense'),
+      })
+      return
+    }
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
     const derivedPaymentMethod = derivePaymentMethod(values)
 

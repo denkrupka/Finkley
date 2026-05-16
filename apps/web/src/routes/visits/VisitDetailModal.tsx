@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useClients } from '@/hooks/useClients'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
@@ -510,6 +511,7 @@ function ChargeView({
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const qc = useQueryClient()
+  const { hasOpenShift } = useRequireCashShift(salonId)
   const baseTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents - v.discount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
@@ -526,6 +528,13 @@ function ChargeView({
   const grandTotal = baseTotalCents + tipCents
 
   async function chargeAll() {
+    // Per-user касса: расчёт визита требует открытую смену текущего юзера.
+    if (!hasOpenShift) {
+      toast.error(t('finance.cash.gate_required_title'), {
+        description: t('finance.cash.gate_required_charge'),
+      })
+      return
+    }
     setBusy(true)
     try {
       // Распределяем tip пропорционально по линиям (если их несколько).

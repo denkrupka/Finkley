@@ -28,6 +28,7 @@ import {
   useOtherIncomeCategories,
 } from '@/hooks/useOtherIncomes'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useCreateVisit, type PaymentMethod } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -78,6 +79,7 @@ export function RetailSaleWizard({
   const createOtherIncome = useCreateOtherIncome(salonId)
   const createOtherCategory = useCreateOtherIncomeCategory(salonId)
   const { data: cashRegisters = [] } = useCashRegisters(salonId)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: false })
   const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
 
@@ -241,6 +243,13 @@ export function RetailSaleWizard({
 
   async function submitSale() {
     if (!step1Valid || !step3Valid) return
+    // Per-user касса: продажа требует открытую смену.
+    if (!hasOpenShift) {
+      toast.error(t('finance.cash.gate_required_title'), {
+        description: t('finance.cash.gate_required_sale'),
+      })
+      return
+    }
     setSubmitting(true)
     try {
       // Создаём visit per line, помечаем status='paid'. Для группировки в UI

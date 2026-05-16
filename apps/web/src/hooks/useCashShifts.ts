@@ -24,19 +24,24 @@ export type CashShift = {
 }
 
 /**
- * Текущая открытая смена салона. Возвращает null, если смена ещё не
- * открыта. Один салон может иметь максимум одну `open` смену (БД-индекс
- * cash_shifts_one_open_per_salon).
+ * Текущая открытая смена ТЕКУЩЕГО юзера. Каждый кассир ведёт свою смену
+ * независимо от других — миграция 20260516000004 заменила уникальность
+ * `(salon_id) where status=open` на `(salon_id, opened_by_user_id) where
+ * status=open`. Возвращает null если у этого юзера сейчас нет открытой
+ * смены в этом салоне.
  */
 export function useCurrentShift(salonId: string | undefined) {
   return useQuery<CashShift | null>({
-    queryKey: ['cash-shifts', salonId, 'current'],
+    queryKey: ['cash-shifts', salonId, 'current-mine'],
     queryFn: async () => {
       if (!salonId) return null
+      const { data: u } = await supabase.auth.getUser()
+      if (!u?.user) return null
       const { data, error } = await supabase
         .from('cash_shifts')
         .select('*')
         .eq('salon_id', salonId)
+        .eq('opened_by_user_id', u.user.id)
         .eq('status', 'open')
         .maybeSingle()
       if (error) {
@@ -173,31 +178,42 @@ export function useShiftTransactions(salonId: string | undefined, shift: CashShi
       if (!salonId || !shift) return []
       const startIso = shift.opened_at
       const endIso = shift.closed_at ?? new Date().toISOString()
+      // Per-user касса: смена принадлежит конкретному пользователю, и в ней
+      // должны быть только ЕГО транзакции. Фильтруем visits и expenses по
+      // created_by = opened_by_user_id. Это работает для записей, сделанных
+      // после миграции 20260516000004 (триггер заполняет created_by из
+      // auth.uid()). Старые записи с NULL созданы не будут видны в смене —
+      // это намеренное поведение, такие записи не относятся к смене.
+      const userId = shift.opened_by_user_id
 
       const [visitsResp, expensesResp] = await Promise.all([
-        supabase
-          .from('visits')
-          .select(
-            'id, visit_at, amount_cents, tip_cents, discount_cents, payment_method, cash_register_id, service_name_snapshot, staff_id, created_by',
-          )
-          .eq('salon_id', salonId)
-          .is('deleted_at', null)
-          .gte('visit_at', startIso)
-          .lte('visit_at', endIso)
-          .eq('status', 'paid')
-          .order('visit_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('expenses')
-          .select(
-            'id, expense_at, amount_cents, payment_method, cash_register_id, description, comment, category_id, created_by, created_at',
-          )
-          .eq('salon_id', salonId)
-          .is('deleted_at', null)
-          .gte('created_at', startIso)
-          .lte('created_at', endIso)
-          .order('created_at', { ascending: false })
-          .limit(500),
+        (() => {
+          let q = supabase
+            .from('visits')
+            .select(
+              'id, visit_at, amount_cents, tip_cents, discount_cents, payment_method, cash_register_id, service_name_snapshot, staff_id, created_by',
+            )
+            .eq('salon_id', salonId)
+            .is('deleted_at', null)
+            .gte('visit_at', startIso)
+            .lte('visit_at', endIso)
+            .eq('status', 'paid')
+          if (userId) q = q.eq('created_by', userId)
+          return q.order('visit_at', { ascending: false }).limit(500)
+        })(),
+        (() => {
+          let q = supabase
+            .from('expenses')
+            .select(
+              'id, expense_at, amount_cents, payment_method, cash_register_id, description, comment, category_id, created_by, created_at',
+            )
+            .eq('salon_id', salonId)
+            .is('deleted_at', null)
+            .gte('created_at', startIso)
+            .lte('created_at', endIso)
+          if (userId) q = q.eq('created_by', userId)
+          return q.order('created_at', { ascending: false }).limit(500)
+        })(),
       ])
 
       const txns: ShiftTxn[] = []
@@ -292,6 +308,24 @@ export function classifyChannel(
   if (m === 'cash') return 'cash'
   if (m === 'card' || m === 'terminal') return 'card'
   return 'other'
+}
+
+/**
+ * useRequireCashShift — гейт для финансовых операций (расчёт визита,
+ * создание расхода). Возвращает текущую открытую смену пользователя и
+ * флаг готовности. Если null — UI должен заблокировать действие и
+ * подсказать «открыть кассовый день».
+ *
+ * Тонкий wrapper над useCurrentShift, чтобы в каждом месте не дублировать
+ * проверку shift !== null + сообщение об ошибке.
+ */
+export function useRequireCashShift(salonId: string | undefined) {
+  const { data: shift, isLoading } = useCurrentShift(salonId)
+  return {
+    shift: shift ?? null,
+    isLoading,
+    hasOpenShift: !!shift,
+  }
 }
 
 /**
