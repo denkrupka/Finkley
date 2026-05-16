@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
@@ -64,6 +65,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const [staffFilter, setStaffFilter] = useState<string>('')
   const [payFilter, setPayFilter] = useState<PaymentMethod | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   // Image #98: клик по строке продажи → открыть карточку с возможностью
   // редактировать любое поле (используем VisitDetailModal в режиме detail).
   const [editingSale, setEditingSale] = useState<VisitRow | null>(null)
@@ -126,7 +128,21 @@ export function SalesTab({ salonId }: { salonId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <PeriodPickerPopover value={period} onChange={setPeriod} />
-          <Button variant="secondary" size="md" onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => {
+              // Per-user касса: «+Продажа» — гейт ДО открытия wizard'а,
+              // чтобы не проходить 4 шага зря.
+              if (!hasOpenShift) {
+                toast.error(t('finance.cash.gate_required_title'), {
+                  description: t('finance.cash.gate_required_sale'),
+                })
+                return
+              }
+              setCreateOpen(true)
+            }}
+          >
             <Plus className="size-4" strokeWidth={2.4} />
             {t('income.sales.add_button')}
           </Button>
