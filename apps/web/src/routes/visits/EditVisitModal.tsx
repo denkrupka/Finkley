@@ -24,6 +24,7 @@ import {
 import { useParams } from 'react-router-dom'
 
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useUpdateVisit, type PaymentMethod, type VisitRow } from '@/hooks/useVisits'
 
 /**
@@ -48,6 +49,7 @@ export function EditVisitModal({
 }) {
   const { t } = useTranslation()
   const update = useUpdateVisit(salonId)
+  const { hasOpenShift } = useRequireCashShift(salonId)
   const { salonId: routeSalonId } = useParams<{ salonId: string }>()
   const { data: paymentMethods = [] } = usePaymentMethods(routeSalonId ?? salonId)
 
@@ -77,6 +79,14 @@ export function EditVisitModal({
 
   function handleSubmit() {
     if (!visit) return
+    // Per-user касса: pending → paid (расчёт) требует открытую смену.
+    // Pure-update (без смены статуса) — пропускаем без гейта.
+    if (isPending && !hasOpenShift) {
+      toast.error(t('finance.cash.gate_required_title'), {
+        description: t('finance.cash.gate_required_charge'),
+      })
+      return
+    }
     const amountCents = parseMoney(amount)
     if (amountCents <= 0) {
       toast.error(t('visits.errors.amount_positive'))
