@@ -34,7 +34,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useCashRegisters, type CashRegisterOption } from '@/hooks/useCashRegisters'
 import {
+  classifyChannel,
   computeExpected,
   useCloseShift,
   useCurrentShift,
@@ -69,6 +71,7 @@ export function CashTab({ salonId }: { salonId: string }) {
   const { data: history = [] } = useShiftHistory(salonId)
   const { data: txns = [] } = useShiftTransactions(salonId, currentShift ?? null)
   const { data: team = [] } = useTeamMembers(salonId)
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
 
   const openShift = useOpenShift(salonId)
   const closeShift = useCloseShift(salonId)
@@ -86,7 +89,7 @@ export function CashTab({ salonId }: { salonId: string }) {
     return map
   }, [team])
 
-  const expected = computeExpected(currentShift ?? null, txns)
+  const expected = computeExpected(currentShift ?? null, txns, cashRegisters)
   const opening = currentShift?.opening_amount_cents ?? 0
   const cashNow = expected.expected_cash_cents
   const todayLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: ru })
@@ -220,7 +223,12 @@ export function CashTab({ salonId }: { salonId: string }) {
 
       {/* Транзакции текущей смены */}
       {currentShift ? (
-        <TransactionsBlock txns={txns} currency={currency} userNameById={userNameById} />
+        <TransactionsBlock
+          txns={txns}
+          currency={currency}
+          userNameById={userNameById}
+          cashRegisters={cashRegisters}
+        />
       ) : (
         <div className="border-border bg-card shadow-finsm rounded-lg border p-6 text-center">
           <Wallet className="text-muted-foreground mx-auto size-8" strokeWidth={1.5} />
@@ -306,26 +314,22 @@ function TransactionsBlock({
   txns,
   currency,
   userNameById,
+  cashRegisters,
 }: {
   txns: ShiftTxn[]
   currency: string
   userNameById: Map<string, string>
+  cashRegisters: CashRegisterOption[]
 }) {
   const { t } = useTranslation()
   const [filter, setFilter] = useState<'all' | 'cash' | 'card' | 'other'>('all')
 
   const filtered = useMemo(() => {
     if (filter === 'all') return txns
-    if (filter === 'cash') return txns.filter((x) => x.payment_method === 'cash')
-    if (filter === 'card')
-      return txns.filter((x) => x.payment_method === 'card' || x.payment_method === 'terminal')
     return txns.filter(
-      (x) =>
-        x.payment_method !== 'cash' &&
-        x.payment_method !== 'card' &&
-        x.payment_method !== 'terminal',
+      (x) => classifyChannel(x.payment_method, x.cash_register_id, cashRegisters) === filter,
     )
-  }, [txns, filter])
+  }, [txns, filter, cashRegisters])
 
   const income = filtered.filter((t) => t.amount_cents > 0)
   const expenses = filtered.filter((t) => t.amount_cents < 0)

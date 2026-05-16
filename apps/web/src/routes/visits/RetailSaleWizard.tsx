@@ -90,10 +90,18 @@ export function RetailSaleWizard({
     return window.localStorage.getItem(LAST_SALE_STAFF_KEY) ?? ''
   })
   // Image #82: вместо payment_method-pills используем cash_registers.
-  // payment_method остаётся в БД (NOT NULL) и пишется как 'card' для
-  // обратной совместимости; реальная касса хранится в cash_register_id.
+  // Касса теперь источник истины (cash_register_id). payment_method
+  // выводим из label кассы: «Касса/нал/Gotówka» → 'cash', «Карта/Karta/
+  // Terminal» → 'card'. Это критично для модуля Касса (computeExpected
+  // суммирует наличку и карту), поэтому хардкодить 'card' нельзя.
   const [cashRegisterId, setCashRegisterId] = useState<string>('')
-  const paymentMethod: PaymentMethod = 'card'
+  const paymentMethod: PaymentMethod = (() => {
+    const reg = cashRegisters.find((r) => r.id === cashRegisterId)
+    if (!reg) return 'card'
+    const l = reg.label.toLowerCase()
+    if (/(касс|нал|gotówk|gotowk|сейф|seif|safe)/i.test(l)) return 'cash'
+    return 'card'
+  })()
   const [extraDiscount, setExtraDiscount] = useState('') // string из input, потом *100
   // Image #90: режим ввода доп. скидки — фиксированная сумма или %.
   // При 'percent' значение трактуется как процент от linesTotalCents;

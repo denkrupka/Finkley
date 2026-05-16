@@ -262,21 +262,57 @@ export function useShiftTransactions(salonId: string | undefined, shift: CashShi
 }
 
 /**
+ * Классифицирует канал транзакции: cash / card / other.
+ *
+ * Логика: сначала смотрим на cash_register_id (он точнее — юзер выбрал
+ * конкретную кассу). Если касса найдена в financial_settings — определяем
+ * по её label (содержит «карт»/«kart» → card; «касс»/«нал»/«gotówka»/
+ * «сейф» → cash). Если cash_register_id отсутствует — fallback на
+ * payment_method (cash / card / terminal).
+ *
+ * Регистр не учитываем, а в label'ах ищем подстроки на ru + pl —
+ * салонам в Польше часто пишут на польском.
+ */
+export type CashChannel = 'cash' | 'card' | 'other'
+
+export function classifyChannel(
+  payment_method: string | null,
+  cash_register_id: string | null,
+  cashRegisters: { id: string; label: string }[],
+): CashChannel {
+  if (cash_register_id) {
+    const reg = cashRegisters.find((r) => r.id === cash_register_id)
+    if (reg) {
+      const l = reg.label.toLowerCase()
+      if (/(карт|kart|terminal|терминал)/i.test(l)) return 'card'
+      if (/(касс|нал|gotówk|gotowk|сейф|seif|safe)/i.test(l)) return 'cash'
+    }
+  }
+  const m = (payment_method ?? '').toLowerCase()
+  if (m === 'cash') return 'cash'
+  if (m === 'card' || m === 'terminal') return 'card'
+  return 'other'
+}
+
+/**
  * Считает ожидаемые суммы (cash/card) на основе списка транзакций смены +
  * opening_amount. Используется и для KPI «касса сейчас», и для snapshot
  * при закрытии смены.
+ *
+ * Канал определяется через classifyChannel (cash_register_id приоритетнее
+ * payment_method). other-канал не входит ни в наличные ни в карту.
  */
 export function computeExpected(
   shift: CashShift | null,
   txns: ShiftTxn[],
+  cashRegisters: { id: string; label: string }[] = [],
 ): { expected_cash_cents: number; expected_card_cents: number } {
   let cash = shift?.opening_amount_cents ?? 0
   let card = 0
   for (const t of txns) {
-    const method = (t.payment_method ?? '').toLowerCase()
-    if (method === 'cash') cash += t.amount_cents
-    else if (method === 'card' || method === 'terminal') card += t.amount_cents
-    // online/transfer/mixed — не входят в наличные/карта сверку.
+    const ch = classifyChannel(t.payment_method, t.cash_register_id, cashRegisters)
+    if (ch === 'cash') cash += t.amount_cents
+    else if (ch === 'card') card += t.amount_cents
   }
   return { expected_cash_cents: cash, expected_card_cents: card }
 }

@@ -386,8 +386,27 @@ export function ExpenseFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
   }, [open, expense?.id])
 
+  /**
+   * Выводим payment_method из выбранной кассы (cash_register_id) если юзер
+   * не указал его явно. Касса теперь источник истины (image #82), но
+   * payment_method остаётся в схеме для модуля Касса и старых отчётов.
+   * Хайристика та же что в classifyChannel: «касс/нал/Gotówka» → cash,
+   * «карт/Karta/Terminal» → card.
+   */
+  function derivePaymentMethod(values: FormValues): PaymentMethod | null {
+    if (values.payment_method) return values.payment_method as PaymentMethod
+    if (!values.cash_register_id) return null
+    const reg = cashRegisters.find((r) => r.id === values.cash_register_id)
+    if (!reg) return null
+    const l = reg.label.toLowerCase()
+    if (/(касс|нал|gotówk|gotowk|сейф|seif|safe)/i.test(l)) return 'cash'
+    if (/(карт|kart|terminal|терминал)/i.test(l)) return 'card'
+    return null
+  }
+
   async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+    const derivedPaymentMethod = derivePaymentMethod(values)
 
     // Edit-mode: простое UPDATE без OCR/auto-push/upload (этого хватает для
     // правки уже-созданного расхода — поля те же, что при создании).
@@ -415,7 +434,7 @@ export function ExpenseFormModal({
           category_id: values.category_id || null,
           counterparty_id: values.counterparty_id || null,
           amount_cents: amountCents,
-          payment_method: values.payment_method || null,
+          payment_method: derivedPaymentMethod,
           cash_register_id: values.cash_register_id || null,
           document_number: values.document_number.trim() || null,
           comment: values.comment || null,
