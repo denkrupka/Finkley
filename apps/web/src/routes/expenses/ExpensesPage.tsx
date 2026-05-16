@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   CheckCircle2,
   FileText,
   Loader2,
@@ -56,6 +57,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
+import { CashTransferModal } from './CashTransferModal'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -143,6 +145,7 @@ export function ExpensesPage() {
   )
 
   const [formOpen, setFormOpen] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
   const { hasOpenShift, disciplineEnabled } = useRequireCashShift(salonId)
   const showShiftBanner = disciplineEnabled && !hasOpenShift
   // Пагинация по 25 — как на /clients. Сброс на 1-ю страницу при смене
@@ -231,12 +234,19 @@ export function ExpensesPage() {
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPickerPopover value={period} onChange={setPeriod} />
           <Button
+            variant="ghost"
+            size="md"
+            onClick={() => setTransferOpen(true)}
+            className="border-border border"
+            data-testid="cash-transfer"
+          >
+            <ArrowLeftRight className="size-4" strokeWidth={2} />
+            {t('cash_transfer.button_open')}
+          </Button>
+          <Button
             variant="secondary"
             size="md"
             onClick={() => {
-              // Per-user касса (если включена): нельзя добавить расход без
-              // открытой смены. Блокируем ОТКРЫТИЕ модалки — юзер сразу
-              // видит сообщение и не вводит данные зря.
               if (!hasOpenShift) {
                 toast.error(t('finance.cash.gate_required_title'), {
                   description: t('finance.cash.gate_required_expense'),
@@ -648,6 +658,12 @@ export function ExpensesPage() {
         salonId={salonId}
         currency={currency}
         expense={editingExpense}
+      />
+
+      <CashTransferModal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        salonId={salonId}
       />
 
       {/* Просмотр чека */}

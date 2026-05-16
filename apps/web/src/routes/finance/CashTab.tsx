@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   ChevronDown,
@@ -50,6 +51,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
+import { CashTransferModal } from '@/routes/expenses/CashTransferModal'
 
 /**
  * Финансы → Касса. Кассовая дисциплина: открытие смены с opening cash,
@@ -79,6 +81,8 @@ export function CashTab({ salonId }: { salonId: string }) {
   const [openDialogShown, setOpenDialogShown] = useState(false)
   const [closeDialogShown, setCloseDialogShown] = useState(false)
   const [drawerShift, setDrawerShift] = useState<CashShift | null>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [postClosePrompt, setPostClosePrompt] = useState(false)
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -144,6 +148,7 @@ export function CashTab({ salonId }: { salonId: string }) {
         onSuccess: () => {
           toast.success(t('finance.cash.toast_closed'))
           setCloseDialogShown(false)
+          setPostClosePrompt(true)
         },
         onError: (err) =>
           toast.error(t('finance.cash.toast_close_error'), {
@@ -173,6 +178,15 @@ export function CashTab({ salonId }: { salonId: string }) {
           <p className="text-muted-foreground mt-0.5 text-sm capitalize">{todayLabel}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => setTransferOpen(true)}
+            className="border-border border"
+          >
+            <ArrowLeftRight className="size-4" strokeWidth={2} />
+            {t('cash_transfer.button_open')}
+          </Button>
           {currentShift ? (
             <>
               <span className="bg-brand-sage-soft text-brand-sage inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold">
@@ -300,6 +314,42 @@ export function CashTab({ salonId }: { salonId: string }) {
         currency={currency}
         userNameById={userNameById}
       />
+
+      <CashTransferModal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        salonId={salonId}
+      />
+
+      <Dialog open={postClosePrompt} onOpenChange={setPostClosePrompt}>
+        <DialogContent className="sm:!w-[440px] sm:!max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>{t('cash_transfer.post_close_title')}</DialogTitle>
+            <DialogDescription>{t('cash_transfer.post_close_subtitle')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() => setPostClosePrompt(false)}
+              className="border-border border"
+            >
+              {t('cash_transfer.post_close_no')}
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                setPostClosePrompt(false)
+                setTransferOpen(true)
+              }}
+            >
+              <ArrowLeftRight className="size-4" strokeWidth={2} />
+              {t('cash_transfer.post_close_yes')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
