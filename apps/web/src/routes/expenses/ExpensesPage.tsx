@@ -1,13 +1,4 @@
-import {
-  ArrowLeftRight,
-  CheckCircle2,
-  FileText,
-  Loader2,
-  Paperclip,
-  Plus,
-  Repeat,
-  Trash2,
-} from 'lucide-react'
+import { CheckCircle2, FileText, Loader2, Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -57,7 +48,6 @@ import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
-import { CashTransferModal } from './CashTransferModal'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -145,7 +135,6 @@ export function ExpensesPage() {
   )
 
   const [formOpen, setFormOpen] = useState(false)
-  const [transferOpen, setTransferOpen] = useState(false)
   const [gateOpen, setGateOpen] = useState(false)
   const { hasOpenShift } = useRequireCashShift(salonId)
   // Пагинация по 25 — как на /clients. Сброс на 1-ю страницу при смене
@@ -213,16 +202,6 @@ export function ExpensesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPickerPopover value={period} onChange={setPeriod} />
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => setTransferOpen(true)}
-            className="border-border border"
-            data-testid="cash-transfer"
-          >
-            <ArrowLeftRight className="size-4" strokeWidth={2} />
-            {t('cash_transfer.button_open')}
-          </Button>
           <Button
             variant="secondary"
             size="md"
@@ -634,12 +613,6 @@ export function ExpensesPage() {
         salonId={salonId}
         currency={currency}
         expense={editingExpense}
-      />
-
-      <CashTransferModal
-        open={transferOpen}
-        onClose={() => setTransferOpen(false)}
-        salonId={salonId}
       />
 
       <CashGateRequiredDialog

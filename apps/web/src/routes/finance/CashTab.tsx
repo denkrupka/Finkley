@@ -81,8 +81,8 @@ export function CashTab({ salonId }: { salonId: string }) {
   const [openDialogShown, setOpenDialogShown] = useState(false)
   const [closeDialogShown, setCloseDialogShown] = useState(false)
   const [drawerShift, setDrawerShift] = useState<CashShift | null>(null)
-  const [transferOpen, setTransferOpen] = useState(false)
   const [postClosePrompt, setPostClosePrompt] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -178,15 +178,6 @@ export function CashTab({ salonId }: { salonId: string }) {
           <p className="text-muted-foreground mt-0.5 text-sm capitalize">{todayLabel}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => setTransferOpen(true)}
-            className="border-border border"
-          >
-            <ArrowLeftRight className="size-4" strokeWidth={2} />
-            {t('cash_transfer.button_open')}
-          </Button>
           {currentShift ? (
             <>
               <span className="bg-brand-sage-soft text-brand-sage inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold">

@@ -1,4 +1,4 @@
-import { ArrowRight, Loader2, Trash2, Wallet } from 'lucide-react'
+import { ArrowRight, Loader2, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -13,36 +13,19 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
-  currentMonthPeriod,
-  periodToRange,
-  type PeriodValue,
-} from '@/components/ui/period-picker-utils'
-import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import {
-  useCashTransfers,
   useCreateCashTransfer,
   useRegisterBalances,
   useReverseCashTransfer,
-  useSoftDeleteCashTransfer,
-  type CashTransfer,
 } from '@/hooks/useCashTransfers'
-import { useSalon, useSalonMembership } from '@/hooks/useSalons'
-import { useTeamMembers } from '@/hooks/useTeam'
+import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDate } from '@/lib/utils/format-date'
 
@@ -55,10 +38,12 @@ type Props = {
 
 /**
  * Модалка «Перестановка средств» — перевод между cash_registers салона.
- * См. ADR-014. Три блока:
+ * См. ADR-014. Два блока:
  *   1. Карточки касс с балансами + подсветка источника/назначения
  *   2. Форма перевода с превью + confirm-step
- *   3. История трансферов (свернутая по умолчанию)
+ *
+ * История переехала на отдельный таб /finance → Перестановка средств
+ * (TransfersTab) с полноценными фильтрами Откуда/Куда/Сумма/Период.
  */
 export function CashTransferModal({ open, onClose, salonId, initialFrom = null }: Props) {
   const { t } = useTranslation()
@@ -78,7 +63,6 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
   const [comment, setComment] = useState<string>('')
   const [dateInput, setDateInput] = useState<string>(() => toLocalISO(new Date()))
   const [step, setStep] = useState<'form' | 'confirm'>('form')
-  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -405,281 +389,9 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
               </div>
             </div>
           )}
-
-          {/* Block 3 — История */}
-          <div className="mt-5">
-            <button
-              type="button"
-              onClick={() => setShowHistory((v) => !v)}
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-semibold"
-            >
-              {showHistory ? '−' : '+'} {t('cash_transfer.history_toggle')}
-            </button>
-            {showHistory ? <TransfersHistory salonId={salonId} currency={currency} /> : null}
-          </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// История
-// ────────────────────────────────────────────────────────────────────────────
-
-function TransfersHistory({ salonId, currency }: { salonId: string; currency: string }) {
-  const { t } = useTranslation()
-  const [page, setPage] = useState(1)
-  const PAGE_SIZE = 50
-  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
-  const [registerFilter, setRegisterFilter] = useState<string>('')
-  const [userFilter, setUserFilter] = useState<string>('')
-  const [drawerTransfer, setDrawerTransfer] = useState<CashTransfer | null>(null)
-  const { data: registers = [] } = useCashRegisters(salonId)
-  const { data: teamMembers = [] } = useTeamMembers(salonId)
-  const labelById = useMemo(() => new Map(registers.map((r) => [r.id, r.label])), [registers])
-  const userNameById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const x of teamMembers) {
-      if (x.user_id) m.set(x.user_id, x.full_name || x.email || '—')
-    }
-    return m
-  }, [teamMembers])
-
-  const range = periodToRange(period)
-  const { data: page1, isLoading } = useCashTransfers(
-    salonId,
-    {
-      start: range.start,
-      end: range.end,
-      registerId: registerFilter || null,
-      userId: userFilter || null,
-    },
-    page,
-    PAGE_SIZE,
-  )
-
-  // Сброс на 1-ю страницу при смене фильтров.
-  useEffect(() => {
-    setPage(1)
-  }, [period, registerFilter, userFilter])
-
-  const rows = page1?.rows ?? []
-  const totalPages = Math.max(1, Math.ceil((page1?.total ?? 0) / PAGE_SIZE))
-
-  return (
-    <div className="mt-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <PeriodPickerPopover value={period} onChange={setPeriod} />
-        <Select
-          value={registerFilter || 'all'}
-          onValueChange={(v) => {
-            setRegisterFilter(v === 'all' ? '' : v)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="h-9 w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('cash_transfer.filter_all_registers')}</SelectItem>
-            {registers.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {r.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={userFilter || 'all'}
-          onValueChange={(v) => {
-            setUserFilter(v === 'all' ? '' : v)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="h-9 w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('cash_transfer.filter_all_users')}</SelectItem>
-            {teamMembers
-              .filter((m) => m.user_id)
-              .map((m) => (
-                <SelectItem key={m.user_id ?? ''} value={m.user_id ?? ''}>
-                  {m.full_name || m.email}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {isLoading ? (
-        <Loader2 className="text-muted-foreground size-4 animate-spin" />
-      ) : rows.length === 0 ? (
-        <p className="text-muted-foreground p-3 text-sm">{t('cash_transfer.history_empty')}</p>
-      ) : (
-        <div className="border-border overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-muted-foreground text-[11px] uppercase tracking-wider">
-              <tr>
-                <th className="px-3 py-2 text-left font-semibold">{t('cash_transfer.col_date')}</th>
-                <th className="px-3 py-2 text-left font-semibold">
-                  {t('cash_transfer.col_route')}
-                </th>
-                <th className="px-3 py-2 text-right font-semibold">
-                  {t('cash_transfer.col_amount')}
-                </th>
-                <th className="px-3 py-2 text-left font-semibold">{t('cash_transfer.col_who')}</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <TransferRow
-                  key={r.id}
-                  row={r}
-                  labelById={labelById}
-                  userNameById={userNameById}
-                  currency={currency}
-                  salonId={salonId}
-                  onOpenDetail={() => setDrawerTransfer(r)}
-                />
-              ))}
-            </tbody>
-          </table>
-          {totalPages > 1 ? (
-            <div className="border-border flex items-center justify-between gap-2 border-t px-3 py-2">
-              <p className="text-muted-foreground text-xs">
-                {t('common.of')}: {page1?.total ?? 0}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-7 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ‹
-                </button>
-                <span className="text-muted-foreground px-2 text-xs">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-7 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      <TransferDetailDrawer
-        transfer={drawerTransfer}
-        onClose={() => setDrawerTransfer(null)}
-        labelById={labelById}
-        userNameById={userNameById}
-        currency={currency}
-      />
-    </div>
-  )
-}
-
-function TransferRow({
-  row,
-  labelById,
-  userNameById,
-  currency,
-  salonId,
-  onOpenDetail,
-}: {
-  row: CashTransfer
-  labelById: Map<string, string>
-  userNameById: Map<string, string>
-  currency: string
-  salonId: string
-  onOpenDetail: () => void
-}) {
-  const { t } = useTranslation()
-  const { data: membership } = useSalonMembership(salonId)
-  const canDelete = membership?.role === 'owner' || membership?.role === 'admin'
-  const softDelete = useSoftDeleteCashTransfer(salonId)
-
-  const fromLabel =
-    labelById.get(row.from_register_id) ?? `(${t('cash_transfer.removed_register')})`
-  const toLabel = labelById.get(row.to_register_id) ?? `(${t('cash_transfer.removed_register')})`
-  const who = row.created_by ? (userNameById.get(row.created_by) ?? '—') : '—'
-  const isDeleted = row.deleted_at !== null
-  const isReversal = row.reversal_of !== null
-
-  async function handleDelete() {
-    const reason = window.prompt(t('cash_transfer.delete_prompt'))
-    if (!reason || !reason.trim()) return
-    try {
-      await softDelete.mutateAsync({ id: row.id, reason: reason.trim() })
-      toast.success(t('cash_transfer.toast_deleted'))
-    } catch (e) {
-      toast.error(describeRpcError(e))
-    }
-  }
-
-  return (
-    <tr
-      className={`border-border/60 cursor-pointer border-t ${
-        isDeleted ? 'opacity-50' : 'hover:bg-muted/30'
-      }`}
-      onClick={onOpenDetail}
-    >
-      <td className="text-muted-foreground num px-3 py-2 text-xs">
-        {formatVisitDate(row.transferred_at)}
-      </td>
-      <td className="text-foreground px-3 py-2 text-xs">
-        <span className="font-semibold">{fromLabel}</span>
-        <ArrowRight className="text-muted-foreground mx-1 inline size-3" strokeWidth={2} />
-        <span className="font-semibold">{toLabel}</span>
-        {isReversal ? (
-          <span className="text-muted-foreground ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">
-            {t('cash_transfer.tag_reversal')}
-          </span>
-        ) : null}
-        {isDeleted ? (
-          <span className="text-muted-foreground ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-red-700">
-            {t('cash_transfer.tag_deleted')}
-          </span>
-        ) : null}
-        {row.comment ? (
-          <p className="text-muted-foreground mt-0.5 text-[11px]">{row.comment}</p>
-        ) : null}
-        {row.deleted_reason ? (
-          <p className="text-muted-foreground mt-0.5 text-[11px] italic">
-            {t('cash_transfer.deleted_reason')}: {row.deleted_reason}
-          </p>
-        ) : null}
-      </td>
-      <td className="num text-brand-navy px-3 py-2 text-right text-xs font-bold tabular-nums">
-        {formatCurrency(row.amount_cents, currency)}
-      </td>
-      <td className="text-muted-foreground px-3 py-2 text-xs">{who}</td>
-      <td className="px-3 py-2 text-right">
-        {canDelete && !isDeleted && !isReversal ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDelete()
-            }}
-            className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
-            aria-label={t('cash_transfer.aria_delete')}
-          >
-            <Trash2 className="size-3.5" strokeWidth={1.7} />
-          </button>
-        ) : null}
-      </td>
-    </tr>
   )
 }
 
@@ -712,102 +424,6 @@ function AnimatedAmount({ cents, currency }: { cents: number; currency: string }
     </p>
   )
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// TransferDetailDrawer — детали записи в Sheet справа
-// ────────────────────────────────────────────────────────────────────────────
-
-function TransferDetailDrawer({
-  transfer,
-  onClose,
-  labelById,
-  userNameById,
-  currency,
-}: {
-  transfer: CashTransfer | null
-  onClose: () => void
-  labelById: Map<string, string>
-  userNameById: Map<string, string>
-  currency: string
-}) {
-  const { t } = useTranslation()
-  if (!transfer) return null
-  const fromLabel = labelById.get(transfer.from_register_id) ?? t('cash_transfer.removed_register')
-  const toLabel = labelById.get(transfer.to_register_id) ?? t('cash_transfer.removed_register')
-  const author = transfer.created_by ? (userNameById.get(transfer.created_by) ?? '—') : '—'
-  const deleter = transfer.deleted_by ? (userNameById.get(transfer.deleted_by) ?? '—') : null
-
-  return (
-    <Sheet open={!!transfer} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{t('cash_transfer.detail_title')}</SheetTitle>
-          <SheetDescription>
-            {formatVisitDate(transfer.transferred_at)} ·{' '}
-            {formatCurrency(transfer.amount_cents, currency)}
-          </SheetDescription>
-        </SheetHeader>
-        <div className="mt-4 flex flex-col gap-3">
-          <div className="bg-muted/30 rounded-md p-3">
-            <p className="text-muted-foreground text-[10px] font-bold uppercase">
-              {t('cash_transfer.detail_route')}
-            </p>
-            <p className="text-foreground mt-1 text-sm font-semibold">
-              {fromLabel}
-              <ArrowRight
-                className="text-muted-foreground mx-1.5 inline size-3.5"
-                strokeWidth={2}
-              />
-              {toLabel}
-            </p>
-          </div>
-          <DetailField
-            label={t('cash_transfer.detail_amount')}
-            value={formatCurrency(transfer.amount_cents, currency)}
-          />
-          {transfer.comment ? (
-            <DetailField label={t('cash_transfer.detail_comment')} value={transfer.comment} />
-          ) : null}
-          <DetailField label={t('cash_transfer.detail_author')} value={author} />
-          <DetailField
-            label={t('cash_transfer.detail_created_at')}
-            value={formatVisitDate(transfer.created_at)}
-          />
-          {transfer.reversal_of ? (
-            <DetailField
-              label={t('cash_transfer.detail_reversal_of')}
-              value={transfer.reversal_of.slice(0, 8)}
-            />
-          ) : null}
-          {transfer.deleted_at ? (
-            <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
-              <p className="text-destructive text-[10px] font-bold uppercase">
-                {t('cash_transfer.tag_deleted')}
-              </p>
-              <p className="text-foreground mt-1 text-xs">
-                {formatVisitDate(transfer.deleted_at)}
-                {deleter ? ` · ${deleter}` : ''}
-              </p>
-              {transfer.deleted_reason ? (
-                <p className="text-foreground mt-2 text-sm italic">«{transfer.deleted_reason}»</p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-function DetailField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-muted-foreground text-[10px] font-bold uppercase">{label}</p>
-      <p className="text-foreground mt-0.5 text-sm">{value}</p>
-    </div>
-  )
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Утилиты
 // ────────────────────────────────────────────────────────────────────────────

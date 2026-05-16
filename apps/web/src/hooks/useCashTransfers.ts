@@ -50,8 +50,15 @@ export function useRegisterBalances(salonId: string | undefined) {
 export type CashTransferFilters = {
   start?: Date | null
   end?: Date | null
+  /** Любая сторона: from OR to. Для общего фильтра «по этой кассе». */
   registerId?: string | null
+  /** Только источник. */
+  fromRegisterId?: string | null
+  /** Только назначение. */
+  toRegisterId?: string | null
   userId?: string | null
+  minAmountCents?: number | null
+  maxAmountCents?: number | null
 }
 
 /**
@@ -74,7 +81,11 @@ export function useCashTransfers(
       startISO,
       endISO,
       filters.registerId ?? null,
+      filters.fromRegisterId ?? null,
+      filters.toRegisterId ?? null,
       filters.userId ?? null,
+      filters.minAmountCents ?? null,
+      filters.maxAmountCents ?? null,
       page,
       pageSize,
     ],
@@ -91,7 +102,15 @@ export function useCashTransfers(
           `from_register_id.eq.${filters.registerId},to_register_id.eq.${filters.registerId}`,
         )
       }
+      if (filters.fromRegisterId) q = q.eq('from_register_id', filters.fromRegisterId)
+      if (filters.toRegisterId) q = q.eq('to_register_id', filters.toRegisterId)
       if (filters.userId) q = q.eq('created_by', filters.userId)
+      if (typeof filters.minAmountCents === 'number') {
+        q = q.gte('amount_cents', filters.minAmountCents)
+      }
+      if (typeof filters.maxAmountCents === 'number') {
+        q = q.lte('amount_cents', filters.maxAmountCents)
+      }
       q = q
         .order('transferred_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
