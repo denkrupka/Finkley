@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { useSalon } from '@/hooks/useSalons'
 import { BudgetsCard } from '@/routes/expenses/BudgetsCard'
-import { ParametersCard } from '@/routes/settings/ParametersCard'
+import { IncomeBudgetsCard } from '@/routes/finance/IncomeBudgetsCard'
 
 type BudgetSub = 'expenses' | 'incomes'
 
@@ -46,7 +46,7 @@ export function BudgetsTab({ salonId }: { salonId: string }) {
       {active === 'expenses' ? (
         <BudgetsCard salonId={salonId} currency={currency} />
       ) : (
-        <ParametersCard sectionKeys={['other_income']} urlKey="plan" />
+        <IncomeBudgetsCard salonId={salonId} currency={currency} />
       )}
     </div>
   )
