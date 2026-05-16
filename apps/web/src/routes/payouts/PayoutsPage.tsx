@@ -13,6 +13,14 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
 import {
@@ -56,6 +64,8 @@ export function PayoutsPage() {
     periodEnd,
   )
   const close = useClosePayoutPeriod(salonId)
+  const { data: cashRegisters = [] } = useCashRegisters(salonId)
+  const [cashRegisterId, setCashRegisterId] = useState<string>('')
 
   const totals = useMemo(() => {
     let revenue = 0
@@ -87,7 +97,11 @@ export function PayoutsPage() {
     )
       return
     close.mutate(
-      { period_start: periodStart, period_end: periodEnd },
+      {
+        period_start: periodStart,
+        period_end: periodEnd,
+        cash_register_id: cashRegisterId || null,
+      },
       {
         onSuccess: (data) => {
           toast.success(
@@ -217,7 +231,25 @@ export function PayoutsPage() {
               ? t('payouts.status_active')
               : t('payouts.status_ready')}
         </p>
-        <div className="flex gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {cashRegisters.length > 0 && !isClosed ? (
+            <Select
+              value={cashRegisterId || 'none'}
+              onValueChange={(v) => setCashRegisterId(v === 'none' ? '' : v)}
+            >
+              <SelectTrigger className="h-10 w-[200px]">
+                <SelectValue placeholder={t('payouts.cash_register_placeholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t('payouts.cash_register_none')}</SelectItem>
+                {cashRegisters.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <Button variant="outline" onClick={() => window.print()} disabled={rows.length === 0}>
             <Printer className="size-4" strokeWidth={2} />
             {t('payouts.print')}

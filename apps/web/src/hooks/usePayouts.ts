@@ -101,17 +101,23 @@ export function usePayoutsHistory(salonId: string | undefined) {
   })
 }
 
-/** Закрывает период: создаёт payouts + auto-expense за зарплаты в категории "Зарплаты". */
+/** Закрывает период: создаёт payouts + auto-expense за зарплаты в категории "Зарплаты".
+ *  cash_register_id (опц.) проставляется на обе строки — для per-register балансов (ADR-014). */
 export function useClosePayoutPeriod(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { period_start: string; period_end: string }) => {
+    mutationFn: async (input: {
+      period_start: string
+      period_end: string
+      cash_register_id?: string | null
+    }) => {
       if (!salonId) throw new Error('no salon')
       const { data, error } = await supabase
         .rpc('close_payout_period', {
           p_salon_id: salonId,
           p_period_start: input.period_start,
           p_period_end: input.period_end,
+          p_cash_register_id: input.cash_register_id ?? null,
         })
         .single()
       if (error) throw error
@@ -121,6 +127,7 @@ export function useClosePayoutPeriod(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['payouts', salonId] })
       qc.invalidateQueries({ queryKey: ['expenses', salonId] })
       qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
+      qc.invalidateQueries({ queryKey: ['register-balances', salonId] })
     },
   })
 }

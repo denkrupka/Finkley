@@ -3251,6 +3251,8 @@
     "print_period": "Период: {{start}} — {{end}}",
     "close_button": "Закрыть период",
     "closed_label": "Период закрыт",
+    "cash_register_placeholder": "С какой кассы выплачено",
+    "cash_register_none": "Не указано",
     "confirm_close": "Закрыть {{period}}? Создастся расход {{total}} и зарплаты больше нельзя будет пересчитать за этот период.",
     "toast_closed": "Закрыто {{count}} выплат на сумму {{total}}",
     "history_title": "История закрытых периодов",
