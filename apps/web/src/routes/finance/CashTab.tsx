@@ -97,11 +97,11 @@ export function CashTab({ salonId }: { salonId: string }) {
   function handleOpenShift(input: { opening_amount_cents: number; opening_comment?: string }) {
     openShift.mutate(input, {
       onSuccess: () => {
-        toast.success(t('cash.toast_opened'))
+        toast.success(t('finance.cash.toast_opened'))
         setOpenDialogShown(false)
       },
       onError: (err) =>
-        toast.error(t('cash.toast_open_error'), {
+        toast.error(t('finance.cash.toast_open_error'), {
           description: err instanceof Error ? err.message : String(err),
         }),
     })
@@ -123,11 +123,11 @@ export function CashTab({ salonId }: { salonId: string }) {
       },
       {
         onSuccess: () => {
-          toast.success(t('cash.toast_closed'))
+          toast.success(t('finance.cash.toast_closed'))
           setCloseDialogShown(false)
         },
         onError: (err) =>
-          toast.error(t('cash.toast_close_error'), {
+          toast.error(t('finance.cash.toast_close_error'), {
             description: err instanceof Error ? err.message : String(err),
           }),
       },
@@ -148,7 +148,9 @@ export function CashTab({ salonId }: { salonId: string }) {
       {/* Заголовок: дата + статус */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-brand-navy text-lg font-bold tracking-tight">{t('cash.title')}</h2>
+          <h2 className="text-brand-navy text-lg font-bold tracking-tight">
+            {t('finance.cash.title')}
+          </h2>
           <p className="text-muted-foreground mt-0.5 text-sm capitalize">{todayLabel}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -156,7 +158,7 @@ export function CashTab({ salonId }: { salonId: string }) {
             <>
               <span className="bg-brand-sage-soft text-brand-sage inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold">
                 <Unlock className="size-3" strokeWidth={2.2} />
-                {t('cash.status_open', {
+                {t('finance.cash.status_open', {
                   name: currentShift.opened_by_user_id
                     ? (userNameById.get(currentShift.opened_by_user_id) ?? '—')
                     : '—',
@@ -165,18 +167,20 @@ export function CashTab({ salonId }: { salonId: string }) {
               </span>
               <Button size="md" onClick={() => setCloseDialogShown(true)}>
                 <Lock className="size-4" strokeWidth={2} />
-                {t('cash.close_shift')}
+                {t('finance.cash.close_shift')}
               </Button>
             </>
           ) : (
             <>
               <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold">
                 <Lock className="size-3" strokeWidth={2.2} />
-                {t('cash.status_closed')}
+                {t('finance.cash.status_closed')}
               </span>
               <Button size="md" onClick={() => setOpenDialogShown(true)}>
                 <Unlock className="size-4" strokeWidth={2} />
-                {isClosedToday(lastClosed) ? t('cash.open_new_shift') : t('cash.open_shift')}
+                {isClosedToday(lastClosed)
+                  ? t('finance.cash.open_new_shift')
+                  : t('finance.cash.open_shift')}
               </Button>
             </>
           )}
@@ -186,17 +190,17 @@ export function CashTab({ salonId }: { salonId: string }) {
       {/* 3 KPI карточки */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <KpiCard
-          title={t('cash.kpi_opening')}
+          title={t('finance.cash.kpi_opening')}
           value={currentShift ? formatCurrency(opening, currency) : '—'}
           hint={currentShift ? format(parseISO(currentShift.opened_at), 'HH:mm') : undefined}
           tone="navy"
         />
         <KpiCard
-          title={t('cash.kpi_now')}
+          title={t('finance.cash.kpi_now')}
           value={currentShift ? formatCurrency(cashNow, currency) : '—'}
           hint={
             currentShift
-              ? t('cash.kpi_now_hint', {
+              ? t('finance.cash.kpi_now_hint', {
                   defaultValue: 'opening + наличные доходы − наличные расходы',
                 })
               : undefined
@@ -204,7 +208,7 @@ export function CashTab({ salonId }: { salonId: string }) {
           tone="sage"
         />
         <KpiCard
-          title={t('cash.kpi_closing')}
+          title={t('finance.cash.kpi_closing')}
           value={
             currentShift
               ? '—'
@@ -234,9 +238,11 @@ export function CashTab({ salonId }: { salonId: string }) {
       ) : (
         <div className="border-border bg-card shadow-finsm rounded-lg border p-6 text-center">
           <Wallet className="text-muted-foreground mx-auto size-8" strokeWidth={1.5} />
-          <p className="text-foreground mt-3 text-sm font-semibold">{t('cash.no_shift_title')}</p>
+          <p className="text-foreground mt-3 text-sm font-semibold">
+            {t('finance.cash.no_shift_title')}
+          </p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
-            {t('cash.no_shift_body')}
+            {t('finance.cash.no_shift_body')}
           </p>
         </div>
       )}
@@ -315,9 +321,11 @@ function ClosedTodayCard({
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h3 className="text-foreground text-sm font-bold">{t('cash.closed_today_title')}</h3>
+        <h3 className="text-foreground text-sm font-bold">
+          {t('finance.cash.closed_today_title')}
+        </h3>
         <span className="text-muted-foreground text-xs">
-          {t('cash.closed_today_meta', {
+          {t('finance.cash.closed_today_meta', {
             name: closerName,
             time: shift.closed_at ? format(parseISO(shift.closed_at), 'HH:mm') : '—',
           })}
@@ -325,7 +333,7 @@ function ClosedTodayCard({
       </div>
       <div className="border-border rounded-md border">
         <ReconciliationRow
-          label={t('cash.row_cash')}
+          label={t('finance.cash.row_cash')}
           expected={shift.expected_cash_cents ?? 0}
           actual={shift.actual_cash_cents ?? 0}
           diff={shift.diff_cash_cents ?? 0}
@@ -333,7 +341,7 @@ function ClosedTodayCard({
         />
         <div className="border-t" />
         <ReconciliationRow
-          label={t('cash.row_card')}
+          label={t('finance.cash.row_card')}
           expected={shift.expected_card_cents ?? 0}
           actual={shift.actual_card_cents ?? 0}
           diff={shift.diff_card_cents ?? 0}
@@ -343,7 +351,7 @@ function ClosedTodayCard({
       {shift.discrepancy_reason ? (
         <div className="bg-muted/30 mt-3 rounded-md p-2 text-xs">
           <span className="text-muted-foreground font-bold uppercase tracking-wider">
-            {t('cash.reason_label')}:{' '}
+            {t('finance.cash.reason_label')}:{' '}
           </span>
           {shift.discrepancy_reason}
         </div>
@@ -351,7 +359,7 @@ function ClosedTodayCard({
       {shift.close_comment ? (
         <div className="bg-muted/30 mt-2 rounded-md p-2 text-xs">
           <span className="text-muted-foreground font-bold uppercase tracking-wider">
-            {t('cash.close_comment_label')}:{' '}
+            {t('finance.cash.close_comment_label')}:{' '}
           </span>
           {shift.close_comment}
         </div>
@@ -422,36 +430,36 @@ function TransactionsBlock({
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-foreground text-sm font-bold">{t('cash.txns_title')}</h3>
+        <h3 className="text-foreground text-sm font-bold">{t('finance.cash.txns_title')}</h3>
         <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
           <SelectTrigger className="h-8 w-[140px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('cash.filter_all')}</SelectItem>
-            <SelectItem value="cash">{t('cash.filter_cash')}</SelectItem>
-            <SelectItem value="card">{t('cash.filter_card')}</SelectItem>
-            <SelectItem value="other">{t('cash.filter_other')}</SelectItem>
+            <SelectItem value="all">{t('finance.cash.filter_all')}</SelectItem>
+            <SelectItem value="cash">{t('finance.cash.filter_cash')}</SelectItem>
+            <SelectItem value="card">{t('finance.cash.filter_card')}</SelectItem>
+            <SelectItem value="other">{t('finance.cash.filter_other')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <TxnSection
-        title={t('cash.section_income')}
+        title={t('finance.cash.section_income')}
         txns={income}
         currency={currency}
         userNameById={userNameById}
         totalByMethod={totalIncomeByMethod}
-        emptyText={t('cash.no_income')}
+        emptyText={t('finance.cash.no_income')}
       />
       <div className="my-3 border-t border-dashed" />
       <TxnSection
-        title={t('cash.section_expense')}
+        title={t('finance.cash.section_expense')}
         txns={expenses}
         currency={currency}
         userNameById={userNameById}
         totalByMethod={totalExpenseByMethod}
-        emptyText={t('cash.no_expense')}
+        emptyText={t('finance.cash.no_expense')}
       />
     </div>
   )
@@ -573,12 +581,14 @@ function OpenShiftDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('cash.open_shift_title')}</DialogTitle>
-          <DialogDescription>{t('cash.open_shift_subtitle')}</DialogDescription>
+          <DialogTitle>{t('finance.cash.open_shift_title')}</DialogTitle>
+          <DialogDescription>{t('finance.cash.open_shift_subtitle')}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 px-5 pb-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="open-amount">{t('cash.opening_amount_label', { currency })}</Label>
+            <Label htmlFor="open-amount">
+              {t('finance.cash.opening_amount_label', { currency })}
+            </Label>
             <Input
               id="open-amount"
               type="number"
@@ -589,15 +599,15 @@ function OpenShiftDialog({
               onChange={(e) => setAmount(e.target.value)}
               autoFocus
             />
-            <p className="text-muted-foreground text-xs">{t('cash.opening_amount_hint')}</p>
+            <p className="text-muted-foreground text-xs">{t('finance.cash.opening_amount_hint')}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="open-comment">{t('cash.opening_comment_label')}</Label>
+            <Label htmlFor="open-comment">{t('finance.cash.opening_comment_label')}</Label>
             <Input
               id="open-comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder={t('cash.opening_comment_placeholder')}
+              placeholder={t('finance.cash.opening_comment_placeholder')}
             />
           </div>
         </div>
@@ -609,7 +619,7 @@ function OpenShiftDialog({
             onClick={() => {
               const n = Number(amount.replace(',', '.'))
               if (!Number.isFinite(n) || n < 0) {
-                toast.error(t('cash.invalid_amount'))
+                toast.error(t('finance.cash.invalid_amount'))
                 return
               }
               onSubmit({
@@ -619,7 +629,7 @@ function OpenShiftDialog({
             }}
             disabled={pending}
           >
-            {pending ? t('common.loading') : t('cash.open_shift_submit')}
+            {pending ? t('common.loading') : t('finance.cash.open_shift_submit')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -683,17 +693,19 @@ function CloseShiftDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {step === 1 ? t('cash.close_step1_title') : t('cash.close_step2_title')}
+            {step === 1 ? t('finance.cash.close_step1_title') : t('finance.cash.close_step2_title')}
           </DialogTitle>
           <DialogDescription>
-            {step === 1 ? t('cash.close_step1_subtitle') : t('cash.close_step2_subtitle')}
+            {step === 1
+              ? t('finance.cash.close_step1_subtitle')
+              : t('finance.cash.close_step2_subtitle')}
           </DialogDescription>
         </DialogHeader>
 
         {step === 1 ? (
           <div className="flex flex-col gap-3 px-5 pb-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="close-cash">{t('cash.actual_cash_label')} *</Label>
+              <Label htmlFor="close-cash">{t('finance.cash.actual_cash_label')} *</Label>
               <Input
                 id="close-cash"
                 type="number"
@@ -707,7 +719,7 @@ function CloseShiftDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="close-card">{t('cash.actual_card_label')} *</Label>
+              <Label htmlFor="close-card">{t('finance.cash.actual_card_label')} *</Label>
               <Input
                 id="close-card"
                 type="number"
@@ -720,23 +732,23 @@ function CloseShiftDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="close-comment">{t('cash.close_comment_label')}</Label>
+              <Label htmlFor="close-comment">{t('finance.cash.close_comment_label')}</Label>
               <Input
                 id="close-comment"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder={t('cash.close_comment_placeholder')}
+                placeholder={t('finance.cash.close_comment_placeholder')}
               />
             </div>
             <p className="rounded-md bg-amber-50 p-2 text-[11px] text-amber-900">
-              {t('cash.blind_warning')}
+              {t('finance.cash.blind_warning')}
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 px-5 pb-2">
             <div className="border-border rounded-md border">
               <ReconciliationRow
-                label={t('cash.row_cash')}
+                label={t('finance.cash.row_cash')}
                 expected={expected.expected_cash_cents}
                 actual={actualCashCents}
                 diff={diffCash}
@@ -744,7 +756,7 @@ function CloseShiftDialog({
               />
               <div className="border-t" />
               <ReconciliationRow
-                label={t('cash.row_card')}
+                label={t('finance.cash.row_card')}
                 expected={expected.expected_card_cents}
                 actual={actualCardCents}
                 diff={diffCard}
@@ -753,19 +765,19 @@ function CloseShiftDialog({
             </div>
             {hasDiff ? (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="close-reason">{t('cash.reason_label')} *</Label>
+                <Label htmlFor="close-reason">{t('finance.cash.reason_label')} *</Label>
                 <Input
                   id="close-reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder={t('cash.reason_placeholder')}
+                  placeholder={t('finance.cash.reason_placeholder')}
                   autoFocus
                 />
               </div>
             ) : (
               <p className="bg-brand-sage-soft text-brand-sage rounded-md p-2 text-xs font-semibold">
                 <Check className="mr-1 inline size-3.5" strokeWidth={2.4} />
-                {t('cash.no_diff')}
+                {t('finance.cash.no_diff')}
               </p>
             )}
           </div>
@@ -780,7 +792,7 @@ function CloseShiftDialog({
               <Button
                 onClick={() => {
                   if (cashStr.trim() === '' || cardStr.trim() === '') {
-                    toast.error(t('cash.fill_actuals'))
+                    toast.error(t('finance.cash.fill_actuals'))
                     return
                   }
                   setStep(2)
@@ -800,7 +812,7 @@ function CloseShiftDialog({
               <Button
                 onClick={() => {
                   if (hasDiff && !reason.trim()) {
-                    toast.error(t('cash.reason_required'))
+                    toast.error(t('finance.cash.reason_required'))
                     return
                   }
                   onSubmit({
@@ -813,7 +825,7 @@ function CloseShiftDialog({
                 disabled={pending}
               >
                 <Lock className="size-4" strokeWidth={2} />
-                {pending ? t('common.loading') : t('cash.close_shift')}
+                {pending ? t('common.loading') : t('finance.cash.close_shift')}
               </Button>
             </>
           )}
@@ -848,16 +860,20 @@ function ReconciliationRow({
     >
       <span className="text-foreground font-semibold">{label}</span>
       <span className="text-muted-foreground text-right">
-        <span className="block text-[10px] uppercase tracking-wider">{t('cash.col_expected')}</span>
+        <span className="block text-[10px] uppercase tracking-wider">
+          {t('finance.cash.col_expected')}
+        </span>
         <span className="num font-bold">{formatCurrency(expected, currency)}</span>
       </span>
       <span className="text-muted-foreground text-right">
-        <span className="block text-[10px] uppercase tracking-wider">{t('cash.col_actual')}</span>
+        <span className="block text-[10px] uppercase tracking-wider">
+          {t('finance.cash.col_actual')}
+        </span>
         <span className="num text-foreground font-bold">{formatCurrency(actual, currency)}</span>
       </span>
       <span className="text-right">
         <span className="text-muted-foreground block text-[10px] uppercase tracking-wider">
-          {t('cash.col_diff')}
+          {t('finance.cash.col_diff')}
         </span>
         <span className={cn('num font-bold', diffTone)}>
           {diff > 0 ? '+' : ''}
@@ -905,7 +921,7 @@ function ShiftHistoryTable({
   return (
     <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
       <div className="flex items-center justify-between gap-2 border-b p-3">
-        <h3 className="text-foreground text-sm font-bold">{t('cash.history_title')}</h3>
+        <h3 className="text-foreground text-sm font-bold">{t('finance.cash.history_title')}</h3>
         {uniqueStaff.length > 1 ? (
           <Select
             value={staffFilter || 'all'}
@@ -915,7 +931,7 @@ function ShiftHistoryTable({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t('cash.filter_all_staff')}</SelectItem>
+              <SelectItem value="all">{t('finance.cash.filter_all_staff')}</SelectItem>
               {uniqueStaff.map((u) => (
                 <SelectItem key={u} value={u}>
                   {userNameById.get(u) ?? '—'}
@@ -928,13 +944,17 @@ function ShiftHistoryTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-muted-foreground text-[11px] uppercase tracking-wider">
           <tr>
-            <th className="px-3 py-2 text-left font-semibold">{t('cash.col_date')}</th>
-            <th className="px-3 py-2 text-left font-semibold">{t('cash.col_opened_by')}</th>
-            <th className="px-3 py-2 text-left font-semibold">{t('cash.col_closed_by')}</th>
-            <th className="px-3 py-2 text-right font-semibold">{t('cash.col_opening')}</th>
-            <th className="px-3 py-2 text-right font-semibold">{t('cash.col_closing')}</th>
-            <th className="px-3 py-2 text-right font-semibold">{t('cash.col_diff_cash')}</th>
-            <th className="px-3 py-2 text-right font-semibold">{t('cash.col_diff_card')}</th>
+            <th className="px-3 py-2 text-left font-semibold">{t('finance.cash.col_date')}</th>
+            <th className="px-3 py-2 text-left font-semibold">{t('finance.cash.col_opened_by')}</th>
+            <th className="px-3 py-2 text-left font-semibold">{t('finance.cash.col_closed_by')}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t('finance.cash.col_opening')}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t('finance.cash.col_closing')}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {t('finance.cash.col_diff_cash')}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {t('finance.cash.col_diff_card')}
+            </th>
             <th className="w-8" />
           </tr>
         </thead>
@@ -1029,7 +1049,7 @@ function ShiftDetailDrawer({
       <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>
-            {t('cash.detail_title', {
+            {t('finance.cash.detail_title', {
               date: format(parseISO(shift.opened_at), 'd MMM yyyy', { locale: ru }),
             })}
           </DialogTitle>
@@ -1038,7 +1058,7 @@ function ShiftDetailDrawer({
             {' — '}
             {shift.closed_at ? format(parseISO(shift.closed_at), 'HH:mm') : '...'}
             {' · '}
-            {t('cash.detail_opener', {
+            {t('finance.cash.detail_opener', {
               name: shift.opened_by_user_id
                 ? (userNameById.get(shift.opened_by_user_id) ?? '—')
                 : '—',
@@ -1049,7 +1069,7 @@ function ShiftDetailDrawer({
           {/* Reconciliation summary */}
           <div className="border-border rounded-md border">
             <ReconciliationRow
-              label={t('cash.row_cash')}
+              label={t('finance.cash.row_cash')}
               expected={shift.expected_cash_cents ?? 0}
               actual={shift.actual_cash_cents ?? 0}
               diff={shift.diff_cash_cents ?? 0}
@@ -1057,7 +1077,7 @@ function ShiftDetailDrawer({
             />
             <div className="border-t" />
             <ReconciliationRow
-              label={t('cash.row_card')}
+              label={t('finance.cash.row_card')}
               expected={shift.expected_card_cents ?? 0}
               actual={shift.actual_card_cents ?? 0}
               diff={shift.diff_card_cents ?? 0}
@@ -1067,7 +1087,7 @@ function ShiftDetailDrawer({
           {shift.discrepancy_reason ? (
             <div className="bg-muted/30 rounded-md p-2 text-xs">
               <span className="text-muted-foreground font-bold uppercase tracking-wider">
-                {t('cash.reason_label')}:{' '}
+                {t('finance.cash.reason_label')}:{' '}
               </span>
               {shift.discrepancy_reason}
             </div>
@@ -1075,7 +1095,7 @@ function ShiftDetailDrawer({
           {shift.close_comment ? (
             <div className="bg-muted/30 rounded-md p-2 text-xs">
               <span className="text-muted-foreground font-bold uppercase tracking-wider">
-                {t('cash.close_comment_label')}:{' '}
+                {t('finance.cash.close_comment_label')}:{' '}
               </span>
               {shift.close_comment}
             </div>
@@ -1085,10 +1105,12 @@ function ShiftDetailDrawer({
           <div>
             <div className="text-muted-foreground mb-2 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider">
               <ChevronDown className="size-3" strokeWidth={2} />
-              {t('cash.detail_txns')}
+              {t('finance.cash.detail_txns')}
             </div>
             {txns.length === 0 ? (
-              <p className="text-muted-foreground text-xs italic">{t('cash.detail_no_txns')}</p>
+              <p className="text-muted-foreground text-xs italic">
+                {t('finance.cash.detail_no_txns')}
+              </p>
             ) : (
               <ul className="divide-border/60 flex max-h-[40vh] flex-col divide-y overflow-y-auto">
                 {txns.map((tx) => (
