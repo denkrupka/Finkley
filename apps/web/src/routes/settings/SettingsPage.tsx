@@ -55,6 +55,7 @@ import { Link } from 'react-router-dom'
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
+import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
 import { PageTabsNav } from '@/components/ui/PageTabsNav'
 import { ApiKeysCard } from './ApiKeysCard'
 import { SalonHoursCard } from './SalonHoursCard'
@@ -423,6 +424,10 @@ export function SettingsPage() {
 
           {/* График работы и праздники переехали в Settings → «График работы»
               (image #71) — две подвкладки: SalonHoursCard и SalonHolidaysCard. */}
+
+          {/* Бухгалтерия (image #122): юр. данные компании, налоговая
+              схема, доставка документов бухгалтеру. */}
+          {salonId ? <AccountingSettingsCard salonId={salonId} /> : null}
 
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
           <TelegramLinkCard />

@@ -58,7 +58,13 @@ export function SettingsTabsNav({
 
   return (
     <div className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-1.5">
-      <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5 sm:overflow-visible">
+      {/* Image #123: 10 табов на одной строке вылазили за рамку контейнера
+          (последняя «Помощь» обрезалась). Меняем поведение:
+          - на узких viewport'ах — горизонтальный скролл (как было);
+          - на средних/широких — flex-wrap, табы переносятся на 2 строки
+            если не влезают в одну. Чуть уменьшил padding/gap чтобы при
+            умеренной ширине всё-таки одной строкой обходилось. */}
+      <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5 sm:flex-wrap sm:overflow-visible">
         {SETTINGS_TABS.map((tab) => {
           const Icon = TAB_ICONS[tab]
           const isActive = active === tab
@@ -67,7 +73,7 @@ export function SettingsTabsNav({
               key={tab}
               type="button"
               onClick={() => onChange(tab)}
-              className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-[13px] font-semibold transition-colors ${
                 isActive
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
