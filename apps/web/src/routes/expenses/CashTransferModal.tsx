@@ -1,5 +1,5 @@
 import { ArrowRight, Loader2, Trash2, Wallet } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -13,12 +13,25 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import {
   useCashTransfers,
@@ -178,9 +191,7 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                         <Wallet className="text-muted-foreground size-3.5" strokeWidth={1.7} />
                         <p className="text-foreground truncate text-xs font-semibold">{r.label}</p>
                       </div>
-                      <p className="num text-brand-navy mt-1 text-base font-bold tabular-nums">
-                        {formatCurrency(bal, currency)}
-                      </p>
+                      <AnimatedAmount cents={bal} currency={currency} />
                       {isFrom ? (
                         <p className="mt-0.5 text-[10px] font-bold uppercase text-amber-700">
                           {t('cash_transfer.tag_source')}
@@ -420,8 +431,10 @@ function TransfersHistory({ salonId, currency }: { salonId: string; currency: st
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 50
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const [registerFilter, setRegisterFilter] = useState<string>('')
   const [userFilter, setUserFilter] = useState<string>('')
+  const [drawerTransfer, setDrawerTransfer] = useState<CashTransfer | null>(null)
   const { data: registers = [] } = useCashRegisters(salonId)
   const { data: teamMembers = [] } = useTeamMembers(salonId)
   const labelById = useMemo(() => new Map(registers.map((r) => [r.id, r.label])), [registers])
@@ -433,9 +446,12 @@ function TransfersHistory({ salonId, currency }: { salonId: string; currency: st
     return m
   }, [teamMembers])
 
+  const range = periodToRange(period)
   const { data: page1, isLoading } = useCashTransfers(
     salonId,
     {
+      start: range.start,
+      end: range.end,
       registerId: registerFilter || null,
       userId: userFilter || null,
     },
@@ -443,12 +459,18 @@ function TransfersHistory({ salonId, currency }: { salonId: string; currency: st
     PAGE_SIZE,
   )
 
+  // Сброс на 1-ю страницу при смене фильтров.
+  useEffect(() => {
+    setPage(1)
+  }, [period, registerFilter, userFilter])
+
   const rows = page1?.rows ?? []
   const totalPages = Math.max(1, Math.ceil((page1?.total ?? 0) / PAGE_SIZE))
 
   return (
     <div className="mt-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
+        <PeriodPickerPopover value={period} onChange={setPeriod} />
         <Select
           value={registerFilter || 'all'}
           onValueChange={(v) => {
@@ -520,6 +542,7 @@ function TransfersHistory({ salonId, currency }: { salonId: string; currency: st
                   userNameById={userNameById}
                   currency={currency}
                   salonId={salonId}
+                  onOpenDetail={() => setDrawerTransfer(r)}
                 />
               ))}
             </tbody>
@@ -554,6 +577,14 @@ function TransfersHistory({ salonId, currency }: { salonId: string; currency: st
           ) : null}
         </div>
       )}
+
+      <TransferDetailDrawer
+        transfer={drawerTransfer}
+        onClose={() => setDrawerTransfer(null)}
+        labelById={labelById}
+        userNameById={userNameById}
+        currency={currency}
+      />
     </div>
   )
 }
@@ -564,12 +595,14 @@ function TransferRow({
   userNameById,
   currency,
   salonId,
+  onOpenDetail,
 }: {
   row: CashTransfer
   labelById: Map<string, string>
   userNameById: Map<string, string>
   currency: string
   salonId: string
+  onOpenDetail: () => void
 }) {
   const { t } = useTranslation()
   const { data: membership } = useSalonMembership(salonId)
@@ -595,7 +628,12 @@ function TransferRow({
   }
 
   return (
-    <tr className={`border-border/60 border-t ${isDeleted ? 'opacity-50' : 'hover:bg-muted/30'}`}>
+    <tr
+      className={`border-border/60 cursor-pointer border-t ${
+        isDeleted ? 'opacity-50' : 'hover:bg-muted/30'
+      }`}
+      onClick={onOpenDetail}
+    >
       <td className="text-muted-foreground num px-3 py-2 text-xs">
         {formatVisitDate(row.transferred_at)}
       </td>
@@ -630,7 +668,10 @@ function TransferRow({
         {canDelete && !isDeleted && !isReversal ? (
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDelete()
+            }}
             className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
             aria-label={t('cash_transfer.aria_delete')}
           >
@@ -639,6 +680,131 @@ function TransferRow({
         ) : null}
       </td>
     </tr>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AnimatedAmount — карточка баланса с подсветкой при изменении суммы
+// ────────────────────────────────────────────────────────────────────────────
+
+function AnimatedAmount({ cents, currency }: { cents: number; currency: string }) {
+  const prev = useRef<number>(cents)
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null)
+  useEffect(() => {
+    if (cents !== prev.current) {
+      setFlash(cents > prev.current ? 'up' : 'down')
+      prev.current = cents
+      const t = setTimeout(() => setFlash(null), 700)
+      return () => clearTimeout(t)
+    }
+  }, [cents])
+  return (
+    <p
+      className={`num mt-1 text-base font-bold tabular-nums transition-colors duration-700 ${
+        flash === 'up'
+          ? 'text-brand-sage-deep'
+          : flash === 'down'
+            ? 'text-amber-700'
+            : 'text-brand-navy'
+      }`}
+    >
+      {formatCurrency(cents, currency)}
+    </p>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TransferDetailDrawer — детали записи в Sheet справа
+// ────────────────────────────────────────────────────────────────────────────
+
+function TransferDetailDrawer({
+  transfer,
+  onClose,
+  labelById,
+  userNameById,
+  currency,
+}: {
+  transfer: CashTransfer | null
+  onClose: () => void
+  labelById: Map<string, string>
+  userNameById: Map<string, string>
+  currency: string
+}) {
+  const { t } = useTranslation()
+  if (!transfer) return null
+  const fromLabel = labelById.get(transfer.from_register_id) ?? t('cash_transfer.removed_register')
+  const toLabel = labelById.get(transfer.to_register_id) ?? t('cash_transfer.removed_register')
+  const author = transfer.created_by ? (userNameById.get(transfer.created_by) ?? '—') : '—'
+  const deleter = transfer.deleted_by ? (userNameById.get(transfer.deleted_by) ?? '—') : null
+
+  return (
+    <Sheet open={!!transfer} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{t('cash_transfer.detail_title')}</SheetTitle>
+          <SheetDescription>
+            {formatVisitDate(transfer.transferred_at)} ·{' '}
+            {formatCurrency(transfer.amount_cents, currency)}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="bg-muted/30 rounded-md p-3">
+            <p className="text-muted-foreground text-[10px] font-bold uppercase">
+              {t('cash_transfer.detail_route')}
+            </p>
+            <p className="text-foreground mt-1 text-sm font-semibold">
+              {fromLabel}
+              <ArrowRight
+                className="text-muted-foreground mx-1.5 inline size-3.5"
+                strokeWidth={2}
+              />
+              {toLabel}
+            </p>
+          </div>
+          <DetailField
+            label={t('cash_transfer.detail_amount')}
+            value={formatCurrency(transfer.amount_cents, currency)}
+          />
+          {transfer.comment ? (
+            <DetailField label={t('cash_transfer.detail_comment')} value={transfer.comment} />
+          ) : null}
+          <DetailField label={t('cash_transfer.detail_author')} value={author} />
+          <DetailField
+            label={t('cash_transfer.detail_created_at')}
+            value={formatVisitDate(transfer.created_at)}
+          />
+          {transfer.reversal_of ? (
+            <DetailField
+              label={t('cash_transfer.detail_reversal_of')}
+              value={transfer.reversal_of.slice(0, 8)}
+            />
+          ) : null}
+          {transfer.deleted_at ? (
+            <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
+              <p className="text-destructive text-[10px] font-bold uppercase">
+                {t('cash_transfer.tag_deleted')}
+              </p>
+              <p className="text-foreground mt-1 text-xs">
+                {formatVisitDate(transfer.deleted_at)}
+                {deleter ? ` · ${deleter}` : ''}
+              </p>
+              {transfer.deleted_reason ? (
+                <p className="text-foreground mt-2 text-sm italic">«{transfer.deleted_reason}»</p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-muted-foreground text-[10px] font-bold uppercase">{label}</p>
+      <p className="text-foreground mt-0.5 text-sm">{value}</p>
+    </div>
   )
 }
 

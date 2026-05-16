@@ -3313,7 +3313,14 @@
     "post_close_title": "Сделать перестановку средств?",
     "post_close_subtitle": "Смена закрыта. Если хочешь сразу перевести деньги в сейф или на банк — открой модалку. Иначе закрой это окно.",
     "post_close_yes": "Сделать перестановку",
-    "post_close_no": "Нет, спасибо"
+    "post_close_no": "Нет, спасибо",
+    "detail_title": "Детали перестановки",
+    "detail_route": "Маршрут",
+    "detail_amount": "Сумма",
+    "detail_comment": "Комментарий",
+    "detail_author": "Создал",
+    "detail_created_at": "Создано",
+    "detail_reversal_of": "Откат записи"
   },
   "expenses": {
     "title": "Расходы",
