@@ -3136,7 +3136,7 @@
       "production": "Производственные расходы",
       "production_master_payout": "ЗП мастера",
       "production_materials": "Расходные материалы",
-      "variable": "Переменные (% от выручки)",
+      "variable": "Переменные",
       "fixed": "Постоянные",
       "taxes": "Налоги",
       "period_saldo": "Сальдо за период",

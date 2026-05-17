@@ -500,7 +500,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
                   key={m}
                   className={`min-w-[100px] border-l border-white/10 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
                     m === currentMonthIdx
-                      ? 'bg-brand-yellow/30 text-brand-navy-deep'
+                      ? 'bg-brand-yellow text-brand-navy-deep'
                       : 'bg-brand-navy/95'
                   }`}
                 >
@@ -521,17 +521,17 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
                       idx % 2 === 1 ? 'bg-muted/15' : ''
                     }`}
                   >
-                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-2 font-medium">
+                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-20 border-r px-3 py-2 font-medium">
                       {reg.label || '—'}
                     </td>
-                    <td className="num text-muted-foreground bg-brand-navy/5 border-brand-navy/10 border-l px-2 py-2 text-right font-semibold">
+                    <td className="num text-muted-foreground border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold">
                       {formatNumberSafe(reg.amount_cents ?? 0, currency)}
                     </td>
                     {months.map((m) => (
                       <td
                         key={m}
                         className={`num text-muted-foreground px-2 py-2 text-right ${
-                          m === currentMonthIdx ? 'bg-brand-yellow/10' : ''
+                          m === currentMonthIdx ? 'bg-amber-50' : ''
                         }`}
                       >
                         {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
@@ -580,10 +580,13 @@ function KpiCard({
   tone: 'sage' | 'red' | 'navy' | 'teal'
   hint?: string
 }) {
+  // Светлые пастельные градиенты. ВАЖНО: `brand-navy-soft` в light theme —
+  // тёмный (HSL 240/30%/20%), а не светлый, поэтому для navy используем
+  // indigo-50 / slate-50 из стандартной TW-палитры.
   const toneClasses: Record<typeof tone, string> = {
     sage: 'from-brand-sage-soft to-brand-sage-soft/30 text-brand-sage border-brand-sage/30',
     red: 'from-brand-red-soft to-brand-red-soft/30 text-brand-red border-brand-red/30',
-    navy: 'from-brand-navy-soft to-brand-navy-soft/30 text-brand-navy border-brand-navy/30',
+    navy: 'from-indigo-50 to-indigo-50/30 text-indigo-700 border-indigo-200',
     teal: 'from-brand-teal-soft to-brand-teal-soft/30 text-brand-teal border-brand-teal/30',
   }
   return (
@@ -681,9 +684,7 @@ function ReportTable({
               key={m}
               colSpan={2}
               className={`min-w-[140px] border-l border-white/10 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                m === currentMonthIdx
-                  ? 'bg-brand-yellow/30 text-brand-navy-deep'
-                  : 'bg-brand-navy/95'
+                m === currentMonthIdx ? 'bg-brand-yellow text-brand-navy-deep' : 'bg-brand-navy/95'
               }`}
             >
               {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
@@ -702,7 +703,7 @@ function ReportTable({
               <th
                 className={`border-l border-white/10 px-2 py-1 text-right text-[9px] font-medium uppercase ${
                   m === currentMonthIdx
-                    ? 'bg-brand-yellow/25 text-brand-navy-deep'
+                    ? 'bg-brand-yellow text-brand-navy-deep'
                     : 'bg-brand-navy/90'
                 }`}
               >
@@ -711,7 +712,7 @@ function ReportTable({
               <th
                 className={`px-2 py-1 text-right text-[9px] font-medium uppercase ${
                   m === currentMonthIdx
-                    ? 'bg-brand-yellow/25 text-brand-navy-deep'
+                    ? 'bg-brand-yellow text-brand-navy-deep'
                     : 'bg-brand-navy/90'
                 }`}
               >
@@ -736,7 +737,7 @@ function ReportTable({
               onClick={hasGroup ? () => onToggle(row.groupKey!) : undefined}
             >
               <td
-                className={`text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-2 ${
+                className={`text-foreground border-border/60 sticky left-0 z-20 border-r px-3 py-2 ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${groupBg || 'bg-card'} ${accentBorder}`}
                 style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
@@ -781,7 +782,7 @@ function ReportTable({
                     <td
                       className={`num border-border/40 border-l px-2 py-2 text-right ${
                         row.bold ? 'font-semibold' : ''
-                      } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-brand-yellow/8' : ''}`}
+                      } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-amber-50' : ''}`}
                     >
                       {formatPF(plan, currency)}
                     </td>
@@ -789,7 +790,7 @@ function ReportTable({
                       className={`num px-2 py-2 text-right ${row.bold ? 'font-semibold' : ''} ${colorClass(
                         row.color,
                         'fact',
-                      )} ${isCurrent ? 'bg-brand-yellow/8' : ''}`}
+                      )} ${isCurrent ? 'bg-amber-50' : ''}`}
                     >
                       {formatPF(fact, currency)}
                     </td>
@@ -859,14 +860,18 @@ function colorClass(color: RowColor | undefined, kind?: 'plan' | 'fact'): string
   return 'text-foreground'
 }
 
-/** Подсветка фона строки-секции (только bold). */
+/**
+ * Подсветка фона строки-секции (только bold). Используем встроенные TW-цвета
+ * без прозрачности — иначе сквозь sticky-колонку label просвечивают
+ * проскролленные ячейки (см. жалобу про «накладываются»).
+ */
 function groupRowBg(color: RowColor | undefined, bold: boolean | undefined): string {
   if (!bold) return ''
-  if (color === 'sage') return 'bg-brand-sage-soft/50'
-  if (color === 'destructive') return 'bg-brand-red-soft/40'
-  if (color === 'teal') return 'bg-brand-teal-soft/40'
-  if (color === 'navy') return 'bg-brand-navy-soft/40'
-  return 'bg-muted/30'
+  if (color === 'sage') return 'bg-emerald-50'
+  if (color === 'destructive') return 'bg-rose-50'
+  if (color === 'teal') return 'bg-sky-50'
+  if (color === 'navy') return 'bg-slate-100'
+  return 'bg-slate-50'
 }
 
 /** Цветной акцент слева у bold-строк (как «полоска категории»). */
@@ -915,9 +920,12 @@ function buildItemsRows(
       return sign * monthly
     })
     const baseLabel = node.label || '—'
-    const label = node.archived ? `${baseLabel} (архив)` : baseLabel
     const fact = factsForLabel ? factsForLabel(baseLabel).map((v) => sign * v) : undefined
-    rows.push({ label, values, factValues: fact, indent })
+    // Архивные позиции без фактических показателей не показываем вовсе.
+    const allZero = values.every((v) => v === 0) && (!fact || fact.every((v) => v === 0))
+    if (!(node.archived && allZero)) {
+      rows.push({ label: baseLabel, values, factValues: fact, indent })
+    }
     const children = byParent.get(node.id) ?? []
     for (const c of children) pushNode(c, indent + 1)
   }
@@ -958,14 +966,17 @@ function buildOtherIncomeCategoryRows(
   const rows: CellRow[] = []
   function pushNode(node: (typeof categories)[number], indent: number) {
     const fact = factMap.get(node.id) ?? zeros.slice()
-    const label = node.is_archived ? `${node.name} (архив)` : node.name
-    rows.push({
-      label,
-      values: zeros.slice(),
-      factValues: fact,
-      indent,
-      parentGroupKey: 'revenue_other',
-    })
+    const allZero = fact.every((v) => v === 0)
+    // Архивные категории без фактов не показываем; без пометки «(архив)».
+    if (!(node.is_archived && allZero)) {
+      rows.push({
+        label: node.name,
+        values: zeros.slice(),
+        factValues: fact,
+        indent,
+        parentGroupKey: 'revenue_other',
+      })
+    }
     const children = byParent.get(node.id) ?? []
     for (const c of children) pushNode(c, indent + 1)
   }
@@ -1036,22 +1047,26 @@ function buildBalanceRows(
     const planArr = months.map(() => planConst)
     const computed = node.preset_key ? computedByKey.get(node.preset_key) : undefined
     const baseLabel = node.label || '—'
-    const label = node.archived ? `${baseLabel} (архив)` : baseLabel
+    const factArr = computed ?? zeros.slice()
     const color: RowColor | undefined = isRoot
       ? node.preset_key === 'balance_liabilities'
         ? 'destructive'
         : 'navy'
       : undefined
-    rows.push({
-      label,
-      values: planArr,
-      factValues: computed ?? zeros.slice(),
-      indent,
-      bold: isRoot,
-      color,
-      groupKey: isRoot ? (myKey ?? undefined) : undefined,
-      parentGroupKey: !isRoot ? (rootKey ?? undefined) : undefined,
-    })
+    const allZero = planArr.every((v) => v === 0) && factArr.every((v) => v === 0)
+    // Архив с нулями не показываем; без пометки «(архив)».
+    if (!(node.archived && allZero)) {
+      rows.push({
+        label: baseLabel,
+        values: planArr,
+        factValues: factArr,
+        indent,
+        bold: isRoot,
+        color,
+        groupKey: isRoot ? (myKey ?? undefined) : undefined,
+        parentGroupKey: !isRoot ? (rootKey ?? undefined) : undefined,
+      })
+    }
     const children = byParent.get(node.id) ?? []
     for (const c of children) pushNode(c, indent + 1, myKey)
   }
