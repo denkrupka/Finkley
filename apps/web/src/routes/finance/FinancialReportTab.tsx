@@ -538,21 +538,30 @@ function BlockSection({
 
 /**
  * Общий colgroup для всех трёх таблиц — 27 колонок одинаковой ширины:
- *   1 (Label, 220px) + 2 (Итого План|Факт, 80px × 2) + 12*2 (Month P|F, 80px × 2)
- * Это позволяет визуально выровнять колонки между блоками при горизонтальном
- * скролле. В таблице кассы каждый месяц занимает `colSpan={2}` чтобы попасть
- * в обе подколонки одного месяца.
+ *   1 (Label, 220px) + 2 (Итого План|Факт, 110px × 2) + 12*2 (Month P|F, 110px × 2)
+ *
+ * Ширина 110px рассчитана так, чтобы «144 794,73 PLN» (~12 символов с пробелами
+ * через формат полировки чисел) помещалась в ячейку с небольшим padding.
+ * Меньше — контент будет шире `<col>` и таблица растянет колонку под контент,
+ * сломав alignment между блоками (в Балансе пустые «—», в Финотчёте длинные
+ * числа → колонки 05/26 не совпадают по X-позиции).
+ *
+ * В кассе каждый месяц занимает `colSpan={2}` чтобы попасть в обе подколонки.
  */
+const COL_LABEL_W = 220
+const COL_SUB_W = 130
+const TABLE_MIN_W = COL_LABEL_W + COL_SUB_W * 2 + COL_SUB_W * 2 * 12 // = 3600
+
 function SharedColGroup({ months }: { months: number[] }) {
   return (
     <colgroup>
-      <col style={{ width: 220 }} />
-      <col style={{ width: 80 }} />
-      <col style={{ width: 80 }} />
+      <col style={{ width: COL_LABEL_W }} />
+      <col style={{ width: COL_SUB_W }} />
+      <col style={{ width: COL_SUB_W }} />
       {months.map((m) => (
         <Fragment key={m}>
-          <col style={{ width: 80 }} />
-          <col style={{ width: 80 }} />
+          <col style={{ width: COL_SUB_W }} />
+          <col style={{ width: COL_SUB_W }} />
         </Fragment>
       ))}
     </colgroup>
@@ -579,7 +588,7 @@ function CashRegistersTable({
   t: (k: string) => string
 }) {
   return (
-    <table className="border-collapse text-xs" style={{ minWidth: 2300 }}>
+    <table className="border-collapse text-xs" style={{ tableLayout: 'fixed', width: TABLE_MIN_W }}>
       <SharedColGroup months={months} />
       <thead>
         <tr className="bg-slate-100 text-slate-600">
@@ -664,7 +673,7 @@ function ReportTable({
 }) {
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
   return (
-    <table className="border-collapse text-xs" style={{ minWidth: 2300 }}>
+    <table className="border-collapse text-xs" style={{ tableLayout: 'fixed', width: TABLE_MIN_W }}>
       <SharedColGroup months={months} />
       <thead>
         {/* Row 1 — Параметр (rowSpan=2) + месяцы (colSpan=2). Sticky top=44px
