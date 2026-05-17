@@ -79,7 +79,16 @@ export function PushNotificationsCard() {
               size="md"
               onClick={() =>
                 test.mutate(undefined, {
-                  onSuccess: (n) => toast.success(t('settings.push.toast_test_sent', { count: n })),
+                  onSuccess: (n) => {
+                    // sentinel из fallback'а (showLocalTestNotification) —
+                    // показали локальное уведомление через service worker,
+                    // edge function недоступна. Сообщаем мягким info-toast.
+                    if (n === -1) {
+                      toast.info(t('settings.push.toast_test_local_fallback'))
+                    } else {
+                      toast.success(t('settings.push.toast_test_sent', { count: n }))
+                    }
+                  },
                   onError: (err) => {
                     const msg = err instanceof Error ? err.message : String(err)
                     // Маппим server-side codes в понятный i18n-текст. Раньше

@@ -233,11 +233,43 @@ export function useTestPush() {
         result = await invokeSendPushTest()
       }
 
+      // Fallback: edge function недоступна (не задеплоена или VAPID
+      // secrets отсутствуют). Показываем native browser notification
+      // через service worker — это даёт пользователю визуальный feedback
+      // что разрешение работает, а саму push-доставку фиксим отдельно.
+      if (result.errorCode === 'push_function_unreachable') {
+        const shown = await showLocalTestNotification()
+        if (shown) return -1 // sentinel: «1 локально» вместо реального push
+      }
+
       if (result.errorCode) throw new Error(result.errorCode)
       if (result.errorMessage) throw new Error(result.errorMessage)
       return result.sent
     },
   })
+}
+
+/**
+ * Показ локального уведомления через service worker. Используется как
+ * fallback когда edge function send-push не отвечает (не задеплоена / нет
+ * VAPID secrets), чтобы пользователь хотя бы видел что разрешение работает.
+ */
+async function showLocalTestNotification(): Promise<boolean> {
+  try {
+    if (!('serviceWorker' in navigator)) return false
+    if (Notification.permission !== 'granted') return false
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (!reg) return false
+    await reg.showNotification('Finkley · Test (локально)', {
+      body: 'Edge-функция send-push временно недоступна. Это локальное уведомление через Service Worker — показано чтобы проверить разрешение браузера.',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'finkley-test-local',
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 type TestResult = {

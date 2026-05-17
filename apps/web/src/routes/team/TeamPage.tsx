@@ -344,13 +344,13 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
 
       {/* Invite dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent>
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0">
           <DialogHeader>
             <DialogTitle>{t('team.invite_title')}</DialogTitle>
             <DialogDescription>{t('team.invite_subtitle')}</DialogDescription>
           </DialogHeader>
           <form
-            className="flex flex-col gap-4 px-5 pb-2 pt-3"
+            className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-3"
             onSubmit={(e) => {
               e.preventDefault()
               submitInvite()
@@ -463,7 +463,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               </div>
             ) : null}
           </form>
-          <DialogFooter className="px-5">
+          <DialogFooter className="border-border shrink-0 border-t bg-white px-5 py-3">
             <Button
               variant="outline"
               type="button"
