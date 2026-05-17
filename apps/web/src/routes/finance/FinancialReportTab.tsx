@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Fragment, useMemo, useRef, useState, type RefObject } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -425,34 +425,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
   )
 
-  // ===== Синхронизация горизонтального скролла трёх таблиц =====
-  // Скроллим по ratio (scrollLeft/scrollMax) — таблицы имеют разную ширину
-  // (касса без «План/Факт»), так что абсолютные пиксели не совпадают.
-  const mainScrollRef = useRef<HTMLDivElement>(null)
-  const cashScrollRef = useRef<HTMLDivElement>(null)
-  const balanceScrollRef = useRef<HTMLDivElement>(null)
-  const isSyncingScrollRef = useRef(false)
-  function makeSyncScroll(self: RefObject<HTMLDivElement>) {
-    return (e: React.UIEvent<HTMLDivElement>) => {
-      if (isSyncingScrollRef.current) return
-      isSyncingScrollRef.current = true
-      const src = e.currentTarget
-      const srcMax = src.scrollWidth - src.clientWidth
-      const ratio = srcMax > 0 ? src.scrollLeft / srcMax : 0
-      for (const ref of [mainScrollRef, cashScrollRef, balanceScrollRef]) {
-        if (ref === self) continue
-        const el = ref.current
-        if (!el) continue
-        const dstMax = el.scrollWidth - el.clientWidth
-        const target = Math.round(ratio * dstMax)
-        if (Math.abs(el.scrollLeft - target) > 1) el.scrollLeft = target
-      }
-      requestAnimationFrame(() => {
-        isSyncingScrollRef.current = false
-      })
-    }
-  }
-
   return (
     <div className="space-y-5">
       {/* ===== TOP TOOLBAR ===== */}
@@ -504,107 +476,62 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         />
       </div>
 
-      {/* ===== MAIN REPORT TABLE ===== */}
-      <ReportCard
-        title={t('finance.report.title')}
-        icon={<BarChart3 className="size-4" strokeWidth={1.8} />}
-        scrollRef={mainScrollRef}
-        onScroll={makeSyncScroll(mainScrollRef)}
-      >
-        <ReportTable
-          year={year}
-          months={months}
-          currentMonthIdx={currentMonthIdx}
-          rows={visibleMainRows}
-          currency={currency}
-          collapsed={collapsed}
-          onToggle={toggleGroup}
-          t={t}
-        />
-      </ReportCard>
+      {/* ===== UNIFIED TABLE CARD =====
+          Один контейнер overflow-auto: горизонтальный скролл синхронизируется
+          автоматически между блоками, плюс sticky-thead работает относительно
+          этого же контейнера. max-h ограничивает высоту чтобы скролл был
+          внутри карточки, а не страницы (иначе sticky не работал бы как
+          надо). При печати ограничения снимаются. */}
+      <div className="shadow-finmd overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="max-h-[calc(100vh-220px)] overflow-auto print:max-h-none print:overflow-visible">
+          <BlockSection
+            title={t('finance.report.title')}
+            icon={<BarChart3 className="size-4" strokeWidth={1.8} />}
+          >
+            <ReportTable
+              year={year}
+              months={months}
+              currentMonthIdx={currentMonthIdx}
+              rows={visibleMainRows}
+              currency={currency}
+              collapsed={collapsed}
+              onToggle={toggleGroup}
+              t={t}
+            />
+          </BlockSection>
 
-      {/* ===== ОСТАТОК ПО КАССАМ ===== */}
-      <ReportCard
-        title={t('finance.report.end_balance_by_register')}
-        icon={<Wallet className="size-4" strokeWidth={1.8} />}
-        scrollRef={cashScrollRef}
-        onScroll={makeSyncScroll(cashScrollRef)}
-      >
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-100 text-slate-600">
-              <th className="sticky left-0 z-30 min-w-[220px] bg-slate-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
-                {t('finance.report.end_balance_by_register')}
-              </th>
-              <th className="border-l border-slate-200 bg-slate-200/60 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider">
-                {t('finance.report.col_start')}
-              </th>
-              {months.map((m) => (
-                <th
-                  key={m}
-                  className={`min-w-[140px] border-l border-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                    m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
-                  }`}
-                >
-                  {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {settings.cash_registers.items
-              .filter((i) => !i.archived)
-              .map((reg, idx) => {
-                const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
-                const zebra = idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
-                return (
-                  <tr
-                    key={reg.id}
-                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${zebra}`}
-                  >
-                    <td
-                      className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 font-medium text-slate-800 ${zebra}`}
-                    >
-                      {reg.label || '—'}
-                    </td>
-                    <td className="num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold text-slate-600">
-                      {formatNumberSafe(reg.amount_cents ?? 0, currency)}
-                    </td>
-                    {months.map((m) => (
-                      <td
-                        key={m}
-                        className={`num border-l border-slate-100 px-2 py-2 text-right text-slate-700 ${
-                          m === currentMonthIdx ? 'bg-amber-50' : ''
-                        }`}
-                      >
-                        {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
-          </tbody>
-        </table>
-      </ReportCard>
+          <BlockSection
+            title={t('finance.report.end_balance_by_register')}
+            icon={<Wallet className="size-4" strokeWidth={1.8} />}
+          >
+            <CashRegistersTable
+              year={year}
+              months={months}
+              currentMonthIdx={currentMonthIdx}
+              registers={settings.cash_registers.items.filter((i) => !i.archived)}
+              monthlyRegBalances={monthlyRegBalances}
+              currency={currency}
+              t={t}
+            />
+          </BlockSection>
 
-      {/* ===== БАЛАНС (отдельная таблица) ===== */}
-      <ReportCard
-        title={t('finance.report.section_balance')}
-        icon={<Landmark className="size-4" strokeWidth={1.8} />}
-        scrollRef={balanceScrollRef}
-        onScroll={makeSyncScroll(balanceScrollRef)}
-      >
-        <ReportTable
-          year={year}
-          months={months}
-          currentMonthIdx={currentMonthIdx}
-          rows={visibleBalanceRows}
-          currency={currency}
-          collapsed={collapsed}
-          onToggle={toggleGroup}
-          t={t}
-        />
-      </ReportCard>
+          <BlockSection
+            title={t('finance.report.section_balance')}
+            icon={<Landmark className="size-4" strokeWidth={1.8} />}
+          >
+            <ReportTable
+              year={year}
+              months={months}
+              currentMonthIdx={currentMonthIdx}
+              rows={visibleBalanceRows}
+              currency={currency}
+              collapsed={collapsed}
+              onToggle={toggleGroup}
+              t={t}
+            />
+          </BlockSection>
+        </div>
+      </div>
     </div>
   )
 }
@@ -667,31 +594,145 @@ function KpiCard({
   )
 }
 
-// ============================ ReportCard ============================
+// ============================ BlockSection ============================
 
-function ReportCard({
+/**
+ * Блок внутри единой финансовой карточки. Title-bar и `<thead>` обоих
+ * вложенных компонентов (ReportTable / CashRegistersTable) — sticky-top.
+ *
+ * Sticky-handoff между блоками работает за счёт того, что title-bar и
+ * thead — sticky **внутри своего `<section>`** (containing block). Когда
+ * контейнер пролистывается до низа section'а, sticky-элементы упираются в
+ * нижнюю границу своего section'а и уходят вверх вместе с ним; в то же
+ * время следующий section появляется со своим sticky title bar.
+ *
+ * `min-w-max` нужен, чтобы header strip растягивался на всю ширину
+ * вложенной таблицы (когда таблица шире контейнера).
+ */
+function BlockSection({
   title,
   icon,
-  scrollRef,
-  onScroll,
   children,
 }: {
   title: string
   icon: React.ReactNode
-  scrollRef?: RefObject<HTMLDivElement>
-  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
   children: React.ReactNode
 }) {
   return (
-    <section className="shadow-finmd overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5">
-        <span className="rounded-md bg-slate-900 p-1.5 text-amber-300">{icon}</span>
-        <h3 className="text-sm font-semibold tracking-tight text-slate-800">{title}</h3>
-      </div>
-      <div ref={scrollRef} onScroll={onScroll} className="overflow-x-auto">
-        {children}
-      </div>
+    <section className="min-w-max border-t border-slate-200 first:border-t-0">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-slate-50">
+        <div className="sticky left-0 inline-flex items-center gap-2.5 px-4 py-2.5">
+          <span className="rounded-md bg-slate-900 p-1.5 text-amber-300">{icon}</span>
+          <h3 className="text-sm font-semibold tracking-tight text-slate-800">{title}</h3>
+        </div>
+      </header>
+      {children}
     </section>
+  )
+}
+
+/**
+ * Общий colgroup для всех трёх таблиц — 27 колонок одинаковой ширины:
+ *   1 (Label, 220px) + 2 (Итого План|Факт, 80px × 2) + 12*2 (Month P|F, 80px × 2)
+ * Это позволяет визуально выровнять колонки между блоками при горизонтальном
+ * скролле. В таблице кассы каждый месяц занимает `colSpan={2}` чтобы попасть
+ * в обе подколонки одного месяца.
+ */
+function SharedColGroup({ months }: { months: number[] }) {
+  return (
+    <colgroup>
+      <col style={{ width: 220 }} />
+      <col style={{ width: 80 }} />
+      <col style={{ width: 80 }} />
+      {months.map((m) => (
+        <Fragment key={m}>
+          <col style={{ width: 80 }} />
+          <col style={{ width: 80 }} />
+        </Fragment>
+      ))}
+    </colgroup>
+  )
+}
+
+// ============================ CashRegistersTable ============================
+
+function CashRegistersTable({
+  year,
+  months,
+  currentMonthIdx,
+  registers,
+  monthlyRegBalances,
+  currency,
+  t,
+}: {
+  year: number
+  months: number[]
+  currentMonthIdx: number
+  registers: { id: string; label?: string | null; amount_cents?: number | null }[]
+  monthlyRegBalances: Map<string, number[]>
+  currency: string
+  t: (k: string) => string
+}) {
+  return (
+    <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+      <SharedColGroup months={months} />
+      <thead>
+        <tr className="bg-slate-100 text-slate-600">
+          <th className="sticky left-0 top-[44px] z-40 border-b border-r border-slate-200 bg-slate-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+            {t('finance.report.end_balance_by_register')}
+          </th>
+          <th
+            colSpan={2}
+            className="sticky top-[44px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider"
+          >
+            {t('finance.report.col_start')}
+          </th>
+          {months.map((m) => (
+            <th
+              key={m}
+              colSpan={2}
+              className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
+              }`}
+            >
+              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {registers.map((reg, idx) => {
+          const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
+          const zebraBg = idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
+          return (
+            <tr key={reg.id} className={`border-t border-slate-100 ${zebraBg}`}>
+              <td
+                className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 font-medium text-slate-800 ${zebraBg}`}
+              >
+                {reg.label || '—'}
+              </td>
+              <td
+                colSpan={2}
+                className="num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold text-slate-600"
+              >
+                {formatNumberSafe(reg.amount_cents ?? 0, currency)}
+              </td>
+              {months.map((m) => (
+                <td
+                  key={m}
+                  colSpan={2}
+                  className={`num border-l border-slate-100 px-2 py-2 text-right text-slate-700 ${
+                    m === currentMonthIdx ? 'bg-amber-50' : ''
+                  }`}
+                >
+                  {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
+                </td>
+              ))}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 
@@ -718,18 +759,22 @@ function ReportTable({
 }) {
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
   return (
-    <table className="w-full border-collapse text-xs">
+    <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+      <SharedColGroup months={months} />
       <thead>
-        <tr className="border-b border-slate-200 bg-slate-100 text-slate-600">
+        {/* Row 1 — Параметр (rowSpan=2) + месяцы (colSpan=2). Sticky top=44px
+            (под title bar блока). Все sticky-ячейки имеют непрозрачный bg,
+            чтобы скроллящиеся под них цифры не просвечивали. */}
+        <tr className="text-slate-600">
           <th
             rowSpan={2}
-            className="sticky left-0 z-30 min-w-[220px] bg-slate-100 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
+            className="sticky left-0 top-[44px] z-40 border-b border-r border-slate-200 bg-slate-100 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_row')}
           </th>
           <th
             colSpan={2}
-            className="border-l border-slate-200 bg-slate-200/60 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
+            className="sticky top-[44px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_total')}
           </th>
@@ -737,7 +782,7 @@ function ReportTable({
             <th
               key={m}
               colSpan={2}
-              className={`min-w-[140px] border-l border-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
+              className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
                 m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
@@ -745,24 +790,25 @@ function ReportTable({
             </th>
           ))}
         </tr>
-        <tr className="border-b border-slate-200 bg-slate-50 text-slate-500">
-          <th className="border-l border-slate-200 bg-slate-100/70 px-2 py-1 text-right text-[9px] font-medium uppercase">
+        {/* Row 2 — План|Факт sub-headers. Sticky top=72px (44px + ~28px row1). */}
+        <tr className="text-slate-500">
+          <th className="sticky top-[72px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_plan')}
           </th>
-          <th className="bg-slate-100/70 px-2 py-1 text-right text-[9px] font-medium uppercase">
+          <th className="sticky top-[72px] z-30 border-b border-slate-200 bg-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_fact')}
           </th>
           {months.map((m) => (
             <Fragment key={m}>
               <th
-                className={`border-l border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                className={`sticky top-[72px] z-30 border-b border-l border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
                   m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
                 {t('finance.report.col_plan')}
               </th>
               <th
-                className={`px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                className={`sticky top-[72px] z-30 border-b border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
                   m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
@@ -779,8 +825,9 @@ function ReportTable({
           const groupBg = groupRowBg(row.color, row.bold)
           const accentBorder = row.bold ? accentLeftBorder(row.color) : ''
           // Чётные строки (не-bold) — slate-50 как лёгкая «зебра». bold-строки
-          // секций имеют свой groupBg.
-          const zebra = !row.bold && idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
+          // секций имеют свой groupBg. Все backgrounds непрозрачные — иначе
+          // через sticky-колонку label просвечивают скроллящиеся цифры.
+          const zebra = !row.bold && idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
           const rowBg = groupBg || zebra
           return (
             <tr
