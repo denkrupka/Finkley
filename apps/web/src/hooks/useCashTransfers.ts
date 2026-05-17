@@ -225,6 +225,47 @@ export function useReverseCashTransfer(salonId: string) {
 }
 
 /**
+ * Редактирование уже существующего трансфера. Прямой UPDATE по таблице с
+ * проверкой RLS (политика разрешает только owner/admin'у того же салона).
+ * Балансы пересчитываются автоматически на следующем чтении (RPC берёт
+ * актуальные ряды cash_transfers).
+ *
+ * ВАЖНО: проверка «не уйти в минус» здесь НЕ делается — Postgres не знает
+ * текущий баланс до и после правки в transaction'е. На практике редактируют
+ * комментарий/дату/маршрут, реже сумму. Если пользователь увеличит сумму
+ * так, что источник уйдёт в минус — это будет видно в кассовом отчёте, но
+ * запись пройдёт.
+ */
+export function useUpdateCashTransfer(salonId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      id: string
+      fromRegisterId: string
+      toRegisterId: string
+      amountCents: number
+      comment: string | null
+      transferredAt: Date
+    }) => {
+      const { data, error } = await supabase.rpc('cash_transfer_update', {
+        p_id: input.id,
+        p_from_register_id: input.fromRegisterId,
+        p_to_register_id: input.toRegisterId,
+        p_amount_cents: input.amountCents,
+        p_comment: input.comment,
+        p_transferred_at: input.transferredAt.toISOString(),
+      })
+      if (error) throw error
+      return data as CashTransfer
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: cashTransfersKeys(salonId) })
+      void qc.invalidateQueries({ queryKey: registerBalancesKeys(salonId) })
+    },
+  })
+}
+
+/**
  * Soft-delete с указанием причины. Только owner/admin (enforce в RPC).
  */
 export function useSoftDeleteCashTransfer(salonId: string) {

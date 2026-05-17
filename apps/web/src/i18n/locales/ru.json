@@ -3366,7 +3366,10 @@
     "detail_comment": "Комментарий",
     "detail_author": "Создал",
     "detail_created_at": "Создано",
-    "detail_reversal_of": "Откат записи"
+    "detail_reversal_of": "Откат записи",
+    "action_save": "Сохранить",
+    "action_delete": "Удалить",
+    "toast_updated": "Перестановка обновлена"
   },
   "expenses": {
     "title": "Расходы",

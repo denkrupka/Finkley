@@ -1,9 +1,16 @@
-import { ArrowLeftRight, ArrowRight, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   currentMonthPeriod,
@@ -18,17 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import {
   useCashTransfers,
   useSoftDeleteCashTransfer,
+  useUpdateCashTransfer,
   type CashTransfer,
 } from '@/hooks/useCashTransfers'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
@@ -300,6 +301,7 @@ function TransfersHistoryBlock({ salonId, currency }: { salonId: string; currenc
       <TransferDetailDrawer
         transfer={drawer}
         onClose={() => setDrawer(null)}
+        salonId={salonId}
         labelById={labelById}
         userNameById={userNameById}
         currency={currency}
@@ -402,75 +404,124 @@ function TransferRow({
   )
 }
 
+/**
+ * Модалка деталей перестановки. Стиль — как у CashTransferModal: Dialog
+ * 640px, форма с полями Откуда/Куда/Сумма/Дата/Комментарий. Можно
+ * редактировать (owner/admin того же салона) и удалить (с указанием
+ * причины). Записи reversal_of и soft-deleted — read-only.
+ */
 function TransferDetailDrawer({
   transfer,
   onClose,
+  salonId,
   labelById,
   userNameById,
   currency,
 }: {
   transfer: CashTransfer | null
   onClose: () => void
+  salonId: string
   labelById: Map<string, string>
   userNameById: Map<string, string>
   currency: string
 }) {
   const { t } = useTranslation()
+  const { data: registers = [] } = useCashRegisters(salonId)
+  const { data: membership } = useSalonMembership(salonId)
+  const canEdit = membership?.role === 'owner' || membership?.role === 'admin'
+
+  const update = useUpdateCashTransfer(salonId)
+  const softDelete = useSoftDeleteCashTransfer(salonId)
+
+  const isReversal = !!transfer?.reversal_of
+  const isDeleted = !!transfer?.deleted_at
+  const readOnly = !canEdit || isReversal || isDeleted
+
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [amountInput, setAmountInput] = useState('')
+  const [comment, setComment] = useState('')
+  const [dateInput, setDateInput] = useState('')
+
+  // Сброс формы при открытии новой записи.
+  useEffect(() => {
+    if (!transfer) return
+    setFrom(transfer.from_register_id)
+    setTo(transfer.to_register_id)
+    setAmountInput((transfer.amount_cents / 100).toFixed(2).replace('.', ','))
+    setComment(transfer.comment ?? '')
+    setDateInput(toLocalISO(new Date(transfer.transferred_at)))
+  }, [transfer])
+
   if (!transfer) return null
-  const fromLabel = labelById.get(transfer.from_register_id) ?? t('cash_transfer.removed_register')
-  const toLabel = labelById.get(transfer.to_register_id) ?? t('cash_transfer.removed_register')
+
+  const amountCents = parseAmountToCents(amountInput)
+  const transferredAtDate = parseLocalISO(dateInput)
+
+  const isChanged =
+    from !== transfer.from_register_id ||
+    to !== transfer.to_register_id ||
+    amountCents !== transfer.amount_cents ||
+    (comment.trim() || null) !== (transfer.comment ?? null) ||
+    transferredAtDate.toISOString() !== transfer.transferred_at
+
+  const sameRegisters = from && to && from === to
+  const invalidAmount = !amountCents || amountCents <= 0
+  const canSave = !readOnly && isChanged && !sameRegisters && !invalidAmount && !!from && !!to
+
   const author = transfer.created_by ? (userNameById.get(transfer.created_by) ?? '—') : '—'
   const deleter = transfer.deleted_by ? (userNameById.get(transfer.deleted_by) ?? '—') : null
 
+  async function handleSave() {
+    try {
+      await update.mutateAsync({
+        id: transfer!.id,
+        fromRegisterId: from,
+        toRegisterId: to,
+        amountCents,
+        comment: comment.trim() || null,
+        transferredAt: transferredAtDate,
+      })
+      toast.success(t('cash_transfer.toast_updated'))
+      onClose()
+    } catch (e) {
+      toast.error(describeRpcError(e))
+    }
+  }
+
+  async function handleDelete() {
+    const reason = window.prompt(t('cash_transfer.delete_prompt'))
+    if (!reason || !reason.trim()) return
+    try {
+      await softDelete.mutateAsync({ id: transfer!.id, reason: reason.trim() })
+      toast.success(t('cash_transfer.toast_deleted'))
+      onClose()
+    } catch (e) {
+      toast.error(describeRpcError(e))
+    }
+  }
+
   return (
-    <Sheet open={!!transfer} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{t('cash_transfer.detail_title')}</SheetTitle>
-          <SheetDescription>
-            {formatVisitDate(transfer.transferred_at)} ·{' '}
-            {formatCurrency(transfer.amount_cents, currency)}
-          </SheetDescription>
-        </SheetHeader>
-        <div className="mt-4 flex flex-col gap-3">
-          <div className="bg-muted/30 rounded-md p-3">
-            <p className="text-muted-foreground text-[10px] font-bold uppercase">
-              {t('cash_transfer.detail_route')}
-            </p>
-            <p className="text-foreground mt-1 text-sm font-semibold">
-              {fromLabel}
-              <ArrowRight
-                className="text-muted-foreground mx-1.5 inline size-3.5"
-                strokeWidth={2}
-              />
-              {toLabel}
-            </p>
-          </div>
-          <DetailField
-            label={t('cash_transfer.detail_amount')}
-            value={formatCurrency(transfer.amount_cents, currency)}
-          />
-          {transfer.comment ? (
-            <DetailField label={t('cash_transfer.detail_comment')} value={transfer.comment} />
-          ) : null}
-          <DetailField label={t('cash_transfer.detail_author')} value={author} />
-          <DetailField
-            label={t('cash_transfer.detail_created_at')}
-            value={formatVisitDate(transfer.created_at)}
-          />
-          {transfer.reversal_of ? (
-            <DetailField
-              label={t('cash_transfer.detail_reversal_of')}
-              value={transfer.reversal_of.slice(0, 8)}
-            />
-          ) : null}
-          {transfer.deleted_at ? (
-            <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
+    <Dialog open={!!transfer} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="w-[96vw] gap-0 p-0 sm:!w-[640px] sm:!max-w-[640px]">
+        <div className="px-5 pt-4">
+          <DialogHeader>
+            <DialogTitle>{t('cash_transfer.detail_title')}</DialogTitle>
+            <DialogDescription>
+              {formatVisitDate(transfer.transferred_at)} ·{' '}
+              {formatCurrency(transfer.amount_cents, currency)}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="max-h-[80vh] overflow-y-auto px-5 pb-4 pt-3">
+          {isDeleted ? (
+            <div className="border-destructive/40 bg-destructive/5 mb-3 rounded-md border p-3">
               <p className="text-destructive text-[10px] font-bold uppercase">
                 {t('cash_transfer.tag_deleted')}
               </p>
               <p className="text-foreground mt-1 text-xs">
-                {formatVisitDate(transfer.deleted_at)}
+                {formatVisitDate(transfer.deleted_at!)}
                 {deleter ? ` · ${deleter}` : ''}
               </p>
               {transfer.deleted_reason ? (
@@ -478,19 +529,193 @@ function TransferDetailDrawer({
               ) : null}
             </div>
           ) : null}
+          {isReversal ? (
+            <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-[10px] font-bold uppercase text-amber-700">
+                {t('cash_transfer.tag_reversal')}
+              </p>
+              <p className="text-foreground mt-1 text-xs">
+                {t('cash_transfer.detail_reversal_of')}: {transfer.reversal_of!.slice(0, 8)}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="border-border bg-muted/20 rounded-lg border p-3">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <label className="text-muted-foreground mb-1 block text-xs font-semibold">
+                  {t('cash_transfer.from')}
+                </label>
+                <Select value={from} onValueChange={setFrom} disabled={readOnly}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder={t('cash_transfer.from_placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {registers.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                    {/* Если касса удалена, всё равно показываем текущее значение */}
+                    {!labelById.has(transfer.from_register_id) ? (
+                      <SelectItem value={transfer.from_register_id}>
+                        ({t('cash_transfer.removed_register')})
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
+              <ArrowRight
+                className="text-muted-foreground mx-1 hidden size-5 shrink-0 self-end pb-2 sm:block"
+                strokeWidth={2}
+              />
+              <div className="flex-1">
+                <label className="text-muted-foreground mb-1 block text-xs font-semibold">
+                  {t('cash_transfer.to')}
+                </label>
+                <Select value={to} onValueChange={setTo} disabled={readOnly}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder={t('cash_transfer.to_placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {registers
+                      .filter((r) => r.id !== from)
+                      .map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    {!labelById.has(transfer.to_register_id) ? (
+                      <SelectItem value={transfer.to_register_id}>
+                        ({t('cash_transfer.removed_register')})
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <label className="text-muted-foreground mb-1 block text-xs font-semibold">
+                {t('cash_transfer.amount')}
+              </label>
+              <div className="relative">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value.replace(/[^\d.,]/g, ''))}
+                  placeholder="0,00"
+                  disabled={readOnly}
+                  className="num h-11 pr-12 font-mono text-lg font-bold tabular-nums"
+                />
+                <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold">
+                  {currency}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <label className="text-muted-foreground mb-1 block text-xs font-semibold">
+                {t('cash_transfer.comment')}
+              </label>
+              <Input
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder={t('cash_transfer.comment_placeholder')}
+                disabled={readOnly}
+              />
+            </div>
+
+            <div>
+              <label className="text-muted-foreground mb-1 block text-xs font-semibold">
+                {t('cash_transfer.date')}
+              </label>
+              <Input
+                type="datetime-local"
+                value={dateInput}
+                onChange={(e) => setDateInput(e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          </div>
+
+          {/* Мета: автор + дата создания */}
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-muted-foreground text-[10px] font-bold uppercase">
+                {t('cash_transfer.detail_author')}
+              </p>
+              <p className="text-foreground mt-0.5 text-sm">{author}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-[10px] font-bold uppercase">
+                {t('cash_transfer.detail_created_at')}
+              </p>
+              <p className="text-foreground mt-0.5 text-sm">
+                {formatVisitDate(transfer.created_at)}
+              </p>
+            </div>
+          </div>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
+          {!readOnly ? (
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={handleDelete}
+              disabled={softDelete.isPending}
+              className="text-destructive hover:bg-destructive/5"
+            >
+              <Trash2 className="size-4" strokeWidth={1.7} />
+              {t('cash_transfer.action_delete')}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="md" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+            {!readOnly ? (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleSave}
+                disabled={!canSave || update.isPending}
+              >
+                {update.isPending ? (
+                  <Loader2 className="size-4 animate-spin" strokeWidth={1.7} />
+                ) : (
+                  <Pencil className="size-4" strokeWidth={1.7} />
+                )}
+                {t('cash_transfer.action_save')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-function DetailField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-muted-foreground text-[10px] font-bold uppercase">{label}</p>
-      <p className="text-foreground mt-0.5 text-sm">{value}</p>
-    </div>
-  )
+function parseAmountToCents(s: string): number {
+  if (!s) return 0
+  const norm = s.replace(/\s/g, '').replace(',', '.')
+  const n = parseFloat(norm)
+  if (!Number.isFinite(n)) return 0
+  return Math.round(n * 100)
+}
+
+function toLocalISO(d: Date): string {
+  const tz = d.getTimezoneOffset()
+  const local = new Date(d.getTime() - tz * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function parseLocalISO(s: string): Date {
+  return new Date(s)
 }
 
 function describeRpcError(e: unknown): string {
