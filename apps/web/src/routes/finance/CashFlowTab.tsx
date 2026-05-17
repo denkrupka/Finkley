@@ -497,6 +497,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         salonId={salonId}
         currency={currency}
         initialView="charge"
+        onBackFromCharge={(v) => setEditingVisit(v)}
       />
     </div>
   )

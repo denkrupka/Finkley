@@ -64,6 +64,7 @@ export function VisitDetailModal({
   currency,
   onClose,
   initialView,
+  onBackFromCharge,
 }: {
   visit: VisitRow | null
   salonId: string
@@ -71,6 +72,10 @@ export function VisitDetailModal({
   onClose: () => void
   /** Image #87: при открытии из QuickEntry-edit «Рассчитать» сразу прыгаем в charge. */
   initialView?: 'detail' | 'charge' | 'document'
+  /** Если задан — «← Назад» в ChargeView не возвращает в detail-view (старый
+   *  вкладочный UI), а закрывает модалку и передаёт управление родителю.
+   *  Родитель обычно открывает QuickEntryModal в edit-режиме для этого визита. */
+  onBackFromCharge?: (visit: VisitRow) => void
 }) {
   const { t } = useTranslation()
   const [view, setView] = useState<'detail' | 'charge' | 'document'>(initialView ?? 'detail')
@@ -182,7 +187,17 @@ export function VisitDetailModal({
             groupLines={groupLines}
             cashRegisters={cashRegisters}
             currency={currency}
-            onBack={() => setView('detail')}
+            onBack={() => {
+              if (onBackFromCharge && visit) {
+                onClose()
+                // Маленькая задержка — чтобы Dialog успел закрыться раньше
+                // открытия следующей модалки (QuickEntryModal). Иначе Radix
+                // может зацепить focus-trap и моргнуть.
+                setTimeout(() => onBackFromCharge(visit), 50)
+              } else {
+                setView('detail')
+              }
+            }}
             onCharged={() => setView('document')}
             t={t}
           />

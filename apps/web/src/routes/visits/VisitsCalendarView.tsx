@@ -862,6 +862,11 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         salonId={salonId}
         currency={salon?.currency ?? 'PLN'}
         initialView={chargeVisit ? 'charge' : undefined}
+        onBackFromCharge={(v) => {
+          setEditingVisit(null)
+          setChargeVisit(null)
+          setQuickEditVisit(v)
+        }}
       />
 
       {/* Image #87: QuickEntryModal в edit-mode — клик по одиночному визиту.

@@ -180,7 +180,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-unit">{t('inventory.form.unit_label')}</Label>
               <Input
@@ -301,7 +301,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-stock">{t('inventory.form.stock_label')}</Label>
               <Input

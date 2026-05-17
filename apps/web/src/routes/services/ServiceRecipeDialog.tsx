@@ -106,7 +106,7 @@ export function ServiceRecipeDialog({ open, onClose, salonId, service }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:!max-w-[560px]">
+      <DialogContent className="w-[min(720px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle>{t('services_page.recipe.title', { service: service.name })}</DialogTitle>
           <DialogDescription>{t('services_page.recipe.subtitle')}</DialogDescription>
@@ -123,9 +123,9 @@ export function ServiceRecipeDialog({ open, onClose, salonId, service }: Props) 
               {recipe.map((r) => (
                 <li
                   key={r.id}
-                  className="grid grid-cols-[1fr_120px_40px] items-center gap-2 px-3 py-2 text-sm"
+                  className="grid grid-cols-[minmax(0,1fr)_120px_40px] items-center gap-2 px-3 py-2 text-sm"
                 >
-                  <span className="text-foreground truncate font-semibold">
+                  <span className="text-foreground min-w-0 break-words font-semibold">
                     {r.material?.name ?? '—'}
                     {r.material?.category ? (
                       <span className="text-muted-foreground ml-1.5 text-[10.5px] font-medium">
@@ -169,15 +169,20 @@ export function ServiceRecipeDialog({ open, onClose, salonId, service }: Props) 
               <Label className="text-muted-foreground mb-2 block text-xs font-bold uppercase">
                 {t('services_page.recipe.add_title')}
               </Label>
-              <div className="grid grid-cols-[1fr_120px_auto] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_120px_auto] gap-2">
                 <Select value={newMaterialId} onValueChange={setNewMaterialId}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={t('services_page.recipe.material_placeholder')} />
+                  <SelectTrigger className="h-10 min-w-0">
+                    <SelectValue
+                      placeholder={t('services_page.recipe.material_placeholder')}
+                      className="truncate"
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {availableItems.map((it) => (
                       <SelectItem key={it.id} value={it.id}>
-                        {it.name} ({it.unit})
+                        <span className="truncate">
+                          {it.name} ({it.unit})
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

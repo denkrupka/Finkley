@@ -45,6 +45,7 @@ import {
 } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDate } from '@/lib/utils/format-date'
+import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
 import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
 
@@ -82,6 +83,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
   // Image #98: клик по строке продажи → открыть карточку с возможностью
   // редактировать любое поле (используем VisitDetailModal в режиме detail).
   const [editingSale, setEditingSale] = useState<VisitRow | null>(null)
+  const [quickEditVisit, setQuickEditVisit] = useState<VisitRow | null>(null)
   const [editingOther, setEditingOther] = useState<OtherIncomeRow | null>(null)
 
   const { data: sales = [], isLoading } = useVisits(salonId, range, {
@@ -384,6 +386,22 @@ export function SalesTab({ salonId }: { salonId: string }) {
         onClose={() => setEditingSale(null)}
         salonId={salonId}
         currency={currency}
+        onBackFromCharge={(v) => setQuickEditVisit(v)}
+      />
+
+      <QuickEntryModal
+        open={quickEditVisit !== null}
+        onOpenChange={(o) => !o && setQuickEditVisit(null)}
+        salonId={salonId}
+        currency={currency}
+        editVisit={quickEditVisit}
+        onChargeRequest={(visitId) => {
+          const v = sales.find((x) => x.id === visitId) ?? quickEditVisit
+          if (v) {
+            setQuickEditVisit(null)
+            setEditingSale(v)
+          }
+        }}
       />
 
       <OtherIncomeEditModal

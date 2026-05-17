@@ -32,6 +32,8 @@ export type OtherIncomeCategoryRow = {
   is_archived: boolean
   is_system: boolean
   sort_order: number
+  /** Родительская категория (иерархия, миграция 20260517000001). */
+  parent_id: string | null
 }
 
 export function useOtherIncomeCategories(
@@ -44,7 +46,7 @@ export function useOtherIncomeCategories(
       if (!salonId) return []
       let q = supabase
         .from('other_income_categories')
-        .select('id, salon_id, name, is_archived, is_system, sort_order')
+        .select('id, salon_id, name, is_archived, is_system, sort_order, parent_id')
         .eq('salon_id', salonId)
         .order('sort_order')
       if (!opts.includeArchived) q = q.eq('is_archived', false)
@@ -59,7 +61,7 @@ export function useOtherIncomeCategories(
 export function useCreateOtherIncomeCategory(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { name: string; sort_order?: number }) => {
+    mutationFn: async (input: { name: string; sort_order?: number; parent_id?: string | null }) => {
       if (!salonId) throw new Error('no_salon')
       const { data, error } = await supabase
         .from('other_income_categories')
@@ -69,6 +71,7 @@ export function useCreateOtherIncomeCategory(salonId: string | undefined) {
           sort_order: input.sort_order ?? 100,
           is_archived: false,
           is_system: false,
+          parent_id: input.parent_id ?? null,
         })
         .select('id')
         .single()
