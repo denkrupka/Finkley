@@ -1,6 +1,17 @@
 import { endOfMonth, format, startOfMonth, startOfYear } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react'
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
+  FileSpreadsheet,
+  Landmark,
+  Printer,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,39 +31,18 @@ import { useSalon } from '@/hooks/useSalons'
 import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
-/**
- * Финансовый отчёт — annual cash-flow table в стиле excel-таблицы owner'а.
- *
- * Строки сгруппированы:
- *   Текущая деятельность
- *     Выручка (Услуги, Прочие доходы)
- *     Расходы:
- *       Производственные (ЗП мастера, Расходные материалы)
- *       Переменные (% от выручки) — admin payroll, банк комиссия, реклама, бонусы
- *       Постоянные — все 17 fixed-расходов из financial_settings
- *       Налоги — PIT-36 / VAT / CIT / PIT-3
- *   Инвестиционная деятельность
- *   Финансовая деятельность (Дивиденды / Вклады / Займы)
- *   Сальдо за период
- *   Остаток на конец месяца (по кассам)
- *
- * Колонки — 12 месяцев текущего года + «Итого тек. год».
- *
- * Данные:
- *  - Выручка / Услуги  — из visits.amount (kind='visit') по месяцу.
- *  - Прочие доходы (факт) — sum other_incomes по месяцу.
- *  - Расходные материалы (факт)  — TODO: подсчёт через service_materials → пока 0,
- *    т.к. требует ещё одного RPC. На скрине у owner'а это % от выручки в settings;
- *    мы тоже берём materials_pct из ServicePlanningParams (avg) либо 0.
- *  - ЗП мастера (факт) — sum payouts.amount_cents за месяц (если есть закрытые
- *    периоды), либо staff_payout_pct × выручка как прогноз.
- *  - Постоянные (план) — financial_settings.fixed (× 1 каждый месяц).
- *  - Переменные  — settings.variable.* × (visits + other_incomes) выручка.
- *  - Налоги — settings.taxes.* (× 1 каждый месяц).
- *  - Инвестиции — settings.investments.* (план — показываем в текущем месяце).
- *  - Финансовая — settings.flows.* (× 1 каждый месяц, для прогноза).
- *  - Остаток на тек. момент — sum of cash_registers.
- */
+type RowColor = 'navy' | 'sage' | 'destructive' | 'muted' | 'teal'
+
+type CellRow = {
+  label: string
+  values: number[]
+  factValues?: number[]
+  bold?: boolean
+  indent?: number
+  color?: RowColor
+  groupKey?: string
+  parentGroupKey?: string
+}
 
 export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
@@ -70,7 +60,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
 
   const { data: visits = [] } = useVisits(salonId, visitsRange, { kind: 'visit' })
-  // Retail-продажи учитываются отдельной подкатегорией в «Выручка».
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
@@ -79,14 +68,12 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: otherIncomeCats = [] } = useOtherIncomeCategories(salonId, {
     includeArchived: true,
   })
-  // Per-register monthly running balances (на конец каждого месяца).
   const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
-  // Aggregate by month (12 buckets, index 0=Jan)
   const monthly = useMemo(() => {
     const buckets = Array.from({ length: 12 }, () => ({
-      visitsRevenue: 0, // сервис-выручка из visits (минус скидки)
-      retailRevenue: 0, // выручка от продаж товаров (kind='retail')
+      visitsRevenue: 0,
+      retailRevenue: 0,
       otherIncome: 0,
       expensesTotal: 0,
     }))
@@ -115,8 +102,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return buckets
   }, [visits, retailSales, otherIncomes, expenses, year])
 
-  // Факт по category-label (вариант A: matching by name). Карта label →
-  // массив 12 элементов (cents за месяц), nfp = case-insensitive trim.
   const factByLabel = useMemo<Map<string, number[]>>(() => {
     const catNameById = new Map<string, string>()
     for (const c of expenseCategories) catNameById.set(c.id, normName(c.name))
@@ -138,9 +123,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return factByLabel.get(normName(label)) ?? Array.from({ length: 12 }, () => 0)
   }
 
-  // Retail-продажи группируются по категории inventory_items.category — для
-  // подразбивки строки «Продажи» в Доходы. Если visit без inventory_item_id —
-  // попадает в виртуальную категорию «(без категории)».
   const retailByCategory = useMemo<Map<string, number[]>>(() => {
     const invCatById = new Map<string, string>()
     for (const i of inventory) invCatById.set(i.id, i.category || '')
@@ -157,8 +139,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return map
   }, [retailSales, inventory, year, t])
 
-  // Other incomes группируются по category_id с учётом иерархии (parent_id из
-  // other_income_categories) — для подразбивки строки «Прочие доходы».
   const otherIncomesByCategory = useMemo<Map<string, number[]>>(() => {
     const map = new Map<string, number[]>()
     for (const oi of otherIncomes) {
@@ -172,23 +152,27 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return map
   }, [otherIncomes, year])
 
-  // ===== Сборка отчёта =====
-  type CellRow = {
-    label: string
-    values: number[] // ПЛАН — 12 чисел в копейках/центах (доход +, расход -)
-    /** ФАКТ — 12 чисел. Если не задан — отрисуем как 0. */
-    factValues?: number[]
-    bold?: boolean
-    indent?: number
-    color?: 'navy' | 'sage' | 'destructive' | 'muted'
-    /** Уникальный ключ для collapse-логики (если эта строка — header группы). */
-    groupKey?: string
-    /** Если задан — строка является дочерней для groupKey и скрывается при свёртывании. */
-    parentGroupKey?: string
-  }
-
-  // Свёрнутые группы — Set с groupKey
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Все группы свёрнуты по умолчанию — пользователь раскрывает только то, что
+  // его интересует. Балансовые корневые группы тоже здесь.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    const set = new Set([
+      'revenue',
+      'retail',
+      'revenue_other',
+      'expenses',
+      'variable',
+      'fixed',
+      'taxes',
+      'investing',
+      'financing',
+    ])
+    for (const item of DEFAULT_FINANCIAL_SETTINGS.balance.items) {
+      if (!item.parent_id && !item.archived) {
+        set.add(`balance_root_${item.preset_key || item.id}`)
+      }
+    }
+    return set
+  })
   function toggleGroup(key: string) {
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -204,9 +188,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const flowsTotalMonthly = sumFlowsCents(settings)
 
   const months = Array.from({ length: 12 }, (_, i) => i)
+  const currentMonthIdx = new Date().getMonth()
 
-  // Plan-vs-fact: postoyannye/налоги/flows/прочие доходы умножены на каждый месяц
-  // года (план), invest — только в текущем месяце (как факт).
   function constant(value: number) {
     return months.map(() => value)
   }
@@ -224,7 +207,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     (v, i) => v + (retailByMonth[i] ?? 0) + (otherIncomeByMonth[i] ?? 0),
   )
 
-  // Переменные (% выручки) — сумма всех items[].pct
   const variableTotalPct = settings.variable.items
     .filter((i) => !i.archived)
     .reduce((acc, i) => acc + (i.pct ?? 0), 0)
@@ -236,7 +218,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     (i) => (variableByMonth[i] ?? 0) + (fixedByMonth[i] ?? 0) + (taxesByMonth[i] ?? 0),
   )
 
-  const currentMonthIdx = new Date().getMonth()
   const investmentsByMonth = months.map((m) => (m === currentMonthIdx ? investmentsTotal : 0))
   const flowsByMonth = constant(flowsTotalMonthly)
 
@@ -252,15 +233,19 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return acc
   }, [])
 
+  // Aggregate KPIs за год (для верхней панели)
+  const totalRevenueYear = revenueByMonth.reduce((s, v) => s + v, 0)
+  const totalExpensesYear = expensesTotalByMonth.reduce((s, v) => s + v, 0)
+  const totalSaldoYear = periodSaldoByMonth.reduce((s, v) => s + v, 0)
+  const endOfYearBalance = runningEndOfMonth[11] ?? openingBalance
+
   const rows: CellRow[] = [
-    // ===== Доходы (статика) =====
     {
       label: t('finance.report.revenue'),
-      // План выручки сейчас не строим (нет model'и) — 0. Факт — реальная сумма.
       values: constant(0),
       factValues: revenueByMonth,
       bold: true,
-      color: 'navy',
+      color: 'sage',
       groupKey: 'revenue',
     },
     {
@@ -278,7 +263,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'revenue',
       groupKey: 'retail',
     },
-    // Подразбивка «Продажи» по категориям склада (inventory_items.category)
     ...Array.from(retailByCategory.entries()).map(([cat, factArr]) => ({
       label: cat,
       values: constant(0),
@@ -288,18 +272,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     })),
     {
       label: t('finance.report.revenue_other'),
-      // План прочих доходов = сумма items в other_income (× 1 в месяц).
       values: constant(otherIncomeMonthly),
       factValues: monthly.map((m) => m.otherIncome),
       indent: 1,
       parentGroupKey: 'revenue',
       groupKey: 'revenue_other',
     },
-    // Подразбивка «Прочие доходы» по категориям из справочника «Доходы»
-    // (с иерархией через parent_id).
     ...buildOtherIncomeCategoryRows(otherIncomeCats, otherIncomesByCategory, t),
 
-    // ===== Расходы (из вкладки «Расходы» справочника) =====
     {
       label: t('finance.report.expenses_total'),
       values: expensesTotalByMonth.map((v) => -v),
@@ -351,12 +331,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'taxes',
     })),
 
-    // ===== Инвестиционная деятельность (Поступления/Выбытия из подгрупп) =====
     {
       label: t('finance.report.section_investing'),
       values: investmentsByMonth.map((v) => -v),
       bold: true,
-      color: 'destructive',
+      color: 'teal',
       groupKey: 'investing',
     },
     ...buildInvestmentRows(settings, currentMonthIdx, factsForLabel).map((r) => ({
@@ -364,12 +343,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'investing',
     })),
 
-    // ===== Финансовая деятельность (Поступления/Выбытия из подгрупп) =====
     {
       label: t('finance.report.section_financing'),
       values: flowsByMonth.map((v) => -v),
       bold: true,
-      color: 'destructive',
+      color: 'navy',
       groupKey: 'financing',
     },
     ...buildFlowRows(settings, factsForLabel).map((r) => ({
@@ -377,7 +355,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'financing',
     })),
 
-    // ===== Сальдо и остаток =====
     {
       label: t('finance.report.period_saldo'),
       values: periodSaldoByMonth,
@@ -390,23 +367,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'navy',
     },
-
-    // ===== Баланс (из новой вкладки справочника) =====
-    {
-      label: t('finance.report.section_balance'),
-      values: constant(0),
-      bold: true,
-      color: 'navy',
-      groupKey: 'balance',
-    },
-    ...buildBalanceRows(
-      settings.balance.items,
-      monthlyRegBalances,
-      runningEndOfMonth,
-      periodSaldoByMonth,
-      inventory,
-    ).map((r) => ({ ...r, parentGroupKey: 'balance' })),
   ]
+
+  // Балансовая таблица — отдельно. Используем общий `collapsed` Set.
+  const balanceRows = buildBalanceRows(
+    settings.balance.items,
+    monthlyRegBalances,
+    runningEndOfMonth,
+    periodSaldoByMonth,
+    inventory,
+  )
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
 
@@ -417,7 +387,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       ...months.map((m) => format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })),
     ]
     const lines = [headers.join(';')]
-    for (const row of rows) {
+    for (const row of [...rows, ...balanceRows]) {
       const cells = [row.label, yearTotal(row.values), ...row.values]
       lines.push(
         cells.map((c) => (typeof c === 'number' ? (c / 100).toFixed(2) : `"${c}"`)).join(';'),
@@ -433,9 +403,17 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     URL.revokeObjectURL(url)
   }
 
+  const visibleMainRows = rows.filter(
+    (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
+  )
+  const visibleBalanceRows = balanceRows.filter(
+    (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
+  )
+
   return (
-    <div>
-      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-5">
+      {/* ===== HEADER ===== */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-brand-navy text-lg font-bold tracking-tight">
             {t('finance.report.title')}
@@ -451,158 +429,81 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             <Printer className="size-4" strokeWidth={1.8} />
             {t('finance.report.print')}
           </Button>
-          <div className="border-border bg-card rounded-md border px-3 py-2 text-right">
-            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-              {t('finance.report.current_balance')}
-            </p>
-            <p className="num text-foreground text-sm font-bold">
-              {formatCurrency(openingBalance, currency)}
-            </p>
-          </div>
         </div>
       </header>
 
-      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+      {/* ===== KPI STRIP ===== */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard
+          icon={<TrendingUp className="size-5" strokeWidth={1.8} />}
+          label={t('finance.report.revenue')}
+          value={formatCurrency(totalRevenueYear, currency)}
+          tone="sage"
+        />
+        <KpiCard
+          icon={<TrendingDown className="size-5" strokeWidth={1.8} />}
+          label={t('finance.report.expenses_total')}
+          value={formatCurrency(totalExpensesYear, currency)}
+          tone="red"
+        />
+        <KpiCard
+          icon={<Sparkles className="size-5" strokeWidth={1.8} />}
+          label={t('finance.report.period_saldo')}
+          value={formatCurrency(totalSaldoYear, currency)}
+          tone={totalSaldoYear >= 0 ? 'sage' : 'red'}
+        />
+        <KpiCard
+          icon={<Wallet className="size-5" strokeWidth={1.8} />}
+          label={t('finance.report.current_balance')}
+          value={formatCurrency(openingBalance, currency)}
+          tone="navy"
+          hint={t('finance.report.end_balance') + ': ' + formatCurrency(endOfYearBalance, currency)}
+        />
+      </div>
+
+      {/* ===== MAIN REPORT TABLE ===== */}
+      <ReportCard
+        title={t('finance.report.title')}
+        subtitle={t('finance.report.subtitle')}
+        icon={<BarChart3 className="size-5" strokeWidth={1.8} />}
+        tone="navy"
+      >
+        <ReportTable
+          year={year}
+          months={months}
+          currentMonthIdx={currentMonthIdx}
+          rows={visibleMainRows}
+          currency={currency}
+          collapsed={collapsed}
+          onToggle={toggleGroup}
+          t={t}
+        />
+      </ReportCard>
+
+      {/* ===== ОСТАТОК ПО КАССАМ ===== */}
+      <ReportCard
+        title={t('finance.report.end_balance_by_register')}
+        icon={<Wallet className="size-5" strokeWidth={1.8} />}
+        tone="teal"
+      >
         <table className="w-full border-collapse text-xs">
-          <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            {/* Двухуровневая шапка: верхняя строка — месяц (colSpan=2),
-                нижняя — План | Факт для каждого месяца. */}
-            <tr className="bg-muted">
-              <th
-                rowSpan={2}
-                className="bg-muted border-border/60 sticky left-0 z-30 min-w-[200px] border-r px-3 py-2 text-left font-semibold"
-              >
-                {t('finance.report.col_row')}
+          <thead>
+            <tr className="bg-brand-navy text-white">
+              <th className="bg-brand-navy sticky left-0 z-30 min-w-[200px] px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+                {t('finance.report.end_balance_by_register')}
               </th>
-              <th
-                colSpan={2}
-                className="bg-muted border-border/60 border-l px-2 py-2 text-center font-semibold"
-              >
-                {t('finance.report.col_total')}
+              <th className="bg-brand-navy/95 border-l border-white/10 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider">
+                {t('finance.report.col_start')}
               </th>
               {months.map((m) => (
                 <th
                   key={m}
-                  colSpan={2}
-                  className="bg-muted border-border/60 min-w-[140px] border-l px-2 py-2 text-center font-semibold capitalize"
+                  className={`min-w-[100px] border-l border-white/10 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                    m === currentMonthIdx
+                      ? 'bg-brand-yellow/30 text-brand-navy-deep'
+                      : 'bg-brand-navy/95'
+                  }`}
                 >
-                  {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
-                </th>
-              ))}
-            </tr>
-            <tr className="bg-muted">
-              <th className="bg-muted border-border/60 border-l px-2 py-1 text-right text-[9px] font-normal">
-                {t('finance.report.col_plan')}
-              </th>
-              <th className="bg-muted px-2 py-1 text-right text-[9px] font-normal">
-                {t('finance.report.col_fact')}
-              </th>
-              {months.map((m) => (
-                <Fragment key={m}>
-                  <th className="bg-muted border-border/60 border-l px-2 py-1 text-right text-[9px] font-normal">
-                    {t('finance.report.col_plan')}
-                  </th>
-                  <th className="bg-muted px-2 py-1 text-right text-[9px] font-normal">
-                    {t('finance.report.col_fact')}
-                  </th>
-                </Fragment>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows
-              // Скрываем дочерние строки если родительская группа свёрнута
-              .filter((row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)))
-              .map((row, idx) => {
-                const hasGroup = !!row.groupKey
-                const isCollapsed = hasGroup && collapsed.has(row.groupKey!)
-                return (
-                  <tr
-                    key={`${row.label}-${idx}`}
-                    className={`border-border/60 border-t ${row.bold ? 'bg-muted/10' : ''} ${hasGroup ? 'hover:bg-muted/30 cursor-pointer' : ''}`}
-                    onClick={hasGroup ? () => toggleGroup(row.groupKey!) : undefined}
-                  >
-                    <td
-                      className={`bg-card border-border/60 sticky left-0 z-10 border-r px-3 py-1.5 ${row.bold ? 'text-foreground font-bold' : 'text-foreground'}`}
-                      style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        {hasGroup ? (
-                          isCollapsed ? (
-                            <ChevronRight className="size-3.5 shrink-0" strokeWidth={2} />
-                          ) : (
-                            <ChevronDown className="size-3.5 shrink-0" strokeWidth={2} />
-                          )
-                        ) : null}
-                        <span>{row.label}</span>
-                      </span>
-                    </td>
-                    {/* Итого План | Факт */}
-                    <td
-                      className={`num border-border/60 border-l px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${colorClass(row.color)}`}
-                    >
-                      {formatPF(yearTotal(row.values), currency)}
-                    </td>
-                    <td
-                      className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${colorClass(row.color)}`}
-                    >
-                      {formatPF(yearTotal(row.factValues ?? []), currency)}
-                    </td>
-                    {row.values.map((plan, mi) => {
-                      const fact = row.factValues?.[mi] ?? 0
-                      return (
-                        <Fragment key={mi}>
-                          <td
-                            className={`num border-border/60 border-l px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                              row.color === 'navy'
-                                ? 'text-foreground'
-                                : row.color === 'sage'
-                                  ? 'text-brand-sage-deep'
-                                  : row.color === 'destructive'
-                                    ? 'text-destructive'
-                                    : 'text-muted-foreground'
-                            }`}
-                          >
-                            {formatPF(plan, currency)}
-                          </td>
-                          <td
-                            className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                              row.color === 'navy'
-                                ? 'text-foreground'
-                                : row.color === 'sage'
-                                  ? 'text-brand-sage-deep'
-                                  : row.color === 'destructive'
-                                    ? 'text-destructive'
-                                    : 'text-foreground'
-                            }`}
-                          >
-                            {formatPF(fact, currency)}
-                          </td>
-                        </Fragment>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Остаток по кассам на конец каждого месяца — упрощённо: всё на одной
-          кассе (Bank/Karta) пока что. Полная разбивка по счетам — следующая
-          итерация когда добавим account_id на транзакции. */}
-      <div className="border-border bg-card shadow-finsm mt-4 overflow-x-auto rounded-lg border">
-        <table className="w-full border-collapse text-xs">
-          <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            <tr className="bg-muted">
-              <th className="bg-muted border-border/60 sticky left-0 z-30 border-r px-3 py-2 text-left font-semibold">
-                {t('finance.report.end_balance_by_register')}
-              </th>
-              <th className="bg-muted px-2 py-2 text-right font-semibold">
-                {t('finance.report.col_start')}
-              </th>
-              {months.map((m) => (
-                <th key={m} className="bg-muted px-2 py-2 text-right font-semibold capitalize">
                   {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
                 </th>
               ))}
@@ -611,18 +512,28 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           <tbody>
             {settings.cash_registers.items
               .filter((i) => !i.archived)
-              .map((reg) => {
+              .map((reg, idx) => {
                 const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
                 return (
-                  <tr key={reg.id} className="border-border/60 border-t">
-                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-1.5">
+                  <tr
+                    key={reg.id}
+                    className={`border-border/60 hover:bg-muted/40 border-t transition-colors ${
+                      idx % 2 === 1 ? 'bg-muted/15' : ''
+                    }`}
+                  >
+                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-2 font-medium">
                       {reg.label || '—'}
                     </td>
-                    <td className="num text-muted-foreground px-2 py-1.5 text-right">
+                    <td className="num text-muted-foreground bg-brand-navy/5 border-brand-navy/10 border-l px-2 py-2 text-right font-semibold">
                       {formatNumberSafe(reg.amount_cents ?? 0, currency)}
                     </td>
                     {months.map((m) => (
-                      <td key={m} className="num text-muted-foreground px-2 py-1.5 text-right">
+                      <td
+                        key={m}
+                        className={`num text-muted-foreground px-2 py-2 text-right ${
+                          m === currentMonthIdx ? 'bg-brand-yellow/10' : ''
+                        }`}
+                      >
                         {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
                       </td>
                     ))}
@@ -631,8 +542,265 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
               })}
           </tbody>
         </table>
-      </div>
+      </ReportCard>
+
+      {/* ===== БАЛАНС (отдельная таблица) ===== */}
+      <ReportCard
+        title={t('finance.report.section_balance')}
+        icon={<Landmark className="size-5" strokeWidth={1.8} />}
+        tone="navy"
+      >
+        <ReportTable
+          year={year}
+          months={months}
+          currentMonthIdx={currentMonthIdx}
+          rows={visibleBalanceRows}
+          currency={currency}
+          collapsed={collapsed}
+          onToggle={toggleGroup}
+          t={t}
+        />
+      </ReportCard>
     </div>
+  )
+}
+
+// ============================ KPI Card ============================
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  tone: 'sage' | 'red' | 'navy' | 'teal'
+  hint?: string
+}) {
+  const toneClasses: Record<typeof tone, string> = {
+    sage: 'from-brand-sage-soft to-brand-sage-soft/30 text-brand-sage border-brand-sage/30',
+    red: 'from-brand-red-soft to-brand-red-soft/30 text-brand-red border-brand-red/30',
+    navy: 'from-brand-navy-soft to-brand-navy-soft/30 text-brand-navy border-brand-navy/30',
+    teal: 'from-brand-teal-soft to-brand-teal-soft/30 text-brand-teal border-brand-teal/30',
+  }
+  return (
+    <div
+      className={`shadow-finsm hover:shadow-finmd rounded-xl border bg-gradient-to-br p-3 transition-shadow ${toneClasses[tone]}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider opacity-80">
+          {label}
+        </span>
+        <span className="opacity-70">{icon}</span>
+      </div>
+      <div className="num text-foreground mt-2 text-lg font-bold leading-tight">{value}</div>
+      {hint ? <p className="text-muted-foreground mt-1 text-[10px]">{hint}</p> : null}
+    </div>
+  )
+}
+
+// ============================ ReportCard ============================
+
+function ReportCard({
+  title,
+  subtitle,
+  icon,
+  tone,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  icon: React.ReactNode
+  tone: 'navy' | 'teal' | 'sage'
+  children: React.ReactNode
+}) {
+  const headerClass: Record<typeof tone, string> = {
+    navy: 'from-brand-navy via-brand-navy/95 to-brand-navy-deep',
+    teal: 'from-brand-teal via-brand-teal/95 to-brand-teal-deep',
+    sage: 'from-brand-sage via-brand-sage/95 to-brand-navy',
+  }
+  return (
+    <section className="border-border bg-card shadow-finmd overflow-hidden rounded-xl border">
+      <div
+        className={`flex items-center gap-2.5 bg-gradient-to-r px-4 py-3 text-white ${headerClass[tone]}`}
+      >
+        <span className="rounded-md bg-white/15 p-1.5">{icon}</span>
+        <div>
+          <h3 className="text-sm font-bold tracking-tight">{title}</h3>
+          {subtitle ? <p className="text-[11px] text-white/75">{subtitle}</p> : null}
+        </div>
+      </div>
+      <div className="overflow-x-auto">{children}</div>
+    </section>
+  )
+}
+
+// ============================ ReportTable ============================
+
+function ReportTable({
+  year,
+  months,
+  currentMonthIdx,
+  rows,
+  currency,
+  collapsed,
+  onToggle,
+  t,
+}: {
+  year: number
+  months: number[]
+  currentMonthIdx: number
+  rows: CellRow[]
+  currency: string
+  collapsed: Set<string>
+  onToggle: (key: string) => void
+  t: (k: string) => string
+}) {
+  const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
+  return (
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr className="bg-brand-navy text-white">
+          <th
+            rowSpan={2}
+            className="bg-brand-navy sticky left-0 z-30 min-w-[220px] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
+          >
+            {t('finance.report.col_row')}
+          </th>
+          <th
+            colSpan={2}
+            className="bg-brand-navy/95 border-l border-white/10 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
+          >
+            {t('finance.report.col_total')}
+          </th>
+          {months.map((m) => (
+            <th
+              key={m}
+              colSpan={2}
+              className={`min-w-[140px] border-l border-white/10 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                m === currentMonthIdx
+                  ? 'bg-brand-yellow/30 text-brand-navy-deep'
+                  : 'bg-brand-navy/95'
+              }`}
+            >
+              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
+            </th>
+          ))}
+        </tr>
+        <tr className="bg-brand-navy/90 text-white/85">
+          <th className="bg-brand-navy/90 border-l border-white/10 px-2 py-1 text-right text-[9px] font-medium uppercase">
+            {t('finance.report.col_plan')}
+          </th>
+          <th className="bg-brand-navy/90 px-2 py-1 text-right text-[9px] font-medium uppercase">
+            {t('finance.report.col_fact')}
+          </th>
+          {months.map((m) => (
+            <Fragment key={m}>
+              <th
+                className={`border-l border-white/10 px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                  m === currentMonthIdx
+                    ? 'bg-brand-yellow/25 text-brand-navy-deep'
+                    : 'bg-brand-navy/90'
+                }`}
+              >
+                {t('finance.report.col_plan')}
+              </th>
+              <th
+                className={`px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                  m === currentMonthIdx
+                    ? 'bg-brand-yellow/25 text-brand-navy-deep'
+                    : 'bg-brand-navy/90'
+                }`}
+              >
+                {t('finance.report.col_fact')}
+              </th>
+            </Fragment>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, idx) => {
+          const hasGroup = !!row.groupKey
+          const isCollapsed = hasGroup && collapsed.has(row.groupKey!)
+          const groupBg = groupRowBg(row.color, row.bold)
+          const accentBorder = row.bold ? accentLeftBorder(row.color) : ''
+          return (
+            <tr
+              key={`${row.label}-${idx}`}
+              className={`border-border/40 hover:bg-muted/40 group border-t transition-colors ${groupBg} ${
+                hasGroup ? 'cursor-pointer' : ''
+              } ${!row.bold && idx % 2 === 1 ? 'bg-muted/10' : ''}`}
+              onClick={hasGroup ? () => onToggle(row.groupKey!) : undefined}
+            >
+              <td
+                className={`text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-2 ${
+                  row.bold ? 'font-bold' : 'font-medium'
+                } ${groupBg || 'bg-card'} ${accentBorder}`}
+                style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  {hasGroup ? (
+                    isCollapsed ? (
+                      <ChevronRight
+                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
+                        strokeWidth={2.2}
+                      />
+                    ) : (
+                      <ChevronDown
+                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
+                        strokeWidth={2.2}
+                      />
+                    )
+                  ) : null}
+                  <span className={row.bold ? '' : 'text-muted-foreground'}>{row.label}</span>
+                </span>
+              </td>
+              {/* Итого План | Факт */}
+              <td
+                className={`num bg-brand-navy/[0.04] border-brand-navy/15 border-l px-2 py-2 text-right ${
+                  row.bold ? 'font-bold' : 'font-medium'
+                } ${colorClass(row.color)}`}
+              >
+                {formatPF(yearTotal(row.values), currency)}
+              </td>
+              <td
+                className={`num bg-brand-navy/[0.04] px-2 py-2 text-right ${
+                  row.bold ? 'font-bold' : 'font-medium'
+                } ${colorClass(row.color)}`}
+              >
+                {formatPF(yearTotal(row.factValues ?? []), currency)}
+              </td>
+              {row.values.map((plan, mi) => {
+                const fact = row.factValues?.[mi] ?? 0
+                const isCurrent = mi === currentMonthIdx
+                return (
+                  <Fragment key={mi}>
+                    <td
+                      className={`num border-border/40 border-l px-2 py-2 text-right ${
+                        row.bold ? 'font-semibold' : ''
+                      } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-brand-yellow/8' : ''}`}
+                    >
+                      {formatPF(plan, currency)}
+                    </td>
+                    <td
+                      className={`num px-2 py-2 text-right ${row.bold ? 'font-semibold' : ''} ${colorClass(
+                        row.color,
+                        'fact',
+                      )} ${isCurrent ? 'bg-brand-yellow/8' : ''}`}
+                    >
+                      {formatPF(fact, currency)}
+                    </td>
+                  </Fragment>
+                )
+              })}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 
@@ -647,7 +815,6 @@ function sumTaxesCents(s: FinancialSettings): number {
 }
 
 function sumInvestmentsCents(s: FinancialSettings): number {
-  // Инвестиции — единоразовые. Используем amount как есть (не делим на period).
   return s.investments.items
     .filter((i) => !i.archived)
     .reduce((acc, i) => acc + (i.amount_cents ?? 0), 0)
@@ -671,22 +838,46 @@ function formatNumberSafe(v: number, currency: string): string {
   return formatCurrency(v, currency)
 }
 
-/** Plan/Fact cell formatter — пустые ячейки показываем как «—». */
 function formatPF(v: number, currency: string): string {
   return v === 0 ? '—' : formatCurrency(v, currency)
 }
 
-function colorClass(color: 'navy' | 'sage' | 'destructive' | 'muted' | undefined): string {
-  return color === 'navy'
-    ? 'text-foreground'
-    : color === 'sage'
-      ? 'text-brand-sage-deep'
-      : color === 'destructive'
-        ? 'text-destructive'
-        : 'text-foreground'
+/** Цвет текста в основной (label) колонке + Итого. */
+function colorClass(color: RowColor | undefined, kind?: 'plan' | 'fact'): string {
+  // План — всегда чуть тише (muted), Факт — насыщеннее
+  if (kind === 'plan') {
+    if (color === 'destructive') return 'text-brand-red/85'
+    if (color === 'sage') return 'text-brand-sage/85'
+    if (color === 'teal') return 'text-brand-teal/85'
+    if (color === 'navy') return 'text-brand-navy/85'
+    return 'text-muted-foreground'
+  }
+  if (color === 'destructive') return 'text-brand-red'
+  if (color === 'sage') return 'text-brand-sage'
+  if (color === 'teal') return 'text-brand-teal'
+  if (color === 'navy') return 'text-brand-navy'
+  return 'text-foreground'
 }
 
-/** Нормализация имени категории/параметра для match'инга План/Факт. */
+/** Подсветка фона строки-секции (только bold). */
+function groupRowBg(color: RowColor | undefined, bold: boolean | undefined): string {
+  if (!bold) return ''
+  if (color === 'sage') return 'bg-brand-sage-soft/50'
+  if (color === 'destructive') return 'bg-brand-red-soft/40'
+  if (color === 'teal') return 'bg-brand-teal-soft/40'
+  if (color === 'navy') return 'bg-brand-navy-soft/40'
+  return 'bg-muted/30'
+}
+
+/** Цветной акцент слева у bold-строк (как «полоска категории»). */
+function accentLeftBorder(color: RowColor | undefined): string {
+  if (color === 'sage') return 'border-l-[3px] border-l-brand-sage'
+  if (color === 'destructive') return 'border-l-[3px] border-l-brand-red'
+  if (color === 'teal') return 'border-l-[3px] border-l-brand-teal'
+  if (color === 'navy') return 'border-l-[3px] border-l-brand-navy'
+  return ''
+}
+
 function normName(s: string | null | undefined): string {
   return (s ?? '').trim().toLowerCase()
 }
@@ -694,10 +885,6 @@ function normName(s: string | null | undefined): string {
 /**
  * Строит строки отчёта из items[] секции с учётом иерархии (parent_id).
  * Корневые позиции рендерятся на уровне `baseIndent`, дочерние — +1.
- *
- * @param sign      Знак значения (+1 для доходов, -1 для расходов).
- * @param onlyInMonth Если задан — позиция показывается только в этом месяце
- *                    (для investments — единоразовые расходы).
  */
 function buildItemsRows(
   items: ParameterItem[],
@@ -706,10 +893,6 @@ function buildItemsRows(
   onlyInMonth: number | null = null,
   factsForLabel?: (label: string) => number[],
 ) {
-  // Архивные параметры тоже рендерим, чтобы их не пропадало в отчёте если в
-  // каком-то месяце по ним был факт (т.е. их удалили из справочника, но они
-  // были в истории). Помечаем (архив) в лейбле, значения у архивных = 0
-  // (план не считается, факт берётся из expenses по совпадению label).
   const byParent = new Map<string | null, ParameterItem[]>()
   for (const it of items) {
     const key = it.parent_id ?? null
@@ -759,21 +942,11 @@ function buildFlowRows(settings: FinancialSettings, factsForLabel?: (label: stri
   return buildItemsRows(settings.flows.items, 1, -1, null, factsForLabel)
 }
 
-/**
- * Подразбивка «Прочие доходы» по категориям справочника с учётом иерархии.
- * factMap: category_id → number[12] за каждый месяц.
- */
 function buildOtherIncomeCategoryRows(
   categories: { id: string; name: string; parent_id: string | null; is_archived: boolean }[],
   factMap: Map<string, number[]>,
   t: (k: string) => string,
-): Array<{
-  label: string
-  values: number[]
-  factValues: number[]
-  indent: number
-  parentGroupKey: string
-}> {
+): CellRow[] {
   const byParent = new Map<string | null, typeof categories>()
   for (const c of categories) {
     const k = c.parent_id ?? null
@@ -782,13 +955,7 @@ function buildOtherIncomeCategoryRows(
     byParent.set(k, arr)
   }
   const zeros = Array.from({ length: 12 }, () => 0)
-  const rows: Array<{
-    label: string
-    values: number[]
-    factValues: number[]
-    indent: number
-    parentGroupKey: string
-  }> = []
+  const rows: CellRow[] = []
   function pushNode(node: (typeof categories)[number], indent: number) {
     const fact = factMap.get(node.id) ?? zeros.slice()
     const label = node.is_archived ? `${node.name} (архив)` : node.name
@@ -804,7 +971,6 @@ function buildOtherIncomeCategoryRows(
   }
   const roots = byParent.get(null) ?? []
   for (const r of roots) pushNode(r, 2)
-  // Дополнительно: other_incomes без category_id → виртуальная «Без категории».
   const noneFact = factMap.get('__none__')
   if (noneFact && noneFact.some((v) => v !== 0)) {
     rows.push({
@@ -819,8 +985,12 @@ function buildOtherIncomeCategoryRows(
 }
 
 /**
- * Баланс per-month — реальные значения где известны (Деньги, Накопленная
- * прибыль, Запасы); остальные — константа из item.amount_cents.
+ * Баланс per-month: реальные значения для preset_key (Деньги / Накопленная
+ * прибыль / Запасы), остальные позиции = константа amount_cents.
+ *
+ * Каждый корневой узел (Активы / Пассивы) делается сворачиваемой группой:
+ * groupKey = `balance_root_${preset_key || id}`, потомки получают
+ * parentGroupKey = тот же ключ.
  */
 function buildBalanceRows(
   items: ParameterItem[],
@@ -828,7 +998,7 @@ function buildBalanceRows(
   _runningEndOfMonth: number[],
   periodSaldoByMonth: number[],
   inventory: Array<{ current_stock?: number; cost_per_unit_cents?: number | null }>,
-): Array<{ label: string; values: number[]; factValues?: number[]; indent: number }> {
+): CellRow[] {
   const months = Array.from({ length: 12 }, (_, i) => i)
   const moneyByMonth = months.map((m) => {
     let sum = 0
@@ -858,27 +1028,34 @@ function buildBalanceRows(
     byParent.set(k, arr)
   }
   const zeros = Array.from({ length: 12 }, () => 0)
-  const rows: Array<{
-    label: string
-    values: number[]
-    factValues?: number[]
-    indent: number
-  }> = []
-  function pushNode(node: ParameterItem, indent: number) {
+  const rows: CellRow[] = []
+  function pushNode(node: ParameterItem, indent: number, rootKey: string | null) {
+    const isRoot = indent === 0
+    const myKey = isRoot ? `balance_root_${node.preset_key || node.id}` : rootKey
     const planConst = node.amount_cents ?? 0
     const planArr = months.map(() => planConst)
     const computed = node.preset_key ? computedByKey.get(node.preset_key) : undefined
-    const label = node.archived ? `${node.label || '—'} (архив)` : node.label || '—'
+    const baseLabel = node.label || '—'
+    const label = node.archived ? `${baseLabel} (архив)` : baseLabel
+    const color: RowColor | undefined = isRoot
+      ? node.preset_key === 'balance_liabilities'
+        ? 'destructive'
+        : 'navy'
+      : undefined
     rows.push({
       label,
       values: planArr,
       factValues: computed ?? zeros.slice(),
       indent,
+      bold: isRoot,
+      color,
+      groupKey: isRoot ? (myKey ?? undefined) : undefined,
+      parentGroupKey: !isRoot ? (rootKey ?? undefined) : undefined,
     })
     const children = byParent.get(node.id) ?? []
-    for (const c of children) pushNode(c, indent + 1)
+    for (const c of children) pushNode(c, indent + 1, myKey)
   }
   const roots = byParent.get(null) ?? []
-  for (const r of roots) pushNode(r, 1)
+  for (const r of roots) pushNode(r, 0, null)
   return rows
 }
