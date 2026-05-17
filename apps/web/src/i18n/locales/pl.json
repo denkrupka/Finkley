@@ -333,7 +333,7 @@
   "team": {
     "title": "Zespół",
     "subtitle": "Zaproś księgową, asystenta lub specjalistów do salonu. Każdy widzi tylko tyle danych, ile potrzebuje do swojej pracy.",
-    "back_to_settings": "← Wróć do ustawień",
+    "back_to_settings": "Wróć do ustawień",
     "members_title": "Aktualni członkowie",
     "pending_title": "Wysłane zaproszenia",
     "empty": "Na razie jesteś jedynym członkiem.",
@@ -1025,7 +1025,7 @@
   "integrations": {
     "title": "Integracje z platformami rezerwacji",
     "subtitle": "Podłącz swoje konto — wizyty, klienci i usługi będą synchronizować się automatycznie. Nie trzeba niczego wpisywać ręcznie.",
-    "back_to_settings": "← Wróć do ustawień",
+    "back_to_settings": "Wróć do ustawień",
     "not_connected": "Niepodłączone",
     "connect": "Podłącz",
     "connect_title": "Podłącz {{name}}",
@@ -1191,7 +1191,7 @@
   "import": {
     "title": "Import wizyt z CSV",
     "subtitle": "Wgraj plik, dopasuj kolumny do pól Finkley, sprawdź podgląd i uruchom. Duplikaty (jeśli wgrasz ten sam plik ponownie) zostaną pominięte automatycznie.",
-    "back_to_settings": "← Wróć do ustawień",
+    "back_to_settings": "Wróć do ustawień",
     "upload": {
       "title": "Wgraj plik CSV",
       "subtitle": "Obsługujemy pliki z Booksy, Fresha, Treatwell i zwykłe tabele Excel/Google Sheets wyeksportowane do CSV.",

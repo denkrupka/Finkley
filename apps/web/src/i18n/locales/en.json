@@ -333,7 +333,7 @@
   "team": {
     "title": "Team",
     "subtitle": "Invite teammates: an accountant, an assistant, specialists. Each one sees exactly the data they need for their job.",
-    "back_to_settings": "← Back to settings",
+    "back_to_settings": "Back to settings",
     "members_title": "Current members",
     "pending_title": "Pending invitations",
     "empty": "You're the only member so far.",
@@ -1024,7 +1024,7 @@
   "integrations": {
     "title": "Booking platform integrations",
     "subtitle": "Connect your account — visits, clients and services will sync automatically. No manual entry.",
-    "back_to_settings": "← Back to settings",
+    "back_to_settings": "Back to settings",
     "not_connected": "Not connected",
     "connect": "Connect",
     "connect_title": "Connect {{name}}",
@@ -1190,7 +1190,7 @@
   "import": {
     "title": "Import visits from CSV",
     "subtitle": "Upload a file, map columns to Finkley fields, check the preview and run. Duplicates (if you reupload the same file) are skipped automatically.",
-    "back_to_settings": "← Back to settings",
+    "back_to_settings": "Back to settings",
     "upload": {
       "title": "Upload a CSV file",
       "subtitle": "Files from Booksy, Fresha, Treatwell and standard Excel/Google Sheets exports as CSV are supported.",

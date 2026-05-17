@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Check,
   ChevronRight,
   Facebook,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -153,7 +154,14 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   return (
     <div className={embedded ? '' : 'flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12'}>
       {embedded ? null : (
-        <div className="mb-5">
+        <div className="mb-5 flex flex-col gap-2">
+          <Link
+            to={`/${salonId}/settings`}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+          >
+            <ArrowLeft className="size-3.5" strokeWidth={2} />
+            {t('integrations.back_to_settings')}
+          </Link>
           <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
             {t('integrations.title')}
           </h1>

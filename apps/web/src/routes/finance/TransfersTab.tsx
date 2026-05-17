@@ -109,7 +109,10 @@ function TransfersHistoryBlock({ salonId, currency }: { salonId: string; currenc
     setPage(1)
   }, [period, fromFilter, toFilter, userFilter, minAmount, maxAmount])
 
-  const range = periodToRange(period)
+  // ВАЖНО: для `kind: 'recent'` `periodToRange` возвращает `new Date()` —
+  // новые объекты каждый рендер → query key churns → React Query infinite
+  // refetch loop. Memo по `period` стабилизирует диапазон.
+  const range = useMemo(() => periodToRange(period), [period])
   const minCents = minAmount ? Math.round(Number(minAmount.replace(',', '.')) * 100) : null
   const maxCents = maxAmount ? Math.round(Number(maxAmount.replace(',', '.')) * 100) : null
 
