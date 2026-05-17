@@ -14,7 +14,8 @@ import {
   type ParameterItem,
 } from '@/hooks/useFinancialSettings'
 import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
-import { useOtherIncomes } from '@/hooks/useOtherIncomes'
+import { useInventoryItems } from '@/hooks/useInventory'
+import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
 import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -74,6 +75,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
+  const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: true })
+  const { data: otherIncomeCats = [] } = useOtherIncomeCategories(salonId, {
+    includeArchived: true,
+  })
   // Per-register monthly running balances (на конец каждого месяца).
   const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
@@ -132,6 +137,40 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   function factsForLabel(label: string): number[] {
     return factByLabel.get(normName(label)) ?? Array.from({ length: 12 }, () => 0)
   }
+
+  // Retail-продажи группируются по категории inventory_items.category — для
+  // подразбивки строки «Продажи» в Доходы. Если visit без inventory_item_id —
+  // попадает в виртуальную категорию «(без категории)».
+  const retailByCategory = useMemo<Map<string, number[]>>(() => {
+    const invCatById = new Map<string, string>()
+    for (const i of inventory) invCatById.set(i.id, i.category || '')
+    const map = new Map<string, number[]>()
+    for (const v of retailSales) {
+      const d = new Date(v.visit_at)
+      if (d.getFullYear() !== year) continue
+      const cat = v.inventory_item_id ? (invCatById.get(v.inventory_item_id) ?? '') : ''
+      const key = cat.trim() || t('finance.report.uncategorized')
+      const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
+      arr[d.getMonth()]! += v.amount_cents - v.discount_cents + v.tip_cents
+      map.set(key, arr)
+    }
+    return map
+  }, [retailSales, inventory, year, t])
+
+  // Other incomes группируются по category_id с учётом иерархии (parent_id из
+  // other_income_categories) — для подразбивки строки «Прочие доходы».
+  const otherIncomesByCategory = useMemo<Map<string, number[]>>(() => {
+    const map = new Map<string, number[]>()
+    for (const oi of otherIncomes) {
+      const d = new Date(oi.income_at)
+      if (d.getFullYear() !== year) continue
+      const key = oi.category_id ?? '__none__'
+      const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
+      arr[d.getMonth()]! += oi.amount_cents
+      map.set(key, arr)
+    }
+    return map
+  }, [otherIncomes, year])
 
   // ===== Сборка отчёта =====
   type CellRow = {
@@ -237,7 +276,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       factValues: retailByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
+      groupKey: 'retail',
     },
+    // Подразбивка «Продажи» по категориям склада (inventory_items.category)
+    ...Array.from(retailByCategory.entries()).map(([cat, factArr]) => ({
+      label: cat,
+      values: constant(0),
+      factValues: factArr,
+      indent: 2,
+      parentGroupKey: 'retail',
+    })),
     {
       label: t('finance.report.revenue_other'),
       // План прочих доходов = сумма items в other_income (× 1 в месяц).
@@ -245,7 +293,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       factValues: monthly.map((m) => m.otherIncome),
       indent: 1,
       parentGroupKey: 'revenue',
+      groupKey: 'revenue_other',
     },
+    // Подразбивка «Прочие доходы» по категориям из справочника «Доходы»
+    // (с иерархией через parent_id).
+    ...buildOtherIncomeCategoryRows(otherIncomeCats, otherIncomesByCategory, t),
 
     // ===== Расходы (из вкладки «Расходы» справочника) =====
     {
@@ -347,10 +399,13 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'navy',
       groupKey: 'balance',
     },
-    ...buildItemsRows(settings.balance.items, 1, 1).map((r) => ({
-      ...r,
-      parentGroupKey: 'balance',
-    })),
+    ...buildBalanceRows(
+      settings.balance.items,
+      monthlyRegBalances,
+      runningEndOfMonth,
+      periodSaldoByMonth,
+      inventory,
+    ).map((r) => ({ ...r, parentGroupKey: 'balance' })),
   ]
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
@@ -702,4 +757,128 @@ function buildInvestmentRows(
 
 function buildFlowRows(settings: FinancialSettings, factsForLabel?: (label: string) => number[]) {
   return buildItemsRows(settings.flows.items, 1, -1, null, factsForLabel)
+}
+
+/**
+ * Подразбивка «Прочие доходы» по категориям справочника с учётом иерархии.
+ * factMap: category_id → number[12] за каждый месяц.
+ */
+function buildOtherIncomeCategoryRows(
+  categories: { id: string; name: string; parent_id: string | null; is_archived: boolean }[],
+  factMap: Map<string, number[]>,
+  t: (k: string) => string,
+): Array<{
+  label: string
+  values: number[]
+  factValues: number[]
+  indent: number
+  parentGroupKey: string
+}> {
+  const byParent = new Map<string | null, typeof categories>()
+  for (const c of categories) {
+    const k = c.parent_id ?? null
+    const arr = byParent.get(k) ?? []
+    arr.push(c)
+    byParent.set(k, arr)
+  }
+  const zeros = Array.from({ length: 12 }, () => 0)
+  const rows: Array<{
+    label: string
+    values: number[]
+    factValues: number[]
+    indent: number
+    parentGroupKey: string
+  }> = []
+  function pushNode(node: (typeof categories)[number], indent: number) {
+    const fact = factMap.get(node.id) ?? zeros.slice()
+    const label = node.is_archived ? `${node.name} (архив)` : node.name
+    rows.push({
+      label,
+      values: zeros.slice(),
+      factValues: fact,
+      indent,
+      parentGroupKey: 'revenue_other',
+    })
+    const children = byParent.get(node.id) ?? []
+    for (const c of children) pushNode(c, indent + 1)
+  }
+  const roots = byParent.get(null) ?? []
+  for (const r of roots) pushNode(r, 2)
+  // Дополнительно: other_incomes без category_id → виртуальная «Без категории».
+  const noneFact = factMap.get('__none__')
+  if (noneFact && noneFact.some((v) => v !== 0)) {
+    rows.push({
+      label: t('finance.report.uncategorized'),
+      values: zeros.slice(),
+      factValues: noneFact,
+      indent: 2,
+      parentGroupKey: 'revenue_other',
+    })
+  }
+  return rows
+}
+
+/**
+ * Баланс per-month — реальные значения где известны (Деньги, Накопленная
+ * прибыль, Запасы); остальные — константа из item.amount_cents.
+ */
+function buildBalanceRows(
+  items: ParameterItem[],
+  monthlyRegBalances: Map<string, number[]>,
+  _runningEndOfMonth: number[],
+  periodSaldoByMonth: number[],
+  inventory: Array<{ current_stock?: number; cost_per_unit_cents?: number | null }>,
+): Array<{ label: string; values: number[]; factValues?: number[]; indent: number }> {
+  const months = Array.from({ length: 12 }, (_, i) => i)
+  const moneyByMonth = months.map((m) => {
+    let sum = 0
+    for (const arr of monthlyRegBalances.values()) sum += arr[m] ?? 0
+    return sum
+  })
+  const accumulatedProfit = periodSaldoByMonth.reduce<number[]>((acc, s, i) => {
+    const prev = i === 0 ? 0 : (acc[i - 1] ?? 0)
+    acc.push(prev + s)
+    return acc
+  }, [])
+  const stockCents = inventory.reduce((acc, i) => {
+    const stock = i.current_stock ?? 0
+    const cost = i.cost_per_unit_cents ?? 0
+    return acc + Math.round(stock * cost)
+  }, 0)
+  const computedByKey = new Map<string, number[]>([
+    ['balance_assets_money', moneyByMonth],
+    ['balance_liabilities_profit', accumulatedProfit],
+    ['balance_assets_stock', months.map(() => stockCents)],
+  ])
+  const byParent = new Map<string | null, ParameterItem[]>()
+  for (const it of items) {
+    const k = it.parent_id ?? null
+    const arr = byParent.get(k) ?? []
+    arr.push(it)
+    byParent.set(k, arr)
+  }
+  const zeros = Array.from({ length: 12 }, () => 0)
+  const rows: Array<{
+    label: string
+    values: number[]
+    factValues?: number[]
+    indent: number
+  }> = []
+  function pushNode(node: ParameterItem, indent: number) {
+    const planConst = node.amount_cents ?? 0
+    const planArr = months.map(() => planConst)
+    const computed = node.preset_key ? computedByKey.get(node.preset_key) : undefined
+    const label = node.archived ? `${node.label || '—'} (архив)` : node.label || '—'
+    rows.push({
+      label,
+      values: planArr,
+      factValues: computed ?? zeros.slice(),
+      indent,
+    })
+    const children = byParent.get(node.id) ?? []
+    for (const c of children) pushNode(c, indent + 1)
+  }
+  const roots = byParent.get(null) ?? []
+  for (const r of roots) pushNode(r, 1)
+  return rows
 }

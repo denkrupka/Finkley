@@ -301,6 +301,8 @@ export function RetailSaleWizard({
           discount_cents: l.lineDiscountCents + shareOfExtra,
           payment_method: paymentMethod,
           cash_register_id: cashRegisterId || null,
+          // Для финотчёта (разбивка «Продажи» по категориям склада).
+          inventory_item_id: l.inventoryItemId,
           comment: lineNotes || null,
           kind: 'retail',
           status: 'paid',

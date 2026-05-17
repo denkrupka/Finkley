@@ -31,6 +31,8 @@ export type VisitRow = {
   duration_min: number | null
   /** ID кассы (financial_settings.cash_registers.items[]) — image #82. */
   cash_register_id: string | null
+  /** Для retail-визитов — товар со склада (для финотчёта по категориям). */
+  inventory_item_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -105,6 +107,8 @@ export type CreateVisitInput = {
   duration_min?: number | null
   /** ID кассы из financial_settings.cash_registers.items[] (image #82). */
   cash_register_id?: string | null
+  /** Для retail-визитов — товар со склада (категория попадает в финотчёт). */
+  inventory_item_id?: string | null
 }
 
 export function useCreateVisit(salonId: string | undefined) {
@@ -146,6 +150,7 @@ export function useCreateVisit(salonId: string | undefined) {
         kind: input.kind ?? 'visit',
         duration_min: input.duration_min ?? null,
         cash_register_id: input.cash_register_id ?? null,
+        inventory_item_id: input.inventory_item_id ?? null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
