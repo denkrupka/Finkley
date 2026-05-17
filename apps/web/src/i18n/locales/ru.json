@@ -3149,16 +3149,16 @@
     "payments_placeholder": "Платёжный календарь — раздел в разработке.",
     "cashflow": {
       "title": "Движение денежных средств",
-      "total_inflow": "Приход",
+      "total_inflow": "Доход",
       "total_outflow": "Расход",
-      "total_net": "Нетто",
+      "total_net": "Прибыль",
       "empty": "За этот период движений не было.",
       "col_date": "Дата",
-      "col_inflow": "Приход",
+      "col_inflow": "Доход",
       "col_outflow": "Расход",
-      "col_net": "Нетто",
+      "col_net": "Прибыль",
       "col_running": "Накопит.",
-      "legend_inflow": "Приход",
+      "legend_inflow": "Доход",
       "legend_outflow": "Расход",
       "legend_running": "Накопит. остаток",
       "no_tx_for_day": "Нет детализированных транзакций за этот день",
@@ -3227,7 +3227,7 @@
     "kpi": {
       "revenue": "Выручка",
       "expense": "Расходы",
-      "profit": "Чистая прибыль",
+      "profit": "Прибыль",
       "vs_prev": "к прошлому периоду"
     },
     "staff": {

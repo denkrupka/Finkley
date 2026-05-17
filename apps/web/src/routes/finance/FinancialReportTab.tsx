@@ -7,9 +7,6 @@ import {
   FileSpreadsheet,
   Landmark,
   Printer,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
   Wallet,
 } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
@@ -249,11 +246,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }, [])
 
   // Aggregate KPIs за год (для верхней панели)
-  const totalRevenueYear = revenueByMonth.reduce((s, v) => s + v, 0)
-  const totalExpensesYear = expensesTotalByMonth.reduce((s, v) => s + v, 0)
-  const totalSaldoYear = periodSaldoByMonth.reduce((s, v) => s + v, 0)
-  const endOfYearBalance = runningEndOfMonth[11] ?? openingBalance
-
   const rows: CellRow[] = [
     {
       label: t('finance.report.revenue'),
@@ -447,35 +439,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         </div>
       </header>
 
-      {/* ===== KPI STRIP ===== */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard
-          icon={<TrendingUp className="size-4" strokeWidth={1.8} />}
-          label={t('finance.report.revenue')}
-          value={formatCurrency(totalRevenueYear, currency)}
-          tone="sage"
-        />
-        <KpiCard
-          icon={<TrendingDown className="size-4" strokeWidth={1.8} />}
-          label={t('finance.report.expenses_total')}
-          value={formatCurrency(totalExpensesYear, currency)}
-          tone="red"
-        />
-        <KpiCard
-          icon={<Sparkles className="size-4" strokeWidth={1.8} />}
-          label={t('finance.report.period_saldo')}
-          value={formatCurrency(totalSaldoYear, currency)}
-          tone={totalSaldoYear >= 0 ? 'sage' : 'red'}
-        />
-        <KpiCard
-          icon={<Wallet className="size-4" strokeWidth={1.8} />}
-          label={t('finance.report.current_balance')}
-          value={formatCurrency(openingBalance, currency)}
-          tone="navy"
-          hint={t('finance.report.end_balance') + ': ' + formatCurrency(endOfYearBalance, currency)}
-        />
-      </div>
-
       {/* ===== UNIFIED TABLE CARD =====
           Один контейнер overflow-auto: горизонтальный скролл синхронизируется
           автоматически между блоками, плюс sticky-thead работает относительно
@@ -531,64 +494,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             />
           </BlockSection>
         </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================ KPI Card ============================
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  tone,
-  hint,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  tone: 'sage' | 'red' | 'navy' | 'teal'
-  hint?: string
-}) {
-  // Минималистичная карточка: белый фон, узкая цветная полоска слева как
-  // акцент. Палитра — приглушённая (Nord-like): emerald / rose / amber /
-  // slate. Без тёмных navy-фонов.
-  const accent: Record<typeof tone, { stripe: string; text: string; iconBg: string }> = {
-    sage: {
-      stripe: 'bg-emerald-500',
-      text: 'text-emerald-700',
-      iconBg: 'bg-emerald-50 text-emerald-600',
-    },
-    red: {
-      stripe: 'bg-rose-400',
-      text: 'text-rose-600',
-      iconBg: 'bg-rose-50 text-rose-500',
-    },
-    navy: {
-      stripe: 'bg-slate-700',
-      text: 'text-slate-800',
-      iconBg: 'bg-slate-100 text-slate-700',
-    },
-    teal: {
-      stripe: 'bg-amber-400',
-      text: 'text-amber-700',
-      iconBg: 'bg-amber-50 text-amber-600',
-    },
-  }
-  const a = accent[tone]
-  return (
-    <div className="shadow-finsm hover:shadow-finmd flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow">
-      <div className={`w-1 shrink-0 ${a.stripe}`} />
-      <div className="flex-1 p-3">
-        <div className="flex items-center gap-2">
-          <span className={`rounded-md p-1.5 ${a.iconBg}`}>{icon}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            {label}
-          </span>
-        </div>
-        <div className={`num mt-2 text-lg font-bold leading-tight ${a.text}`}>{value}</div>
-        {hint ? <p className="mt-1 text-[10px] text-slate-500">{hint}</p> : null}
       </div>
     </div>
   )
@@ -674,7 +579,7 @@ function CashRegistersTable({
   t: (k: string) => string
 }) {
   return (
-    <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+    <table className="border-collapse text-xs" style={{ minWidth: 2300 }}>
       <SharedColGroup months={months} />
       <thead>
         <tr className="bg-slate-100 text-slate-600">
@@ -759,7 +664,7 @@ function ReportTable({
 }) {
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
   return (
-    <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+    <table className="border-collapse text-xs" style={{ minWidth: 2300 }}>
       <SharedColGroup months={months} />
       <thead>
         {/* Row 1 — Параметр (rowSpan=2) + месяцы (colSpan=2). Sticky top=44px
