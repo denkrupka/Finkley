@@ -76,10 +76,9 @@ test.describe('Admin UI flow', () => {
     await expect(page.getByText('Демо закончилось').first()).toBeVisible()
     await expect(page.getByText('Неактивны').first()).toBeVisible()
     await expect(page.getByText('Всего пользователей').first()).toBeVisible()
-    // Графики
+    // Графики (Визиты по месяцам удалён в более позднем коммите)
     await expect(page.getByRole('heading', { name: 'Новые салоны по месяцам' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Новые пользователи по месяцам' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Визиты по месяцам' })).toBeVisible()
   })
 
   test('переход по табам Салоны / Пользователи / Фидбек / Блог не падает', async ({ page }) => {
@@ -89,7 +88,7 @@ test.describe('Admin UI flow', () => {
     // прогонов — admin-stats action=salons тяжелый (KPI 12 мес по каждому).
     // Поднимаем timeout до 45 секунд для admin-страниц.
     await page.goto('/admin/salons')
-    await expect(page.getByRole('columnheader', { name: /Ср\. выручка/ }).first()).toBeVisible({
+    await expect(page.getByRole('columnheader', { name: /Доход портала/ }).first()).toBeVisible({
       timeout: 45_000,
     })
 

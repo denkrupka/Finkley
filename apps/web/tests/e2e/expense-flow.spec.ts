@@ -65,6 +65,11 @@ test.describe('Expense flow', () => {
     })
     expect(rpcErr).toBeNull()
 
+    // Скипаем onboarding-tour чтобы не перехватывал клики.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('finkley:tour:dismissed', '1')
+    })
+
     // Логин в UI
     await page.goto('/login')
     await page.getByTestId('login-form').waitFor()
@@ -81,9 +86,10 @@ test.describe('Expense flow', () => {
     await page.getByTestId('add-expense').click()
     await expect(page.getByRole('dialog')).toBeVisible()
 
-    // Заполнить форму: категория «Аренда», сумма 250
+    // Заполнить форму: категория «Аренда», сумма 250, описание обязательно
     await page.getByTestId('exp-cat').click()
     await page.getByRole('option', { name: 'Аренда' }).click()
+    await page.getByTestId('exp-description').fill('E2E ренда офиса')
     await page.getByTestId('exp-amount').fill('250')
     await page.getByTestId('exp-submit').click()
 

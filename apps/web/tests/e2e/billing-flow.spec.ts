@@ -81,7 +81,8 @@ test.describe('Billing checkout flow', () => {
     await page.getByTestId('login-submit').click()
     await page.waitForURL(new RegExp(`/${salonId}/dashboard`), { timeout: 15_000 })
 
-    await page.goto(`/${salonId}/settings`)
+    // BillingButtons под /settings?tab=billing
+    await page.goto(`/${salonId}/settings?tab=billing`)
     const checkoutBtn = page.getByTestId('billing-checkout')
     await expect(checkoutBtn).toBeVisible({ timeout: 10_000 })
 

@@ -76,6 +76,11 @@ test.describe('Visit flow', () => {
     expect(rpcErr).toBeNull()
     expect(typeof salonId).toBe('string')
 
+    // Скипаем onboarding-tour чтобы не перехватывал клики по FAB.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('finkley:tour:dismissed', '1')
+    })
+
     // 3. Логин в UI и переход на дашборд салона
     await page.goto('/login')
     await page.getByTestId('login-form').waitFor()
@@ -87,12 +92,14 @@ test.describe('Visit flow', () => {
     // На дашборде — приветствие, прибыль €0
     await expect(page.getByRole('heading', { level: 1, name: /Привет/i })).toBeVisible()
 
-    // 4. FAB открывает Quick Entry
-    await page.getByTestId('fab-add-visit-desktop').click()
+    // 4. FAB → меню → Визит → Quick Entry
+    await page.getByTestId('fab-add').click()
+    await page.getByTestId('fab-action-visit').click()
     await expect(page.getByRole('dialog')).toBeVisible()
 
     // 5. Заполняем форму: мастер уже выбран (только Аня), услугу выбрать
-    await page.getByTestId('qe-service').click()
+    //    через SearchableSelect (combobox с aria-label «Услуга»)
+    await page.getByRole('combobox', { name: /^Услуга/i }).click()
     await page.getByRole('option', { name: /Женская стрижка/i }).click()
     // Сумма автоподставится из default_price (40), не трогаем
     // Способ оплаты — оставляем default (Карта)
@@ -106,8 +113,8 @@ test.describe('Visit flow', () => {
     // 7. Прибыль обновилась — должна появиться сумма 40,00 € (ru-RU EUR формат)
     await expect(page.getByText(/40,00\s?€/).first()).toBeVisible({ timeout: 10_000 })
 
-    // 8. Идём на /visits — там запись
-    await page.goto(`/${salonId}/visits`)
+    // 8. Идём на /visits?view=list — там запись (?view=list, иначе календарь)
+    await page.goto(`/${salonId}/visits?view=list`)
     await expect(page.getByTestId('visit-row').first()).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText(/Аня/).first()).toBeVisible()
   })

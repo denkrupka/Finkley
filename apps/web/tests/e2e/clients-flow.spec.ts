@@ -66,6 +66,11 @@ test.describe('Clients flow', () => {
     })
     expect(rpcErr).toBeNull()
 
+    // Скипаем onboarding-tour чтобы не перехватывал клики по FAB.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('finkley:tour:dismissed', '1')
+    })
+
     // Логин
     await page.goto('/login')
     await page.getByTestId('login-form').waitFor()
@@ -74,24 +79,24 @@ test.describe('Clients flow', () => {
     await page.getByTestId('login-submit').click()
     await page.waitForURL(new RegExp(`/${salonId}/dashboard`), { timeout: 15_000 })
 
-    // /clients
-    await page.goto(`/${salonId}/clients`)
-    await expect(page.getByRole('heading', { level: 1, name: /Клиенты/i })).toBeVisible()
-    await expect(page.getByText(/Пока ни одного клиента/i)).toBeVisible()
+    // Клиенты переехали в /reports?tab=clients&client=list
+    await page.goto(`/${salonId}/reports?tab=clients&client=list`)
+    // Дождаться загрузки списка через testid'ы (UI без отдельного h1)
+    await page.getByTestId('add-client-reports').waitFor({ timeout: 10_000 })
 
     // Создать клиента
-    await page.getByTestId('add-client').click()
+    await page.getByTestId('add-client-reports').click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByTestId('cl-name').fill('Анна Ковальская')
-    await page.locator('#cl-phone').fill('+48600123456')
+    // Телефон: страна-Select оставляем по умолчанию (+48 PL), вводим только локальную часть
+    await page.locator('#cl-phone-local').fill('600123456')
     await page.locator('#cl-email').fill('anna@example.com')
     await page.getByTestId('cl-submit').click()
 
     await expect(page.getByText('Клиент добавлен').first()).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('dialog')).not.toBeVisible()
 
-    // В списке
-    const row = page.getByTestId('client-row').first()
+    // В списке (на ClientsAnalyticsTab testid строки — client-row-reports)
+    const row = page.getByTestId('client-row-reports').first()
     await expect(row).toContainText('Анна Ковальская')
 
     // Drawer открывается кликом
@@ -104,23 +109,26 @@ test.describe('Clients flow', () => {
 
     // FAB → Quick Entry → выбор клиента
     await page.goto(`/${salonId}/dashboard`)
-    await page.getByTestId('fab-add-visit-desktop').click()
+    // FAB на десктопе/мобильной — один и тот же testid fab-add (открывает popover-меню),
+    // дальше выбираем «Визит» через fab-action-visit.
+    await page.getByTestId('fab-add').click()
+    await page.getByTestId('fab-action-visit').click()
     await expect(page.getByRole('dialog')).toBeVisible()
 
-    // Услуга
-    await page.getByTestId('qe-service').click()
-    await page.getByRole('option', { name: /Женская стрижка/i }).click()
-
-    // Клиент
+    // Клиент — ClientPicker с testId=qe-client
     await page.getByTestId('qe-client').click()
     await page.getByRole('button', { name: /Анна Ковальская/i }).click()
+
+    // Услуга — SearchableSelect (role=combobox с aria-label «Услуга»)
+    await page.getByRole('combobox', { name: /^Услуга/i }).click()
+    await page.getByRole('option', { name: /Женская стрижка/i }).click()
 
     await page.getByTestId('qe-submit').click()
     await expect(page.getByText(/Визит добавлен/).first()).toBeVisible({ timeout: 10_000 })
 
-    // /clients → drawer → история должна содержать визит
-    await page.goto(`/${salonId}/clients`)
-    await page.getByTestId('client-row').first().click()
+    // Список клиентов → drawer → история должна содержать визит
+    await page.goto(`/${salonId}/reports?tab=clients&client=list`)
+    await page.getByTestId('client-row-reports').first().click()
     await expect(page.getByTestId('client-history-row').first()).toBeVisible({ timeout: 10_000 })
   })
 })
