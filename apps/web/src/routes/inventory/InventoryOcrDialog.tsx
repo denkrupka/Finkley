@@ -135,7 +135,7 @@ export function InventoryOcrDialog({ open, onClose, salonId, currency }: Props) 
         }
       }}
     >
-      <DialogContent className="w-[min(900px,95vw)] max-w-none">
+      <DialogContent className="w-[min(1100px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="text-secondary size-5" strokeWidth={2} />

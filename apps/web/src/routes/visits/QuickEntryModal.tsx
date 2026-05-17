@@ -43,6 +43,7 @@ import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
 import { ClientPicker } from '@/routes/clients/ClientPicker'
+import { VisitReceiptModal } from '@/routes/visits/VisitReceiptModal'
 
 const STAFF_PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#FBE5C0']
 
@@ -161,6 +162,7 @@ export function QuickEntryModal({
    */
   const [linesTouched, setLinesTouched] = useState(false)
   const [gateOpen, setGateOpen] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -562,8 +564,9 @@ export function QuickEntryModal({
             overflow-y-auto — на ноутбучных экранах <800px она схлопнется
             корректно, но в обычном кейсе скролла не будет. */}
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? t('visits.form.title_edit') : t('visits.form.title_new')}
+          <DialogTitle className="flex items-center gap-2">
+            <span>{isEdit ? t('visits.form.title_edit') : t('visits.form.title_new')}</span>
+            {isEdit && editVisit ? <StatusBadge status={editVisit.status} /> : null}
           </DialogTitle>
         </DialogHeader>
 
@@ -905,24 +908,33 @@ export function QuickEntryModal({
               >
                 {t('common.delete')}
               </Button>
-              <Button
-                type="button"
-                size="lg"
-                onClick={() => {
-                  // Per-user касса: гейт ДО открытия ChargeView. Если смены
-                  // нет — toast'имся и не вызываем handleSubmit, чтобы юзер
-                  // не вбивал суммы зря.
-                  if (!hasOpenShift) {
-                    setGateOpen(true)
-                    return
-                  }
-                  void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()
-                }}
-                disabled={updateVisit.isPending || deleteVisit.isPending}
-                data-testid="qe-charge"
-              >
-                {updateVisit.isPending ? t('common.loading') : t('visits.detail.charge')}
-              </Button>
+              {editVisit?.status === 'paid' ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => setReceiptOpen(true)}
+                  data-testid="qe-receipt"
+                >
+                  {t('visits.form.show_receipt')}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => {
+                    // Per-user касса: гейт ДО открытия ChargeView.
+                    if (!hasOpenShift) {
+                      setGateOpen(true)
+                      return
+                    }
+                    void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()
+                  }}
+                  disabled={updateVisit.isPending || deleteVisit.isPending}
+                  data-testid="qe-charge"
+                >
+                  {updateVisit.isPending ? t('common.loading') : t('visits.detail.charge')}
+                </Button>
+              )}
             </>
           ) : (
             <Button
@@ -944,6 +956,29 @@ export function QuickEntryModal({
         action="visit_charge"
         onShiftOpened={() => void form.handleSubmit((v) => onSubmit(v, { thenCharge: true }))()}
       />
+      <VisitReceiptModal
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        salonId={salonId}
+        visit={editVisit ?? null}
+      />
     </Dialog>
+  )
+}
+
+function StatusBadge({ status }: { status: 'paid' | 'pending' | 'cancelled' }) {
+  const { t } = useTranslation()
+  const cls =
+    status === 'paid'
+      ? 'bg-brand-sage-soft text-brand-sage-deep'
+      : status === 'cancelled'
+        ? 'bg-red-100 text-red-700'
+        : 'bg-amber-100 text-amber-800'
+  return (
+    <span
+      className={`${cls} rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider`}
+    >
+      {t(`visits.status.${status}`)}
+    </span>
   )
 }

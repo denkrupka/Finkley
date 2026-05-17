@@ -92,7 +92,7 @@ export function StocktakeDialog({ open, onClose, salonId, items }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:!max-w-[640px]">
+      <DialogContent className="w-[min(820px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardCheck className="text-brand-teal size-5" strokeWidth={1.8} />
@@ -106,7 +106,7 @@ export function StocktakeDialog({ open, onClose, salonId, items }: Props) {
             <p className="text-muted-foreground text-sm">{t('inventory.empty')}</p>
           ) : (
             <>
-              <div className="text-muted-foreground grid grid-cols-[1fr_120px_120px_60px] gap-2 text-xs font-bold uppercase">
+              <div className="text-muted-foreground grid grid-cols-[minmax(0,1fr)_100px_120px_60px] gap-2 text-xs font-bold uppercase">
                 <span>{t('inventory.stocktake.col_name')}</span>
                 <span className="text-right">{t('inventory.stocktake.col_system')}</span>
                 <span className="text-right">{t('inventory.stocktake.col_actual')}</span>
@@ -117,9 +117,9 @@ export function StocktakeDialog({ open, onClose, salonId, items }: Props) {
                 return (
                   <div
                     key={it.id}
-                    className="border-border grid grid-cols-[1fr_120px_120px_60px] items-center gap-2 border-b py-2 last:border-b-0"
+                    className="border-border grid grid-cols-[minmax(0,1fr)_100px_120px_60px] items-center gap-2 border-b py-2 last:border-b-0"
                   >
-                    <span className="text-foreground truncate text-sm">
+                    <span className="text-foreground min-w-0 break-words text-sm">
                       {it.name} <span className="text-muted-foreground text-xs">{it.unit}</span>
                     </span>
                     <span className="num text-muted-foreground text-right text-sm">

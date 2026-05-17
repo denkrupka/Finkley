@@ -28,8 +28,10 @@ import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
-import { useVisits } from '@/hooks/useVisits'
+import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
+import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
 
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'online' | 'mixed' | null
 
@@ -87,6 +89,8 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
 
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
+  const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  const [openSaleDetail, setOpenSaleDetail] = useState<VisitRow | null>(null)
   const range = periodToRange(period)
   const from = format(range.start, 'yyyy-MM-dd')
   const to = format(range.end, 'yyyy-MM-dd')
@@ -167,10 +171,26 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
   }, [visits, otherIncomes, expenses, staff, clients, expenseCategories, incomeCategories])
 
   function navigateToEntity(tx: Tx) {
-    if (tx.source === 'visit') navigate(`/${salonId}/income?tab=visits`)
-    else if (tx.source === 'retail') navigate(`/${salonId}/income?tab=sales`)
-    else if (tx.source === 'other_income') navigate(`/${salonId}/income?tab=other`)
-    else navigate(`/${salonId}/expenses`)
+    // Клик по строке ДДС → открыть карточку конкретной записи, а не список.
+    if (tx.source === 'visit') {
+      const v = visits.find((x) => x.id === tx.id)
+      if (v) {
+        setEditingVisit(v)
+        return
+      }
+      navigate(`/${salonId}/income?tab=visits`)
+    } else if (tx.source === 'retail') {
+      const v = visits.find((x) => x.id === tx.id)
+      if (v) {
+        setOpenSaleDetail(v)
+        return
+      }
+      navigate(`/${salonId}/income?tab=sales`)
+    } else if (tx.source === 'other_income') {
+      navigate(`/${salonId}/income?tab=other`)
+    } else {
+      navigate(`/${salonId}/expenses`)
+    }
   }
 
   const { totalIn, totalOut, totalNet, withRunning } = useMemo(() => {
@@ -455,6 +475,29 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
           </table>
         )}
       </div>
+
+      <QuickEntryModal
+        open={editingVisit !== null}
+        onOpenChange={(v) => !v && setEditingVisit(null)}
+        salonId={salonId}
+        currency={currency}
+        editVisit={editingVisit}
+        onChargeRequest={(visitId) => {
+          const v = visits.find((x) => x.id === visitId)
+          if (v) {
+            setEditingVisit(null)
+            setOpenSaleDetail(v)
+          }
+        }}
+      />
+
+      <VisitDetailModal
+        visit={openSaleDetail}
+        onClose={() => setOpenSaleDetail(null)}
+        salonId={salonId}
+        currency={currency}
+        initialView="charge"
+      />
     </div>
   )
 }

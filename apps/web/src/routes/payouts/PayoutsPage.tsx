@@ -13,12 +13,7 @@ import {
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
-import {
-  useIsPeriodClosed,
-  usePayoutsHistory,
-  usePayoutsPreview,
-  type PayoutPreviewRow,
-} from '@/hooks/usePayouts'
+import { usePayoutsHistory, usePayoutsPreview, type PayoutPreviewRow } from '@/hooks/usePayouts'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 const SCHEME_KEY: Record<PayoutPreviewRow['payout_scheme'], string> = {
@@ -43,7 +38,6 @@ export function PayoutsPage() {
   const periodEnd = format(range.end, 'yyyy-MM-dd')
 
   const { data: rows = [], isLoading } = usePayoutsPreview(salonId, periodStart, periodEnd)
-  const { data: isClosed = false } = useIsPeriodClosed(salonId, periodStart, periodEnd)
   const { data: history = [] } = usePayoutsHistory(salonId)
   const { data: advancesByStaff = new Map<string, number>() } = usePayrollAdvances(
     salonId,
@@ -61,12 +55,6 @@ export function PayoutsPage() {
     }
     return { revenue, payout, advances, remaining: payout - advances }
   }, [rows, advancesByStaff])
-
-  // Период закрывать можно только если он завершился (последний день < сегодня)
-  const isPeriodFinished = useMemo(() => {
-    const today = new Date()
-    return range.end < new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  }, [range.end])
 
   if (!salonId) return null
 
@@ -167,17 +155,6 @@ export function PayoutsPage() {
             </div>
           </div>
         ) : null}
-      </div>
-
-      <div className="mt-4 print:hidden">
-        {/* Подсказка о статусе периода */}
-        <p className="text-muted-foreground text-xs">
-          {isClosed
-            ? t('payouts.status_closed')
-            : !isPeriodFinished
-              ? t('payouts.status_active')
-              : t('payouts.status_ready')}
-        </p>
       </div>
 
       {history.length > 0 ? (
