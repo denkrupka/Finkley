@@ -284,7 +284,7 @@ function App() {
         />
         <Route
           path="settings/investments-catalog"
-          element={<Navigate to="../settings/finance-catalog?tab=incomes" replace />}
+          element={<Navigate to="../settings/finance-catalog?tab=investments" replace />}
         />
         <Route
           path="settings/cash-registers"

@@ -1,4 +1,4 @@
-import { ArrowLeft, Coins, Plus, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Coins, Plus, Trash2, Undo2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
@@ -160,107 +160,111 @@ export function CategoriesSection({ salonId }: { salonId: string }) {
         ) : categories.length === 0 ? (
           <div className="text-muted-foreground p-6 text-sm">{t('income_categories.empty')}</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-border bg-muted/10 border-b">
-              <tr className="text-muted-foreground text-left text-[11px] font-semibold uppercase tracking-wider">
-                <th className="px-4 py-3">{t('income_categories.col_name')}</th>
-                <th className="w-32 px-4 py-3 text-center">{t('income_categories.col_status')}</th>
-                <th className="w-28 px-4 py-3 text-right" />
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {categories.map((c) => {
-                const isEditing = editingId === c.id
-                return (
-                  <tr
-                    key={c.id}
-                    className={cn(
-                      'hover:bg-muted/30 transition-colors',
-                      c.is_archived && 'opacity-60',
-                    )}
-                  >
-                    <td className="px-4 py-2">
-                      {isEditing ? (
-                        <Input
-                          autoFocus
-                          value={draftName}
-                          onChange={(e) => setDraftName(e.target.value)}
-                          onBlur={saveEdit}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              saveEdit()
-                            } else if (e.key === 'Escape') {
-                              setEditingId(null)
-                            }
-                          }}
-                          className="h-8 max-w-[360px]"
-                          disabled={update.isPending}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEdit(c.id, c.name)}
-                          className="text-foreground hover:text-primary text-left text-sm font-semibold"
-                          disabled={c.is_archived}
-                        >
-                          {c.name}
-                        </button>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/10 text-muted-foreground border-border text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold">
+                    {t('income_categories.col_name')}
+                  </th>
+                  <th className="w-28 px-4 py-2 text-right font-semibold" />
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c) => {
+                  const isEditing = editingId === c.id
+                  return (
+                    <tr
+                      key={c.id}
+                      className={cn(
+                        'border-border/40 hover:bg-muted/20 border-t transition-colors',
+                        c.is_archived && 'opacity-60',
                       )}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      {c.is_system ? (
-                        <span className="bg-brand-teal-soft text-brand-teal-deep rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-                          {t('income_categories.badge_system')}
-                        </span>
-                      ) : c.is_archived ? (
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-                          {t('income_categories.badge_archived')}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        {c.is_archived ? (
-                          <>
+                    >
+                      <td className="px-4 py-1.5 align-middle">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="w-3.5 shrink-0">
+                            <ChevronRight
+                              className="text-muted-foreground/40 size-3.5"
+                              strokeWidth={2}
+                            />
+                          </span>
+                          <Input
+                            value={isEditing ? draftName : c.name}
+                            onFocus={() => {
+                              if (!isEditing && !c.is_archived) startEdit(c.id, c.name)
+                            }}
+                            onChange={(e) => setDraftName(e.target.value)}
+                            onBlur={() => {
+                              if (isEditing) saveEdit()
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                ;(e.target as HTMLInputElement).blur()
+                              } else if (e.key === 'Escape') {
+                                setEditingId(null)
+                              }
+                            }}
+                            disabled={c.is_archived || update.isPending}
+                            className="h-8 min-w-0 flex-1 text-sm"
+                          />
+                          {c.is_system ? (
+                            <span className="bg-brand-teal-soft text-brand-teal-deep shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                              {t('income_categories.badge_system')}
+                            </span>
+                          ) : null}
+                          {c.is_archived ? (
+                            <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                              {t('income_categories.badge_archived')}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-1.5 text-right align-middle">
+                        <div className="inline-flex items-center gap-1">
+                          {!c.is_archived ? (
                             <button
                               type="button"
-                              onClick={() => restore(c.id)}
-                              title={t('income_categories.restore')}
-                              className="text-secondary hover:text-secondary/80 grid size-7 place-items-center rounded-md"
+                              onClick={() => archive(c.id)}
+                              title={t('income_categories.archive')}
+                              aria-label={t('income_categories.archive')}
+                              className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
                             >
-                              <Undo2 className="size-3.5" strokeWidth={2} />
+                              <Trash2 className="size-3.5" strokeWidth={1.8} />
                             </button>
-                            {!c.is_system ? (
+                          ) : (
+                            <>
                               <button
                                 type="button"
-                                onClick={() => destroy(c.id, c.name, c.is_system)}
-                                title={t('income_categories.delete_permanent')}
-                                className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md font-semibold"
+                                onClick={() => restore(c.id)}
+                                title={t('income_categories.restore')}
+                                aria-label={t('income_categories.restore')}
+                                className="text-secondary hover:text-secondary/80 grid size-7 place-items-center rounded-md"
                               >
-                                ✕
+                                <Undo2 className="size-3.5" strokeWidth={2} />
                               </button>
-                            ) : null}
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => archive(c.id)}
-                            title={t('income_categories.archive')}
-                            className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
-                          >
-                            <Trash2 className="size-3.5" strokeWidth={1.8} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                              {!c.is_system ? (
+                                <button
+                                  type="button"
+                                  onClick={() => destroy(c.id, c.name, c.is_system)}
+                                  title={t('income_categories.delete_permanent')}
+                                  aria-label={t('income_categories.delete_permanent')}
+                                  className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md font-semibold"
+                                >
+                                  ✕
+                                </button>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
