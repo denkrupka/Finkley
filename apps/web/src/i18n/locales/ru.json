@@ -1756,6 +1756,7 @@
     },
     "picker": {
       "no_client": "Без клиента",
+      "new_client": "Новый клиент",
       "search_placeholder": "Имя или телефон",
       "create_with": "+ Создать «{{name}}»",
       "clear": "Очистить выбор"

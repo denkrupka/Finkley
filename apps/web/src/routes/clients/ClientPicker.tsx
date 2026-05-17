@@ -129,6 +129,18 @@ export function ClientPicker({ salonId, value, onChange, placeholder, testId }: 
           </div>
 
           <div className="max-h-72 overflow-y-auto px-1 pb-1">
+            {/* «+ Новый клиент» — всегда первой позицией, открывает полную
+                модалку создания. С prefill из query (если что-то набрано). */}
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="text-secondary hover:bg-muted/40 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold"
+              data-testid="cl-picker-new"
+            >
+              <Plus className="size-4" strokeWidth={2} />
+              {t('clients.picker.new_client')}
+            </button>
+
             {/* No-client option — всегда доступно */}
             <button
               type="button"

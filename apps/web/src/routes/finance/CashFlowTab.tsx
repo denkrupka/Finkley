@@ -30,8 +30,10 @@ import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+import type { ExpenseRow } from '@/hooks/useExpenses'
 
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'online' | 'mixed' | null
 
@@ -91,6 +93,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
   const [openSaleDetail, setOpenSaleDetail] = useState<VisitRow | null>(null)
+  const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
   const range = periodToRange(period)
   const from = format(range.start, 'yyyy-MM-dd')
   const to = format(range.end, 'yyyy-MM-dd')
@@ -189,6 +192,12 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
     } else if (tx.source === 'other_income') {
       navigate(`/${salonId}/income?tab=other`)
     } else {
+      // expense — открываем модалку расхода в режиме редактирования.
+      const e = expenses.find((x) => x.id === tx.id)
+      if (e) {
+        setEditingExpense(e)
+        return
+      }
       navigate(`/${salonId}/expenses`)
     }
   }
@@ -498,6 +507,14 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         currency={currency}
         initialView="charge"
         onBackFromCharge={(v) => setEditingVisit(v)}
+      />
+
+      <ExpenseFormModal
+        open={editingExpense !== null}
+        onOpenChange={(v) => !v && setEditingExpense(null)}
+        salonId={salonId}
+        currency={currency}
+        expense={editingExpense}
       />
     </div>
   )
