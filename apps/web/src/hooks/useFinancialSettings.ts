@@ -56,8 +56,13 @@ export type FinancialSettings = {
   variable: ParameterSection
   other_income: ParameterSection
   taxes: ParameterSection
+  /** Инвестиционная деятельность. Дети группируются под root-items
+   *  с preset_key='investments_in' (Поступления) и 'investments_out' (Выбытия). */
   investments: ParameterSection
+  /** Финансовая деятельность (было `flows`). Группы — 'flows_in' / 'flows_out'. */
   flows: ParameterSection
+  /** Баланс предприятия. Группы — 'balance_assets' (АКТИВЫ) / 'balance_liabilities' (ПАССИВЫ). */
+  balance: ParameterSection
 }
 
 // ---------------------------------------------------------------------------
@@ -129,21 +134,103 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   },
   investments: {
     items: [
-      preset('franchise_fee', 'Паушальный взнос', { amount_cents: 0 }),
-      preset('first_rent', 'Первый месяц аренды', { amount_cents: 0 }),
-      preset('renovation', 'Ремонт помещения', { amount_cents: 0 }),
-      preset('equipment', 'Оборудование', { amount_cents: 0 }),
-      preset('inventory', 'Стартовый инвентарь', { amount_cents: 0 }),
-      preset('furniture', 'Мебель', { amount_cents: 0 }),
-      preset('other', 'Прочие инвестиции', { amount_cents: 0 }),
+      // Группа Поступления
+      preset('investments_in', 'Поступления'),
+      preset('investments_in_os_sale', 'Поступления от продажи ОС', {
+        amount_cents: 0,
+        parent_id: 'investments_in',
+      }),
+      preset('investments_in_other', 'Прочие поступления по ИД', {
+        amount_cents: 0,
+        parent_id: 'investments_in',
+      }),
+      // Группа Выбытия
+      preset('investments_out', 'Выбытия'),
+      preset('investments_out_os_buy', 'Покупка ОС', {
+        amount_cents: 0,
+        parent_id: 'investments_out',
+      }),
+      preset('investments_out_leasing', 'Лизинг', {
+        amount_cents: 0,
+        parent_id: 'investments_out',
+      }),
+      preset('investments_out_other_biz', 'Вложения в другие бизнесы', {
+        amount_cents: 0,
+        parent_id: 'investments_out',
+      }),
     ],
   },
   flows: {
     items: [
-      preset('dividends', 'Дивиденды (вывод собственника)', { amount_cents: 0, period: 'month' }),
-      preset('owner_contributions', 'Вклад собственника', { amount_cents: 0, period: 'month' }),
-      preset('owner_loans', 'Займ собственника', { amount_cents: 0, period: 'month' }),
-      preset('other_loans', 'Прочие займы', { amount_cents: 0, period: 'month' }),
+      // Поступления — приходы от собственника / займы
+      preset('flows_in', 'Поступления'),
+      preset('flows_in_owner_contrib', 'Вклад собственника', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_in',
+      }),
+      preset('flows_in_owner_loan', 'Займ собственника', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_in',
+      }),
+      preset('flows_in_other_loans', 'Прочие займы', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_in',
+      }),
+      // Выбытия — дивиденды и обслуживание долга
+      preset('flows_out', 'Выбытия'),
+      preset('flows_out_dividends', 'Дивиденды', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_out',
+      }),
+      preset('flows_out_credit_body', 'Тело кредита', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_out',
+      }),
+      preset('flows_out_credit_interest', 'Проценты по кредиту', {
+        amount_cents: 0,
+        period: 'month',
+        parent_id: 'flows_out',
+      }),
+    ],
+  },
+  balance: {
+    items: [
+      // АКТИВЫ
+      preset('balance_assets', 'АКТИВЫ'),
+      preset('balance_assets_os', 'ОС, НМА', { amount_cents: 0, parent_id: 'balance_assets' }),
+      preset('balance_assets_stock', 'Запасы', { amount_cents: 0, parent_id: 'balance_assets' }),
+      preset('balance_assets_money', 'Деньги', { amount_cents: 0, parent_id: 'balance_assets' }),
+      preset('balance_assets_debt', 'Дебиторская задолженность', {
+        amount_cents: 0,
+        parent_id: 'balance_assets',
+      }),
+      // ПАССИВЫ
+      preset('balance_liabilities', 'ПАССИВЫ'),
+      preset('balance_liabilities_capital', 'Уставной капитал', {
+        amount_cents: 0,
+        parent_id: 'balance_liabilities',
+      }),
+      preset('balance_liabilities_profit', 'Накопленная прибыль', {
+        amount_cents: 0,
+        parent_id: 'balance_liabilities',
+      }),
+      preset('balance_liabilities_loans', 'Кредиты и займы', {
+        amount_cents: 0,
+        parent_id: 'balance_liabilities',
+      }),
+      preset('balance_liabilities_leasing', 'Лизинг', {
+        amount_cents: 0,
+        parent_id: 'balance_liabilities',
+      }),
+      preset('balance_liabilities_creditor', 'Кредиторская задолженность', {
+        amount_cents: 0,
+        parent_id: 'balance_liabilities',
+      }),
     ],
   },
 }
@@ -248,6 +335,9 @@ function mergeWithDefaults(stored: unknown): FinancialSettings {
     },
     flows: {
       items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.flows.items, s.flows),
+    },
+    balance: {
+      items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.balance.items, s.balance),
     },
   }
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Coins, CreditCard, Sprout, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowRightLeft, Coins, CreditCard, Scale, Sprout, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
@@ -7,17 +7,26 @@ import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { CategoriesSection } from './IncomeCategoriesPage'
 import { ParametersCard } from './ParametersCard'
 
-type FinanceCatalogTab = 'expenses' | 'incomes' | 'investments' | 'cash'
+type FinanceCatalogTab = 'expenses' | 'incomes' | 'investments' | 'financing' | 'cash' | 'balance'
 
 const TABS: PageTab<FinanceCatalogTab>[] = [
   { id: 'expenses', labelKey: 'settings.finance_catalog.tabs.expenses', icon: Wallet },
   { id: 'incomes', labelKey: 'settings.finance_catalog.tabs.incomes', icon: Coins },
   { id: 'investments', labelKey: 'settings.finance_catalog.tabs.investments', icon: Sprout },
+  { id: 'financing', labelKey: 'settings.finance_catalog.tabs.financing', icon: ArrowRightLeft },
   { id: 'cash', labelKey: 'settings.finance_catalog.tabs.cash', icon: CreditCard },
+  { id: 'balance', labelKey: 'settings.finance_catalog.tabs.balance', icon: Scale },
 ]
 
 function isTab(v: string | null): v is FinanceCatalogTab {
-  return v === 'expenses' || v === 'incomes' || v === 'investments' || v === 'cash'
+  return (
+    v === 'expenses' ||
+    v === 'incomes' ||
+    v === 'investments' ||
+    v === 'financing' ||
+    v === 'cash' ||
+    v === 'balance'
+  )
 }
 
 /**
@@ -81,8 +90,12 @@ export function FinanceCatalogPage() {
         <CategoriesSection salonId={salonId} />
       ) : active === 'investments' ? (
         <ParametersCard sectionKeys={['investments']} urlKey="inv" />
-      ) : (
+      ) : active === 'financing' ? (
+        <ParametersCard sectionKeys={['flows']} urlKey="fin" />
+      ) : active === 'cash' ? (
         <ParametersCard sectionKeys={['cash_registers']} urlKey="cash" />
+      ) : (
+        <ParametersCard sectionKeys={['balance']} urlKey="bal" />
       )}
     </div>
   )

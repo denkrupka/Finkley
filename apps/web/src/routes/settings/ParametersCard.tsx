@@ -119,6 +119,14 @@ const SECTIONS: SectionDef[] = [
     showPeriod: true,
     icon: ArrowLeftRight,
   },
+  {
+    key: 'balance',
+    titleKey: 'settings.parameters.balance.title',
+    subtitleKey: 'settings.parameters.balance.subtitle',
+    kind: 'money',
+    showPeriod: false,
+    icon: Landmark,
+  },
 ]
 
 const SUB_TABS: PageTab<SectionKey>[] = SECTIONS.map((s) => ({

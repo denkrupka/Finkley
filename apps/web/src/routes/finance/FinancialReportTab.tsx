@@ -16,7 +16,6 @@ import {
 import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
 import { useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
-import { useServices } from '@/hooks/useServices'
 import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
@@ -74,7 +73,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
-  const { data: services = [] } = useServices(salonId)
   // Per-register monthly running balances (на конец каждого месяца).
   const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
@@ -161,16 +159,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     (v, i) => v + (retailByMonth[i] ?? 0) + (otherIncomeByMonth[i] ?? 0),
   )
 
-  // Производственные = ЗП мастера + расходные материалы (план через %, средний
-  // по всем активным услугам — см. ServicePlanningCard).
-  const masterPayout = revenueByMonth.map((rev) =>
-    Math.round((rev * averagePct(services, 'staff_payout', 40)) / 100),
-  )
-  const materials = revenueByMonth.map((rev) =>
-    Math.round((rev * averagePct(services, 'materials', 3)) / 100),
-  )
-  const productionByMonth = masterPayout.map((p, i) => p + (materials[i] ?? 0))
-
   // Переменные (% выручки) — сумма всех items[].pct
   const variableTotalPct = settings.variable.items
     .filter((i) => !i.archived)
@@ -179,8 +167,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
   const fixedByMonth = constant(fixedTotalMonthly)
   const taxesByMonth = constant(taxesTotalMonthly)
-  const expensesTotalByMonth = productionByMonth.map(
-    (p, i) => p + (variableByMonth[i] ?? 0) + (fixedByMonth[i] ?? 0) + (taxesByMonth[i] ?? 0),
+  const expensesTotalByMonth = months.map(
+    (i) => (variableByMonth[i] ?? 0) + (fixedByMonth[i] ?? 0) + (taxesByMonth[i] ?? 0),
   )
 
   const currentMonthIdx = new Date().getMonth()
@@ -200,11 +188,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }, [])
 
   const rows: CellRow[] = [
-    {
-      label: t('finance.report.section_operating'),
-      values: revenueByMonth.map((r, i) => r - (expensesTotalByMonth[i] ?? 0)),
-      bold: true,
-    },
+    // ===== Доходы (статика) =====
     {
       label: t('finance.report.revenue'),
       values: revenueByMonth,
@@ -231,33 +215,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'revenue',
     },
 
+    // ===== Расходы (из вкладки «Расходы» справочника) =====
     {
       label: t('finance.report.expenses_total'),
       values: expensesTotalByMonth.map((v) => -v),
       bold: true,
       color: 'destructive',
+      groupKey: 'expenses',
     },
-    {
-      label: t('finance.report.production'),
-      values: productionByMonth.map((v) => -v),
-      indent: 1,
-      bold: true,
-      color: 'destructive',
-      groupKey: 'production',
-    },
-    {
-      label: t('finance.report.production_master_payout'),
-      values: masterPayout.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'production',
-    },
-    {
-      label: t('finance.report.production_materials'),
-      values: materials.map((v) => -v),
-      indent: 2,
-      parentGroupKey: 'production',
-    },
-
     {
       label: t('finance.report.variable'),
       values: variableByMonth.map((v) => -v),
@@ -265,6 +230,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'destructive',
       groupKey: 'variable',
+      parentGroupKey: 'expenses',
     },
     ...settings.variable.items
       .filter((i) => !i.archived)
@@ -274,7 +240,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         indent: 2,
         parentGroupKey: 'variable',
       })),
-
     {
       label: t('finance.report.fixed'),
       values: fixedByMonth.map((v) => -v),
@@ -282,9 +247,9 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'destructive',
       groupKey: 'fixed',
+      parentGroupKey: 'expenses',
     },
     ...buildFixedRows(settings).map((r) => ({ ...r, parentGroupKey: 'fixed' })),
-
     {
       label: t('finance.report.taxes'),
       values: taxesByMonth.map((v) => -v),
@@ -292,12 +257,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'destructive',
       groupKey: 'taxes',
+      parentGroupKey: 'expenses',
     },
     ...buildItemsRows(settings.taxes.items, 2, -1).map((r) => ({
       ...r,
       parentGroupKey: 'taxes',
     })),
 
+    // ===== Инвестиционная деятельность (Поступления/Выбытия из подгрупп) =====
     {
       label: t('finance.report.section_investing'),
       values: investmentsByMonth.map((v) => -v),
@@ -310,6 +277,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'investing',
     })),
 
+    // ===== Финансовая деятельность (Поступления/Выбытия из подгрупп) =====
     {
       label: t('finance.report.section_financing'),
       values: flowsByMonth.map((v) => -v),
@@ -319,6 +287,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     },
     ...buildFlowRows(settings).map((r) => ({ ...r, parentGroupKey: 'financing' })),
 
+    // ===== Сальдо и остаток =====
     {
       label: t('finance.report.period_saldo'),
       values: periodSaldoByMonth,
@@ -331,6 +300,19 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'navy',
     },
+
+    // ===== Баланс (из новой вкладки справочника) =====
+    {
+      label: t('finance.report.section_balance'),
+      values: constant(0),
+      bold: true,
+      color: 'navy',
+      groupKey: 'balance',
+    },
+    ...buildItemsRows(settings.balance.items, 1, 1).map((r) => ({
+      ...r,
+      parentGroupKey: 'balance',
+    })),
   ]
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
@@ -551,20 +533,6 @@ function sumCashRegistersCents(s: FinancialSettings): number {
 
 function sumSectionMonthly(items: ParameterItem[]): number {
   return items.filter((i) => !i.archived).reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
-}
-
-/** Средневзвешенный % из услуг (для plan-vs-fact на ЗП мастера / расходные материалы). */
-function averagePct<T extends { staff_payout_pct?: number; materials_pct?: number }>(
-  services: T[],
-  kind: 'staff_payout' | 'materials',
-  fallback: number,
-): number {
-  if (services.length === 0) return fallback
-  const sum = services.reduce(
-    (s, sv) => s + ((kind === 'staff_payout' ? sv.staff_payout_pct : sv.materials_pct) ?? fallback),
-    0,
-  )
-  return sum / services.length
 }
 
 function formatNumberSafe(v: number, currency: string): string {
