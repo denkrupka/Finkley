@@ -1,11 +1,11 @@
 import { endOfMonth, format, startOfMonth, startOfYear } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { useExpenses } from '@/hooks/useExpenses'
+import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
   monthlyEquivalentCents,
@@ -73,6 +73,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
+  const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   // Per-register monthly running balances (на конец каждого месяца).
   const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
@@ -109,10 +110,35 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return buckets
   }, [visits, retailSales, otherIncomes, expenses, year])
 
+  // Факт по category-label (вариант A: matching by name). Карта label →
+  // массив 12 элементов (cents за месяц), nfp = case-insensitive trim.
+  const factByLabel = useMemo<Map<string, number[]>>(() => {
+    const catNameById = new Map<string, string>()
+    for (const c of expenseCategories) catNameById.set(c.id, normName(c.name))
+    const map = new Map<string, number[]>()
+    for (const e of expenses) {
+      if (!e.category_id) continue
+      const name = catNameById.get(e.category_id)
+      if (!name) continue
+      const d = new Date(e.expense_at)
+      if (d.getFullYear() !== year) continue
+      const arr = map.get(name) ?? Array.from({ length: 12 }, () => 0)
+      arr[d.getMonth()]! += e.amount_cents
+      map.set(name, arr)
+    }
+    return map
+  }, [expenses, expenseCategories, year])
+
+  function factsForLabel(label: string): number[] {
+    return factByLabel.get(normName(label)) ?? Array.from({ length: 12 }, () => 0)
+  }
+
   // ===== Сборка отчёта =====
   type CellRow = {
     label: string
-    values: number[] // 12 чисел в копейках/центах (положительные = inflow, отрицательные = outflow)
+    values: number[] // ПЛАН — 12 чисел в копейках/центах (доход +, расход -)
+    /** ФАКТ — 12 чисел. Если не задан — отрисуем как 0. */
+    factValues?: number[]
     bold?: boolean
     indent?: number
     color?: 'navy' | 'sage' | 'destructive' | 'muted'
@@ -191,26 +217,32 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     // ===== Доходы (статика) =====
     {
       label: t('finance.report.revenue'),
-      values: revenueByMonth,
+      // План выручки сейчас не строим (нет model'и) — 0. Факт — реальная сумма.
+      values: constant(0),
+      factValues: revenueByMonth,
       bold: true,
       color: 'navy',
       groupKey: 'revenue',
     },
     {
       label: t('finance.report.revenue_services'),
-      values: visitsByMonth,
+      values: constant(0),
+      factValues: visitsByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
     },
     {
       label: t('finance.report.revenue_retail'),
-      values: retailByMonth,
+      values: constant(0),
+      factValues: retailByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
     },
     {
       label: t('finance.report.revenue_other'),
-      values: otherIncomeByMonth,
+      // План прочих доходов = сумма items в other_income (× 1 в месяц).
+      values: constant(otherIncomeMonthly),
+      factValues: monthly.map((m) => m.otherIncome),
       indent: 1,
       parentGroupKey: 'revenue',
     },
@@ -249,7 +281,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       groupKey: 'fixed',
       parentGroupKey: 'expenses',
     },
-    ...buildFixedRows(settings).map((r) => ({ ...r, parentGroupKey: 'fixed' })),
+    ...buildFixedRows(settings, factsForLabel).map((r) => ({
+      ...r,
+      parentGroupKey: 'fixed',
+    })),
     {
       label: t('finance.report.taxes'),
       values: taxesByMonth.map((v) => -v),
@@ -259,7 +294,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       groupKey: 'taxes',
       parentGroupKey: 'expenses',
     },
-    ...buildItemsRows(settings.taxes.items, 2, -1).map((r) => ({
+    ...buildItemsRows(settings.taxes.items, 2, -1, null, factsForLabel).map((r) => ({
       ...r,
       parentGroupKey: 'taxes',
     })),
@@ -272,7 +307,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'investing',
     },
-    ...buildInvestmentRows(settings, currentMonthIdx).map((r) => ({
+    ...buildInvestmentRows(settings, currentMonthIdx, factsForLabel).map((r) => ({
       ...r,
       parentGroupKey: 'investing',
     })),
@@ -285,7 +320,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'financing',
     },
-    ...buildFlowRows(settings).map((r) => ({ ...r, parentGroupKey: 'financing' })),
+    ...buildFlowRows(settings, factsForLabel).map((r) => ({
+      ...r,
+      parentGroupKey: 'financing',
+    })),
 
     // ===== Сальдо и остаток =====
     {
@@ -372,23 +410,47 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-xs">
           <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            {/* Двухуровневая шапка: верхняя строка — месяц (colSpan=2),
+                нижняя — План | Факт для каждого месяца. */}
             <tr className="bg-muted">
-              {/* Sticky left header — нужен opaque bg (без /40) и z-30, чтобы
-                  при горизонтальном скролле остальные ячейки шапки уезжали
-                  ПОД него, а не торчали поверх (баг image #20). */}
-              <th className="bg-muted border-border/60 sticky left-0 z-30 min-w-[200px] border-r px-3 py-2 text-left font-semibold">
+              <th
+                rowSpan={2}
+                className="bg-muted border-border/60 sticky left-0 z-30 min-w-[200px] border-r px-3 py-2 text-left font-semibold"
+              >
                 {t('finance.report.col_row')}
               </th>
-              <th className="bg-muted px-2 py-2 text-right font-semibold">
+              <th
+                colSpan={2}
+                className="bg-muted border-border/60 border-l px-2 py-2 text-center font-semibold"
+              >
                 {t('finance.report.col_total')}
               </th>
               {months.map((m) => (
                 <th
                   key={m}
-                  className="bg-muted min-w-[70px] px-2 py-2 text-right font-semibold capitalize"
+                  colSpan={2}
+                  className="bg-muted border-border/60 min-w-[140px] border-l px-2 py-2 text-center font-semibold capitalize"
                 >
                   {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
                 </th>
+              ))}
+            </tr>
+            <tr className="bg-muted">
+              <th className="bg-muted border-border/60 border-l px-2 py-1 text-right text-[9px] font-normal">
+                {t('finance.report.col_plan')}
+              </th>
+              <th className="bg-muted px-2 py-1 text-right text-[9px] font-normal">
+                {t('finance.report.col_fact')}
+              </th>
+              {months.map((m) => (
+                <Fragment key={m}>
+                  <th className="bg-muted border-border/60 border-l px-2 py-1 text-right text-[9px] font-normal">
+                    {t('finance.report.col_plan')}
+                  </th>
+                  <th className="bg-muted px-2 py-1 text-right text-[9px] font-normal">
+                    {t('finance.report.col_fact')}
+                  </th>
+                </Fragment>
               ))}
             </tr>
           </thead>
@@ -420,35 +482,50 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
                         <span>{row.label}</span>
                       </span>
                     </td>
+                    {/* Итого План | Факт */}
                     <td
-                      className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                        row.color === 'navy'
-                          ? 'text-foreground'
-                          : row.color === 'sage'
-                            ? 'text-brand-sage-deep'
-                            : row.color === 'destructive'
-                              ? 'text-destructive'
-                              : 'text-foreground'
-                      }`}
+                      className={`num border-border/60 border-l px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${colorClass(row.color)}`}
                     >
-                      {formatNumberSafe(yearTotal(row.values), currency)}
+                      {formatPF(yearTotal(row.values), currency)}
                     </td>
-                    {row.values.map((v, mi) => (
-                      <td
-                        key={mi}
-                        className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
-                          row.color === 'navy'
-                            ? 'text-foreground'
-                            : row.color === 'sage'
-                              ? 'text-brand-sage-deep'
-                              : row.color === 'destructive'
-                                ? 'text-destructive'
-                                : 'text-muted-foreground'
-                        }`}
-                      >
-                        {v === 0 ? '—' : formatNumberSafe(v, currency)}
-                      </td>
-                    ))}
+                    <td
+                      className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${colorClass(row.color)}`}
+                    >
+                      {formatPF(yearTotal(row.factValues ?? []), currency)}
+                    </td>
+                    {row.values.map((plan, mi) => {
+                      const fact = row.factValues?.[mi] ?? 0
+                      return (
+                        <Fragment key={mi}>
+                          <td
+                            className={`num border-border/60 border-l px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
+                              row.color === 'navy'
+                                ? 'text-foreground'
+                                : row.color === 'sage'
+                                  ? 'text-brand-sage-deep'
+                                  : row.color === 'destructive'
+                                    ? 'text-destructive'
+                                    : 'text-muted-foreground'
+                            }`}
+                          >
+                            {formatPF(plan, currency)}
+                          </td>
+                          <td
+                            className={`num px-2 py-1.5 text-right ${row.bold ? 'font-bold' : ''} ${
+                              row.color === 'navy'
+                                ? 'text-foreground'
+                                : row.color === 'sage'
+                                  ? 'text-brand-sage-deep'
+                                  : row.color === 'destructive'
+                                    ? 'text-destructive'
+                                    : 'text-foreground'
+                            }`}
+                          >
+                            {formatPF(fact, currency)}
+                          </td>
+                        </Fragment>
+                      )
+                    })}
                   </tr>
                 )
               })}
@@ -539,6 +616,26 @@ function formatNumberSafe(v: number, currency: string): string {
   return formatCurrency(v, currency)
 }
 
+/** Plan/Fact cell formatter — пустые ячейки показываем как «—». */
+function formatPF(v: number, currency: string): string {
+  return v === 0 ? '—' : formatCurrency(v, currency)
+}
+
+function colorClass(color: 'navy' | 'sage' | 'destructive' | 'muted' | undefined): string {
+  return color === 'navy'
+    ? 'text-foreground'
+    : color === 'sage'
+      ? 'text-brand-sage-deep'
+      : color === 'destructive'
+        ? 'text-destructive'
+        : 'text-foreground'
+}
+
+/** Нормализация имени категории/параметра для match'инга План/Факт. */
+function normName(s: string | null | undefined): string {
+  return (s ?? '').trim().toLowerCase()
+}
+
 /**
  * Строит строки отчёта из items[] секции с учётом иерархии (parent_id).
  * Корневые позиции рендерятся на уровне `baseIndent`, дочерние — +1.
@@ -552,11 +649,12 @@ function buildItemsRows(
   baseIndent: number,
   sign: 1 | -1,
   onlyInMonth: number | null = null,
+  factsForLabel?: (label: string) => number[],
 ) {
   // Архивные параметры тоже рендерим, чтобы их не пропадало в отчёте если в
   // каком-то месяце по ним был факт (т.е. их удалили из справочника, но они
   // были в истории). Помечаем (архив) в лейбле, значения у архивных = 0
-  // (план не считается, факт пока не привязан per-параметр в expenses).
+  // (план не считается, факт берётся из expenses по совпадению label).
   const byParent = new Map<string | null, ParameterItem[]>()
   for (const it of items) {
     const key = it.parent_id ?? null
@@ -564,7 +662,12 @@ function buildItemsRows(
     arr.push(it)
     byParent.set(key, arr)
   }
-  const rows: Array<{ label: string; values: number[]; indent: number }> = []
+  const rows: Array<{
+    label: string
+    values: number[]
+    factValues?: number[]
+    indent: number
+  }> = []
   function pushNode(node: ParameterItem, indent: number) {
     const monthly = node.archived ? 0 : monthlyEquivalentCents(node)
     const values = Array.from({ length: 12 }, (_, m) => {
@@ -575,7 +678,8 @@ function buildItemsRows(
     })
     const baseLabel = node.label || '—'
     const label = node.archived ? `${baseLabel} (архив)` : baseLabel
-    rows.push({ label, values, indent })
+    const fact = factsForLabel ? factsForLabel(baseLabel).map((v) => sign * v) : undefined
+    rows.push({ label, values, factValues: fact, indent })
     const children = byParent.get(node.id) ?? []
     for (const c of children) pushNode(c, indent + 1)
   }
@@ -584,14 +688,18 @@ function buildItemsRows(
   return rows
 }
 
-function buildFixedRows(settings: FinancialSettings) {
-  return buildItemsRows(settings.fixed.items, 2, -1)
+function buildFixedRows(settings: FinancialSettings, factsForLabel?: (label: string) => number[]) {
+  return buildItemsRows(settings.fixed.items, 2, -1, null, factsForLabel)
 }
 
-function buildInvestmentRows(settings: FinancialSettings, currentMonthIdx: number) {
-  return buildItemsRows(settings.investments.items, 1, -1, currentMonthIdx)
+function buildInvestmentRows(
+  settings: FinancialSettings,
+  currentMonthIdx: number,
+  factsForLabel?: (label: string) => number[],
+) {
+  return buildItemsRows(settings.investments.items, 1, -1, currentMonthIdx, factsForLabel)
 }
 
-function buildFlowRows(settings: FinancialSettings) {
-  return buildItemsRows(settings.flows.items, 1, -1)
+function buildFlowRows(settings: FinancialSettings, factsForLabel?: (label: string) => number[]) {
+  return buildItemsRows(settings.flows.items, 1, -1, null, factsForLabel)
 }
