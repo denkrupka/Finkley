@@ -70,3 +70,40 @@ export function useStaff(salonId: string | undefined, opts?: { activeOnly?: bool
     staleTime: 60_000,
   })
 }
+
+/**
+ * Staff-карточки, у которых ещё нет привязки к user (salon_members.staff_id IS
+ * NULL для этого staff.id). Используется в team-invite — выбор существующего
+ * мастера для multi-role «Админ-Мастер» (например, импортированные из Booksy
+ * мастера, которым ещё не выдан логин).
+ */
+export function useUnlinkedStaff(salonId: string | undefined) {
+  return useQuery<StaffRow[]>({
+    queryKey: ['staff', salonId, 'unlinked'],
+    queryFn: async () => {
+      if (!salonId) return []
+      // staff без связи в salon_members. Тащим всех активных, затем фильтруем
+      // на клиенте — у салона до сотни staff'ов, влияние минимальное.
+      const [{ data: staff, error: e1 }, { data: members, error: e2 }] = await Promise.all([
+        supabase
+          .from('staff')
+          .select(STAFF_FIELDS)
+          .eq('salon_id', salonId)
+          .eq('is_active', true)
+          .is('deleted_at', null)
+          .order('full_name', { ascending: true }),
+        supabase
+          .from('salon_members')
+          .select('staff_id')
+          .eq('salon_id', salonId)
+          .not('staff_id', 'is', null),
+      ])
+      if (e1) throw e1
+      if (e2) throw e2
+      const linkedIds = new Set((members ?? []).map((m) => m.staff_id as string))
+      return ((staff ?? []) as StaffRow[]).filter((s) => !linkedIds.has(s.id))
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}

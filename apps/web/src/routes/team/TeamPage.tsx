@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useStaff } from '@/hooks/useStaff'
+import { useStaff, useUnlinkedStaff } from '@/hooks/useStaff'
 import {
   useCancelInvitation,
   useInvitations,
@@ -62,14 +62,35 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [openMember, setOpenMember] = useState<TeamMember | null>(null)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<SalonRole>('staff')
-  // staffId больше не задаётся в UI — auto-resolve при accept-invite
-  // (см. accept_salon_invitation: если role='staff' и нет staff_id —
-  // создаётся новая staff row с именем приглашённого).
-  const staffId = ''
+  // Multi-role: набор checkbox'ов. Финальный role в БД — топ-приоритет
+  // owner > admin > accountant > staff. Если «Мастер» отмечен вместе с
+  // admin/accountant — это «Админ-Мастер»: salon_members.role = admin,
+  // плюс staff_id заранее задан или auto_create_staff=true.
+  const [selectedRoles, setSelectedRoles] = useState<Set<SalonRole>>(new Set(['staff']))
+  const [staffLinkChoice, setStaffLinkChoice] = useState<string>('new')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+
+  const { data: unlinkedStaff = [] } = useUnlinkedStaff(salonId)
+  const isMasterChecked = selectedRoles.has('staff')
+
+  function toggleRole(r: SalonRole) {
+    setSelectedRoles((prev) => {
+      const next = new Set(prev)
+      if (next.has(r)) next.delete(r)
+      else next.add(r)
+      // Хотя бы одна роль должна быть выбрана.
+      if (next.size === 0) next.add('staff')
+      return next
+    })
+  }
+
+  function highestRole(): SalonRole {
+    if (selectedRoles.has('admin')) return 'admin'
+    if (selectedRoles.has('accountant')) return 'accountant'
+    return 'staff'
+  }
 
   const canManage = myRole === 'owner' || myRole === 'admin'
 
@@ -78,11 +99,23 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
       toast.error(t('team.errors.email_required'))
       return
     }
+    const role = highestRole()
+    // Staff-link срабатывает если в multi-role выбран «Мастер».
+    const wantsMasterLink = isMasterChecked
+    const linkExistingStaffId =
+      wantsMasterLink && staffLinkChoice !== 'new' ? staffLinkChoice : null
+    // auto_create_staff: если выбран «Мастер» И не выбран существующий staff_id.
+    const autoCreateStaff =
+      wantsMasterLink && !linkExistingStaffId && role !== 'staff' ? true : false
+    // Для role='staff' без существующего staff_id — RPC уже создаст staff
+    // (legacy behavior). auto_create_staff не нужен дополнительно.
+
     invite.mutate(
       {
         email: email.trim(),
         role,
-        staffId: role === 'staff' ? staffId || null : null,
+        staffId: linkExistingStaffId,
+        autoCreateStaff,
         first_name: firstName,
         last_name: lastName,
         phone,
@@ -92,7 +125,8 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
           toast.success(t('team.toast_invited'))
           setInviteOpen(false)
           setEmail('')
-          setRole('staff')
+          setSelectedRoles(new Set(['staff']))
+          setStaffLinkChoice('new')
           setFirstName('')
           setLastName('')
           setPhone('')
@@ -368,25 +402,65 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               <p className="text-muted-foreground text-xs">{t('team.invite_phone_hint')}</p>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="inv-role">{t('team.invite_role')}</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as SalonRole)}>
-                <SelectTrigger id="inv-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {t(r.key)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">{t(`team.role_hint.${role}`)}</p>
-            </div>
-            {role === 'staff' ? (
-              <p className="text-muted-foreground rounded-md border border-sky-200 bg-sky-50 p-2 text-xs leading-relaxed">
-                {t('team.invite_staff_auto_hint')}
+              <Label>{t('team.invite_role')}</Label>
+              <p className="text-muted-foreground -mt-1 text-xs">
+                {t('team.invite_role_multi_hint')}
               </p>
+              <div className="flex flex-col gap-1.5">
+                {ROLE_OPTIONS.map((r) => {
+                  const active = selectedRoles.has(r.value)
+                  return (
+                    <label
+                      key={r.value}
+                      className={`border-border flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-sm transition-colors ${
+                        active ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => toggleRole(r.value)}
+                        className="mt-0.5 size-4"
+                      />
+                      <div className="flex-1">
+                        <p className="text-foreground font-semibold">{t(r.key)}</p>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {t(`team.role_hint.${r.value}`)}
+                        </p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            {isMasterChecked ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="inv-staff-link">{t('team.invite_staff_link')}</Label>
+                <Select value={staffLinkChoice} onValueChange={setStaffLinkChoice}>
+                  <SelectTrigger id="inv-staff-link">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">{t('team.invite_staff_new')}</SelectItem>
+                    {unlinkedStaff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name}
+                        {s.external_source ? (
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            · {s.external_source}
+                          </span>
+                        ) : null}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  {staffLinkChoice === 'new'
+                    ? t('team.invite_staff_new_hint')
+                    : t('team.invite_staff_existing_hint')}
+                </p>
+              </div>
             ) : null}
           </form>
           <DialogFooter className="px-5">

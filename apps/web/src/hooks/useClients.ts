@@ -3,6 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { normalizeSearchPhone } from '@/lib/utils/phone-search'
 
+export type ClientSocial = {
+  /** instagram | facebook | telegram | custom. Иконка/UI берётся отсюда. */
+  kind: 'instagram' | 'facebook' | 'telegram' | 'custom'
+  /** Произвольный лейбл для custom kind (например, «VK», «TikTok»). */
+  label?: string
+  /** Username / номер / ссылка — что юзер вписал. */
+  handle: string
+}
+
 export type ClientRow = {
   id: string
   salon_id: string
@@ -13,6 +22,7 @@ export type ClientRow = {
   source: string | null
   tags: string[]
   notes: string | null
+  socials: ClientSocial[]
   visit_count: number
   total_revenue_cents: number
   last_visit_at: string | null

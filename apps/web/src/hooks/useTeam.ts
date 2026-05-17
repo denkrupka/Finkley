@@ -101,6 +101,8 @@ export function useInviteMember(salonId: string | undefined) {
       email: string
       role: SalonRole
       staffId?: string | null
+      /** Multi-role «Админ-Мастер»: создать staff-карточку даже если role не staff. */
+      autoCreateStaff?: boolean
       first_name?: string
       last_name?: string
       phone?: string
@@ -112,6 +114,7 @@ export function useInviteMember(salonId: string | undefined) {
           email: input.email,
           role: input.role,
           staff_id: input.staffId ?? null,
+          auto_create_staff: !!input.autoCreateStaff,
           invited_first_name: input.first_name?.trim() || null,
           invited_last_name: input.last_name?.trim() || null,
           invited_phone: input.phone?.trim() || null,

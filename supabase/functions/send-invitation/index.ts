@@ -52,7 +52,16 @@ async function ensureAdmin(
 async function handleCreate(
   admin: SupabaseClient,
   userId: string,
-  body: { salon_id?: string; email?: string; role?: string; staff_id?: string | null },
+  body: {
+    salon_id?: string
+    email?: string
+    role?: string
+    staff_id?: string | null
+    auto_create_staff?: boolean
+    invited_first_name?: string
+    invited_last_name?: string
+    invited_phone?: string
+  },
 ): Promise<Response> {
   if (!body.salon_id || !body.email || !body.role) {
     return jsonResponse({ ok: false, error: 'missing_fields' }, 400)
@@ -101,6 +110,7 @@ async function handleCreate(
       email,
       role: body.role,
       staff_id: body.staff_id ?? null,
+      auto_create_staff: !!body.auto_create_staff,
       token,
       invited_by: userId,
       invited_first_name:
