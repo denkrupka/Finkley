@@ -13,6 +13,7 @@ import {
   type FinancialSettings,
   type ParameterItem,
 } from '@/hooks/useFinancialSettings'
+import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
 import { useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
@@ -74,6 +75,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
   const { data: services = [] } = useServices(salonId)
+  // Per-register monthly running balances (на конец каждого месяца).
+  const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
   // Aggregate by month (12 buckets, index 0=Jan)
   const monthly = useMemo(() => {
@@ -494,21 +497,24 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           <tbody>
             {settings.cash_registers.items
               .filter((i) => !i.archived)
-              .map((reg) => (
-                <tr key={reg.id} className="border-border/60 border-t">
-                  <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-1.5">
-                    {reg.label || '—'}
-                  </td>
-                  <td className="num text-muted-foreground px-2 py-1.5 text-right">
-                    {formatNumberSafe(reg.amount_cents ?? 0, currency)}
-                  </td>
-                  {months.map((m) => (
-                    <td key={m} className="num text-muted-foreground px-2 py-1.5 text-right">
+              .map((reg) => {
+                const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
+                return (
+                  <tr key={reg.id} className="border-border/60 border-t">
+                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-1.5">
+                      {reg.label || '—'}
+                    </td>
+                    <td className="num text-muted-foreground px-2 py-1.5 text-right">
                       {formatNumberSafe(reg.amount_cents ?? 0, currency)}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {months.map((m) => (
+                      <td key={m} className="num text-muted-foreground px-2 py-1.5 text-right">
+                        {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
           </tbody>
         </table>
       </div>
@@ -579,9 +585,12 @@ function buildItemsRows(
   sign: 1 | -1,
   onlyInMonth: number | null = null,
 ) {
-  const visible = items.filter((i) => !i.archived)
+  // Архивные параметры тоже рендерим, чтобы их не пропадало в отчёте если в
+  // каком-то месяце по ним был факт (т.е. их удалили из справочника, но они
+  // были в истории). Помечаем (архив) в лейбле, значения у архивных = 0
+  // (план не считается, факт пока не привязан per-параметр в expenses).
   const byParent = new Map<string | null, ParameterItem[]>()
-  for (const it of visible) {
+  for (const it of items) {
     const key = it.parent_id ?? null
     const arr = byParent.get(key) ?? []
     arr.push(it)
@@ -589,14 +598,16 @@ function buildItemsRows(
   }
   const rows: Array<{ label: string; values: number[]; indent: number }> = []
   function pushNode(node: ParameterItem, indent: number) {
-    const monthly = monthlyEquivalentCents(node)
+    const monthly = node.archived ? 0 : monthlyEquivalentCents(node)
     const values = Array.from({ length: 12 }, (_, m) => {
       if (onlyInMonth !== null) {
-        return m === onlyInMonth ? sign * (node.amount_cents ?? 0) : 0
+        return m === onlyInMonth && !node.archived ? sign * (node.amount_cents ?? 0) : 0
       }
       return sign * monthly
     })
-    rows.push({ label: node.label || '—', values, indent })
+    const baseLabel = node.label || '—'
+    const label = node.archived ? `${baseLabel} (архив)` : baseLabel
+    rows.push({ label, values, indent })
     const children = byParent.get(node.id) ?? []
     for (const c of children) pushNode(c, indent + 1)
   }

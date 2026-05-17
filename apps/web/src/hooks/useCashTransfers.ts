@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -25,6 +26,56 @@ export type RegisterBalance = {
 
 export const cashTransfersKeys = (salonId: string) => ['cash-transfers', salonId] as const
 export const registerBalancesKeys = (salonId: string) => ['register-balances', salonId] as const
+
+/**
+ * Per-month balances for all cash registers — для финотчёта (12 столбцов).
+ * Возвращает Map<register_id, number[12]> где индекс месяца = balance на
+ * конец этого месяца.
+ *
+ * Под капотом — 12 параллельных вызовов compute_all_register_balances с
+ * end-of-month timestamp. Для типичного салона (3-5 касс, год транзакций)
+ * это <1s в сумме.
+ */
+export function useMonthlyRegisterBalances(
+  salonId: string | undefined,
+  year: number,
+): { data: Map<string, number[]>; isLoading: boolean } {
+  const months = useMemo(() => {
+    return Array.from({ length: 12 }, (_, m) => {
+      // Конец последнего дня месяца UTC — используем UTC чтобы не плыть по
+      // tz-смене сервера (RPC всё равно работает в UTC и сравнивает <= p_at).
+      const lastDay = new Date(Date.UTC(year, m + 1, 0, 23, 59, 59, 999))
+      return lastDay.toISOString()
+    })
+  }, [year])
+
+  const queries = useQuery<Map<string, number[]>>({
+    queryKey: ['register-balances', salonId, 'monthly', year],
+    queryFn: async () => {
+      if (!salonId) return new Map()
+      const results = await Promise.all(
+        months.map((iso) =>
+          supabase.rpc('compute_all_register_balances', { p_salon_id: salonId, p_at: iso }),
+        ),
+      )
+      const map = new Map<string, number[]>()
+      results.forEach((res, monthIdx) => {
+        if (res.error) return
+        const rows = (res.data ?? []) as RegisterBalance[]
+        for (const r of rows) {
+          const arr = map.get(r.register_id) ?? Array.from({ length: 12 }, () => 0)
+          arr[monthIdx] = r.balance_cents
+          map.set(r.register_id, arr)
+        }
+      })
+      return map
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+
+  return { data: queries.data ?? new Map(), isLoading: queries.isLoading }
+}
 
 /**
  * Все балансы активных касс салона одним вызовом (RPC
