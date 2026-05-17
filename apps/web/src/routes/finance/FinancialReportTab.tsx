@@ -69,6 +69,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
 
   const { data: visits = [] } = useVisits(salonId, visitsRange, { kind: 'visit' })
+  // Retail-продажи учитываются отдельной подкатегорией в «Выручка».
+  const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
   const { data: services = [] } = useServices(salonId)
@@ -77,6 +79,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const monthly = useMemo(() => {
     const buckets = Array.from({ length: 12 }, () => ({
       visitsRevenue: 0, // сервис-выручка из visits (минус скидки)
+      retailRevenue: 0, // выручка от продаж товаров (kind='retail')
       otherIncome: 0,
       expensesTotal: 0,
     }))
@@ -85,6 +88,12 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       if (d.getFullYear() !== year) continue
       const m = d.getMonth()
       buckets[m]!.visitsRevenue += v.amount_cents - v.discount_cents + v.tip_cents
+    }
+    for (const v of retailSales) {
+      const d = new Date(v.visit_at)
+      if (d.getFullYear() !== year) continue
+      const m = d.getMonth()
+      buckets[m]!.retailRevenue += v.amount_cents - v.discount_cents + v.tip_cents
     }
     for (const oi of otherIncomes) {
       const d = new Date(oi.income_at)
@@ -97,7 +106,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       buckets[d.getMonth()]!.expensesTotal += e.amount_cents
     }
     return buckets
-  }, [visits, otherIncomes, expenses, year])
+  }, [visits, retailSales, otherIncomes, expenses, year])
 
   // ===== Сборка отчёта =====
   type CellRow = {
@@ -140,11 +149,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
 
   const visitsByMonth = monthly.map((m) => m.visitsRevenue)
+  const retailByMonth = monthly.map((m) => m.retailRevenue)
   const otherIncomeMonthly = settings.other_income.items
     .filter((i) => !i.archived)
     .reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
   const otherIncomeByMonth = monthly.map((m) => m.otherIncome + otherIncomeMonthly)
-  const revenueByMonth = visitsByMonth.map((v, i) => v + (otherIncomeByMonth[i] ?? 0))
+  const revenueByMonth = visitsByMonth.map(
+    (v, i) => v + (retailByMonth[i] ?? 0) + (otherIncomeByMonth[i] ?? 0),
+  )
 
   // Производственные = ЗП мастера + расходные материалы (план через %, средний
   // по всем активным услугам — см. ServicePlanningCard).
@@ -200,6 +212,12 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     {
       label: t('finance.report.revenue_services'),
       values: visitsByMonth,
+      indent: 1,
+      parentGroupKey: 'revenue',
+    },
+    {
+      label: t('finance.report.revenue_retail'),
+      values: retailByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
     },
@@ -368,16 +386,22 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-muted/40 text-muted-foreground text-[10px] uppercase tracking-wider">
-            <tr>
-              <th className="bg-muted/40 sticky left-0 z-20 min-w-[200px] px-3 py-2 text-left font-semibold">
+          <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            <tr className="bg-muted">
+              {/* Sticky left header — нужен opaque bg (без /40) и z-30, чтобы
+                  при горизонтальном скролле остальные ячейки шапки уезжали
+                  ПОД него, а не торчали поверх (баг image #20). */}
+              <th className="bg-muted border-border/60 sticky left-0 z-30 min-w-[200px] border-r px-3 py-2 text-left font-semibold">
                 {t('finance.report.col_row')}
               </th>
-              <th className="px-2 py-2 text-right font-semibold">
+              <th className="bg-muted px-2 py-2 text-right font-semibold">
                 {t('finance.report.col_total')}
               </th>
               {months.map((m) => (
-                <th key={m} className="min-w-[70px] px-2 py-2 text-right font-semibold capitalize">
+                <th
+                  key={m}
+                  className="bg-muted min-w-[70px] px-2 py-2 text-right font-semibold capitalize"
+                >
                   {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
                 </th>
               ))}
@@ -397,7 +421,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
                     onClick={hasGroup ? () => toggleGroup(row.groupKey!) : undefined}
                   >
                     <td
-                      className={`bg-card sticky left-0 z-10 px-3 py-1.5 ${row.bold ? 'text-foreground font-bold' : 'text-foreground'}`}
+                      className={`bg-card border-border/60 sticky left-0 z-10 border-r px-3 py-1.5 ${row.bold ? 'text-foreground font-bold' : 'text-foreground'}`}
                       style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
                     >
                       <span className="inline-flex items-center gap-1.5">
@@ -452,16 +476,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           итерация когда добавим account_id на транзакции. */}
       <div className="border-border bg-card shadow-finsm mt-4 overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-muted/40 text-muted-foreground text-[10px] uppercase tracking-wider">
-            <tr>
-              <th className="bg-muted/40 sticky left-0 z-10 px-3 py-2 text-left font-semibold">
+          <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            <tr className="bg-muted">
+              <th className="bg-muted border-border/60 sticky left-0 z-30 border-r px-3 py-2 text-left font-semibold">
                 {t('finance.report.end_balance_by_register')}
               </th>
-              <th className="px-2 py-2 text-right font-semibold">
+              <th className="bg-muted px-2 py-2 text-right font-semibold">
                 {t('finance.report.col_start')}
               </th>
               {months.map((m) => (
-                <th key={m} className="px-2 py-2 text-right font-semibold capitalize">
+                <th key={m} className="bg-muted px-2 py-2 text-right font-semibold capitalize">
                   {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
                 </th>
               ))}
@@ -472,7 +496,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
               .filter((i) => !i.archived)
               .map((reg) => (
                 <tr key={reg.id} className="border-border/60 border-t">
-                  <td className="bg-card text-foreground sticky left-0 z-10 px-3 py-1.5">
+                  <td className="bg-card text-foreground border-border/60 sticky left-0 z-10 border-r px-3 py-1.5">
                     {reg.label || '—'}
                   </td>
                   <td className="num text-muted-foreground px-2 py-1.5 text-right">
