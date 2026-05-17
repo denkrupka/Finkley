@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -125,12 +125,27 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
   const retailByCategory = useMemo<Map<string, number[]>>(() => {
     const invCatById = new Map<string, string>()
-    for (const i of inventory) invCatById.set(i.id, i.category || '')
+    const invCatByName = new Map<string, string>()
+    for (const i of inventory) {
+      invCatById.set(i.id, i.category || '')
+      if (i.name) invCatByName.set(normName(i.name), i.category || '')
+    }
     const map = new Map<string, number[]>()
     for (const v of retailSales) {
       const d = new Date(v.visit_at)
       if (d.getFullYear() !== year) continue
-      const cat = v.inventory_item_id ? (invCatById.get(v.inventory_item_id) ?? '') : ''
+      // 1. Сначала по inventory_item_id (новые продажи после миграции).
+      // 2. Fallback — по service_name_snapshot (старые продажи или «ручные
+      //    позиции», где пользователь ввёл название вручную, не выбирая со
+      //    склада). Снимаем суффикс «×N» (количество).
+      let cat = ''
+      if (v.inventory_item_id) {
+        cat = invCatById.get(v.inventory_item_id) ?? ''
+      }
+      if (!cat && v.service_name_snapshot) {
+        const base = v.service_name_snapshot.replace(/\s*×\s*\d+\s*$/, '').trim()
+        cat = invCatByName.get(normName(base)) ?? ''
+      }
       const key = cat.trim() || t('finance.report.uncategorized')
       const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
       arr[d.getMonth()]! += v.amount_cents - v.discount_cents + v.tip_cents
@@ -410,15 +425,43 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
   )
 
+  // ===== Синхронизация горизонтального скролла трёх таблиц =====
+  // Скроллим по ratio (scrollLeft/scrollMax) — таблицы имеют разную ширину
+  // (касса без «План/Факт»), так что абсолютные пиксели не совпадают.
+  const mainScrollRef = useRef<HTMLDivElement>(null)
+  const cashScrollRef = useRef<HTMLDivElement>(null)
+  const balanceScrollRef = useRef<HTMLDivElement>(null)
+  const isSyncingScrollRef = useRef(false)
+  function makeSyncScroll(self: RefObject<HTMLDivElement>) {
+    return (e: React.UIEvent<HTMLDivElement>) => {
+      if (isSyncingScrollRef.current) return
+      isSyncingScrollRef.current = true
+      const src = e.currentTarget
+      const srcMax = src.scrollWidth - src.clientWidth
+      const ratio = srcMax > 0 ? src.scrollLeft / srcMax : 0
+      for (const ref of [mainScrollRef, cashScrollRef, balanceScrollRef]) {
+        if (ref === self) continue
+        const el = ref.current
+        if (!el) continue
+        const dstMax = el.scrollWidth - el.clientWidth
+        const target = Math.round(ratio * dstMax)
+        if (Math.abs(el.scrollLeft - target) > 1) el.scrollLeft = target
+      }
+      requestAnimationFrame(() => {
+        isSyncingScrollRef.current = false
+      })
+    }
+  }
+
   return (
     <div className="space-y-5">
-      {/* ===== HEADER ===== */}
+      {/* ===== TOP TOOLBAR ===== */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-brand-navy text-lg font-bold tracking-tight">
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">
             {t('finance.report.title')}
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">{t('finance.report.subtitle')}</p>
+          <p className="mt-1 text-sm text-slate-500">{t('finance.report.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
           <Button variant="outline" size="md" onClick={exportCsv}>
@@ -435,25 +478,25 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       {/* ===== KPI STRIP ===== */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
-          icon={<TrendingUp className="size-5" strokeWidth={1.8} />}
+          icon={<TrendingUp className="size-4" strokeWidth={1.8} />}
           label={t('finance.report.revenue')}
           value={formatCurrency(totalRevenueYear, currency)}
           tone="sage"
         />
         <KpiCard
-          icon={<TrendingDown className="size-5" strokeWidth={1.8} />}
+          icon={<TrendingDown className="size-4" strokeWidth={1.8} />}
           label={t('finance.report.expenses_total')}
           value={formatCurrency(totalExpensesYear, currency)}
           tone="red"
         />
         <KpiCard
-          icon={<Sparkles className="size-5" strokeWidth={1.8} />}
+          icon={<Sparkles className="size-4" strokeWidth={1.8} />}
           label={t('finance.report.period_saldo')}
           value={formatCurrency(totalSaldoYear, currency)}
           tone={totalSaldoYear >= 0 ? 'sage' : 'red'}
         />
         <KpiCard
-          icon={<Wallet className="size-5" strokeWidth={1.8} />}
+          icon={<Wallet className="size-4" strokeWidth={1.8} />}
           label={t('finance.report.current_balance')}
           value={formatCurrency(openingBalance, currency)}
           tone="navy"
@@ -464,9 +507,9 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       {/* ===== MAIN REPORT TABLE ===== */}
       <ReportCard
         title={t('finance.report.title')}
-        subtitle={t('finance.report.subtitle')}
-        icon={<BarChart3 className="size-5" strokeWidth={1.8} />}
-        tone="navy"
+        icon={<BarChart3 className="size-4" strokeWidth={1.8} />}
+        scrollRef={mainScrollRef}
+        onScroll={makeSyncScroll(mainScrollRef)}
       >
         <ReportTable
           year={year}
@@ -483,25 +526,24 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       {/* ===== ОСТАТОК ПО КАССАМ ===== */}
       <ReportCard
         title={t('finance.report.end_balance_by_register')}
-        icon={<Wallet className="size-5" strokeWidth={1.8} />}
-        tone="teal"
+        icon={<Wallet className="size-4" strokeWidth={1.8} />}
+        scrollRef={cashScrollRef}
+        onScroll={makeSyncScroll(cashScrollRef)}
       >
         <table className="w-full border-collapse text-xs">
           <thead>
-            <tr className="bg-brand-navy text-white">
-              <th className="bg-brand-navy sticky left-0 z-30 min-w-[200px] px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+            <tr className="border-b border-slate-200 bg-slate-100 text-slate-600">
+              <th className="sticky left-0 z-30 min-w-[220px] bg-slate-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
                 {t('finance.report.end_balance_by_register')}
               </th>
-              <th className="bg-brand-navy/95 border-l border-white/10 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider">
+              <th className="border-l border-slate-200 bg-slate-200/60 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider">
                 {t('finance.report.col_start')}
               </th>
               {months.map((m) => (
                 <th
                   key={m}
-                  className={`min-w-[100px] border-l border-white/10 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                    m === currentMonthIdx
-                      ? 'bg-brand-yellow text-brand-navy-deep'
-                      : 'bg-brand-navy/95'
+                  className={`min-w-[140px] border-l border-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                    m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
                   }`}
                 >
                   {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
@@ -514,23 +556,24 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
               .filter((i) => !i.archived)
               .map((reg, idx) => {
                 const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
+                const zebra = idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
                 return (
                   <tr
                     key={reg.id}
-                    className={`border-border/60 hover:bg-muted/40 border-t transition-colors ${
-                      idx % 2 === 1 ? 'bg-muted/15' : ''
-                    }`}
+                    className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${zebra}`}
                   >
-                    <td className="bg-card text-foreground border-border/60 sticky left-0 z-20 border-r px-3 py-2 font-medium">
+                    <td
+                      className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 font-medium text-slate-800 ${zebra}`}
+                    >
                       {reg.label || '—'}
                     </td>
-                    <td className="num text-muted-foreground border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold">
+                    <td className="num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold text-slate-600">
                       {formatNumberSafe(reg.amount_cents ?? 0, currency)}
                     </td>
                     {months.map((m) => (
                       <td
                         key={m}
-                        className={`num text-muted-foreground px-2 py-2 text-right ${
+                        className={`num border-l border-slate-100 px-2 py-2 text-right text-slate-700 ${
                           m === currentMonthIdx ? 'bg-amber-50' : ''
                         }`}
                       >
@@ -547,8 +590,9 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       {/* ===== БАЛАНС (отдельная таблица) ===== */}
       <ReportCard
         title={t('finance.report.section_balance')}
-        icon={<Landmark className="size-5" strokeWidth={1.8} />}
-        tone="navy"
+        icon={<Landmark className="size-4" strokeWidth={1.8} />}
+        scrollRef={balanceScrollRef}
+        onScroll={makeSyncScroll(balanceScrollRef)}
       >
         <ReportTable
           year={year}
@@ -580,27 +624,45 @@ function KpiCard({
   tone: 'sage' | 'red' | 'navy' | 'teal'
   hint?: string
 }) {
-  // Светлые пастельные градиенты. ВАЖНО: `brand-navy-soft` в light theme —
-  // тёмный (HSL 240/30%/20%), а не светлый, поэтому для navy используем
-  // indigo-50 / slate-50 из стандартной TW-палитры.
-  const toneClasses: Record<typeof tone, string> = {
-    sage: 'from-brand-sage-soft to-brand-sage-soft/30 text-brand-sage border-brand-sage/30',
-    red: 'from-brand-red-soft to-brand-red-soft/30 text-brand-red border-brand-red/30',
-    navy: 'from-indigo-50 to-indigo-50/30 text-indigo-700 border-indigo-200',
-    teal: 'from-brand-teal-soft to-brand-teal-soft/30 text-brand-teal border-brand-teal/30',
+  // Минималистичная карточка: белый фон, узкая цветная полоска слева как
+  // акцент. Палитра — приглушённая (Nord-like): emerald / rose / amber /
+  // slate. Без тёмных navy-фонов.
+  const accent: Record<typeof tone, { stripe: string; text: string; iconBg: string }> = {
+    sage: {
+      stripe: 'bg-emerald-500',
+      text: 'text-emerald-700',
+      iconBg: 'bg-emerald-50 text-emerald-600',
+    },
+    red: {
+      stripe: 'bg-rose-400',
+      text: 'text-rose-600',
+      iconBg: 'bg-rose-50 text-rose-500',
+    },
+    navy: {
+      stripe: 'bg-slate-700',
+      text: 'text-slate-800',
+      iconBg: 'bg-slate-100 text-slate-700',
+    },
+    teal: {
+      stripe: 'bg-amber-400',
+      text: 'text-amber-700',
+      iconBg: 'bg-amber-50 text-amber-600',
+    },
   }
+  const a = accent[tone]
   return (
-    <div
-      className={`shadow-finsm hover:shadow-finmd rounded-xl border bg-gradient-to-br p-3 transition-shadow ${toneClasses[tone]}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider opacity-80">
-          {label}
-        </span>
-        <span className="opacity-70">{icon}</span>
+    <div className="shadow-finsm hover:shadow-finmd flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow">
+      <div className={`w-1 shrink-0 ${a.stripe}`} />
+      <div className="flex-1 p-3">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-md p-1.5 ${a.iconBg}`}>{icon}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            {label}
+          </span>
+        </div>
+        <div className={`num mt-2 text-lg font-bold leading-tight ${a.text}`}>{value}</div>
+        {hint ? <p className="mt-1 text-[10px] text-slate-500">{hint}</p> : null}
       </div>
-      <div className="num text-foreground mt-2 text-lg font-bold leading-tight">{value}</div>
-      {hint ? <p className="text-muted-foreground mt-1 text-[10px]">{hint}</p> : null}
     </div>
   )
 }
@@ -609,34 +671,26 @@ function KpiCard({
 
 function ReportCard({
   title,
-  subtitle,
   icon,
-  tone,
+  scrollRef,
+  onScroll,
   children,
 }: {
   title: string
-  subtitle?: string
   icon: React.ReactNode
-  tone: 'navy' | 'teal' | 'sage'
+  scrollRef?: RefObject<HTMLDivElement>
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
   children: React.ReactNode
 }) {
-  const headerClass: Record<typeof tone, string> = {
-    navy: 'from-brand-navy via-brand-navy/95 to-brand-navy-deep',
-    teal: 'from-brand-teal via-brand-teal/95 to-brand-teal-deep',
-    sage: 'from-brand-sage via-brand-sage/95 to-brand-navy',
-  }
   return (
-    <section className="border-border bg-card shadow-finmd overflow-hidden rounded-xl border">
-      <div
-        className={`flex items-center gap-2.5 bg-gradient-to-r px-4 py-3 text-white ${headerClass[tone]}`}
-      >
-        <span className="rounded-md bg-white/15 p-1.5">{icon}</span>
-        <div>
-          <h3 className="text-sm font-bold tracking-tight">{title}</h3>
-          {subtitle ? <p className="text-[11px] text-white/75">{subtitle}</p> : null}
-        </div>
+    <section className="shadow-finmd overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5">
+        <span className="rounded-md bg-slate-900 p-1.5 text-amber-300">{icon}</span>
+        <h3 className="text-sm font-semibold tracking-tight text-slate-800">{title}</h3>
       </div>
-      <div className="overflow-x-auto">{children}</div>
+      <div ref={scrollRef} onScroll={onScroll} className="overflow-x-auto">
+        {children}
+      </div>
     </section>
   )
 }
@@ -666,16 +720,16 @@ function ReportTable({
   return (
     <table className="w-full border-collapse text-xs">
       <thead>
-        <tr className="bg-brand-navy text-white">
+        <tr className="border-b border-slate-200 bg-slate-100 text-slate-600">
           <th
             rowSpan={2}
-            className="bg-brand-navy sticky left-0 z-30 min-w-[220px] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
+            className="sticky left-0 z-30 min-w-[220px] bg-slate-100 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_row')}
           </th>
           <th
             colSpan={2}
-            className="bg-brand-navy/95 border-l border-white/10 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
+            className="border-l border-slate-200 bg-slate-200/60 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_total')}
           </th>
@@ -683,37 +737,33 @@ function ReportTable({
             <th
               key={m}
               colSpan={2}
-              className={`min-w-[140px] border-l border-white/10 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                m === currentMonthIdx ? 'bg-brand-yellow text-brand-navy-deep' : 'bg-brand-navy/95'
+              className={`min-w-[140px] border-l border-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
               {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
             </th>
           ))}
         </tr>
-        <tr className="bg-brand-navy/90 text-white/85">
-          <th className="bg-brand-navy/90 border-l border-white/10 px-2 py-1 text-right text-[9px] font-medium uppercase">
+        <tr className="border-b border-slate-200 bg-slate-50 text-slate-500">
+          <th className="border-l border-slate-200 bg-slate-100/70 px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_plan')}
           </th>
-          <th className="bg-brand-navy/90 px-2 py-1 text-right text-[9px] font-medium uppercase">
+          <th className="bg-slate-100/70 px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_fact')}
           </th>
           {months.map((m) => (
             <Fragment key={m}>
               <th
-                className={`border-l border-white/10 px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  m === currentMonthIdx
-                    ? 'bg-brand-yellow text-brand-navy-deep'
-                    : 'bg-brand-navy/90'
+                className={`border-l border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                  m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
                 {t('finance.report.col_plan')}
               </th>
               <th
                 className={`px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  m === currentMonthIdx
-                    ? 'bg-brand-yellow text-brand-navy-deep'
-                    : 'bg-brand-navy/90'
+                  m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
                 {t('finance.report.col_fact')}
@@ -728,47 +778,53 @@ function ReportTable({
           const isCollapsed = hasGroup && collapsed.has(row.groupKey!)
           const groupBg = groupRowBg(row.color, row.bold)
           const accentBorder = row.bold ? accentLeftBorder(row.color) : ''
+          // Чётные строки (не-bold) — slate-50 как лёгкая «зебра». bold-строки
+          // секций имеют свой groupBg.
+          const zebra = !row.bold && idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'
+          const rowBg = groupBg || zebra
           return (
             <tr
               key={`${row.label}-${idx}`}
-              className={`border-border/40 hover:bg-muted/40 group border-t transition-colors ${groupBg} ${
+              className={`group border-t border-slate-100 transition-colors hover:bg-slate-50 ${rowBg} ${
                 hasGroup ? 'cursor-pointer' : ''
-              } ${!row.bold && idx % 2 === 1 ? 'bg-muted/10' : ''}`}
+              }`}
               onClick={hasGroup ? () => onToggle(row.groupKey!) : undefined}
             >
               <td
-                className={`text-foreground border-border/60 sticky left-0 z-20 border-r px-3 py-2 ${
+                className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 text-slate-800 ${
                   row.bold ? 'font-bold' : 'font-medium'
-                } ${groupBg || 'bg-card'} ${accentBorder}`}
+                } ${rowBg} ${accentBorder}`}
                 style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
               >
                 <span className="inline-flex items-center gap-1.5">
                   {hasGroup ? (
                     isCollapsed ? (
                       <ChevronRight
-                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
+                        className="size-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-slate-700"
                         strokeWidth={2.2}
                       />
                     ) : (
                       <ChevronDown
-                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
+                        className="size-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-slate-700"
                         strokeWidth={2.2}
                       />
                     )
                   ) : null}
-                  <span className={row.bold ? '' : 'text-muted-foreground'}>{row.label}</span>
+                  <span className={row.bold ? 'text-slate-800' : 'text-slate-600'}>
+                    {row.label}
+                  </span>
                 </span>
               </td>
               {/* Итого План | Факт */}
               <td
-                className={`num bg-brand-navy/[0.04] border-brand-navy/15 border-l px-2 py-2 text-right ${
+                className={`num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${colorClass(row.color)}`}
               >
                 {formatPF(yearTotal(row.values), currency)}
               </td>
               <td
-                className={`num bg-brand-navy/[0.04] px-2 py-2 text-right ${
+                className={`num bg-slate-50 px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${colorClass(row.color)}`}
               >
@@ -780,7 +836,7 @@ function ReportTable({
                 return (
                   <Fragment key={mi}>
                     <td
-                      className={`num border-border/40 border-l px-2 py-2 text-right ${
+                      className={`num border-l border-slate-100 px-2 py-2 text-right ${
                         row.bold ? 'font-semibold' : ''
                       } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-amber-50' : ''}`}
                     >
@@ -843,43 +899,44 @@ function formatPF(v: number, currency: string): string {
   return v === 0 ? '—' : formatCurrency(v, currency)
 }
 
-/** Цвет текста в основной (label) колонке + Итого. */
+/**
+ * Палитра текста (Nord-like — приглушённая, не ядовитая):
+ * - sage (доходы, положительное сальдо) → emerald
+ * - destructive (расходы, отрицательное) → rose
+ * - teal (инвестиции — нейтрально-предупреждающее) → amber
+ * - navy (финансовая, остаток, баланс) → slate-dark
+ */
 function colorClass(color: RowColor | undefined, kind?: 'plan' | 'fact'): string {
-  // План — всегда чуть тише (muted), Факт — насыщеннее
   if (kind === 'plan') {
-    if (color === 'destructive') return 'text-brand-red/85'
-    if (color === 'sage') return 'text-brand-sage/85'
-    if (color === 'teal') return 'text-brand-teal/85'
-    if (color === 'navy') return 'text-brand-navy/85'
-    return 'text-muted-foreground'
+    if (color === 'destructive') return 'text-rose-500/80'
+    if (color === 'sage') return 'text-emerald-600/80'
+    if (color === 'teal') return 'text-amber-600/80'
+    if (color === 'navy') return 'text-slate-600/80'
+    return 'text-slate-400'
   }
-  if (color === 'destructive') return 'text-brand-red'
-  if (color === 'sage') return 'text-brand-sage'
-  if (color === 'teal') return 'text-brand-teal'
-  if (color === 'navy') return 'text-brand-navy'
-  return 'text-foreground'
+  if (color === 'destructive') return 'text-rose-600'
+  if (color === 'sage') return 'text-emerald-700'
+  if (color === 'teal') return 'text-amber-700'
+  if (color === 'navy') return 'text-slate-800'
+  return 'text-slate-700'
 }
 
 /**
- * Подсветка фона строки-секции (только bold). Используем встроенные TW-цвета
- * без прозрачности — иначе сквозь sticky-колонку label просвечивают
- * проскролленные ячейки (см. жалобу про «накладываются»).
+ * Фон строки-секции. Все секции на одинаковом мягком `slate-50` — различаются
+ * только цветной полоской слева (см. accentLeftBorder). Это держит вид
+ * спокойным, без пёстрых пастельных полос на каждом разделе.
  */
-function groupRowBg(color: RowColor | undefined, bold: boolean | undefined): string {
+function groupRowBg(_color: RowColor | undefined, bold: boolean | undefined): string {
   if (!bold) return ''
-  if (color === 'sage') return 'bg-emerald-50'
-  if (color === 'destructive') return 'bg-rose-50'
-  if (color === 'teal') return 'bg-sky-50'
-  if (color === 'navy') return 'bg-slate-100'
   return 'bg-slate-50'
 }
 
 /** Цветной акцент слева у bold-строк (как «полоска категории»). */
 function accentLeftBorder(color: RowColor | undefined): string {
-  if (color === 'sage') return 'border-l-[3px] border-l-brand-sage'
-  if (color === 'destructive') return 'border-l-[3px] border-l-brand-red'
-  if (color === 'teal') return 'border-l-[3px] border-l-brand-teal'
-  if (color === 'navy') return 'border-l-[3px] border-l-brand-navy'
+  if (color === 'sage') return 'border-l-[3px] border-l-emerald-500'
+  if (color === 'destructive') return 'border-l-[3px] border-l-rose-400'
+  if (color === 'teal') return 'border-l-[3px] border-l-amber-400'
+  if (color === 'navy') return 'border-l-[3px] border-l-slate-700'
   return ''
 }
 
