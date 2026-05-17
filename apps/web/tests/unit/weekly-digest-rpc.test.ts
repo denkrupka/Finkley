@@ -81,12 +81,14 @@ function isoDow(date: Date): number {
  * совпадает с расчётом в weekly_digest_kpis.
  */
 function lastWeekMondayLocal(): Date {
-  // Берём «сегодня» в локальной TZ через offset Warsaw (для теста используем UTC,
-  // но эта функция должна вернуть тот же день что вернёт RPC)
+  // RPC weekly_digest_kpis считает «сегодня» в Europe/Warsaw (TIMESTAMPTZ AT
+  // TIME ZONE 'Europe/Warsaw'). Если просто взять UTC-сегодня, то в окне с
+  // 22:00 UTC до 24:00 UTC (полночь — 02:00 в Варшаве летом, 01:00 зимой)
+  // даты разойдутся и тест упадёт ровно раз в неделю — на стыке дня.
   const now = new Date()
-  // Упрощение: считаем что сейчас в UTC; для CET/CEST тест устойчив, потому что
-  // мы будем класть визиты на середину недели, не на границу.
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const todayWarsaw = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Warsaw' })
+  const [y, m, d] = todayWarsaw.split('-').map(Number)
+  const today = new Date(Date.UTC(y!, m! - 1, d!))
   const dow = isoDow(today)
   const thisMonday = new Date(today)
   thisMonday.setUTCDate(today.getUTCDate() - (dow - 1))
