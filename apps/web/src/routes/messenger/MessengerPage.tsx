@@ -2,6 +2,8 @@ import { formatDistanceToNowStrict } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
   CalendarPlus,
+  Check,
+  CheckCheck,
   CheckCircle2,
   Facebook,
   Image as ImageIcon,
@@ -14,7 +16,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -42,8 +44,69 @@ import {
   type MessengerConversation,
   type MessengerMessage,
 } from '@/hooks/useMessenger'
+import {
+  getTgMediaSignedUrl,
+  isTgConvId,
+  makeTgConvId,
+  parseTgConvId,
+  useTgDialogs,
+  useTgMarkRead,
+  useTgMessages,
+  useTgRealtime,
+  useTgSendPhoto,
+  useTgSendText,
+  type TgDialog,
+  type TgMessage,
+} from '@/hooks/useTgMessenger'
+import { useTgSessions } from '@/hooks/useTgUserbot'
 import { ClientFormModal } from '@/routes/clients/ClientFormModal'
 import { cn } from '@/lib/utils/cn'
+
+/** Адаптер TgDialog → MessengerConversation для переиспользования UI-компонентов. */
+function tgDialogToConv(d: TgDialog): MessengerConversation {
+  return {
+    id: makeTgConvId(d.id),
+    salon_id: '',
+    channel: 'telegram',
+    external_user_id: String(d.tg_chat_id),
+    display_name: d.title || d.username || '—',
+    avatar_url: null,
+    client_id: null,
+    unread_count: d.unread_count,
+    last_message_at: d.last_message_at || new Date(0).toISOString(),
+    last_message_preview: d.last_message_text,
+    created_at: d.last_message_at || new Date(0).toISOString(),
+    archived_at: d.archived ? new Date().toISOString() : null,
+  } as unknown as MessengerConversation
+}
+
+/** Адаптер TgMessage → MessengerMessage для переиспользования MessageBody. */
+function tgMessageToMsg(m: TgMessage): MessengerMessage & {
+  read_by_recipient_at?: string | null
+  _isTg?: true
+} {
+  // Маппинг media_kind: tg использует photo/video/voice/sticker/animation/document,
+  // bot api использует image/video/audio/file/sticker. Конвертируем.
+  const mediaKindMap: Record<string, MessengerMessage['media_kind']> = {
+    photo: 'image',
+    video: 'video',
+    voice: 'audio',
+    sticker: 'image',
+    document: 'file',
+    animation: 'video',
+  }
+  return {
+    id: m.id,
+    conversation_id: makeTgConvId(m.dialog_id),
+    direction: m.is_outgoing ? 'out' : 'in',
+    text: m.text,
+    media_path: m.media_path,
+    media_kind: m.media_kind ? (mediaKindMap[m.media_kind] ?? 'file') : null,
+    created_at: m.sent_at,
+    read_by_recipient_at: m.read_by_recipient_at,
+    _isTg: true,
+  } as MessengerMessage & { read_by_recipient_at?: string | null; _isTg?: true }
+}
 
 /**
  * Встроенный мессенджер. Унифицирует входящие из подключённых каналов
@@ -79,20 +142,68 @@ export function MessengerPage() {
   const linkClient = useLinkConversationClient(salonId)
 
   useMessengerRealtime(salonId)
-  const { data: conversations = [], isLoading: convLoading } = useConversations(salonId, {
+  useTgRealtime(salonId)
+  // Bot API conversations — фильтруем telegram-channel (юзаем userbot вместо)
+  const { data: botConversations = [], isLoading: convLoading } = useConversations(salonId, {
     channel: activeChannel,
     search,
   })
-  const { data: messages = [] } = useConversationMessages(selectedId ?? undefined)
+  const { data: tgDialogs = [] } = useTgDialogs(salonId)
+  const { data: tgSessions = [] } = useTgSessions(salonId)
+  const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null
+
+  // Объединённый список: Bot API без telegram + tg_dialogs как telegram
+  const conversations = useMemo(() => {
+    const filtered = botConversations.filter((c) => c.channel !== 'telegram')
+    const tgConvs = tgDialogs.map(tgDialogToConv).filter((c) => {
+      if (activeChannel && activeChannel !== 'telegram') return false
+      if (search && !c.display_name?.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+    // Объединяем + сортируем по last_message_at desc
+    return [...filtered, ...tgConvs].sort(
+      (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
+    )
+  }, [botConversations, tgDialogs, activeChannel, search])
+
+  const selectedIsTg = isTgConvId(selectedId)
+  const selectedTgDialogId = selectedIsTg ? parseTgConvId(selectedId!) : null
+
+  // Сообщения: либо Bot API, либо tg_messages
+  const { data: botMessages = [] } = useConversationMessages(
+    !selectedIsTg && selectedId ? selectedId : undefined,
+  )
+  const { data: tgMessages = [] } = useTgMessages(selectedTgDialogId ?? undefined)
+  const messages = useMemo(
+    () => (selectedIsTg ? tgMessages.map(tgMessageToMsg) : botMessages),
+    [selectedIsTg, botMessages, tgMessages],
+  )
+
   const sendMessage = useSendMessage(salonId)
   const markRead = useMarkConversationRead(salonId)
+  const tgSendText = useTgSendText(salonId)
+  const tgSendPhoto = useTgSendPhoto(salonId)
+  const tgMarkRead = useTgMarkRead()
   const selected = conversations.find((c) => c.id === selectedId) ?? null
 
-  // Auto-mark read on open
+  // Auto-mark read on open (Bot или tg)
   useEffect(() => {
-    if (selectedId) markRead.mutate(selectedId)
+    if (!selectedId) return
+    if (selectedIsTg && selectedTgDialogId && activeTgSession && tgMessages.length > 0) {
+      // Mark up to last message id
+      const lastMsg = tgMessages[tgMessages.length - 1]
+      if (lastMsg) {
+        tgMarkRead.mutate({
+          session_id: activeTgSession.id,
+          dialog_id: selectedTgDialogId,
+          tg_message_id: lastMsg.tg_message_id,
+        })
+      }
+    } else if (!selectedIsTg) {
+      markRead.mutate(selectedId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId])
+  }, [selectedId, selectedIsTg, tgMessages.length])
 
   if (!salonId) return null
 
@@ -245,21 +356,69 @@ export function MessengerPage() {
               <Composer
                 salonId={salonId}
                 conversationId={selected.id}
-                disabled={sendMessage.isPending}
-                onSend={(text, mediaPath, mediaKind) =>
-                  sendMessage.mutate(
-                    {
-                      conversation_id: selected.id,
-                      text: text || undefined,
-                      media_path: mediaPath,
-                      media_kind: mediaKind,
-                    },
-                    {
-                      onError: (err) =>
-                        toast.error(err instanceof Error ? err.message : String(err)),
-                    },
-                  )
-                }
+                isTg={selectedIsTg}
+                disabled={sendMessage.isPending || tgSendText.isPending || tgSendPhoto.isPending}
+                onSendText={(text) => {
+                  if (selectedIsTg && selectedTgDialogId && activeTgSession) {
+                    tgSendText.mutate(
+                      {
+                        session_id: activeTgSession.id,
+                        dialog_id: selectedTgDialogId,
+                        text,
+                      },
+                      {
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      },
+                    )
+                  } else {
+                    sendMessage.mutate(
+                      { conversation_id: selected.id, text },
+                      {
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      },
+                    )
+                  }
+                }}
+                onSendPhoto={async (file, caption) => {
+                  if (selectedIsTg && selectedTgDialogId && activeTgSession) {
+                    tgSendPhoto.mutate(
+                      {
+                        session_id: activeTgSession.id,
+                        dialog_id: selectedTgDialogId,
+                        file,
+                        caption,
+                      },
+                      {
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      },
+                    )
+                  } else {
+                    try {
+                      const { path, mediaKind } = await uploadMessengerMedia(
+                        salonId,
+                        selected.id,
+                        file,
+                      )
+                      sendMessage.mutate(
+                        {
+                          conversation_id: selected.id,
+                          text: caption || undefined,
+                          media_path: path,
+                          media_kind: mediaKind,
+                        },
+                        {
+                          onError: (err) =>
+                            toast.error(err instanceof Error ? err.message : String(err)),
+                        },
+                      )
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : String(e))
+                    }
+                  }
+                }}
               />
             </>
           ) : (
@@ -440,18 +599,19 @@ function ConversationRow({
   )
 }
 
-function MessageBody({ message }: { message: MessengerMessage }) {
+function MessageBody({ message }: { message: MessengerMessage & { _isTg?: boolean } }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   useEffect(() => {
     if (!message.media_path) return
     let cancelled = false
-    getMessengerMediaUrl(message.media_path).then((url) => {
+    const fetcher = message._isTg ? getTgMediaSignedUrl : getMessengerMediaUrl
+    fetcher(message.media_path).then((url) => {
       if (!cancelled) setMediaUrl(url)
     })
     return () => {
       cancelled = true
     }
-  }, [message.media_path])
+  }, [message.media_path, message._isTg])
 
   return (
     <>
@@ -529,14 +689,24 @@ function MessagesList({
             <MessageBody message={m} />
             <p
               className={cn(
-                'mt-1 text-[10px] opacity-70',
-                m.direction === 'out' ? 'text-right' : 'text-left',
+                'mt-1 flex items-center gap-1 text-[10px] opacity-70',
+                m.direction === 'out' ? 'justify-end' : 'justify-start',
               )}
             >
-              {new Date(m.created_at).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              <span>
+                {new Date(m.created_at).toLocaleTimeString('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+              {/* Read receipts: ✓ = доставлено, ✓✓ = прочитано (для outgoing TG) */}
+              {m.direction === 'out' && '_isTg' in m && (m as { _isTg?: boolean })._isTg ? (
+                (m as { read_by_recipient_at?: string | null }).read_by_recipient_at ? (
+                  <CheckCheck className="size-3 text-sky-200" strokeWidth={2.4} />
+                ) : (
+                  <Check className="size-3" strokeWidth={2.4} />
+                )
+              ) : null}
             </p>
           </div>
         ))}
@@ -546,19 +716,16 @@ function MessagesList({
 }
 
 function Composer({
-  salonId,
-  conversationId,
   disabled,
-  onSend,
+  onSendText,
+  onSendPhoto,
 }: {
   salonId: string
   conversationId: string
+  isTg?: boolean
   disabled: boolean
-  onSend: (
-    text: string,
-    mediaPath?: string,
-    mediaKind?: 'image' | 'video' | 'audio' | 'file',
-  ) => void
+  onSendText: (text: string) => void
+  onSendPhoto: (file: File, caption?: string) => void | Promise<void>
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
@@ -572,8 +739,8 @@ function Composer({
     }
     setUploading(true)
     try {
-      const { path, mediaKind } = await uploadMessengerMedia(salonId, conversationId, file)
-      onSend('', path, mediaKind)
+      await onSendPhoto(file, value.trim() || undefined)
+      setValue('')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -587,7 +754,7 @@ function Composer({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*,audio/*,.pdf"
+        accept="image/*"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
@@ -610,7 +777,7 @@ function Composer({
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (value.trim()) {
-              onSend(value.trim())
+              onSendText(value.trim())
               setValue('')
             }
           }
@@ -626,7 +793,7 @@ function Composer({
         disabled={disabled || uploading || !value.trim()}
         onClick={() => {
           if (value.trim()) {
-            onSend(value.trim())
+            onSendText(value.trim())
             setValue('')
           }
         }}
