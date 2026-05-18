@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { supabase } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ScheduledPaymentRow } from '@/hooks/useScheduledPayments'
+import { cn } from '@/lib/utils/cn'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -722,7 +723,7 @@ export function ExpenseFormModal({
           Image #133: ещё уплотнил — сократил form gap до 2, paddings до
           pt-2/pb-1, и пакую парные поля в 2-колоночный grid (дата+категория,
           контрагент+номер документа), чтобы вся форма умещалась без скролла. */}
-      <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
+      <DialogContent className="sm:!w-[820px] sm:!max-w-[820px]">
         <DialogHeader>
           <DialogTitle>
             {mode === 'planned-paying'
@@ -774,43 +775,42 @@ export function ExpenseFormModal({
             </div>
           ) : null}
 
-          {/* Image #93: голосовая надиктовка. Юзер диктует расход — Whisper
-              + Llama расшифровывают и распарсивают, applyDictation подставит
-              в форму. Доступна и для запланированного платежа — поля
-              описание/сумма/контрагент/номер документа общие. Компактный
-              one-line layout (h-9), без вторичной подсказки — экономим высоту. */}
-          <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex h-9 items-center justify-between gap-3 rounded-md border px-2.5">
-            <p className="text-brand-teal-deep truncate text-[11px] font-bold uppercase tracking-wider">
-              {t('dictate.title')}
-            </p>
-            <DictateButton
-              pending={dictate.isPending}
-              onAudio={async (blob) => {
-                const res = await dictate.mutateAsync(blob)
-                if (!res.parsed) {
-                  toast.error(t('dictate.parse_failed'))
-                  return
-                }
-                applyDictation(res.parsed)
-                toast.success(t('dictate.toast_applied'))
-              }}
-            />
-          </div>
+          {/* Image #93 + #109: два способа быстрого ввода (диктовка + чек/OCR)
+              в одной строке на десктопе (2-col), друг под другом на mobile.
+              Доступны и для запланированного платежа — поля общие.
+              Receipt: для payroll-категорий чека не бывает, скрываем его
+              половину (диктовка остаётся на всю ширину). */}
+          <div className={cn('grid grid-cols-1 gap-1.5', !isPayrollCategory && 'sm:grid-cols-2')}>
+            {/* Голосовая надиктовка: row h-9, compact button (size=sm matches). */}
+            <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex h-9 items-center justify-between gap-2 rounded-md border px-2.5">
+              <p className="text-brand-teal-deep min-w-0 truncate text-[11px] font-bold uppercase tracking-wider">
+                {t('dictate.title')}
+              </p>
+              <DictateButton
+                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+                pending={dictate.isPending}
+                onAudio={async (blob) => {
+                  const res = await dictate.mutateAsync(blob)
+                  if (!res.parsed) {
+                    toast.error(t('dictate.parse_failed'))
+                    return
+                  }
+                  applyDictation(res.parsed)
+                  toast.success(t('dictate.toast_applied'))
+                }}
+              />
+            </div>
 
-          {/* Image #109: блок чек (фото или PDF) — для быстрого OCR-распознавания
-              суммы/контрагента/номера документа. Доступен и для запланированного
-              платежа (юзер может загрузить фото фактуры). Скрывается только для
-              payroll-категорий (зарплатная — чека не бывает). */}
-          {isPayrollCategory ? null : (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
-              {receiptFile ? (
-                <div className="border-border bg-muted/30 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2 truncate">
+            {/* Чек (фото/PDF) — один-в-один h-9 как у диктовки. Скрываем для
+                payroll-категорий. Загруженный файл показываем с иконкой + ×. */}
+            {!isPayrollCategory &&
+              (receiptFile ? (
+                <div className="border-border bg-muted/30 flex h-9 items-center justify-between gap-2 rounded-md border px-2.5 text-xs">
+                  <span className="flex min-w-0 items-center gap-2 truncate">
                     {ocr.isPending ? (
-                      <Loader2 className="text-secondary size-4 animate-spin" strokeWidth={1.7} />
+                      <Loader2 className="text-secondary size-3.5 animate-spin" strokeWidth={1.7} />
                     ) : (
-                      <Paperclip className="text-muted-foreground size-4" strokeWidth={1.7} />
+                      <Paperclip className="text-muted-foreground size-3.5" strokeWidth={1.7} />
                     )}
                     <span className="truncate">
                       {ocr.isPending ? t('expenses.form.ocr_recognizing') : receiptFile.name}
@@ -822,114 +822,118 @@ export function ExpenseFormModal({
                       setReceiptFile(null)
                       setOcrNips({ buyer_nip: null, vendor_nip: null })
                     }}
-                    className="text-muted-foreground hover:text-destructive grid size-6 place-items-center rounded-md"
+                    className="text-muted-foreground hover:text-destructive grid size-6 shrink-0 place-items-center rounded-md"
                     aria-label={t('expenses.form.receipt_remove')}
                   >
-                    <X className="size-4" strokeWidth={1.7} />
+                    <X className="size-3.5" strokeWidth={1.7} />
                   </button>
                 </div>
               ) : (
                 <label
                   htmlFor="exp-receipt"
-                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-9 cursor-pointer items-center gap-2 rounded-md border-[1.5px] border-dashed px-3 text-xs"
+                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-9 cursor-pointer items-center gap-2 rounded-md border-[1.5px] border-dashed px-2.5 text-xs"
                 >
-                  <Camera className="size-4" strokeWidth={1.7} />
-                  <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
+                  <Camera className="size-3.5 shrink-0" strokeWidth={1.7} />
+                  <span className="truncate">{t('expenses.form.receipt_placeholder_ocr')}</span>
                 </label>
-              )}
-              <input
-                id="exp-receipt"
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                data-testid="exp-receipt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null
-                  if (file && file.size > 10 * 1024 * 1024) {
-                    toast.error(t('expenses.form.receipt_too_big'))
-                    return
-                  }
-                  setReceiptFile(file)
-                  setOcrNips({ buyer_nip: null, vendor_nip: null })
-                  // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
-                  if (file && file.type.startsWith('image/')) {
-                    ocr.mutate(file, {
-                      onSuccess: (parsed) => {
-                        // Предзаполняем поля: только если они пусты или дефолтные.
-                        // Юзер редактируемые значения не теряет.
-                        if (parsed.amount && !form.getValues('amount')) {
-                          form.setValue('amount', String(parsed.amount), { shouldDirty: true })
-                        }
-                        if (parsed.expense_at) {
-                          form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
-                        }
-                        const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
-                        if (matchedCat && !form.getValues('category_id')) {
-                          form.setValue('category_id', matchedCat, { shouldDirty: true })
-                        }
-                        if (parsed.vendor && !form.getValues('comment')) {
-                          form.setValue('comment', parsed.vendor, { shouldDirty: true })
-                        }
-                        // Описание (image #94) — auto-fill из vendor если пусто.
-                        if (parsed.vendor && !form.getValues('description')) {
-                          form.setValue('description', parsed.vendor.slice(0, 200), {
-                            shouldDirty: true,
-                          })
-                        }
-                        // Image #93: номер документа из чека.
-                        if (parsed.document_number && !form.getValues('document_number')) {
-                          form.setValue('document_number', parsed.document_number, {
-                            shouldDirty: true,
-                          })
-                        }
-                        // Image #93: контрагент. Сначала пытаемся match по NIP
-                        // (надёжный ключ), потом по имени. Если не нашли —
-                        // открываем CounterpartyEditModal с префилом для
-                        // быстрого создания (юзер подтверждает данные).
-                        if (!form.getValues('counterparty_id') && parsed.vendor) {
-                          const byNip = parsed.vendor_nip
-                            ? counterparties.find(
-                                (cp) =>
-                                  cp.nip?.replace(/[^0-9]/g, '') ===
-                                  parsed.vendor_nip?.replace(/[^0-9]/g, ''),
-                              )
-                            : null
-                          const byName = byNip
-                            ? null
-                            : counterparties.find(
-                                (cp) => cp.name.toLowerCase() === parsed.vendor!.toLowerCase(),
-                              )
-                          const matched = byNip ?? byName
-                          if (matched) {
-                            form.setValue('counterparty_id', matched.id, { shouldDirty: true })
-                          } else {
-                            setDictationPrefillForNewCp({
-                              name: parsed.vendor,
-                              // CounterpartyEditModal принимает prefill { name, nip, address }
-                              // — дополняем доступными полями из OCR.
-                              ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
-                              ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
-                            } as { name: string; nip?: string; address?: string })
-                            setCounterpartyModalOpen(true)
-                          }
-                        }
-                        // NIP'ы — для wFirma auto-push (см. ADR-012).
-                        // Сами поля юзеру не показываем — это служебная мета.
-                        setOcrNips({
-                          buyer_nip: parsed.buyer_nip,
-                          vendor_nip: parsed.vendor_nip,
+              ))}
+          </div>
+
+          {/* Hidden file input: оставляем вне grid'а, т.к. это invisible target
+              для <label htmlFor="exp-receipt"> выше. */}
+          {!isPayrollCategory && (
+            <input
+              id="exp-receipt"
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              data-testid="exp-receipt"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                if (file && file.size > 10 * 1024 * 1024) {
+                  toast.error(t('expenses.form.receipt_too_big'))
+                  return
+                }
+                setReceiptFile(file)
+                setOcrNips({ buyer_nip: null, vendor_nip: null })
+                // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
+                if (file && file.type.startsWith('image/')) {
+                  ocr.mutate(file, {
+                    onSuccess: (parsed) => {
+                      // Предзаполняем поля: только если они пусты или дефолтные.
+                      // Юзер редактируемые значения не теряет.
+                      if (parsed.amount && !form.getValues('amount')) {
+                        form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+                      }
+                      if (parsed.expense_at) {
+                        form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
+                      }
+                      const matchedCat = findCategoryByGuess(parsed.category_guess, categories)
+                      if (matchedCat && !form.getValues('category_id')) {
+                        form.setValue('category_id', matchedCat, { shouldDirty: true })
+                      }
+                      if (parsed.vendor && !form.getValues('comment')) {
+                        form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                      }
+                      // Описание (image #94) — auto-fill из vendor если пусто.
+                      if (parsed.vendor && !form.getValues('description')) {
+                        form.setValue('description', parsed.vendor.slice(0, 200), {
+                          shouldDirty: true,
                         })
-                        toast.success(t('expenses.form.ocr_done'))
-                      },
-                      onError: () => {
-                        // Юзер заполнит сам, фото остаётся прикреплённым
-                        toast.error(t('expenses.form.ocr_failed'))
-                      },
-                    })
-                  }
-                }}
-              />
-            </div>
+                      }
+                      // Image #93: номер документа из чека.
+                      if (parsed.document_number && !form.getValues('document_number')) {
+                        form.setValue('document_number', parsed.document_number, {
+                          shouldDirty: true,
+                        })
+                      }
+                      // Image #93: контрагент. Сначала пытаемся match по NIP
+                      // (надёжный ключ), потом по имени. Если не нашли —
+                      // открываем CounterpartyEditModal с префилом для
+                      // быстрого создания (юзер подтверждает данные).
+                      if (!form.getValues('counterparty_id') && parsed.vendor) {
+                        const byNip = parsed.vendor_nip
+                          ? counterparties.find(
+                              (cp) =>
+                                cp.nip?.replace(/[^0-9]/g, '') ===
+                                parsed.vendor_nip?.replace(/[^0-9]/g, ''),
+                            )
+                          : null
+                        const byName = byNip
+                          ? null
+                          : counterparties.find(
+                              (cp) => cp.name.toLowerCase() === parsed.vendor!.toLowerCase(),
+                            )
+                        const matched = byNip ?? byName
+                        if (matched) {
+                          form.setValue('counterparty_id', matched.id, { shouldDirty: true })
+                        } else {
+                          setDictationPrefillForNewCp({
+                            name: parsed.vendor,
+                            // CounterpartyEditModal принимает prefill { name, nip, address }
+                            // — дополняем доступными полями из OCR.
+                            ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
+                            ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
+                          } as { name: string; nip?: string; address?: string })
+                          setCounterpartyModalOpen(true)
+                        }
+                      }
+                      // NIP'ы — для wFirma auto-push (см. ADR-012).
+                      // Сами поля юзеру не показываем — это служебная мета.
+                      setOcrNips({
+                        buyer_nip: parsed.buyer_nip,
+                        vendor_nip: parsed.vendor_nip,
+                      })
+                      toast.success(t('expenses.form.ocr_done'))
+                    },
+                    onError: () => {
+                      // Юзер заполнит сам, фото остаётся прикреплённым
+                      toast.error(t('expenses.form.ocr_failed'))
+                    },
+                  })
+                }
+              }}
+            />
           )}
 
           {/* Image #133: Дата + Категория в 2-колоночном grid'е — экономим
