@@ -125,3 +125,22 @@ class SupabaseClient:
         if r.status_code >= 400:
             raise SupabaseError(f"storage upload {bucket}/{path} failed: {r.status_code} {r.text}")
         return path
+
+    async def storage_delete(self, bucket: str, paths: list[str]) -> None:
+        """Удаляет файлы из bucket. Принимает список путей.
+        Supabase Storage поддерживает batch-delete через DELETE /object/{bucket}
+        с JSON body {prefixes: [...]}."""
+        if not paths:
+            return
+        url = f"{self.base}/storage/v1/object/{bucket}"
+        headers = {
+            "apikey": self.headers["apikey"],
+            "Authorization": self.headers["Authorization"],
+            "Content-Type": "application/json",
+        }
+        r = await self.client.request(
+            "DELETE", url, content=__import__("json").dumps({"prefixes": paths}), headers=headers
+        )
+        # 200 OK с массивом удалённых, 400 если ни одного — игнорируем
+        if r.status_code not in (200, 204, 400):
+            raise SupabaseError(f"storage delete {bucket} failed: {r.status_code} {r.text}")

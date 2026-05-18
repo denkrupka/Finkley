@@ -51,6 +51,7 @@ class Worker:
         self._stop = asyncio.Event()
         self._refresh_task: asyncio.Task | None = None
         self._outbox_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         log.info("Worker starting")
@@ -60,13 +61,14 @@ class Worker:
             log.warning("initial refresh_sessions failed (will retry): %s", e)
         self._refresh_task = asyncio.create_task(self._refresh_loop(), name="tg-refresh")
         self._outbox_task = asyncio.create_task(self._outbox_loop(), name="tg-outbox")
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop(), name="tg-cleanup")
 
     async def stop(self) -> None:
         log.info("Worker stopping")
         self._stop.set()
         for s in list(self.sessions.values()):
             await self._stop_session(s)
-        for t in (self._refresh_task, self._outbox_task):
+        for t in (self._refresh_task, self._outbox_task, self._cleanup_task):
             if t:
                 t.cancel()
                 try:
@@ -145,6 +147,12 @@ class Worker:
         client.add_event_handler(
             self._make_message_deleted_handler(sid), events.MessageDeleted()
         )
+        # Raw handler для реакций — Telethon не даёт высокоуровневого события.
+        from telethon.tl.types import UpdateMessageReactions, UpdateBotMessageReactions
+        client.add_event_handler(
+            self._make_reactions_handler(sid),
+            events.Raw(types=(UpdateMessageReactions, UpdateBotMessageReactions)),
+        )
 
         task = asyncio.create_task(client.run_until_disconnected(), name=f"tg-{sid[:8]}")
         self.sessions[sid] = RunningSession(
@@ -192,6 +200,19 @@ class Worker:
         каждого, чтобы юзер сразу видел свою TG-историю в портале."""
         log.info("bootstrap session %s — loading dialogs", sid)
         try:
+            # Свою аватарку (для шапки профиля)
+            try:
+                me_photo_path = await self._download_avatar(sid, client, "me", target_key="me")
+                if me_photo_path:
+                    async with SupabaseClient() as sb:
+                        await sb.update(
+                            "tg_sessions",
+                            {"id": f"eq.{sid}"},
+                            {"tg_photo_path": me_photo_path},
+                        )
+            except Exception:
+                log.exception("bootstrap me avatar failed (session=%s)", sid)
+
             dialogs = await client.get_dialogs(limit=50)
             log.info("bootstrap %s: %d dialogs", sid, len(dialogs))
             for dlg in dialogs:
@@ -199,7 +220,8 @@ class Worker:
                     await self._save_dialog(sid, dlg.entity, last_msg=dlg.message,
                                             unread_count=dlg.unread_count or 0,
                                             pinned=bool(dlg.pinned),
-                                            archived=bool(dlg.archived))
+                                            archived=bool(dlg.archived),
+                                            client=client)
                     # Подтягиваем последние 20 сообщений
                     messages = await client.get_messages(dlg.entity, limit=20)
                     for msg in reversed(messages):  # старые → новые
@@ -221,6 +243,32 @@ class Worker:
             log.info("bootstrap session %s — done", sid)
         except Exception:
             log.exception("bootstrap session %s failed", sid)
+
+    async def _download_avatar(
+        self,
+        session_id: str,
+        client: TelegramClient,
+        entity: Any,
+        *,
+        target_key: str,
+    ) -> str | None:
+        """Скачивает аватар entity в tg-media под session_id/avatars/<target_key>.jpg.
+        target_key — обычно tg_chat_id (str) или 'me'. Возвращает path или None."""
+        buf = io.BytesIO()
+        try:
+            res = await client.download_profile_photo(entity, file=buf, download_big=False)
+        except Exception as e:
+            log.debug("download_profile_photo %s failed: %s", target_key, e)
+            return None
+        if not res:
+            return None
+        blob = buf.getvalue()
+        if not blob:
+            return None
+        path = f"{session_id}/avatars/{target_key}.jpg"
+        async with SupabaseClient() as sb:
+            await sb.storage_upload("tg-media", path, blob, content_type="image/jpeg")
+        return path
 
     # ------------------------------------------------------------------------
     # Event handlers
@@ -311,6 +359,29 @@ class Worker:
                 log.exception("delete message failed (session=%s)", session_id)
         return handler
 
+    def _make_reactions_handler(self, session_id: str):
+        """Raw handler для UpdateMessageReactions — обновляет reactions jsonb."""
+        async def handler(update: Any) -> None:
+            try:
+                # update имеет атрибуты peer (peer chat), msg_id, reactions
+                msg_id = getattr(update, "msg_id", None)
+                reactions = getattr(update, "reactions", None)
+                if msg_id is None or reactions is None:
+                    return
+                payload = _reactions_to_jsonb(reactions)
+                async with SupabaseClient() as sb:
+                    await sb.update(
+                        "tg_messages",
+                        {
+                            "session_id": f"eq.{session_id}",
+                            "tg_message_id": f"eq.{msg_id}",
+                        },
+                        {"reactions": payload},
+                    )
+            except Exception:
+                log.exception("reactions update failed (session=%s)", session_id)
+        return handler
+
     # ------------------------------------------------------------------------
     # Persist
     # ------------------------------------------------------------------------
@@ -324,8 +395,10 @@ class Worker:
         unread_count: int = 0,
         pinned: bool = False,
         archived: bool = False,
+        client: TelegramClient | None = None,
     ) -> str:
-        """Upsert tg_dialogs запись. Возвращает dialog_id (uuid)."""
+        """Upsert tg_dialogs запись. Возвращает dialog_id (uuid).
+        Если передан client и у chat есть photo — скачиваем аватарку в bucket."""
         async with SupabaseClient() as sb:
             row = {
                 "session_id": session_id,
@@ -344,7 +417,27 @@ class Worker:
             rows = await sb.upsert(
                 "tg_dialogs", row, on_conflict="session_id,tg_chat_id"
             )
-            return rows[0]["id"]
+            dialog_id = rows[0]["id"]
+            existing_photo = rows[0].get("photo_path")
+
+        # Аватарку качаем один раз — только если в БД её ещё нет.
+        # client передаётся при bootstrap'е; при обычном _persist_message — None,
+        # чтобы не дёргать TG на каждое сообщение.
+        if client is not None and not existing_photo and getattr(chat, "photo", None):
+            try:
+                path = await self._download_avatar(
+                    session_id, client, chat, target_key=str(chat.id)
+                )
+                if path:
+                    async with SupabaseClient() as sb:
+                        await sb.update(
+                            "tg_dialogs",
+                            {"id": f"eq.{dialog_id}"},
+                            {"photo_path": path},
+                        )
+            except Exception:
+                log.exception("save dialog avatar failed (chat=%s)", chat.id)
+        return dialog_id
 
     async def _persist_message(
         self,
@@ -364,28 +457,9 @@ class Worker:
         )
 
         media_kind = _media_kind(msg)
-        media_path: str | None = None
-        media_mime: str | None = None
-        media_size: int | None = None
-
-        # Скачиваем медиа (фото/видео/документ) — только при первичной обработке.
-        # Видео и большие документы пропускаем чтобы не забивать диск на E2.1.Micro.
-        if media_kind in ("photo", "voice", "sticker"):
-            try:
-                buf = io.BytesIO()
-                await client.download_media(msg, file=buf)
-                blob = buf.getvalue()
-                if blob:
-                    ext = _media_extension(msg, media_kind)
-                    media_path = f"{session_id}/{msg.id}{ext}"
-                    media_mime = mimetypes.guess_type(media_path)[0] or "application/octet-stream"
-                    media_size = len(blob)
-                    async with SupabaseClient() as sb:
-                        await sb.storage_upload(
-                            "tg-media", media_path, blob, content_type=media_mime
-                        )
-            except Exception:
-                log.exception("media download failed (msg=%s)", msg.id)
+        # Lazy media: НЕ качаем сразу. SPA при открытии чата отправит
+        # action='download_media', тогда заполним media_path.
+        reactions_payload = _serialize_reactions(msg)
 
         async with SupabaseClient() as sb:
             await sb.upsert(
@@ -398,11 +472,9 @@ class Worker:
                     "is_outgoing": bool(msg.out),
                     "text": msg.message,
                     "media_kind": media_kind,
-                    "media_path": media_path,
-                    "media_mime_type": media_mime,
-                    "media_size_bytes": media_size,
                     "media_caption": msg.message if media_kind and msg.message else None,
                     "reply_to_tg_message_id": msg.reply_to_msg_id,
+                    "reactions": reactions_payload,
                     "sent_at": msg.date.isoformat(),
                 },
                 on_conflict="session_id,tg_message_id",
@@ -498,22 +570,56 @@ class Worker:
             # к моменту UPDATE outbox.status='sent'. Поэтому явно сохраняем тут.
             await self._persist_message(s.session_id, sent, s.client, skip_dialog_update=False)
 
-        elif action == "send_photo":
+        elif action in ("send_photo", "send_video", "send_voice", "send_document"):
             if tg_chat_id is None:
-                raise ValueError("send_photo requires dialog_id")
-            # payload: { storage_path: 'tg-media/upload/...', caption?: '...' }
+                raise ValueError(f"{action} requires dialog_id")
+            # payload: { storage_path: 'upload/<sid>/...', caption?: '...' }
             storage_path = payload["storage_path"]
             caption = payload.get("caption")
-            # Скачиваем из Supabase Storage в bytes, потом передаём в send_file
             blob = await self._fetch_storage_blob("tg-media", storage_path)
+            buf = io.BytesIO(blob)
+            # Имя файла нужно чтобы Telethon правильно определил mime
+            buf.name = storage_path.rsplit("/", 1)[-1]
+            force_document = action == "send_document"
+            voice_note = action == "send_voice"
             sent = await s.client.send_file(
                 tg_chat_id,
-                file=io.BytesIO(blob),
+                file=buf,
                 caption=caption,
-                attributes=[],
-                force_document=False,
+                force_document=force_document,
+                voice_note=voice_note,
             )
             await self._persist_message(s.session_id, sent, s.client)
+            # После отправки удаляем upload-файл из storage (он уже в TG)
+            try:
+                async with SupabaseClient() as sb:
+                    await sb.storage_delete("tg-media", [storage_path])
+            except Exception:
+                log.warning("failed to cleanup upload %s", storage_path, exc_info=True)
+
+        elif action == "react":
+            if tg_chat_id is None:
+                raise ValueError("react requires dialog_id")
+            # payload: { tg_message_id, emoji: '👍' | '❤' | ... или null для снятия }
+            from telethon.tl.functions.messages import SendReactionRequest
+            from telethon.tl.types import ReactionEmoji
+            emoji = payload.get("emoji")
+            reaction_list = [ReactionEmoji(emoticon=emoji)] if emoji else []
+            await s.client(
+                SendReactionRequest(
+                    peer=tg_chat_id,
+                    msg_id=payload["tg_message_id"],
+                    reaction=reaction_list,
+                )
+            )
+
+        elif action == "download_media":
+            # SPA-инициированное lazy-скачивание медиа конкретного сообщения.
+            # payload: { tg_message_id: number, dialog_id: uuid }
+            if tg_chat_id is None:
+                raise ValueError("download_media requires dialog_id")
+            tg_msg_id = payload["tg_message_id"]
+            await self._download_message_media(s.session_id, s.client, tg_chat_id, tg_msg_id)
 
         elif action == "mark_read":
             if tg_chat_id is None:
@@ -545,6 +651,158 @@ class Worker:
 
         else:
             raise NotImplementedError(f"action {action!r} not supported yet")
+
+    async def _download_message_media(
+        self,
+        session_id: str,
+        client: TelegramClient,
+        tg_chat_id: int,
+        tg_message_id: int,
+    ) -> None:
+        """По требованию SPA (action='download_media') качает медиа конкретного
+        сообщения и сохраняет media_path в БД. Лимит: 30 MB на файл (чтобы
+        не положить диск VM)."""
+        try:
+            msgs = await client.get_messages(tg_chat_id, ids=[tg_message_id])
+        except Exception as e:
+            log.warning("get_messages tg_chat=%s id=%s failed: %s", tg_chat_id, tg_message_id, e)
+            return
+        if not msgs or msgs[0] is None:
+            return
+        msg = msgs[0]
+        kind = _media_kind(msg)
+        if not kind:
+            return
+        # Лимит по размеру
+        size = 0
+        if msg.document:
+            size = getattr(msg.document, "size", 0) or 0
+        elif msg.photo:
+            # Фото обычно <5MB, разрешаем безусловно
+            size = 0
+        if size > 30 * 1024 * 1024:
+            log.info("skip media tg_msg=%s — too large (%d bytes)", tg_message_id, size)
+            async with SupabaseClient() as sb:
+                await sb.update(
+                    "tg_messages",
+                    {"session_id": f"eq.{session_id}", "tg_message_id": f"eq.{tg_message_id}"},
+                    {"media_pending": False},
+                )
+            return
+        buf = io.BytesIO()
+        try:
+            await client.download_media(msg, file=buf)
+        except Exception:
+            log.exception("download_media failed for tg_msg=%s", tg_message_id)
+            return
+        blob = buf.getvalue()
+        if not blob:
+            return
+        ext = _media_extension(msg, kind)
+        media_path = f"{session_id}/{tg_message_id}{ext}"
+        media_mime = mimetypes.guess_type(media_path)[0] or "application/octet-stream"
+        async with SupabaseClient() as sb:
+            await sb.storage_upload("tg-media", media_path, blob, content_type=media_mime)
+            await sb.update(
+                "tg_messages",
+                {"session_id": f"eq.{session_id}", "tg_message_id": f"eq.{tg_message_id}"},
+                {
+                    "media_path": media_path,
+                    "media_mime_type": media_mime,
+                    "media_size_bytes": len(blob),
+                    "media_pending": False,
+                },
+            )
+
+    # ------------------------------------------------------------------------
+    # Cleanup loop — удаляет старые медиа из storage (TTL 5 мин после закрытия)
+    # ------------------------------------------------------------------------
+
+    async def _cleanup_loop(self) -> None:
+        """Каждую минуту:
+          - находит tg_messages с media_path != null где dialog был закрыт > 5 мин
+            назад (или никогда не был открыт, но фото уже есть — legacy bootstrap)
+          - удаляет файлы из storage, обнуляет media_path в БД.
+        Аватарки (path содержит /avatars/) НЕ трогает.
+        """
+        while not self._stop.is_set():
+            try:
+                await asyncio.sleep(60)
+                if self._stop.is_set():
+                    break
+                await self._cleanup_stale_media()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                log.exception("cleanup loop error")
+
+    async def _cleanup_stale_media(self) -> None:
+        """Один проход: удаляет медиа в неактивных диалогах."""
+        async with SupabaseClient() as sb:
+            # Берём все диалоги где есть закешированные медиа
+            rows = await sb.select(
+                "tg_messages",
+                columns="id,session_id,dialog_id,media_path,tg_message_id",
+                filters={
+                    "media_path": "not.is.null",
+                    "deleted": "eq.false",
+                },
+                limit=500,
+            )
+        if not rows:
+            return
+        # Группируем по dialog_id чтобы узнать last_opened_at одним запросом
+        dialog_ids = list({r["dialog_id"] for r in rows})
+        async with SupabaseClient() as sb:
+            views = await sb.select(
+                "tg_dialog_views",
+                columns="dialog_id,last_opened_at,last_closed_at",
+                filters={"dialog_id": f"in.({','.join(dialog_ids)})"},
+            )
+        view_map = {v["dialog_id"]: v for v in views}
+        now = datetime.now(timezone.utc)
+        # 5 минут после закрытия (или 5 минут после открытия, если не закрыт явно
+        # но heartbeat давно не приходил — last_opened_at старше 5 мин).
+        stale_paths: list[str] = []
+        stale_msg_ids: list[str] = []
+        for r in rows:
+            path = r["media_path"]
+            # Аватарки не удаляем
+            if "/avatars/" in path:
+                continue
+            v = view_map.get(r["dialog_id"])
+            if not v:
+                # Если у диалога вообще не было View записи — legacy медиа
+                # (после bootstrap'а раньше). Чистим.
+                stale_paths.append(path)
+                stale_msg_ids.append(r["id"])
+                continue
+            last_opened = _parse_ts(v.get("last_opened_at"))
+            last_closed = _parse_ts(v.get("last_closed_at"))
+            # «активный» = открыт меньше 5 мин назад ИЛИ последний heartbeat
+            # (last_opened_at обновляется) свежий. Закрытый = last_closed_at
+            # был после last_opened_at, и прошло >5 мин.
+            ref_time = last_opened
+            if last_closed and last_opened and last_closed > last_opened:
+                ref_time = last_closed
+            if ref_time and (now - ref_time).total_seconds() > 300:
+                stale_paths.append(path)
+                stale_msg_ids.append(r["id"])
+        if not stale_paths:
+            return
+        log.info("cleanup: removing %d stale media files", len(stale_paths))
+        async with SupabaseClient() as sb:
+            try:
+                await sb.storage_delete("tg-media", stale_paths)
+            except Exception:
+                log.warning("storage delete batch failed (will retry)", exc_info=True)
+            # Обнуляем media_path в БД (батчами по 50 чтобы PostgREST не задохнулся)
+            for chunk in _chunks(stale_msg_ids, 50):
+                await sb.update(
+                    "tg_messages",
+                    {"id": f"in.({','.join(chunk)})"},
+                    {"media_path": None, "media_size_bytes": None},
+                )
 
     async def _fetch_storage_blob(self, bucket: str, path: str) -> bytes:
         """Скачивает blob из Supabase Storage используя service_role key."""
@@ -604,6 +862,48 @@ def _media_kind(msg: Message) -> str | None:
     if msg.document:
         return "document"
     return None
+
+
+def _parse_ts(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    try:
+        # Postgres возвращает '2026-05-19T00:00:00+00:00' или с микросек
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _chunks(lst: list, n: int):
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
+def _serialize_reactions(msg: Message) -> list[dict] | None:
+    """Извлекает реакции из Telethon Message в JSON-сериализуемый формат."""
+    reactions = getattr(msg, "reactions", None)
+    if not reactions:
+        return None
+    return _reactions_to_jsonb(reactions)
+
+
+def _reactions_to_jsonb(reactions: Any) -> list[dict]:
+    """Конвертирует MessageReactions Telethon в [{emoji, count, chosen}]."""
+    result: list[dict] = []
+    results_list = getattr(reactions, "results", None) or []
+    for r in results_list:
+        reaction = getattr(r, "reaction", None)
+        emoji = getattr(reaction, "emoticon", None) if reaction else None
+        # Custom emoji (premium) — пропускаем, выглядит как DocumentID
+        if not emoji:
+            continue
+        result.append({
+            "emoji": emoji,
+            "count": int(getattr(r, "count", 0) or 0),
+            "chosen": bool(getattr(r, "chosen_order", None) is not None
+                          or getattr(r, "chosen", False)),
+        })
+    return result
 
 
 def _media_extension(msg: Message, kind: str) -> str:

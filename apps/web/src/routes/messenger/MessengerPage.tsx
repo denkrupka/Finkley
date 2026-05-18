@@ -9,9 +9,14 @@ import {
   Image as ImageIcon,
   Instagram,
   MessageCircle,
+  Mic,
+  Paperclip,
   Phone,
+  Play,
+  Plus,
   Search,
   Send,
+  Smile,
   UserPlus,
   Users,
   X,
@@ -49,12 +54,15 @@ import {
   isTgConvId,
   makeTgConvId,
   parseTgConvId,
+  useTgDialogOpen,
   useTgDialogs,
   useTgMarkRead,
   useTgMessages,
+  useTgReact,
   useTgRealtime,
-  useTgSendPhoto,
+  useTgSendFile,
   useTgSendText,
+  useTgSignedUrls,
   type TgDialog,
   type TgMessage,
 } from '@/hooks/useTgMessenger'
@@ -63,14 +71,14 @@ import { ClientFormModal } from '@/routes/clients/ClientFormModal'
 import { cn } from '@/lib/utils/cn'
 
 /** Адаптер TgDialog → MessengerConversation для переиспользования UI-компонентов. */
-function tgDialogToConv(d: TgDialog): MessengerConversation {
+function tgDialogToConv(d: TgDialog, avatarUrl: string | null): MessengerConversation {
   return {
     id: makeTgConvId(d.id),
     salon_id: '',
     channel: 'telegram',
     external_user_id: String(d.tg_chat_id),
     display_name: d.title || d.username || '—',
-    avatar_url: null,
+    avatar_url: avatarUrl,
     client_id: null,
     unread_count: d.unread_count,
     last_message_at: d.last_message_at || new Date(0).toISOString(),
@@ -80,11 +88,16 @@ function tgDialogToConv(d: TgDialog): MessengerConversation {
   } as unknown as MessengerConversation
 }
 
-/** Адаптер TgMessage → MessengerMessage для переиспользования MessageBody. */
-function tgMessageToMsg(m: TgMessage): MessengerMessage & {
+type TgMessageAdapted = MessengerMessage & {
   read_by_recipient_at?: string | null
+  reactions?: { emoji: string; count: number; chosen: boolean }[] | null
+  media_pending?: boolean
+  tg_message_id?: number
   _isTg?: true
-} {
+}
+
+/** Адаптер TgMessage → MessengerMessage для переиспользования MessageBody. */
+function tgMessageToMsg(m: TgMessage): TgMessageAdapted {
   // Маппинг media_kind: tg использует photo/video/voice/sticker/animation/document,
   // bot api использует image/video/audio/file/sticker. Конвертируем.
   const mediaKindMap: Record<string, MessengerMessage['media_kind']> = {
@@ -94,18 +107,22 @@ function tgMessageToMsg(m: TgMessage): MessengerMessage & {
     sticker: 'image',
     document: 'file',
     animation: 'video',
+    video_note: 'video',
   }
   return {
     id: m.id,
     conversation_id: makeTgConvId(m.dialog_id),
     direction: m.is_outgoing ? 'out' : 'in',
-    text: m.text,
+    text: m.text || m.media_caption,
     media_path: m.media_path,
     media_kind: m.media_kind ? (mediaKindMap[m.media_kind] ?? 'file') : null,
     created_at: m.sent_at,
     read_by_recipient_at: m.read_by_recipient_at,
+    reactions: m.reactions,
+    media_pending: m.media_pending,
+    tg_message_id: m.tg_message_id,
     _isTg: true,
-  } as MessengerMessage & { read_by_recipient_at?: string | null; _isTg?: true }
+  } as TgMessageAdapted
 }
 
 /**
@@ -137,6 +154,7 @@ export function MessengerPage() {
   const [activeChannel, setActiveChannel] = useState<MessengerChannel | null>(null)
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [messageSearch, setMessageSearch] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
   const [clientFormOpen, setClientFormOpen] = useState(false)
   const linkClient = useLinkConversationClient(salonId)
@@ -152,19 +170,25 @@ export function MessengerPage() {
   const { data: tgSessions = [] } = useTgSessions(salonId)
   const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null
 
+  // Аватарки TG-диалогов (batch signed URLs)
+  const avatarPaths = useMemo(() => tgDialogs.map((d) => d.photo_path), [tgDialogs])
+  const avatarUrlMap = useTgSignedUrls(avatarPaths)
+
   // Объединённый список: Bot API без telegram + tg_dialogs как telegram
   const conversations = useMemo(() => {
     const filtered = botConversations.filter((c) => c.channel !== 'telegram')
-    const tgConvs = tgDialogs.map(tgDialogToConv).filter((c) => {
-      if (activeChannel && activeChannel !== 'telegram') return false
-      if (search && !c.display_name?.toLowerCase().includes(search.toLowerCase())) return false
-      return true
-    })
+    const tgConvs = tgDialogs
+      .map((d) => tgDialogToConv(d, d.photo_path ? (avatarUrlMap[d.photo_path] ?? null) : null))
+      .filter((c) => {
+        if (activeChannel && activeChannel !== 'telegram') return false
+        if (search && !c.display_name?.toLowerCase().includes(search.toLowerCase())) return false
+        return true
+      })
     // Объединяем + сортируем по last_message_at desc
     return [...filtered, ...tgConvs].sort(
       (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
     )
-  }, [botConversations, tgDialogs, activeChannel, search])
+  }, [botConversations, tgDialogs, avatarUrlMap, activeChannel, search])
 
   const selectedIsTg = isTgConvId(selectedId)
   const selectedTgDialogId = selectedIsTg ? parseTgConvId(selectedId!) : null
@@ -174,16 +198,34 @@ export function MessengerPage() {
     !selectedIsTg && selectedId ? selectedId : undefined,
   )
   const { data: tgMessages = [] } = useTgMessages(selectedTgDialogId ?? undefined)
-  const messages = useMemo(
+  // Lazy media + open/close trекинг (только для TG)
+  useTgDialogOpen(
+    selectedIsTg && activeTgSession ? activeTgSession.id : undefined,
+    selectedTgDialogId ?? undefined,
+    tgMessages,
+  )
+  const allMessages = useMemo(
     () => (selectedIsTg ? tgMessages.map(tgMessageToMsg) : botMessages),
     [selectedIsTg, botMessages, tgMessages],
   )
+  // Поиск по сообщениям в открытом чате
+  const messages = useMemo(() => {
+    const q = messageSearch.trim().toLowerCase()
+    if (!q) return allMessages
+    return allMessages.filter((m) => (m.text || '').toLowerCase().includes(q))
+  }, [allMessages, messageSearch])
+
+  // При смене чата — сбрасываем поиск по сообщениям
+  useEffect(() => {
+    setMessageSearch('')
+  }, [selectedId])
 
   const sendMessage = useSendMessage(salonId)
   const markRead = useMarkConversationRead(salonId)
   const tgSendText = useTgSendText(salonId)
-  const tgSendPhoto = useTgSendPhoto(salonId)
+  const tgSendFile = useTgSendFile(salonId)
   const tgMarkRead = useTgMarkRead()
+  const tgReact = useTgReact(salonId)
   const selected = conversations.find((c) => c.id === selectedId) ?? null
 
   // Auto-mark read on open (Bot или tg)
@@ -296,68 +338,100 @@ export function MessengerPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {selected ? (
             <>
-              <header className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-2.5">
-                <div className="flex min-w-0 items-center gap-3">
-                  <ConversationAvatar conversation={selected} size={36} />
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <p className="text-foreground truncate text-sm font-semibold">
-                        {selected.display_name || t('messenger.unnamed')}
+              <header className="border-border bg-card flex flex-col gap-2 border-b px-4 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ConversationAvatar conversation={selected} size={36} />
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="text-foreground truncate text-sm font-semibold">
+                          {selected.display_name || t('messenger.unnamed')}
+                        </p>
+                        {selected.client_id ? (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
+                            title={t('messenger.client_linked_tooltip')}
+                          >
+                            <CheckCircle2 className="size-3" strokeWidth={2.5} />
+                            {t('messenger.client_linked')}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setClientFormOpen(true)}
+                            className="border-primary/40 text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                            title={t('messenger.client_unlinked_tooltip')}
+                          >
+                            <UserPlus className="size-3" strokeWidth={2.5} />
+                            {t('messenger.client_unlinked')}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-[11px]">
+                        {CHANNEL_META[selected.channel].label}
                       </p>
-                      {selected.client_id ? (
-                        <span
-                          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
-                          title={t('messenger.client_linked_tooltip')}
-                        >
-                          <CheckCircle2 className="size-3" strokeWidth={2.5} />
-                          {t('messenger.client_linked')}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setClientFormOpen(true)}
-                          className="border-primary/40 text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
-                          title={t('messenger.client_unlinked_tooltip')}
-                        >
-                          <UserPlus className="size-3" strokeWidth={2.5} />
-                          {t('messenger.client_unlinked')}
-                        </button>
-                      )}
                     </div>
-                    <p className="text-muted-foreground text-[11px]">
-                      {CHANNEL_META[selected.channel].label}
-                    </p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      window.dispatchEvent(
-                        new CustomEvent('finsalon:open-quick-entry', {
-                          detail: {
-                            staffId: '',
-                            when: new Date().toISOString(),
-                            clientId: selected.client_id ?? undefined,
-                          },
-                        }),
-                      )
-                    }}
-                  >
-                    <CalendarPlus className="size-4" strokeWidth={1.8} />
-                    {t('messenger.create_visit')}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search
+                        className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2"
+                        strokeWidth={1.7}
+                      />
+                      <Input
+                        value={messageSearch}
+                        onChange={(e) => setMessageSearch(e.target.value)}
+                        placeholder={t('messenger.search_in_chat')}
+                        className="h-8 w-[180px] pl-7 text-xs"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent('finsalon:open-quick-entry', {
+                            detail: {
+                              staffId: '',
+                              when: new Date().toISOString(),
+                              clientId: selected.client_id ?? undefined,
+                            },
+                          }),
+                        )
+                      }}
+                    >
+                      <CalendarPlus className="size-4" strokeWidth={1.8} />
+                      {t('messenger.create_visit')}
+                    </Button>
+                  </div>
                 </div>
               </header>
 
-              <MessagesList messages={messages} />
+              <MessagesList
+                messages={messages}
+                onReact={(tgMessageId, emoji) => {
+                  if (selectedIsTg && selectedTgDialogId && activeTgSession) {
+                    tgReact.mutate(
+                      {
+                        session_id: activeTgSession.id,
+                        dialog_id: selectedTgDialogId,
+                        tg_message_id: tgMessageId,
+                        emoji,
+                      },
+                      {
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : String(err)),
+                      },
+                    )
+                  }
+                }}
+              />
 
               <Composer
                 salonId={salonId}
                 conversationId={selected.id}
                 isTg={selectedIsTg}
-                disabled={sendMessage.isPending || tgSendText.isPending || tgSendPhoto.isPending}
+                disabled={sendMessage.isPending || tgSendText.isPending || tgSendFile.isPending}
                 onSendText={(text) => {
                   if (selectedIsTg && selectedTgDialogId && activeTgSession) {
                     tgSendText.mutate(
@@ -381,9 +455,9 @@ export function MessengerPage() {
                     )
                   }
                 }}
-                onSendPhoto={async (file, caption) => {
+                onSendFile={async (file, caption) => {
                   if (selectedIsTg && selectedTgDialogId && activeTgSession) {
-                    tgSendPhoto.mutate(
+                    tgSendFile.mutate(
                       {
                         session_id: activeTgSession.id,
                         dialog_id: selectedTgDialogId,
@@ -599,22 +673,35 @@ function ConversationRow({
   )
 }
 
-function MessageBody({ message }: { message: MessengerMessage & { _isTg?: boolean } }) {
+function MessageBody({
+  message,
+}: {
+  message: MessengerMessage & { _isTg?: boolean; media_pending?: boolean }
+}) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   useEffect(() => {
-    if (!message.media_path) return
+    if (!message.media_path) {
+      setMediaUrl(null)
+      return
+    }
     let cancelled = false
     const fetcher = message._isTg ? getTgMediaSignedUrl : getMessengerMediaUrl
-    fetcher(message.media_path).then((url) => {
-      if (!cancelled) setMediaUrl(url)
-    })
+    fetcher(message.media_path)
+      .then((url) => {
+        if (!cancelled) setMediaUrl(url)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [message.media_path, message._isTg])
 
+  // TG-lazy: медиа есть (media_kind), но ещё качается (media_path == null)
+  const isLoadingMedia = !!message.media_kind && !message.media_path
+
   return (
     <>
+      {/* Image */}
       {message.media_path && message.media_kind === 'image' ? (
         mediaUrl ? (
           <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
@@ -628,8 +715,37 @@ function MessageBody({ message }: { message: MessengerMessage & { _isTg?: boolea
           <span className="text-xs italic opacity-70">📷 …</span>
         )
       ) : null}
+      {/* Video — inline player */}
+      {message.media_path && message.media_kind === 'video' ? (
+        mediaUrl ? (
+          <video
+            src={mediaUrl}
+            controls
+            preload="metadata"
+            className="mb-1 max-h-72 w-auto max-w-full rounded-md bg-black"
+          />
+        ) : (
+          <span className="text-xs italic opacity-70">🎥 …</span>
+        )
+      ) : null}
+      {/* Voice / audio — inline player */}
+      {message.media_path && message.media_kind === 'audio' ? (
+        mediaUrl ? (
+          <audio src={mediaUrl} controls preload="metadata" className="mb-1 max-w-full" />
+        ) : (
+          <span className="text-xs italic opacity-70">🎙 …</span>
+        )
+      ) : null}
+      {/* Lazy placeholder для медиа без media_path */}
+      {isLoadingMedia && message._isTg ? (
+        <span className="text-xs italic opacity-70">{mediaLabel(message.media_kind!)} …</span>
+      ) : null}
+      {/* Text / caption */}
       {message.text ? <p className="whitespace-pre-wrap break-words">{message.text}</p> : null}
-      {message.media_kind && !message.text && message.media_kind !== 'image' ? (
+      {/* Файл / документ / стикер — ссылка */}
+      {message.media_kind &&
+      message.media_path &&
+      !['image', 'video', 'audio'].includes(message.media_kind) ? (
         mediaUrl ? (
           <a
             href={mediaUrl}
@@ -644,6 +760,82 @@ function MessageBody({ message }: { message: MessengerMessage & { _isTg?: boolea
         )
       ) : null}
     </>
+  )
+}
+
+/** Полоска реакций под сообщением (для TG). Поддерживает 5 quick-emoji
+ * + просмотр существующих. Клик по существующей — toggle (снимет если уже стояла). */
+const QUICK_REACTIONS = ['👍', '❤', '🔥', '😁', '😢'] as const
+
+function ReactionsBar({
+  reactions,
+  onReact,
+  isOut,
+}: {
+  reactions: { emoji: string; count: number; chosen: boolean }[] | null | undefined
+  onReact: (emoji: string | null) => void
+  isOut: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const hasReactions = reactions && reactions.length > 0
+  return (
+    <div
+      className={cn(
+        'mt-1 flex flex-wrap items-center gap-1',
+        isOut ? 'justify-end' : 'justify-start',
+      )}
+    >
+      {hasReactions
+        ? reactions!.map((r) => (
+            <button
+              key={r.emoji}
+              type="button"
+              onClick={() => onReact(r.chosen ? null : r.emoji)}
+              className={cn(
+                'inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] leading-none transition-colors',
+                r.chosen
+                  ? 'border-amber-300 bg-amber-100 text-amber-900'
+                  : 'border-border bg-card hover:bg-muted/50',
+              )}
+            >
+              <span>{r.emoji}</span>
+              {r.count > 1 ? <span className="font-semibold">{r.count}</span> : null}
+            </button>
+          ))
+        : null}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-muted-foreground hover:text-foreground inline-flex size-5 items-center justify-center rounded-full opacity-50 hover:opacity-100"
+          title="React"
+        >
+          <Smile className="size-3.5" strokeWidth={1.8} />
+        </button>
+        {open ? (
+          <div
+            className={cn(
+              'absolute z-20 mt-1 flex gap-1 rounded-full border bg-white p-1 shadow-md',
+              isOut ? 'right-0' : 'left-0',
+            )}
+          >
+            {QUICK_REACTIONS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => {
+                  onReact(e)
+                  setOpen(false)
+                }}
+                className="hover:bg-muted/40 grid size-7 place-items-center rounded-full text-base"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 }
 
@@ -666,8 +858,10 @@ function mediaLabel(kind: string): string {
 
 function MessagesList({
   messages,
+  onReact,
 }: {
   messages: ReturnType<typeof useConversationMessages>['data']
+  onReact?: (tgMessageId: number, emoji: string | null) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -676,40 +870,61 @@ function MessagesList({
   return (
     <div ref={ref} className="bg-muted/10 min-h-0 flex-1 overflow-y-auto p-4">
       <div className="flex flex-col gap-2">
-        {(messages ?? []).map((m) => (
-          <div
-            key={m.id}
-            className={cn(
-              'w-fit max-w-[75%] rounded-lg px-3 py-2 text-sm',
-              m.direction === 'out'
-                ? 'bg-primary text-primary-foreground self-end'
-                : 'bg-card text-foreground border-border self-start border',
-            )}
-          >
-            <MessageBody message={m} />
-            <p
+        {(messages ?? []).map((m) => {
+          const isTg = '_isTg' in m && (m as { _isTg?: boolean })._isTg
+          const reactions = isTg
+            ? (m as { reactions?: { emoji: string; count: number; chosen: boolean }[] | null })
+                .reactions
+            : null
+          const tgMessageId = isTg ? (m as { tg_message_id?: number }).tg_message_id : undefined
+          return (
+            <div
+              key={m.id}
               className={cn(
-                'mt-1 flex items-center gap-1 text-[10px] opacity-70',
-                m.direction === 'out' ? 'justify-end' : 'justify-start',
+                'flex w-full flex-col',
+                m.direction === 'out' ? 'items-end' : 'items-start',
               )}
             >
-              <span>
-                {new Date(m.created_at).toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-              {/* Read receipts: ✓ = доставлено, ✓✓ = прочитано (для outgoing TG) */}
-              {m.direction === 'out' && '_isTg' in m && (m as { _isTg?: boolean })._isTg ? (
-                (m as { read_by_recipient_at?: string | null }).read_by_recipient_at ? (
-                  <CheckCheck className="size-3 text-sky-200" strokeWidth={2.4} />
-                ) : (
-                  <Check className="size-3" strokeWidth={2.4} />
-                )
+              <div
+                className={cn(
+                  'w-fit max-w-[75%] rounded-lg px-3 py-2 text-sm',
+                  m.direction === 'out'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-foreground border-border border',
+                )}
+              >
+                <MessageBody message={m} />
+                <p
+                  className={cn(
+                    'mt-1 flex items-center gap-1 text-[10px] opacity-70',
+                    m.direction === 'out' ? 'justify-end' : 'justify-start',
+                  )}
+                >
+                  <span>
+                    {new Date(m.created_at).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  {m.direction === 'out' && isTg ? (
+                    (m as { read_by_recipient_at?: string | null }).read_by_recipient_at ? (
+                      <CheckCheck className="size-3 text-sky-200" strokeWidth={2.4} />
+                    ) : (
+                      <Check className="size-3" strokeWidth={2.4} />
+                    )
+                  ) : null}
+                </p>
+              </div>
+              {isTg && onReact && tgMessageId ? (
+                <ReactionsBar
+                  reactions={reactions}
+                  isOut={m.direction === 'out'}
+                  onReact={(emoji) => onReact(tgMessageId, emoji)}
+                />
               ) : null}
-            </p>
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -717,42 +932,92 @@ function MessagesList({
 
 function Composer({
   disabled,
+  isTg,
   onSendText,
-  onSendPhoto,
+  onSendFile,
 }: {
   salonId: string
   conversationId: string
   isTg?: boolean
   disabled: boolean
   onSendText: (text: string) => void
-  onSendPhoto: (file: File, caption?: string) => void | Promise<void>
+  onSendFile: (file: File, caption?: string) => void | Promise<void>
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const voiceInputRef = useRef<HTMLInputElement>(null)
+  const [recording, setRecording] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
 
   async function handleFile(file: File) {
-    if (file.size > 20 * 1024 * 1024) {
+    if (file.size > 50 * 1024 * 1024) {
       toast.error(t('messenger.errors.file_too_large'))
       return
     }
     setUploading(true)
     try {
-      await onSendPhoto(file, value.trim() || undefined)
+      await onSendFile(file, value.trim() || undefined)
       setValue('')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      for (const r of [imageInputRef, videoInputRef, fileInputRef, voiceInputRef]) {
+        if (r.current) r.current.value = ''
+      }
+    }
+  }
+
+  async function toggleVoiceRecord() {
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error(t('messenger.errors.no_mic'))
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType: mime })
+      recordedChunksRef.current = []
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data)
+      }
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(recordedChunksRef.current, { type: mime })
+        if (blob.size > 100) {
+          const ext = mime.includes('ogg') ? 'ogg' : 'webm'
+          const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: mime })
+          await handleFile(file)
+        }
+        setRecording(false)
+      }
+      mediaRecorderRef.current = mr
+      mr.start()
+      setRecording(true)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+      setRecording(false)
     }
   }
 
   return (
     <div className="border-border bg-card flex shrink-0 items-center gap-2 border-t p-2">
       <input
-        ref={fileInputRef}
+        ref={imageInputRef}
         type="file"
         accept="image/*"
         className="hidden"
@@ -761,15 +1026,94 @@ function Composer({
           if (f) handleFile(f)
         }}
       />
-      <button
-        type="button"
-        className="text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md disabled:opacity-50"
-        title={t('messenger.attach_image')}
-        onClick={() => fileInputRef.current?.click()}
-        disabled={disabled || uploading}
-      >
-        <ImageIcon className="size-4" strokeWidth={1.8} />
-      </button>
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
+      />
+      <input
+        ref={voiceInputRef}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
+      />
+      <div className="relative">
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md disabled:opacity-50"
+          title={t('messenger.attach')}
+          onClick={() => setAttachMenuOpen((v) => !v)}
+          disabled={disabled || uploading}
+        >
+          <Plus className="size-5" strokeWidth={1.8} />
+        </button>
+        {attachMenuOpen ? (
+          <div className="border-border absolute bottom-12 left-0 z-30 flex w-40 flex-col rounded-lg border bg-white shadow-lg">
+            <AttachMenuItem
+              icon={<ImageIcon className="size-4" strokeWidth={1.8} />}
+              label={t('messenger.attach_image')}
+              onClick={() => {
+                setAttachMenuOpen(false)
+                imageInputRef.current?.click()
+              }}
+            />
+            {isTg ? (
+              <>
+                <AttachMenuItem
+                  icon={<Play className="size-4" strokeWidth={1.8} />}
+                  label={t('messenger.attach_video')}
+                  onClick={() => {
+                    setAttachMenuOpen(false)
+                    videoInputRef.current?.click()
+                  }}
+                />
+                <AttachMenuItem
+                  icon={<Paperclip className="size-4" strokeWidth={1.8} />}
+                  label={t('messenger.attach_file')}
+                  onClick={() => {
+                    setAttachMenuOpen(false)
+                    fileInputRef.current?.click()
+                  }}
+                />
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {isTg ? (
+        <button
+          type="button"
+          className={cn(
+            'grid size-9 place-items-center rounded-md transition-colors disabled:opacity-50',
+            recording
+              ? 'animate-pulse bg-red-100 text-red-700'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          title={recording ? t('messenger.stop_recording') : t('messenger.record_voice')}
+          onClick={toggleVoiceRecord}
+          disabled={disabled || uploading}
+        >
+          <Mic className="size-4" strokeWidth={1.8} />
+        </button>
+      ) : null}
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -782,15 +1126,21 @@ function Composer({
             }
           }
         }}
-        placeholder={uploading ? t('messenger.uploading') : t('messenger.composer_placeholder')}
+        placeholder={
+          uploading
+            ? t('messenger.uploading')
+            : recording
+              ? t('messenger.recording')
+              : t('messenger.composer_placeholder')
+        }
         className="h-10"
-        disabled={disabled || uploading}
+        disabled={disabled || uploading || recording}
       />
       <Button
         type="button"
         variant="primary"
         size="md"
-        disabled={disabled || uploading || !value.trim()}
+        disabled={disabled || uploading || recording || !value.trim()}
         onClick={() => {
           if (value.trim()) {
             onSendText(value.trim())
@@ -801,6 +1151,27 @@ function Composer({
         <Send className="size-4" strokeWidth={1.8} />
       </Button>
     </div>
+  )
+}
+
+function AttachMenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hover:bg-muted/50 flex items-center gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0"
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   )
 }
 
