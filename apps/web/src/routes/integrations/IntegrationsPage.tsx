@@ -40,6 +40,8 @@ import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { MessengerConnectDialog } from './MessengerConnectDialog'
+import { TelegramUserbotConnectDialog } from './TelegramUserbotConnectDialog'
+import { useTgLogout, useTgSessions } from '@/hooks/useTgUserbot'
 import { useDisconnectMessenger, useMessengerIntegrations } from '@/hooks/useMessenger'
 import {
   CATEGORY_ORDER,
@@ -492,6 +494,10 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
   const [openChannel, setOpenChannel] = useState<
     'telegram' | 'whatsapp' | 'instagram' | 'facebook' | null
   >(null)
+  const [tgUserbotOpen, setTgUserbotOpen] = useState(false)
+  const { data: tgSessions = [] } = useTgSessions(salonId)
+  const tgLogout = useTgLogout(salonId)
+  const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null
 
   const channels = [
     { id: 'telegram', name: 'Telegram', icon: Send, color: '#229ED9' },
@@ -582,6 +588,76 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
             </div>
           )
         })}
+
+        {/* ADR-015: личный TG-аккаунт через MTProto userbot (отдельный от бота). */}
+        <div
+          className={[
+            'border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5',
+            activeTgSession ? 'border-brand-sage/40' : '',
+          ].join(' ')}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className="grid size-10 shrink-0 place-items-center rounded-md"
+              style={{ background: '#229ED9', color: 'white' }}
+            >
+              <Send className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-foreground text-base font-bold">
+                  {t('integrations.telegram_userbot.card_title')}
+                </h3>
+                {activeTgSession ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    <Check className="size-3" strokeWidth={2.5} />
+                    {t('integrations.status.connected')}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                {activeTgSession
+                  ? activeTgSession.tg_username
+                    ? `@${activeTgSession.tg_username} · ${activeTgSession.phone}`
+                    : `${activeTgSession.tg_first_name ?? ''} · ${activeTgSession.phone}`
+                  : t('integrations.telegram_userbot.card_subtitle')}
+              </p>
+              {activeTgSession?.last_error ? (
+                <p className="text-destructive mt-1 line-clamp-2 text-xs">
+                  ⚠ {activeTgSession.last_error}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setTgUserbotOpen(true)}
+              className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+            >
+              {activeTgSession
+                ? t('integrations.messengers.reconnect')
+                : t('integrations.messengers.connect')}
+            </button>
+            {activeTgSession ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirm(t('integrations.telegram_userbot.confirm_disconnect'))) return
+                  tgLogout.mutate(activeTgSession.id, {
+                    onSuccess: () => toast.success(t('integrations.toast_disconnected')),
+                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+                  })
+                }}
+                className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+                aria-label={t('integrations.disconnect')}
+                title={t('integrations.disconnect')}
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.7} />
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <MessengerConnectDialog
@@ -589,6 +665,11 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
         channel={openChannel}
         salonId={salonId}
         onClose={() => setOpenChannel(null)}
+      />
+      <TelegramUserbotConnectDialog
+        open={tgUserbotOpen}
+        salonId={salonId}
+        onClose={() => setTgUserbotOpen(false)}
       />
     </>
   )

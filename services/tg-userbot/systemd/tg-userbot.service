@@ -1,0 +1,34 @@
+[Unit]
+Description=FinSalon Telegram userbot bridge (FastAPI + Telethon)
+Documentation=https://github.com/denkrupka/Finkley/blob/main/decisions/015-telegram-userbot.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tg-userbot
+Group=tg-userbot
+WorkingDirectory=/opt/tg-userbot
+EnvironmentFile=/opt/tg-userbot/.env
+ExecStart=/opt/tg-userbot/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level info
+Restart=always
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# Memory limit (E2.1.Micro имеет 1 GB RAM, оставляем запас для nginx + system)
+MemoryMax=500M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target
