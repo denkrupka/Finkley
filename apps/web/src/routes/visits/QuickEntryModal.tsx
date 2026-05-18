@@ -38,6 +38,7 @@ import {
   useUpdateVisit,
   type VisitRow,
 } from '@/hooks/useVisits'
+import { useInventoryItems } from '@/hooks/useInventory'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -62,6 +63,25 @@ type ServiceLine = {
    * Если null — для submit считаем что мастер не выбран (валидация
    * `linesNeedStaff` ниже).
    */
+  staff_id: string | null
+}
+
+/**
+ * Доп. продажа товара/услуги в рамках визита. Может быть из inventory
+ * (выбрана позиция со склада — цена подтягивается) или вручную (ввели
+ * название + сумму). Мастер по умолчанию = мастер первой услуги визита,
+ * но можно изменить — тому начисляется % от продажи (по настройкам).
+ *
+ * На submit каждая addon-line становится отдельным retail-визитом с
+ * group_key привязанным к основному визиту (используем существующий
+ * механизм retail+group_key как в RetailSaleWizard).
+ */
+type AddonLine = {
+  uid: string
+  inventory_item_id: string | null
+  name: string
+  qty: number
+  unit_price_cents: number
   staff_id: string | null
 }
 
@@ -156,6 +176,8 @@ export function QuickEntryModal({
 
   const [lines, setLines] = useState<ServiceLine[]>([])
   const [pendingServiceId, setPendingServiceId] = useState<string>('')
+  const [addonLines, setAddonLines] = useState<AddonLine[]>([])
+  const { data: inventory = [] } = useInventoryItems(salonId)
   /**
    * Отдельный флаг для подсветки пустого списка услуг под форму.
    * react-hook-form не валидирует `lines`, держим вне формы.
@@ -207,6 +229,7 @@ export function QuickEntryModal({
       setLines([line])
       setPendingServiceId('')
       setLinesTouched(false)
+      setAddonLines([])
       return
     }
     const prefillDate = prefill ? format(new Date(prefill.when), 'yyyy-MM-dd') : todayIso
@@ -227,6 +250,7 @@ export function QuickEntryModal({
     setLines([])
     setPendingServiceId('')
     setLinesTouched(false)
+    setAddonLines([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
@@ -296,6 +320,40 @@ export function QuickEntryModal({
 
   // Image #124: addService удалена — услуга добавляется сразу при выборе из
   // dropdown'а (логика инлайнена в onChange SearchableSelect ниже).
+
+  // ===== Helpers для блока «Доп. Продажи» =====
+  const firstStaffId = lines[0]?.staff_id ?? null
+  function addAddonLine() {
+    setAddonLines((prev) => [
+      ...prev,
+      {
+        uid: crypto.randomUUID(),
+        inventory_item_id: null,
+        name: '',
+        qty: 1,
+        unit_price_cents: 0,
+        staff_id: firstStaffId,
+      },
+    ])
+  }
+  function updateAddonLine(uid: string, patch: Partial<AddonLine>) {
+    setAddonLines((prev) => prev.map((a) => (a.uid === uid ? { ...a, ...patch } : a)))
+  }
+  function removeAddonLine(uid: string) {
+    setAddonLines((prev) => prev.filter((a) => a.uid !== uid))
+  }
+  function selectAddonInventory(uid: string, itemId: string) {
+    const item = inventory.find((i) => i.id === itemId)
+    if (!item) return
+    updateAddonLine(uid, {
+      inventory_item_id: item.id,
+      name: item.name,
+      // На складе пока хранится только cost_per_unit_cents (себестоимость).
+      // Используем как стартовую цену продажи — пользователь может изменить
+      // в поле вручную.
+      unit_price_cents: item.cost_per_unit_cents ?? 0,
+    })
+  }
 
   function removeLine(uid: string) {
     setLines((prev) => prev.filter((l) => l.uid !== uid))
@@ -473,6 +531,49 @@ export function QuickEntryModal({
         })
         createdIds.push(created.id)
       }
+
+      // Доп. Продажи — создаём retail-визиты, связанные group_key'ом с
+      // основным визитом. Используем существующий механизм retail (как в
+      // RetailSaleWizard). Списываем со склада через inventory_apply_tx.
+      const addonGroupKey = groupKey ?? createdIds[0] ?? null
+      for (const a of addonLines) {
+        const validQty = Math.max(1, Math.round(a.qty))
+        const total = validQty * a.unit_price_cents
+        if (total <= 0 || !a.name.trim()) continue
+        const retailVisit = await createVisit.mutateAsync({
+          salon_id: salonId,
+          staff_id: a.staff_id ?? lines[0]?.staff_id ?? null,
+          client_id: values.client_id || null,
+          service_id: null,
+          service_name_snapshot: validQty > 1 ? `${a.name.trim()} ×${validQty}` : a.name.trim(),
+          visit_at: visitAt,
+          amount_cents: total,
+          tip_cents: 0,
+          discount_cents: 0,
+          payment_method: defaultPayment as 'cash' | 'card' | 'transfer' | 'online' | 'mixed',
+          comment: null,
+          kind: 'retail',
+          status: 'pending',
+          group_key: addonGroupKey,
+          inventory_item_id: a.inventory_item_id,
+        })
+        createdIds.push(retailVisit.id)
+        // Списание со склада только для inventory-позиций.
+        if (a.inventory_item_id && validQty > 0) {
+          const { error: invErr } = await supabase.rpc('inventory_apply_tx', {
+            p_material_id: a.inventory_item_id,
+            p_type: 'manual_adjustment',
+            p_quantity: -validQty,
+            p_cost_cents: null,
+            p_notes: `Доп. продажа в визите`,
+          })
+          if (invErr) {
+            console.warn('inventory_apply_tx failed', invErr)
+            toast.error(`Склад: ${invErr.message}`)
+          }
+        }
+      }
+
       // Запоминаем мастера ПЕРВОЙ строки как last-staff (используем как
       // дефолт для следующей записи).
       const firstStaff = lines[0]?.staff_id
@@ -787,6 +888,147 @@ export function QuickEntryModal({
 
           {/* Image #104: глобальный селектор мастера удалён — выбор теперь
               рядом с каждой услугой в списке выше. */}
+
+          {/* Доп. Продажи: товар со склада или ручной ввод. Каждая строка
+              станет отдельным retail-визитом с group_key привязанным к
+              основному. Мастер по умолчанию = мастер первой услуги, но
+              можно изменить — тому начисляется % от продажи. */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <Label>{t('visits.form.addon_sales_label')}</Label>
+              <button
+                type="button"
+                onClick={addAddonLine}
+                className="text-secondary text-xs font-semibold hover:underline"
+                data-testid="qe-addon-add"
+              >
+                + {t('visits.form.addon_add')}
+              </button>
+            </div>
+            {addonLines.length === 0 ? (
+              <p className="text-muted-foreground text-xs">{t('visits.form.addon_empty')}</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {addonLines.map((a) => {
+                  const stock = a.inventory_item_id
+                    ? inventory.find((i) => i.id === a.inventory_item_id)
+                    : null
+                  return (
+                    <li
+                      key={a.uid}
+                      className="border-border bg-card flex flex-col gap-2 rounded-md border p-2.5 text-sm"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="flex-1">
+                          <SearchableSelect
+                            value={a.inventory_item_id ?? ''}
+                            options={[
+                              ...inventory.map((it) => ({
+                                value: it.id,
+                                label: it.name,
+                                subLabel: formatCurrency(it.cost_per_unit_cents ?? 0, currency),
+                              })),
+                            ]}
+                            onChange={(v) => {
+                              if (v) selectAddonInventory(a.uid, v)
+                            }}
+                            placeholder={t('visits.form.addon_inventory_placeholder')}
+                            searchPlaceholder={t('visits.form.addon_search')}
+                          />
+                          {/* Manual mode: если inventory не выбран, поле name редактируемое */}
+                          {!a.inventory_item_id ? (
+                            <Input
+                              value={a.name}
+                              onChange={(e) => updateAddonLine(a.uid, { name: e.target.value })}
+                              placeholder={t('visits.form.addon_manual_name')}
+                              className="mt-1.5 h-9 text-sm"
+                            />
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAddonLine(a.uid)}
+                          aria-label={t('common.remove')}
+                          className="text-muted-foreground hover:text-destructive grid size-8 shrink-0 place-items-center rounded-md"
+                        >
+                          <Trash2 className="size-3.5" strokeWidth={1.8} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-[80px_1fr_1fr] gap-2">
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
+                            {t('visits.form.addon_qty')}
+                          </label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={a.qty}
+                            onChange={(e) =>
+                              updateAddonLine(a.uid, {
+                                qty: Math.max(1, Math.round(Number(e.target.value) || 1)),
+                              })
+                            }
+                            className="num h-9 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
+                            {t('visits.form.addon_price')}
+                          </label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={(a.unit_price_cents / 100).toFixed(2)}
+                            onChange={(e) =>
+                              updateAddonLine(a.uid, {
+                                unit_price_cents: Math.round(
+                                  (parseFloat(e.target.value.replace(',', '.')) || 0) * 100,
+                                ),
+                              })
+                            }
+                            className="num h-9 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
+                            {t('visits.form.addon_sold_by')}
+                          </label>
+                          <Select
+                            value={a.staff_id ?? ''}
+                            onValueChange={(v) => updateAddonLine(a.uid, { staff_id: v })}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder={t('visits.form.staff_placeholder')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {staff.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.full_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {stock
+                            ? t('visits.form.addon_stock_left', {
+                                qty: stock.current_stock,
+                                unit: stock.unit ?? '',
+                              })
+                            : t('visits.form.addon_manual_hint')}
+                        </span>
+                        <span className="num text-foreground font-bold">
+                          {formatCurrency(a.qty * a.unit_price_cents, currency)}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
 
           {/* Дата + Время от/до */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
