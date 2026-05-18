@@ -2,8 +2,8 @@ import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 import { ClientTemplatesSection } from './ClientTemplatesSection'
-import { Mail, Phone, Pencil, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { Facebook, Instagram, Link2, Mail, Pencil, Phone, Send, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -51,6 +51,21 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
     })
   }
 
+  // Дата первого визита — самый старый visit_at. visits отсортированы DESC
+  // (newest first), значит первый визит = последний элемент массива.
+  const firstVisitDate = useMemo(() => {
+    if (!visits.length) return null
+    const oldest = visits.at(-1)
+    if (!oldest) return null
+    try {
+      return format(parseISO(oldest.visit_at), 'MMMM yyyy', { locale: ru })
+    } catch {
+      return null
+    }
+  }, [visits])
+
+  const socials = client?.socials ?? []
+
   if (!client) return null
 
   return (
@@ -64,6 +79,11 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
               <span className="num">{formatCurrency(client.total_revenue_cents, currency)}</span>{' '}
               {t('clients.drawer.lifetime')}
             </p>
+            {firstVisitDate ? (
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {t('clients.drawer.client_since', { date: firstVisitDate })}
+              </p>
+            ) : null}
           </SheetHeader>
 
           <SheetBody className="px-5 py-4">
@@ -86,6 +106,9 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
                   <span>{client.email}</span>
                 </a>
               ) : null}
+              {socials.map((s, idx) => (
+                <SocialRow key={`${s.kind}-${idx}`} social={s} />
+              ))}
               {client.notes ? (
                 <div className="bg-muted/40 mt-2 rounded-md p-3 text-sm">
                   <p className="text-muted-foreground mb-1 text-xs font-semibold uppercase">
@@ -175,4 +198,62 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
       />
     </>
   )
+}
+
+/** Строка соц-сети в шапке карточки клиента. Ссылка если handle — это
+ *  URL или @username, иначе просто текст. */
+function SocialRow({ social }: { social: { kind: string; label?: string; handle: string } }) {
+  const Icon =
+    social.kind === 'instagram'
+      ? Instagram
+      : social.kind === 'facebook'
+        ? Facebook
+        : social.kind === 'telegram'
+          ? Send
+          : Link2
+  const handle = social.handle?.trim() ?? ''
+  const href = socialHref(social.kind, handle)
+  const label = social.kind === 'custom' && social.label ? `${social.label}: ${handle}` : handle
+  if (!handle) return null
+  const inner = (
+    <>
+      <Icon className="text-muted-foreground size-4" strokeWidth={1.7} />
+      <span className="truncate">{label}</span>
+    </>
+  )
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="text-foreground hover:bg-muted/50 flex items-center gap-3 rounded-md p-2 text-sm"
+      >
+        {inner}
+      </a>
+    )
+  }
+  return (
+    <div className="text-foreground flex items-center gap-3 rounded-md p-2 text-sm">{inner}</div>
+  )
+}
+
+function socialHref(kind: string, handle: string): string | null {
+  if (!handle) return null
+  const h = handle.trim()
+  if (/^https?:\/\//i.test(h)) return h
+  if (kind === 'instagram') {
+    const username = h.replace(/^@/, '')
+    return `https://instagram.com/${username}`
+  }
+  if (kind === 'facebook') {
+    return h.includes('/')
+      ? `https://${h.replace(/^https?:\/\//, '')}`
+      : `https://facebook.com/${h}`
+  }
+  if (kind === 'telegram') {
+    if (h.startsWith('+')) return `https://t.me/${h.replace('+', '')}`
+    return `https://t.me/${h.replace(/^@/, '')}`
+  }
+  return null
 }

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Facebook, Instagram, Plus, Send, Trash2 } from 'lucide-react'
+import { ChevronDown, Facebook, Instagram, Plus, Send, Trash2 } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -144,12 +144,7 @@ export function ClientFormModal({
     },
   })
 
-  const {
-    fields,
-    append,
-    remove,
-    update: updateField,
-  } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'socials',
   })
@@ -341,20 +336,15 @@ export function ClientFormModal({
           {/* Соцсети */}
           <div className="flex flex-col gap-1.5">
             <Label>{t('clients.form.socials_label')}</Label>
-            {fields.length === 0 ? (
-              <p className="text-muted-foreground text-xs">{t('clients.form.socials_empty')}</p>
-            ) : (
-              <div className="flex flex-col gap-2">
+            {fields.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
                 {fields.map((f, idx) => (
                   <div key={f.id} className="flex items-center gap-2">
                     <SocialIcon kind={f.kind} />
                     {f.kind === 'custom' ? (
                       <Input
                         placeholder={t('clients.form.social_kind_placeholder')}
-                        value={f.label ?? ''}
-                        onChange={(e) =>
-                          updateField(idx, { ...f, label: e.target.value, kind: 'custom' })
-                        }
+                        {...form.register(`socials.${idx}.label` as const)}
                         className="h-9 w-[110px] shrink-0 text-sm"
                       />
                     ) : (
@@ -364,8 +354,7 @@ export function ClientFormModal({
                     )}
                     <Input
                       placeholder={socialPlaceholder(f.kind, t)}
-                      value={f.handle}
-                      onChange={(e) => updateField(idx, { ...f, handle: e.target.value })}
+                      {...form.register(`socials.${idx}.handle` as const)}
                       className="h-9 flex-1 text-sm"
                     />
                     <button
@@ -379,8 +368,10 @@ export function ClientFormModal({
                   </div>
                 ))}
               </div>
-            )}
-            <div className="mt-1 flex flex-wrap gap-1.5">
+            ) : null}
+            {/* Кнопки добавления — в одну строку (flex-nowrap), как просил
+                пользователь. На узких экранах допускаем перенос. */}
+            <div className="flex flex-wrap gap-1.5 sm:flex-nowrap">
               {availableSocials.map((k) => (
                 <button
                   key={k}
@@ -403,21 +394,29 @@ export function ClientFormModal({
             </div>
           </div>
 
-          {/* Источник */}
+          {/* Источник — Input + datalist стилизованный как dropdown. История
+              ранее введённых значений сохраняется автоматически (distinct
+              source у клиентов салона). */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="cl-source">{t('clients.form.source_label')}</Label>
-            <Input
-              id="cl-source"
-              placeholder={t('clients.form.source_placeholder')}
-              {...form.register('source')}
-              list="cl-source-suggestions"
-            />
+            <div className="relative">
+              <Input
+                id="cl-source"
+                placeholder={t('clients.form.source_placeholder')}
+                {...form.register('source')}
+                list="cl-source-suggestions"
+                className="pr-9"
+              />
+              <ChevronDown
+                className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2"
+                strokeWidth={1.7}
+              />
+            </div>
             <datalist id="cl-source-suggestions">
               {sourceSuggestions.map((s) => (
                 <option key={s} value={s} />
               ))}
             </datalist>
-            <p className="text-muted-foreground text-xs">{t('clients.form.source_hint')}</p>
           </div>
 
           {/* Заметка */}

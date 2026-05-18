@@ -1749,6 +1749,7 @@
     "drawer": {
       "visits_count": "визитов",
       "lifetime": "за всё время",
+      "client_since": "Клиент с {{date}}",
       "notes": "Заметка",
       "history": "История визитов",
       "history_empty": "Визитов с этим клиентом ещё нет.",
