@@ -44,6 +44,22 @@ type FormValues = {
   comment: string
 }
 
+/** Типичные категории платежей бьюти-салона — для подсказок в form vendor. */
+const BEAUTY_VENDOR_SUGGESTIONS = [
+  'Аренда помещения',
+  'ЗП мастерам',
+  'Materiały / косметика',
+  'Реклама (Instagram, Booksy Boost)',
+  'PIT-36 (налог)',
+  'VAT',
+  'ZUS (соц. взносы)',
+  'Коммуналка',
+  'Booksy подписка',
+  'wFirma подписка',
+  'Оборудование',
+  'Обучение мастеров',
+]
+
 const schema = z.object({
   due_date: z.string().min(1),
   vendor_name: z.string().min(1, 'finance.payments_form.errors.vendor_required'),
@@ -328,8 +344,14 @@ function PaymentFormModal({
             <Input
               id="pmt-vendor"
               placeholder={t('finance.payments_form.vendor_placeholder')}
+              list="pmt-vendor-suggestions"
               {...form.register('vendor_name')}
             />
+            <datalist id="pmt-vendor-suggestions">
+              {BEAUTY_VENDOR_SUGGESTIONS.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
             {form.formState.errors.vendor_name ? (
               <p className="text-destructive text-xs">
                 {t(form.formState.errors.vendor_name.message ?? '')}
