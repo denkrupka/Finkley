@@ -491,16 +491,15 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const { data: integrations = [] } = useMessengerIntegrations(salonId)
   const disconnect = useDisconnectMessenger(salonId)
-  const [openChannel, setOpenChannel] = useState<
-    'telegram' | 'whatsapp' | 'instagram' | 'facebook' | null
-  >(null)
+  const [openChannel, setOpenChannel] = useState<'whatsapp' | 'instagram' | 'facebook' | null>(null)
   const [tgUserbotOpen, setTgUserbotOpen] = useState(false)
   const { data: tgSessions = [] } = useTgSessions(salonId)
   const tgLogout = useTgLogout(salonId)
   const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null
 
+  // Telegram-бот (Bot API) убран — заменён userbot-карточкой ниже.
+  // Bot API не даёт доступ к личной переписке владельца.
   const channels = [
-    { id: 'telegram', name: 'Telegram', icon: Send, color: '#229ED9' },
     { id: 'whatsapp', name: 'WhatsApp Business', icon: Phone, color: '#25D366' },
     { id: 'instagram', name: 'Instagram Direct', icon: Instagram, color: '#E4405F' },
     { id: 'facebook', name: 'Facebook Messenger', icon: Facebook, color: '#1877F2' },

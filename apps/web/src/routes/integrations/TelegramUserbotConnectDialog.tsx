@@ -175,7 +175,7 @@ export function TelegramUserbotConnectDialog({
                 {t('integrations.telegram_userbot.phone_hint')}
               </p>
             </div>
-            <DialogFooter className="mt-2 px-0">
+            <DialogFooter className="mt-2 flex-row justify-end gap-2 px-0">
               <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
                 {t('common.cancel')}
               </Button>
@@ -208,7 +208,7 @@ export function TelegramUserbotConnectDialog({
                 {t('integrations.telegram_userbot.code_hint', { phone })}
               </p>
             </div>
-            <DialogFooter className="mt-2 px-0">
+            <DialogFooter className="mt-2 flex-row justify-end gap-2 px-0">
               <Button
                 type="button"
                 variant="outline"
@@ -244,7 +244,7 @@ export function TelegramUserbotConnectDialog({
                 {t('integrations.telegram_userbot.password_hint')}
               </p>
             </div>
-            <DialogFooter className="mt-2 px-0">
+            <DialogFooter className="mt-2 flex-row justify-end gap-2 px-0">
               <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
                 {t('common.cancel')}
               </Button>
