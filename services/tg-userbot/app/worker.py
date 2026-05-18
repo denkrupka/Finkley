@@ -164,9 +164,13 @@ class Worker:
         )
         log.info("started session %s", sid)
 
-        # Bootstrap: если не делали — делаем сейчас
+        # Bootstrap: если не делали — делаем сейчас. Иначе — догоняем аватарки
+        # для уже существующих диалогов (один раз, для сессий созданных до того
+        # как worker умел качать photo_path).
         if not row.get("bootstrap_completed_at"):
             asyncio.create_task(self._bootstrap_session(sid, client), name=f"bootstrap-{sid[:8]}")
+        else:
+            asyncio.create_task(self._catch_up_avatars(sid, client), name=f"avatars-{sid[:8]}")
 
     async def _stop_session(self, s: RunningSession) -> None:
         try:
@@ -243,6 +247,63 @@ class Worker:
             log.info("bootstrap session %s — done", sid)
         except Exception:
             log.exception("bootstrap session %s failed", sid)
+
+    async def _catch_up_avatars(self, sid: str, client: TelegramClient) -> None:
+        """Для уже существующих сессий (bootstrap'ом не прошлись с фото) —
+        качаем аватарки своего профиля + всех диалогов без photo_path.
+        Безопасно к повторному запуску (проверяем existing photo_path)."""
+        try:
+            # Свой аватар
+            async with SupabaseClient() as sb:
+                me_rows = await sb.select(
+                    "tg_sessions",
+                    columns="tg_photo_path",
+                    filters={"id": f"eq.{sid}"},
+                    limit=1,
+                )
+            if me_rows and not me_rows[0].get("tg_photo_path"):
+                try:
+                    me_path = await self._download_avatar(sid, client, "me", target_key="me")
+                    if me_path:
+                        async with SupabaseClient() as sb:
+                            await sb.update(
+                                "tg_sessions",
+                                {"id": f"eq.{sid}"},
+                                {"tg_photo_path": me_path},
+                            )
+                except Exception:
+                    log.exception("catch-up me avatar failed")
+
+            # Аватарки диалогов (max 50 за раз чтобы не положить TG api rate limit)
+            async with SupabaseClient() as sb:
+                dialogs = await sb.select(
+                    "tg_dialogs",
+                    columns="id,tg_chat_id",
+                    filters={"session_id": f"eq.{sid}", "photo_path": "is.null"},
+                    limit=50,
+                )
+            for d in dialogs:
+                try:
+                    entity = await client.get_entity(d["tg_chat_id"])
+                    if not getattr(entity, "photo", None):
+                        continue
+                    path = await self._download_avatar(
+                        sid, client, entity, target_key=str(d["tg_chat_id"])
+                    )
+                    if path:
+                        async with SupabaseClient() as sb:
+                            await sb.update(
+                                "tg_dialogs",
+                                {"id": f"eq.{d['id']}"},
+                                {"photo_path": path},
+                            )
+                except Exception:
+                    log.debug("catch-up dialog avatar %s failed", d["tg_chat_id"], exc_info=True)
+                # rate-limit-friendly pause
+                await asyncio.sleep(0.4)
+            log.info("catch-up avatars done for %s: %d dialogs", sid, len(dialogs))
+        except Exception:
+            log.exception("catch_up_avatars failed (session=%s)", sid)
 
     async def _download_avatar(
         self,
