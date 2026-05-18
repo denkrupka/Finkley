@@ -1,11 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { addMonths, addWeeks, format } from 'date-fns'
-import { Camera, Loader2, Paperclip, X } from 'lucide-react'
+import { CalendarClock, Camera, CheckCircle2, Loader2, Paperclip, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { z } from 'zod'
+
+import { supabase } from '@/lib/supabase/client'
+import { useQueryClient } from '@tanstack/react-query'
+import type { ScheduledPaymentRow } from '@/hooks/useScheduledPayments'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -213,6 +217,21 @@ function findCategoryByGuess(
   return partial?.id ?? null
 }
 
+/**
+ * Режимы работы модалки:
+ *  - `'expense'` — обычный flow из вкладки «Расходы». Переключатель Оплачено/Не
+ *    оплачено скрыт, всегда создаём `expenses` (как было до объединения).
+ *  - `'planned-new'` — открыто из «Платёжного календаря» как новый платёж.
+ *    Переключатель доступен: если выкл → создаём только `scheduled_payments`
+ *    (status=pending); если вкл → создаём `expenses` + связанный
+ *    `scheduled_payments(status=paid)`.
+ *  - `'planned-paying'` — клик «Mark as paid» на pending платеже. Префилл из
+ *    переданного `existingPayment`, переключатель скрыт (paid). При submit
+ *    создаём `expenses` и UPDATE существующего payment'а (status=paid,
+ *    paid_expense_id, paid_at).
+ */
+export type ExpenseFormMode = 'expense' | 'planned-new' | 'planned-paying'
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -223,6 +242,12 @@ type Props = {
   /** Image #49: если передано — модалка работает в режиме редактирования
    *  существующего расхода (UPDATE вместо INSERT). Поля префиллятся. */
   expense?: ExpenseRow | null
+  /** Режим работы модалки (см. ExpenseFormMode). Default: 'expense'. */
+  mode?: ExpenseFormMode
+  /** Дата по умолчанию (для prefill due_date/expense_at). Default: сегодня. */
+  defaultDate?: string | null
+  /** Существующий запланированный платёж — для mode='planned-paying'. */
+  existingPayment?: ScheduledPaymentRow | null
 }
 
 export function ExpenseFormModal({
@@ -232,9 +257,22 @@ export function ExpenseFormModal({
   currency,
   defaultCategoryId,
   expense,
+  mode = 'expense',
+  defaultDate,
+  existingPayment,
 }: Props) {
   const { t } = useTranslation()
   const isEdit = !!expense
+  const qc = useQueryClient()
+  // Toggle Оплачено/Не оплачено — управляет тем, что создаём (expense vs
+  // scheduled_payment). Только для mode='planned-new'; в остальных режимах
+  // значение зафиксировано: 'expense' → true, 'planned-paying' → true.
+  const [paid, setPaid] = useState<boolean>(
+    mode === 'planned-paying' || mode === 'expense' ? true : false,
+  )
+  // Если paid=false — поля чек/касса/payment_method/recurrence/payroll/dictate
+  // не имеют смысла (план, не факт оплаты). Скрываем их и не валидируем.
+  const showPaidOnlyFields = paid
   const { data: categories = [] } = useExpenseCategories(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const { data: cashRegisters = [] } = useCashRegisters(salonId)
@@ -350,8 +388,17 @@ export function ExpenseFormModal({
   const isPayrollCategory = !!watchedCategory?.is_payroll
 
   // При открытии в edit-mode — префиллим форму данными существующего расхода.
+  // Для mode='planned-paying' — префиллим из existingPayment (vendor → description,
+  // category_id, amount, document_number, comment, expense_at=today). Toggle
+  // paid синхронизируем с режимом каждый раз при открытии.
   useEffect(() => {
     if (!open) return
+    // Sync toggle paid с режимом при открытии:
+    //   'expense'         → paid=true (фиксировано)
+    //   'planned-new'     → paid=false (default; юзер может включить)
+    //   'planned-paying'  → paid=true (фиксировано)
+    setPaid(mode === 'planned-new' ? false : true)
+
     if (expense) {
       form.reset({
         expense_at: expense.expense_at.slice(0, 10),
@@ -369,9 +416,28 @@ export function ExpenseFormModal({
         payroll_period_start: expense.payroll_period_start ?? '',
         payroll_period_end: expense.payroll_period_end ?? '',
       })
-    } else {
+    } else if (existingPayment) {
+      // mode='planned-paying' — оплата существующего pending. vendor_name свободный
+      // текст → описание (юзер может потом выбрать counterparty из выпадашки).
       form.reset({
         expense_at: today,
+        description: existingPayment.vendor_name ?? '',
+        category_id: existingPayment.category_id ?? defaultCategoryId ?? '',
+        counterparty_id: '',
+        amount: (existingPayment.amount_cents / 100).toFixed(2),
+        payment_method: '',
+        cash_register_id: '',
+        document_number: existingPayment.invoice_number ?? '',
+        comment: existingPayment.comment ?? '',
+        recurrence: 'none',
+        payroll_staff_id: '',
+        payroll_kind: '',
+        payroll_period_start: '',
+        payroll_period_end: '',
+      })
+    } else {
+      form.reset({
+        expense_at: defaultDate || today,
         description: '',
         category_id: defaultCategoryId ?? '',
         counterparty_id: '',
@@ -388,7 +454,7 @@ export function ExpenseFormModal({
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
-  }, [open, expense?.id])
+  }, [open, expense?.id, existingPayment?.id, mode, defaultDate])
 
   /**
    * Выводим payment_method из выбранной кассы (cash_register_id) если юзер
@@ -409,14 +475,38 @@ export function ExpenseFormModal({
   }
 
   async function onSubmit(values: FormValues) {
-    // Per-user касса: создание/редактирование расхода требует открытую смену.
-    // Изменения существующего расхода (isEdit) — тоже за гейтом, иначе
-    // можно «починить» прошлые цифры без смены.
+    const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+
+    // Ветка 1: запланированный платёж (paid=false из календаря) — пишем только
+    // в scheduled_payments(status=pending). CashGate не нужен (это план,
+    // движения денег нет). Поля кассы/recurrence/payroll/чек не вычисляем.
+    if (mode === 'planned-new' && !paid) {
+      const { error } = await supabase.from('scheduled_payments').insert({
+        salon_id: salonId,
+        due_date: values.expense_at,
+        amount_cents: amountCents,
+        vendor_name: values.description.trim() || null,
+        invoice_number: values.document_number.trim() || null,
+        category_id: values.category_id || null,
+        comment: values.comment || null,
+        source: 'manual',
+      })
+      if (error) {
+        toast.error(t('expenses.toast_error'), { description: error.message })
+        return
+      }
+      toast.success(t('finance.payments.toast_added'))
+      await qc.invalidateQueries({ queryKey: ['scheduled-payments', salonId] })
+      onOpenChange(false)
+      return
+    }
+
+    // Все остальные ветки (expense / planned-new+paid / planned-paying) создают
+    // expense, поэтому требуют открытой смены.
     if (!hasOpenShift) {
       setGateOpen(true)
       return
     }
-    const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
     const derivedPaymentMethod = derivePaymentMethod(values)
 
     // Edit-mode: простое UPDATE без OCR/auto-push/upload (этого хватает для
@@ -501,7 +591,47 @@ export function ExpenseFormModal({
         ...payrollFields,
       },
       {
-        onSuccess: (created) => {
+        onSuccess: async (created) => {
+          // Связывание с scheduled_payments в зависимости от mode:
+          //  - 'planned-paying': UPDATE существующего payment'а — status=paid,
+          //    paid_expense_id=created.id, paid_at=now.
+          //  - 'planned-new'+paid=true: INSERT нового payment'а уже в paid-статусе,
+          //    привязанного к свежесозданному expense.
+          //  - 'expense': ничего не делаем (текущий путь).
+          if (mode === 'planned-paying' && existingPayment && created?.id) {
+            const { error: linkErr } = await supabase
+              .from('scheduled_payments')
+              .update({
+                status: 'paid',
+                paid_at: new Date().toISOString(),
+                paid_expense_id: created.id,
+              })
+              .eq('id', existingPayment.id)
+            if (linkErr) {
+              // Расход создан, но линковка упала — лог в toast чтобы юзер заметил.
+              toast.error(t('finance.payments.toast_error'), { description: linkErr.message })
+            }
+            await qc.invalidateQueries({ queryKey: ['scheduled-payments', salonId] })
+          } else if (mode === 'planned-new' && paid && created?.id) {
+            const { error: insErr } = await supabase.from('scheduled_payments').insert({
+              salon_id: salonId,
+              due_date: values.expense_at,
+              amount_cents: amountCents,
+              vendor_name: values.description.trim() || null,
+              invoice_number: values.document_number.trim() || null,
+              category_id: values.category_id || null,
+              comment: values.comment || null,
+              source: 'manual',
+              status: 'paid',
+              paid_at: new Date().toISOString(),
+              paid_expense_id: created.id,
+            })
+            if (insErr) {
+              toast.error(t('finance.payments.toast_error'), { description: insErr.message })
+            }
+            await qc.invalidateQueries({ queryKey: ['scheduled-payments', salonId] })
+          }
+
           toast.success(t('expenses.toast_added'))
           form.reset({
             expense_at: today,
@@ -595,7 +725,15 @@ export function ExpenseFormModal({
           контрагент+номер документа), чтобы вся форма умещалась без скролла. */}
       <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
         <DialogHeader>
-          <DialogTitle>{t('expenses.form.title_new')}</DialogTitle>
+          <DialogTitle>
+            {mode === 'planned-paying'
+              ? t('expenses.form.title_pay_planned')
+              : mode === 'planned-new'
+                ? paid
+                  ? t('expenses.form.title_new_paid_from_calendar')
+                  : t('expenses.form.title_new_planned')
+                : t('expenses.form.title_new')}
+          </DialogTitle>
         </DialogHeader>
 
         <form
@@ -603,35 +741,71 @@ export function ExpenseFormModal({
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
+          {/* Переключатель «Оплачено / Не оплачено» — только в mode='planned-new'.
+              В expense он не нужен (всегда paid), в planned-paying он скрыт
+              (фиксирован paid). */}
+          {mode === 'planned-new' ? (
+            <div className="border-border bg-muted/30 grid grid-cols-2 gap-1 rounded-md border p-1">
+              <button
+                type="button"
+                onClick={() => setPaid(false)}
+                className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  !paid
+                    ? 'bg-sky-100 text-sky-800 shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted/60'
+                }`}
+              >
+                <CalendarClock className="size-3.5" strokeWidth={2} />
+                {t('expenses.form.toggle_unpaid')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaid(true)}
+                className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  paid
+                    ? 'bg-emerald-100 text-emerald-800 shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted/60'
+                }`}
+              >
+                <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                {t('expenses.form.toggle_paid')}
+              </button>
+            </div>
+          ) : null}
+
           {/* Image #93: голосовая надиктовка. Юзер диктует расход — Whisper
               + Llama расшифровывают и распарсивают, applyDictation подставит
-              в форму. */}
-          <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex items-center justify-between gap-3 rounded-md border p-2.5">
-            <div className="min-w-0">
-              <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
-                {t('dictate.title')}
-              </p>
-              <p className="text-brand-teal-deep/80 text-[10.5px]">{t('dictate.hint')}</p>
+              в форму. Для запланированного (план) платежа — скрываем: диктовка
+              заточена под фактические расходы (чек, сумма, способ оплаты). */}
+          {showPaidOnlyFields ? (
+            <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex items-center justify-between gap-3 rounded-md border p-2.5">
+              <div className="min-w-0">
+                <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
+                  {t('dictate.title')}
+                </p>
+                <p className="text-brand-teal-deep/80 text-[10.5px]">{t('dictate.hint')}</p>
+              </div>
+              <DictateButton
+                pending={dictate.isPending}
+                onAudio={async (blob) => {
+                  const res = await dictate.mutateAsync(blob)
+                  if (!res.parsed) {
+                    toast.error(t('dictate.parse_failed'))
+                    return
+                  }
+                  applyDictation(res.parsed)
+                  toast.success(t('dictate.toast_applied'))
+                }}
+              />
             </div>
-            <DictateButton
-              pending={dictate.isPending}
-              onAudio={async (blob) => {
-                const res = await dictate.mutateAsync(blob)
-                if (!res.parsed) {
-                  toast.error(t('dictate.parse_failed'))
-                  return
-                }
-                applyDictation(res.parsed)
-                toast.success(t('dictate.toast_applied'))
-              }}
-            />
-          </div>
+          ) : null}
 
           {/* Image #109: блок чек (фото или PDF) перенесён сразу под голосовую
               надиктовку — оба способа быстрого ввода стоят рядом наверху формы.
               Image #65: для зарплатных категорий чека по смыслу не бывает —
-              скрываем блок целиком, чтобы не сбивать с толку. */}
-          {isPayrollCategory ? null : (
+              скрываем блок целиком, чтобы не сбивать с толку.
+              План платежа (paid=false) — чека ещё нет, скрываем тоже. */}
+          {isPayrollCategory || !showPaidOnlyFields ? null : (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
               {receiptFile ? (
@@ -766,7 +940,9 @@ export function ExpenseFormModal({
               вертикаль. На мобиле остаётся одна колонка. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="exp-date">{t('expenses.form.date_label')}</Label>
+              <Label htmlFor="exp-date">
+                {paid ? t('expenses.form.date_label') : t('expenses.form.due_date_label')}
+              </Label>
               <Input id="exp-date" type="date" {...form.register('expense_at')} />
             </div>
 
@@ -837,8 +1013,9 @@ export function ExpenseFormModal({
           </div>
 
           {/* Payroll-блок: показываем только если выбранная категория
-              is_payroll=true. Поля: мастер / аванс или окончательный / период. */}
-          {isPayrollCategory ? (
+              is_payroll=true. Поля: мастер / аванс или окончательный / период.
+              Для плана (paid=false) — скрываем: план зарплаты пока не делаем. */}
+          {isPayrollCategory && showPaidOnlyFields ? (
             <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex flex-col gap-3 rounded-md border p-3">
               <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
                 {t('expenses.form.payroll_section')}
@@ -957,47 +1134,50 @@ export function ExpenseFormModal({
           {/* Image #82: кассы (вместо payment_methods). Pills рендерятся из
               financial_settings.cash_registers.items[] — конкретные кассы
               салона, а не абстрактные cash/card/transfer. Если касс нет —
-              показываем подсказку со ссылкой на справочник. */}
-          <Controller
-            name="cash_register_id"
-            control={form.control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1.5">
-                <Label>{t('expenses.form.cash_register_label')}</Label>
-                {cashRegisters.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
-                    {t('expenses.form.cash_register_empty')}{' '}
-                    <a
-                      href={`/${salonId}/settings/cash-registers`}
-                      className="text-primary font-semibold hover:underline"
-                    >
-                      {t('expenses.form.cash_register_empty_link')}
-                    </a>
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {cashRegisters.map((r) => {
-                      const active = field.value === r.id
-                      return (
-                        <button
-                          type="button"
-                          key={r.id}
-                          onClick={() => field.onChange(active ? '' : r.id)}
-                          className={`flex h-10 items-center justify-center rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors ${
-                            active
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-card text-foreground hover:bg-accent/50'
-                          }`}
-                        >
-                          {r.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          />
+              показываем подсказку со ссылкой на справочник.
+              План платежа (paid=false) — кассы нет, скрываем целиком. */}
+          {showPaidOnlyFields ? (
+            <Controller
+              name="cash_register_id"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t('expenses.form.cash_register_label')}</Label>
+                  {cashRegisters.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t('expenses.form.cash_register_empty')}{' '}
+                      <a
+                        href={`/${salonId}/settings/cash-registers`}
+                        className="text-primary font-semibold hover:underline"
+                      >
+                        {t('expenses.form.cash_register_empty_link')}
+                      </a>
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {cashRegisters.map((r) => {
+                        const active = field.value === r.id
+                        return (
+                          <button
+                            type="button"
+                            key={r.id}
+                            onClick={() => field.onChange(active ? '' : r.id)}
+                            className={`flex h-10 items-center justify-center rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors ${
+                              active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-border bg-card text-foreground hover:bg-accent/50'
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            />
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-comment">{t('expenses.form.comment_label')}</Label>
@@ -1084,7 +1264,13 @@ export function ExpenseFormModal({
             disabled={createExpense.isPending || uploading}
             data-testid="exp-submit"
           >
-            {createExpense.isPending || uploading ? t('common.loading') : t('expenses.form.submit')}
+            {createExpense.isPending || uploading
+              ? t('common.loading')
+              : mode === 'planned-paying'
+                ? t('expenses.form.submit_pay')
+                : mode === 'planned-new' && !paid
+                  ? t('expenses.form.submit_planned')
+                  : t('expenses.form.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>
