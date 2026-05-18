@@ -5,6 +5,74 @@
 
 ---
 
+## Стадия 3 — Messenger Phase 3 · 19 мая 2026
+
+**Релиз:** прод-патч поверх ADR-015 (TG userbot).
+
+### Что сделано
+
+- **Bug-fix отправки фото из портала** (`new row violates RLS`): SPA-юзер не
+  имел INSERT policy в bucket `tg-media`. Добавили
+  `tg_media_insert_own_upload` (path `upload/<sid>/...` + owner check) +
+  расширенный SELECT (worker-загруженные `<sid>/<msg>.ext` И SPA `upload/...`).
+  Миграция 20260519130000.
+- **Аватарки TG** (вместо инициалов): worker качает `client.download_profile_photo`
+  для своего профиля + всех диалогов → `tg-media/<sid>/avatars/`. Catch-up
+  task для существующих сессий (50 диалогов с паузой 0.4с) — без re-bootstrap'а.
+  SPA подписывает batch-ом через `createSignedUrls` (1 запрос на 50 path'ов,
+  кэш 50 мин в памяти).
+- **Lazy media + TTL 5 мин** ([ADR-016](../decisions/016-tg-userbot-lazy-media.md)):
+  worker НЕ качает медиа в `_persist_message`. Открытие чата → SPA upsert
+  `tg_dialog_views.last_opened_at` + heartbeat 60s + outbox `download_media`
+  для видимых медиа. `_cleanup_loop` каждую минуту удаляет файлы где
+  `max(last_opened_at, last_closed_at) > 5 мин` (аватарки исключены).
+- **Phase 3** (реакции, видео, голосовые, поиск):
+  - `events.Raw(UpdateMessageReactions)` handler + outbox `react` через
+    `SendReactionRequest`. Picker 👍❤🔥😁😢 под сообщением, отображение
+    чужих с count.
+  - Новые actions: `send_video`, `send_voice`, `send_document`. SPA сама
+    детектит по mime, заливает в `upload/...`, после отправки worker
+    удаляет upload-файл (не дожидаясь TTL).
+  - Voice-запись в браузере через `MediaRecorder` (opus/webm).
+  - Inline `<video>`/`<audio>` плееры в чате.
+  - Поиск в открытом чате (pg_trgm индекс + ILIKE на клиенте).
+- **Мобильная адаптация** мессенджера: single-pane navigation как
+  Telegram/WhatsApp, back-кнопка, иконочный header, поиск раскрывается
+  по иконке.
+
+### Метрики качества на конец сессии
+
+- `pnpm typecheck` — зелёный
+- `pnpm lint` — зелёный (max-warnings 0)
+- `pnpm build` — собирается
+- `pnpm test` — 72 passed / 1 skipped
+- Worker на VM: `systemctl active`, 0 exceptions за наблюдаемый период
+- Все 50 аватарок sender'а скачаны в bucket
+
+### Узнали нового
+
+- В Telethon реакции не дают высокоуровневого события — нужен
+  `events.Raw(types=(UpdateMessageReactions, UpdateBotMessageReactions))`.
+- `client.send_file(buf, voice_note=True)` отправляет аудио как «голосовое»
+  с временной шкалой. Без флага — обычный документ.
+- Supabase `createSignedUrls` (множественное число) принимает массив
+  путей и возвращает `[{path, signedUrl, error}]` — один HTTP вместо N.
+  Существенно для списков (50 аватарок = 1 запрос вместо 50).
+- `storage.foldername(name)` в RLS-policy возвращает массив папок:
+  `upload/abc/xyz.jpg` → `[upload, abc]`. Удобно для path-pattern policy.
+- Heartbeat-подход к TTL надёжнее единой `expires_at` колонки: пользователь
+  может «забить» чат открытым в фоновой вкладке и не терять медиа, пока
+  вкладка живая.
+
+### Что мониторим (см. ADR-016)
+
+- Размер `tg-media` bucket — должен оставаться <100 МБ.
+- Логи `cleanup loop: removing N stale media files` — должны появляться
+  периодически с ненулевыми N.
+- `download_media failed` errors — если массово, значит retry не справляется.
+
+---
+
 ## Стадия 1 — Фундамент · 6 мая 2026
 
 **Релиз:** закрытая бета для 5–10 знакомых владелиц.
