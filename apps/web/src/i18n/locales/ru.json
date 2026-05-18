@@ -1361,7 +1361,8 @@
       "tip": "Чаевые",
       "discount": "Скидка",
       "total": "Итого",
-      "payment": "Оплачено: {{method}}"
+      "payment": "Оплачено: {{method}}",
+      "paid_at": "Оплачено · {{method}} · {{at}}"
     },
     "tabs": {
       "single": "Один визит",

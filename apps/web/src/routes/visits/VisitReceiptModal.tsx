@@ -8,6 +8,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import type { VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { formatPhoneDisplay } from '@/lib/utils/format-phone'
 
 type Props = {
   open: boolean
@@ -17,10 +18,16 @@ type Props = {
 }
 
 /**
- * Визуализация подтверждения оплаты визита в виде квитанции (а-ля Booksy
- * receipt). Открывается в QuickEntryModal в edit-mode когда status='paid'
- * вместо кнопки «Рассчитать». Это не настоящий fiscal-чек — только
- * человекочитаемая выдержка из визита (для скриншота / отправки клиенту).
+ * Квитанция визита в стиле fiscal-receipt. Структура (по примеру #62):
+ *   1. Статус-pill + дата справа
+ *   2. Заголовок: «Квитанция №ID» / клиент / название салона
+ *   3. Таблица позиций: Позиция | Кол-во | Сумма
+ *   4. Раздел сумм: Сумма / Чаевые / Скидка / Итого (bold)
+ *   5. Строка оплаты с методом и временем
+ *   6. Зубчатый низ (как у бумажного чека)
+ *
+ * Не fiscal-чек — это человекочитаемое подтверждение для клиента (скриншот /
+ * AirDrop).
  */
 export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
   const { t } = useTranslation()
@@ -40,40 +47,73 @@ export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
   const tip = visit.tip_cents
   const discount = visit.discount_cents
   const total = gross - discount + tip
+  const paidAtLabel = visit.updated_at
+    ? format(parseISO(visit.updated_at), 'dd.MM.yyyy, HH:mm', { locale: ru })
+    : `${format(at, 'dd.MM.yyyy', { locale: ru })}, ${timeLabel}`
+
+  const methodLabel = visit.payment_method
+    ? t(`payment_methods.${visit.payment_method}`, { defaultValue: visit.payment_method })
+    : '—'
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="w-[min(560px,95vw)] gap-0 p-0">
-        <div className="p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="bg-brand-sage-soft text-brand-sage-deep border-current/30 rounded-md border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider">
+      <DialogContent className="w-[min(560px,95vw)] gap-0 overflow-visible bg-transparent p-0 shadow-none">
+        {/* Бумажная карточка с зубчатым низом */}
+        <div
+          className="bg-white px-6 pb-6 pt-5"
+          style={{
+            WebkitMaskImage:
+              'radial-gradient(circle 8px at 8px 100%, transparent 7.5px, black 8px) repeat-x',
+            WebkitMaskSize: '16px 16px',
+            WebkitMaskPosition: 'bottom',
+            maskImage:
+              'radial-gradient(circle 8px at 8px 100%, transparent 7.5px, black 8px) repeat-x',
+            maskSize: '16px 16px',
+            maskPosition: 'bottom',
+            paddingBottom: 22,
+          }}
+        >
+          {/* 1. Статус + дата */}
+          <div className="mb-3 flex items-start justify-between">
+            <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
               {t('visits.receipt.paid')}
             </span>
             <p className="text-muted-foreground text-xs">{dateLabel}</p>
           </div>
 
+          {/* 2. Заголовок */}
           <div className="mb-4">
-            <h2 className="text-brand-navy text-lg font-bold tracking-tight">
+            <h2 className="text-foreground text-lg font-bold tracking-tight">
               {t('visits.receipt.title', { id: visit.id.slice(0, 8).toUpperCase() })}
             </h2>
             {client ? (
               <p className="text-foreground mt-0.5 text-sm">
                 {client.name}
                 {client.phone ? (
-                  <span className="text-muted-foreground"> · {client.phone}</span>
+                  <span className="num text-muted-foreground">
+                    {' · '}
+                    {formatPhoneDisplay(client.phone)}
+                  </span>
+                ) : null}
+                {client.email ? (
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {client.email}
+                  </span>
                 ) : null}
               </p>
             ) : null}
-            <p className="text-foreground mt-2 text-sm font-semibold">{salon?.name ?? '—'}</p>
+            <p className="text-foreground mt-2 text-sm font-bold">{salon?.name ?? '—'}</p>
           </div>
 
+          {/* 3. Таблица позиций */}
           <div className="border-border border-t pt-3">
-            <div className="text-muted-foreground mb-2 flex justify-between text-[11px] font-bold uppercase tracking-wider">
+            <div className="text-muted-foreground mb-2 grid grid-cols-[1fr_auto] gap-x-4 text-[10px] font-bold uppercase tracking-wider">
               <span>{t('visits.receipt.position')}</span>
-              <span>{t('visits.receipt.amount')}</span>
+              <span className="text-right">{t('visits.receipt.amount')}</span>
             </div>
-            <div className="flex justify-between">
-              <div className="min-w-0 flex-1">
+            <div className="grid grid-cols-[1fr_auto] gap-x-4">
+              <div className="min-w-0">
                 <p className="text-foreground text-sm font-semibold">
                   {visit.service_name_snapshot ?? '—'}
                 </p>
@@ -82,15 +122,16 @@ export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
                   {stf ? ` · ${stf.full_name}` : ''}
                 </p>
                 {visit.comment ? (
-                  <p className="text-muted-foreground mt-1 text-xs italic">{visit.comment}</p>
+                  <p className="text-muted-foreground mt-1 text-xs italic">«{visit.comment}»</p>
                 ) : null}
               </div>
-              <p className="num text-foreground shrink-0 text-sm font-bold tabular-nums">
+              <p className="num text-foreground self-start text-right text-sm font-bold tabular-nums">
                 {formatCurrency(gross, currency)}
               </p>
             </div>
           </div>
 
+          {/* 4. Суммы */}
           <div className="border-border mt-4 space-y-1 border-t pt-3 text-sm">
             <div className="text-muted-foreground flex justify-between">
               <span>{t('visits.receipt.subtotal')}</span>
@@ -114,16 +155,14 @@ export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
             </div>
           </div>
 
-          <div className="border-border mt-4 border-t pt-3 text-xs">
-            <p className="text-muted-foreground">
-              {t('visits.receipt.payment', {
-                method: visit.payment_method
-                  ? t(`payment_methods.${visit.payment_method}`, {
-                      defaultValue: visit.payment_method,
-                    })
-                  : '—',
-              })}
-            </p>
+          {/* 5. Оплачено · метод · время → сумма */}
+          <div className="border-border mt-3 flex items-center justify-between border-t pt-3 text-xs">
+            <span className="text-muted-foreground">
+              {t('visits.receipt.paid_at', { method: methodLabel, at: paidAtLabel })}
+            </span>
+            <span className="num text-foreground font-bold tabular-nums">
+              {formatCurrency(total, currency)}
+            </span>
           </div>
         </div>
       </DialogContent>
