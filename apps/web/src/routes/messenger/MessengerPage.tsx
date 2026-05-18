@@ -251,26 +251,38 @@ export function MessengerPage() {
 
   return (
     // Чат-страница: занимает всю доступную высоту <main> и НЕ скроллит body.
-    // sticky=true на родителе <main> (overflow-y-auto на lg) — на десктопе
-    // мы фактически забираем у main внешний скролл и держим всё внутри
-    // высоты viewport. На мобильном падаем на обычный flex-grow.
-    <div className="flex h-full min-h-0 flex-1 flex-col px-5 py-6 sm:px-8 lg:max-h-full">
-      <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
-        <div>
-          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+    // На мобиле: показываем либо список, либо чат (как Telegram/WhatsApp).
+    // На lg+: обе колонки одновременно.
+    <div className="flex h-full min-h-0 flex-1 flex-col px-3 py-3 sm:px-8 sm:py-6 lg:max-h-full">
+      <header className="mb-3 flex shrink-0 items-center justify-between gap-2 sm:mb-4 sm:gap-3">
+        <div className="min-w-0">
+          <h1 className="text-brand-navy truncate text-xl font-bold tracking-tight sm:text-2xl">
             {t('messenger.title')}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{t('messenger.subtitle')}</p>
+          <p className="text-muted-foreground mt-0.5 hidden text-sm sm:mt-1 sm:block">
+            {t('messenger.subtitle')}
+          </p>
         </div>
-        <Button variant="secondary" size="md" onClick={() => setBulkOpen(true)}>
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => setBulkOpen(true)}
+          className="shrink-0"
+        >
           <Users className="size-4" strokeWidth={1.8} />
-          {t('messenger.bulk_button')}
+          <span className="hidden sm:inline">{t('messenger.bulk_button')}</span>
         </Button>
       </header>
 
       <div className="border-border bg-card shadow-finsm flex min-h-0 flex-1 overflow-hidden rounded-lg border">
-        {/* Список чатов */}
-        <aside className="border-border bg-muted/10 flex w-[340px] shrink-0 flex-col border-r">
+        {/* Список чатов: на мобиле hidden когда выбран чат */}
+        <aside
+          className={cn(
+            'border-border bg-muted/10 flex-col border-r',
+            selectedId ? 'hidden lg:flex' : 'flex',
+            'w-full lg:w-[340px] lg:shrink-0',
+          )}
+        >
           {/* Search + filters */}
           <div className="border-border border-b p-2">
             <div className="relative">
@@ -334,46 +346,70 @@ export function MessengerPage() {
           </ul>
         </aside>
 
-        {/* Диалог */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Диалог: на мобиле hidden когда чат не выбран */}
+        <div
+          className={cn('min-h-0 min-w-0 flex-1 flex-col', selected ? 'flex' : 'hidden lg:flex')}
+        >
           {selected ? (
             <>
-              <header className="border-border bg-card flex flex-col gap-2 border-b px-4 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
+              <header className="border-border bg-card flex flex-col gap-2 border-b px-3 py-2 sm:px-4 sm:py-2.5">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    {/* Back-кнопка на мобиле */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(null)}
+                      className="hover:bg-muted/40 -ml-1 grid size-8 shrink-0 place-items-center rounded-md lg:hidden"
+                      title={t('common.back')}
+                      aria-label={t('common.back')}
+                    >
+                      <X className="size-5 rotate-45" strokeWidth={1.8} />
+                    </button>
                     <ConversationAvatar conversation={selected} size={36} />
                     <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
                         <p className="text-foreground truncate text-sm font-semibold">
                           {selected.display_name || t('messenger.unnamed')}
                         </p>
                         {selected.client_id ? (
                           <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
                             title={t('messenger.client_linked_tooltip')}
                           >
                             <CheckCircle2 className="size-3" strokeWidth={2.5} />
-                            {t('messenger.client_linked')}
+                            <span className="hidden sm:inline">{t('messenger.client_linked')}</span>
                           </span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setClientFormOpen(true)}
-                            className="border-primary/40 text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                            className="border-primary/40 text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-full border bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
                             title={t('messenger.client_unlinked_tooltip')}
                           >
                             <UserPlus className="size-3" strokeWidth={2.5} />
-                            {t('messenger.client_unlinked')}
+                            <span className="hidden sm:inline">
+                              {t('messenger.client_unlinked')}
+                            </span>
                           </button>
                         )}
                       </div>
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-[10px] sm:text-[11px]">
                         {CHANNEL_META[selected.channel].label}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    {/* На мобиле — иконка-кнопка поиска, на десктопе — инпут */}
+                    <button
+                      type="button"
+                      onClick={() => setMessageSearch((v) => (v === '' ? ' ' : ''))}
+                      className="text-muted-foreground hover:bg-muted/40 grid size-8 shrink-0 place-items-center rounded-md sm:hidden"
+                      title={t('messenger.search_in_chat')}
+                      aria-label={t('messenger.search_in_chat')}
+                    >
+                      <Search className="size-4" strokeWidth={1.8} />
+                    </button>
+                    <div className="relative hidden sm:block">
                       <Search
                         className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2"
                         strokeWidth={1.7}
@@ -388,6 +424,7 @@ export function MessengerPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="shrink-0"
                       onClick={() => {
                         window.dispatchEvent(
                           new CustomEvent('finsalon:open-quick-entry', {
@@ -401,10 +438,26 @@ export function MessengerPage() {
                       }}
                     >
                       <CalendarPlus className="size-4" strokeWidth={1.8} />
-                      {t('messenger.create_visit')}
+                      <span className="hidden sm:inline">{t('messenger.create_visit')}</span>
                     </Button>
                   </div>
                 </div>
+                {/* На мобиле — поиск раскрывается в отдельную строку когда есть текст */}
+                {messageSearch !== '' ? (
+                  <div className="relative sm:hidden">
+                    <Search
+                      className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2"
+                      strokeWidth={1.7}
+                    />
+                    <Input
+                      value={messageSearch}
+                      onChange={(e) => setMessageSearch(e.target.value)}
+                      placeholder={t('messenger.search_in_chat')}
+                      className="h-8 pl-7 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                ) : null}
               </header>
 
               <MessagesList
