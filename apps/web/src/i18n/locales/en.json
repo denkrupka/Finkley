@@ -1371,7 +1371,6 @@
       "today": "today",
       "in_days": "in {{n}} d",
       "mark_paid": "Mark paid",
-      "confirm_mark_paid": "Also create an expense record? OK — yes (recommended, so it shows up in cash flow). Cancel — no, just mark as paid.",
       "confirm_delete": "Remove this payment from the calendar?",
       "toast_added": "Payment added to the calendar",
       "toast_paid": "Payment marked as paid",

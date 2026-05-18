@@ -1376,7 +1376,6 @@
       "today": "dziś",
       "in_days": "za {{n}} dni",
       "mark_paid": "Oznacz jako zapłacone",
-      "confirm_mark_paid": "Czy utworzyć też wpis wydatku w kasie? OK — tak (zalecane, aby trafiło do przepływów). Anuluj — nie, tylko oznacz jako zapłacone.",
       "confirm_delete": "Usunąć tę płatność z kalendarza?",
       "toast_added": "Płatność dodana do kalendarza",
       "toast_paid": "Płatność oznaczona jako zapłacona",

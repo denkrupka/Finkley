@@ -477,10 +477,12 @@ export function ExpenseFormModal({
   async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
 
-    // Ветка 1: запланированный платёж (paid=false из календаря) — пишем только
-    // в scheduled_payments(status=pending). CashGate не нужен (это план,
+    // Ветка 1: запланированный платёж (paid=false) — пишем только в
+    // scheduled_payments(status=pending). Может прийти как из календаря
+    // (mode='planned-new'), так и из вкладки «Расходы» (mode='expense'),
+    // если юзер переключил на «Не оплачено». CashGate не нужен (это план,
     // движения денег нет). Поля кассы/recurrence/payroll/чек не вычисляем.
-    if (mode === 'planned-new' && !paid) {
+    if ((mode === 'planned-new' || mode === 'expense') && !paid) {
       const { error } = await supabase.from('scheduled_payments').insert({
         salon_id: salonId,
         due_date: values.expense_at,
@@ -728,11 +730,11 @@ export function ExpenseFormModal({
           <DialogTitle>
             {mode === 'planned-paying'
               ? t('expenses.form.title_pay_planned')
-              : mode === 'planned-new'
-                ? paid
+              : !paid
+                ? t('expenses.form.title_new_planned')
+                : mode === 'planned-new'
                   ? t('expenses.form.title_new_paid_from_calendar')
-                  : t('expenses.form.title_new_planned')
-                : t('expenses.form.title_new')}
+                  : t('expenses.form.title_new')}
           </DialogTitle>
         </DialogHeader>
 
@@ -741,10 +743,12 @@ export function ExpenseFormModal({
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
-          {/* Переключатель «Оплачено / Не оплачено» — только в mode='planned-new'.
-              В expense он не нужен (всегда paid), в planned-paying он скрыт
-              (фиксирован paid). */}
-          {mode === 'planned-new' ? (
+          {/* Переключатель «Оплачено / Не оплачено» — для нового расхода (вкладка
+              «Расходы») и нового платежа (календарь). Дефолт paid=true для expense
+              и false для planned-new. В planned-paying скрыт (фиксирован paid).
+              При редактировании существующего расхода (isEdit) скрыт — нельзя
+              перевести оплаченный расход в план. */}
+          {(mode === 'planned-new' || mode === 'expense') && !isEdit ? (
             <div className="border-border bg-muted/30 grid grid-cols-2 gap-1 rounded-md border p-1">
               <button
                 type="button"
@@ -1268,7 +1272,7 @@ export function ExpenseFormModal({
               ? t('common.loading')
               : mode === 'planned-paying'
                 ? t('expenses.form.submit_pay')
-                : mode === 'planned-new' && !paid
+                : !paid
                   ? t('expenses.form.submit_planned')
                   : t('expenses.form.submit')}
           </Button>
