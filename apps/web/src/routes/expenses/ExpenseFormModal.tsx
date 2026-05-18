@@ -267,9 +267,8 @@ export function ExpenseFormModal({
   // Toggle Оплачено/Не оплачено — управляет тем, что создаём (expense vs
   // scheduled_payment). Только для mode='planned-new'; в остальных режимах
   // значение зафиксировано: 'expense' → true, 'planned-paying' → true.
-  const [paid, setPaid] = useState<boolean>(
-    mode === 'planned-paying' || mode === 'expense' ? true : false,
-  )
+  // Дефолт = Оплачено для всех режимов; юзер переключит при необходимости.
+  const [paid, setPaid] = useState<boolean>(true)
   // Если paid=false — поля чек/касса/payment_method/recurrence/payroll/dictate
   // не имеют смысла (план, не факт оплаты). Скрываем их и не валидируем.
   const showPaidOnlyFields = paid
@@ -393,11 +392,9 @@ export function ExpenseFormModal({
   // paid синхронизируем с режимом каждый раз при открытии.
   useEffect(() => {
     if (!open) return
-    // Sync toggle paid с режимом при открытии:
-    //   'expense'         → paid=true (фиксировано)
-    //   'planned-new'     → paid=false (default; юзер может включить)
-    //   'planned-paying'  → paid=true (фиксировано)
-    setPaid(mode === 'planned-new' ? false : true)
+    // Sync toggle paid при открытии: дефолт = «Оплачено» во всех режимах.
+    // Юзер сам переключит на «Не оплачено» если хочет добавить план.
+    setPaid(true)
 
     if (expense) {
       form.reset({
@@ -739,7 +736,7 @@ export function ExpenseFormModal({
         </DialogHeader>
 
         <form
-          className="flex min-h-0 flex-col gap-2 overflow-y-auto px-5 pb-1 pt-2"
+          className="flex min-h-0 flex-col gap-1.5 overflow-y-auto px-5 pb-1 pt-1.5"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -752,20 +749,8 @@ export function ExpenseFormModal({
             <div className="border-border bg-muted/30 grid grid-cols-2 gap-1 rounded-md border p-1">
               <button
                 type="button"
-                onClick={() => setPaid(false)}
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  !paid
-                    ? 'bg-sky-100 text-sky-800 shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted/60'
-                }`}
-              >
-                <CalendarClock className="size-3.5" strokeWidth={2} />
-                {t('expenses.form.toggle_unpaid')}
-              </button>
-              <button
-                type="button"
                 onClick={() => setPaid(true)}
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
+                className={`flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
                   paid
                     ? 'bg-emerald-100 text-emerald-800 shadow-sm'
                     : 'text-muted-foreground hover:bg-muted/60'
@@ -774,42 +759,49 @@ export function ExpenseFormModal({
                 <CheckCircle2 className="size-3.5" strokeWidth={2} />
                 {t('expenses.form.toggle_paid')}
               </button>
+              <button
+                type="button"
+                onClick={() => setPaid(false)}
+                className={`flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  !paid
+                    ? 'bg-sky-100 text-sky-800 shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted/60'
+                }`}
+              >
+                <CalendarClock className="size-3.5" strokeWidth={2} />
+                {t('expenses.form.toggle_unpaid')}
+              </button>
             </div>
           ) : null}
 
           {/* Image #93: голосовая надиктовка. Юзер диктует расход — Whisper
               + Llama расшифровывают и распарсивают, applyDictation подставит
-              в форму. Для запланированного (план) платежа — скрываем: диктовка
-              заточена под фактические расходы (чек, сумма, способ оплаты). */}
-          {showPaidOnlyFields ? (
-            <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex items-center justify-between gap-3 rounded-md border p-2.5">
-              <div className="min-w-0">
-                <p className="text-brand-teal-deep text-[11px] font-bold uppercase tracking-wider">
-                  {t('dictate.title')}
-                </p>
-                <p className="text-brand-teal-deep/80 text-[10.5px]">{t('dictate.hint')}</p>
-              </div>
-              <DictateButton
-                pending={dictate.isPending}
-                onAudio={async (blob) => {
-                  const res = await dictate.mutateAsync(blob)
-                  if (!res.parsed) {
-                    toast.error(t('dictate.parse_failed'))
-                    return
-                  }
-                  applyDictation(res.parsed)
-                  toast.success(t('dictate.toast_applied'))
-                }}
-              />
-            </div>
-          ) : null}
+              в форму. Доступна и для запланированного платежа — поля
+              описание/сумма/контрагент/номер документа общие. Компактный
+              one-line layout (h-9), без вторичной подсказки — экономим высоту. */}
+          <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex h-9 items-center justify-between gap-3 rounded-md border px-2.5">
+            <p className="text-brand-teal-deep truncate text-[11px] font-bold uppercase tracking-wider">
+              {t('dictate.title')}
+            </p>
+            <DictateButton
+              pending={dictate.isPending}
+              onAudio={async (blob) => {
+                const res = await dictate.mutateAsync(blob)
+                if (!res.parsed) {
+                  toast.error(t('dictate.parse_failed'))
+                  return
+                }
+                applyDictation(res.parsed)
+                toast.success(t('dictate.toast_applied'))
+              }}
+            />
+          </div>
 
-          {/* Image #109: блок чек (фото или PDF) перенесён сразу под голосовую
-              надиктовку — оба способа быстрого ввода стоят рядом наверху формы.
-              Image #65: для зарплатных категорий чека по смыслу не бывает —
-              скрываем блок целиком, чтобы не сбивать с толку.
-              План платежа (paid=false) — чека ещё нет, скрываем тоже. */}
-          {isPayrollCategory || !showPaidOnlyFields ? null : (
+          {/* Image #109: блок чек (фото или PDF) — для быстрого OCR-распознавания
+              суммы/контрагента/номера документа. Доступен и для запланированного
+              платежа (юзер может загрузить фото фактуры). Скрывается только для
+              payroll-категорий (зарплатная — чека не бывает). */}
+          {isPayrollCategory ? null : (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="exp-receipt">{t('expenses.form.receipt_label')}</Label>
               {receiptFile ? (
@@ -839,7 +831,7 @@ export function ExpenseFormModal({
               ) : (
                 <label
                   htmlFor="exp-receipt"
-                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-12 cursor-pointer items-center gap-2.5 rounded-md border-[1.5px] border-dashed px-3.5 text-sm"
+                  className="border-border bg-card hover:bg-muted/30 text-muted-foreground flex h-9 cursor-pointer items-center gap-2 rounded-md border-[1.5px] border-dashed px-3 text-xs"
                 >
                   <Camera className="size-4" strokeWidth={1.7} />
                   <span>{t('expenses.form.receipt_placeholder_ocr')}</span>
@@ -1114,8 +1106,8 @@ export function ExpenseFormModal({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-amount">{t('expenses.form.amount_label')}</Label>
-            <div className="border-brand-yellow-deep bg-brand-yellow flex h-16 items-center gap-2 rounded-md border-[1.5px] px-4">
-              <span className="num text-brand-navy text-3xl font-bold">{currencySymbol}</span>
+            <div className="border-brand-yellow-deep bg-brand-yellow flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
+              <span className="num text-brand-navy text-2xl font-bold">{currencySymbol}</span>
               <input
                 id="exp-amount"
                 type="number"
@@ -1124,7 +1116,7 @@ export function ExpenseFormModal({
                 min="0"
                 placeholder="0"
                 {...form.register('amount')}
-                className="num text-brand-navy placeholder:text-brand-navy/30 h-full flex-1 bg-transparent text-3xl font-bold tracking-tight outline-none"
+                className="num text-brand-navy placeholder:text-brand-navy/30 h-full flex-1 bg-transparent text-2xl font-bold tracking-tight outline-none"
                 data-testid="exp-amount"
               />
             </div>

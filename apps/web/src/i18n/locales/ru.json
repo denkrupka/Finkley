@@ -3455,7 +3455,7 @@
       "title_new_paid_from_calendar": "Новый платёж (сразу оплачен)",
       "title_pay_planned": "Оплатить запланированный платёж",
       "toggle_paid": "Оплачено",
-      "toggle_unpaid": "Не оплачено (план)",
+      "toggle_unpaid": "Не оплачено",
       "due_date_label": "Срок оплаты",
       "submit_planned": "Добавить в календарь",
       "submit_pay": "Сохранить оплату",
