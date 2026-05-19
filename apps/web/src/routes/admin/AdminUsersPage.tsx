@@ -307,25 +307,60 @@ function IconButton({
   )
 }
 
+// Тираж ролей-чекбоксов как в TeamPage. owner — спец-роль, отдельным
+// бейджем (передача владения через эту модалку не делается).
+const ROLE_CHECKBOX_OPTIONS: { value: 'admin' | 'accountant' | 'staff'; key: string }[] = [
+  { value: 'admin', key: 'roles.admin' },
+  { value: 'accountant', key: 'roles.accountant' },
+  { value: 'staff', key: 'roles.staff' },
+]
+
+/** Берём highest-приоритет роль из набора. admin > accountant > staff. */
+function highestRole(roles: Set<string>): 'admin' | 'accountant' | 'staff' {
+  if (roles.has('admin')) return 'admin'
+  if (roles.has('accountant')) return 'accountant'
+  return 'staff'
+}
+
 function EditRolesModal({ user, onClose }: { user: AdminUserRow; onClose: () => void }) {
   const { t } = useTranslation()
   const change = useMemberRoleChange()
-  const [roles, setRoles] = useState<Record<string, string>>(() =>
-    Object.fromEntries(user.salons.map((s) => [s.salon_id, s.role])),
+  // Для каждого salon_id храним набор выбранных ролей. Если в БД owner —
+  // checkbox-блок не активен и работает только как индикатор.
+  const [rolesBySalon, setRolesBySalon] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(user.salons.map((s) => [s.salon_id, new Set([s.role])])),
   )
 
+  function toggle(salonId: string, role: string) {
+    setRolesBySalon((prev) => {
+      const next = new Set(prev[salonId] ?? [])
+      if (next.has(role)) next.delete(role)
+      else next.add(role)
+      // Хотя бы одна должна быть выбрана — иначе остаётся staff по умолчанию.
+      if (next.size === 0) next.add('staff')
+      return { ...prev, [salonId]: next }
+    })
+  }
+
   function save() {
-    const changed = user.salons.filter((s) => roles[s.salon_id] !== s.role)
+    const changed: { salon_id: string; role: 'admin' | 'accountant' | 'staff' }[] = []
+    for (const s of user.salons) {
+      if (s.role === 'owner') continue // owner редактируется отдельно
+      const selected = rolesBySalon[s.salon_id]
+      if (!selected) continue
+      const next = highestRole(selected)
+      if (next !== s.role) changed.push({ salon_id: s.salon_id, role: next })
+    }
     if (changed.length === 0) {
       onClose()
       return
     }
     Promise.all(
-      changed.map((s) =>
+      changed.map((c) =>
         change.mutateAsync({
-          salon_id: s.salon_id,
+          salon_id: c.salon_id,
           user_id: user.id,
-          role: roles[s.salon_id] ?? s.role,
+          role: c.role,
         }),
       ),
     )
@@ -350,27 +385,56 @@ function EditRolesModal({ user, onClose }: { user: AdminUserRow; onClose: () => 
           <p className="text-muted-foreground mb-3 text-sm">
             {t('admin.users.modal.edit_roles_body')}
           </p>
-          <div className="space-y-2">
-            {user.salons.map((s) => (
-              <div
-                key={s.salon_id}
-                className="border-border flex items-center justify-between gap-3 rounded-md border p-2"
-              >
-                <span className="text-foreground truncate text-sm font-semibold">
-                  {s.salon_name}
-                </span>
-                <select
-                  value={roles[s.salon_id] ?? s.role}
-                  onChange={(e) => setRoles((r) => ({ ...r, [s.salon_id]: e.target.value }))}
-                  className="border-border bg-card h-9 shrink-0 rounded-md border px-2 text-sm"
-                >
-                  <option value="owner">{t('roles.owner')}</option>
-                  <option value="admin">{t('roles.admin')}</option>
-                  <option value="accountant">{t('roles.accountant')}</option>
-                  <option value="staff">{t('roles.staff')}</option>
-                </select>
-              </div>
-            ))}
+          <div className="space-y-3">
+            {user.salons.map((s) => {
+              const isOwner = s.role === 'owner'
+              const selected = rolesBySalon[s.salon_id] ?? new Set([s.role])
+              return (
+                <div key={s.salon_id} className="border-border rounded-md border p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-foreground truncate text-sm font-semibold">
+                      {s.salon_name}
+                    </span>
+                    {isOwner ? (
+                      <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                        {t('roles.owner')}
+                      </span>
+                    ) : null}
+                  </div>
+                  {isOwner ? (
+                    <p className="text-muted-foreground text-[11px]">
+                      {t('admin.users.modal.owner_readonly', {
+                        defaultValue: 'Владелец салона. Передача владения — отдельно.',
+                      })}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {ROLE_CHECKBOX_OPTIONS.map((r) => {
+                        const checked = selected.has(r.value)
+                        return (
+                          <label
+                            key={r.value}
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                              checked
+                                ? 'border-brand-teal bg-brand-teal-soft text-brand-teal-deep'
+                                : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggle(s.salon_id, r.value)}
+                              className="size-3.5"
+                            />
+                            {t(r.key)}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
         <div className="border-border flex justify-end gap-2 border-t px-5 py-3">
