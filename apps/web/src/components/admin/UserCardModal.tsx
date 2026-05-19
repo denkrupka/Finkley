@@ -2,7 +2,6 @@ import {
   Ban,
   Building2,
   Calendar,
-  FlaskConical,
   Mail,
   Pencil,
   Phone,
@@ -27,7 +26,6 @@ import { Label } from '@/components/ui/label'
 import {
   useAdminGrant,
   useAdminRevoke,
-  useSetTesterFlag,
   useUpdateUserProfile,
   useUserBlock,
   useUserUnblock,
@@ -48,7 +46,6 @@ export function UserCardModal({ user, onClose }: { user: AdminUserRow; onClose: 
   const unblock = useUserUnblock()
   const grant = useAdminGrant()
   const revoke = useAdminRevoke()
-  const setTester = useSetTesterFlag()
   const update = useUpdateUserProfile()
   const { data: callerIsSuper } = useIsAppSuperAdmin()
 
@@ -104,12 +101,6 @@ export function UserCardModal({ user, onClose }: { user: AdminUserRow; onClose: 
                   <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-700">
                     <Shield className="size-3" strokeWidth={2.2} />
                     admin
-                  </span>
-                ) : null}
-                {user.is_tester ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                    <FlaskConical className="size-3" strokeWidth={2.2} />
-                    tester
                   </span>
                 ) : null}
                 {isBanned ? (
@@ -281,30 +272,6 @@ export function UserCardModal({ user, onClose }: { user: AdminUserRow; onClose: 
 
         {/* Footer actions */}
         <div className="border-border flex flex-wrap items-center gap-2 border-t px-5 py-3">
-          {/* Тестировщик toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={setTester.isPending}
-            onClick={() =>
-              setTester.mutate(
-                { user_id: user.id, is_tester: !user.is_tester },
-                {
-                  onSuccess: () =>
-                    toast.success(
-                      user.is_tester
-                        ? t('admin.users.toast.tester_off')
-                        : t('admin.users.toast.tester_on'),
-                    ),
-                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                },
-              )
-            }
-          >
-            <FlaskConical className="size-3.5" strokeWidth={1.8} />
-            {user.is_tester ? t('admin.user_card.unset_tester') : t('admin.user_card.set_tester')}
-          </Button>
-
           {/* Admin grant/revoke — только super-admin может назначать */}
           {callerIsSuper && !isSuper ? (
             isAdmin ? (
