@@ -1,4 +1,13 @@
-import { CheckCircle2, FileText, Loader2, Paperclip, Plus, Repeat, Trash2 } from 'lucide-react'
+import {
+  CalendarClock,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Paperclip,
+  Plus,
+  Repeat,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -32,6 +41,12 @@ import {
   useExpenses,
   type ExpenseRow,
 } from '@/hooks/useExpenses'
+import {
+  useDeleteScheduledPayment,
+  useScheduledPayments,
+  type ScheduledPaymentRow,
+} from '@/hooks/useScheduledPayments'
+import { cn } from '@/lib/utils/cn'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import {
@@ -74,6 +89,14 @@ export function ExpensesPage() {
   const [params, setParams] = useSearchParams()
   const categoryFilter = params.get('cat') || ''
   const payFilter = (params.get('pay') || '') as PaymentMethod | ''
+  // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments).
+  const tab = (params.get('tab') === 'pending' ? 'pending' : 'paid') as 'paid' | 'pending'
+  function setTab(value: 'paid' | 'pending') {
+    const next = new URLSearchParams(params)
+    if (value === 'pending') next.set('tab', 'pending')
+    else next.delete('tab')
+    setParams(next, { replace: true })
+  }
   // PeriodPickerPopover как в отчётах — выбор пресета/диапазона дат.
   // useExpenses ждёт диапазон дат в формате 'YYYY-MM-DD' (без времени),
   // потому что у expenses.expense_at колонка типа date, не timestamp.
@@ -121,6 +144,22 @@ export function ExpensesPage() {
     categoryId: categoryFilter || null,
     paymentMethod: payFilter || null,
   })
+  // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
+  // категории — на клиенте, чтобы не плодить варианты хука.
+  const { data: allScheduled = [], isLoading: scheduledLoading } = useScheduledPayments(salonId)
+  const deleteScheduled = useDeleteScheduledPayment(salonId)
+  const pendingPayments = useMemo(
+    () =>
+      allScheduled
+        .filter((p) => p.status === 'pending')
+        .filter((p) => p.due_date >= range.start && p.due_date <= range.end)
+        .filter((p) => !categoryFilter || p.category_id === categoryFilter)
+        .sort((a, b) => a.due_date.localeCompare(b.due_date)),
+    [allScheduled, range.start, range.end, categoryFilter],
+  )
+  const pendingTotal = pendingPayments.reduce((s, p) => s + p.amount_cents, 0)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const [editingPayment, setEditingPayment] = useState<ScheduledPaymentRow | null>(null)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
@@ -194,9 +233,16 @@ export function ExpensesPage() {
             {t('expenses.title')}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {t('expenses.subtitle_total')}{' '}
-            <span className="num text-destructive font-bold">
-              {formatCurrency(total, currency)}
+            {tab === 'pending'
+              ? t('expenses.tabs.subtitle_pending', { defaultValue: 'Запланировано к оплате:' })
+              : t('expenses.subtitle_total')}{' '}
+            <span
+              className={cn(
+                'num font-bold',
+                tab === 'pending' ? 'text-sky-700' : 'text-destructive',
+              )}
+            >
+              {formatCurrency(tab === 'pending' ? pendingTotal : total, currency)}
             </span>
           </p>
         </div>
@@ -220,9 +266,42 @@ export function ExpensesPage() {
         </div>
       </div>
 
-      {/* Подвкладки «Расходы / Поступления» убраны по запросу owner 2026-05-12.
-          На странице остаётся только список расходов. Поступления из банка
-          (если подключён) видны в разделе Финансы → ДДС. */}
+      {/* Табы Оплачено / Не оплачено */}
+      <div className="border-border bg-card shadow-finsm mb-4 inline-flex rounded-lg border p-1">
+        <button
+          type="button"
+          onClick={() => setTab('paid')}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+            tab === 'paid'
+              ? 'bg-brand-teal-soft text-brand-teal-deep'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <CheckCircle2 className="size-4" strokeWidth={1.8} />
+          {t('expenses.tabs.paid', { defaultValue: 'Оплачено' })}
+          <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
+            {expenses.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('pending')}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+            tab === 'pending'
+              ? 'bg-amber-100 text-amber-900'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <CalendarClock className="size-4" strokeWidth={1.8} />
+          {t('expenses.tabs.pending', { defaultValue: 'Не оплачено' })}
+          <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
+            {pendingPayments.length}
+          </span>
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Select
@@ -264,18 +343,141 @@ export function ExpensesPage() {
           BudgetsCard перенесены в /finance → Бюджеты → Плановые расходы.
           На странице расходов остался только список + структура. */}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
+      <div className={cn('grid grid-cols-1 gap-5', tab === 'paid' && 'lg:grid-cols-[2fr_1fr]')}>
         {/* List */}
         <div className="border-border bg-card shadow-finsm rounded-lg border">
           <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
             <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {t('expenses.list_title')}
+              {tab === 'pending'
+                ? t('expenses.tabs.list_title_pending', { defaultValue: 'Запланированные платежи' })
+                : t('expenses.list_title')}
             </h2>
             <span className="text-muted-foreground text-xs">
-              {expenses.length} {t('expenses.records')}
+              {tab === 'pending' ? pendingPayments.length : expenses.length} {t('expenses.records')}
             </span>
           </div>
-          {isLoading ? (
+          {tab === 'pending' ? (
+            scheduledLoading ? (
+              <div className="space-y-2 p-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
+                ))}
+              </div>
+            ) : pendingPayments.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <p className="text-muted-foreground text-sm">
+                  {t('expenses.tabs.empty_pending', {
+                    defaultValue: 'В этом периоде нет запланированных платежей',
+                  })}
+                </p>
+              </div>
+            ) : (
+              <ul>
+                {pendingPayments.map((p) => {
+                  const cat = p.category_id ? categoryById.get(p.category_id) : null
+                  const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
+                  const color =
+                    idx >= 0
+                      ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
+                      : '#9A9A9A'
+                  const overdue = p.due_date < todayStr
+                  const today = p.due_date === todayStr
+                  return (
+                    <li
+                      key={p.id}
+                      onClick={() => {
+                        if (!hasOpenShift) {
+                          setGateOpen(true)
+                          return
+                        }
+                        setEditingPayment(p)
+                      }}
+                      className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
+                      style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                    >
+                      <span className="num text-muted-foreground text-xs">
+                        {p.due_date.slice(5).replace('-', '.')}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                          <span className="truncate">
+                            {p.vendor_name || cat?.name || t('expenses.no_category')}
+                          </span>
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                              overdue
+                                ? 'bg-rose-100 text-rose-700'
+                                : today
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-sky-100 text-sky-700',
+                            )}
+                          >
+                            {overdue
+                              ? t('expenses.tabs.badge_overdue', { defaultValue: 'просрочен' })
+                              : today
+                                ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
+                                : t('expenses.tabs.badge_pending', {
+                                    defaultValue: 'запланирован',
+                                  })}
+                          </span>
+                        </span>
+                        <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                          {cat ? <span>{cat.name}</span> : null}
+                          {p.invoice_number ? (
+                            <>
+                              {cat ? <span aria-hidden>·</span> : null}
+                              <span className="num">№ {p.invoice_number}</span>
+                            </>
+                          ) : null}
+                          {p.comment ? (
+                            <>
+                              {cat || p.invoice_number ? <span aria-hidden>·</span> : null}
+                              <span className="truncate">{p.comment}</span>
+                            </>
+                          ) : null}
+                        </span>
+                      </span>
+                      <span className="num text-foreground text-right text-sm font-bold">
+                        −{formatCurrency(p.amount_cents, currency)}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!hasOpenShift) {
+                              setGateOpen(true)
+                              return
+                            }
+                            setEditingPayment(p)
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                          {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!confirm(t('finance.payments.confirm_delete'))) return
+                            deleteScheduled.mutate(p.id, {
+                              onSuccess: () => toast.success(t('finance.payments.toast_deleted')),
+                            })
+                          }}
+                          className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                          aria-label="delete"
+                        >
+                          <Trash2 className="size-4" strokeWidth={1.7} />
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )
+          ) : isLoading ? (
             <div className="space-y-2 p-3">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
@@ -531,7 +733,7 @@ export function ExpensesPage() {
             </ul>
           )}
           {/* Пагинация по 25 (#9). Скрываем когда страница одна. */}
-          {!isLoading && totalPages > 1 ? (
+          {tab === 'paid' && !isLoading && totalPages > 1 ? (
             <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
               <p className="text-muted-foreground text-xs">
                 {(page - 1) * PAGE_SIZE + 1}—{Math.min(page * PAGE_SIZE, expenses.length)}{' '}
@@ -562,42 +764,44 @@ export function ExpensesPage() {
           ) : null}
         </div>
 
-        {/* Structure (BudgetsCard перенесена в /finance → Бюджеты) */}
-        <div className="flex flex-col gap-4">
-          <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-            <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-              {t('expenses.structure_title')}
-            </h2>
-            {structureCategories.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t('expenses.structure_empty')}</p>
-            ) : (
-              <div className="flex flex-col gap-3.5">
-                {structureCategories.map((c) => {
-                  const pct = total > 0 ? (c.total_cents / total) * 100 : 0
-                  return (
-                    <div key={c.id}>
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                        <span className="text-foreground text-sm font-medium">{c.name}</span>
-                        <span className="num text-brand-navy text-sm font-bold">
-                          {formatCurrency(c.total_cents, currency)}{' '}
-                          <span className="text-brand-text-faint font-medium">
-                            · {Math.round(pct)}%
+        {/* Structure: только для paid таба (для pending пока не строим) */}
+        {tab === 'paid' ? (
+          <div className="flex flex-col gap-4">
+            <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+              <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
+                {t('expenses.structure_title')}
+              </h2>
+              {structureCategories.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('expenses.structure_empty')}</p>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {structureCategories.map((c) => {
+                    const pct = total > 0 ? (c.total_cents / total) * 100 : 0
+                    return (
+                      <div key={c.id}>
+                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                          <span className="text-foreground text-sm font-medium">{c.name}</span>
+                          <span className="num text-brand-navy text-sm font-bold">
+                            {formatCurrency(c.total_cents, currency)}{' '}
+                            <span className="text-brand-text-faint font-medium">
+                              · {Math.round(pct)}%
+                            </span>
                           </span>
-                        </span>
+                        </div>
+                        <div className="bg-background h-2.5 overflow-hidden rounded-full">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${pct}%`, background: c.color }}
+                          />
+                        </div>
                       </div>
-                      <div className="bg-background h-2.5 overflow-hidden rounded-full">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${pct}%`, background: c.color }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       <ExpenseFormModal
@@ -613,6 +817,16 @@ export function ExpensesPage() {
         salonId={salonId}
         currency={currency}
         expense={editingExpense}
+      />
+
+      {/* Оплата запланированного платежа из таба «Не оплачено» */}
+      <ExpenseFormModal
+        open={!!editingPayment}
+        onOpenChange={(o) => !o && setEditingPayment(null)}
+        salonId={salonId}
+        currency={currency}
+        mode="planned-paying"
+        existingPayment={editingPayment}
       />
 
       <CashGateRequiredDialog
