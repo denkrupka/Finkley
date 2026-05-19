@@ -388,6 +388,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
               today={now}
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
+              onPaymentClick={handlePay}
               paymentsByDate={paymentsByDate}
               currency={currency}
               todayStr={todayStr}
@@ -437,8 +438,26 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
                 {selectedDayPayments.map((p) => {
                   const tone = classifyPayment(p, todayStr)
                   const daysDelta = differenceInCalendarDays(new Date(p.due_date), now)
+                  const isPaid = p.status === 'paid'
                   return (
-                    <li key={p.id} className="px-4 py-3">
+                    <li
+                      key={p.id}
+                      onClick={() => {
+                        if (!isPaid) handlePay(p)
+                      }}
+                      className={cn(
+                        'px-4 py-3 transition-colors',
+                        !isPaid && 'hover:bg-muted/40 cursor-pointer',
+                      )}
+                      role={!isPaid ? 'button' : undefined}
+                      tabIndex={!isPaid ? 0 : undefined}
+                      onKeyDown={(e) => {
+                        if (!isPaid && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          handlePay(p)
+                        }
+                      }}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -575,6 +594,7 @@ function MonthGrid({
   today,
   selectedDate,
   onSelectDate,
+  onPaymentClick,
   paymentsByDate,
   currency,
   todayStr,
@@ -583,6 +603,7 @@ function MonthGrid({
   today: Date
   selectedDate: Date
   onSelectDate: (d: Date) => void
+  onPaymentClick: (p: ScheduledPaymentRow) => void
   paymentsByDate: Map<string, ScheduledPaymentRow[]>
   currency: string
   todayStr: string
@@ -637,12 +658,29 @@ function MonthGrid({
             <div className="flex flex-col gap-0.5">
               {visible.map((p) => {
                 const tone = classifyPayment(p, todayStr)
+                const isPaid = p.status === 'paid'
                 return (
                   <span
                     key={p.id}
+                    role={!isPaid ? 'button' : undefined}
+                    tabIndex={!isPaid ? 0 : undefined}
+                    onClick={(e) => {
+                      if (!isPaid) {
+                        e.stopPropagation()
+                        onPaymentClick(p)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!isPaid && (e.key === 'Enter' || e.key === ' ')) {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        onPaymentClick(p)
+                      }
+                    }}
                     className={cn(
-                      'truncate rounded border px-1 py-0.5 text-[10px] font-semibold leading-tight',
+                      'truncate rounded border px-1 py-0.5 text-[10px] font-semibold leading-tight transition-shadow',
                       TONE_CHIP[tone],
+                      !isPaid && 'cursor-pointer hover:shadow-sm',
                     )}
                     title={`${p.vendor_name ?? '—'} · ${formatCurrency(p.amount_cents, currency)}`}
                   >

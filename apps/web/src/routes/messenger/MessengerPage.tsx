@@ -5,6 +5,9 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   Facebook,
   Image as ImageIcon,
   Instagram,
@@ -157,6 +160,7 @@ export function MessengerPage() {
   const [messageSearch, setMessageSearch] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
   const [clientFormOpen, setClientFormOpen] = useState(false)
+  const [lightboxMessageId, setLightboxMessageId] = useState<string | null>(null)
   const linkClient = useLinkConversationClient(salonId)
 
   useMessengerRealtime(salonId)
@@ -215,10 +219,20 @@ export function MessengerPage() {
     return allMessages.filter((m) => (m.text || '').toLowerCase().includes(q))
   }, [allMessages, messageSearch])
 
-  // При смене чата — сбрасываем поиск по сообщениям
+  // При смене чата — сбрасываем поиск по сообщениям и lightbox
   useEffect(() => {
     setMessageSearch('')
+    setLightboxMessageId(null)
   }, [selectedId])
+
+  // Список изображений в текущем чате (для перелистывания в lightbox)
+  const imageMessages = useMemo(
+    () =>
+      messages.filter((m) => m.media_kind === 'image' && m.media_path) as Array<
+        MessengerMessage & { _isTg?: boolean }
+      >,
+    [messages],
+  )
 
   const sendMessage = useSendMessage(salonId)
   const markRead = useMarkConversationRead(salonId)
@@ -462,6 +476,7 @@ export function MessengerPage() {
 
               <MessagesList
                 messages={messages}
+                onImageClick={(id) => setLightboxMessageId(id)}
                 onReact={(tgMessageId, emoji) => {
                   if (selectedIsTg && selectedTgDialogId && activeTgSession) {
                     tgReact.mutate(
@@ -562,6 +577,12 @@ export function MessengerPage() {
         onClose={() => setBulkOpen(false)}
         salonId={salonId}
         conversations={conversations}
+      />
+
+      <MessengerLightbox
+        images={imageMessages}
+        openId={lightboxMessageId}
+        onClose={() => setLightboxMessageId(null)}
       />
 
       {selected && !selected.client_id ? (
@@ -728,8 +749,10 @@ function ConversationRow({
 
 function MessageBody({
   message,
+  onImageClick,
 }: {
   message: MessengerMessage & { _isTg?: boolean; media_pending?: boolean }
+  onImageClick?: (id: string) => void
 }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   useEffect(() => {
@@ -754,16 +777,16 @@ function MessageBody({
 
   return (
     <>
-      {/* Image */}
+      {/* Image: клик открывает lightbox (если callback передан), иначе новая вкладка */}
       {message.media_path && message.media_kind === 'image' ? (
         mediaUrl ? (
-          <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+          <button type="button" onClick={() => onImageClick?.(message.id)} className="block">
             <img
               src={mediaUrl}
               alt=""
-              className="mb-1 max-h-60 w-auto max-w-full rounded-md object-cover"
+              className="mb-1 max-h-60 w-auto max-w-full rounded-md object-cover transition-opacity hover:opacity-90"
             />
-          </a>
+          </button>
         ) : (
           <span className="text-xs italic opacity-70">📷 …</span>
         )
@@ -909,12 +932,186 @@ function mediaLabel(kind: string): string {
   }
 }
 
+/** Полноэкранный просмотр изображений с перелистыванием и скачиванием. */
+function MessengerLightbox({
+  images,
+  openId,
+  onClose,
+}: {
+  images: Array<MessengerMessage & { _isTg?: boolean }>
+  openId: string | null
+  onClose: () => void
+}) {
+  const idx = openId ? images.findIndex((m) => m.id === openId) : -1
+  const [currentIdx, setCurrentIdx] = useState<number>(idx)
+  const [imgUrl, setImgUrl] = useState<string | null>(null)
+
+  // sync external openId → internal index
+  useEffect(() => {
+    if (idx >= 0) setCurrentIdx(idx)
+  }, [idx])
+
+  const current = currentIdx >= 0 ? images[currentIdx] : null
+
+  // Подгрузка signed URL текущего изображения
+  useEffect(() => {
+    if (!current?.media_path) {
+      setImgUrl(null)
+      return
+    }
+    let cancelled = false
+    const fetcher = current._isTg ? getTgMediaSignedUrl : getMessengerMediaUrl
+    fetcher(current.media_path)
+      .then((url) => {
+        if (!cancelled) setImgUrl(url)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [current])
+
+  // Клавиатура: Esc, стрелки
+  useEffect(() => {
+    if (openId === null) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') setCurrentIdx((i) => Math.max(0, i - 1))
+      if (e.key === 'ArrowRight') setCurrentIdx((i) => Math.min(images.length - 1, i + 1))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [openId, images.length, onClose])
+
+  if (openId === null || !current) return null
+
+  const hasPrev = currentIdx > 0
+  const hasNext = currentIdx < images.length - 1
+
+  async function handleDownload() {
+    if (!imgUrl) return
+    try {
+      const r = await fetch(imgUrl)
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      a.download = `photo-${Date.now()}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Top bar */}
+      <div
+        className="absolute left-0 right-0 top-0 flex items-center justify-between p-3 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-xs font-semibold opacity-80">
+          {currentIdx + 1} / {images.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="grid size-9 place-items-center rounded-full transition-colors hover:bg-white/15"
+            title="Скачать"
+            aria-label="Download"
+          >
+            <Download className="size-5" strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 place-items-center rounded-full transition-colors hover:bg-white/15"
+            title="Закрыть"
+            aria-label="Close"
+          >
+            <X className="size-5" strokeWidth={1.8} />
+          </button>
+        </div>
+      </div>
+
+      {/* Prev */}
+      {hasPrev ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setCurrentIdx((i) => i - 1)
+          }}
+          className="absolute left-3 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full text-white transition-colors hover:bg-white/15"
+          aria-label="Previous"
+        >
+          <ChevronLeft className="size-7" strokeWidth={1.8} />
+        </button>
+      ) : null}
+
+      {/* Image */}
+      <div
+        className="flex max-h-[90vh] max-w-[92vw] items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {imgUrl ? (
+          <img
+            key={current.id}
+            src={imgUrl}
+            alt=""
+            className="max-h-[90vh] max-w-[92vw] object-contain"
+          />
+        ) : (
+          <span className="text-sm text-white opacity-70">Loading…</span>
+        )}
+      </div>
+
+      {/* Next */}
+      {hasNext ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setCurrentIdx((i) => i + 1)
+          }}
+          className="absolute right-3 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full text-white transition-colors hover:bg-white/15"
+          aria-label="Next"
+        >
+          <ChevronRight className="size-7" strokeWidth={1.8} />
+        </button>
+      ) : null}
+
+      {/* Caption */}
+      {current.text ? (
+        <div
+          className="absolute bottom-0 left-0 right-0 max-h-[30vh] overflow-y-auto bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 text-center text-sm text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="mx-auto max-w-3xl whitespace-pre-wrap break-words">{current.text}</p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function MessagesList({
   messages,
   onReact,
+  onImageClick,
 }: {
   messages: ReturnType<typeof useConversationMessages>['data']
   onReact?: (tgMessageId: number, emoji: string | null) => void
+  onImageClick?: (id: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -946,7 +1143,7 @@ function MessagesList({
                     : 'bg-card text-foreground border-border border',
                 )}
               >
-                <MessageBody message={m} />
+                <MessageBody message={m} onImageClick={onImageClick} />
                 <p
                   className={cn(
                     'mt-1 flex items-center gap-1 text-[10px] opacity-70',

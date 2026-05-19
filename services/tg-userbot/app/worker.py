@@ -715,14 +715,35 @@ class Worker:
             from telethon.tl.functions.messages import SendReactionRequest
             from telethon.tl.types import ReactionEmoji
             emoji = payload.get("emoji")
+            tg_msg_id = payload["tg_message_id"]
             reaction_list = [ReactionEmoji(emoticon=emoji)] if emoji else []
             await s.client(
                 SendReactionRequest(
                     peer=tg_chat_id,
-                    msg_id=payload["tg_message_id"],
+                    msg_id=tg_msg_id,
                     reaction=reaction_list,
                 )
             )
+            # events.Raw(UpdateMessageReactions) часто НЕ срабатывает на наши
+            # собственные реакции (Telethon уже применяет апдейт inline в
+            # SendReactionRequest response). Поэтому обновляем reactions
+            # локально — берём свежее сообщение и его merged reactions.
+            try:
+                msgs = await s.client.get_messages(tg_chat_id, ids=[tg_msg_id])
+                if msgs and msgs[0] is not None:
+                    fresh = msgs[0]
+                    payload_jsonb = _reactions_to_jsonb(fresh.reactions) if fresh.reactions else []
+                    async with SupabaseClient() as sb:
+                        await sb.update(
+                            "tg_messages",
+                            {
+                                "session_id": f"eq.{s.session_id}",
+                                "tg_message_id": f"eq.{tg_msg_id}",
+                            },
+                            {"reactions": payload_jsonb},
+                        )
+            except Exception:
+                log.exception("react: failed to refresh reactions for msg=%s", tg_msg_id)
 
         elif action == "download_media":
             # SPA-инициированное lazy-скачивание медиа конкретного сообщения.
