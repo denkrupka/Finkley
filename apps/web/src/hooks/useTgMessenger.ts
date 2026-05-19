@@ -231,7 +231,6 @@ export function useTgDialogOpen(
     }
     if (!toRequest.length) return
     ;(async () => {
-      // Помечаем pending=true локально через optimistic mark + INSERT в outbox
       const rows = toRequest.map((m) => ({
         session_id: sessionId,
         dialog_id: dialogId,
@@ -243,9 +242,27 @@ export function useTgDialogOpen(
         console.warn('outbox download_media insert', e1)
         return
       }
-      // media_pending пишет worker (через service_role); SPA не имеет UPDATE
-      // policy на tg_messages — поэтому просто инвалидируем cache через ~3s.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['tg-messages', dialogId] }), 2500)
+      // worker подхватит за ~0.5s и параллельно качает (concurrency=5).
+      // Realtime на tg_messages инвалидирует кэш после UPDATE — несколько
+      // дополнительных принудительных refetch'ей подстрахуют (на случай
+      // если realtime подвисает).
+      const t1 = setTimeout(
+        () => qc.invalidateQueries({ queryKey: ['tg-messages', dialogId] }),
+        1500,
+      )
+      const t2 = setTimeout(
+        () => qc.invalidateQueries({ queryKey: ['tg-messages', dialogId] }),
+        4000,
+      )
+      const t3 = setTimeout(
+        () => qc.invalidateQueries({ queryKey: ['tg-messages', dialogId] }),
+        8000,
+      )
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+        clearTimeout(t3)
+      }
     })()
   }, [sessionId, dialogId, messages, qc])
 }

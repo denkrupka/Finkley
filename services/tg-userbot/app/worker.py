@@ -251,6 +251,8 @@ class Worker:
     async def _catch_up_avatars(self, sid: str, client: TelegramClient) -> None:
         """Для уже существующих сессий (bootstrap'ом не прошлись с фото) —
         качаем аватарки своего профиля + всех диалогов без photo_path.
+        Использует iter_dialogs — entities приходят полные, с access_hash
+        и правильным polymorphic photo (User.photo / Channel.photo / Chat.photo).
         Безопасно к повторному запуску (проверяем existing photo_path)."""
         try:
             # Свой аватар
@@ -274,34 +276,47 @@ class Worker:
                 except Exception:
                     log.exception("catch-up me avatar failed")
 
-            # Аватарки диалогов (max 50 за раз чтобы не положить TG api rate limit)
+            # Какие dialog_id в БД ещё без photo_path
             async with SupabaseClient() as sb:
-                dialogs = await sb.select(
+                missing = await sb.select(
                     "tg_dialogs",
                     columns="id,tg_chat_id",
                     filters={"session_id": f"eq.{sid}", "photo_path": "is.null"},
-                    limit=50,
+                    limit=500,
                 )
-            for d in dialogs:
+            missing_by_chat = {int(r["tg_chat_id"]): r["id"] for r in missing}
+            if not missing_by_chat:
+                log.info("catch-up avatars: no missing for %s", sid)
+                return
+
+            downloaded = 0
+            # iter_dialogs даёт полный entity (с photo) и access_hash в кэше.
+            async for dlg in client.iter_dialogs(limit=200):
+                entity = dlg.entity
+                chat_id_int = int(getattr(entity, "id", 0) or 0)
+                if chat_id_int not in missing_by_chat:
+                    continue
+                if not getattr(entity, "photo", None):
+                    # ChatPhotoEmpty или None — пропускаем без шума
+                    continue
                 try:
-                    entity = await client.get_entity(d["tg_chat_id"])
-                    if not getattr(entity, "photo", None):
-                        continue
                     path = await self._download_avatar(
-                        sid, client, entity, target_key=str(d["tg_chat_id"])
+                        sid, client, entity, target_key=str(chat_id_int)
                     )
                     if path:
                         async with SupabaseClient() as sb:
                             await sb.update(
                                 "tg_dialogs",
-                                {"id": f"eq.{d['id']}"},
+                                {"id": f"eq.{missing_by_chat[chat_id_int]}"},
                                 {"photo_path": path},
                             )
+                        downloaded += 1
                 except Exception:
-                    log.debug("catch-up dialog avatar %s failed", d["tg_chat_id"], exc_info=True)
+                    log.debug("catch-up dialog avatar %s failed", chat_id_int, exc_info=True)
                 # rate-limit-friendly pause
-                await asyncio.sleep(0.4)
-            log.info("catch-up avatars done for %s: %d dialogs", sid, len(dialogs))
+                await asyncio.sleep(0.3)
+            log.info("catch-up avatars done for %s: %d downloaded / %d missing",
+                     sid, downloaded, len(missing_by_chat))
         except Exception:
             log.exception("catch_up_avatars failed (session=%s)", sid)
 
@@ -509,12 +524,15 @@ class Worker:
         skip_dialog_update: bool = False,
     ) -> None:
         """Сохраняет сообщение в tg_messages + (опц.) обновляет dialog preview.
-        Скачивает медиа в Supabase Storage если есть."""
+        Lazy: медиа не качается здесь — это делает download_media action когда
+        SPA открывает чат. Аватарку диалога подгружаем один раз (если ещё нет
+        в БД) — _save_dialog внутри сам это проверяет."""
         chat = await msg.get_chat()
         dialog_id = await self._save_dialog(
             session_id, chat,
             last_msg=None if skip_dialog_update else msg,
             unread_count=0 if msg.out else 1,
+            client=client,
         )
 
         media_kind = _media_kind(msg)
@@ -548,7 +566,7 @@ class Worker:
     async def _outbox_loop(self) -> None:
         while not self._stop.is_set():
             try:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 if not self.sessions:
                     continue
                 await self._process_outbox()
@@ -558,6 +576,11 @@ class Worker:
                 log.exception("outbox loop error: %s", e)
 
     async def _process_outbox(self) -> None:
+        """Обрабатывает pending outbox.
+        - download_media: параллельно (concurrency=5), порядок не важен.
+        - остальные actions (send_text/photo/react/mark_read/...): последовательно,
+          чтобы сохранить порядок отправки и не флудить TG API.
+        """
         session_ids = list(self.sessions.keys())
         if not session_ids:
             return
@@ -569,37 +592,64 @@ class Worker:
                     "session_id": f"in.({','.join(session_ids)})",
                 },
                 order="created_at.asc",
-                limit=20,
+                limit=50,
             )
-            for row in rows:
-                marked = await sb.update(
-                    "tg_outbox",
-                    {"id": f"eq.{row['id']}", "status": "eq.pending"},
-                    {"status": "processing", "attempts": row["attempts"] + 1},
-                )
-                if not marked:
-                    continue
-                try:
-                    await self._dispatch_outbox(row)
-                    await sb.update(
-                        "tg_outbox",
-                        {"id": f"eq.{row['id']}"},
-                        {
-                            "status": "sent",
-                            "processed_at": datetime.now(timezone.utc).isoformat(),
-                            "last_error": None,
-                        },
-                    )
-                except Exception as e:
-                    log.exception("outbox dispatch failed (id=%s)", row["id"])
-                    await sb.update(
-                        "tg_outbox",
-                        {"id": f"eq.{row['id']}"},
-                        {
-                            "status": "failed" if row["attempts"] >= 3 else "pending",
-                            "last_error": str(e)[:500],
-                        },
-                    )
+
+        downloads: list[dict] = []
+        serial: list[dict] = []
+        for row in rows:
+            if row["action"] == "download_media":
+                downloads.append(row)
+            else:
+                serial.append(row)
+
+        # Serial actions
+        if serial:
+            async with SupabaseClient() as sb:
+                for row in serial:
+                    await self._claim_and_run(sb, row)
+
+        # Concurrent downloads (max 5 одновременно)
+        if downloads:
+            sem = asyncio.Semaphore(5)
+
+            async def run_one(row: dict) -> None:
+                async with sem, SupabaseClient() as sb:
+                    await self._claim_and_run(sb, row)
+
+            await asyncio.gather(*(run_one(r) for r in downloads), return_exceptions=True)
+
+    async def _claim_and_run(self, sb: SupabaseClient, row: dict) -> None:
+        """Marks outbox row as 'processing' (compare-and-swap), dispatches,
+        updates final status."""
+        marked = await sb.update(
+            "tg_outbox",
+            {"id": f"eq.{row['id']}", "status": "eq.pending"},
+            {"status": "processing", "attempts": row["attempts"] + 1},
+        )
+        if not marked:
+            return
+        try:
+            await self._dispatch_outbox(row)
+            await sb.update(
+                "tg_outbox",
+                {"id": f"eq.{row['id']}"},
+                {
+                    "status": "sent",
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
+                    "last_error": None,
+                },
+            )
+        except Exception as e:
+            log.exception("outbox dispatch failed (id=%s)", row["id"])
+            await sb.update(
+                "tg_outbox",
+                {"id": f"eq.{row['id']}"},
+                {
+                    "status": "failed" if row["attempts"] >= 3 else "pending",
+                    "last_error": str(e)[:500],
+                },
+            )
 
     async def _dispatch_outbox(self, row: dict) -> None:
         s = self.sessions.get(row["session_id"])
