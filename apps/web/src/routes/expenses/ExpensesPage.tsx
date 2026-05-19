@@ -224,6 +224,28 @@ export function ExpensesPage() {
     .filter((c) => c.total_cents > 0)
     .sort((a, b) => b.total_cents - a.total_cents)
 
+  // То же самое но по запланированным платежам — для таба «Не оплачено».
+  const pendingTotalsByCategory = new Map<string, number>()
+  for (const p of pendingPayments) {
+    if (!p.category_id) continue
+    pendingTotalsByCategory.set(
+      p.category_id,
+      (pendingTotalsByCategory.get(p.category_id) ?? 0) + p.amount_cents,
+    )
+  }
+  const pendingStructureCategories = categories
+    .map((c, i) => ({
+      ...c,
+      color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] ?? '#9A9A9A',
+      total_cents: pendingTotalsByCategory.get(c.id) ?? 0,
+    }))
+    .filter((c) => c.total_cents > 0)
+    .sort((a, b) => b.total_cents - a.total_cents)
+
+  // Текущий набор для отображения справа — зависит от таба.
+  const sideStructure = tab === 'pending' ? pendingStructureCategories : structureCategories
+  const sideTotal = tab === 'pending' ? pendingTotal : total
+
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       {/* Header */}
@@ -343,7 +365,7 @@ export function ExpensesPage() {
           BudgetsCard перенесены в /finance → Бюджеты → Плановые расходы.
           На странице расходов остался только список + структура. */}
 
-      <div className={cn('grid grid-cols-1 gap-5', tab === 'paid' && 'lg:grid-cols-[2fr_1fr]')}>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
         {/* List */}
         <div className="border-border bg-card shadow-finsm rounded-lg border">
           <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
@@ -764,44 +786,52 @@ export function ExpensesPage() {
           ) : null}
         </div>
 
-        {/* Structure: только для paid таба (для pending пока не строим) */}
-        {tab === 'paid' ? (
-          <div className="flex flex-col gap-4">
-            <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-              <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-                {t('expenses.structure_title')}
-              </h2>
-              {structureCategories.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('expenses.structure_empty')}</p>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {structureCategories.map((c) => {
-                    const pct = total > 0 ? (c.total_cents / total) * 100 : 0
-                    return (
-                      <div key={c.id}>
-                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                          <span className="text-foreground text-sm font-medium">{c.name}</span>
-                          <span className="num text-brand-navy text-sm font-bold">
-                            {formatCurrency(c.total_cents, currency)}{' '}
-                            <span className="text-brand-text-faint font-medium">
-                              · {Math.round(pct)}%
-                            </span>
+        {/* Structure — одинаковый блок для обоих табов, источник зависит от tab */}
+        <div className="flex flex-col gap-4">
+          <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+            <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
+              {tab === 'pending'
+                ? t('expenses.tabs.structure_title_pending', {
+                    defaultValue: 'Структура запланированных',
+                  })
+                : t('expenses.structure_title')}
+            </h2>
+            {sideStructure.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {tab === 'pending'
+                  ? t('expenses.tabs.structure_empty_pending', {
+                      defaultValue: 'Нет запланированных платежей в этом периоде',
+                    })
+                  : t('expenses.structure_empty')}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3.5">
+                {sideStructure.map((c) => {
+                  const pct = sideTotal > 0 ? (c.total_cents / sideTotal) * 100 : 0
+                  return (
+                    <div key={c.id}>
+                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                        <span className="text-foreground text-sm font-medium">{c.name}</span>
+                        <span className="num text-brand-navy text-sm font-bold">
+                          {formatCurrency(c.total_cents, currency)}{' '}
+                          <span className="text-brand-text-faint font-medium">
+                            · {Math.round(pct)}%
                           </span>
-                        </div>
-                        <div className="bg-background h-2.5 overflow-hidden rounded-full">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, background: c.color }}
-                          />
-                        </div>
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                      <div className="bg-background h-2.5 overflow-hidden rounded-full">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${pct}%`, background: c.color }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        ) : null}
+        </div>
       </div>
 
       <ExpenseFormModal
