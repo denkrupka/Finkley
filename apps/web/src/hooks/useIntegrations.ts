@@ -178,16 +178,23 @@ export function useBooksySync(salonId: string | undefined) {
         ok?: boolean
         error?: string
         message?: string
-        stats?: { staff_synced: number; services_synced: number; visits_synced: number }
+        stats?: {
+          staff_synced?: number
+          services_synced?: number
+          visits_synced?: number
+          reservations_synced?: number
+          clients_synced?: number
+        }
       }
       if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
-      return json.stats!
+      return json.stats ?? {}
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
       qc.invalidateQueries({ queryKey: ['staff', salonId] })
       qc.invalidateQueries({ queryKey: ['services', salonId] })
       qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
     },
   })
 }

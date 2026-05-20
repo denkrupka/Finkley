@@ -464,6 +464,7 @@ type SyncStats = {
   staff_filtered_out?: number
   services_synced?: number
   visits_synced?: number
+  reservations_synced?: number
   clients_synced?: number
   history_visits_synced?: number
   salon_hours_synced?: boolean
@@ -1042,6 +1043,11 @@ async function insertHistoricalBooking(
     ? new Date(b.booked_from_iso).toISOString()
     : new Date(b.booked_from + ':00+02:00').toISOString()
 
+  // duration_min из booked_till - booked_from. Без этого карточка визита
+  // рендерится по services.default_duration_min или fallback 60 мин — у нас
+  // получался разнотык с Booksy (Manicure 2h vs 1h в портале).
+  const durationMin = computeDurationMin(b.booked_from, b.booked_till)
+
   const { error } = await admin.from('visits').upsert(
     {
       salon_id: salonId,
@@ -1050,6 +1056,7 @@ async function insertHistoricalBooking(
       service_id: serviceUuid,
       service_name_snapshot: serviceName,
       visit_at: visitAtIso,
+      duration_min: durationMin,
       amount_cents: amountCents,
       tip_cents: 0,
       discount_cents: 0,
@@ -1125,21 +1132,36 @@ async function buildResolveCaches(admin: SupabaseClient, salonId: string): Promi
   return caches
 }
 
-async function loadExistingVisitExternalIds(
+type ExistingVisitInfo = { id: string; duration_min: number | null }
+
+async function loadExistingVisits(
   admin: SupabaseClient,
   salonId: string,
-): Promise<Set<string>> {
+): Promise<Map<string, ExistingVisitInfo>> {
   const { data: existingVisits } = await admin
     .from('visits')
-    .select('external_id')
+    .select('id, external_id, duration_min')
     .eq('salon_id', salonId)
     .eq('source', 'booksy')
     .is('deleted_at', null)
-  const set = new Set<string>()
+  const map = new Map<string, ExistingVisitInfo>()
   for (const r of existingVisits ?? []) {
-    if (r.external_id) set.add(r.external_id)
+    if (r.external_id) map.set(r.external_id, { id: r.id, duration_min: r.duration_min })
   }
-  return set
+  return map
+}
+
+/**
+ * Длительность визита/резервации в минутах из Booksy "YYYY-MM-DDTHH:MM" пары.
+ * Используем фиксированный +00:00 для обоих концов — реальный смещение TZ
+ * салона сокращается при вычитании, поэтому конкретное значение не важно.
+ */
+function computeDurationMin(from?: string | null, till?: string | null): number | null {
+  if (!from || !till) return null
+  const fromMs = new Date(`${from}:00+00:00`).getTime()
+  const tillMs = new Date(`${till}:00+00:00`).getTime()
+  if (!Number.isFinite(fromMs) || !Number.isFinite(tillMs) || tillMs <= fromMs) return null
+  return Math.round((tillMs - fromMs) / 60_000)
 }
 
 function mapPaymentMethod(code?: string | null): 'cash' | 'card' | 'transfer' | 'online' | 'mixed' {
@@ -1253,8 +1275,15 @@ async function syncVisits(
   stats: SyncStats,
 ): Promise<void> {
   const caches = await buildResolveCaches(admin, salonId)
-  const existingExt = await loadExistingVisitExternalIds(admin, salonId)
+  const existingByExt = await loadExistingVisits(admin, salonId)
+  const existingExt = new Set(existingByExt.keys())
   stats.visits_synced = stats.visits_synced ?? 0
+
+  // Бэкфилл duration_min для уже импортированных booksy-визитов: до этого
+  // изменения duration_min не записывался (UI рендерил по services.default).
+  // Заполняем сейчас по (booked_till - booked_from). См. ADR-017 §3 —
+  // portal-owned трогает только NULL, ручные правки duration остаются.
+  const durationPatches: { id: string; duration_min: number }[] = []
 
   const startTs = Date.now()
   const BUDGET_MS = 45_000
@@ -1304,6 +1333,19 @@ async function syncVisits(
 
     for (const [apptUid, bookings] of byAppt) {
       if (Date.now() - startTs > BUDGET_MS) break
+
+      // Для известных бронирований с NULL duration_min копим бэкфилл-патчи.
+      for (const b of bookings) {
+        const ext = `subbk:${b.id}`
+        const existing = existingByExt.get(ext)
+        if (existing && existing.duration_min === null) {
+          const d = computeDurationMin(b.booked_from, b.booked_till)
+          if (d !== null) {
+            durationPatches.push({ id: existing.id, duration_min: d })
+            existing.duration_min = d
+          }
+        }
+      }
 
       const allKnown = bookings.every((b) => existingExt.has(`subbk:${b.id}`))
       if (allKnown) continue
@@ -1418,6 +1460,7 @@ async function syncVisits(
         }
 
         const visitAtIso = new Date(b.booked_from + ':00+02:00').toISOString()
+        const durationMin = computeDurationMin(b.booked_from, b.booked_till)
         const isPrimary = i === 0
         const tipForVisit = isPrimary ? (detail?.totalTipCents ?? 0) : 0
         const discountForVisit = isPrimary ? (detail?.totalDiscountCents ?? 0) : 0
@@ -1436,6 +1479,7 @@ async function syncVisits(
             service_id: serviceId,
             service_name_snapshot: serviceName,
             visit_at: visitAtIso,
+            duration_min: durationMin,
             amount_cents: amountCents,
             tip_cents: tipForVisit,
             discount_cents: discountForVisit,
@@ -1452,6 +1496,165 @@ async function syncVisits(
           existingExt.add(externalId)
           stats.visits_synced! += 1
         }
+      }
+    }
+  }
+
+  // Применяем накопленные duration_min патчи одним батчем (по 100 строк).
+  for (let i = 0; i < durationPatches.length; i += 100) {
+    const chunk = durationPatches.slice(i, i + 100)
+    await Promise.all(
+      chunk.map((p) =>
+        admin
+          .from('visits')
+          .update({ duration_min: p.duration_min })
+          .eq('id', p.id)
+          .is('duration_min', null),
+      ),
+    )
+  }
+}
+
+// =============================================================================
+// syncReservations — «Rezerwacja czasu» (блокировки слотов мастера)
+// =============================================================================
+//
+// Booksy /me/businesses/{biz}/reservations/ — это блоки времени, которые
+// мастер резервирует на свои дела (pererwa, блогер, осмотр и т.п.). В
+// календаре они рисуются полупрозрачным прямоугольником с reason. В нашем
+// портале аналог — staff_time_blocks (kind='reservation').
+//
+// Стратегия: тянем за последние 60 дней + 60 вперёд (тот же window, что и
+// /calendar), upsert по (salon_id, external_source='booksy', external_id='res:{id}').
+// Игнорируем существующие — резервации portal-owned: после первого импорта
+// юзер может отредактировать label/время в портале и Booksy его не перетрёт.
+
+type BooksyReservation = {
+  id: number | string
+  reserved_from: string // "YYYY-MM-DDTHH:MM" (local)
+  reserved_till: string
+  resources?: (number | { id?: number })[]
+  reason?: string | null
+}
+
+async function syncReservations(
+  admin: SupabaseClient,
+  salonId: string,
+  accessToken: string,
+  businessId: number,
+  stats: SyncStats,
+): Promise<void> {
+  stats.reservations_synced = stats.reservations_synced ?? 0
+
+  const now = new Date()
+  const start = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+  const end = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
+  const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
+
+  // Booksy /reservations/ — одиночный GET с фильтром по диапазону.
+  // Точное имя query-параметров не задокументировано публично; пробуем
+  // самое употребимое (reserved_from/reserved_till), при 404 — без фильтра.
+  const urls = [
+    `/me/businesses/${businessId}/reservations/?reserved_from=${fmtDate(start)}&reserved_till=${fmtDate(end)}`,
+    `/me/businesses/${businessId}/reservations/`,
+  ]
+
+  type ReservationsResp = {
+    reservations?: BooksyReservation[] | Record<string, BooksyReservation>
+  }
+
+  let data: ReservationsResp | null = null
+  for (const url of urls) {
+    const res = await booksyGet<ReservationsResp>(url, accessToken)
+    if (res.ok) {
+      data = res.data
+      break
+    }
+    if (res.status !== 404 && res.status !== 400) {
+      console.warn(`reservations fetch failed: ${res.reason} (${res.status})`)
+      return
+    }
+  }
+  if (!data) return
+
+  const rawList = Array.isArray(data.reservations)
+    ? data.reservations
+    : Object.values(data.reservations ?? {})
+
+  // Карта staff_external_id (number, как в Booksy) → uuid в нашей БД
+  const { data: staffRows } = await admin
+    .from('staff')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .not('external_id', 'is', null)
+  const staffByExtId = new Map<string, string>()
+  for (const s of staffRows ?? []) {
+    if (s.external_id) staffByExtId.set(s.external_id, s.id)
+  }
+
+  // Кэш уже импортированных, чтобы не делать insert если запись есть
+  const externalIds = rawList.map((r) => `res:${r.id}`).filter(Boolean)
+  let existingExt = new Set<string>()
+  if (externalIds.length > 0) {
+    const { data: existing } = await admin
+      .from('staff_time_blocks')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('external_source', 'booksy')
+      .in('external_id', externalIds)
+    for (const r of existing ?? []) {
+      if (r.external_id) existingExt.add(r.external_id)
+    }
+  }
+
+  for (const r of rawList) {
+    const externalId = `res:${r.id}`
+    if (existingExt.has(externalId)) continue
+    if (!r.reserved_from || !r.reserved_till) continue
+
+    // resources в ответе может быть массивом number'ов или объектов {id}
+    const resIds: string[] = []
+    for (const item of r.resources ?? []) {
+      const rawId = typeof item === 'number' ? item : item?.id
+      if (rawId !== undefined && rawId !== null) resIds.push(String(rawId))
+    }
+    if (resIds.length === 0) continue
+
+    // Booksy выдаёт время в локальной TZ салона без TZ-суффикса. Используем
+    // тот же приём, что и для визитов (+02:00). Для расчёта внутри суток
+    // DST не критичен (резерв не выходит за пределы суток).
+    const startsAt = new Date(`${r.reserved_from}:00+02:00`).toISOString()
+    const endsAt = new Date(`${r.reserved_till}:00+02:00`).toISOString()
+    const label = r.reason?.trim() || null
+
+    // Один блок на каждого назначенного мастера. external_id шарится между
+    // ними — добавляем суффикс ":{staff_ext}" чтобы соблюсти UNIQUE
+    // (salon_id, external_source, external_id).
+    for (const stafferExt of resIds) {
+      const staffUuid = staffByExtId.get(stafferExt)
+      if (!staffUuid) continue
+      const blockExternalId = resIds.length > 1 ? `${externalId}:${stafferExt}` : externalId
+      if (existingExt.has(blockExternalId)) continue
+
+      const { error } = await admin.from('staff_time_blocks').upsert(
+        {
+          salon_id: salonId,
+          staff_id: staffUuid,
+          kind: 'reservation',
+          starts_at: startsAt,
+          ends_at: endsAt,
+          label,
+          external_source: 'booksy',
+          external_id: blockExternalId,
+        },
+        { onConflict: 'salon_id,external_source,external_id', ignoreDuplicates: true },
+      )
+      if (!error) {
+        existingExt.add(blockExternalId)
+        stats.reservations_synced! += 1
+      } else {
+        console.warn(`reservation upsert ${blockExternalId}: ${error.message}`)
       }
     }
   }
@@ -1485,6 +1688,7 @@ async function runTieredSync(
   }
   if (tiers.includes('visits')) {
     await syncVisits(admin, salonId, accessToken, businessId, config, stats)
+    await syncReservations(admin, salonId, accessToken, businessId, stats)
     tierTimestamps.last_sync_at = nowIso
   }
 

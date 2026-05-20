@@ -2979,6 +2979,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string
+          external_id: string | null
+          external_source: string | null
           id: string
           kind: Database["public"]["Enums"]["staff_block_kind"]
           label: string | null
@@ -2991,6 +2993,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           kind: Database["public"]["Enums"]["staff_block_kind"]
           label?: string | null
@@ -3003,6 +3007,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["staff_block_kind"]
           label?: string | null

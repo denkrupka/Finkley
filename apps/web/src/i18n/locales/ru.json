@@ -1389,6 +1389,12 @@
       "calendar": "Календарь"
     },
     "import_csv": "Импорт CSV",
+    "sync_now": "Синхронизировать",
+    "sync_now_short": "Синк",
+    "sync_in_progress": "Синхронизирую…",
+    "sync_done": "Готово: {{visits}} визитов, {{reservations}} резервов",
+    "sync_failed": "Не удалось синхронизировать",
+    "sync_not_connected": "Booksy не подключен — нечего синхронизировать",
     "export": {
       "button": "Экспорт",
       "title": "Экспорт визитов",
