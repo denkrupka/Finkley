@@ -29,7 +29,6 @@ async function migrationApplied(): Promise<boolean> {
 const migrationOk = await migrationApplied()
 const skipReason = !migrationOk ? 'migration 20260520000001 not yet applied to test DB' : null
 if (skipReason) {
-   
   console.warn(`[booksy-full-sync-schema] skipped: ${skipReason}`)
 }
 
