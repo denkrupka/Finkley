@@ -2155,21 +2155,37 @@ async function handleCreateReservation(
         502,
       )
     }
-    let parsed: { reservation?: { id?: number | string } } = {}
+    let parsed: { reservation?: { id?: number | string }; id?: number | string } = {}
     try {
       parsed = JSON.parse(text)
     } catch {
       // ignore
     }
-    const reservationId = parsed.reservation?.id ? String(parsed.reservation.id) : null
+    // Booksy наблюдалось две формы ответа: {reservation:{id}} и {id}.
+    // Пытаемся обе.
+    const reservationId = parsed.reservation?.id
+      ? String(parsed.reservation.id)
+      : parsed.id
+        ? String(parsed.id)
+        : null
+    console.log(
+      `create_reservation result: visit_id=${input.visit_id ?? 'none'} reservation_id=${reservationId} body=${text.slice(0, 200)}`,
+    )
 
     // Если caller передал visit_id — сохраняем reservation_id для последующего delete
     if (reservationId && input.visit_id) {
-      await admin
+      const { error: updErr } = await admin
         .from('visits')
         .update({ external_reservation_id: reservationId })
         .eq('id', input.visit_id)
         .eq('salon_id', salonId)
+      if (updErr) {
+        console.warn(
+          `visits.external_reservation_id update failed for visit=${input.visit_id}: ${updErr.message}`,
+        )
+      } else {
+        console.log(`saved external_reservation_id=${reservationId} on visit=${input.visit_id}`)
+      }
     }
     return jsonResponse({ ok: true, reservation_id: reservationId })
   } catch (e) {
@@ -2203,12 +2219,15 @@ async function handleDeleteReservation(
   if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
   const creds = integration.credentials as { access_token: string; business_id: number }
   try {
+    console.log(`delete_reservation: business=${creds.business_id} reservation_id=${reservationId}`)
     const res = await fetch(
       `${BOOKSY_API}/me/businesses/${creds.business_id}/reservations/${encodeURIComponent(reservationId)}/`,
       { method: 'DELETE', headers: booksyHeaders(creds.access_token) },
     )
+    console.log(`delete_reservation result: status=${res.status}`)
     if (!res.ok && res.status !== 404) {
       const txt = await res.text()
+      console.warn(`delete_reservation booksy_error: ${txt.slice(0, 300)}`)
       return jsonResponse(
         {
           ok: false,

@@ -234,6 +234,9 @@ export function useDeleteVisit(salonId: string | undefined) {
         .select('external_reservation_id, salon_id')
         .eq('id', visitId)
         .maybeSingle()
+      console.warn(
+        `[useDeleteVisit] visit=${visitId} external_reservation_id=${visitRow?.external_reservation_id ?? 'null'}`,
+      )
       const { error } = await supabase
         .from('visits')
         .update({ deleted_at: new Date().toISOString() })
@@ -242,19 +245,35 @@ export function useDeleteVisit(salonId: string | undefined) {
       // Best-effort: ошибка в Booksy не откатывает локальный delete.
       if (visitRow?.external_reservation_id && visitRow.salon_id) {
         try {
-          await supabase.functions.invoke('booksy-proxy', {
+          const { data, error: invokeErr } = await supabase.functions.invoke('booksy-proxy', {
             body: {
               action: 'delete_reservation',
               salon_id: visitRow.salon_id,
               reservation_id: visitRow.external_reservation_id,
             },
           })
+          if (invokeErr) {
+            console.warn('[useDeleteVisit] booksy-proxy invoke error:', invokeErr.message)
+          } else {
+            const json = data as { ok?: boolean; error?: string; message?: string; status?: number }
+            if (!json.ok) {
+              console.warn(
+                `[useDeleteVisit] booksy delete_reservation failed: ${json.error} ${json.message ?? ''} (status=${json.status ?? '?'})`,
+              )
+            } else {
+              console.warn(
+                `[useDeleteVisit] booksy reservation ${visitRow.external_reservation_id} deleted ok`,
+              )
+            }
+          }
         } catch (e) {
           console.warn(
-            'Booksy delete_reservation failed:',
+            '[useDeleteVisit] Booksy delete_reservation threw:',
             e instanceof Error ? e.message : String(e),
           )
         }
+      } else {
+        console.warn(`[useDeleteVisit] no external_reservation_id — skip booksy delete`)
       }
       return visitId
     },
