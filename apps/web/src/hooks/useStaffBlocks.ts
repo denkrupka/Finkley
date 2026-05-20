@@ -12,6 +12,8 @@ export type StaffBlockRow = {
   starts_at: string
   ends_at: string
   label: string | null
+  external_source: string | null
+  external_id: string | null
   created_at: string
 }
 

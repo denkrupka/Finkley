@@ -43,3 +43,24 @@ export function useCreateBooksyReservation() {
     },
   })
 }
+
+/**
+ * Удаляет резервацию в Booksy. Вызывается когда юзер удаляет блок времени
+ * в портале (staff_time_blocks с external_source='booksy'). Silent.
+ */
+export function useDeleteBooksyReservation() {
+  return useMutation({
+    mutationFn: async (input: { salonId: string; reservationId: string }): Promise<boolean> => {
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: {
+          action: 'delete_reservation',
+          salon_id: input.salonId,
+          reservation_id: input.reservationId,
+        },
+      })
+      if (error) return false
+      const json = data as { ok?: boolean }
+      return !!json.ok
+    },
+  })
+}

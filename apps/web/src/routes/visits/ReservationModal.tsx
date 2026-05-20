@@ -25,12 +25,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  useCreateBooksyReservation,
+  useDeleteBooksyReservation,
+} from '@/hooks/useBooksyReservation'
+import { useSalonIntegrations } from '@/hooks/useIntegrations'
+import {
   useCreateStaffBlock,
   useDeleteStaffBlock,
   useUpdateStaffBlock,
   type StaffBlockRow,
 } from '@/hooks/useStaffBlocks'
 import { useStaff } from '@/hooks/useStaff'
+import { supabase } from '@/lib/supabase/client'
 
 type FormValues = {
   visit_date: string // YYYY-MM-DD
@@ -71,10 +77,58 @@ type Props = {
 export function ReservationModal({ open, onOpenChange, salonId, prefill, block }: Props) {
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
+  const booksyConnected = integrations.some(
+    (i) => i.provider === 'booksy' && i.status === 'connected',
+  )
+  const reserveBooksy = useCreateBooksyReservation()
+  const deleteBooksyRes = useDeleteBooksyReservation()
   const createBlock = useCreateStaffBlock(salonId)
   const updateBlock = useUpdateStaffBlock(salonId)
   const deleteBlock = useDeleteStaffBlock(salonId)
   const isEdit = !!block
+
+  // Booksy reverse-sync: блок из портала → reservation в Booksy чтобы клиент
+  // не мог забукать этот слот через онлайн-запись. Silent: если Booksy не
+  // подключён или мастер не привязан к Booksy — пропускаем без ошибки.
+  async function pushBooksyCreate(
+    blockId: string,
+    staffId: string,
+    startAt: Date,
+    endAt: Date,
+    title: string,
+  ): Promise<void> {
+    if (!booksyConnected) return
+    const stf = staff.find((s) => s.id === staffId)
+    const stfExternal =
+      stf?.external_source === 'booksy' && stf.external_id ? stf.external_id : null
+    if (!stfExternal) {
+      console.warn(`Booksy reservation skipped: staff ${stf?.full_name ?? staffId} not linked`)
+      return
+    }
+    const reservationId = await reserveBooksy.mutateAsync({
+      salonId,
+      staffIdExternal: stfExternal,
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      title: title || 'Резерв времени',
+    })
+    if (reservationId) {
+      await supabase
+        .from('staff_time_blocks')
+        .update({ external_source: 'booksy', external_id: `res:${reservationId}` })
+        .eq('id', blockId)
+    }
+  }
+
+  // Удалить парную reservation в Booksy. external_id формата `res:{id}` или
+  // `res:{id}:{stafferExt}` (для multi-staff из синка) — берём числовой id.
+  async function pushBooksyDelete(externalId: string | null): Promise<void> {
+    if (!externalId || !booksyConnected) return
+    const m = externalId.match(/^res:([^:]+)/)
+    if (!m || !m[1]) return
+    await deleteBooksyRes.mutateAsync({ salonId, reservationId: m[1] })
+  }
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -137,57 +191,71 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill, block }
       return
     }
 
+    const label = values.reason.trim() || null
+
     if (isEdit && block) {
-      updateBlock.mutate(
-        {
+      try {
+        await updateBlock.mutateAsync({
           id: block.id,
           staff_id: values.staff_id,
           starts_at: starts.toISOString(),
           ends_at: ends.toISOString(),
-          label: values.reason.trim() || null,
-        },
-        {
-          onSuccess: () => {
-            toast.success(t('visits.reservation.toast_updated'))
-            onOpenChange(false)
-          },
-          onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-        },
-      )
+          label,
+        })
+        // Booksy reverse-sync на изменение: API не поддерживает PUT, поэтому
+        // удаляем старую резервацию и создаём новую. Если её не было —
+        // просто создаём (например, мастера привязали к Booksy позже).
+        if (block.external_source === 'booksy') {
+          await pushBooksyDelete(block.external_id)
+        }
+        await pushBooksyCreate(block.id, values.staff_id, starts, ends, label ?? '')
+        toast.success(t('visits.reservation.toast_updated'))
+        onOpenChange(false)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : String(err))
+      }
       return
     }
 
-    createBlock.mutate(
-      {
+    try {
+      const created = await createBlock.mutateAsync({
         staff_id: values.staff_id,
         kind: 'reservation',
         starts_at: starts.toISOString(),
         ends_at: ends.toISOString(),
-        label: values.reason.trim() || null,
-      },
-      {
-        onSuccess: () => {
-          toast.success(t('visits.calendar.subslot.toast_reserved'))
-          onOpenChange(false)
-        },
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-      },
-    )
+        label,
+      })
+      await pushBooksyCreate(created.id, values.staff_id, starts, ends, label ?? '')
+      toast.success(t('visits.calendar.subslot.toast_reserved'))
+      onOpenChange(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!block) return
     if (!window.confirm(t('visits.calendar.confirm_remove_reservation'))) return
-    deleteBlock.mutate(block.id, {
-      onSuccess: () => {
-        toast.success(t('visits.calendar.toast_block_removed'))
-        onOpenChange(false)
-      },
-      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-    })
+    try {
+      await deleteBlock.mutateAsync(block.id)
+      // Booksy reverse-sync: удаляем парную резервацию если она была
+      // (как импортированную через sync, так и созданную нами в портале)
+      if (block.external_source === 'booksy') {
+        await pushBooksyDelete(block.external_id)
+      }
+      toast.success(t('visits.calendar.toast_block_removed'))
+      onOpenChange(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
   }
 
-  const isPending = createBlock.isPending || updateBlock.isPending || deleteBlock.isPending
+  const isPending =
+    createBlock.isPending ||
+    updateBlock.isPending ||
+    deleteBlock.isPending ||
+    reserveBooksy.isPending ||
+    deleteBooksyRes.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
