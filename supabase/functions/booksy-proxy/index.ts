@@ -1066,6 +1066,7 @@ async function insertHistoricalBooking(
       status,
       source: 'booksy',
       external_id: externalId,
+      external_reservation_id: b.appointment_uid ? String(b.appointment_uid) : null,
       group_key: null,
       comment: null,
     },
@@ -1556,8 +1557,35 @@ async function syncVisits(
         let status: 'paid' | 'pending' = isPaidBooksy ? 'paid' : 'pending'
         if (!config.booksy_owns_payment_status) status = 'pending'
 
-        const { error } = await admin.from('visits').upsert(
-          {
+        // Bug 1: visit moved in Booksy → portal не обновлялся (upsert
+        // ignoreDuplicates пропускал). Bug 1b: после reverse-delete визит
+        // оставался soft-deleted, новое появление в Booksy не восстанавливало.
+        // Решение: явная ветка update vs insert. Money-поля
+        // (amount/tip/discount/status/payment_method) НЕ обновляем —
+        // ручные правки в портале сохраняем (ADR-017 portal-owned).
+        // Bug 2: external_reservation_id = appointment_uid сохраняем чтоб
+        // delete визита в портале мог снять appointment в Booksy.
+        const existing = existingByExt.get(externalId)
+        if (existing) {
+          const { error: updErr } = await admin
+            .from('visits')
+            .update({
+              staff_id: staffId,
+              service_id: serviceId,
+              service_name_snapshot: serviceName,
+              visit_at: visitAtIso,
+              duration_min: durationMin,
+              external_reservation_id: String(apptUid),
+              deleted_at: null,
+              group_key: groupKey,
+            })
+            .eq('id', existing.id)
+          if (!updErr) {
+            existingExt.add(externalId)
+            stats.visits_synced! += 1
+          }
+        } else {
+          const { error } = await admin.from('visits').insert({
             salon_id: salonId,
             staff_id: staffId,
             client_id: clientId,
@@ -1572,14 +1600,14 @@ async function syncVisits(
             status,
             source: 'booksy',
             external_id: externalId,
+            external_reservation_id: String(apptUid),
             group_key: groupKey,
             comment: null,
-          },
-          { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
-        )
-        if (!error) {
-          existingExt.add(externalId)
-          stats.visits_synced! += 1
+          })
+          if (!error) {
+            existingExt.add(externalId)
+            stats.visits_synced! += 1
+          }
         }
       }
     }
