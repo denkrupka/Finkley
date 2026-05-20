@@ -120,3 +120,23 @@ export function useUnarchiveStaff(salonId: string | undefined) {
     },
   })
 }
+
+/**
+ * Переключает видимость мастера в календаре (не влияет на is_active).
+ * Используется в Popover по клику на staff cell в VisitsCalendarView.
+ */
+export function useToggleStaffCalendarVisibility(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; visible: boolean }) => {
+      const { error } = await supabase
+        .from('staff')
+        .update({ visible_on_calendar: input.visible })
+        .eq('id', input.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+    },
+  })
+}

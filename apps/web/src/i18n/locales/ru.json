@@ -1212,6 +1212,10 @@
     },
     "invite_first_name": "Имя",
     "invite_first_name_placeholder": "Анна",
+    "invite_avatar": "Фото",
+    "invite_avatar_pick": "Выбрать фото",
+    "invite_avatar_uploading": "Загружаю…",
+    "invite_avatar_hint": "Опционально. Файл до 2 МБ. После принятия приглашения автоматически попадёт в карточку мастера.",
     "invite_last_name": "Фамилия",
     "invite_last_name_placeholder": "Иванова",
     "invite_phone": "Телефон",
@@ -1268,7 +1272,10 @@
       "already_member": "Этот юзер уже в команде",
       "missing_fields": "Заполни все поля",
       "invalid_role": "Некорректная роль",
-      "forbidden": "Нет прав приглашать"
+      "forbidden": "Нет прав приглашать",
+      "avatar_invalid_type": "Файл должен быть изображением (JPG / PNG / WebP)",
+      "avatar_too_large": "Файл слишком большой. Максимум 2 МБ.",
+      "avatar_failed": "Не удалось загрузить фото — попробуй ещё раз"
     }
   },
   "help": {
@@ -1430,7 +1437,21 @@
       },
       "confirm_remove_reservation": "Снять резерв времени?",
       "confirm_remove_absence": "Убрать отсутствие?",
-      "toast_block_removed": "Удалено"
+      "toast_block_removed": "Удалено",
+      "daily_focus_active": "Дневной вид: {{name}}",
+      "daily_focus_exit": "Показать всех",
+      "hidden_staff_one": "Скрыт {{count}} мастер",
+      "hidden_staff_few": "Скрыто {{count}} мастера",
+      "hidden_staff_many": "Скрыто {{count}} мастеров",
+      "hidden_staff": "Скрыто из календаря",
+      "staff_menu": {
+        "daily_view": "Дневной вид",
+        "add_absence": "Добавить отсутствие",
+        "edit_schedule": "Редактировать график",
+        "hide_from_calendar": "Не отображать в календаре",
+        "hidden_toast": "{{name}} скрыт из календаря",
+        "absence_coming_soon": "Управление отсутствиями — скоро (нужна отдельная таблица per-staff time-offs)"
+      }
     },
     "move": {
       "title": "Сохранить изменения в визите?",
@@ -1594,6 +1615,9 @@
       "duration_default": "по умолчанию",
       "tip_label": "Чаевые",
       "discount_label": "Скидка",
+      "client_discount_hint": "Скидка {{pct}}% из карточки клиента — применится при сохранении",
+      "toast_booksy_skip_no_external": "Резерв в Booksy не создан",
+      "toast_booksy_skip_no_external_hint": "Мастер не привязан к Booksy. Открой Settings → Интеграции → «Синхронизировать сейчас» чтобы Booksy связал мастеров с порталом.",
       "payment_method_label": "Оплата",
       "comment_label": "Комментарий (необязательно)",
       "comment_placeholder": "Например: новая клиентка, по рекомендации",
@@ -1763,6 +1787,8 @@
       "source_hint": "Поможет потом понять, какой канал привлечения работает лучше всего. Свои варианты сохраняются — будут в подсказках для следующего клиента.",
       "notes_label": "Заметка",
       "notes_placeholder": "Что важно помнить про этого клиента",
+      "discount_label": "Персональная скидка",
+      "discount_hint": "Автоматически предзаполняется в форме визита (от amount). Юзер может снять или изменить.",
       "submit_new": "Создать",
       "submit_edit": "Сохранить"
     },
@@ -1784,7 +1810,8 @@
     },
     "errors": {
       "name_required": "Имя обязательно",
-      "email_invalid": "Неверный формат email"
+      "email_invalid": "Неверный формат email",
+      "discount_invalid": "Скидка должна быть от 0 до 100"
     }
   },
   "billing": {
@@ -2527,7 +2554,28 @@
     "connect_title": "Подключить {{name}}",
     "connect_subtitle": "Введи данные доступа к {{name}}. Пароль шифруется и используется только для синхронизации.",
     "save": "Сохранить и подключить",
+    "saving": "Сохраняю…",
     "connecting": "Подключаю…",
+    "booksy_config_title": "Настройка синхронизации Booksy",
+    "booksy_config_subtitle": "Два вопроса о том, как ты используешь Booksy",
+    "booksy_config_intro": "Эта информация нужна, чтобы правильно настроить логику синхронизации. Мы не будем менять что-либо в твоём Booksy.",
+    "booksy_config_q1": "Ты отмечаешь статусы оплаты визитов в Booksy?",
+    "booksy_config_q1_hint_no": "Понятно. Тогда мы не будем доверять статусу оплаты из Booksy: все импортированные визиты будут «не оплачено», а оплату ты отметишь сам в Finkley.",
+    "booksy_config_q2": "Ты иногда удаляешь визиты, которые фактически состоялись, в Booksy?",
+    "booksy_config_q2_hint_yes": "Принято. После того как визит попал к нам в Finkley — мы его никогда не удалим, даже если ты удалишь его в Booksy. Изменения в портале — только вручную.",
+    "booksy_invite": {
+      "title": "Пригласить мастеров в Finkley?",
+      "subtitle": "Импортированы из Booksy. Отправь им email-приглашения — они увидят свои визиты и зарплаты.",
+      "hint": "Сними галочку у тех, кого не нужно приглашать. Email можно отредактировать или вписать вручную, если его не оказалось в Booksy.",
+      "send": "Отправить приглашения",
+      "sending": "Отправляю…",
+      "skip": "Пока пропустить",
+      "sent": "Отправлено приглашений: {{count}}",
+      "errors": {
+        "emails_required": "Заполни email у всех выбранных мастеров",
+        "send_failed": "Не удалось отправить {{count}} приглашений — попробуй позже"
+      }
+    },
     "toast_saved_stub": "Интеграция в разработке — скоро заработает 🛠",
     "toast_connected": "✅ Подключён аккаунт {{name}}",
     "toast_synced": "Синхронизация: +{{staff}} мастеров, +{{services}} услуг, +{{visits}} визитов",

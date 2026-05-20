@@ -61,6 +61,7 @@ async function handleCreate(
     invited_first_name?: string
     invited_last_name?: string
     invited_phone?: string
+    invited_avatar_url?: string
   },
 ): Promise<Response> {
   if (!body.salon_id || !body.email || !body.role) {
@@ -123,6 +124,10 @@ async function handleCreate(
           : null,
       invited_phone:
         typeof body.invited_phone === 'string' && body.invited_phone ? body.invited_phone : null,
+      invited_avatar_url:
+        typeof body.invited_avatar_url === 'string' && body.invited_avatar_url
+          ? body.invited_avatar_url
+          : null,
     })
     .select('id, expires_at')
     .single()

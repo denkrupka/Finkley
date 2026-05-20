@@ -341,6 +341,10 @@
     "invite_title": "Zaproś do zespołu",
     "invite_subtitle": "Użytkownik dostanie email z linkiem. Ważność — 14 dni.",
     "invite_email": "Email",
+    "invite_avatar": "Zdjęcie",
+    "invite_avatar_pick": "Wybierz zdjęcie",
+    "invite_avatar_uploading": "Wysyłam…",
+    "invite_avatar_hint": "Opcjonalnie. Do 2 MB. Po akceptacji zaproszenia trafi do karty pracownika.",
     "invite_role": "Rola",
     "invite_staff_link": "Powiąż z specjalistą (dla roli „Specjalista”)",
     "invite_staff_none": "— Nie wybrano —",
@@ -386,7 +390,10 @@
       "already_member": "Ten użytkownik już jest w zespole",
       "missing_fields": "Wypełnij wszystkie pola",
       "invalid_role": "Nieprawidłowa rola",
-      "forbidden": "Brak uprawnień do zapraszania"
+      "forbidden": "Brak uprawnień do zapraszania",
+      "avatar_invalid_type": "Plik musi być obrazem (JPG / PNG / WebP)",
+      "avatar_too_large": "Plik za duży. Maksimum 2 MB.",
+      "avatar_failed": "Nie udało się wysłać zdjęcia — spróbuj ponownie"
     }
   },
   "help": {
@@ -486,6 +493,17 @@
         "reserve_time": "Rezerwacja czasu",
         "absence": "Dodaj nieobecność",
         "coming_soon": "Wkrótce dostępne"
+      },
+      "daily_focus_active": "Widok dzienny: {{name}}",
+      "daily_focus_exit": "Pokaż wszystkich",
+      "hidden_staff": "Ukryte z kalendarza",
+      "staff_menu": {
+        "daily_view": "Widok dzienny",
+        "add_absence": "Dodaj nieobecność",
+        "edit_schedule": "Edytuj grafik pracy",
+        "hide_from_calendar": "Ukryj z kalendarza",
+        "hidden_toast": "{{name}} ukryty z kalendarza",
+        "absence_coming_soon": "Zarządzanie nieobecnościami — wkrótce"
       }
     },
     "status_paid": "Opłacona",
@@ -550,6 +568,9 @@
       "amount_label": "Kwota",
       "tip_label": "Napiwek",
       "discount_label": "Rabat",
+      "client_discount_hint": "Rabat {{pct}}% z karty klienta — zostanie zastosowany przy zapisie",
+      "toast_booksy_skip_no_external": "Rezerwacja w Booksy nie została utworzona",
+      "toast_booksy_skip_no_external_hint": "Pracownik nie jest powiązany z Booksy. Otwórz Settings → Integracje → Synchronizuj teraz.",
       "payment_method_label": "Płatność",
       "comment_label": "Komentarz (opcjonalnie)",
       "comment_placeholder": "Na przykład: nowa klientka, z polecenia",
@@ -640,6 +661,8 @@
       "email_label": "Email",
       "notes_label": "Notatka",
       "notes_placeholder": "Co warto pamiętać o tym kliencie",
+      "discount_label": "Indywidualny rabat",
+      "discount_hint": "Automatycznie wypełniany w formularzu wizyty (od kwoty). Można wyczyścić lub zmienić.",
       "submit_new": "Utwórz",
       "submit_edit": "Zapisz"
     },
@@ -659,7 +682,8 @@
     },
     "errors": {
       "name_required": "Imię jest wymagane",
-      "email_invalid": "Nieprawidłowy format email"
+      "email_invalid": "Nieprawidłowy format email",
+      "discount_invalid": "Rabat musi być w zakresie 0–100"
     }
   },
   "billing": {
@@ -1031,7 +1055,28 @@
     "connect_title": "Podłącz {{name}}",
     "connect_subtitle": "Wpisz dane dostępowe do {{name}}. Hasło jest szyfrowane i używane wyłącznie do synchronizacji.",
     "save": "Zapisz i podłącz",
+    "saving": "Zapisuję…",
     "connecting": "Podłączam…",
+    "booksy_config_title": "Konfiguracja synchronizacji Booksy",
+    "booksy_config_subtitle": "Dwa pytania o to, jak korzystasz z Booksy",
+    "booksy_config_intro": "Te informacje są potrzebne wyłącznie do konfiguracji logiki synchronizacji. Nie zmieniamy nic w Twoim Booksy.",
+    "booksy_config_q1": "Czy oznaczasz statusy płatności wizyt w Booksy?",
+    "booksy_config_q1_hint_no": "OK. Wtedy nie ufamy statusowi płatności z Booksy: wszystkie importowane wizyty będą «nieopłacone», a płatność oznaczysz sam w Finkley.",
+    "booksy_config_q2": "Czy zdarza Ci się usuwać wizyty, które faktycznie się odbyły, w Booksy?",
+    "booksy_config_q2_hint_yes": "Rozumiem. Gdy wizyta trafi do Finkley — nigdy jej nie usuniemy, nawet jeśli usuniesz ją w Booksy. Zmiany w portalu wprowadzasz tylko ręcznie.",
+    "booksy_invite": {
+      "title": "Zaprosić pracowników do Finkley?",
+      "subtitle": "Zaimportowani z Booksy. Wyślij im zaproszenia mailem — zobaczą swoje wizyty i wypłaty.",
+      "hint": "Odznacz tych, których nie chcesz zapraszać. Możesz edytować email lub wpisać go ręcznie, jeśli Booksy go nie podało.",
+      "send": "Wyślij zaproszenia",
+      "sending": "Wysyłam…",
+      "skip": "Pomiń na razie",
+      "sent": "Wysłano zaproszeń: {{count}}",
+      "errors": {
+        "emails_required": "Podaj email dla wszystkich wybranych pracowników",
+        "send_failed": "Nie udało się wysłać {{count}} zaproszeń — spróbuj później"
+      }
+    },
     "toast_saved_stub": "Integracja w przygotowaniu — wkrótce zadziała 🛠",
     "toast_connected": "✅ Konto {{name}} podłączone",
     "toast_synced": "Synchronizacja: +{{staff}} specjalistów, +{{services}} usług, +{{visits}} wizyt",

@@ -187,16 +187,26 @@ export function DashboardPage() {
                 const max = Math.max(1, ...topStaff.map((x) => x.revenue_cents))
                 const pct = (s.revenue_cents / max) * 100
                 const color = STAFF_PALETTE[i % STAFF_PALETTE.length]!
+                const avatarUrl = staff.find((st) => st.id === s.staff_id)?.avatar_url ?? null
                 return (
                   <div key={s.staff_id}>
                     <div className="mb-1.5 flex items-baseline justify-between">
                       <span className="flex items-center gap-2.5">
-                        <span
-                          className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
-                          style={{ background: color }}
-                        >
-                          {s.full_name.charAt(0).toUpperCase()}
-                        </span>
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt=""
+                            loading="lazy"
+                            className="size-7 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
+                            style={{ background: color }}
+                          >
+                            {s.full_name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
                         <span className="text-foreground text-sm font-semibold">{s.full_name}</span>
                       </span>
                       <span className="num text-brand-navy text-[15px] font-bold">

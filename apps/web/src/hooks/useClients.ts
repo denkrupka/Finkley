@@ -23,6 +23,8 @@ export type ClientRow = {
   tags: string[]
   notes: string | null
   socials: ClientSocial[]
+  /** Персональная скидка клиента (%, 0..100). Авто-применяется в форме визита. */
+  discount_percent: number | null
   visit_count: number
   total_revenue_cents: number
   last_visit_at: string | null
@@ -121,13 +123,15 @@ export type CreateClientInput = {
   email?: string | null
   source?: string | null
   notes?: string | null
+  discount_percent?: number | null
+  socials?: ClientSocial[]
 }
 
 export function useCreateClient(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: CreateClientInput) => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         salon_id: input.salon_id,
         name: input.name.trim(),
         phone: input.phone?.trim() || null,
@@ -135,6 +139,8 @@ export function useCreateClient(salonId: string | undefined) {
         source: input.source?.trim() || null,
         notes: input.notes?.trim() || null,
       }
+      if (input.discount_percent !== undefined) payload.discount_percent = input.discount_percent
+      if (input.socials !== undefined) payload.socials = input.socials
       const { data, error } = await supabase.from('clients').insert(payload).select('*').single()
       if (error) throw error
       return data as ClientRow
@@ -152,6 +158,8 @@ export type UpdateClientInput = {
   email?: string | null
   source?: string | null
   notes?: string | null
+  discount_percent?: number | null
+  socials?: ClientSocial[]
 }
 
 export function useUpdateClient(salonId: string | undefined) {

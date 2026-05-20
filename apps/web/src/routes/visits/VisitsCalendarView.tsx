@@ -1,6 +1,14 @@
 import { addDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, Maximize2, Minimize2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Eye,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -19,13 +27,16 @@ import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
+import { useToggleStaffCalendarVisibility } from '@/hooks/useStaffMutations'
 import { useUpdateVisit, useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 
 import { QuickEntryModal } from './QuickEntryModal'
+import { StaffHeaderMenu } from './StaffHeaderMenu'
 import { VisitDetailModal } from './VisitDetailModal'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
 import { ReservationModal } from './ReservationModal'
+import { StaffEditSheet } from '@/routes/staff/StaffEditSheet'
 
 // =============================================================================
 // Конфиг сетки
@@ -83,7 +94,19 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const range = { start: dayStart.toISOString(), end: dayEnd.toISOString() }
 
   const { data: salon } = useSalon(salonId)
-  const { data: staff = [] } = useStaff(salonId)
+  const { data: allStaff = [] } = useStaff(salonId)
+  // Фильтруем мастеров, скрытых юзером из календаря.
+  // Если установлен focusStaffId (через dropdown «Дневной вид») — показываем только его.
+  const [focusStaffId, setFocusStaffId] = useState<string | null>(null)
+  const [editScheduleStaffId, setEditScheduleStaffId] = useState<string | null>(null)
+  const visibleStaff = useMemo(
+    () =>
+      focusStaffId
+        ? allStaff.filter((s) => s.id === focusStaffId)
+        : allStaff.filter((s) => s.visible_on_calendar !== false),
+    [allStaff, focusStaffId],
+  )
+  const staff = visibleStaff
   const { data: services = [] } = useServices(salonId)
   const { data: clients = [] } = useClients(salonId)
   const { data: blocks = [] } = useStaffBlocks(salonId, range)
@@ -407,28 +430,49 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                     .join('')
                     .toUpperCase()
                   return (
-                    <div
+                    <StaffHeaderMenu
                       key={s.id}
-                      className="border-border bg-card sticky top-0 z-30 flex items-center gap-2 border-b border-r px-3"
-                      style={{ height: 64 }}
+                      salonId={salonId}
+                      staff={s}
+                      onShowDailyView={(id) => setFocusStaffId(id)}
+                      onEditSchedule={(id) => setEditScheduleStaffId(id)}
                     >
                       <div
-                        className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-bold"
-                        style={{ background: palette.bg, color: palette.accent }}
+                        role="button"
+                        tabIndex={0}
+                        className="border-border bg-card hover:bg-muted/30 focus-visible:bg-muted/30 sticky top-0 z-30 flex cursor-pointer items-center gap-2 border-b border-r px-3 outline-none"
+                        style={{ height: 64 }}
                       >
-                        {initials || '?'}
+                        {s.avatar_url ? (
+                          <img
+                            src={s.avatar_url}
+                            alt=""
+                            loading="lazy"
+                            className="size-9 shrink-0 rounded-full object-cover"
+                            onError={(e) => {
+                              ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-bold"
+                            style={{ background: palette.bg, color: palette.accent }}
+                          >
+                            {initials || '?'}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-foreground truncate text-sm font-semibold">
+                            {s.full_name}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {sched && !sched.off
+                              ? `${sched.start} – ${sched.end}`
+                              : t('visits.calendar.day_off')}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-foreground truncate text-sm font-semibold">
-                          {s.full_name}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {sched && !sched.off
-                            ? `${sched.start} – ${sched.end}`
-                            : t('visits.calendar.day_off')}
-                        </p>
-                      </div>
-                    </div>
+                    </StaffHeaderMenu>
                   )
                 })}
               </div>
@@ -1040,6 +1084,70 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sheet редактирования графика мастера (из dropdown'а в шапке колонки) */}
+      <StaffEditSheet
+        salonId={salonId}
+        open={!!editScheduleStaffId}
+        onOpenChange={(o) => !o && setEditScheduleStaffId(null)}
+        staff={
+          editScheduleStaffId ? (allStaff.find((s) => s.id === editScheduleStaffId) ?? null) : null
+        }
+      />
+
+      {/* Баннер «показан только один мастер» — для выхода из focus-mode */}
+      {focusStaffId ? (
+        <div className="bg-brand-yellow/20 border-brand-yellow-deep/30 fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border px-4 py-2 shadow-lg">
+          <span className="text-foreground text-sm font-semibold">
+            {t('visits.calendar.daily_focus_active', {
+              name: allStaff.find((s) => s.id === focusStaffId)?.full_name ?? '',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => setFocusStaffId(null)}
+            className="text-brand-navy/80 hover:text-brand-navy text-xs font-bold uppercase"
+          >
+            {t('visits.calendar.daily_focus_exit')}
+          </button>
+        </div>
+      ) : null}
+
+      {/* Баннер «есть скрытые мастера» — для возврата */}
+      {!focusStaffId && allStaff.some((s) => s.visible_on_calendar === false) ? (
+        <HiddenStaffBanner allStaff={allStaff} salonId={salonId} />
+      ) : null}
+    </div>
+  )
+}
+
+function HiddenStaffBanner({
+  allStaff,
+  salonId,
+}: {
+  allStaff: { id: string; full_name: string; visible_on_calendar: boolean }[]
+  salonId: string
+}) {
+  const { t } = useTranslation()
+  const toggle = useToggleStaffCalendarVisibility(salonId)
+  const hidden = allStaff.filter((s) => s.visible_on_calendar === false)
+  if (hidden.length === 0) return null
+  return (
+    <div className="border-border bg-muted/30 mt-3 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
+      <span className="text-muted-foreground font-semibold">
+        {t('visits.calendar.hidden_staff', { count: hidden.length })}:
+      </span>
+      {hidden.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => toggle.mutate({ id: s.id, visible: true })}
+          className="border-border bg-card hover:bg-muted/40 inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold"
+        >
+          <Eye className="size-3" strokeWidth={1.8} />
+          {s.full_name}
+        </button>
+      ))}
     </div>
   )
 }

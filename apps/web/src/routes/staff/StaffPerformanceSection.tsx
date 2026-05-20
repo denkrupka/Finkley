@@ -17,6 +17,7 @@ type Props = {
     full_name: string
     is_active: boolean
     retention_window_days?: number | null
+    avatar_url?: string | null
   }>
   currency: string
   /**
@@ -206,12 +207,21 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                       ) : (
                         <span className="w-4 shrink-0" />
                       )}
-                      <span
-                        className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
-                        style={{ background: color }}
-                      >
-                        {s.full_name.charAt(0).toUpperCase()}
-                      </span>
+                      {s.avatar_url ? (
+                        <img
+                          src={s.avatar_url}
+                          alt=""
+                          loading="lazy"
+                          className="size-7 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
+                          style={{ background: color }}
+                        >
+                          {s.full_name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                       <span className="text-foreground font-semibold">{s.full_name}</span>
                       {flagAttention ? (
                         <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-800">

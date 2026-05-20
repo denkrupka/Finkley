@@ -38,6 +38,7 @@ import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 
 import { BankingSection } from './BankingSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
+import { BooksyStaffInviteModal } from './BooksyStaffInviteModal'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import { MessengerConnectDialog } from './MessengerConnectDialog'
 import { TelegramUserbotConnectDialog } from './TelegramUserbotConnectDialog'
@@ -74,6 +75,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   const [params, setParams] = useSearchParams()
   const [connecting, setConnecting] = useState<IntegrationDef | null>(null)
   const [booksyOpen, setBooksyOpen] = useState(false)
+  const [booksyInviteOpen, setBooksyInviteOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
   const [ksefOpen, setKsefOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
@@ -205,7 +207,16 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
       <p className="text-muted-foreground mt-6 text-xs">{t('integrations.privacy_note')}</p>
 
       <ConnectIntegrationDialog provider={connecting} onClose={() => setConnecting(null)} />
-      <BooksyConnectDialog open={booksyOpen} onClose={() => setBooksyOpen(false)} />
+      <BooksyConnectDialog
+        open={booksyOpen}
+        onClose={() => {
+          setBooksyOpen(false)
+          // После закрытия (значит config сохранён) — открываем invite-модалку
+          // с задержкой, чтобы дать caталог-sync подгрузить мастеров.
+          setTimeout(() => setBooksyInviteOpen(true), 800)
+        }}
+      />
+      <BooksyStaffInviteModal open={booksyInviteOpen} onClose={() => setBooksyInviteOpen(false)} />
       <WfirmaConnectDialog open={wfirmaOpen} onClose={() => setWfirmaOpen(false)} />
       <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} />
     </div>

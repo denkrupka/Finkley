@@ -56,6 +56,7 @@ type FormValues = {
   source: string
   notes: string
   socials: { kind: SocialKind; label?: string; handle: string }[]
+  discountPercent: string // строкой в форме чтобы пустое = null
 }
 
 const schema = z.object({
@@ -79,6 +80,15 @@ const schema = z.object({
       }),
     )
     .default([]),
+  discountPercent: z
+    .string()
+    .optional()
+    .default('')
+    .refine((v) => {
+      if (!v) return true
+      const n = Number(v)
+      return Number.isFinite(n) && n >= 0 && n <= 100
+    }, 'clients.errors.discount_invalid'),
 })
 
 type Props = {
@@ -176,6 +186,10 @@ export function ClientFormModal({
       source: client?.source ?? '',
       notes: client?.notes ?? '',
       socials: client?.socials ?? [],
+      discountPercent:
+        client?.discount_percent !== null && client?.discount_percent !== undefined
+          ? String(client.discount_percent)
+          : '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет на open
   }, [open, client?.id, prefillName])
@@ -201,6 +215,9 @@ export function ClientFormModal({
         handle: s.handle.trim(),
       }))
 
+    const discountRaw = values.discountPercent?.trim() ?? ''
+    const discountToSave = discountRaw === '' ? null : Number(discountRaw)
+
     const payload = {
       name: values.name.trim(),
       phone: phoneToSave,
@@ -208,6 +225,7 @@ export function ClientFormModal({
       source: values.source.trim() || null,
       notes: values.notes.trim() || null,
       socials: socialsClean,
+      discount_percent: discountToSave,
     }
 
     const onError = (err: unknown) => {
@@ -417,6 +435,33 @@ export function ClientFormModal({
                 <option key={s} value={s} />
               ))}
             </datalist>
+          </div>
+
+          {/* Персональная скидка % — auto-apply в форме визита */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cl-discount">{t('clients.form.discount_label')}</Label>
+            <div className="relative">
+              <Input
+                id="cl-discount"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step="0.01"
+                placeholder="0"
+                {...form.register('discountPercent')}
+                className="num pr-8"
+              />
+              <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                %
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">{t('clients.form.discount_hint')}</p>
+            {form.formState.errors.discountPercent ? (
+              <p className="text-destructive text-xs font-medium" role="alert">
+                {t(form.formState.errors.discountPercent.message ?? '')}
+              </p>
+            ) : null}
           </div>
 
           {/* Заметка */}

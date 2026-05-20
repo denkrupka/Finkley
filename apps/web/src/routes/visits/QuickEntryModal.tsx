@@ -43,6 +43,7 @@ import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
+import { useClient } from '@/hooks/useClients'
 import { ClientPicker } from '@/routes/clients/ClientPicker'
 import { VisitReceiptModal } from '@/routes/visits/VisitReceiptModal'
 
@@ -281,6 +282,8 @@ export function QuickEntryModal({
   // мастера руками для этой строки. Флаг appliedSuggestionFor не даёт
   // зациклиться.
   const watchedClientId = form.watch('client_id')
+  // Подтягиваем карточку клиента — для auto-apply discount_percent при сохранении.
+  const { data: selectedClient } = useClient(salonId, watchedClientId ?? undefined)
   const firstServiceId = lines[0]?.service_id ?? null
   const { data: suggestedStaffId } = useSuggestedStaffForClientService(
     salonId,
@@ -398,10 +401,18 @@ export function QuickEntryModal({
       return
     }
 
-    // Чаевые и скидку на этапе создания не вводим — задаются позже при
-    // нажатии «Рассчитать» в карточке визита. Здесь фиксируем 0.
+    // Чаевые на этапе создания не вводим (задаются в «Рассчитать»).
+    // Скидку — если у клиента стоит discount_percent — авто-применяем от
+    // суммы всех строк. Юзер может поменять в карточке визита.
     const tipCentsTotal = 0
-    const discountCentsTotal = 0
+    const clientDiscountPct =
+      selectedClient?.discount_percent != null && selectedClient.discount_percent > 0
+        ? Number(selectedClient.discount_percent)
+        : 0
+    const discountCentsTotal =
+      clientDiscountPct > 0
+        ? Math.round((lines.reduce((s, l) => s + l.price_cents, 0) * clientDiscountPct) / 100)
+        : 0
 
     const [yyyy, mm, dd] = values.visit_date.split('-').map(Number)
     const [sh, sm] = values.start_time.split(':').map(Number)
@@ -613,11 +624,19 @@ export function QuickEntryModal({
       if (booksyConnected && totalDurationMin > 0) {
         const startAt = new Date(visitAt)
         const endAt = new Date(startAt.getTime() + totalDurationMin * 60000)
+        let reservedCount = 0
+        let skippedNoExternal = 0
         for (const staffId of uniqueStaffIds) {
           const stf = staff.find((s) => s.id === staffId)
           const stfExternal =
             stf?.external_source === 'booksy' && stf.external_id ? stf.external_id : null
-          if (!stfExternal) continue
+          if (!stfExternal) {
+            skippedNoExternal++
+            console.warn(
+              `Booksy reservation skipped: staff ${stf?.full_name ?? staffId} has no external_id (not linked to Booksy)`,
+            )
+            continue
+          }
           reserveBooksy.mutate({
             salonId,
             staffIdExternal: stfExternal,
@@ -627,6 +646,14 @@ export function QuickEntryModal({
               .filter((ln) => ln.staff_id === staffId)
               .map((ln) => ln.name)
               .join(', '),
+          })
+          reservedCount++
+        }
+        // Warning если ни одной резервации не сделали — частая причина
+        // у юзера: мастер вручную создан в портале (без Booksy external_id)
+        if (reservedCount === 0 && skippedNoExternal > 0) {
+          toast.warning(t('visits.toast_booksy_skip_no_external'), {
+            description: t('visits.toast_booksy_skip_no_external_hint'),
           })
         }
       }
@@ -1115,7 +1142,27 @@ export function QuickEntryModal({
 
           {/* Чаевые и скидка на создании визита больше не показываются
               (image #69) — они задаются при нажатии «Рассчитать» в
-              VisitDetailModal → ChargeView, когда визит реально оплачивается. */}
+              VisitDetailModal → ChargeView, когда визит реально оплачивается.
+              Исключение: если у клиента в карточке стоит discount_percent > 0
+              — показываем подсказку, что скидка автоприменится при сохранении. */}
+          {selectedClient?.discount_percent != null &&
+          Number(selectedClient.discount_percent) > 0 &&
+          totalAmountCents > 0 ? (
+            <div className="border-brand-yellow/40 bg-brand-yellow/10 flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-xs">
+              <span className="text-foreground/80">
+                {t('visits.form.client_discount_hint', {
+                  pct: Number(selectedClient.discount_percent),
+                })}
+              </span>
+              <span className="num text-foreground font-semibold">
+                −{currencySymbol}
+                {(
+                  Math.round((totalAmountCents * Number(selectedClient.discount_percent)) / 100) /
+                  100
+                ).toFixed(2)}
+              </span>
+            </div>
+          ) : null}
 
           {/* Комментарий — единственное необязательное поле */}
           <div className="flex flex-col gap-1.5">

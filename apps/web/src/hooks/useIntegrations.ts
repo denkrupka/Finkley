@@ -23,6 +23,8 @@ export type SalonIntegrationPublic = {
     staff_synced?: number
     services_synced?: number
     visits_synced?: number
+    clients_synced?: number
+    salon_hours_synced?: boolean
     // wFirma / KSeF / Fakturownia / iFirma / 360Księgowość
     expenses_synced?: number
     expenses_skipped?: number
@@ -31,6 +33,13 @@ export type SalonIntegrationPublic = {
   connected_at: string
   updated_at: string
   sync_interval_minutes: number
+  // Booksy-specific (см. ADR-017 §5)
+  config?: {
+    booksy_owns_payment_status?: boolean
+    booksy_can_delete_visits?: boolean
+  } | null
+  last_clients_sync_at?: string | null
+  last_catalog_sync_at?: string | null
 }
 
 /** Доступные интервалы авто-синхронизации Booksy (минуты). */
@@ -179,6 +188,33 @@ export function useBooksySync(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['staff', salonId] })
       qc.invalidateQueries({ queryKey: ['services', salonId] })
       qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
+  })
+}
+
+/** Обновить config-флаги Booksy (онбординг-вопросы — ADR-017 §5). */
+export function useUpdateBooksyConfig(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      booksy_owns_payment_status?: boolean
+      booksy_can_delete_visits?: boolean
+    }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: {
+          action: 'update_config',
+          salon_id: salonId,
+          ...input,
+        },
+      })
+      if (error) throw error
+      const json = data as { ok?: boolean; error?: string; message?: string; config?: unknown }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'update_failed')
+      return json.config
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
     },
   })
 }

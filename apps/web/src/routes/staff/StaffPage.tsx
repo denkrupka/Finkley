@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { StaffAvatar } from '@/components/ui/StaffAvatar'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff, type StaffRow } from '@/hooks/useStaff'
 import { useArchiveStaff, useUnarchiveStaff } from '@/hooks/useStaffMutations'
@@ -168,7 +169,12 @@ function StaffRowItem({
 
   return (
     <tr className={['border-border border-t', archived ? 'opacity-60' : ''].join(' ')}>
-      <td className="px-4 py-3 font-semibold">{staff.full_name}</td>
+      <td className="px-4 py-3 font-semibold">
+        <div className="flex items-center gap-2">
+          <StaffAvatar avatarUrl={staff.avatar_url} fullName={staff.full_name} />
+          <span>{staff.full_name}</span>
+        </div>
+      </td>
       <td className="text-muted-foreground px-4 py-3 text-xs">
         {payoutSummary(staff, currency, tt)}
       </td>

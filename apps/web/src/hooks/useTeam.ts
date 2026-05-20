@@ -106,6 +106,7 @@ export function useInviteMember(salonId: string | undefined) {
       first_name?: string
       last_name?: string
       phone?: string
+      avatar_url?: string
     }) => {
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
@@ -118,6 +119,7 @@ export function useInviteMember(salonId: string | undefined) {
           invited_first_name: input.first_name?.trim() || null,
           invited_last_name: input.last_name?.trim() || null,
           invited_phone: input.phone?.trim() || null,
+          invited_avatar_url: input.avatar_url?.trim() || null,
         },
       })
       if (error) throw error

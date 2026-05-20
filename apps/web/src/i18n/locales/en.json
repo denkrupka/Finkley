@@ -341,6 +341,10 @@
     "invite_title": "Invite to team",
     "invite_subtitle": "The user gets an email with a link. The link is valid for 14 days.",
     "invite_email": "Email",
+    "invite_avatar": "Photo",
+    "invite_avatar_pick": "Choose photo",
+    "invite_avatar_uploading": "Uploading…",
+    "invite_avatar_hint": "Optional. Up to 2 MB. Automatically attached to the staff card on accept.",
     "invite_role": "Role",
     "invite_staff_link": "Link to specialist (for the \"Staff\" role)",
     "invite_staff_none": "— Not selected —",
@@ -386,7 +390,10 @@
       "already_member": "This user is already on the team",
       "missing_fields": "Fill in all the fields",
       "invalid_role": "Invalid role",
-      "forbidden": "You don't have permission to invite"
+      "forbidden": "You don't have permission to invite",
+      "avatar_invalid_type": "File must be an image (JPG / PNG / WebP)",
+      "avatar_too_large": "File too large. Maximum 2 MB.",
+      "avatar_failed": "Failed to upload photo — try again"
     }
   },
   "help": {
@@ -486,6 +493,17 @@
         "reserve_time": "Reserve time",
         "absence": "Add absence",
         "coming_soon": "Coming soon"
+      },
+      "daily_focus_active": "Daily view: {{name}}",
+      "daily_focus_exit": "Show all",
+      "hidden_staff": "Hidden from calendar",
+      "staff_menu": {
+        "daily_view": "Daily view",
+        "add_absence": "Add absence",
+        "edit_schedule": "Edit work schedule",
+        "hide_from_calendar": "Hide from calendar",
+        "hidden_toast": "{{name}} hidden from calendar",
+        "absence_coming_soon": "Per-staff absence management — coming soon"
       }
     },
     "status_paid": "Paid",
@@ -550,6 +568,9 @@
       "amount_label": "Amount",
       "tip_label": "Tip",
       "discount_label": "Discount",
+      "client_discount_hint": "Discount {{pct}}% from client profile — will be applied on save",
+      "toast_booksy_skip_no_external": "Booksy reservation not created",
+      "toast_booksy_skip_no_external_hint": "Staff is not linked to Booksy. Open Settings → Integrations → Sync now to link.",
       "payment_method_label": "Payment",
       "comment_label": "Comment (optional)",
       "comment_placeholder": "For example: new client, came on a referral",
@@ -639,6 +660,8 @@
       "email_label": "Email",
       "notes_label": "Note",
       "notes_placeholder": "Anything important to remember about this client",
+      "discount_label": "Personal discount",
+      "discount_hint": "Auto-applied in the visit form (off amount). Can be cleared or changed.",
       "submit_new": "Create",
       "submit_edit": "Save"
     },
@@ -658,7 +681,8 @@
     },
     "errors": {
       "name_required": "Name is required",
-      "email_invalid": "Invalid email format"
+      "email_invalid": "Invalid email format",
+      "discount_invalid": "Discount must be 0–100"
     }
   },
   "billing": {
@@ -1030,7 +1054,28 @@
     "connect_title": "Connect {{name}}",
     "connect_subtitle": "Enter your {{name}} access details. Your password is encrypted and used only for syncing.",
     "save": "Save and connect",
+    "saving": "Saving…",
     "connecting": "Connecting…",
+    "booksy_config_title": "Booksy sync setup",
+    "booksy_config_subtitle": "Two questions about how you use Booksy",
+    "booksy_config_intro": "This is only used to configure sync logic. We won't change anything in your Booksy.",
+    "booksy_config_q1": "Do you mark visit payment statuses in Booksy?",
+    "booksy_config_q1_hint_no": "Got it. Then we won't trust payment status from Booksy: all imported visits will be 'unpaid', and you'll mark payments yourself in Finkley.",
+    "booksy_config_q2": "Do you ever delete completed visits in Booksy?",
+    "booksy_config_q2_hint_yes": "Understood. Once a visit lands in Finkley — we'll never delete it, even if you delete it from Booksy. Changes in the portal are manual only.",
+    "booksy_invite": {
+      "title": "Invite masters to Finkley?",
+      "subtitle": "Imported from Booksy. Send them email invitations — they'll see their visits and payouts.",
+      "hint": "Uncheck anyone you don't want to invite. Edit email or fill it in if Booksy didn't provide one.",
+      "send": "Send invitations",
+      "sending": "Sending…",
+      "skip": "Skip for now",
+      "sent": "Invitations sent: {{count}}",
+      "errors": {
+        "emails_required": "Provide an email for every selected master",
+        "send_failed": "Failed to send {{count}} invitations — try again later"
+      }
+    },
     "toast_saved_stub": "Integration in development — coming soon 🛠",
     "toast_connected": "✅ Connected to {{name}}",
     "toast_synced": "Synced: +{{staff}} specialists, +{{services}} services, +{{visits}} visits",

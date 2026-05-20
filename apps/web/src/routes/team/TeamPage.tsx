@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2, Mail, Trash2, UserPlus } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mail, Trash2, UserPlus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useStaff, useUnlinkedStaff } from '@/hooks/useStaff'
+import { uploadStaffAvatar } from '@/lib/storage/upload-avatar'
 import {
   useCancelInvitation,
   useInvitations,
@@ -71,6 +72,8 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
 
   const { data: unlinkedStaff = [] } = useUnlinkedStaff(salonId)
   const isMasterChecked = selectedRoles.has('staff')
@@ -119,6 +122,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
         first_name: firstName,
         last_name: lastName,
         phone,
+        avatar_url: avatarUrl ?? undefined,
       },
       {
         onSuccess: () => {
@@ -130,6 +134,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
           setFirstName('')
           setLastName('')
           setPhone('')
+          setAvatarUrl(null)
         },
         onError: (err) => {
           const msg = err instanceof Error ? err.message : String(err)
@@ -356,6 +361,70 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               submitInvite()
             }}
           >
+            {/* Аватар (опционально) — загружается в Storage сразу при выборе */}
+            <div className="flex flex-col items-center gap-2">
+              <Label className="self-start">{t('team.invite_avatar')}</Label>
+              <div className="flex items-center gap-3">
+                <div className="border-border bg-muted/30 relative grid size-16 place-items-center overflow-hidden rounded-full border">
+                  {avatarUrl ? (
+                    <>
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        className="size-full object-cover"
+                        onError={() => setAvatarUrl(null)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl(null)}
+                        className="absolute right-0 top-0 rounded-bl-md bg-black/60 p-0.5 text-white"
+                        aria-label="remove"
+                      >
+                        <X className="size-3" strokeWidth={2.5} />
+                      </button>
+                    </>
+                  ) : avatarUploading ? (
+                    <Loader2 className="text-muted-foreground size-5 animate-spin" />
+                  ) : (
+                    <Camera className="text-muted-foreground size-5" strokeWidth={1.5} />
+                  )}
+                </div>
+                <label
+                  htmlFor="inv-avatar"
+                  className="border-border hover:bg-muted/40 cursor-pointer rounded-md border px-3 py-1.5 text-xs font-semibold"
+                >
+                  {avatarUploading
+                    ? t('team.invite_avatar_uploading')
+                    : t('team.invite_avatar_pick')}
+                  <input
+                    id="inv-avatar"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={avatarUploading || !salonId}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file || !salonId) return
+                      setAvatarUploading(true)
+                      try {
+                        const url = await uploadStaffAvatar(salonId, file)
+                        setAvatarUrl(url)
+                      } catch (err) {
+                        const code = err instanceof Error ? err.message : String(err)
+                        toast.error(t(`team.errors.${code}`, t('team.errors.avatar_failed')))
+                      } finally {
+                        setAvatarUploading(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-muted-foreground text-center text-xs">
+                {t('team.invite_avatar_hint')}
+              </p>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
               <Input
