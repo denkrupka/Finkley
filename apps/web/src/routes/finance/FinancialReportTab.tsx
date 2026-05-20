@@ -25,6 +25,7 @@ import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
 import { useInventoryItems } from '@/hooks/useInventory'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
+import { useScheduledPayments } from '@/hooks/useScheduledPayments'
 import { useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
@@ -60,6 +61,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
   const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
+  const { data: scheduledPayments = [] } = useScheduledPayments(salonId)
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: true })
   const { data: otherIncomeCats = [] } = useOtherIncomeCategories(salonId, {
@@ -67,37 +69,56 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   })
   const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
 
+  // Семантика двух колонок (запрос юзера 21.05):
+  //   План = ВСЕ записи периода (paid + pending визиты, expenses + scheduled).
+  //   Факт = только фактически оплаченные (visits.status='paid', expenses
+  //          — таблица содержит только paid, scheduled НЕ учитываем).
   const monthly = useMemo(() => {
-    const buckets = Array.from({ length: 12 }, () => ({
-      visitsRevenue: 0,
-      retailRevenue: 0,
-      otherIncome: 0,
-      expensesTotal: 0,
-    }))
+    const make = () =>
+      Array.from({ length: 12 }, () => ({
+        visitsRevenue: 0,
+        retailRevenue: 0,
+        otherIncome: 0,
+        expensesTotal: 0,
+      }))
+    const plan = make()
+    const fact = make()
     for (const v of visits) {
       const d = new Date(v.visit_at)
       if (d.getFullYear() !== year) continue
       const m = d.getMonth()
-      buckets[m]!.visitsRevenue += v.amount_cents - v.discount_cents + v.tip_cents
+      const amt = v.amount_cents - v.discount_cents + v.tip_cents
+      plan[m]!.visitsRevenue += amt
+      if (v.status === 'paid') fact[m]!.visitsRevenue += amt
     }
     for (const v of retailSales) {
       const d = new Date(v.visit_at)
       if (d.getFullYear() !== year) continue
       const m = d.getMonth()
-      buckets[m]!.retailRevenue += v.amount_cents - v.discount_cents + v.tip_cents
+      const amt = v.amount_cents - v.discount_cents + v.tip_cents
+      plan[m]!.retailRevenue += amt
+      if (v.status === 'paid') fact[m]!.retailRevenue += amt
     }
     for (const oi of otherIncomes) {
       const d = new Date(oi.income_at)
       if (d.getFullYear() !== year) continue
-      buckets[d.getMonth()]!.otherIncome += oi.amount_cents
+      plan[d.getMonth()]!.otherIncome += oi.amount_cents
+      fact[d.getMonth()]!.otherIncome += oi.amount_cents
     }
     for (const e of expenses) {
       const d = new Date(e.expense_at)
       if (d.getFullYear() !== year) continue
-      buckets[d.getMonth()]!.expensesTotal += e.amount_cents
+      plan[d.getMonth()]!.expensesTotal += e.amount_cents
+      fact[d.getMonth()]!.expensesTotal += e.amount_cents
     }
-    return buckets
-  }, [visits, retailSales, otherIncomes, expenses, year])
+    for (const sp of scheduledPayments) {
+      if (sp.status === 'paid') continue // уже учтено через paid_expense_id
+      const d = new Date(sp.due_date)
+      if (d.getFullYear() !== year) continue
+      plan[d.getMonth()]!.expensesTotal += sp.amount_cents
+    }
+    return { plan, fact }
+  }, [visits, retailSales, otherIncomes, expenses, scheduledPayments, year])
 
   const factByLabel = useMemo<Map<string, number[]>>(() => {
     const catNameById = new Map<string, string>()
@@ -206,15 +227,24 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return months.map(() => value)
   }
   function variablePctOfRevenue(pct: number) {
-    return monthly.map((m) => Math.round(((m.visitsRevenue + m.otherIncome) * pct) / 100))
+    // % от выручки считаем от ПЛАНОВОЙ (все визиты), а fact = от реальной paid.
+    return monthly.plan.map((m) => Math.round(((m.visitsRevenue + m.otherIncome) * pct) / 100))
   }
 
-  const visitsByMonth = monthly.map((m) => m.visitsRevenue)
-  const retailByMonth = monthly.map((m) => m.retailRevenue)
+  // Plan: все визиты (paid + pending) + расходы + scheduled.
+  // Fact: только paid визиты + actual expenses (= таблица expenses).
+  const visitsByMonthPlan = monthly.plan.map((m) => m.visitsRevenue)
+  const visitsByMonth = monthly.fact.map((m) => m.visitsRevenue)
+  const retailByMonthPlan = monthly.plan.map((m) => m.retailRevenue)
+  const retailByMonth = monthly.fact.map((m) => m.retailRevenue)
   const otherIncomeMonthly = settings.other_income.items
     .filter((i) => !i.archived)
     .reduce((acc, i) => acc + monthlyEquivalentCents(i), 0)
-  const otherIncomeByMonth = monthly.map((m) => m.otherIncome + otherIncomeMonthly)
+  const otherIncomeByMonthPlan = monthly.plan.map((m) => m.otherIncome + otherIncomeMonthly)
+  const otherIncomeByMonth = monthly.fact.map((m) => m.otherIncome + otherIncomeMonthly)
+  const revenueByMonthPlan = visitsByMonthPlan.map(
+    (v, i) => v + (retailByMonthPlan[i] ?? 0) + (otherIncomeByMonthPlan[i] ?? 0),
+  )
   const revenueByMonth = visitsByMonth.map(
     (v, i) => v + (retailByMonth[i] ?? 0) + (otherIncomeByMonth[i] ?? 0),
   )
@@ -246,10 +276,13 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }, [])
 
   // Aggregate KPIs за год (для верхней панели)
+  // Plan-колонка теперь = РЕАЛЬНЫЕ данные периода (все визиты, paid+pending).
+  // Fact-колонка = только paid визиты. Просьба юзера (21.05): «если есть
+  // визит — показывай его в плане независимо от статуса».
   const rows: CellRow[] = [
     {
       label: t('finance.report.revenue'),
-      values: constant(0),
+      values: revenueByMonthPlan,
       factValues: revenueByMonth,
       bold: true,
       color: 'sage',
@@ -257,14 +290,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     },
     {
       label: t('finance.report.revenue_services'),
-      values: constant(0),
+      values: visitsByMonthPlan,
       factValues: visitsByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
     },
     {
       label: t('finance.report.revenue_retail'),
-      values: constant(0),
+      values: retailByMonthPlan,
       factValues: retailByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
@@ -272,15 +305,15 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     },
     ...Array.from(retailByCategory.entries()).map(([cat, factArr]) => ({
       label: cat,
-      values: constant(0),
+      values: factArr, // план = факт для retail категорий (нет pending retail визитов обычно)
       factValues: factArr,
       indent: 2,
       parentGroupKey: 'retail',
     })),
     {
       label: t('finance.report.revenue_other'),
-      values: constant(otherIncomeMonthly),
-      factValues: monthly.map((m) => m.otherIncome),
+      values: otherIncomeByMonthPlan,
+      factValues: monthly.fact.map((m) => m.otherIncome),
       indent: 1,
       parentGroupKey: 'revenue',
       groupKey: 'revenue_other',

@@ -117,6 +117,9 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
     }
 
     for (const v of visits) {
+      // ДДС = только фактические потоки денег. Pending визиты (ещё не
+      // рассчитаны) не учитываются — попадут когда юзер их «Рассчитает».
+      if (v.status !== 'paid') continue
       const day = v.visit_at.slice(0, 10)
       const amt = v.amount_cents - v.discount_cents + v.tip_cents
       if (amt === 0) continue
