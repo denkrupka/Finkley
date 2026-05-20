@@ -1700,6 +1700,20 @@ async function processReservations(
     if (s.external_id) staffByExtId.set(s.external_id, s.id)
   }
 
+  // Резервации, которые мы сами создали в Booksy при записи визитов в портале
+  // (visits.external_reservation_id). Их нельзя импортировать обратно как
+  // staff_time_blocks — будет наложение поверх визита (Image #20).
+  const { data: portalOwnedRes } = await admin
+    .from('visits')
+    .select('external_reservation_id')
+    .eq('salon_id', salonId)
+    .not('external_reservation_id', 'is', null)
+    .is('deleted_at', null)
+  const portalOwnedReservationIds = new Set<string>()
+  for (const v of portalOwnedRes ?? []) {
+    if (v.external_reservation_id) portalOwnedReservationIds.add(String(v.external_reservation_id))
+  }
+
   const allExternalIds: string[] = []
   for (const r of rawList) {
     if (r.id === undefined || r.id === null) continue
@@ -1723,6 +1737,10 @@ async function processReservations(
 
   for (const r of rawList) {
     if (r.id === undefined || r.id === null) continue
+    // Skip: эта резервация создана нашим же порталом при записи визита.
+    // Если её импортировать, она наложится как штрихованный блок поверх
+    // визита (Image #20).
+    if (portalOwnedReservationIds.has(String(r.id))) continue
     const from = r.reserved_from ?? r.booked_from
     const till = r.reserved_till ?? r.booked_till
     if (!from || !till) {
