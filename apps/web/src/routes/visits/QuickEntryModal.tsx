@@ -475,6 +475,7 @@ export function QuickEntryModal({
         .select('id, visit_at, service_id, service_name_snapshot, payment_method, status')
         .eq('salon_id', salonId)
         .eq('staff_id', staffId)
+        .is('deleted_at', null)
         .gte('visit_at', dayStart.toISOString())
         .lt('visit_at', dayEnd.toISOString())
       const conflict = (sameDayVisits ?? []).find(
