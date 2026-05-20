@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { CalendarDays, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -76,6 +77,7 @@ type Props = {
  */
 export function ReservationModal({ open, onOpenChange, salonId, prefill, block }: Props) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const { data: staff = [] } = useStaff(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const booksyConnected = integrations.some(
@@ -118,6 +120,11 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill, block }
         .from('staff_time_blocks')
         .update({ external_source: 'booksy', external_id: `res:${reservationId}` })
         .eq('id', blockId)
+      // useCreateStaffBlock уже инвалидировал кеш ДО того, как мы записали
+      // external_id, поэтому UI держит блок без external_source. Без этой
+      // повторной инвалидации удаление блока не каскадит в Booksy: cancel
+      // не зовётся, на следующем sync блок воскресает.
+      qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
     }
   }
 
