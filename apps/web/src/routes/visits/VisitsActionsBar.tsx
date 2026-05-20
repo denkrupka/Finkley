@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { useBooksySync, useSalonIntegrations } from '@/hooks/useIntegrations'
+import { useBooksySyncDay, useSalonIntegrations } from '@/hooks/useIntegrations'
 import { cn } from '@/lib/utils/cn'
 
 import { ExportVisitsButton } from './ExportVisitsButton'
@@ -24,7 +24,14 @@ export function VisitsActionsBar() {
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const booksy = integrations.find((i) => i.provider === 'booksy')
   const booksyConnected = booksy?.status === 'connected'
-  const sync = useBooksySync(salonId)
+  const syncDay = useBooksySyncDay(salonId)
+  // День, выбранный в календаре (URL-source-of-truth). Если параметра нет —
+  // считаем что юзер смотрит сегодня.
+  const dayParam = params.get('day')
+  const currentDay =
+    dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam)
+      ? dayParam
+      : new Date().toISOString().slice(0, 10)
 
   function setView(v: 'list' | 'calendar') {
     const next = new URLSearchParams(params)
@@ -40,10 +47,7 @@ export function VisitsActionsBar() {
     }
     const toastId = toast.loading(t('visits.sync_in_progress'))
     try {
-      const stats = (await sync.mutateAsync()) as {
-        visits_synced?: number
-        reservations_synced?: number
-      }
+      const stats = await syncDay.mutateAsync(currentDay)
       toast.success(
         t('visits.sync_done', {
           visits: stats.visits_synced ?? 0,
@@ -63,12 +67,12 @@ export function VisitsActionsBar() {
         <button
           type="button"
           onClick={handleSync}
-          disabled={sync.isPending}
+          disabled={syncDay.isPending}
           className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           title={t('visits.sync_now')}
         >
           <RefreshCw
-            className={cn('size-3.5', sync.isPending && 'animate-spin')}
+            className={cn('size-3.5', syncDay.isPending && 'animate-spin')}
             strokeWidth={1.8}
           />
           <span className="hidden sm:inline">{t('visits.sync_now')}</span>

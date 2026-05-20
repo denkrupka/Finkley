@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useClients } from '@/hooks/useClients'
+import { useBooksySyncDay, useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
@@ -88,10 +90,52 @@ function parseHHMM(s: string): number {
 
 export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
-  const [cursor, setCursor] = useState(() => startOfDay(new Date()))
+  // День синхронизирован с URL `?day=YYYY-MM-DD` — это shared state с
+  // VisitsActionsBar (кнопка «Синхронизировать»). Если параметра нет —
+  // показываем сегодня.
+  const [params, setParams] = useSearchParams()
+  const dayParam = params.get('day')
+  const cursor = useMemo(() => {
+    if (dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam)) {
+      const [y, m, d] = dayParam.split('-').map(Number)
+      return startOfDay(new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1))
+    }
+    return startOfDay(new Date())
+  }, [dayParam])
+  function setCursor(d: Date) {
+    const next = new URLSearchParams(params)
+    const ymd = format(startOfDay(d), 'yyyy-MM-dd')
+    next.set('day', ymd)
+    setParams(next, { replace: true })
+  }
   const dayStart = startOfDay(cursor)
   const dayEnd = addDays(dayStart, 1)
   const range = { start: dayStart.toISOString(), end: dayEnd.toISOString() }
+
+  // Booksy day-sync: на смену дня — silent autosync (debounce 600ms +
+  // rate-limit 8s одного и того же дня). На кнопке «Синхронизировать»
+  // в VisitsActionsBar — то же, но с toast. См. /Image #11.
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
+  const booksyConnected = integrations.some(
+    (i) => i.provider === 'booksy' && i.status === 'connected',
+  )
+  const syncDay = useBooksySyncDay(salonId)
+  const lastSyncRef = useRef<Map<string, number>>(new Map())
+  useEffect(() => {
+    if (!booksyConnected) return
+    const ymd = format(cursor, 'yyyy-MM-dd')
+    const last = lastSyncRef.current.get(ymd) ?? 0
+    if (Date.now() - last < 8_000) return // rate-limit того же дня
+    const handle = setTimeout(() => {
+      lastSyncRef.current.set(ymd, Date.now())
+      syncDay.mutate(ymd, {
+        onError: (e) => console.warn('day-sync failed:', e),
+      })
+    }, 600)
+    return () => clearTimeout(handle)
+    // syncDay стабилен (мутация) — игнорим
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, booksyConnected])
 
   const { data: salon } = useSalon(salonId)
   const { data: allStaff = [] } = useStaff(salonId)
@@ -334,7 +378,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
       {/* Шапка с навигацией по дням */}
       <div className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addDays(c, -1))}>
+          <Button variant="outline" size="sm" onClick={() => setCursor(addDays(cursor, -1))}>
             <ChevronLeft className="size-4" strokeWidth={2} />
           </Button>
           <Popover>
@@ -360,7 +404,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
               ) : null}
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="sm" onClick={() => setCursor((c) => addDays(c, 1))}>
+          <Button variant="outline" size="sm" onClick={() => setCursor(addDays(cursor, 1))}>
             <ChevronRight className="size-4" strokeWidth={2} />
           </Button>
         </div>

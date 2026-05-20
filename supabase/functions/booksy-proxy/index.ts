@@ -1290,6 +1290,7 @@ async function syncVisits(
   businessId: number,
   config: BooksyConfig,
   stats: SyncStats,
+  opts?: { rangeStart?: Date; rangeEnd?: Date },
 ): Promise<void> {
   const caches = await buildResolveCaches(admin, salonId)
   const existingByExt = await loadExistingVisits(admin, salonId)
@@ -1319,16 +1320,22 @@ async function syncVisits(
   const BUDGET_MS = 45_000
 
   const now = new Date()
-  const start = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
-  const end = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
+  // Если opts задан (day-sync) — узкое окно. Иначе ±60 дней (полный sync).
+  const start = opts?.rangeStart ?? new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+  const end = opts?.rangeEnd ?? new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
   const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
 
   const weeks: { start: string; end: string }[] = []
-  for (let cursor = new Date(end); cursor >= start; cursor.setDate(cursor.getDate() - 7)) {
-    const weekStart = new Date(cursor)
-    weekStart.setDate(weekStart.getDate() - 6)
-    if (weekStart < start) weekStart.setTime(start.getTime())
-    weeks.push({ start: fmtDate(weekStart), end: fmtDate(cursor) })
+  if (opts?.rangeStart && opts?.rangeEnd) {
+    // Day/narrow-range mode: один диапазон, без разбивки на недели.
+    weeks.push({ start: fmtDate(start), end: fmtDate(end) })
+  } else {
+    for (let cursor = new Date(end); cursor >= start; cursor.setDate(cursor.getDate() - 7)) {
+      const weekStart = new Date(cursor)
+      weekStart.setDate(weekStart.getDate() - 6)
+      if (weekStart < start) weekStart.setTime(start.getTime())
+      weeks.push({ start: fmtDate(weekStart), end: fmtDate(cursor) })
+    }
   }
 
   const apptDetailCache = new Map<
@@ -1855,10 +1862,12 @@ async function runTieredSync(
   businessId: number,
   config: BooksyConfig,
   tiers: ('catalog' | 'clients' | 'visits')[],
+  opts?: { visitsRange?: { start: Date; end: Date } },
 ): Promise<SyncStats> {
   const stats: SyncStats = {}
   const tierTimestamps: Record<string, string> = {}
   const nowIso = new Date().toISOString()
+  const isNarrowVisits = !!opts?.visitsRange
 
   if (tiers.includes('catalog')) {
     const r = await syncCatalog(admin, salonId, accessToken, businessId)
@@ -1871,12 +1880,25 @@ async function runTieredSync(
     tierTimestamps.last_clients_sync_at = nowIso
   }
   if (tiers.includes('visits')) {
-    await syncVisits(admin, salonId, accessToken, businessId, config, stats)
-    // Если /calendar не вернул резервы — пробуем отдельный endpoint
-    if (!stats.reservations_synced || stats.reservations_synced === 0) {
+    await syncVisits(
+      admin,
+      salonId,
+      accessToken,
+      businessId,
+      config,
+      stats,
+      opts?.visitsRange
+        ? { rangeStart: opts.visitsRange.start, rangeEnd: opts.visitsRange.end }
+        : undefined,
+    )
+    // Fallback на отдельный /reservations endpoint только в полном sync —
+    // в day-mode мы знаем что reservations пришли из этого же /calendar.
+    if (!isNarrowVisits && (!stats.reservations_synced || stats.reservations_synced === 0)) {
       await syncReservationsFallback(admin, salonId, accessToken, businessId, stats)
     }
-    tierTimestamps.last_sync_at = nowIso
+    // last_sync_at обновляем ТОЛЬКО при полном sync. Day-sync — side channel,
+    // не должен сбивать cron-таймер (иначе фон ±60д перестанет крутиться).
+    if (!isNarrowVisits) tierTimestamps.last_sync_at = nowIso
   }
 
   // Помечаем время каждого выполненного tier'а
@@ -2194,6 +2216,7 @@ async function runSyncForSalon(
   admin: SupabaseClient,
   salonId: string,
   tiers: ('catalog' | 'clients' | 'visits')[] = ['catalog', 'clients', 'visits'],
+  opts?: { visitsRange?: { start: Date; end: Date } },
 ): Promise<{ ok: true; stats: SyncStats } | { ok: false; status: number; message: string }> {
   const { data: integration } = await admin
     .from('salon_integrations')
@@ -2215,6 +2238,7 @@ async function runSyncForSalon(
       creds.business_id,
       config,
       tiers,
+      opts,
     )
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -2247,11 +2271,26 @@ async function handleSync(
   admin: SupabaseClient,
   userId: string,
   salonId: string,
+  day?: string,
 ): Promise<Response> {
   if (!(await ensureMember(admin, userId, salonId))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403)
   }
-  // Manual sync — все 3 tier'а
+  // Day-sync — только visits для указанного дня (без catalog/clients).
+  // Full sync — все 3 tier'а, ±60 дней визиты.
+  if (day) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+    if (!m) return jsonResponse({ ok: false, error: 'invalid_day_format' }, 400)
+    const dayStart = new Date(`${day}T00:00:00Z`)
+    const dayEnd = new Date(`${day}T23:59:59Z`)
+    const res = await runSyncForSalon(admin, salonId, ['visits'], {
+      visitsRange: { start: dayStart, end: dayEnd },
+    })
+    if (!res.ok) {
+      return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
+    }
+    return jsonResponse({ ok: true, stats: res.stats, day })
+  }
   const res = await runSyncForSalon(admin, salonId, ['catalog', 'clients', 'visits'])
   if (!res.ok) {
     return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
@@ -2367,6 +2406,7 @@ Deno.serve(
       title?: string
       visit_id?: string | null
       reservation_id?: string
+      day?: string
     }
     try {
       body = await req.json()
@@ -2420,7 +2460,7 @@ Deno.serve(
         }
         return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
       case 'sync':
-        return handleSync(admin, userId, body.salon_id)
+        return handleSync(admin, userId, body.salon_id, body.day)
       case 'clear_visits':
         return handleClearVisits(admin, userId, body.salon_id)
       case 'update_interval':

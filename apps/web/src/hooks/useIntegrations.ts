@@ -164,6 +164,43 @@ export function useBooksyLoginWithToken(salonId: string | undefined) {
   })
 }
 
+/**
+ * Day-sync Booksy: тянет визиты/резервы только за один день. Используется
+ * кнопкой «Синхронизировать» и автосинком при смене дня в календаре.
+ * НЕ обновляет last_sync_at на бэкенде, чтобы cron'овский фон ±60д
+ * продолжал работать в обычном ритме.
+ */
+export function useBooksySyncDay(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (day: string) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: { action: 'sync', salon_id: salonId, day },
+      })
+      if (error) throw error
+      const json = data as {
+        ok?: boolean
+        error?: string
+        message?: string
+        stats?: {
+          visits_synced?: number
+          visits_deleted?: number
+          reservations_synced?: number
+          reservations_deleted?: number
+        }
+      }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
+      return json.stats ?? {}
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
 /** Триггер синка Booksy (полный — staff/services/visits). */
 export function useBooksySync(salonId: string | undefined) {
   const qc = useQueryClient()
