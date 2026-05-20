@@ -1208,6 +1208,7 @@ type CalendarReservationRaw = {
   reason?: string | null
   description?: string | null
   type?: string
+  status?: string // 'A' active, 'C' cancelled, 'X' no-show
 }
 
 type CalendarResp = {
@@ -1748,6 +1749,10 @@ async function processReservations(
   for (const r of rawList) {
     const apptUid = r.appointment_uid ?? r.id
     if (apptUid === undefined || apptUid === null) continue
+    // Skip: cancelled/no-show резервации Booksy продолжает возвращать
+    // в /calendar какое-то время. Без этого фильтра удалённый в портале
+    // блок сразу же импортируется обратно следующим sync'ом.
+    if (r.status === 'C' || r.status === 'X' || r.status === 'N') continue
     // Skip: эта резервация создана нашим же порталом при записи визита.
     // Сравниваем по обоим возможным ключам (appointment_uid И reservation.id),
     // т.к. старые записи в visits.external_reservation_id могут хранить
