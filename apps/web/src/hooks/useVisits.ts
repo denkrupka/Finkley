@@ -226,12 +226,36 @@ export function useDeleteVisit(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (visitId: string) => {
-      // soft delete
+      // Тянем external_reservation_id и salon_id ДО soft-delete чтобы знать
+      // нужно ли снять парный блок в Booksy. Visit мы создавали через портал
+      // → reservation в Booksy наш, он portal-owned, удаляем симметрично.
+      const { data: visitRow } = await supabase
+        .from('visits')
+        .select('external_reservation_id, salon_id')
+        .eq('id', visitId)
+        .maybeSingle()
       const { error } = await supabase
         .from('visits')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', visitId)
       if (error) throw error
+      // Best-effort: ошибка в Booksy не откатывает локальный delete.
+      if (visitRow?.external_reservation_id && visitRow.salon_id) {
+        try {
+          await supabase.functions.invoke('booksy-proxy', {
+            body: {
+              action: 'delete_reservation',
+              salon_id: visitRow.salon_id,
+              reservation_id: visitRow.external_reservation_id,
+            },
+          })
+        } catch (e) {
+          console.warn(
+            'Booksy delete_reservation failed:',
+            e instanceof Error ? e.message : String(e),
+          )
+        }
+      }
       return visitId
     },
     onSuccess: () => {
