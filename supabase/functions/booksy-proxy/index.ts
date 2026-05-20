@@ -798,7 +798,7 @@ async function syncClients(
 
   // Caches для resolve booksy_id → uuid (staff/service)
   const caches = await buildResolveCaches(admin, salonId)
-  const existingVisitsExt = await loadExistingVisitExternalIds(admin, salonId)
+  const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
 
   // ── Customers paginated ───────────────────────────────────────────────
   let page = 1
