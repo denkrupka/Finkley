@@ -8,6 +8,9 @@ export type CreateBooksyReservationInput = {
   startAt: string // ISO
   endAt: string // ISO
   title: string
+  /** Если задан — booksy-proxy сохранит reservation_id в visits.external_reservation_id
+   *  → при удалении визита в портале мы сможем снять парную резервацию в Booksy. */
+  visitId?: string | null
 }
 
 /**
@@ -34,6 +37,7 @@ export function useCreateBooksyReservation() {
           start_at: input.startAt,
           end_at: input.endAt,
           title: input.title,
+          visit_id: input.visitId ?? null,
         },
       })
       if (error) return null // silent

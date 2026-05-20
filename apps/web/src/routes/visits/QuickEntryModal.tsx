@@ -624,6 +624,17 @@ export function QuickEntryModal({
       if (booksyConnected && totalDurationMin > 0) {
         const startAt = new Date(visitAt)
         const endAt = new Date(startAt.getTime() + totalDurationMin * 60000)
+        // Map: staff_id → первый visit_id для этого мастера. Нужно чтобы
+        // booksy-proxy записал reservation_id в visits.external_reservation_id,
+        // и при удалении визита в портале можно было снять парный блок в Booksy.
+        const staffToVisitId = new Map<string, string>()
+        for (let i = 0; i < lines.length; i++) {
+          const l = lines[i]!
+          const vid = createdIds[i]
+          if (l.staff_id && vid && !staffToVisitId.has(l.staff_id)) {
+            staffToVisitId.set(l.staff_id, vid)
+          }
+        }
         let reservedCount = 0
         let skippedNoExternal = 0
         for (const staffId of uniqueStaffIds) {
@@ -646,6 +657,7 @@ export function QuickEntryModal({
               .filter((ln) => ln.staff_id === staffId)
               .map((ln) => ln.name)
               .join(', '),
+            visitId: staffToVisitId.get(staffId) ?? null,
           })
           reservedCount++
         }
