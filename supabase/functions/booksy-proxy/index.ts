@@ -633,6 +633,14 @@ async function syncCatalog(
     // Фильтр: только не-люди (type R — стулья/комнаты)
     if (!shouldImportAsStaff(detail)) {
       stats.staff_filtered_out = (stats.staff_filtered_out ?? 0) + 1
+      // Если стул уже был импортирован ранее (до фильтра) — деактивируем,
+      // чтобы пропал из календаря и списков. Визиты на нём не трогаем.
+      if (existing && existing.is_active) {
+        await admin
+          .from('staff')
+          .update({ is_active: false, visible_on_calendar: false })
+          .eq('id', existing.id)
+      }
       continue
     }
 
