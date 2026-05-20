@@ -1348,6 +1348,7 @@ async function syncVisits(
       totalTipCents: number
       totalDiscountCents: number
       profile?: { full_name?: string; cell_phone?: string; email?: string }
+      hasBasket: boolean
     } | null
   >()
 
@@ -1413,12 +1414,22 @@ async function syncVisits(
       const allKnown = bookings.every((b) => existingExt.has(`subbk:${b.id}`))
       if (allKnown) continue
 
-      const isPaidBooksy = bookings[0]!.status === 'F'
+      // ВНИМАНИЕ: Booksy status='F' (Finalized) НЕ означает «оплачен».
+      // Это значит «визит закрыт» (услуга оказана). Реальная оплата
+      // определяется наличием basket_id у appointment + payable=false.
+      // Денежные кейсы:
+      //   - paid: status='F' && basket_id IS NOT NULL && payable=false
+      //   - finalized-but-unpaid: status='F' && basket_id IS NULL (ZAKOŃCZONE
+      //     в Booksy UI с кнопкой ROZLICZ)
+      //   - upcoming: status='A' (Active/booked)
+      // Поэтому isClosedBooksy используем для fetch'а detail, а
+      // isPaidBooksy уточняется ПОСЛЕ fetch'а через basket_id.
+      const isClosedBooksy = bookings[0]!.status === 'F'
       const customer = bookings[0]!.customer
       if (!customer?.id) continue
 
       let detail = apptDetailCache.get(apptUid)
-      if (detail === undefined && isPaidBooksy) {
+      if (detail === undefined && isClosedBooksy) {
         const detailRes = await booksyGet<AppointmentDetail>(
           `/me/businesses/${businessId}/appointments/${apptUid}/`,
           accessToken,
@@ -1433,7 +1444,8 @@ async function syncVisits(
           let paymentMethod: 'cash' | 'card' | 'transfer' | 'online' | 'mixed' = 'cash'
           let totalTipCents = 0
           let totalDiscountCents = 0
-          if (a.basket_id) {
+          const hasBasket = !!a.basket_id
+          if (hasBasket) {
             paymentMethod = mapPaymentMethod(a.payment_info?.transaction_info?.payment_type_code)
             totalDiscountCents = Math.round((a.total_discount_amount ?? 0) * 100)
             const basketRes = await booksyGet<BasketResponse>(
@@ -1446,10 +1458,20 @@ async function syncVisits(
               if (tips?.amount?.amount) totalTipCents = tips.amount.amount
             }
           }
-          detail = { basketItems, paymentMethod, totalTipCents, totalDiscountCents, profile }
+          detail = {
+            basketItems,
+            paymentMethod,
+            totalTipCents,
+            totalDiscountCents,
+            profile,
+            hasBasket,
+          }
           apptDetailCache.set(apptUid, detail)
         }
       }
+
+      // Реальный paid-флаг: статус F И есть basket в Booksy.
+      const isPaidBooksy = isClosedBooksy && !!detail?.hasBasket
 
       const dryRunByBookingId = new Map<number, number>()
       if (!isPaidBooksy) {
