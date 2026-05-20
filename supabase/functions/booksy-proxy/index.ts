@@ -464,7 +464,9 @@ type SyncStats = {
   staff_filtered_out?: number
   services_synced?: number
   visits_synced?: number
+  visits_deleted?: number
   reservations_synced?: number
+  reservations_deleted?: number
   clients_synced?: number
   history_visits_synced?: number
   salon_hours_synced?: boolean
@@ -1305,6 +1307,14 @@ async function syncVisits(
   // дедуплицируем по id и upsert'им в staff_time_blocks одним проходом.
   const reservationsByExtId = new Map<string, CalendarReservationRaw>()
 
+  // Reverse-delete: что мы реально увидели в Booksy за этот sync. Всё, что
+  // есть в портале с source='booksy', но НЕ в этих сетах — удалено в Booksy.
+  // Чтобы не false-positive из-за частичного syn (budget timeout) — отдельно
+  // храним диапазон фактически опрошенных дней.
+  const seenVisitExtIds = new Set<string>()
+  const seenReservationBooksyIds = new Set<string>()
+  const fetchedRange: { start: Date | null; end: Date | null } = { start: null, end: null }
+
   const startTs = Date.now()
   const BUDGET_MS = 45_000
 
@@ -1342,6 +1352,13 @@ async function syncVisits(
     const calRes = await booksyGet<CalendarResp>(url, accessToken)
     if (!calRes.ok) continue
 
+    // Запоминаем что эта неделя успешно опрошена — для reverse-delete окна.
+    const weekStartDate = new Date(`${week.start}T00:00:00Z`)
+    const weekEndDate = new Date(`${week.end}T23:59:59Z`)
+    if (!fetchedRange.start || weekStartDate < fetchedRange.start)
+      fetchedRange.start = weekStartDate
+    if (!fetchedRange.end || weekEndDate > fetchedRange.end) fetchedRange.end = weekEndDate
+
     // Резервы из этого же ответа
     const weekReservations = Array.isArray(calRes.data.reservations)
       ? calRes.data.reservations
@@ -1349,6 +1366,7 @@ async function syncVisits(
     for (const r of weekReservations) {
       if (r?.id !== undefined && r.id !== null) {
         reservationsByExtId.set(String(r.id), r)
+        seenReservationBooksyIds.add(String(r.id))
       }
     }
 
@@ -1356,6 +1374,7 @@ async function syncVisits(
     for (const b of Object.values(calRes.data.bookings ?? {})) {
       if (b.status === 'X' || b.status === 'N') continue
       if (!b.appointment_uid) continue
+      seenVisitExtIds.add(`subbk:${b.id}`)
       const arr = byAppt.get(b.appointment_uid) ?? []
       arr.push(b)
       byAppt.set(b.appointment_uid, arr)
@@ -1546,6 +1565,103 @@ async function syncVisits(
 
   // Резервы времени (block-слоты) → staff_time_blocks
   await processReservations(admin, salonId, Array.from(reservationsByExtId.values()), stats)
+
+  // Reverse-delete: всё, что было в портале и не пришло из Booksy в этот sync.
+  // Делаем только если опросили хотя бы одну неделю успешно.
+  if (fetchedRange.start && fetchedRange.end) {
+    await reverseDeleteMissing(admin, salonId, {
+      fetchedStart: fetchedRange.start,
+      fetchedEnd: fetchedRange.end,
+      seenVisitExtIds,
+      seenReservationBooksyIds,
+      stats,
+    })
+  }
+}
+
+// =============================================================================
+// reverseDeleteMissing — удалить локальные booksy-записи, которых не стало в Booksy
+// =============================================================================
+// Визиты: soft-delete (deleted_at), только БУДУЩИЕ. Исторические сохраняем
+// для отчётности — если booksy удалил прошлый визит, это либо ошибка либо
+// чистка старья, локальная история выручки важнее.
+//
+// Резервы: hard-delete (нет финансового веса, можно).
+async function reverseDeleteMissing(
+  admin: SupabaseClient,
+  salonId: string,
+  args: {
+    fetchedStart: Date
+    fetchedEnd: Date
+    seenVisitExtIds: Set<string>
+    seenReservationBooksyIds: Set<string>
+    stats: SyncStats
+  },
+): Promise<void> {
+  const startIso = args.fetchedStart.toISOString()
+  const endIso = args.fetchedEnd.toISOString()
+  const nowIso = new Date().toISOString()
+
+  // ── Визиты: будущие booksy-визиты в опрошенном окне, которых не пришло
+  const { data: localFutureVisits } = await admin
+    .from('visits')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('source', 'booksy')
+    .is('deleted_at', null)
+    .gte('visit_at', nowIso)
+    .gte('visit_at', startIso)
+    .lte('visit_at', endIso)
+  let visitsDeleted = 0
+  const visitIdsToDelete: string[] = []
+  for (const v of localFutureVisits ?? []) {
+    if (v.external_id && !args.seenVisitExtIds.has(v.external_id)) {
+      visitIdsToDelete.push(v.id)
+    }
+  }
+  if (visitIdsToDelete.length > 0) {
+    const { error } = await admin
+      .from('visits')
+      .update({ deleted_at: nowIso })
+      .in('id', visitIdsToDelete)
+    if (error) {
+      console.warn(`reverse-delete visits failed: ${error.message}`)
+    } else {
+      visitsDeleted = visitIdsToDelete.length
+    }
+  }
+
+  // ── Резервы: все booksy-блоки в опрошенном окне, которых не пришло
+  const { data: localBlocks } = await admin
+    .from('staff_time_blocks')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .gte('starts_at', startIso)
+    .lte('starts_at', endIso)
+  const blockIdsToDelete: string[] = []
+  for (const b of localBlocks ?? []) {
+    if (!b.external_id) continue
+    // external_id формата 'res:{id}' или 'res:{id}:{stafferExt}' — берём числовой id
+    const m = b.external_id.match(/^res:([^:]+)/)
+    if (!m || !m[1]) continue
+    if (!args.seenReservationBooksyIds.has(m[1])) blockIdsToDelete.push(b.id)
+  }
+  let blocksDeleted = 0
+  if (blockIdsToDelete.length > 0) {
+    const { error } = await admin.from('staff_time_blocks').delete().in('id', blockIdsToDelete)
+    if (error) {
+      console.warn(`reverse-delete blocks failed: ${error.message}`)
+    } else {
+      blocksDeleted = blockIdsToDelete.length
+    }
+  }
+
+  if (visitsDeleted > 0 || blocksDeleted > 0) {
+    console.log(`reverse-delete: ${visitsDeleted} visits, ${blocksDeleted} blocks`)
+  }
+  args.stats.visits_deleted = (args.stats.visits_deleted ?? 0) + visitsDeleted
+  args.stats.reservations_deleted = (args.stats.reservations_deleted ?? 0) + blocksDeleted
 }
 
 // =============================================================================
