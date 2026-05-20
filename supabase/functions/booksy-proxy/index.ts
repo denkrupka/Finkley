@@ -1199,6 +1199,7 @@ type CalendarBooking = {
 
 type CalendarReservationRaw = {
   id?: number | string
+  appointment_uid?: number | string
   reserved_from?: string
   reserved_till?: string
   booked_from?: string
@@ -1371,9 +1372,14 @@ async function syncVisits(
       ? calRes.data.reservations
       : Object.values(calRes.data.reservations ?? {})
     for (const r of weekReservations) {
-      if (r?.id !== undefined && r.id !== null) {
-        reservationsByExtId.set(String(r.id), r)
-        seenReservationBooksyIds.add(String(r.id))
+      const apptUid = r?.appointment_uid ?? r?.id
+      if (apptUid !== undefined && apptUid !== null) {
+        reservationsByExtId.set(String(apptUid), r)
+        // В seen — оба ключа: appointment_uid (новый формат) и id (legacy),
+        // чтобы reverse-delete не сносил старые блоки, у которых external_id
+        // ещё содержит reservation.id вместо uid.
+        seenReservationBooksyIds.add(String(apptUid))
+        if (r?.id !== undefined && r.id !== null) seenReservationBooksyIds.add(String(r.id))
       }
     }
 
@@ -1714,12 +1720,16 @@ async function processReservations(
     if (v.external_reservation_id) portalOwnedReservationIds.add(String(v.external_reservation_id))
   }
 
+  // Для cancel'а нужен appointment_uid, а не reservation.id — храним именно
+  // его в staff_time_blocks.external_id чтобы delete-reservation работало
+  // одинаково и для импортированных, и для созданных в портале блоков.
   const allExternalIds: string[] = []
   for (const r of rawList) {
-    if (r.id === undefined || r.id === null) continue
+    const apptUid = r.appointment_uid ?? r.id
+    if (apptUid === undefined || apptUid === null) continue
     const resIds = extractReservationResourceIds(r)
     for (const stafferExt of resIds) {
-      allExternalIds.push(buildReservationExternalId(String(r.id), stafferExt, resIds.length))
+      allExternalIds.push(buildReservationExternalId(String(apptUid), stafferExt, resIds.length))
     }
   }
   const existingExt = new Set<string>()
@@ -1736,11 +1746,17 @@ async function processReservations(
   }
 
   for (const r of rawList) {
-    if (r.id === undefined || r.id === null) continue
+    const apptUid = r.appointment_uid ?? r.id
+    if (apptUid === undefined || apptUid === null) continue
     // Skip: эта резервация создана нашим же порталом при записи визита.
-    // Если её импортировать, она наложится как штрихованный блок поверх
-    // визита (Image #20).
-    if (portalOwnedReservationIds.has(String(r.id))) continue
+    // Сравниваем по обоим возможным ключам (appointment_uid И reservation.id),
+    // т.к. старые записи в visits.external_reservation_id могут хранить
+    // ещё reservation.id (до фикса с lookup'ом).
+    if (
+      portalOwnedReservationIds.has(String(apptUid)) ||
+      (r.id !== undefined && portalOwnedReservationIds.has(String(r.id)))
+    )
+      continue
     const from = r.reserved_from ?? r.booked_from
     const till = r.reserved_till ?? r.booked_till
     if (!from || !till) {
@@ -1763,10 +1779,10 @@ async function processReservations(
     for (const stafferExt of resIds) {
       const staffUuid = staffByExtId.get(stafferExt)
       if (!staffUuid) {
-        console.warn(`reservation ${r.id}: staff_ext=${stafferExt} not mapped`)
+        console.warn(`reservation ${apptUid}: staff_ext=${stafferExt} not mapped`)
         continue
       }
-      const blockExternalId = buildReservationExternalId(String(r.id), stafferExt, resIds.length)
+      const blockExternalId = buildReservationExternalId(String(apptUid), stafferExt, resIds.length)
       if (existingExt.has(blockExternalId)) continue
 
       const { error } = await admin.from('staff_time_blocks').upsert(
@@ -2169,14 +2185,41 @@ async function handleCreateReservation(
         ? String(parsed.id)
         : null
     console.log(
-      `create_reservation result: visit_id=${input.visit_id ?? 'none'} reservation_id=${reservationId} body=${text.slice(0, 200)}`,
+      `create_reservation result: visit_id=${input.visit_id ?? 'none'} reservation_id=${reservationId}`,
     )
 
-    // Если caller передал visit_id — сохраняем reservation_id для последующего delete
-    if (reservationId && input.visit_id) {
+    // Для cancel'а Booksy нужен appointment_uid (не reservation.id) — это
+    // отдельная umbrella-сущность над резервацией. POST /reservations/ его
+    // не возвращает, поэтому делаем follow-up GET /calendar за дату резерва.
+    let appointmentUid: string | null = null
+    if (reservationId) {
+      const dateOnly = input.start_at.slice(0, 10) // YYYY-MM-DD из ISO
+      const calRes = await fetch(
+        `${BOOKSY_API}/me/businesses/${creds.business_id}/calendar?start_date=${dateOnly}&end_date=${dateOnly}&include_unconfirmed=true&version=3&resources_per_page=100`,
+        { headers: booksyHeaders(creds.access_token) },
+      )
+      if (calRes.ok) {
+        const calData = (await calRes.json()) as {
+          reservations?:
+            | Record<string, { id?: number | string; appointment_uid?: number | string }>
+            | { id?: number | string; appointment_uid?: number | string }[]
+        }
+        const list = Array.isArray(calData.reservations)
+          ? calData.reservations
+          : Object.values(calData.reservations ?? {})
+        const found = list.find((r) => String(r.id) === reservationId)
+        if (found?.appointment_uid) appointmentUid = String(found.appointment_uid)
+      }
+      console.log(`appointment_uid lookup for reservation=${reservationId}: ${appointmentUid}`)
+    }
+
+    // Сохраняем appointment_uid (а не reservation.id). Cancel идёт через
+    // POST /appointments/{uid}/action/. Fallback на id если lookup упал.
+    const storedId = appointmentUid ?? reservationId
+    if (storedId && input.visit_id) {
       const { error: updErr } = await admin
         .from('visits')
-        .update({ external_reservation_id: reservationId })
+        .update({ external_reservation_id: storedId })
         .eq('id', input.visit_id)
         .eq('salon_id', salonId)
       if (updErr) {
@@ -2184,10 +2227,12 @@ async function handleCreateReservation(
           `visits.external_reservation_id update failed for visit=${input.visit_id}: ${updErr.message}`,
         )
       } else {
-        console.log(`saved external_reservation_id=${reservationId} on visit=${input.visit_id}`)
+        console.log(
+          `saved external_reservation_id=${storedId} (appt_uid=${appointmentUid ?? 'fallback-to-id'}) on visit=${input.visit_id}`,
+        )
       }
     }
-    return jsonResponse({ ok: true, reservation_id: reservationId })
+    return jsonResponse({ ok: true, reservation_id: storedId })
   } catch (e) {
     return jsonResponse(
       {
@@ -2219,20 +2264,63 @@ async function handleDeleteReservation(
   if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
   const creds = integration.credentials as { access_token: string; business_id: number }
   try {
-    console.log(`delete_reservation: business=${creds.business_id} reservation_id=${reservationId}`)
-    const res = await fetch(
-      `${BOOKSY_API}/me/businesses/${creds.business_id}/reservations/${encodeURIComponent(reservationId)}/`,
-      { method: 'DELETE', headers: booksyHeaders(creds.access_token) },
+    console.log(
+      `delete_reservation: business=${creds.business_id} appointment_uid=${reservationId}`,
     )
-    console.log(`delete_reservation result: status=${res.status}`)
-    if (!res.ok && res.status !== 404) {
-      const txt = await res.text()
-      console.warn(`delete_reservation booksy_error: ${txt.slice(0, 300)}`)
+    // Booksy DELETE /reservations/{id}/ возвращает 302 redirect на booksy.com
+    // — endpoint просто не существует, наш fetch следовал redirect и считал
+    // его успехом. Корректная отмена идёт через action endpoint:
+    //   POST /appointments/{appointment_uid}/action/ {action:"cancel", _version}.
+    // _version берём из GET /appointments/{uid}/ (требуется Booksy для
+    // optimistic locking).
+    const apptRes = await fetch(
+      `${BOOKSY_API}/me/businesses/${creds.business_id}/appointments/${encodeURIComponent(reservationId)}/`,
+      { headers: booksyHeaders(creds.access_token) },
+    )
+    if (!apptRes.ok) {
+      const txt = await apptRes.text()
+      console.warn(`delete_reservation: GET appointment ${reservationId} → ${apptRes.status}`)
+      // 404 — уже нет или передан неверный uid; считаем что отменено
+      if (apptRes.status === 404) return jsonResponse({ ok: true, note: 'already_gone' })
       return jsonResponse(
         {
           ok: false,
-          error: 'delete_failed',
-          status: res.status,
+          error: 'lookup_failed',
+          status: apptRes.status,
+          message: txt.slice(0, 300),
+        },
+        502,
+      )
+    }
+    const apptData = (await apptRes.json()) as {
+      appointment?: { _version?: number | string; status?: string }
+    }
+    const version = apptData.appointment?._version
+    if (version === undefined) {
+      console.warn(`delete_reservation: no _version in appointment ${reservationId}`)
+      return jsonResponse({ ok: false, error: 'no_version' }, 502)
+    }
+    if (apptData.appointment?.status === 'C' || apptData.appointment?.status === 'X') {
+      console.log(`delete_reservation: appointment ${reservationId} already cancelled`)
+      return jsonResponse({ ok: true, note: 'already_cancelled' })
+    }
+    const cancelRes = await fetch(
+      `${BOOKSY_API}/me/businesses/${creds.business_id}/appointments/${encodeURIComponent(reservationId)}/action/`,
+      {
+        method: 'POST',
+        headers: booksyHeaders(creds.access_token),
+        body: JSON.stringify({ action: 'cancel', _version: version }),
+      },
+    )
+    console.log(`delete_reservation: cancel action status=${cancelRes.status}`)
+    if (!cancelRes.ok) {
+      const txt = await cancelRes.text()
+      console.warn(`delete_reservation booksy cancel failed: ${txt.slice(0, 300)}`)
+      return jsonResponse(
+        {
+          ok: false,
+          error: 'cancel_failed',
+          status: cancelRes.status,
           message: txt.slice(0, 300),
         },
         502,
