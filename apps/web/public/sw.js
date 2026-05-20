@@ -12,7 +12,7 @@
  * в `activate`. Сейчас single-version, потому что precache пустой.
  */
 
-const CACHE_NAME = 'finkley-shell-v1'
+const CACHE_NAME = 'finkley-shell-v2'
 const APP_SHELL = '/app/'
 
 self.addEventListener('install', (event) => {
@@ -46,22 +46,49 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
 
-  // Навигации: network-first с fallback на app shell
+  // Навигации: network-first с fallback на app shell.
+  // SPA-deep-link на GH Pages: /app/{salon}/dashboard напрямую — у GH Pages
+  // нет такого файла, отдаёт /404.html с redirect-скриптом. Браузер видит
+  // 404 в консоли. Перехватываем: при 404 (или другой 4xx/5xx) навигации
+  // под /app/ — отдаём cached shell (или /app/ из сети). Браузер получит
+  // 200 OK с index.html, React Router сам разрулит deep-link. Чистая консоль.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
-        .then((response) => {
-          // Обновляем кэш shell на лету
+      (async () => {
+        try {
+          const response = await fetch(req)
           if (response.ok) {
             const copy = response.clone()
             caches
               .open(CACHE_NAME)
               .then((cache) => cache.put(APP_SHELL, copy))
               .catch(() => undefined)
+            return response
+          }
+          // Не-2xx ответ — пробуем shell (cached → fresh → как есть)
+          if (url.pathname.startsWith(APP_SHELL)) {
+            const cachedShell = await caches.match(APP_SHELL)
+            if (cachedShell) return cachedShell
+            try {
+              const freshShell = await fetch(APP_SHELL)
+              if (freshShell.ok) {
+                const copy = freshShell.clone()
+                caches
+                  .open(CACHE_NAME)
+                  .then((cache) => cache.put(APP_SHELL, copy))
+                  .catch(() => undefined)
+                return freshShell
+              }
+            } catch {
+              // ignore — отдадим оригинальный response ниже
+            }
           }
           return response
-        })
-        .catch(() => caches.match(APP_SHELL).then((r) => r ?? Response.error())),
+        } catch {
+          const cached = await caches.match(APP_SHELL)
+          return cached ?? Response.error()
+        }
+      })(),
     )
     return
   }
