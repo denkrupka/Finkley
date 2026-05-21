@@ -109,6 +109,17 @@ export function useTriggerReviewsSync(salonId: string | undefined) {
  * Триггер автоподбора конкурентов через Google Places Nearby Search.
  * Возвращает кол-во добавленных конкурентов.
  */
+async function extractFunctionErrorCode(error: unknown): Promise<string | undefined> {
+  const ctx = (error as { context?: Response } | null)?.context
+  if (!ctx || typeof ctx.clone !== 'function') return undefined
+  try {
+    const body = (await ctx.clone().json()) as { error?: string } | null
+    return body?.error ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function useDiscoverCompetitors(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
@@ -117,7 +128,12 @@ export function useDiscoverCompetitors(salonId: string | undefined) {
       const { data, error } = await supabase.functions.invoke('competitor-discover', {
         body: { salon_id: salonId },
       })
-      if (error) throw error
+      if (error) {
+        const code = await extractFunctionErrorCode(error)
+        const err = new Error(code ?? error.message) as Error & { code?: string }
+        err.code = code
+        throw err
+      }
       return (data as { added?: number } | null)?.added ?? 0
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['competitors', salonId] }),

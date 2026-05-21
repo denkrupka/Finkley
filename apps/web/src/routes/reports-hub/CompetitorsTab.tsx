@@ -378,7 +378,19 @@ function ParamsSection({
               discoverCompetitors.mutate(undefined, {
                 onSuccess: (n) =>
                   toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
-                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                onError: (e) => {
+                  const code = (e as Error & { code?: string }).code
+                  const message = e instanceof Error ? e.message : String(e)
+                  const key =
+                    code === 'no_geo'
+                      ? 'reports_hub.competitors.params.discover_error_no_geo'
+                      : code === 'forbidden'
+                        ? 'reports_hub.competitors.params.discover_error_forbidden'
+                        : code === 'salon_not_found'
+                          ? 'reports_hub.competitors.params.discover_error_salon_not_found'
+                          : 'reports_hub.competitors.params.discover_error_generic'
+                  toast.error(t(key, { message }))
+                },
               })
             }}
             disabled={discoverCompetitors.isPending}
