@@ -2472,7 +2472,13 @@
       "col_name_full": "Imię i nazwisko",
       "col_tags": "Tagi",
       "col_next_visit": "Następna wizyta",
-      "contacts_hidden": "kontakty ukryte rolą"
+      "contacts_hidden": "kontakty ukryte rolą",
+      "col_revenue_ltv": "Revenue LTV",
+      "col_gross_ltv": "Gross LTV",
+      "col_visits_count": "Wizyt",
+      "col_lifetime": "Czas trwania",
+      "months": "{{count}} mies.",
+      "gross_hint": "Przychód minus koszt usług (services.cost_cents)."
     }
   },
   "finance": {

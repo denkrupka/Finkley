@@ -2472,7 +2472,13 @@
       "col_name_full": "Full name",
       "col_tags": "Tags",
       "col_next_visit": "Next visit",
-      "contacts_hidden": "contacts hidden by role"
+      "contacts_hidden": "contacts hidden by role",
+      "col_revenue_ltv": "Revenue LTV",
+      "col_gross_ltv": "Gross LTV",
+      "col_visits_count": "Visits",
+      "col_lifetime": "Lifetime",
+      "months": "{{count}} mo",
+      "gross_hint": "Revenue minus service cost (services.cost_cents)."
     }
   },
   "finance": {

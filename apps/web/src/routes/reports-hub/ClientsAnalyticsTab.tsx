@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
-import { useClients, type ClientSort } from '@/hooks/useClients'
+import { useClientLtvMetrics, useClients, type ClientSort } from '@/hooks/useClients'
 import { useClientIdsWithVisitsInPeriod, useNextVisitsByClient } from '@/hooks/useNextVisits'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { supabase } from '@/lib/supabase/client'
@@ -64,6 +64,8 @@ const SEGMENT_BADGE: Record<ClientSegment, { className: string; i18nKey: string 
  *  владельцу салона уходит уведомление о массовом просмотре администратором.
  *  Установлен заказчиком (>50 = «подозрительно много в один заход»). */
 const MASS_VIEW_THRESHOLD = 50
+
+// (LTV-default не нужен — используем optional chaining + ?? '—')
 
 /**
  * Reports → Клиенты. Два sub-tab'а:
@@ -154,6 +156,7 @@ function ClientsListTab({
     sort,
   })
   const { data: nextVisitsByClient = new Map<string, string>() } = useNextVisitsByClient(salonId)
+  const { data: ltvByClient } = useClientLtvMetrics(salonId)
   const { data: clientsInPeriod = null } = useClientIdsWithVisitsInPeriod(salonId, periodRangeIso)
 
   const thresholds = useMemo(
@@ -366,13 +369,19 @@ function ClientsListTab({
                   {t('reports_hub.clients.col_tags')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.clients.col_revenue')}
+                  {t('reports_hub.clients.col_revenue_ltv')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_gross_ltv')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.clients.col_avg_check')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.clients.col_visits')}
+                  {t('reports_hub.clients.col_visits_count')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.col_lifetime')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.clients.col_last_visit')}
@@ -447,12 +456,45 @@ function ClientsListTab({
                     <td className="num text-brand-sage-deep px-3 py-2.5 text-right text-sm font-bold">
                       {formatCurrency(c.total_revenue_cents, currency)}
                     </td>
+                    {(() => {
+                      const ltv = ltvByClient?.get(c.id)
+                      const gross = ltv?.gross_ltv_cents ?? null
+                      return (
+                        <td
+                          className={cn(
+                            'num px-3 py-2.5 text-right',
+                            gross != null && gross > 0
+                              ? 'text-brand-sage-deep font-semibold'
+                              : 'text-muted-foreground/60',
+                          )}
+                          title={t('reports_hub.clients.gross_hint', {
+                            defaultValue:
+                              'Выручка минус себестоимость услуг (services.cost_cents).',
+                          })}
+                        >
+                          {gross != null ? formatCurrency(gross, currency) : '—'}
+                        </td>
+                      )
+                    })()}
                     <td className="num text-muted-foreground px-3 py-2.5 text-right">
                       {formatCurrency(avg, currency)}
                     </td>
                     <td className="num text-muted-foreground px-3 py-2.5 text-right">
                       {c.visit_count}
                     </td>
+                    {(() => {
+                      const months = ltvByClient?.get(c.id)?.customer_lifetime_months ?? null
+                      return (
+                        <td className="num text-muted-foreground px-3 py-2.5 text-right text-xs">
+                          {months != null && months > 0
+                            ? t('reports_hub.clients.months', {
+                                count: months,
+                                defaultValue: '{{count}} мес',
+                              })
+                            : '—'}
+                        </td>
+                      )
+                    })()}
                     {/* Image #112/#131: одинаковый стиль для «Последний» и
                         «След. визит» — единый цвет (text-foreground), один
                         шрифт num text-xs font-medium. Различие только в

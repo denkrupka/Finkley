@@ -3135,7 +3135,13 @@
       "tabs": {
         "list": "Список",
         "params": "Параметры"
-      }
+      },
+      "col_revenue_ltv": "Revenue LTV",
+      "col_gross_ltv": "Gross LTV",
+      "col_visits_count": "Визитов",
+      "col_lifetime": "Лояльность",
+      "months": "{{count}} мес",
+      "gross_hint": "Выручка минус себестоимость услуг (services.cost_cents)."
     }
   },
   "finance": {

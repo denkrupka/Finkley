@@ -46,6 +46,39 @@ export function clientsKeys(salonId: string | undefined) {
  *   и в phone (после normalizeSearchPhone). Размер списка обычно ≤ 5000,
  *   серверный поиск имеет смысл только при больших объёмах — в стадии 2 не нужно.
  */
+/**
+ * Per-client LTV metrics — gross/visits/lifetime. Revenue уже есть в
+ * clients.total_revenue_cents, но RPC возвращает свежий пересчёт + gross
+ * (с учётом services.cost_cents).
+ */
+export type ClientLtvMetrics = {
+  client_id: string
+  revenue_ltv_cents: number
+  gross_ltv_cents: number
+  visits_count: number
+  customer_lifetime_months: number
+}
+
+export function useClientLtvMetrics(salonId: string | undefined) {
+  return useQuery<Map<string, ClientLtvMetrics>>({
+    queryKey: ['client-ltv-metrics', salonId],
+    queryFn: async () => {
+      if (!salonId) return new Map()
+      const { data, error } = await supabase.rpc('client_ltv_metrics', {
+        p_salon_id: salonId,
+      })
+      if (error) throw error
+      const m = new Map<string, ClientLtvMetrics>()
+      for (const row of (data ?? []) as ClientLtvMetrics[]) {
+        m.set(row.client_id, row)
+      }
+      return m
+    },
+    enabled: !!salonId,
+    staleTime: 5 * 60 * 1000, // 5 min — пересчёт нужен реже чем список клиентов
+  })
+}
+
 export function useClients(
   salonId: string | undefined,
   options?: { search?: string; sort?: ClientSort },
