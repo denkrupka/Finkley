@@ -4,34 +4,132 @@ import Layout from '../layouts/Layout.astro'
 const FEATURES = [
   {
     title: 'Прибыль в одном клике',
-    text: 'Главная карточка дашборда — твоя чистая прибыль за месяц. Не записи клиентов, не загрузка кресел — деньги в кармане.',
+    text: 'Главная карточка дашборда — чистая прибыль за месяц с разбивкой на выручку и расходы. Не загрузка кресел, не количество клиентов — реальные деньги.',
     emoji: '💰',
   },
   {
-    title: 'Ввод визита за 10 секунд',
-    text: 'Мастер, услуга, сумма, тип оплаты — и всё. Большой жёлтый инпут под цифру и одна кнопка «Сохранить».',
-    emoji: '⚡',
+    title: 'Booksy → автосинхр',
+    text: 'Подключи Booksy один раз — визиты, клиенты, услуги и оплаты подтянутся сами. Резервы времени мастеров и удаления в обе стороны.',
+    emoji: '🔄',
   },
   {
-    title: 'Расходы, которые видно',
-    text: 'Аренда, зарплата, материалы, реклама. Структура по категориям — сразу понятно, куда уходят деньги.',
+    title: 'KSeF + wFirma + Fakturownia',
+    text: 'Фактуры от поставщиков прилетают сами в расходы со статусами оплат. Не нужно вводить вручную — налоговая видит, и ты видишь.',
+    emoji: '📑',
+  },
+  {
+    title: 'Календарь мастеров',
+    text: 'Все визиты по мастерам на одной сетке. Drag-n-drop, цветовые статусы, резервы времени. Готовая замена расписанию в блокноте.',
+    emoji: '📅',
+  },
+  {
+    title: 'Расходы по структуре',
+    text: 'Аренда, зарплата, материалы, реклама, налоги. План vs Факт, бюджеты по категориям, платёжный календарь с напоминаниями.',
     emoji: '📊',
   },
   {
-    title: 'Мастера и услуги',
-    text: 'Кто принёс сколько за месяц. Маржа по услугам — какие выгодные, какие тянут вниз.',
-    emoji: '👥',
+    title: 'Зарплаты мастеров',
+    text: '% от выручки, фикс, аренда кресла, смешанные схемы. Авто-расчёт за период с одной кнопкой «Закрыть период».',
+    emoji: '💸',
+  },
+  {
+    title: 'Склад и инвентарь',
+    text: 'Лаки, гель, материалы. Списание со склада автоматически при продаже. Уведомление о низких остатках.',
+    emoji: '📦',
+  },
+  {
+    title: 'P&L и ДДС',
+    text: 'Полный финансовый отчёт: план/факт, по месяцам, с накоплениями. Движение денежных средств по кассам — наличные vs безнал.',
+    emoji: '📈',
+  },
+  {
+    title: 'Банк-фид PSD2',
+    text: 'Поступления и списания с расчётного счёта подтягиваются автоматически через открытый банкинг. Совмещение с расходами и визитами в один клик.',
+    emoji: '🏦',
+  },
+  {
+    title: 'AI-инсайты',
+    text: 'Каждое утро AI смотрит на твои данные и пишет: «прибыль упала на 12%, причина — рост на материалы у мастера X». На русском, без BI-курсов.',
+    emoji: '🧠',
+  },
+  {
+    title: 'Мессенджер',
+    text: 'Telegram + Instagram + Facebook Messenger в одном окне. Шаблоны ответов, AI-помощник, история переписки с клиентом привязана к визитам.',
+    emoji: '💬',
+  },
+  {
+    title: 'Telegram-бот учёта',
+    text: 'Записал визит голосом в боте — попал в портал. Получай ежедневный/еженедельный дайджест в TG. Никакого браузера не нужно.',
+    emoji: '🤖',
+  },
+  {
+    title: 'Multi-salon',
+    text: 'Несколько салонов на одном аккаунте. Каждый со своими мастерами, кассами, статистикой. Переключатель сверху.',
+    emoji: '🏢',
   },
   {
     title: 'Без бухгалтера',
-    text: 'Не заменяет бухгалтера для налогов. Заменяет Excel, в котором ты ведёшь свои настоящие цифры.',
+    text: 'Не заменяет бухгалтера для налогов и ZUS. Заменяет Excel, в котором ты ведёшь свои настоящие цифры.',
     emoji: '✂️',
   },
   {
     title: 'Все данные в ЕС',
-    text: 'Серверы во Франкфурте, шифрование at-rest, GDPR-compliance. Никакой передачи третьим лицам.',
+    text: 'Серверы во Франкфурте, шифрование at-rest и in-transit, GDPR-compliance. Никакой передачи третьим лицам.',
     emoji: '🔒',
   },
+]
+
+const TIME_SAVED = [
+  {
+    title: 'Учёт визитов',
+    before: '~20 мин/день вручную в Excel',
+    after: 'Автосинхр из Booksy — 0 мин',
+    saved: '~10 часов / мес',
+  },
+  {
+    title: 'Расходы и фактуры',
+    before: '~30 мин/неделю заносить из почты',
+    after: 'KSeF/wFirma тянут сами',
+    saved: '~2 часа / мес',
+  },
+  {
+    title: 'Зарплаты мастеров',
+    before: '~2 часа в конце месяца с калькулятором',
+    after: 'Кнопка «Закрыть период»',
+    saved: '~2 часа / мес',
+  },
+  {
+    title: 'Финансовый отчёт',
+    before: 'Целый день в конце квартала',
+    after: 'Готов в реалтайме',
+    saved: '~8 часов / квартал',
+  },
+  {
+    title: 'Платёжный календарь',
+    before: 'Просрочки штрафы пропущенные счета',
+    after: 'Пуш + email + TG за 2 дня до срока',
+    saved: 'Деньги на штрафах',
+  },
+  {
+    title: 'Принятие решений',
+    before: 'Интуиция без цифр',
+    after: 'AI-инсайты каждое утро',
+    saved: '+12% прибыли в среднем',
+  },
+]
+
+const INTEGRATIONS = [
+  ['Booksy', 'Запись и календарь'],
+  ['Fresha', 'Запись (в разработке)'],
+  ['KSeF', 'Гос.реестр фактур PL'],
+  ['wFirma', 'Бухгалтерия'],
+  ['Fakturownia', 'Бухгалтерия'],
+  ['iFirma', 'Бухгалтерия'],
+  ['Банкинг PSD2', 'Открытый банкинг ЕС'],
+  ['Stripe', 'Подписка'],
+  ['Telegram', 'Бот + мессенджер'],
+  ['Instagram + FB', 'Мессенджер'],
+  ['Google OAuth', 'Логин'],
 ]
 
 const FAQ = [
@@ -168,6 +266,117 @@ const FAQ = [
               <div class="text-3xl">{f.emoji}</div>
               <h3 class="mt-4 text-lg font-bold tracking-tight text-brand-navy">{f.title}</h3>
               <p class="mt-2 text-sm leading-relaxed text-brand-text-muted">{f.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Сколько времени экономит -->
+  <section class="border-b border-brand-border bg-brand-bg">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+      <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+        Сколько времени ты получишь обратно
+      </h2>
+      <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+        Реальные часы в неделю, которые сейчас уходят на учёт. С Finkley — половина из них на
+        автомате.
+      </p>
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {
+          TIME_SAVED.map((t) => (
+            <div class="rounded-lg border border-brand-border bg-white p-5">
+              <div class="flex items-center justify-between">
+                <h3 class="text-base font-bold text-brand-navy">{t.title}</h3>
+                <span class="rounded-full bg-brand-sage-soft px-3 py-1 font-mono text-xs font-bold text-brand-sage">
+                  {t.saved}
+                </span>
+              </div>
+              <div class="mt-3 space-y-1.5 text-sm">
+                <div class="flex items-start gap-2">
+                  <span class="text-brand-red">✗</span>
+                  <span class="text-brand-text-muted">{t.before}</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <span class="text-brand-sage">✓</span>
+                  <span class="font-semibold text-brand-text">{t.after}</span>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+      <p class="mx-auto mt-8 max-w-2xl text-center text-sm text-brand-text-muted">
+        Итого в среднем — <strong class="text-brand-navy">15–20 часов в месяц</strong>, которые
+        раньше ели Excel, калькулятор и почта. И самое главное — точная цифра прибыли вместо
+        приблизительной.
+      </p>
+    </div>
+  </section>
+
+  <!-- Интеграции -->
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+      <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+        Подключается к тому, чем ты уже пользуешься
+      </h2>
+      <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+        Никакого «перенесите все данные руками». Подключи нужные сервисы — данные синхронизируются
+        автоматически в обе стороны.
+      </p>
+      <div class="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {
+          INTEGRATIONS.map(([name, desc]) => (
+            <div class="rounded-md border border-brand-border bg-brand-bg p-4 transition hover:bg-white">
+              <div class="text-sm font-bold text-brand-navy">{name}</div>
+              <div class="mt-1 text-xs text-brand-text-muted">{desc}</div>
+            </div>
+          ))
+        }
+      </div>
+      <div class="mt-10 text-center">
+        <a
+          href="/features/integrations"
+          class="inline-flex items-center text-sm font-semibold text-brand-navy hover:underline"
+        >
+          Подробнее про интеграции →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Отчёты -->
+  <section class="border-b border-brand-border bg-brand-bg">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+      <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+        Отчёты, на которые смотрят 5 минут — и видят всё
+      </h2>
+      <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+        Не таблицы на 50 колонок. Конкретные карточки с цифрами и графиками.
+      </p>
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {
+          [
+            ['Дашборд', 'Прибыль, выручка, расходы за месяц. Динамика к прошлому периоду.'],
+            ['P&L (план/факт)', 'Полный отчёт о прибылях и убытках по месяцам. План vs реальность.'],
+            ['ДДС', 'Движение денег по дням и кассам. Графики и накопленный остаток.'],
+            ['Зарплаты мастеров', 'Расчёт за период с разбивкой по услугам. Кнопка «Закрыть период».'],
+            ['Бюджеты', 'Цели по категориям расходов с пуш-уведомлениями при превышении.'],
+            ['Платёжный календарь', 'Все будущие платежи поставщикам с напоминаниями.'],
+            ['Складская аналитика', 'Что продаётся, что лежит без движения, прогноз закупок.'],
+            ['Маржа по услугам', 'Какие услуги выгодные, какие тянут прибыль вниз.'],
+            ['Загрузка мастеров', 'Часы работы / часы записи. Где простой.'],
+            ['ABC клиентов', 'Кто приносит 80% выручки. Кто давно не приходил.'],
+            ['Benchmarks', 'Сравнение с другими салонами того же сегмента (анонимно).'],
+            ['Экспорт CSV/Excel', 'В любой момент — все данные себе. Никакого vendor-lock-in.'],
+          ].map(([title, desc]) => (
+            <div class="flex items-start gap-3 rounded-md border border-brand-border bg-white p-4">
+              <span class="mt-0.5 text-brand-sage">▸</span>
+              <div>
+                <div class="text-sm font-bold text-brand-navy">{title}</div>
+                <div class="mt-0.5 text-xs leading-relaxed text-brand-text-muted">{desc}</div>
+              </div>
             </div>
           ))
         }
