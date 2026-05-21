@@ -4,7 +4,6 @@ import {
   Clock,
   Download,
   History,
-  Mail,
   Scissors,
   Sparkles,
   Users,
@@ -38,14 +37,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
-import { useSalon, type DigestChannel } from '@/hooks/useSalons'
+import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
 import {
   useSendDailyDigest,
   useSendWeeklyDigest,
   useUpdateDigestChannels,
-  type SendDigestResponse,
 } from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
@@ -60,7 +58,7 @@ import { SalonHoursCard } from './SalonHoursCard'
 import { SalonHolidaysCard } from './SalonHolidaysCard'
 // SegmentationCard перенесён в /staff (Справочник мастеров).
 import { MFACard } from './MFACard'
-import { PushNotificationsCard } from './PushNotificationsCard'
+import { NotificationsTabContent } from './NotificationsTabContent'
 // ReferralCard убран из Settings — раньше жил на отдельной вкладке /team.
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
@@ -587,107 +585,13 @@ export function SettingsPage() {
       {activeTab === 'schedule' && <ScheduleTab />}
 
       {activeTab === 'notifications' && (
-        <>
-          {/* Push-уведомления */}
-          <div className="mb-6">
-            <PushNotificationsCard />
-          </div>
-
-          {/* Еженедельный дайджест */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.digest.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.digest.subtitle')}
-                </p>
-                <DigestChannelsField
-                  channels={
-                    salon.weekly_digest_channels ?? (salon.weekly_digest_enabled ? ['email'] : [])
-                  }
-                  onChange={(next) =>
-                    updateWeeklyChannels.mutate(next, {
-                      onSuccess: () =>
-                        toast.success(
-                          next.length > 0
-                            ? t('settings.digest.toast_enabled')
-                            : t('settings.digest.toast_disabled'),
-                        ),
-                      onError: (err) =>
-                        toast.error(err instanceof Error ? err.message : String(err)),
-                    })
-                  }
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => {
-                  sendDigest.mutate(undefined, {
-                    onSuccess: (data) =>
-                      toast.success(digestSentToastText(t, salon, data, 'weekly')),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }}
-                disabled={sendDigest.isPending || !salon.weekly_digest_enabled}
-                data-testid="settings-digest-send"
-              >
-                <Mail className="size-4" strokeWidth={1.7} />
-                {sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
-              </Button>
-            </div>
-          </section>
-
-          {/* Ежедневная сводка */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <h2 className="text-brand-navy text-base font-bold tracking-tight">
-                  {t('settings.daily_digest.title')}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t('settings.daily_digest.subtitle')}
-                </p>
-                <DigestChannelsField
-                  channels={
-                    salon.daily_digest_channels ?? (salon.daily_digest_enabled ? ['email'] : [])
-                  }
-                  onChange={(next) =>
-                    updateDailyChannels.mutate(next, {
-                      onSuccess: () =>
-                        toast.success(
-                          next.length > 0
-                            ? t('settings.daily_digest.toast_enabled')
-                            : t('settings.daily_digest.toast_disabled'),
-                        ),
-                      onError: (err) =>
-                        toast.error(err instanceof Error ? err.message : String(err)),
-                    })
-                  }
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => {
-                  sendDailyDigest.mutate(undefined, {
-                    onSuccess: (data) =>
-                      toast.success(digestSentToastText(t, salon, data, 'daily')),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }}
-                disabled={sendDailyDigest.isPending || !salon.daily_digest_enabled}
-              >
-                <Mail className="size-4" strokeWidth={1.7} />
-                {sendDailyDigest.isPending
-                  ? t('common.loading')
-                  : t('settings.daily_digest.button')}
-              </Button>
-            </div>
-          </section>
-        </>
+        <NotificationsTabContent
+          salon={salon}
+          sendDigest={sendDigest}
+          sendDailyDigest={sendDailyDigest}
+          updateWeeklyChannels={updateWeeklyChannels}
+          updateDailyChannels={updateDailyChannels}
+        />
       )}
 
       {activeTab === 'api' && (
@@ -872,85 +776,5 @@ function ScheduleTab() {
   )
 }
 
-/**
- * Два независимых чекбокса каналов доставки дайджеста (Email + Telegram).
- * Записывает channels-массив через useUpdateDigestChannels — мастер-флажок
- * `*_enabled` обновляется автоматически (true если хоть один канал ON).
- *
- * Telegram-чекбокс активен всегда; если у юзера не привязан Telegram,
- * edge function send-*-digest просто скипнет этот канал — UX без блокировки
- * (чтобы не приходилось перезагружать страницу после привязки).
- */
-function DigestChannelsField({
-  channels,
-  onChange,
-}: {
-  channels: DigestChannel[]
-  onChange: (next: DigestChannel[]) => void
-}) {
-  const { t } = useTranslation()
-  function toggle(ch: DigestChannel) {
-    const next = channels.includes(ch) ? channels.filter((c) => c !== ch) : [...channels, ch]
-    onChange(next)
-  }
-  return (
-    <div className="mt-3 flex flex-col gap-1.5">
-      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-        {t('settings.digest.channels.title')}
-      </p>
-      <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={channels.includes('email')}
-          onChange={() => toggle('email')}
-          className="size-4 cursor-pointer"
-        />
-        <span className="text-foreground">{t('settings.digest.channels.email')}</span>
-      </label>
-      <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={channels.includes('telegram')}
-          onChange={() => toggle('telegram')}
-          className="size-4 cursor-pointer"
-        />
-        <span className="text-foreground">{t('settings.digest.channels.telegram')}</span>
-      </label>
-      {channels.length === 0 ? (
-        <p className="text-muted-foreground mt-1 text-xs italic">
-          {t('settings.digest.channels.all_off')}
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-/**
- * Текст toast'а после ручной отправки дайджеста. Раньше выводили только
- * email, что путало юзеров с включённым Telegram-каналом ("ушло на email
- * — а где telegram?"). Теперь читаем via-массив из edge function: если
- * telegram не был доставлен (нет привязки), показываем подсказку как
- * привязать.
- */
-function digestSentToastText(
-  t: (key: string, opts?: Record<string, unknown>) => string,
-  salon: { weekly_digest_channels?: DigestChannel[]; daily_digest_channels?: DigestChannel[] },
-  data: SendDigestResponse | undefined,
-  kind: 'weekly' | 'daily',
-): string {
-  const via = data?.via ?? []
-  const selectedRaw = kind === 'weekly' ? salon.weekly_digest_channels : salon.daily_digest_channels
-  const selected: DigestChannel[] = selectedRaw ?? ['email']
-  const parts: string[] = []
-  if (via.includes('email')) {
-    parts.push(t('settings.digest.toast_sent_email', { email: data?.sent_to ?? '' }))
-  }
-  if (via.includes('telegram')) {
-    parts.push(t('settings.digest.toast_sent_telegram'))
-  }
-  // Был выбран Telegram, но не доставлен — показываем подсказку.
-  if (selected.includes('telegram') && !via.includes('telegram')) {
-    parts.push(t('settings.digest.toast_telegram_skipped'))
-  }
-  return parts.length > 0 ? parts.join('. ') : t('settings.digest.toast_no_channel')
-}
+// DigestChannelsField и digestSentToastText переехали в
+// NotificationsTabContent.tsx — sub-tab «Каналы» использует ту же логику.

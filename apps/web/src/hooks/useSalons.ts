@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -32,7 +32,23 @@ export type SalonRow = {
   /** Optional — миграция 20260514150000 может ещё не примениться. */
   blocked_at?: string | null
   blocked_reason?: string | null
+  /** Optional — миграция 20260521000002. Какие ТИПЫ уведомлений включены.
+   *  Отсутствующие ключи трактуются как true (показывать). */
+  notification_prefs?: Record<string, boolean>
 }
+
+/** Полный список типов уведомлений с человекочитаемыми i18n-ключами. */
+export type NotificationTypeKey =
+  | 'weekly_digest'
+  | 'daily_digest'
+  | 'ai_insights'
+  | 'payment_due_2d'
+  | 'payment_due_1d'
+  | 'payment_due_today'
+  | 'payment_overdue'
+  | 'low_inventory'
+  | 'booksy_new_visits'
+  | 'calendar_conflicts'
 
 /**
  * Возвращает список салонов текущего юзера через RLS-политику
@@ -50,7 +66,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -93,7 +109,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs',
         )
         .eq('id', salonId)
         .maybeSingle()
@@ -102,5 +118,34 @@ export function useSalon(salonId: string | undefined) {
     },
     enabled: !!salonId,
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Patch'ает salons.notification_prefs одним ключом. Использует merge:
+ * текущий prefs объединяется с patch перед UPDATE, чтобы не затереть
+ * другие типы. Для атомарности merge делается на клиенте — race с
+ * параллельным edit'ом возможен, но в UI чекбоксы редко жмут пачкой.
+ */
+export function useUpdateNotificationPref(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (patch: Record<string, boolean>) => {
+      if (!salonId) throw new Error('no_salon')
+      // Текущие prefs из кеша (если есть) — для merge.
+      const cached = qc.getQueryData<SalonRow | null>(['salons', 'one', salonId])
+      const current = cached?.notification_prefs ?? {}
+      const next = { ...current, ...patch }
+      const { error } = await supabase
+        .from('salons')
+        .update({ notification_prefs: next })
+        .eq('id', salonId)
+      if (error) throw error
+      return next
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salons', 'one', salonId] })
+      qc.invalidateQueries({ queryKey: ['salons', 'mine'] })
+    },
   })
 }
