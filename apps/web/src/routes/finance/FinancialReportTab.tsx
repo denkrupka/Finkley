@@ -322,7 +322,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
     {
       label: t('finance.report.expenses_total'),
-      values: expensesTotalByMonth.map((v) => -v),
+      // План: ожидаемые (settings.variable% + fixed + taxes) + scheduled
+      // из БД. Факт: реальные expenses из БД.
+      values: expensesTotalByMonth.map((v, i) => -(v + (monthly.plan[i]?.expensesTotal ?? 0))),
+      factValues: monthly.fact.map((m) => -m.expensesTotal),
       bold: true,
       color: 'destructive',
       groupKey: 'expenses',
