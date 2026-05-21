@@ -1567,18 +1567,38 @@ async function syncVisits(
         // delete визита в портале мог снять appointment в Booksy.
         const existing = existingByExt.get(externalId)
         if (existing) {
+          const updatePatch: Record<string, unknown> = {
+            staff_id: staffId,
+            service_id: serviceId,
+            service_name_snapshot: serviceName,
+            visit_at: visitAtIso,
+            duration_min: durationMin,
+            external_reservation_id: String(apptUid),
+            deleted_at: null,
+            group_key: groupKey,
+          }
+          // Upgrade pending → paid когда Booksy теперь показывает оплату
+          // (basket появился). Обратное (paid → pending) НЕ делаем — это
+          // могло быть ручное «Рассчитать» в портале, не хотим терять.
+          if (isPaidBooksy && existing.duration_min !== null) {
+            // existing.duration_min проксирует существование объекта; используем
+            // отдельный fetch чтобы получить status (см. loadExistingVisits)
+          }
+          if (isPaidBooksy && config.booksy_owns_payment_status !== false) {
+            updatePatch.status = 'paid'
+            if (detail?.paymentMethod) updatePatch.payment_method = detail.paymentMethod
+            // amount_cents апгрейдим только если basket дал ненулевую сумму
+            // (типичный сценарий: в Booksy сначала записали, потом оплатили
+            // и появилась basket с реальной суммой). Не трогаем если 0.
+            if (amountCents > 0) updatePatch.amount_cents = amountCents
+            if (isPrimary && (detail?.totalTipCents ?? 0) > 0)
+              updatePatch.tip_cents = detail?.totalTipCents
+            if (isPrimary && (detail?.totalDiscountCents ?? 0) > 0)
+              updatePatch.discount_cents = detail?.totalDiscountCents
+          }
           const { error: updErr } = await admin
             .from('visits')
-            .update({
-              staff_id: staffId,
-              service_id: serviceId,
-              service_name_snapshot: serviceName,
-              visit_at: visitAtIso,
-              duration_min: durationMin,
-              external_reservation_id: String(apptUid),
-              deleted_at: null,
-              group_key: groupKey,
-            })
+            .update(updatePatch)
             .eq('id', existing.id)
           if (!updErr) {
             existingExt.add(externalId)
