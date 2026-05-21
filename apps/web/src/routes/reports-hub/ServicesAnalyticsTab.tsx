@@ -25,8 +25,10 @@ import { formatCurrency } from '@/lib/utils/format-currency'
  * Топ-3 услуг в группе получают медальки (🥇/🥈/🥉).
  * Топ-20% услуг в группе подсвечены зелёным фоном.
  *
- * Новые колонки: Время услуги (duration_min) и Стоимость часа работы
- * (revenue / duration * 60).
+ * Колонки: Цена (default_price_cents услуги), Время (duration_min),
+ * Доход/час (price/duration*60 — unit-rate услуги, показывает какие
+ * услуги по природе самые «дорогие за час», независимо от количества
+ * продаж), Выручка (total за период), Маржа, Доля.
  */
 type EnrichedRow = {
   service_id: string
@@ -36,6 +38,7 @@ type EnrichedRow = {
   margin_cents: number | null
   margin_pct: number | null
   duration_min: number | null
+  price_cents: number | null
   hourly_cents: number | null
   category_id: string | null
   category_name: string
@@ -87,7 +90,10 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
     return rows.map((r) => {
       const svc = serviceById.get(r.service_id)
       const dur = svc?.default_duration_min ?? null
-      const hourly = dur && dur > 0 ? Math.round((r.revenue_cents / dur) * 60) : null
+      const price = svc?.default_price_cents ?? null
+      // Доход/час по unit-rate: цена услуги / её длительность * 60. Показывает
+      // «потенциал» услуги, не зависит от того сколько раз была продана.
+      const hourly = price != null && dur && dur > 0 ? Math.round((price / dur) * 60) : null
       const cat = svc?.category_id ? categoryById.get(svc.category_id) : null
       return {
         service_id: r.service_id,
@@ -97,6 +103,7 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
         margin_cents: r.margin_cents,
         margin_pct: r.margin_pct,
         duration_min: dur,
+        price_cents: price,
         hourly_cents: hourly,
         category_id: svc?.category_id ?? null,
         category_name: cat?.name ?? fallback,
@@ -194,6 +201,9 @@ export function ServicesAnalyticsTab({ salonId }: { salonId: string }) {
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_duration')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.services.col_price')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.services.col_hourly')}
@@ -296,6 +306,7 @@ function GroupBlock({
         </td>
         <td className="px-3 py-2.5" />
         <td className="px-3 py-2.5" />
+        <td className="px-3 py-2.5" />
         <td className="num text-brand-sage-deep px-3 py-2.5 text-right text-sm font-bold">
           {formatCurrency(group.total_revenue, currency)}
         </td>
@@ -341,6 +352,9 @@ function GroupBlock({
                 <td className="num text-muted-foreground px-3 py-2 text-right">{r.visits_count}</td>
                 <td className="num text-muted-foreground px-3 py-2 text-right text-xs">
                   {r.duration_min ? `${r.duration_min} ${t('common.min')}` : '—'}
+                </td>
+                <td className="num text-foreground px-3 py-2 text-right text-xs font-semibold">
+                  {r.price_cents != null ? formatCurrency(r.price_cents, currency) : '—'}
                 </td>
                 <td className="num text-muted-foreground px-3 py-2 text-right text-xs">
                   {r.hourly_cents != null ? formatCurrency(r.hourly_cents, currency) : '—'}

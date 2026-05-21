@@ -2572,6 +2572,7 @@
       "group_count_few": "{{count}} services",
       "group_count_many": "{{count}} services",
       "col_duration": "Time",
+      "col_price": "Price",
       "col_hourly": "Revenue/hr",
       "medal_1": "🥇 1st place",
       "medal_2": "🥈 2nd place",
@@ -2603,7 +2604,7 @@
       "months": "{{count}} mo",
       "regularity": {
         "title": "Clients who missed their next visit window",
-        "subtitle": "Client hasn't booked within return_period_days+3 (grace). Period set in Services → Parameters.",
+        "subtitle": "Client hasn't booked even with a 3-day buffer past the recommended return period. Periods are set in Services → Parameters → «Return cadence».",
         "empty": "All clients book on time 🎉",
         "empty_hint": "Or no service category has a return period set yet (Services → Parameters).",
         "category": "Category",

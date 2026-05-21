@@ -2572,6 +2572,7 @@
       "group_count_few": "{{count}} usługi",
       "group_count_many": "{{count}} usług",
       "col_duration": "Czas",
+      "col_price": "Cena",
       "col_hourly": "Przychód/godz.",
       "medal_1": "🥇 1. miejsce",
       "medal_2": "🥈 2. miejsce",
@@ -2603,7 +2604,7 @@
       "months": "{{count}} mies.",
       "regularity": {
         "title": "Klienci, którzy ominęli termin",
-        "subtitle": "Klient nie umówił się w okresie return_period_days+3 (grace). Okres ustawiony w Usługi → Parametry.",
+        "subtitle": "Klient nie umówił się nawet z 3-dniowym zapasem po zalecanym okresie powrotu. Okresy ustawiasz w Usługi → Parametry → „Regularność powrotu”.",
         "empty": "Wszyscy klienci rezerwują na czas 🎉",
         "empty_hint": "Lub żadna kategoria usług nie ma jeszcze okresu powrotu (Usługi → Parametry).",
         "category": "Kategoria",
