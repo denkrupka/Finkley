@@ -24,6 +24,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -244,6 +245,37 @@ async function processSalon(admin: SupabaseClient, salonId: string): Promise<num
     console.warn('insights insert failed', salonId, insErr.message)
     return 0
   }
+
+  // Push owner'у с top-1 инсайтом если ai_insights не выключены
+  try {
+    const { data: salon } = await admin
+      .from('salons')
+      .select('notification_prefs')
+      .eq('id', salonId)
+      .maybeSingle()
+    const prefs = ((salon?.notification_prefs ?? {}) as Record<string, boolean>) || {}
+    if (prefs.ai_insights !== false && top3[0]) {
+      const { data: ownerRow } = await admin
+        .from('salon_members')
+        .select('user_id')
+        .eq('salon_id', salonId)
+        .eq('role', 'owner')
+        .limit(1)
+        .maybeSingle()
+      if (ownerRow) {
+        const userId = (ownerRow as { user_id: string }).user_id
+        await sendPushToUser(admin, userId, {
+          title: `🧠 ${top3[0].title}`,
+          body: top3[0].body.slice(0, 200),
+          url: '/dashboard',
+          tag: `insights-${salonId}`,
+        })
+      }
+    }
+  } catch (e) {
+    console.warn(`insights push failed: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
   return rows.length
 }
 

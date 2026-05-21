@@ -37,6 +37,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { recordSyncResult } from '../_shared/notify.ts'
 import { withSentry } from '../_shared/sentry.ts'
+import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -802,6 +803,29 @@ async function syncClients(
   const caches = await buildResolveCaches(admin, salonId)
   const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
 
+  // Маппинг payment_method → cash_register_id для historic backfill.
+  const { data: salonForMapping } = await admin
+    .from('salons')
+    .select('financial_settings')
+    .eq('id', salonId)
+    .maybeSingle()
+  type FinCashItem = {
+    id?: string
+    archived?: boolean
+    payment_method_mapping?: string | null
+  }
+  const cashRegisterByMethod: Record<string, string> = {}
+  const finSettings =
+    (salonForMapping?.financial_settings as {
+      cash_registers?: { items?: FinCashItem[] }
+    } | null) ?? null
+  for (const item of finSettings?.cash_registers?.items ?? []) {
+    if (item.archived) continue
+    if (item.payment_method_mapping && item.id) {
+      cashRegisterByMethod[item.payment_method_mapping] = item.id
+    }
+  }
+
   // ── Customers paginated ───────────────────────────────────────────────
   let page = 1
   const perPage = 100
@@ -915,6 +939,7 @@ async function syncClients(
           caches,
           existingVisitsExt,
           config,
+          cashRegisterByMethod,
         )
         stats.history_visits_synced = (stats.history_visits_synced ?? 0) + historyAdded
         // Помечаем что бэкфилл сделан
@@ -948,6 +973,7 @@ async function backfillCustomerHistory(
   caches: ResolveCaches,
   existingExt: Set<string>,
   config: BooksyConfig,
+  cashRegisterByMethod?: Record<string, string>,
 ): Promise<number> {
   let added = 0
   let page = 1
@@ -975,6 +1001,7 @@ async function backfillCustomerHistory(
         caches,
         existingExt,
         config,
+        cashRegisterByMethod,
       )
       // extra_bookings и combo_children — sub-services того же appointment
       for (const eb of b.extra_bookings ?? []) {
@@ -986,6 +1013,7 @@ async function backfillCustomerHistory(
           caches,
           existingExt,
           config,
+          cashRegisterByMethod,
         )
       }
     }
@@ -1004,6 +1032,7 @@ async function insertHistoricalBooking(
   caches: ResolveCaches,
   existingExt: Set<string>,
   config: BooksyConfig,
+  cashRegisterByMethod?: Record<string, string>,
 ): Promise<number> {
   const externalId = `subbk:${b.id}`
   if (existingExt.has(externalId)) return 0
@@ -1063,6 +1092,7 @@ async function insertHistoricalBooking(
       tip_cents: 0,
       discount_cents: 0,
       payment_method: paymentMethod,
+      cash_register_id: cashRegisterByMethod?.[paymentMethod] ?? null,
       status,
       source: 'booksy',
       external_id: externalId,
@@ -1345,6 +1375,13 @@ async function syncVisits(
   const seenVisitExtIds = new Set<string>()
   const seenReservationBooksyIds = new Set<string>()
   const fetchedRange: { start: Date | null; end: Date | null } = { start: null, end: null }
+  // Накапливаем НОВЫЕ вставленные визиты (insert, не update). После прохода
+  // шлём один push owner'у — booksy_new_visits.
+  const newlyInserted: Array<{
+    visit_at: string
+    serviceName: string
+    clientName?: string | null
+  }> = []
 
   const startTs = Date.now()
   const BUDGET_MS = 45_000
@@ -1659,6 +1696,11 @@ async function syncVisits(
           if (!error) {
             existingExt.add(externalId)
             stats.visits_synced! += 1
+            newlyInserted.push({
+              visit_at: visitAtIso,
+              serviceName,
+              clientName: detail?.profile?.full_name ?? customer.name ?? null,
+            })
           }
         }
       }
@@ -1692,6 +1734,58 @@ async function syncVisits(
       seenReservationBooksyIds,
       stats,
     })
+  }
+
+  // booksy_new_visits push — только если есть свежие импорты + юзер их хочет.
+  if (newlyInserted.length > 0) {
+    await notifyBooksyNewVisits(admin, salonId, newlyInserted)
+  }
+}
+
+async function notifyBooksyNewVisits(
+  admin: SupabaseClient,
+  salonId: string,
+  newVisits: Array<{ visit_at: string; serviceName: string; clientName?: string | null }>,
+): Promise<void> {
+  try {
+    const { data: salon } = await admin
+      .from('salons')
+      .select('id, name, notification_prefs')
+      .eq('id', salonId)
+      .maybeSingle()
+    if (!salon) return
+    const prefs = (salon.notification_prefs ?? {}) as Record<string, boolean>
+    if (prefs.booksy_new_visits === false) return
+    const { data: ownerRow } = await admin
+      .from('salon_members')
+      .select('user_id')
+      .eq('salon_id', salonId)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle()
+    if (!ownerRow) return
+    const lines = newVisits
+      .slice(0, 5)
+      .map((v) => {
+        const t = new Date(v.visit_at).toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        const who = v.clientName ?? '—'
+        return `${t} ${who} · ${v.serviceName}`
+      })
+      .join('\n')
+    const more = newVisits.length > 5 ? `\n…ещё ${newVisits.length - 5}` : ''
+    await sendPushToUser(admin, (ownerRow as { user_id: string }).user_id, {
+      title: `Новые визиты из Booksy (${newVisits.length})`,
+      body: `${lines}${more}`,
+      url: '/visits',
+      tag: 'booksy-new-visits',
+    })
+  } catch (e) {
+    console.warn(`notifyBooksyNewVisits failed: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 

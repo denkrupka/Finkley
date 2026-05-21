@@ -135,6 +135,120 @@ async function processLowInventory(
   return sent
 }
 
+async function processCalendarConflicts(
+  admin: SupabaseClient,
+  salon: SalonRow,
+  owner: { user_id: string; email: string | null; telegram_id: number | null },
+): Promise<number> {
+  if (!isEnabled(salon.notification_prefs, 'calendar_conflicts')) return 0
+  // Берём БУДУЩИЕ визиты на 14 дней вперёд — этого окна достаточно для
+  // утреннего предупреждения, дальше юзер сам корректирует.
+  const nowIso = new Date().toISOString()
+  const horizonIso = new Date(Date.now() + 14 * 86400000).toISOString()
+  const { data: visits } = await admin
+    .from('visits')
+    .select('id, visit_at, duration_min, staff_id, service_name_snapshot, client_id')
+    .eq('salon_id', salon.id)
+    .is('deleted_at', null)
+    .neq('status', 'cancelled')
+    .not('staff_id', 'is', null)
+    .gte('visit_at', nowIso)
+    .lt('visit_at', horizonIso)
+    .order('staff_id', { ascending: true })
+    .order('visit_at', { ascending: true })
+  if (!visits || visits.length === 0) return 0
+
+  type V = {
+    id: string
+    visit_at: string
+    duration_min: number | null
+    staff_id: string | null
+    service_name_snapshot: string | null
+  }
+  // Парами по тому же staff_id — overlap если start_b < end_a.
+  const conflicts: Array<{ a: V; b: V }> = []
+  const byStaff = new Map<string, V[]>()
+  for (const v of visits as V[]) {
+    if (!v.staff_id) continue
+    const arr = byStaff.get(v.staff_id) ?? []
+    arr.push(v)
+    byStaff.set(v.staff_id, arr)
+  }
+  for (const arr of byStaff.values()) {
+    for (let i = 0; i < arr.length - 1; i++) {
+      const a = arr[i]!
+      const b = arr[i + 1]!
+      const aStart = new Date(a.visit_at).getTime()
+      const aEnd = aStart + (a.duration_min ?? 60) * 60_000
+      const bStart = new Date(b.visit_at).getTime()
+      if (bStart < aEnd) conflicts.push({ a, b })
+    }
+  }
+  if (conflicts.length === 0) return 0
+
+  // Имена staff для message
+  const staffIds = [...new Set(conflicts.map((c) => c.a.staff_id!).filter(Boolean))]
+  const { data: staffRows } = await admin.from('staff').select('id, full_name').in('id', staffIds)
+  const staffName = new Map<string, string>(
+    (staffRows ?? []).map((s) => [s.id as string, s.full_name as string]),
+  )
+
+  const salonName = salon.name ?? 'Salon'
+  const lines = conflicts.slice(0, 10).map((c) => {
+    const staff = staffName.get(c.a.staff_id!) ?? '—'
+    const fmt = (iso: string) =>
+      new Date(iso).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    return `• ${staff}: ${fmt(c.a.visit_at)} «${c.a.service_name_snapshot ?? '—'}» × ${fmt(c.b.visit_at)} «${c.b.service_name_snapshot ?? '—'}»`
+  })
+  const more = conflicts.length > 10 ? `\n…ещё ${conflicts.length - 10}` : ''
+  const text = `⚠️ Конфликты в календаре (${salonName})\n\n${lines.join('\n')}${more}`
+  const html =
+    `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">⚠️ Конфликты в календаре (${salonName})</h2>` +
+    `<ul style="padding-left:20px;color:#1A1A2E;font-size:14px;line-height:1.6">` +
+    conflicts
+      .slice(0, 20)
+      .map((c) => {
+        const staff = staffName.get(c.a.staff_id!) ?? '—'
+        const fmt = (iso: string) =>
+          new Date(iso).toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        return `<li><strong>${staff}</strong>: ${fmt(c.a.visit_at)} «${c.a.service_name_snapshot ?? '—'}» пересекается с ${fmt(c.b.visit_at)} «${c.b.service_name_snapshot ?? '—'}»</li>`
+      })
+      .join('') +
+    `</ul>` +
+    `<p style="color:#6b7280;font-size:12px;margin-top:16px">Открой <a href="https://finkley.app/app/">Finkley → Визиты</a> чтобы исправить.</p>`
+
+  let sent = 0
+  try {
+    const pushed = await sendPushToUser(admin, owner.user_id, {
+      title: `Конфликты в календаре — ${salonName}`,
+      body: lines.slice(0, 3).join('\n'),
+      url: '/visits',
+      tag: 'calendar-conflicts',
+    })
+    sent += pushed
+  } catch (e) {
+    console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
+  }
+  if (owner.telegram_id) {
+    if (await sendTelegramToUser(owner.telegram_id, text)) sent++
+  }
+  if (owner.email) {
+    const r = await sendEmail(owner.email, `Конфликты в календаре — ${salonName}`, html)
+    if (r.ok) sent++
+  }
+  return sent
+}
+
 async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<{ sent: number }> {
   const stats = { sent: 0 }
   // Owner
@@ -157,6 +271,7 @@ async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<
     telegram_id: owner.profiles?.telegram_id ?? null,
   }
   stats.sent += await processLowInventory(admin, salon, ownerData)
+  stats.sent += await processCalendarConflicts(admin, salon, ownerData)
   return stats
 }
 
