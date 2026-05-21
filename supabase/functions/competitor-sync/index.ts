@@ -21,6 +21,11 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import {
+  estimatePostsPerMonth,
+  parseFbLikes,
+  parseInstaOgDescription,
+} from '../_shared/social-metrics.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -161,17 +166,14 @@ async function fetchContent(
       })
       if (r.ok) {
         const html = await r.text()
-        // og:description содержит "X Followers, Y Following, Z Posts".
-        const og = html.match(/<meta property="og:description" content="([^"]+)"/)
-        if (og && og[1]) {
-          const followersMatch = og[1].match(/([\d,]+(?:\.\d+)?[KM]?)\s*Followers/i)
-          const postsMatch = og[1].match(/([\d,]+(?:\.\d+)?[KM]?)\s*Posts/i)
-          const followingMatch = og[1].match(/([\d,]+(?:\.\d+)?[KM]?)\s*Following/i)
-          if (followersMatch) out.followers = parseSocialCount(followersMatch[1] ?? '0')
-          if (postsMatch) out.posts = parseSocialCount(postsMatch[1] ?? '0')
-          if (followingMatch) out.following = parseSocialCount(followingMatch[1] ?? '0')
-          out.instagram_url = instaUrl
-        }
+        const counts = parseInstaOgDescription(html)
+        if (counts.followers != null) out.followers = counts.followers
+        if (counts.posts != null) out.posts = counts.posts
+        if (counts.following != null) out.following = counts.following
+        // Частота постов — best-effort на основе ISO/timestamp дат в HTML.
+        const ppm = estimatePostsPerMonth(html, counts.posts)
+        if (ppm != null) out.posts_per_month = ppm
+        out.instagram_url = instaUrl
       }
     } catch {
       /* ignore */
@@ -184,8 +186,14 @@ async function fetchContent(
       })
       if (r.ok) {
         const html = await r.text()
-        const m = html.match(/([\d,]+)\s*(?:people\s+like|likes)/i)
-        if (m) out.fb_likes = parseSocialCount(m[1] ?? '0')
+        const likes = parseFbLikes(html)
+        if (likes != null) out.fb_likes = likes
+        // На FB-странице публичные посты обычно имеют datetime атрибуты —
+        // тоже попробуем оценить частоту, если ещё не получили от Insta.
+        if (out.posts_per_month == null) {
+          const ppm = estimatePostsPerMonth(html)
+          if (ppm != null) out.posts_per_month = ppm
+        }
         out.facebook_url = fbUrl
       }
     } catch {
@@ -193,14 +201,6 @@ async function fetchContent(
     }
   }
   return Object.keys(out).length > 0 ? out : null
-}
-
-function parseSocialCount(raw: string): number {
-  const r = raw.trim().replace(/,/g, '')
-  if (r.endsWith('K') || r.endsWith('k')) return Math.round(parseFloat(r) * 1_000)
-  if (r.endsWith('M') || r.endsWith('m')) return Math.round(parseFloat(r) * 1_000_000)
-  const n = parseFloat(r)
-  return Number.isFinite(n) ? Math.round(n) : 0
 }
 
 // =============================================================================

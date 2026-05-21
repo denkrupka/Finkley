@@ -280,7 +280,14 @@ function renderSnapshotData(
   if (s.kind === 'content') {
     const followers = data.followers as number | undefined
     const posts = data.posts as number | undefined
-    return `👥 ${followers ?? '?'} · 📷 ${posts ?? '?'}`
+    const following = data.following as number | undefined
+    const ppm = data.posts_per_month as number | undefined
+    const parts: string[] = []
+    parts.push(`👥 ${followers ?? '?'}`)
+    parts.push(`📷 ${posts ?? '?'}`)
+    if (following != null) parts.push(`➡ ${following}`)
+    if (ppm != null) parts.push(`📅 ${ppm}/мес`)
+    return parts.join(' · ')
   }
   if (s.kind === 'occupancy') {
     const pct = data.occupancy_pct as number | undefined
