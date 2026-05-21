@@ -1,83 +1,56 @@
-# MORNING NOTE — финальный
+# MORNING NOTE — финал i18n-цикла
 
-> Все задачи из расширенного списка закрыты. Этот файл — навигация по тому, что появилось/изменилось.
+> Финальный summary всей i18n-перестройки и сопутствующих фиксов. После этого
+> приложение полностью локализовано RU/PL/EN — от UI до email/push и backend AI.
 
 ## 🎯 Главное — что протестировать в первую очередь
 
-1. **Ctrl+Shift+R** в браузере чтобы выкинуть старый SW.
-2. **KSeF** — Settings → Интеграции → KSeF → «Подключить» с твоим токеном. Sync должен импортировать фактуры в Расходы.
-3. **Booksy paid статус** — «Синхронизировать» на визитах → визиты с зелёным $ в Booksy станут «оплачено».
-4. **Move в Booksy** → перенос дня → portal обновится через autosync.
-5. **Settings → Кассы**: новая колонка «Маппинг оплаты». Выбери Конверт = cash, Bank/Karta = card. Все импорты/новые визиты будут зачисляться по маппингу.
-6. **Settings → Уведомления**: 2 подвкладки «Каналы» / «Типы». В «Типах» — чек-лист 10 событий.
-7. **Финансы → Финансовый отчёт** → раздел «Расходы» теперь включает Прочие категории (твои кастомные).
-8. **Финансы → ДДС**: только paid визиты + actual expenses, клик по визиту → карточка визита.
-9. **Зарплаты** → клик по мастеру → модалка визитов разбитых по дням.
-10. **Settings → Интеграции → Booksy** → новая кнопка «Починить legacy связь». Нажми один раз чтобы каскадное удаление работало для старых импортированных визитов.
-11. **/clients** → теги вместо `#booksy:app_user` — «Клиент Booksy», «Часто не приходит».
+1. **Ctrl+Shift+R** в браузере (новый SW + размеры chunk'ов).
+2. **Сменить язык** через 🌐 dropdown — должно автосохраниться в profiles.locale, на новом устройстве должно подтянуться.
+3. **Booksy → Sync now** — все 28 услуг должны разлететься по категориям, получить duration/price.
+4. **/services → «Задать себестоимость»** — поставить 30%, маржа моментально появится в /reports → услуги.
+5. **VisitDetailModal → «+ Добавить услугу»** — выбрать услугу из списка, должна добавиться в группу.
+6. **EN/PL email**: создать тестового invitee на en/pl → должен прийти EN/PL welcome/team_invitation.
 
-## 📦 Что было сделано (24 коммита, c24b9e2 → 7cbfcf1 + утренние фиксы → cac3ceb)
+## 📦 Что сделано в этом цикле (60+ коммитов)
 
-### Утренние фиксы 2026-05-21 (по баг-репортам со скриншотов)
+### Booksy fixes
 
-- **Booksy услуги без категории** (скриншот 28 услуг в «Без категории»): syncCatalog игнорировал `service_categories[]` верхний уровень → не записывал `services.category_id`. Починено: миграция `service_categories.external_source/external_id`, маппим Booksy cat-id → local uuid, проставляем при insert + при существующей услуге если `category_id=null` (ручной выбор не перетираем).
-- **Booksy услуги: пустые «Время / Доход/час / Маржа»**: Booksy сменил schema — `duration`/`price` теперь в `variants[0]`, а не на top-level. `extractServicePriceDuration()` парсит обе схемы (legacy v1 + v2 variants). 12 unit-тестов.
-- **Cash mapping unit-тесты**: `buildCashRegisterByMethod`/`cashRegisterFor` извлечены в `apps/web/src/lib/booksy-cash-mapping.ts` как pure shadow-helper. 10 тестов на archived, null, дубли, неизвестные методы.
-- **TODO cleanup**: stale TODO в `payment-reminders.ts` (push уже сделан) и `daily-notifications.ts` (calendar_conflicts реализован) почищены.
+- Категории импортируются (миграция `service_categories.external_*` + syncCatalog маппит cat → service).
+- duration_min/price извлекаются из `variants[0]` (Booksy сменили schema).
+- Cash mapping `payment_method → cash_register_id` через `salons.financial_settings.cash_registers[*].payment_method_mapping`.
 
-После `git pull` в проде достаточно один раз нажать «Sync now» в Settings → Интеграции → Booksy — все 28 услуг получат категории, duration, price. `shouldOverwrite` не тронет ручные правки.
+### UI i18n (1635 ключей RU/PL/EN)
 
-## 📦 Что было сделано — основное (24 коммита, c24b9e2 → 7cbfcf1)
+- Полный перевод EN+PL вручную.
+- `useI18nSync()` — авто-подтягивание `profile.locale`. LocaleSwitcher сохраняет обратно.
+- `getDateLocale()` + `getCurrencyLocale()` — даты и валюта по `i18n.language`.
+- `useBulkSetServiceCost(percent, overwrite)` — UI-кнопка «Задать себестоимость» в /services.
+- VisitDetailModal: «+ Добавить услугу» работает (inline picker, создаёт visit в той же группе).
 
-### Booksy
+### Edge functions i18n
 
-- Маппинг касс при импорте: `payment_method` → `cash_register_id` через `salons.financial_settings.cash_registers[*].payment_method_mapping`. И для INSERT, и для UPDATE paid-апгрейда, и для historic backfill через клиента.
-- Real-time push «Новые визиты из Booksy (N)» owner'у после успешного импорта.
-- Backfill `external_reservation_id` для legacy визитов — UI-кнопка + edge endpoint `backfill_appt_uids`.
+- **AI** (3): `ai-report-insights`, `ai-assistant`, `generate-insights` — отвечают на языке юзера, system prompts параметризованы.
+- **Push/Telegram/Email cron** (3): `payment-reminders`, `daily-notifications`, `send-daily-digest`. STR-dicts в `_shared/notifications-i18n.ts`.
+- **Email templates** (11/11): welcome, team*invitation, weekly_digest, trial_ending, payment*\*, subscription_canceled, gdpr_export, bank_consent_expiring, privacy_alert. LOCALE_OVERRIDES в `send-email/templates.ts`.
+- **Каскад выбора локали** `pickLocale()` в `_shared/salon-lookup.ts`: profile.locale → salon.locale → country_code → 'ru'.
 
-### Отчёты / Аналитика
+### Performance
 
-- ДДС: визуальный hint (chevron) что строка кликабельна → VisitDetailModal.
-- Фин-отчёт: новая группа «Прочие категории» под Расходами — кастомные категории из `expense_categories` которых нет в settings.fixed/variable/taxes.
-- Фин-отчёт: реальные expenses факт в строке «Расходы».
-- Зарплаты: StaffVisitsModal — клик по мастеру → модалка визитов сгруппированных по дням → клик по визиту → VisitDetailModal.
-- Клиенты: humanizeTag — booksy:app_user → «Клиент Booksy», RFM tags переведены.
-- P&L «Способы оплаты»: лейблы строк — имена касс из маппинга.
+- **Lazy locales**: `ru.json` eager, `en.json`/`pl.json` через dynamic `import()`. Main bundle 535KB → **273KB** (gzip 188KB → **98KB**).
+- **Recharts chunk**: вытащен из page-chunks, отдельный 406KB chunk (110KB gzip). FinancePage -23KB.
 
-### Уведомления
+### Tests (155 → 187, всё зелёное)
 
-- Settings → Уведомления: 2 подвкладки «Каналы»/«Типы».
-- `salons.notification_prefs` jsonb — какие 10 типов событий включены.
-- `payment-reminders` edge function + pg_cron 08:00 UTC: bucket'ы 2д/1д/0/просрочка → push + email (Resend) + Telegram.
-- `daily-notifications` edge function + pg_cron 08:30 UTC: low_inventory + calendar_conflicts.
-- `generate-insights` (существующий cron) теперь шлёт push с top-1 AI-инсайтом.
-- Web Push helper `_shared/web-push.ts` (VAPID + RFC 8291 + 8188) — переиспользуется во всех cron-функциях.
+- `booksy-cash-mapping` (10) — payment_method → cash_register_id
+- `booksy-overwrite` (18) — anti-overwrite snapshot policy ADR-017 §4
+- `booksy-service-extract` (12) — variants[0] vs legacy schema
+- `ics-helpers` (21) — RFC 5545 ICS serialization
+- `notifications-i18n` (12) — makeT + normalizeNotifLocale
+- `format-currency` (5 new) — getCurrencyLocale auto-detect
+- `pick-locale` (12) — каскад profile→salon→country→ru
 
-### Google / Apple Calendar
-
-- `calendar-feed` (RFC 5545 ICS) — role-based: owner/admin видит ВСЕ визиты + платежи (VALARM за 24ч); мастер только свои.
-- `visits.duration_min` используется для DTEND вместо +60 мин.
-
-### KSeF / Booksy / Прочее
-
-- См. предыдущие коммиты ночи (challenge ISO, async auth polling, invoice query shape, paid by basket_id, conflict-check soft-deleted, move/delete cascade, day-sync, reverse-delete) — всё это уже было.
-
-### Тесты
-
-- 17 новых unit-тестов (humanizeTag, dueOffset/classifyOffset, computeDurationMin). Все 97 тестов проходят.
-
-### i18n
-
-- **Полный перевод EN + PL** — 1635 ключей переведены вручную (0 русских fallback осталось).
-- Покрыто: visits, finance, dashboard, staff, clients, reports_hub, inventory, expenses, services_page, integrations, banking, messenger, income_categories, settings (включая parameters, accounting, telegram, opening_hours, daily_digest), cash_transfer, retail_wizard, counterparties, team, audit, tour, dictate, roles, tester, referral, blocked, admin.
-
-### SPA stability
-
-- Stale-chunk reload чистит SW caches.
-- CSP добавлен Cloudflare Insights.
-- Push payload.url включает `/app/{salonId}/...` префикс — SW.navigate корректно открывает SPA.
-
-## ⚙️ Что нужно настроить в Supabase env (если ещё нет)
+## ⚙️ Что нужно настроить в Supabase env
 
 Без них соответствующие каналы silent-skip:
 
@@ -86,18 +59,21 @@
 - `TELEGRAM_BOT_TOKEN` — TG канал
 - `ANTHROPIC_API_KEY` — AI polish инсайтов
 
-## 🐛 Известные мелочи
+## 🐛 Что осталось (мелочи, можно ignorить)
 
-- **Integration-тесты** для calendar-feed / маппинг касс — pure unit покрыты, но без реального Booksy stub'а интеграционных нет.
-- **historic insertHistoricalBooking** — не шлёт push real-time (импорт прошлого не критичен).
+- `AdminMediaPage` 423KB chunk — admin-only lazy, приемлемо.
+- `TesterBugModal` 236KB chunk — tester-only.
+- `ai-seo-helper`, `ocr-receipt`, `telegram-bug-collector` — admin/internal, RU-only.
+- "Show tour" из Help-таба — не реализовано (комментарий в OnboardingTour:75).
+- `salon.locale` UI — нет UI-выбора, только онбординг и BD-fallback.
 
 ## 🚀 Финальное состояние
 
-Все 4 раунда задач закрыты:
+- **187 тестов** проходят (1 skipIf для remote Supabase).
+- **typecheck + lint** зелёные.
+- **build** собирается, главный chunk 273KB.
+- 11/11 email шаблонов локализованы (3 локали).
+- Все user-visible AI ответы на языке юзера.
+- Каскад `profile → salon → country → ru` работает для серверных уведомлений.
 
-- Раунд 1 (моя ночь): 11 задач ✅
-- Раунд 2 («доделывай»): 10 задач ✅
-- Раунд 3 (осознанные TODO): 4 задачи ✅
-- Раунд 4 (мелкие хвосты): 3 задачи ✅
-
-Все коммиты в `main`. CI зелёный. Deploy на проде.
+Все коммиты в `main`. Deploy ушёл.

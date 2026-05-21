@@ -47,11 +47,14 @@ function isFinanceTab(v: string | null): v is FinanceTab {
 
 /**
  * Страница «Финансы» — финансовая картина бизнеса:
- *   - P&L              — текущая ReportsPage (KPI + dynamic charts)
- *   - ДДС              — TODO: cash flow daily (TASK-55)
- *   - Счета на оплату  — TODO: scheduled_payments (TASK-56)
+ *   - P&L (report)     — финансовый отчёт с план/факт по месяцам
+ *   - ДДС (cashflow)   — ежедневный cash flow, paid-only визиты + расходы
+ *   - Счета на оплату (payments) — scheduled_payments с календарём
+ *   - Бюджеты (budgets) — плановые расходы и доходы
+ *   - Касса (cash)     — кассовая дисциплина (если включена)
+ *   - Перемещения (transfers) — между кассами
  *
- * Активный таб — в URL `?tab=pnl|cashflow|payments`.
+ * Активный таб — в URL `?tab=...`.
  */
 export function FinancePage() {
   const { t } = useTranslation()
