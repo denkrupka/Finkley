@@ -2077,17 +2077,26 @@
     },
     "performance": {
       "title": "Master performance",
-      "subtitle": "Key work metrics — visits, revenue, average ticket, client retention. Window is individual (default from salon settings).",
+      "subtitle": "Visits, revenue by type, tips and two client retention metrics. Window is the selected period.",
       "col_master": "Master",
       "col_visits": "Visits",
+      "col_visits_revenue": "Services",
+      "col_retail_revenue": "Retail",
+      "col_tips": "Tips",
       "col_revenue": "Revenue",
       "col_share": "Share",
       "col_avg": "Avg ticket",
       "col_clients": "Clients",
       "col_retention": "Returns",
+      "col_retention_new": "New retention",
+      "col_retention_new_hint": "Of clients who came to this master for the first time in this period — how many returned at least once. Low % means the master loses clients after the first visit.",
+      "col_retention_new_title": "{{returned}} returned out of {{total}} new",
+      "col_retention_regular": "Regular retention",
+      "col_retention_regular_hint": "Of regular clients (≥2 visits, first one — before this period) — how many came in the current period. Low % = regular base is leaving.",
+      "col_retention_regular_title": "{{active}} active out of {{total}} regular (window {{window}} d{{custom}})",
       "flag_attention": "attention",
       "window_tooltip": "Window: {{days}} d.{{custom}}",
-      "note": "Retention = % of master's clients with ≥2 visits in the window. Window is set in master card or salon settings. Green ≥50%, yellow 25-50%, red <25%."
+      "note": "«Services» + «Retail» = «Revenue». Tips are separate (not in revenue). New retention ≥50% — excellent, ≥25% — ok, <25% — problem. Regular retention ≥60% — excellent, ≥30% — ok, <30% — losing base."
     },
     "schedule": {
       "title": "Work schedule",

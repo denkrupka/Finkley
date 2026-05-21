@@ -2077,17 +2077,26 @@
     },
     "performance": {
       "title": "Wydajność mistrzów",
-      "subtitle": "Kluczowe wskaźniki — wizyty, przychód, średni rachunek, retencja klientów. Okno indywidualne (domyślnie z ustawień salonu).",
+      "subtitle": "Wizyty, przychód wg typu, napiwki i dwie metryki retencji klientów. Okno = wybrany okres.",
       "col_master": "Mistrz",
       "col_visits": "Wizyty",
+      "col_visits_revenue": "Usługi",
+      "col_retail_revenue": "Sprzedaż dodatkowa",
+      "col_tips": "Napiwki",
       "col_revenue": "Przychód",
       "col_share": "Udział",
       "col_avg": "Śr. rachunek",
       "col_clients": "Klienci",
       "col_retention": "Powroty",
+      "col_retention_new": "Powrót nowych",
+      "col_retention_new_hint": "Z klientów, którzy po raz pierwszy przyszli do mistrza w tym okresie — ilu wróciło choć raz. Niski % oznacza, że mistrz traci klientów po pierwszej wizycie.",
+      "col_retention_new_title": "{{returned}} wróciło z {{total}} nowych",
+      "col_retention_regular": "Utrzymanie stałych",
+      "col_retention_regular_hint": "Ze stałych klientów (≥2 wizyt, pierwsza — przed tym okresem) — ilu przyszło w bieżącym okresie. Niski % = baza odpływa.",
+      "col_retention_regular_title": "{{active}} aktywnych z {{total}} stałych (okno {{window}} d{{custom}})",
       "flag_attention": "uwaga",
       "window_tooltip": "Okno: {{days}} dni{{custom}}",
-      "note": "Retencja = % klientów mistrza z ≥2 wizytami w oknie. Okno ustawiane w karcie mistrza lub ustawieniach salonu. Zielony ≥50%, żółty 25-50%, czerwony <25%."
+      "note": "«Usługi» + «Sprzedaż dodatkowa» = «Przychód». Napiwki osobno (nie wchodzą w przychód). Powrót nowych ≥50% — świetnie, ≥25% — ok, <25% — problem. Utrzymanie stałych ≥60% — świetnie, ≥30% — ok, <30% — tracimy bazę."
     },
     "schedule": {
       "title": "Grafik pracy",
