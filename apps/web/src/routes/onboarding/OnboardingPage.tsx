@@ -16,18 +16,23 @@ import {
   type CountryCode,
   type SalonTypeId,
 } from './onboarding-defaults'
+import { Step0Path, type OnboardingPath } from './Step0Path'
 import { Step1Salon } from './Step1Salon'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
 import { Step3Services, type ServiceDraft } from './Step3Services'
 import { Step4Expenses } from './Step4Expenses'
 import { Step5Done } from './Step5Done'
+import { TutorialNote } from './TutorialNote'
 
-const STEPS = ['salon', 'staff', 'services', 'expenses', 'done'] as const
-type StepId = (typeof STEPS)[number]
+const STEPS_QUICK = ['path', 'salon', 'done'] as const
+const STEPS_FULL = ['path', 'salon', 'staff', 'services', 'expenses', 'done'] as const
+type StepId = (typeof STEPS_FULL)[number]
 
 export type OnboardingIntegration = 'booksy' | 'wfirma' | 'banking'
 
 export type OnboardingState = {
+  // Шаг 0 — путь (быстрый/полный). null = ещё не выбран.
+  path: OnboardingPath | null
   // Шаг 1
   name: string
   country_code: CountryCode
@@ -44,6 +49,7 @@ export type OnboardingState = {
 }
 
 const INITIAL: OnboardingState = {
+  path: null,
   name: '',
   country_code: 'PL',
   salon_type: 'hair',
@@ -64,7 +70,9 @@ export function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const stepId: StepId = STEPS[stepIndex]!
+  // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
+  const STEPS: readonly StepId[] = state.path === 'full' ? STEPS_FULL : STEPS_QUICK
+  const stepId: StepId = (STEPS[stepIndex] ?? 'path') as StepId
   const isFirst = stepIndex === 0
   const isLast = stepIndex === STEPS.length - 1
 
@@ -174,6 +182,7 @@ export function OnboardingPage() {
 
   // Валидация перехода. Step5 — терминальный, переход = submit.
   function canProceed(): boolean {
+    if (stepId === 'path') return state.path !== null
     if (stepId === 'salon') return state.name.trim().length >= 2
     return true
   }
@@ -234,45 +243,63 @@ export function OnboardingPage() {
 
           {/* Step body */}
           <div data-testid={`onboarding-step-${stepId}`}>
+            {stepId === 'path' && (
+              <Step0Path value={state.path} onChange={(v) => patch('path', v)} />
+            )}
             {stepId === 'salon' && (
-              <Step1Salon
-                value={{
-                  name: state.name,
-                  country_code: state.country_code,
-                  salon_type: state.salon_type,
-                }}
-                onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
-              />
+              <>
+                <TutorialNote>{t('onboarding.tutorial.salon')}</TutorialNote>
+                <Step1Salon
+                  value={{
+                    name: state.name,
+                    country_code: state.country_code,
+                    salon_type: state.salon_type,
+                  }}
+                  onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
+                />
+              </>
             )}
             {stepId === 'staff' && (
-              <Step2Staff value={state.staff} onChange={(v) => patch('staff', v)} />
+              <>
+                <TutorialNote>{t('onboarding.tutorial.staff')}</TutorialNote>
+                <Step2Staff value={state.staff} onChange={(v) => patch('staff', v)} />
+              </>
             )}
             {stepId === 'services' && (
-              <Step3Services
-                value={state.services}
-                onChange={(v) => patch('services', v)}
-                salonType={state.salon_type}
-              />
+              <>
+                <TutorialNote>{t('onboarding.tutorial.services')}</TutorialNote>
+                <Step3Services
+                  value={state.services}
+                  onChange={(v) => patch('services', v)}
+                  salonType={state.salon_type}
+                />
+              </>
             )}
             {stepId === 'expenses' && (
-              <Step4Expenses
-                value={state.expense_categories}
-                onChange={(v) => patch('expense_categories', v)}
-              />
+              <>
+                <TutorialNote>{t('onboarding.tutorial.expenses')}</TutorialNote>
+                <Step4Expenses
+                  value={state.expense_categories}
+                  onChange={(v) => patch('expense_categories', v)}
+                />
+              </>
             )}
             {stepId === 'done' && (
-              <Step5Done
-                summary={{
-                  salonName: state.name,
-                  staffCount: state.staff.filter((s) => s.full_name.trim()).length,
-                  servicesCount: state.services.filter((s) => s.name.trim()).length,
-                  expensesCount: state.expense_categories.filter((c) => c.trim()).length,
-                }}
-                benchmarksOptIn={state.benchmarks_opt_in}
-                onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
-                selectedIntegrations={state.selected_integrations}
-                onIntegrationsToggle={(v) => patch('selected_integrations', v)}
-              />
+              <>
+                <TutorialNote>{t('onboarding.tutorial.done')}</TutorialNote>
+                <Step5Done
+                  summary={{
+                    salonName: state.name,
+                    staffCount: state.staff.filter((s) => s.full_name.trim()).length,
+                    servicesCount: state.services.filter((s) => s.name.trim()).length,
+                    expensesCount: state.expense_categories.filter((c) => c.trim()).length,
+                  }}
+                  benchmarksOptIn={state.benchmarks_opt_in}
+                  onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
+                  selectedIntegrations={state.selected_integrations}
+                  onIntegrationsToggle={(v) => patch('selected_integrations', v)}
+                />
+              </>
             )}
           </div>
 

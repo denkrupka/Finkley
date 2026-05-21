@@ -141,11 +141,36 @@
       "mixed": "Mieszany"
     },
     "steps": {
+      "path": "Start",
       "salon": "Salon",
       "staff": "Pracownicy",
       "services": "Usługi",
       "expenses": "Wydatki",
       "done": "Gotowe"
+    },
+    "path": {
+      "title": "Jak skonfigurować salon?",
+      "subtitle": "Wybierz wygodniej: minimum szybko — lub od razu pełna konfiguracja z tutorialem.",
+      "quick_title": "Szybka konfiguracja",
+      "quick_subtitle": "Tylko niezbędne — salon i taryfa. Resztę dodasz w trakcie pracy.",
+      "quick_eta": "≈ 2 min",
+      "quick_bullet_1": "Tylko nazwa salonu + typ",
+      "quick_bullet_2": "Import wizyt/usług z Booksy później",
+      "quick_bullet_3": "Od razu do subskrypcji i pracy",
+      "full_title": "Pełna konfiguracja",
+      "full_subtitle": "Przejdziemy przez wszystkie sekcje, wyjaśniając po co i jak. Wypełnisz — i gotowe.",
+      "full_eta": "≈ 10 min",
+      "full_bullet_1": "Pracownicy + usługi + kategorie wydatków",
+      "full_bullet_2": "Wskazówki tutoriala na każdym kroku",
+      "full_bullet_3": "Każdy krok można pominąć",
+      "switch_hint": "Możesz zmienić ścieżkę w każdej chwili przyciskiem «Wstecz»."
+    },
+    "tutorial": {
+      "salon": "Nazwa salonu będzie widoczna dla klientów w mailach i SMS-ach. Kraj określa walutę, strefę czasową i format adresu. Typ salonu napędza szablony usług i porównanie z konkurencją.",
+      "staff": "Dodaj co najmniej jednego pracownika — jest potrzebny do zapisywania wizyt. Procent od przychodu używany jest w /payouts do wyliczania wypłat. Później można zaimportować z Booksy.",
+      "services": "Usługi z ceną — podstawa raportów i rezerwacji online. Czas trwania potrzebny do kalendarza. Te usługi zasugerowane dla Twojego typu salonu — zostaw potrzebne, ceny edytujesz później.",
+      "expenses": "Kategorie wydatków — używane w P&L i raportach przepływów pieniężnych. Usuń niepotrzebne lub dodaj swoje. Kategoria «Wypłaty» tworzy się automatycznie.",
+      "done": "Gotowe! Przycisk poniżej zapisze salon i otworzy panel. Następnie podłącz Booksy/bank/wFirma w Ustawienia → Integracje i aktywuj subskrypcję (14 dni za darmo)."
     },
     "step1": {
       "title": "Opowiedz o salonie",

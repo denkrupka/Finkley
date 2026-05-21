@@ -141,11 +141,36 @@
       "mixed": "Mixed"
     },
     "steps": {
+      "path": "Start",
       "salon": "Salon",
       "staff": "Specialists",
       "services": "Services",
       "expenses": "Expenses",
       "done": "Done"
+    },
+    "path": {
+      "title": "How to set up your salon?",
+      "subtitle": "Pick what's easier: bare minimum quick — or full setup with a tutorial.",
+      "quick_title": "Quick setup",
+      "quick_subtitle": "Bare essentials only — salon and plan. Everything else you can add later.",
+      "quick_eta": "≈ 2 min",
+      "quick_bullet_1": "Just salon name + type",
+      "quick_bullet_2": "Import visits/services from Booksy later",
+      "quick_bullet_3": "Straight to subscription and work",
+      "full_title": "Full setup",
+      "full_subtitle": "We'll walk through all sections, explaining what and why. Fill in and you're ready.",
+      "full_eta": "≈ 10 min",
+      "full_bullet_1": "Specialists + services + expense categories",
+      "full_bullet_2": "Tutorial tips on every step",
+      "full_bullet_3": "Any step can be skipped",
+      "switch_hint": "You can switch the path anytime via the «Back» button."
+    },
+    "tutorial": {
+      "salon": "Salon name will be visible to clients in emails and SMS. Country sets currency, timezone and address format. Salon type drives service templates and competitor benchmarks.",
+      "staff": "Add at least one specialist — needed to record visits. Revenue percentage is used in /payouts for salary calculations. You can later import from Booksy.",
+      "services": "Services with price are the basis for reports and online booking. Duration is needed for the calendar. These services are suggested for your salon type — keep what's relevant, prices can be edited later.",
+      "expenses": "Expense categories — used in P&L and cash flow reports. Remove unneeded or add your own. «Salaries» category is created automatically.",
+      "done": "All set! The button below saves your salon and opens the dashboard. After that, connect Booksy/bank/wFirma in Settings → Integrations and start your subscription (14 days free trial)."
     },
     "step1": {
       "title": "Tell us about your salon",
