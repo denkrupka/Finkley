@@ -25,7 +25,6 @@ import {
   useAccountingSync,
   useBooksySync,
   useBackfillBooksyApptUids,
-  useBackfillBooksyServiceCategories,
   useClearBooksyVisits,
   useDisconnectIntegration,
   useKsefSync,
@@ -249,7 +248,6 @@ function IntegrationCard({
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
   const backfillAppts = useBackfillBooksyApptUids(salonId)
-  const backfillSvcCats = useBackfillBooksyServiceCategories(salonId)
   const updateInterval = useUpdateBooksyInterval(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
@@ -483,43 +481,6 @@ function IntegrationCard({
                     ? t('common.loading')
                     : t('integrations.backfill_appt_uids', {
                         defaultValue: 'Починить legacy связь',
-                      })}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    backfillSvcCats.mutate(undefined, {
-                      onSuccess: ({
-                        categoriesUpserted,
-                        servicesPatched,
-                        durationsPatched,
-                        pricesPatched,
-                      }) =>
-                        toast.success(
-                          t('integrations.toast_backfill_svc_cats_done', {
-                            defaultValue:
-                              'Категории: {{categoriesUpserted}}, услуг: {{servicesPatched}}, ⏱ {{durationsPatched}}, 💰 {{pricesPatched}}',
-                            categoriesUpserted,
-                            servicesPatched,
-                            durationsPatched,
-                            pricesPatched,
-                          }),
-                        ),
-                      onError: (err) =>
-                        toast.error(err instanceof Error ? err.message : String(err)),
-                    })
-                  }}
-                  disabled={backfillSvcCats.isPending}
-                  className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
-                  title={t('integrations.backfill_svc_cats_hint', {
-                    defaultValue:
-                      'Подтянуть категории услуг из Booksy и проставить их уже импортированным услугам',
-                  })}
-                >
-                  {backfillSvcCats.isPending
-                    ? t('common.loading')
-                    : t('integrations.backfill_svc_cats', {
-                        defaultValue: 'Подтянуть категории услуг',
                       })}
                 </button>
               </>

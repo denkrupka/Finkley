@@ -338,44 +338,6 @@ export function useBackfillBooksyApptUids(salonId: string | undefined) {
   })
 }
 
-/**
- * Backfill: проставить services.category_id для уже импортированных Booksy-услуг.
- * Использует action: backfill_service_categories. Idempotent — повторный запуск
- * не дублирует категории и не перетирает уже заданный category_id.
- */
-export function useBackfillBooksyServiceCategories(salonId: string | undefined) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      if (!salonId) throw new Error('no salon')
-      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
-        body: { action: 'backfill_service_categories', salon_id: salonId },
-      })
-      if (error) throw error
-      const json = data as {
-        ok?: boolean
-        categories_upserted?: number
-        services_patched?: number
-        durations_patched?: number
-        prices_patched?: number
-        message?: string
-        error?: string
-      }
-      if (!json.ok) throw new Error(json.message ?? json.error ?? 'backfill_failed')
-      return {
-        categoriesUpserted: json.categories_upserted ?? 0,
-        servicesPatched: json.services_patched ?? 0,
-        durationsPatched: json.durations_patched ?? 0,
-        pricesPatched: json.prices_patched ?? 0,
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['services', salonId] })
-      qc.invalidateQueries({ queryKey: ['service-categories', salonId] })
-    },
-  })
-}
-
 /** Отключить интеграцию (удалить credentials). */
 export function useDisconnectIntegration(salonId: string | undefined) {
   const qc = useQueryClient()
