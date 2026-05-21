@@ -2,12 +2,16 @@
  * SMS provider scaffold.
  *
  * Поддерживает несколько провайдеров через env:
- *   - SMS_PROVIDER = 'flysms' | 'twilio' | 'none' (default 'none' → silent skip)
+ *   - SMS_PROVIDER = 'smsapi' | 'flysms' | 'twilio' | 'none' (default 'none' → silent skip)
  *   - SMS_API_KEY / SMS_API_SECRET / SMS_FROM — креды провайдера
  *
  * Если SMS_PROVIDER не задан или равен 'none' — функция возвращает false без
  * сетевых вызовов. Это позволяет callers слать SMS не блокирующим способом —
  * если provider не подключён, просто шлётся только email.
+ *
+ * SMSAPI (smsapi.com — польский провайдер): POST https://api.smsapi.com/sms.do
+ *   Auth: Bearer <oauth_token> (через SMS_API_KEY).
+ *   Form-encoded: to, message, from, format=json.
  *
  * FlySMS API: POST https://api.flysms.com/v1/send
  *   body: { phone, message, api_key }
@@ -29,6 +33,7 @@ export async function sendSms(to: string, text: string): Promise<SmsResult> {
   }
 
   try {
+    if (provider === 'smsapi') return await sendViaSmsApi(phone, text)
     if (provider === 'flysms') return await sendViaFlySms(phone, text)
     if (provider === 'twilio') return await sendViaTwilio(phone, text)
     return { ok: false, error: `unknown_provider:${provider}` }
@@ -51,6 +56,52 @@ function normalizePhone(raw: string): string | null {
     return null
   }
   return cleaned
+}
+
+/**
+ * SMSAPI (smsapi.com / smsapi.pl) — польский провайдер.
+ * Использует OAuth-токен из SMS_API_KEY как Bearer. SMS_FROM — sender name
+ * (требует регистрации в SMSAPI; по умолчанию `Test` для песочницы).
+ * Returns 200 + JSON {count, list, message} при успехе.
+ */
+async function sendViaSmsApi(phone: string, text: string): Promise<SmsResult> {
+  const apiKey = Deno.env.get('SMS_API_KEY') ?? ''
+  if (!apiKey) return { ok: false, error: 'smsapi_no_api_key' }
+  // SMSAPI принимает номер БЕЗ «+» (E.164 без префикса), так что снимаем его.
+  const cleanedPhone = phone.startsWith('+') ? phone.slice(1) : phone
+  const form = new URLSearchParams({
+    to: cleanedPhone,
+    message: text,
+    from: Deno.env.get('SMS_FROM') ?? 'Test',
+    format: 'json',
+    encoding: 'utf-8',
+  })
+  const r = await fetch('https://api.smsapi.com/sms.do', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: form.toString(),
+  })
+  const body = await r.text()
+  if (!r.ok) {
+    return { ok: false, provider: 'smsapi', error: `http_${r.status}:${body.slice(0, 200)}` }
+  }
+  // SMSAPI возвращает 200 даже на ошибки уровня приложения (errcode, message).
+  try {
+    const data = JSON.parse(body) as { error?: number; message?: string; count?: number }
+    if (data.error) {
+      return {
+        ok: false,
+        provider: 'smsapi',
+        error: `smsapi_${data.error}:${data.message ?? ''}`.slice(0, 200),
+      }
+    }
+  } catch {
+    // Не-JSON в 200 — считаем успехом (sandbox/тест).
+  }
+  return { ok: true, provider: 'smsapi' }
 }
 
 async function sendViaFlySms(phone: string, text: string): Promise<SmsResult> {
