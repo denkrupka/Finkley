@@ -141,6 +141,9 @@ const MediaListPage = lazyWithRetry(() =>
 const MediaArticlePage = lazyWithRetry(() =>
   import('@/routes/media/MediaArticlePage').then((m) => ({ default: m.MediaArticlePage })),
 )
+const ReviewPage = lazyWithRetry(() =>
+  import('@/routes/public/ReviewPage').then((m) => ({ default: m.ReviewPage })),
+)
 
 /** Скелетон для Suspense-fallback. Простой, не привлекающий внимания. */
 function PageFallback() {
@@ -193,6 +196,10 @@ function App() {
       {/* Блог Finkley — публичные, без авторизации */}
       <Route path="/media" element={lazyRoute(<MediaListPage />)} />
       <Route path="/media/:slug" element={lazyRoute(<MediaArticlePage />)} />
+
+      {/* Публичная страница сбора отзыва после визита (FlySMS-flow).
+          Не требует auth — только token из URL. */}
+      <Route path="/review/:token" element={lazyRoute(<ReviewPage />)} />
 
       {/* Блокировки — публичные (юзер должен видеть страницу даже без активной сессии) */}
       <Route path="/blocked/account" element={lazyRoute(<BlockedAccountPage />)} />

@@ -1,4 +1,4 @@
-import { Scissors, Sparkles, Users, Wallet } from 'lucide-react'
+import { Scissors, Sparkles, Star, Users, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
@@ -6,20 +6,22 @@ import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { PayoutsPage } from '@/routes/payouts/PayoutsPage'
 
 import { ClientsAnalyticsTab } from './ClientsAnalyticsTab'
+import { ReviewsTab } from './ReviewsTab'
 import { ServicesAnalyticsTab } from './ServicesAnalyticsTab'
 import { StaffAnalyticsTab } from './StaffAnalyticsTab'
 
-type ReportsTab = 'services' | 'clients' | 'staff' | 'payouts'
+type ReportsTab = 'services' | 'clients' | 'staff' | 'payouts' | 'reviews'
 
 const TABS: PageTab<ReportsTab>[] = [
   { id: 'services', labelKey: 'reports_hub.tabs.services', icon: Sparkles },
   { id: 'clients', labelKey: 'reports_hub.tabs.clients', icon: Users },
   { id: 'staff', labelKey: 'reports_hub.tabs.staff', icon: Scissors },
   { id: 'payouts', labelKey: 'reports_hub.tabs.payouts', icon: Wallet },
+  { id: 'reviews', labelKey: 'reports_hub.tabs.reviews', icon: Star },
 ]
 
 function isReportsTab(v: string | null): v is ReportsTab {
-  return v === 'services' || v === 'clients' || v === 'staff' || v === 'payouts'
+  return v === 'services' || v === 'clients' || v === 'staff' || v === 'payouts' || v === 'reviews'
 }
 
 /**
@@ -59,6 +61,8 @@ export function ReportsHubPage() {
         <StaffAnalyticsTab salonId={salonId} />
       ) : active === 'clients' ? (
         <ClientsAnalyticsTab salonId={salonId} />
+      ) : active === 'reviews' ? (
+        <ReviewsTab salonId={salonId} />
       ) : (
         <PayoutsPage />
       )}

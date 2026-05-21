@@ -2458,7 +2458,8 @@
       "services": "Usługi",
       "clients": "Klienci",
       "staff": "Specjaliści",
-      "payouts": "Wynagrodzenia"
+      "payouts": "Wynagrodzenia",
+      "reviews": "Opinie"
     },
     "clients_placeholder": "Analityka klientów — sekcja w przygotowaniu.",
     "staff": {
@@ -2535,6 +2536,21 @@
         "expected": "Oczekiwane po",
         "overdue": "Opóźnienie"
       }
+    },
+    "reviews": {
+      "tabs": {
+        "external": "Z Booksy i Google",
+        "internal": "Wewnętrzne"
+      },
+      "search_placeholder": "Szukaj po tekście lub autorze…",
+      "empty": "Brak opinii.",
+      "negative_unread_title": "Nowe negatywne opinie: {{count}}",
+      "mark_read": "Oznacz przeczytane",
+      "marked_read": "Oznaczono jako przeczytane",
+      "anonymous": "Anonimowa opinia",
+      "no_text": "(bez tekstu, tylko ocena)",
+      "import_button": "Import z Booksy/Google",
+      "imported": "Zaimportowano {{count}} opinii"
     }
   },
   "finance": {
@@ -3758,5 +3774,21 @@
     "action_save": "Zapisz",
     "action_delete": "Usuń",
     "toast_updated": "Przelew zaktualizowany"
+  },
+  "review": {
+    "expired": "Link wygasł",
+    "not_found": "Link nie znaleziono",
+    "already_submitted": "Dzięki, Twoja opinia już wysłana",
+    "error_generic": "Coś poszło nie tak. Spróbuj później.",
+    "rate_title": "Jak przebiegła Twoja wizyta?",
+    "rate_subtitle": "{{salon}} — oceń od 1 do 5 gwiazdek",
+    "stars": "gwiazdek",
+    "feedback_title": "Powiedz, co poszło nie tak",
+    "feedback_subtitle": "Tylko właściciel salonu zobaczy. Pomoże nam się poprawić.",
+    "your_name": "Twoje imię (opcjonalnie)",
+    "feedback_placeholder": "Opisz dokładniej co można poprawić…",
+    "submit": "Wyślij",
+    "done_title": "Dzięki za opinię!",
+    "done_subtitle": "Właściciel salonu to przeczyta."
   }
 }

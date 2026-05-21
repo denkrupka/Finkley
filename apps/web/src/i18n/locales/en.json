@@ -2458,7 +2458,8 @@
       "services": "Services",
       "clients": "Clients",
       "staff": "Specialists",
-      "payouts": "Payroll"
+      "payouts": "Payroll",
+      "reviews": "Reviews"
     },
     "clients_placeholder": "Client analytics — section in development.",
     "staff": {
@@ -2535,6 +2536,21 @@
         "expected": "Expected after",
         "overdue": "Overdue"
       }
+    },
+    "reviews": {
+      "tabs": {
+        "external": "From Booksy & Google",
+        "internal": "Internal"
+      },
+      "search_placeholder": "Search by text or author…",
+      "empty": "No reviews yet.",
+      "negative_unread_title": "New negative reviews: {{count}}",
+      "mark_read": "Mark read",
+      "marked_read": "Marked as read",
+      "anonymous": "Anonymous review",
+      "no_text": "(no text, only rating)",
+      "import_button": "Import from Booksy/Google",
+      "imported": "Imported {{count}} reviews"
     }
   },
   "finance": {
@@ -3758,5 +3774,21 @@
     "action_save": "Save",
     "action_delete": "Delete",
     "toast_updated": "Transfer updated"
+  },
+  "review": {
+    "expired": "Link expired",
+    "not_found": "Link not found",
+    "already_submitted": "Thanks, your review is already submitted",
+    "error_generic": "Something went wrong. Try again later.",
+    "rate_title": "How was your visit?",
+    "rate_subtitle": "{{salon}} — rate from 1 to 5 stars",
+    "stars": "stars",
+    "feedback_title": "Tell us what didn't work",
+    "feedback_subtitle": "Only the salon owner sees this. It helps us improve.",
+    "your_name": "Your name (optional)",
+    "feedback_placeholder": "Tell us in detail what could be improved…",
+    "submit": "Submit",
+    "done_title": "Thanks for your feedback!",
+    "done_subtitle": "The salon owner will read it."
   }
 }
