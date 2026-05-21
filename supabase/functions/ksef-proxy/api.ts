@@ -269,13 +269,31 @@ export async function openSession(
   if (!challengeRes.ok) {
     return { ...challengeRes, code: 'CHALLENGE' }
   }
-  const ch = challengeRes.data as { challenge?: string; timestamp?: number | string }
-  if (!ch.challenge || ch.timestamp == null) {
-    return { ok: false, code: 'CHALLENGE', message: 'missing_challenge_or_timestamp' }
+  const ch = challengeRes.data as {
+    challenge?: string
+    timestamp?: number | string
+    timestampMs?: number | string
   }
-  const timestampMs = typeof ch.timestamp === 'number' ? ch.timestamp : Number(ch.timestamp)
+  if (!ch.challenge) {
+    return { ok: false, code: 'CHALLENGE', message: 'missing_challenge' }
+  }
+  // KSeF API 2.0 (на проде с 2026-05-21): timestamp — ISO-строка
+  // ("2026-05-21T00:01:11.671+00:00"), а ms-эквивалент лежит отдельно
+  // в timestampMs. Старый формат (timestamp как ms-число) тоже поддерживаем.
+  let timestampMs: number = NaN
+  if (typeof ch.timestampMs === 'number') timestampMs = ch.timestampMs
+  else if (typeof ch.timestampMs === 'string') timestampMs = Number(ch.timestampMs)
+  if (!isFinite(timestampMs) && ch.timestamp != null) {
+    if (typeof ch.timestamp === 'number') timestampMs = ch.timestamp
+    else if (/^\d+$/.test(ch.timestamp)) timestampMs = Number(ch.timestamp)
+    else timestampMs = new Date(ch.timestamp).getTime()
+  }
   if (!isFinite(timestampMs)) {
-    return { ok: false, code: 'CHALLENGE', message: 'invalid_timestamp' }
+    return {
+      ok: false,
+      code: 'CHALLENGE',
+      message: `invalid_timestamp:ts=${ch.timestamp}:tsMs=${ch.timestampMs}`,
+    }
   }
 
   // Step 3: encrypt `<token>|<timestampMs>`
@@ -294,6 +312,7 @@ export async function openSession(
   // Step 4: submit ksef-token. publicKeyId не передаём — KSeF API 2.0 prod
   // не возвращает его в /security/public-key-certificates (только cert + usage
   // + validity). Сертификат сам по себе содержит идентификатор внутри.
+  // Endpoint возвращает 202 Accepted — auth обрабатывается асинхронно.
   const submitRes = await authPostJson('/auth/ksef-token', {
     challenge: ch.challenge,
     encryptedToken,
@@ -309,6 +328,40 @@ export async function openSession(
   const referenceNumber = sub.referenceNumber
   if (!authToken || !referenceNumber) {
     return { ok: false, code: 'PARSE', message: 'missing_authentication_token' }
+  }
+
+  // Step 4b: poll auth status — иначе redeem вернёт 400 «status 100».
+  // KSeF меняет status 100 (in progress) → 200 (success) асинхронно.
+  let authStatus: number | null = null
+  for (let i = 0; i < 30; i++) {
+    try {
+      const stRes = await fetch(`${baseUrl()}/auth/${encodeURIComponent(referenceNumber)}`, {
+        headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' },
+      })
+      if (stRes.ok) {
+        const stData = (await stRes.json()) as {
+          status?: { code?: number; description?: string }
+        }
+        const code = stData.status?.code
+        if (code === 200) {
+          authStatus = 200
+          break
+        }
+        if (typeof code === 'number' && code >= 400) {
+          return {
+            ok: false,
+            code: 'AUTH',
+            message: `auth_failed_status_${code}:${stData.status?.description ?? ''}`,
+          }
+        }
+      }
+    } catch {
+      // network blip — retry
+    }
+    await new Promise((r) => setTimeout(r, 800))
+  }
+  if (authStatus !== 200) {
+    return { ok: false, code: 'AUTH', message: 'auth_timeout_status_100' }
   }
 
   // Step 5: redeem authentication token → access/refresh
