@@ -339,6 +339,22 @@
       "overwrite_label": "Overwrite already set costs",
       "submit": "Apply",
       "toast_done": "Applied to {{count}} services"
+    },
+    "tabs": {
+      "list": "Services",
+      "params": "Parameters"
+    },
+    "params": {
+      "title": "Service categories — return periods",
+      "subtitle": "After how many days client returns on average. Used in Reports → Clients → Regularity.",
+      "new_category_placeholder": "New category…",
+      "add_category": "Add",
+      "empty": "No categories yet. Add the first one above.",
+      "col_category": "Category",
+      "col_period": "Return period",
+      "no_tracking": "no tracking",
+      "days": "days",
+      "invalid_period": "Period must be 1–365 days"
     }
   },
   "inventory": {
@@ -2469,7 +2485,8 @@
       "tabs": {
         "top": "Top clients",
         "params": "Parameters",
-        "list": "List"
+        "list": "List",
+        "regularity": "Visit regularity"
       },
       "list_title": "Client database",
       "col_name_full": "Full name",
@@ -2481,7 +2498,17 @@
       "col_visits_count": "Visits",
       "col_lifetime": "Lifetime",
       "months": "{{count}} mo",
-      "gross_hint": "Revenue minus service cost (services.cost_cents)."
+      "gross_hint": "Revenue minus service cost (services.cost_cents).",
+      "regularity": {
+        "title": "Clients who missed their next visit window",
+        "subtitle": "Client hasn't booked within return_period_days+3 (grace). Period set in Services → Parameters.",
+        "empty": "All clients book on time 🎉",
+        "empty_hint": "Or no service category has a return period set yet (Services → Parameters).",
+        "category": "Category",
+        "last_visit": "Last visit",
+        "expected": "Expected after",
+        "overdue": "Overdue"
+      }
     }
   },
   "finance": {

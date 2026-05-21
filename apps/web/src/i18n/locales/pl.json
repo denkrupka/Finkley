@@ -339,6 +339,22 @@
       "overwrite_label": "Nadpisz już ustawione koszty",
       "submit": "Zastosuj",
       "toast_done": "Zastosowano do {{count}} usług"
+    },
+    "tabs": {
+      "list": "Usługi",
+      "params": "Parametry"
+    },
+    "params": {
+      "title": "Kategorie usług — okresy powrotu",
+      "subtitle": "Po ilu dniach klient zazwyczaj wraca. Używane w Raporty → Klienci → Regularność.",
+      "new_category_placeholder": "Nowa kategoria…",
+      "add_category": "Dodaj",
+      "empty": "Brak kategorii. Dodaj pierwszą powyżej.",
+      "col_category": "Kategoria",
+      "col_period": "Okres powrotu",
+      "no_tracking": "bez śledzenia",
+      "days": "dni",
+      "invalid_period": "Okres 1–365 dni"
     }
   },
   "inventory": {
@@ -2469,7 +2485,8 @@
       "tabs": {
         "top": "Top klienci",
         "params": "Parametry",
-        "list": "Lista"
+        "list": "Lista",
+        "regularity": "Regularność wizyt"
       },
       "list_title": "Baza klientów",
       "col_name_full": "Imię i nazwisko",
@@ -2481,7 +2498,17 @@
       "col_visits_count": "Wizyt",
       "col_lifetime": "Czas trwania",
       "months": "{{count}} mies.",
-      "gross_hint": "Przychód minus koszt usług (services.cost_cents)."
+      "gross_hint": "Przychód minus koszt usług (services.cost_cents).",
+      "regularity": {
+        "title": "Klienci, którzy ominęli termin",
+        "subtitle": "Klient nie umówił się w okresie return_period_days+3 (grace). Okres ustawiony w Usługi → Parametry.",
+        "empty": "Wszyscy klienci rezerwują na czas 🎉",
+        "empty_hint": "Lub żadna kategoria usług nie ma jeszcze okresu powrotu (Usługi → Parametry).",
+        "category": "Kategoria",
+        "last_visit": "Ostatnia wizyta",
+        "expected": "Oczekiwane po",
+        "overdue": "Opóźnienie"
+      }
     }
   },
   "finance": {

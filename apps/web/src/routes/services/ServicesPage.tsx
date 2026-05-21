@@ -1,7 +1,10 @@
 import { Archive, FlaskConical, Loader2, Percent, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
+
+import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { Layers, Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +33,7 @@ import {
   useServiceCategories,
   useServices,
   useUpdateService,
+  useUpdateServiceCategory,
   type ServiceCategoryRow,
   type ServiceRow,
 } from '@/hooks/useServices'
@@ -67,6 +71,21 @@ export function ServicesPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [archived, setArchived] = useState<ServiceRow[]>([])
 
+  // Tabs «Услуги» / «Параметры». Tab в URL → можно делиться ссылкой.
+  const [searchParams, setSearchParams] = useSearchParams()
+  type ServicesTab = 'list' | 'params'
+  const tab: ServicesTab = searchParams.get('tab') === 'params' ? 'params' : 'list'
+  function setTab(next: ServicesTab) {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'params') sp.set('tab', 'params')
+    else sp.delete('tab')
+    setSearchParams(sp, { replace: true })
+  }
+  const SERVICES_TABS: PageTab<ServicesTab>[] = [
+    { id: 'list', labelKey: 'services_page.tabs.list', icon: Layers },
+    { id: 'params', labelKey: 'services_page.tabs.params', icon: SettingsIcon },
+  ]
+
   useEffect(() => {
     if (!showArchived || !salonId) return
     void supabase
@@ -98,21 +117,34 @@ export function ServicesPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">{t('services_page.subtitle')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {services.length > 0 ? (
-            <Button variant="outline" onClick={() => setOpenBulkCost(true)}>
-              <Percent className="size-4" strokeWidth={2} />
-              {t('services_page.bulk_cost.button')}
+        {tab === 'list' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {services.length > 0 ? (
+              <Button variant="outline" onClick={() => setOpenBulkCost(true)}>
+                <Percent className="size-4" strokeWidth={2} />
+                {t('services_page.bulk_cost.button')}
+              </Button>
+            ) : null}
+            <Button onClick={() => setOpenNew(true)}>
+              <Plus className="size-4" strokeWidth={2} />
+              {t('services_page.add')}
             </Button>
-          ) : null}
-          <Button onClick={() => setOpenNew(true)}>
-            <Plus className="size-4" strokeWidth={2} />
-            {t('services_page.add')}
-          </Button>
-        </div>
+          </div>
+        ) : null}
       </header>
 
-      <section className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+      <div className="mb-4">
+        <PageTabsNav<ServicesTab> tabs={SERVICES_TABS} active={tab} onChange={setTab} t={t} />
+      </div>
+
+      {tab === 'params' ? <CategoriesParamsTab salonId={salonId} categories={categories} /> : null}
+
+      <section
+        className={cn(
+          'border-border bg-card shadow-finsm overflow-hidden rounded-lg border',
+          tab !== 'list' && 'hidden',
+        )}
+      >
         {services.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <p className="text-muted-foreground text-sm">{t('services_page.empty')}</p>
@@ -341,6 +373,141 @@ function BulkCostDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function CategoriesParamsTab({
+  salonId,
+  categories,
+}: {
+  salonId: string
+  categories: ServiceCategoryRow[]
+}) {
+  const { t } = useTranslation()
+  const createCategory = useCreateServiceCategory(salonId)
+  const updateCategory = useUpdateServiceCategory(salonId)
+  const [newName, setNewName] = useState('')
+
+  function handleAdd() {
+    const name = newName.trim()
+    if (!name) return
+    createCategory.mutate(
+      { name },
+      {
+        onSuccess: () => {
+          setNewName('')
+          toast.success(t('services_page.toast_category_created'))
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  return (
+    <section className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+      <div className="border-border bg-muted/10 flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-brand-navy text-base font-bold">{t('services_page.params.title')}</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {t('services_page.params.subtitle')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder={t('services_page.params.new_category_placeholder')}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAdd()
+            }}
+            className="w-56"
+          />
+          <Button onClick={handleAdd} disabled={!newName.trim() || createCategory.isPending}>
+            <Plus className="size-4" strokeWidth={2} />
+            {t('services_page.params.add_category')}
+          </Button>
+        </div>
+      </div>
+
+      {categories.length === 0 ? (
+        <p className="text-muted-foreground px-5 py-10 text-center text-sm">
+          {t('services_page.params.empty')}
+        </p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="bg-muted/10 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">
+                {t('services_page.params.col_category')}
+              </th>
+              <th className="px-4 py-3 text-right font-semibold">
+                {t('services_page.params.col_period')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {categories.map((c) => (
+              <CategoryParamRow key={c.id} category={c} onUpdate={updateCategory.mutate} />
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  )
+}
+
+function CategoryParamRow({
+  category,
+  onUpdate,
+}: {
+  category: ServiceCategoryRow
+  onUpdate: (input: { id: string; return_period_days?: number | null }) => void
+}) {
+  const { t } = useTranslation()
+  const [value, setValue] = useState(
+    category.return_period_days != null ? String(category.return_period_days) : '',
+  )
+  const [dirty, setDirty] = useState(false)
+
+  function commit() {
+    if (!dirty) return
+    const trimmed = value.trim()
+    const next = trimmed === '' ? null : Number(trimmed)
+    if (next != null && (!Number.isFinite(next) || next < 1 || next > 365)) {
+      toast.error(t('services_page.params.invalid_period'))
+      return
+    }
+    onUpdate({ id: category.id, return_period_days: next })
+    setDirty(false)
+  }
+
+  return (
+    <tr>
+      <td className="text-foreground px-4 py-3 font-semibold">{category.name}</td>
+      <td className="px-4 py-3 text-right">
+        <div className="ml-auto inline-flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            max={365}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value)
+              setDirty(true)
+            }}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                ;(e.target as HTMLInputElement).blur()
+              }
+            }}
+            placeholder={t('services_page.params.no_tracking')}
+            className="w-24 text-right"
+          />
+          <span className="text-muted-foreground text-xs">{t('services_page.params.days')}</span>
+        </div>
+      </td>
+    </tr>
   )
 }
 

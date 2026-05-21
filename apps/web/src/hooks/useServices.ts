@@ -40,6 +40,9 @@ export type ServiceCategoryRow = {
   name: string
   sort_order: number
   is_archived: boolean
+  /** Ожидаемый период возвращаемости клиента (дней). NULL = не отслеживать.
+   *  См. /reports → клиенты → Регулярность записей (миграция 20260521000013). */
+  return_period_days: number | null
 }
 
 export function useServices(salonId: string | undefined) {
@@ -206,7 +209,7 @@ export function useServiceCategories(salonId: string | undefined) {
       if (!salonId) return []
       const { data, error } = await supabase
         .from('service_categories')
-        .select('id, salon_id, name, sort_order, is_archived')
+        .select('id, salon_id, name, sort_order, is_archived, return_period_days')
         .eq('salon_id', salonId)
         .eq('is_archived', false)
         .order('sort_order', { ascending: true })
@@ -240,7 +243,12 @@ export function useCreateServiceCategory(salonId: string | undefined) {
 export function useUpdateServiceCategory(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { id: string; name?: string; is_archived?: boolean }) => {
+    mutationFn: async (input: {
+      id: string
+      name?: string
+      is_archived?: boolean
+      return_period_days?: number | null
+    }) => {
       const { id, ...patch } = input
       const { error } = await supabase.from('service_categories').update(patch).eq('id', id)
       if (error) throw error
@@ -249,6 +257,38 @@ export function useUpdateServiceCategory(salonId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['service_categories', salonId] })
       qc.invalidateQueries({ queryKey: ['services', salonId] })
+      qc.invalidateQueries({ queryKey: ['client-regularity', salonId] })
     },
+  })
+}
+
+/** RPC client_visit_regularity — клиенты с нарушенной регулярностью. */
+export type ClientRegularityRow = {
+  client_id: string
+  client_name: string
+  client_phone: string | null
+  client_email: string | null
+  category_id: string
+  category_name: string
+  expected_period_days: number
+  last_visit_at: string
+  days_since_last: number
+  days_overdue: number
+}
+
+export function useClientRegularity(salonId: string | undefined, graceDays = 3) {
+  return useQuery<ClientRegularityRow[]>({
+    queryKey: ['client-regularity', salonId, graceDays],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase.rpc('client_visit_regularity', {
+        p_salon_id: salonId,
+        p_grace_days: graceDays,
+      })
+      if (error) throw error
+      return (data ?? []) as ClientRegularityRow[]
+    },
+    enabled: !!salonId,
+    staleTime: 5 * 60 * 1000,
   })
 }

@@ -1,5 +1,13 @@
 import { format, parseISO } from 'date-fns'
-import { Cake, EyeOff, ListChecks, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import {
+  AlertTriangle,
+  Cake,
+  EyeOff,
+  ListChecks,
+  Plus,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -24,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
 import { useClientLtvMetrics, useClients, type ClientSort } from '@/hooks/useClients'
+import { useClientRegularity } from '@/hooks/useServices'
 import { useClientIdsWithVisitsInPeriod, useNextVisitsByClient } from '@/hooks/useNextVisits'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { supabase } from '@/lib/supabase/client'
@@ -36,15 +45,20 @@ import { clientSegment, daysToBirthday, type ClientSegment } from '@/routes/clie
 import type { ClientRow } from '@/hooks/useClients'
 import { SegmentationCard } from '@/routes/settings/SegmentationCard'
 
-type ClientsSubTab = 'list' | 'params'
+type ClientsSubTab = 'list' | 'params' | 'regularity'
 
 const SUB_TABS: PageTab<ClientsSubTab>[] = [
   { id: 'list', labelKey: 'reports_hub.clients.tabs.list', icon: ListChecks },
+  {
+    id: 'regularity',
+    labelKey: 'reports_hub.clients.tabs.regularity',
+    icon: AlertTriangle,
+  },
   { id: 'params', labelKey: 'reports_hub.clients.tabs.params', icon: SlidersHorizontal },
 ]
 
 function isClientsSubTab(v: string | null): v is ClientsSubTab {
-  return v === 'list' || v === 'params'
+  return v === 'list' || v === 'params' || v === 'regularity'
 }
 
 type SegmentFilter = 'all' | ClientSegment
@@ -95,8 +109,101 @@ export function ClientsAnalyticsTab({ salonId }: { salonId: string }) {
       <PageTabsNav tabs={SUB_TABS} active={activeSub} onChange={setActiveSub} t={t} />
       {activeSub === 'list' ? (
         <ClientsListTab salonId={salonId} currency={currency} t={t} salon={salon} />
+      ) : activeSub === 'regularity' ? (
+        <RegularityTab salonId={salonId} t={t} />
       ) : (
         <div>{salon ? <SegmentationCard salon={salon} /> : null}</div>
+      )}
+    </div>
+  )
+}
+
+function RegularityTab({
+  salonId,
+  t,
+}: {
+  salonId: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const { data: rows = [], isLoading } = useClientRegularity(salonId)
+  return (
+    <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+      <div className="border-border bg-muted/10 border-b px-5 py-4">
+        <h2 className="text-brand-navy text-base font-bold">
+          {t('reports_hub.clients.regularity.title')}
+        </h2>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {t('reports_hub.clients.regularity.subtitle')}
+        </p>
+      </div>
+      {isLoading ? (
+        <p className="text-muted-foreground px-5 py-8 text-center text-sm">{t('common.loading')}</p>
+      ) : rows.length === 0 ? (
+        <div className="px-5 py-12 text-center">
+          <p className="text-muted-foreground text-sm">
+            {t('reports_hub.clients.regularity.empty')}
+          </p>
+          <p className="text-muted-foreground/70 mt-1 text-xs">
+            {t('reports_hub.clients.regularity.empty_hint')}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.clients.col_name_full')}
+                </th>
+                <th className="px-3 py-3 text-left font-semibold">
+                  {t('reports_hub.clients.regularity.category')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.regularity.last_visit')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.regularity.expected')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.clients.regularity.overdue')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr
+                  key={`${r.client_id}-${r.category_id}`}
+                  className="border-border/60 hover:bg-muted/20 border-t"
+                >
+                  <td className="px-4 py-2.5">
+                    <div className="text-foreground text-sm font-semibold">{r.client_name}</div>
+                    {r.client_phone || r.client_email ? (
+                      <div className="text-muted-foreground mt-0.5 text-[11px]">
+                        {r.client_email || ''}
+                        {r.client_email && r.client_phone ? ' · ' : ''}
+                        <span className="num">{r.client_phone || ''}</span>
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="text-muted-foreground px-3 py-2.5 text-xs">
+                    <span className="bg-muted text-foreground rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                      {r.category_name}
+                    </span>
+                  </td>
+                  <td className="num text-muted-foreground px-3 py-2.5 text-right text-xs">
+                    {format(parseISO(r.last_visit_at), 'd MMM yyyy', { locale: getDateLocale() })}
+                  </td>
+                  <td className="num text-muted-foreground px-3 py-2.5 text-right text-xs">
+                    {r.expected_period_days} {t('services_page.params.days')}
+                  </td>
+                  <td className="num text-destructive px-3 py-2.5 text-right text-sm font-bold">
+                    +{r.days_overdue} {t('services_page.params.days')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
