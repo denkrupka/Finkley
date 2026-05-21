@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -312,6 +313,7 @@ function ParamsSection({
   const discoverCompetitors = useDiscoverCompetitors(salonId)
   const syncCompetitors = useSyncCompetitors(salonId)
   const [newName, setNewName] = useState('')
+  const [newGooglePlaceId, setNewGooglePlaceId] = useState<string | null>(null)
   const [newBooksy, setNewBooksy] = useState('')
   const [newGoogle, setNewGoogle] = useState('')
   const [newInsta, setNewInsta] = useState('')
@@ -330,12 +332,14 @@ function ParamsSection({
         name: newName.trim(),
         booksy_url: newBooksy.trim() || null,
         google_place_url: newGoogle.trim() || null,
+        google_place_id: newGooglePlaceId,
         instagram_url: newInsta.trim() || null,
         facebook_url: newFb.trim() || null,
       },
       {
         onSuccess: () => {
           setNewName('')
+          setNewGooglePlaceId(null)
           setNewBooksy('')
           setNewGoogle('')
           setNewInsta('')
@@ -436,14 +440,22 @@ function ParamsSection({
         </p>
         <div className="mt-4 flex flex-col gap-3">
           <div>
-            <Label htmlFor="comp-name">{t('reports_hub.competitors.params.name_label')}</Label>
-            <Input
-              id="comp-name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={t('reports_hub.competitors.params.name_placeholder')}
-              className="mt-1.5"
-            />
+            <Label>{t('reports_hub.competitors.params.name_label')}</Label>
+            <div className="mt-1.5">
+              <GooglePlaceSearchInput
+                initialName={newName || null}
+                initialPlaceId={newGooglePlaceId}
+                onPick={(p) => {
+                  setNewName(p.name)
+                  setNewGooglePlaceId(p.google_place_id)
+                  if (p.google_maps_uri) setNewGoogle(p.google_maps_uri)
+                }}
+                onClear={() => {
+                  setNewName('')
+                  setNewGooglePlaceId(null)
+                }}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>

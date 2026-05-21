@@ -222,7 +222,12 @@ export function useCreateCompetitor(salonId: string | undefined) {
       input: Partial<
         Pick<
           Competitor,
-          'name' | 'booksy_url' | 'google_place_url' | 'instagram_url' | 'facebook_url'
+          | 'name'
+          | 'booksy_url'
+          | 'google_place_url'
+          | 'google_place_id'
+          | 'instagram_url'
+          | 'facebook_url'
         >
       >,
     ) => {
