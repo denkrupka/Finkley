@@ -182,56 +182,105 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
   }
 }
 
-async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<{ imported: number }> {
+type ProcessResult = {
+  imported: number
+  google_reviews_fetched: number
+  booksy_reviews_fetched: number
+  upsert_error?: string
+  google_error?: string
+}
+
+async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<ProcessResult> {
   let imported = 0
+  let googleFetched = 0
+  let booksyFetched = 0
+  let googleError: string | undefined
+  let upsertError: string | undefined
   const inserts: ReviewInsert[] = []
 
   // Google
   if (salon.google_place_id) {
-    const g = await syncGooglePlace(salon.google_place_id)
-    for (const r of g.reviews) {
-      inserts.push({
-        salon_id: salon.id,
-        source: 'google',
-        visibility: 'public',
-        rating: r.rating,
-        body: r.body,
-        author_name: r.author_name,
-        external_id: r.external_id,
-        external_url: r.external_url ?? salon.google_place_url,
-        posted_at: r.posted_at,
-      })
+    try {
+      const g = await syncGooglePlace(salon.google_place_id)
+      googleFetched = g.reviews.length
+      for (const r of g.reviews) {
+        inserts.push({
+          salon_id: salon.id,
+          source: 'google',
+          visibility: 'public',
+          rating: r.rating,
+          body: r.body,
+          author_name: r.author_name,
+          external_id: r.external_id,
+          external_url: r.external_url ?? salon.google_place_url,
+          posted_at: r.posted_at,
+        })
+      }
+    } catch (e) {
+      googleError = e instanceof Error ? e.message : String(e)
+      console.warn(`google sync failed for salon ${salon.id}:`, googleError)
     }
   }
 
   // Booksy
   if (salon.booksy_url) {
-    const b = await syncBooksyReviews(salon.booksy_url)
-    for (const r of b) {
-      inserts.push({
-        salon_id: salon.id,
-        source: 'booksy',
-        visibility: 'public',
-        rating: r.rating,
-        body: r.body,
-        author_name: r.author_name,
-        external_id: r.external_id,
-        external_url: salon.booksy_url,
-        posted_at: r.posted_at,
-      })
+    try {
+      const b = await syncBooksyReviews(salon.booksy_url)
+      booksyFetched = b.length
+      for (const r of b) {
+        inserts.push({
+          salon_id: salon.id,
+          source: 'booksy',
+          visibility: 'public',
+          rating: r.rating,
+          body: r.body,
+          author_name: r.author_name,
+          external_id: r.external_id,
+          external_url: salon.booksy_url,
+          posted_at: r.posted_at,
+        })
+      }
+    } catch (e) {
+      console.warn(`booksy sync failed for salon ${salon.id}:`, e)
     }
   }
 
-  // Upsert батчем — конфликт по уникальному (salon_id, source, external_id).
+  // Manual dedup вместо upsert: уникальный индекс `ux_reviews_external` —
+  // partial (WHERE external_id is not null), и PostgreSQL не принимает его
+  // как valid ON CONFLICT target. Поэтому: загружаем existing external_ids,
+  // фильтруем новые, инсертим только их.
   if (inserts.length > 0) {
-    const { error } = await admin
+    const sources = Array.from(new Set(inserts.map((i) => i.source)))
+    const { data: existing } = await admin
       .from('reviews')
-      .upsert(inserts, { onConflict: 'salon_id,source,external_id', ignoreDuplicates: false })
-    if (!error) imported = inserts.length
-    else console.warn('reviews upsert failed', error.message)
+      .select('source, external_id')
+      .eq('salon_id', salon.id)
+      .in('source', sources)
+      .not('external_id', 'is', null)
+    const taken = new Set<string>(
+      ((existing ?? []) as Array<{ source: string; external_id: string | null }>).map(
+        (r) => `${r.source}::${r.external_id}`,
+      ),
+    )
+    const fresh = inserts.filter((r) => !taken.has(`${r.source}::${r.external_id}`))
+    if (fresh.length > 0) {
+      const { error, data } = await admin.from('reviews').insert(fresh).select('id')
+      if (!error) {
+        imported = (data as unknown[] | null)?.length ?? fresh.length
+      } else {
+        upsertError = error.message
+        console.warn(`reviews insert failed for salon ${salon.id}:`, error.message)
+      }
+    }
   }
 
-  return { imported }
+  return {
+    imported,
+    google_reviews_fetched: googleFetched,
+    booksy_reviews_fetched: booksyFetched,
+    ...(upsertError ? { upsert_error: upsertError } : {}),
+    ...(googleError ? { google_error: googleError } : {}),
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -279,14 +328,16 @@ Deno.serve(async (req: Request) => {
   })
 
   let totalImported = 0
+  const debug: Array<{ salon_id: string; salon_name: string | null } & ProcessResult> = []
   if (isCron) {
     const { data: salons } = await admin
       .from('salons')
       .select('id, name, google_place_id, google_place_url, booksy_url')
       .or('google_place_id.not.is.null,booksy_url.not.is.null')
     for (const s of (salons ?? []) as SalonRow[]) {
-      const { imported } = await processSalon(admin, s)
-      totalImported += imported
+      const res = await processSalon(admin, s)
+      totalImported += res.imported
+      debug.push({ salon_id: s.id, salon_name: s.name, ...res })
     }
   } else {
     const { data: salon } = await admin
@@ -295,9 +346,10 @@ Deno.serve(async (req: Request) => {
       .eq('id', body.salon_id!)
       .maybeSingle()
     if (!salon) return jsonResponse({ error: 'salon_not_found' }, 404)
-    const { imported } = await processSalon(admin, salon as SalonRow)
-    totalImported = imported
+    const res = await processSalon(admin, salon as SalonRow)
+    totalImported = res.imported
+    debug.push({ salon_id: (salon as SalonRow).id, salon_name: (salon as SalonRow).name, ...res })
   }
 
-  return jsonResponse({ ok: true, imported: totalImported })
+  return jsonResponse({ ok: true, imported: totalImported, debug })
 })
