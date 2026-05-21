@@ -1300,6 +1300,33 @@ async function syncVisits(
   const existingExt = new Set(existingByExt.keys())
   stats.visits_synced = stats.visits_synced ?? 0
 
+  // Маппинг payment_method → cash_register_id из financial_settings.cash_registers.
+  // Юзер настраивает в Settings → Кассы → колонка «Маппинг оплаты». Если
+  // визит из Booksy оплачен наличными — пишем в кассу с маппингом cash.
+  const { data: salonForMapping } = await admin
+    .from('salons')
+    .select('financial_settings')
+    .eq('id', salonId)
+    .maybeSingle()
+  const cashRegisterByMethod: Record<string, string> = {}
+  type FinCashItem = {
+    id?: string
+    archived?: boolean
+    payment_method_mapping?: string | null
+  }
+  const finSettings =
+    (salonForMapping?.financial_settings as {
+      cash_registers?: { items?: FinCashItem[] }
+    } | null) ?? null
+  for (const item of finSettings?.cash_registers?.items ?? []) {
+    if (item.archived) continue
+    if (item.payment_method_mapping && item.id) {
+      cashRegisterByMethod[item.payment_method_mapping] = item.id
+    }
+  }
+  const cashRegisterFor = (method: string | null | undefined): string | null =>
+    method ? (cashRegisterByMethod[method] ?? null) : null
+
   // Бэкфилл duration_min для уже импортированных booksy-визитов: до этого
   // изменения duration_min не записывался (UI рендерил по services.default).
   // Заполняем сейчас по (booked_till - booked_from). См. ADR-017 §3 —
@@ -1586,7 +1613,11 @@ async function syncVisits(
           }
           if (isPaidBooksy && config.booksy_owns_payment_status !== false) {
             updatePatch.status = 'paid'
-            if (detail?.paymentMethod) updatePatch.payment_method = detail.paymentMethod
+            if (detail?.paymentMethod) {
+              updatePatch.payment_method = detail.paymentMethod
+              const reg = cashRegisterFor(detail.paymentMethod)
+              if (reg) updatePatch.cash_register_id = reg
+            }
             // amount_cents апгрейдим только если basket дал ненулевую сумму
             // (типичный сценарий: в Booksy сначала записали, потом оплатили
             // и появилась basket с реальной суммой). Не трогаем если 0.
@@ -1617,6 +1648,7 @@ async function syncVisits(
             tip_cents: tipForVisit,
             discount_cents: discountForVisit,
             payment_method: paymentMethod,
+            cash_register_id: cashRegisterFor(paymentMethod),
             status,
             source: 'booksy',
             external_id: externalId,
