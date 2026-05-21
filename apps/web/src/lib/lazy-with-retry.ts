@@ -38,6 +38,21 @@ export function lazyWithRetry<T extends AnyComponent>(loader: () => Promise<{ de
         const alreadyReloaded = sessionStorage.getItem(reloadedKey)
         if (!alreadyReloaded) {
           sessionStorage.setItem(reloadedKey, '1')
+          // Stale chunk почти всегда = SW кэширует старый shell, который
+          // ссылается на удалённые чанки. Очищаем caches + unregister SW
+          // ДО reload, чтобы свежий index.html гарантированно подтянулся.
+          try {
+            if ('caches' in window) {
+              const keys = await caches.keys()
+              await Promise.all(keys.map((k) => caches.delete(k)))
+            }
+            if ('serviceWorker' in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations()
+              await Promise.all(regs.map((r) => r.unregister()))
+            }
+          } catch {
+            // best-effort, всё равно делаем reload
+          }
           window.location.reload()
           // Возвращаем pending promise — компонент никогда не зарендерится
           // потому что страница уже перезагружается
