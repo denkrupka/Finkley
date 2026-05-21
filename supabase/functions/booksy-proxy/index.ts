@@ -464,6 +464,7 @@ type SyncStats = {
   staff_synced?: number
   staff_filtered_out?: number
   services_synced?: number
+  service_categories_synced?: number
   visits_synced?: number
   visits_deleted?: number
   reservations_synced?: number
@@ -487,6 +488,7 @@ async function syncCatalog(
     staff_synced: 0,
     staff_filtered_out: 0,
     services_synced: 0,
+    service_categories_synced: 0,
     salon_hours_synced: false,
   }
 
@@ -535,7 +537,75 @@ async function syncCatalog(
   )
   if (!svcRes.ok) throw new Error(`service_categories_${svcRes.reason}`)
 
+  // Сначала маппим категории — иначе services.category_id остаётся null и в UI
+  // все услуги падают в группу «Без категории» (см. bug-screenshot 2026-05-21).
+  // Booksy отдаёт `service_categories[].id` (number) + name. Мы создаём/находим
+  // соответствующую запись в public.service_categories и кэшируем booksyCatId →
+  // local uuid, чтобы потом проставить services.category_id.
+  const categoryMap = new Map<string, string>() // booksy cat id → local uuid
   for (const cat of svcRes.data.service_categories ?? []) {
+    const catExtId = String(cat.id)
+    const catName = (cat.name ?? '').trim()
+    if (!catName) continue
+
+    let { data: existingCat } = await admin
+      .from('service_categories')
+      .select('id, name')
+      .eq('salon_id', salonId)
+      .eq('external_source', 'booksy')
+      .eq('external_id', catExtId)
+      .maybeSingle()
+
+    if (!existingCat) {
+      // Сначала пробуем match by name среди НЕ-привязанных к Booksy категорий —
+      // юзер мог завести категорию вручную ещё до интеграции. Если нашли —
+      // привязываем (а не создаём дубль).
+      const { data: byName } = await admin
+        .from('service_categories')
+        .select('id, name')
+        .eq('salon_id', salonId)
+        .eq('name', catName)
+        .eq('is_archived', false)
+        .is('external_id', null)
+        .maybeSingle()
+      if (byName) {
+        await admin
+          .from('service_categories')
+          .update({ external_source: 'booksy', external_id: catExtId })
+          .eq('id', byName.id)
+        existingCat = byName
+      } else {
+        const { data: created } = await admin
+          .from('service_categories')
+          .insert({
+            salon_id: salonId,
+            name: catName,
+            external_source: 'booksy',
+            external_id: catExtId,
+            external_snapshot: { name: catName },
+          })
+          .select('id, name')
+          .maybeSingle()
+        if (created) {
+          existingCat = created
+          stats.service_categories_synced = (stats.service_categories_synced ?? 0) + 1
+        }
+      }
+    } else if (existingCat.name !== catName) {
+      // Booksy переименовали — обновляем snapshot и (если юзер не правил имя локально) само имя.
+      // shouldOverwrite не используем — мы пока не храним snapshot.name для категорий локально
+      // отдельно от текущего имени; держим простой rule: name = booksy name.
+      await admin
+        .from('service_categories')
+        .update({ name: catName, external_snapshot: { name: catName } })
+        .eq('id', existingCat.id)
+    }
+
+    if (existingCat) categoryMap.set(catExtId, existingCat.id)
+  }
+
+  for (const cat of svcRes.data.service_categories ?? []) {
+    const localCatId = categoryMap.get(String(cat.id)) ?? null
     for (const s of cat.services ?? []) {
       const extId = String(s.id)
       const priceCents = Math.round((s.price?.amount ?? 0) * 100)
@@ -543,7 +613,9 @@ async function syncCatalog(
 
       let { data: existing } = await admin
         .from('services')
-        .select('id, name, default_price_cents, default_duration_min, external_snapshot')
+        .select(
+          'id, name, default_price_cents, default_duration_min, category_id, external_snapshot',
+        )
         .eq('salon_id', salonId)
         .eq('external_source', 'booksy')
         .eq('external_id', extId)
@@ -551,7 +623,9 @@ async function syncCatalog(
       if (!existing) {
         const { data: byName } = await admin
           .from('services')
-          .select('id, name, default_price_cents, default_duration_min, external_snapshot')
+          .select(
+            'id, name, default_price_cents, default_duration_min, category_id, external_snapshot',
+          )
           .eq('salon_id', salonId)
           .eq('name', s.name)
           .eq('is_archived', false)
@@ -586,6 +660,12 @@ async function syncCatalog(
           booksyNow.duration_min,
         )
         if (durOverwrite !== undefined) update.default_duration_min = durOverwrite
+        // category_id: если у услуги локально ещё нет категории (null) —
+        // проставляем то, что отдал Booksy. Если юзер уже выбрал свою — не
+        // перетираем (Booksy не owns service grouping).
+        if (existing.category_id == null && localCatId) {
+          update.category_id = localCatId
+        }
         await admin.from('services').update(update).eq('id', existing.id)
       } else {
         await admin.from('services').insert({
@@ -593,6 +673,7 @@ async function syncCatalog(
           name: s.name,
           default_price_cents: priceCents,
           default_duration_min: s.duration ?? null,
+          category_id: localCatId,
           external_source: 'booksy',
           external_id: extId,
           external_snapshot: booksyNow,
@@ -2377,6 +2458,135 @@ async function handleBackfillApptUids(
   return jsonResponse({ ok: true, scanned: legacy.length, patched })
 }
 
+// =============================================================================
+// handleBackfillServiceCategories — для уже импортированных booksy-услуг
+// проставляет services.category_id (если он null).
+//
+// Зачем: до 2026-05-21 syncCatalog игнорировал service_categories.* — на
+// скриншоте у пользователя 28 услуг лежали в группе «Без категории». Сам факт
+// есть в Booksy API, просто не подтягивался. Этот endpoint пробегает всю
+// иерархию ещё раз и патчит локальные категории.
+// =============================================================================
+async function handleBackfillServiceCategories(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const { data: integration } = await admin
+    .from('salon_integrations')
+    .select('credentials')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .eq('status', 'connected')
+    .maybeSingle()
+  if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+  const creds = integration.credentials as { access_token: string; business_id: number }
+
+  type SvcResp = {
+    service_categories?: {
+      id: number
+      name: string
+      services?: { id: number; name: string }[]
+    }[]
+  }
+  const svcRes = await booksyGet<SvcResp>(
+    `/me/businesses/${creds.business_id}/service_categories`,
+    creds.access_token,
+  )
+  if (!svcRes.ok) {
+    return jsonResponse({ ok: false, error: `booksy_${svcRes.reason}` }, 502)
+  }
+
+  let categoriesUpserted = 0
+  let servicesPatched = 0
+  const categoryMap = new Map<string, string>() // booksy cat id → local uuid
+
+  // 1) Категории: ensure rows + map booksy id → local uuid
+  for (const cat of svcRes.data.service_categories ?? []) {
+    const catExtId = String(cat.id)
+    const catName = (cat.name ?? '').trim()
+    if (!catName) continue
+
+    let { data: existingCat } = await admin
+      .from('service_categories')
+      .select('id, name')
+      .eq('salon_id', salonId)
+      .eq('external_source', 'booksy')
+      .eq('external_id', catExtId)
+      .maybeSingle()
+
+    if (!existingCat) {
+      const { data: byName } = await admin
+        .from('service_categories')
+        .select('id, name')
+        .eq('salon_id', salonId)
+        .eq('name', catName)
+        .eq('is_archived', false)
+        .is('external_id', null)
+        .maybeSingle()
+      if (byName) {
+        await admin
+          .from('service_categories')
+          .update({ external_source: 'booksy', external_id: catExtId })
+          .eq('id', byName.id)
+        existingCat = byName
+        categoriesUpserted += 1
+      } else {
+        const { data: created } = await admin
+          .from('service_categories')
+          .insert({
+            salon_id: salonId,
+            name: catName,
+            external_source: 'booksy',
+            external_id: catExtId,
+            external_snapshot: { name: catName },
+          })
+          .select('id, name')
+          .maybeSingle()
+        if (created) {
+          existingCat = created
+          categoriesUpserted += 1
+        }
+      }
+    }
+
+    if (existingCat) categoryMap.set(catExtId, existingCat.id)
+  }
+
+  // 2) Услуги: проставляем category_id где сейчас null.
+  for (const cat of svcRes.data.service_categories ?? []) {
+    const localCatId = categoryMap.get(String(cat.id))
+    if (!localCatId) continue
+    for (const s of cat.services ?? []) {
+      const extId = String(s.id)
+      const { data: svc } = await admin
+        .from('services')
+        .select('id, category_id')
+        .eq('salon_id', salonId)
+        .eq('external_source', 'booksy')
+        .eq('external_id', extId)
+        .maybeSingle()
+      if (!svc) continue
+      if (svc.category_id) continue // не перетираем выбор юзера
+      const { error } = await admin
+        .from('services')
+        .update({ category_id: localCatId })
+        .eq('id', svc.id)
+        .is('category_id', null)
+      if (!error) servicesPatched += 1
+    }
+  }
+
+  return jsonResponse({
+    ok: true,
+    categories_upserted: categoriesUpserted,
+    services_patched: servicesPatched,
+  })
+}
+
 // ── reservation actions ─────────────────────────────────────────────────
 // POST /me/businesses/{biz}/reservations/ body:
 //   {id:null, reserved_from:"YYYY-MM-DDTHH:MM", reserved_till:"YYYY-MM-DDTHH:MM",
@@ -2882,6 +3092,8 @@ Deno.serve(
         return handleClearVisits(admin, userId, body.salon_id)
       case 'backfill_appt_uids':
         return handleBackfillApptUids(admin, userId, body.salon_id)
+      case 'backfill_service_categories':
+        return handleBackfillServiceCategories(admin, userId, body.salon_id)
       case 'update_interval':
         if (typeof body.interval_minutes !== 'number') {
           return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
