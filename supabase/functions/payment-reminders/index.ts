@@ -19,6 +19,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { sendTelegramToUser } from '../_shared/notify.ts'
+import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -212,6 +213,20 @@ async function processOneSalon(
     }
     const { text, html } = buildMessage(salonName, list, bucketKey, currency)
     const subject = text.split('\n')[0]
+
+    // Push (browser/PWA) — все подписки владельца
+    try {
+      const pushed = await sendPushToUser(admin, ownerData.user_id, {
+        title: subject,
+        body: text.split('\n').slice(2).join('\n').slice(0, 200),
+        url: '/finance?tab=payments',
+        tag: `payments-${bucketKey}`,
+        requireInteraction: bucketKey === 'payment_due_today' || bucketKey === 'payment_overdue',
+      })
+      stats.sent += pushed
+    } catch (e) {
+      console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
 
     // Telegram (silent fail)
     if (ownerData.telegram_id) {

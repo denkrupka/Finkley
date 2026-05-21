@@ -17,6 +17,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { sendTelegramToUser } from '../_shared/notify.ts'
+import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -83,7 +84,7 @@ async function sendEmail(
 async function processLowInventory(
   admin: SupabaseClient,
   salon: SalonRow,
-  owner: { email: string | null; telegram_id: number | null },
+  owner: { user_id: string; email: string | null; telegram_id: number | null },
 ): Promise<number> {
   if (!isEnabled(salon.notification_prefs, 'low_inventory')) return 0
   const { data: items } = await admin
@@ -113,6 +114,17 @@ async function processLowInventory(
     `</ul>` +
     `<p style="color:#6b7280;font-size:12px;margin-top:16px">Открой <a href="https://finkley.app/app/">Finkley → Склад</a> чтобы оприходовать закупку.</p>`
   let sent = 0
+  try {
+    const pushed = await sendPushToUser(admin, owner.user_id, {
+      title: `Низкие остатки — ${salonName}`,
+      body: lines.slice(0, 3).join('\n'),
+      url: '/inventory',
+      tag: 'low-inventory',
+    })
+    sent += pushed
+  } catch (e) {
+    console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
+  }
   if (owner.telegram_id) {
     if (await sendTelegramToUser(owner.telegram_id, text)) sent++
   }
@@ -140,6 +152,7 @@ async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<
   const owner = ownerRow as OwnerRaw | null
   if (!owner) return stats
   const ownerData = {
+    user_id: owner.user_id,
     email: owner.profiles?.email ?? null,
     telegram_id: owner.profiles?.telegram_id ?? null,
   }
