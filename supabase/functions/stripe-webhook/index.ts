@@ -252,13 +252,24 @@ Deno.serve(async (req: Request) => {
  */
 async function sendTemplated(
   template: EmailTemplate,
-  owner: { email: string; full_name: string; salon_name: string },
+  owner: { email: string; full_name: string; salon_name: string; locale?: string },
   vars: Record<string, string | number | null>,
 ): Promise<void> {
-  await sendEmail(template, owner.email, {
-    full_name: owner.full_name || owner.salon_name,
-    salon_name: owner.salon_name,
-    owner_name: 'команда Finkley',
-    ...vars,
-  })
+  const localeBase = (owner.locale ?? 'ru').split('-')[0]?.toLowerCase() ?? 'ru'
+  const ownerNameByLocale: Record<string, string> = {
+    ru: 'команда Finkley',
+    pl: 'zespół Finkley',
+    en: 'Finkley team',
+  }
+  await sendEmail(
+    template,
+    owner.email,
+    {
+      full_name: owner.full_name || owner.salon_name,
+      salon_name: owner.salon_name,
+      owner_name: ownerNameByLocale[localeBase] ?? ownerNameByLocale.ru,
+      ...vars,
+    },
+    owner.locale,
+  )
 }

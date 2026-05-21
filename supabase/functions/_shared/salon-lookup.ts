@@ -12,6 +12,8 @@ export type OwnerInfo = {
   full_name: string
   salon_id: string
   salon_name: string
+  /** profile.locale (ru/pl/en/...). Дефолт 'ru' если профиль ещё не создан. */
+  locale: string
 }
 
 function admin(): SupabaseClient {
@@ -44,12 +46,20 @@ async function getOwnerBySalonId(salonId: string): Promise<OwnerInfo | null> {
   const full_name = (userRes?.user?.user_metadata?.full_name as string | undefined) ?? ''
   if (!email) return null
 
+  const { data: profile } = await supa
+    .from('profiles')
+    .select('locale')
+    .eq('id', member.user_id)
+    .maybeSingle()
+  const locale = (profile as { locale?: string | null } | null)?.locale ?? 'ru'
+
   return {
     user_id: member.user_id,
     email,
     full_name,
     salon_id: salon.id,
     salon_name: salon.name,
+    locale,
   }
 }
 

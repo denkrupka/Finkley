@@ -977,17 +977,331 @@ Nie chcesz więcej digestów? Otwórz Ustawienia i wyłącz „Cotygodniowy dige
 </html>`,
 }
 
+const TRIAL_ENDING_EN: EmailTemplate = {
+  subject: 'Your trial ends in {{days_left}} days',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Your Finkley trial ends in <strong>{{days_left}} days</strong>.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+So far you've recorded <strong>{{visits_during_trial}}</strong> visits for <strong>{{revenue_during_trial}}</strong>. Nice start.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td>
+<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Finkley Standard plan</p>
+<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">€15 / month</p>
+<p style="margin:0; font-size:14px; color:#64748b;">VAT added automatically by your country</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Subscribe</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Card payment via Stripe — secure. 7-day money-back guarantee — if you change your mind, we'll refund.
+</p>
+<p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+If you decide not to continue — your data is preserved for 30 days, then deleted. Until then you can export everything to CSV.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">info@finkley.app</span></p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland
+</p>
+</td></tr></table></body></html>`,
+}
+
+const TRIAL_ENDING_PL: EmailTemplate = {
+  subject: 'Twój okres próbny kończy się za {{days_left}} dni',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Twój okres próbny w Finkley kończy się za <strong>{{days_left}} dni</strong>.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+W tym czasie wprowadziłeś <strong>{{visits_during_trial}}</strong> wizyt na kwotę <strong>{{revenue_during_trial}}</strong>. Dobry początek.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td>
+<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Plan Finkley Standard</p>
+<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">15 € / miesiąc</p>
+<p style="margin:0; font-size:14px; color:#64748b;">VAT dodawany automatycznie w zależności od kraju</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Aktywuj subskrypcję</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Płatność kartą przez Stripe — bezpiecznie. 7-dniowa gwarancja zwrotu — jeśli zmienisz zdanie, zwrócimy pieniądze.
+</p>
+<p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Jeśli zdecydujesz nie kontynuować — Twoje dane zostaną zachowane 30 dni, potem usunięte. Do tego czasu możesz wyeksportować wszystko do CSV.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">info@finkley.app</span></p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska
+</p>
+</td></tr></table></body></html>`,
+}
+
+const PAYMENT_SUCCEEDED_EN: EmailTemplate = {
+  subject: 'Thanks for the payment · Finkley',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Thank you, {{full_name}}!</h1>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Payment received. Finkley is running at full power.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td>
+<p style="margin:0 0 4px 0; font-size:14px; color:#047857;">Paid</p>
+<p style="margin:0 0 8px 0; font-size:24px; font-weight:600; color:#065f46;">{{amount}}</p>
+<p style="margin:0; font-size:14px; color:#065f46;">Next charge: {{period_end_date}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
+<a href="{{invoice_url}}" style="color:#0f172a; text-decoration:none; font-weight:500; font-size:14px;">📄 Download invoice</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Manage subscription, change card or cancel — in the Billing section inside the app.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland</p>
+</td></tr></table></body></html>`,
+}
+
+const PAYMENT_SUCCEEDED_PL: EmailTemplate = {
+  subject: 'Dziękujemy za płatność · Finkley',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Dziękujemy, {{full_name}}!</h1>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Płatność przeszła pomyślnie. Finkley działa na pełną moc.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td>
+<p style="margin:0 0 4px 0; font-size:14px; color:#047857;">Opłacono</p>
+<p style="margin:0 0 8px 0; font-size:24px; font-weight:600; color:#065f46;">{{amount}}</p>
+<p style="margin:0; font-size:14px; color:#065f46;">Następne obciążenie: {{period_end_date}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
+<a href="{{invoice_url}}" style="color:#0f172a; text-decoration:none; font-weight:500; font-size:14px;">📄 Pobierz fakturę</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Zarządzanie subskrypcją, zmiana karty lub anulowanie — w sekcji Billing w aplikacji.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska</p>
+</td></tr></table></body></html>`,
+}
+
+const PAYMENT_FAILED_EN: EmailTemplate = {
+  subject: 'Payment failed · Finkley',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+We tried to charge <strong>{{amount}}</strong> for your Finkley subscription, but the payment didn't go through.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Could be: insufficient funds, expired card, or 3D-Secure verification needed. Stripe will retry on <strong>{{retry_date}}</strong>.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+To keep access — update your card or confirm the payment:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Manage subscription</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Access to Finkley remains for a few more days. If payment fails after several retries — the account goes to "read-only", but data is preserved.
+</p>
+<p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Questions — email <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland</p>
+</td></tr></table></body></html>`,
+}
+
+const PAYMENT_FAILED_PL: EmailTemplate = {
+  subject: 'Nie udało się pobrać płatności · Finkley',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Próbowaliśmy pobrać <strong>{{amount}}</strong> za subskrypcję Finkley, ale płatność się nie powiodła.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Możliwe przyczyny: brak środków, wygasła karta lub potrzebne potwierdzenie 3D-Secure. Stripe spróbuje ponownie <strong>{{retry_date}}</strong>.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Aby nie utracić dostępu — zaktualizuj kartę lub potwierdź płatność:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Zarządzaj subskrypcją</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Dostęp do Finkley pozostaje jeszcze kilka dni. Jeśli płatność się nie powiedzie po kilku próbach — konto przejdzie w tryb "tylko do odczytu", ale dane pozostaną.
+</p>
+<p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Pytania — napisz na <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska</p>
+</td></tr></table></body></html>`,
+}
+
+const SUBSCRIPTION_CANCELED_EN: EmailTemplate = {
+  subject: 'Finkley subscription canceled',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Subscription canceled. Sorry it didn't work out.
+</p>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Finkley access remains until <strong>{{period_end_date}}</strong>. After that, the account goes to "read-only" — data is visible, but no new entries can be added.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+You can export all your data to CSV — in case you want to move to Excel or another tool:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+<tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
+<a href="{{export_url}}" style="color:#0f172a; text-decoration:none; font-weight:500; font-size:14px;">📥 Export data</a>
+</td></tr>
+</table>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+If you change your mind — you can come back anytime. Data is preserved for 12 months.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{resubscribe_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Resume subscription</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Tell us why you canceled? One paragraph would really help make the product better: <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+Thanks for trying.<br>{{owner_name}}
+</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland</p>
+</td></tr></table></body></html>`,
+}
+
+const SUBSCRIPTION_CANCELED_PL: EmailTemplate = {
+  subject: 'Subskrypcja Finkley anulowana',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Subskrypcja anulowana. Szkoda, że nie podeszło.
+</p>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Dostęp do Finkley pozostaje do <strong>{{period_end_date}}</strong>. Później konto przejdzie w tryb "tylko do odczytu" — dane będą widoczne, ale nie można będzie dodawać nowych wpisów.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Możesz wyeksportować wszystkie dane do CSV — na wypadek przejścia do Excel lub innego narzędzia:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+<tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
+<a href="{{export_url}}" style="color:#0f172a; text-decoration:none; font-weight:500; font-size:14px;">📥 Eksport danych</a>
+</td></tr>
+</table>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Jeśli zmienisz zdanie — możesz wrócić w dowolnym momencie. Dane zachowane przez 12 miesięcy.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{resubscribe_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Wznów subskrypcję</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Powiedz, dlaczego anulowałeś? Jeden akapit naprawdę pomógłby ulepszyć produkt: <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+Dzięki, że próbowałeś.<br>{{owner_name}}
+</p>
+</td></tr></table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska</p>
+</td></tr></table></body></html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
     welcome: WELCOME_EN,
     team_invitation: TEAM_INVITATION_EN,
     weekly_digest: WEEKLY_DIGEST_EN,
+    trial_ending: TRIAL_ENDING_EN,
+    payment_succeeded: PAYMENT_SUCCEEDED_EN,
+    payment_failed: PAYMENT_FAILED_EN,
+    subscription_canceled: SUBSCRIPTION_CANCELED_EN,
   },
   pl: {
     welcome: WELCOME_PL,
     team_invitation: TEAM_INVITATION_PL,
     weekly_digest: WEEKLY_DIGEST_PL,
+    trial_ending: TRIAL_ENDING_PL,
+    payment_succeeded: PAYMENT_SUCCEEDED_PL,
+    payment_failed: PAYMENT_FAILED_PL,
+    subscription_canceled: SUBSCRIPTION_CANCELED_PL,
   },
 }
 
