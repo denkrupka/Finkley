@@ -147,6 +147,36 @@ async function handleCreate(
     invUser?.user?.email ??
     'Owner'
 
+  // Локаль для письма: inviter.profile.locale (приглашающий обычно знает на
+  // каком языке инвитировать). Если invitee уже существует и у него profile
+  // — берём его locale (точнее).
+  let locale = 'ru'
+  if (existing) {
+    const { data: inviteeProfile } = await admin
+      .from('profiles')
+      .select('locale')
+      .eq('id', existing.id)
+      .maybeSingle()
+    if (inviteeProfile?.locale) locale = inviteeProfile.locale as string
+  }
+  if (locale === 'ru') {
+    const { data: inviterProfile } = await admin
+      .from('profiles')
+      .select('locale')
+      .eq('id', userId)
+      .maybeSingle()
+    if (inviterProfile?.locale) locale = inviterProfile.locale as string
+  }
+  const localeBase = locale.split('-')[0]?.toLowerCase() ?? 'ru'
+
+  // Роль в письме — локализованный лейбл, не raw token. По умолчанию RU.
+  const roleLabels: Record<string, Record<string, string>> = {
+    ru: { admin: 'Администратор', accountant: 'Бухгалтер', staff: 'Мастер' },
+    pl: { admin: 'Administrator', accountant: 'Księgowy', staff: 'Mistrz' },
+    en: { admin: 'Administrator', accountant: 'Accountant', staff: 'Master' },
+  }
+  const localizedRole = roleLabels[localeBase]?.[body.role] ?? roleLabels.ru[body.role] ?? body.role
+
   // Базовый «accept»-URL — он содержит наш token и работает для уже
   // авторизованного юзера. Если приглашённый ещё не зарегистрирован —
   // оборачиваем в Supabase invite-link, который создаст auth.user, подтвердит
@@ -179,14 +209,19 @@ async function handleCreate(
   }
 
   try {
-    await sendEmail('team_invitation', email, {
-      inviter_name: inviterName,
-      salon_name: salon?.name ?? 'Salon',
-      logo_block: renderLogoBlock((salon as { logo_url?: string | null } | null)?.logo_url),
-      role: body.role,
-      invite_url: finalInviteUrl,
-      expires_in_days: '14',
-    })
+    await sendEmail(
+      'team_invitation',
+      email,
+      {
+        inviter_name: inviterName,
+        salon_name: salon?.name ?? 'Salon',
+        logo_block: renderLogoBlock((salon as { logo_url?: string | null } | null)?.logo_url),
+        role: localizedRole,
+        invite_url: finalInviteUrl,
+        expires_in_days: '14',
+      },
+      locale,
+    )
   } catch (e) {
     console.warn('email send failed, invitation still created:', e instanceof Error ? e.message : e)
   }

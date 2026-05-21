@@ -763,10 +763,102 @@ To wiadomość transakcyjna. Pytania o przetwarzanie danych — info@finkley.app
 </html>`,
 }
 
+const TEAM_INVITATION_EN: EmailTemplate = {
+  subject: '{{inviter_name}} invited you to Finkley',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  {{logo_block}}
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6B5B95;">Team invitation</p>
+  <h1 style="margin:0 0 12px 0;font-size:24px;line-height:30px;font-weight:800;color:#1A1A2E;">
+    {{inviter_name}} invited you to&nbsp;'{{salon_name}}'
+  </h1>
+  <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:#334155;">
+    You've been invited to work in Finkley as <strong>{{role}}</strong>.
+    Accept the invitation to get access to the salon's data.
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{invite_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Accept invitation
+    </a>
+  </p>
+  <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">
+    If the button doesn't work, copy the link:
+  </p>
+  <p style="margin:0 0 16px 0;font-size:12px;color:#0f172a;word-break:break-all;">
+    <a href="{{invite_url}}" style="color:#0f172a;">{{invite_url}}</a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    Link is valid for {{expires_in_days}} days. If you weren't expecting this invitation — just ignore this email.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · management accounting for beauty salons
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
+const TEAM_INVITATION_PL: EmailTemplate = {
+  subject: '{{inviter_name}} zaprasza Cię do Finkley',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  {{logo_block}}
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6B5B95;">Zaproszenie do zespołu</p>
+  <h1 style="margin:0 0 12px 0;font-size:24px;line-height:30px;font-weight:800;color:#1A1A2E;">
+    {{inviter_name}} zaprasza Cię do&nbsp;„{{salon_name}}"
+  </h1>
+  <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:#334155;">
+    Zostałeś zaproszony do pracy w Finkley w roli <strong>{{role}}</strong>.
+    Przyjmij zaproszenie, aby uzyskać dostęp do danych salonu.
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{invite_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Przyjmij zaproszenie
+    </a>
+  </p>
+  <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">
+    Jeśli przycisk nie działa, skopiuj link:
+  </p>
+  <p style="margin:0 0 16px 0;font-size:12px;color:#0f172a;word-break:break-all;">
+    <a href="{{invite_url}}" style="color:#0f172a;">{{invite_url}}</a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    Link jest ważny przez {{expires_in_days}} dni. Jeśli nie spodziewałeś się tego zaproszenia — po prostu zignoruj tę wiadomość.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · księgowość zarządcza dla salonów kosmetycznych
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
-  en: { welcome: WELCOME_EN },
-  pl: { welcome: WELCOME_PL },
+  en: {
+    welcome: WELCOME_EN,
+    team_invitation: TEAM_INVITATION_EN,
+  },
+  pl: {
+    welcome: WELCOME_PL,
+    team_invitation: TEAM_INVITATION_PL,
+  },
 }
 
 export function normalizeEmailLocale(input: unknown): EmailLocale {
