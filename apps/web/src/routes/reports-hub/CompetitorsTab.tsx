@@ -28,6 +28,7 @@ import {
   useCreateCompetitor,
   useDiscoverCompetitors,
   useOwnSalonMetrics,
+  useSyncCompetitors,
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
 } from '@/hooks/useCompetitors'
@@ -302,6 +303,7 @@ function ParamsSection({
   const createCompetitor = useCreateCompetitor(salonId)
   const updateCompetitor = useUpdateCompetitor(salonId)
   const discoverCompetitors = useDiscoverCompetitors(salonId)
+  const syncCompetitors = useSyncCompetitors(salonId)
   const [newName, setNewName] = useState('')
   const [newBooksy, setNewBooksy] = useState('')
   const [newGoogle, setNewGoogle] = useState('')
@@ -362,22 +364,48 @@ function ParamsSection({
         <p className="text-muted-foreground mt-1 text-xs">
           {t('reports_hub.competitors.params.discover_subtitle')}
         </p>
-        <Button
-          variant="outline"
-          onClick={() => {
-            discoverCompetitors.mutate(undefined, {
-              onSuccess: (n) =>
-                toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
-              onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-            })
-          }}
-          disabled={discoverCompetitors.isPending}
-          className="mt-3"
-        >
-          {discoverCompetitors.isPending
-            ? t('common.loading')
-            : t('reports_hub.competitors.params.discover_button')}
-        </Button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              discoverCompetitors.mutate(undefined, {
+                onSuccess: (n) =>
+                  toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
+                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+              })
+            }}
+            disabled={discoverCompetitors.isPending}
+          >
+            {discoverCompetitors.isPending
+              ? t('common.loading')
+              : t('reports_hub.competitors.params.discover_button')}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              syncCompetitors.mutate(undefined, {
+                onSuccess: (r) =>
+                  toast.success(
+                    t('reports_hub.competitors.params.sync_done', {
+                      competitors: r.competitors,
+                      snapshots: r.snapshots,
+                    }),
+                  ),
+                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+              })
+            }}
+            disabled={syncCompetitors.isPending || (competitors?.length ?? 0) === 0}
+            title={
+              (competitors?.length ?? 0) === 0
+                ? t('reports_hub.competitors.params.sync_disabled_hint')
+                : undefined
+            }
+          >
+            {syncCompetitors.isPending
+              ? t('common.loading')
+              : t('reports_hub.competitors.params.sync_button')}
+          </Button>
+        </div>
       </div>
 
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">

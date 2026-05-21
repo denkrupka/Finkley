@@ -14,6 +14,16 @@ export type UpdateSalonInput = {
   retention_window_days?: number
   churn_window_days?: number
   opening_hours?: Record<string, { open?: string; close?: string; closed?: boolean }>
+  /** Гео и публичные ссылки (миграции 20260521000014/20260521000019).
+   *  Нужны для FlySMS-flow (google_place_url → 5★ редирект), импорта отзывов
+   *  с Booksy/Google и автоподбора конкурентов рядом. */
+  google_place_url?: string | null
+  google_place_id?: string | null
+  booksy_url?: string | null
+  address?: string | null
+  city?: string | null
+  lat?: number | null
+  lng?: number | null
 }
 
 export function useUpdateSalon() {

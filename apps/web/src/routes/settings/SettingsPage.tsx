@@ -132,6 +132,18 @@ export function SettingsPage() {
   const [salonType, setSalonType] = useState<string>('hair')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
+  // Адрес и публичные ссылки. Нужны для:
+  //   - google_place_url → редирект 5★ отзывов в FlySMS-flow (review/<token>)
+  //   - google_place_id  → импорт отзывов с Google + rating мониторинг
+  //   - booksy_url       → импорт отзывов с Booksy
+  //   - address/lat/lng  → автоподбор конкурентов через Nearby Search
+  const [address, setAddress] = useState('')
+  const [city, setCity] = useState('')
+  const [lat, setLat] = useState<string>('')
+  const [lng, setLng] = useState<string>('')
+  const [googlePlaceUrl, setGooglePlaceUrl] = useState('')
+  const [googlePlaceId, setGooglePlaceId] = useState('')
+  const [booksyUrl, setBooksyUrl] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   // Если URL = /settings/integrations — это вкладка интеграций. Иначе
@@ -205,6 +217,13 @@ export function SettingsPage() {
     setCountry(salon.country_code as CountryCode)
     setSalonType(salon.salon_type ?? 'hair')
     setLogoUrl(salon.logo_url ?? '')
+    setAddress(salon.address ?? '')
+    setCity(salon.city ?? '')
+    setLat(salon.lat != null ? String(salon.lat) : '')
+    setLng(salon.lng != null ? String(salon.lng) : '')
+    setGooglePlaceUrl(salon.google_place_url ?? '')
+    setGooglePlaceId(salon.google_place_id ?? '')
+    setBooksyUrl(salon.booksy_url ?? '')
   }, [salon])
 
   if (!salon || !salonId) return null
@@ -213,7 +232,14 @@ export function SettingsPage() {
     name !== salon.name ||
     country !== salon.country_code ||
     salonType !== salon.salon_type ||
-    logoUrl !== (salon.logo_url ?? '')
+    logoUrl !== (salon.logo_url ?? '') ||
+    address !== (salon.address ?? '') ||
+    city !== (salon.city ?? '') ||
+    lat !== (salon.lat != null ? String(salon.lat) : '') ||
+    lng !== (salon.lng != null ? String(salon.lng) : '') ||
+    googlePlaceUrl !== (salon.google_place_url ?? '') ||
+    googlePlaceId !== (salon.google_place_id ?? '') ||
+    booksyUrl !== (salon.booksy_url ?? '')
 
   function save() {
     if (!salon) return
@@ -222,6 +248,17 @@ export function SettingsPage() {
       return
     }
     const c = COUNTRY_OPTIONS.find((x) => x.code === country)!
+    // Парсим координаты: пусто → null; иначе число (NaN = валидационная ошибка).
+    const latN = lat.trim() ? Number(lat.replace(',', '.')) : null
+    const lngN = lng.trim() ? Number(lng.replace(',', '.')) : null
+    if (latN != null && !Number.isFinite(latN)) {
+      toast.error(t('settings.profile.lat_invalid'))
+      return
+    }
+    if (lngN != null && !Number.isFinite(lngN)) {
+      toast.error(t('settings.profile.lng_invalid'))
+      return
+    }
     update.mutate(
       {
         id: salon.id,
@@ -231,6 +268,13 @@ export function SettingsPage() {
         timezone: c.timezone,
         salon_type: salonType,
         logo_url: logoUrl.trim() || null,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        lat: latN,
+        lng: lngN,
+        google_place_url: googlePlaceUrl.trim() || null,
+        google_place_id: googlePlaceId.trim() || null,
+        booksy_url: booksyUrl.trim() || null,
       },
       {
         onSuccess: () => toast.success(t('settings.toast_saved')),
@@ -420,6 +464,100 @@ export function SettingsPage() {
 
           {/* График работы и праздники переехали в Settings → «График работы»
               (image #71) — две подвкладки: SalonHoursCard и SalonHolidaysCard. */}
+
+          {/* Адрес и публичные ссылки. Дашборд монокарта — заполнение нужно для:
+                  – /review/:token (5★ → google_place_url редирект)
+                  – reviews-sync (импорт отзывов с Booksy + Google Places)
+                  – competitor-discover (Nearby Search вокруг lat/lng) */}
+          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
+            <h2 className="text-brand-navy mb-1 text-base font-bold tracking-tight">
+              {t('settings.profile.public_title')}
+            </h2>
+            <p className="text-muted-foreground mb-4 text-sm">
+              {t('settings.profile.public_subtitle')}
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label htmlFor="set-address">{t('settings.profile.address_label')}</Label>
+                <Input
+                  id="set-address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={t('settings.profile.address_placeholder')}
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.address_hint')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="set-city">{t('settings.profile.city_label')}</Label>
+                <Input
+                  id="set-city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder={t('settings.profile.city_placeholder')}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('settings.profile.coords_label')}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={lat}
+                    onChange={(e) => setLat(e.target.value)}
+                    placeholder="52.2297"
+                    className="num"
+                  />
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={lng}
+                    onChange={(e) => setLng(e.target.value)}
+                    placeholder="21.0122"
+                    className="num"
+                  />
+                </div>
+                <p className="text-muted-foreground text-xs">{t('settings.profile.coords_hint')}</p>
+              </div>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label htmlFor="set-gplace-url">Google Maps URL</Label>
+                <Input
+                  id="set-gplace-url"
+                  value={googlePlaceUrl}
+                  onChange={(e) => setGooglePlaceUrl(e.target.value)}
+                  placeholder="https://maps.google.com/?cid=..."
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.google_url_hint')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="set-gplace-id">Google Place ID</Label>
+                <Input
+                  id="set-gplace-id"
+                  value={googlePlaceId}
+                  onChange={(e) => setGooglePlaceId(e.target.value)}
+                  placeholder="ChIJ..."
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.google_id_hint')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="set-booksy-url">Booksy URL</Label>
+                <Input
+                  id="set-booksy-url"
+                  value={booksyUrl}
+                  onChange={(e) => setBooksyUrl(e.target.value)}
+                  placeholder="https://booksy.com/..."
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.booksy_url_hint')}
+                </p>
+              </div>
+            </div>
+          </section>
 
           {/* Бухгалтерия (image #122): юр. данные компании, налоговая
               схема, доставка документов бухгалтеру. */}

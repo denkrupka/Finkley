@@ -124,6 +124,30 @@ export function useDiscoverCompetitors(salonId: string | undefined) {
   })
 }
 
+/**
+ * Ручной триггер competitor-sync (UI-вызов «Синхронизировать сейчас»).
+ * Возвращает (competitors, snapshots) — сколько визитов и сколько собрано.
+ * Cron по расписанию делает то же самое раз в день, но юзеру полезно дёргать
+ * сразу после добавления конкурентов, чтобы не ждать сутки.
+ */
+export function useSyncCompetitors(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<{ competitors: number; snapshots: number }> => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase.functions.invoke('competitor-sync', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      const d = (data ?? {}) as { competitors?: number; snapshots?: number }
+      return { competitors: d.competitors ?? 0, snapshots: d.snapshots ?? 0 }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['competitor-snapshots'] })
+    },
+  })
+}
+
 /** Метрики «своего салона» для сравнения с конкурентами (rating + content). */
 export type OwnSalonMetrics = {
   rating_avg: number | null

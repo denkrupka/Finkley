@@ -90,6 +90,9 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
             <SelectItem value="rating_desc">{t('reports_hub.reviews.sort.rating_desc')}</SelectItem>
           </SelectContent>
         </Select>
+        <div className="sm:ml-auto">
+          <ReviewsImportButton salonId={salonId} />
+        </div>
       </div>
 
       {negativeUnread.length > 0 ? (
@@ -215,22 +218,26 @@ function ReviewRow({
   )
 }
 
-// Кнопка импорта с Booksy/Google — пока stub.
+// Кнопка импорта с Booksy + Google Places. Дёргает edge function reviews-sync.
+// Требует у салона заполненный google_place_id и/или booksy_url, иначе sync
+// просто вернёт 0 и юзер увидит «импортировано 0 отзывов» — это сигнал
+// заполнить ссылки в Settings.
 export function ReviewsImportButton({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const importMutation = useReviewsImport(salonId)
   return (
     <button
       type="button"
+      disabled={importMutation.isPending}
       onClick={() => {
         importMutation.mutate(undefined, {
           onSuccess: (n) => toast.success(t('reports_hub.reviews.imported', { count: n })),
           onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
         })
       }}
-      className="text-secondary inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+      className="border-border bg-card text-foreground hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {t('reports_hub.reviews.import_button')}
+      {importMutation.isPending ? t('common.loading') : t('reports_hub.reviews.import_button')}
     </button>
   )
 }
