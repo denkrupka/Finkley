@@ -1416,7 +1416,14 @@
       "lng_invalid": "Lng musi być liczbą",
       "google_url_hint": "Gdzie trafia klient po ocenie 5★. Przykład: link «Udostępnij» z Google Maps.",
       "google_id_hint": "Identyfikator dla Places API. Znajdź swój salon w Google i skopiuj ChIJ... z URL.",
-      "booksy_url_hint": "Publiczna strona Twojego salonu na Booksy. Używana do importu opinii i porównania cen."
+      "booksy_url_hint": "Publiczna strona Twojego salonu na Booksy. Używana do importu opinii i porównania cen.",
+      "place_search": {
+        "label": "Znajdź salon w Google Maps",
+        "placeholder": "Zacznij wpisywać nazwę salonu — np. «Zefir salon Warszawa»",
+        "hint": "Wybór miejsca auto-wypełni adres, współrzędne i linki Google. Potrzebne do importu opinii i przekierowania 5★.",
+        "selected": "Miejsce wybrane",
+        "clear": "Zmień"
+      }
     },
     "services": {
       "title": "Usługi i ceny",

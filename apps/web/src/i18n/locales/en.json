@@ -1416,7 +1416,14 @@
       "lng_invalid": "Lng must be a number",
       "google_url_hint": "Where the client lands after a 5★ rating. Example: Google Maps «Share» link.",
       "google_id_hint": "Places API identifier. Find your salon on Google and copy ChIJ... from the URL.",
-      "booksy_url_hint": "Public Booksy page for your salon. Used for importing reviews and comparing prices."
+      "booksy_url_hint": "Public Booksy page for your salon. Used for importing reviews and comparing prices.",
+      "place_search": {
+        "label": "Find your salon on Google Maps",
+        "placeholder": "Start typing the salon name — e.g. «Zefir salon Warsaw»",
+        "hint": "Picking a place auto-fills address, coordinates and Google links. Needed for review import and 5★ redirect.",
+        "selected": "Place selected",
+        "clear": "Change"
+      }
     },
     "services": {
       "title": "Services and pricing",

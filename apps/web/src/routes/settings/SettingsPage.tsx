@@ -49,6 +49,7 @@ import { Link } from 'react-router-dom'
 
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
+import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
 import { CashDisciplineCard } from '@/routes/settings/CashDisciplineCard'
@@ -465,10 +466,15 @@ export function SettingsPage() {
           {/* График работы и праздники переехали в Settings → «График работы»
               (image #71) — две подвкладки: SalonHoursCard и SalonHolidaysCard. */}
 
-          {/* Адрес и публичные ссылки. Дашборд монокарта — заполнение нужно для:
+          {/* Адрес и публичные ссылки. Заполнение нужно для:
                   – /review/:token (5★ → google_place_url редирект)
                   – reviews-sync (импорт отзывов с Booksy + Google Places)
-                  – competitor-discover (Nearby Search вокруг lat/lng) */}
+                  – competitor-discover (Nearby Search вокруг lat/lng).
+
+              Поиск Google Places стоит первым — клик по найденному месту
+              авто-заполняет address/city/lat/lng/google_place_url/google_place_id
+              в один шаг. Остальные инпуты редактируемые на случай если
+              юзер хочет уточнить (например адрес другим языком). */}
           <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
             <h2 className="text-brand-navy mb-1 text-base font-bold tracking-tight">
               {t('settings.profile.public_title')}
@@ -476,6 +482,32 @@ export function SettingsPage() {
             <p className="text-muted-foreground mb-4 text-sm">
               {t('settings.profile.public_subtitle')}
             </p>
+
+            <div className="mb-4">
+              <Label className="mb-1.5 block">{t('settings.profile.place_search.label')}</Label>
+              <GooglePlaceSearchInput
+                initialName={salon.name}
+                initialPlaceId={googlePlaceId || null}
+                onPick={(p) => {
+                  setGooglePlaceId(p.google_place_id)
+                  setGooglePlaceUrl(p.google_maps_uri ?? '')
+                  if (p.address) setAddress(p.address)
+                  if (p.lat != null) setLat(String(p.lat))
+                  if (p.lng != null) setLng(String(p.lng))
+                  // Город попытаемся вытащить из адреса (последний компонент
+                  // обычно страна, предпоследний — город. Это эвристика).
+                  if (p.address) {
+                    const parts = p.address.split(',').map((s) => s.trim())
+                    if (parts.length >= 2) setCity(parts[parts.length - 2] ?? '')
+                  }
+                }}
+                onClear={() => {
+                  setGooglePlaceId('')
+                  setGooglePlaceUrl('')
+                }}
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <Label htmlFor="set-address">{t('settings.profile.address_label')}</Label>
@@ -521,30 +553,6 @@ export function SettingsPage() {
                 <p className="text-muted-foreground text-xs">{t('settings.profile.coords_hint')}</p>
               </div>
               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <Label htmlFor="set-gplace-url">Google Maps URL</Label>
-                <Input
-                  id="set-gplace-url"
-                  value={googlePlaceUrl}
-                  onChange={(e) => setGooglePlaceUrl(e.target.value)}
-                  placeholder="https://maps.google.com/?cid=..."
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.google_url_hint')}
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-gplace-id">Google Place ID</Label>
-                <Input
-                  id="set-gplace-id"
-                  value={googlePlaceId}
-                  onChange={(e) => setGooglePlaceId(e.target.value)}
-                  placeholder="ChIJ..."
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.google_id_hint')}
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
                 <Label htmlFor="set-booksy-url">Booksy URL</Label>
                 <Input
                   id="set-booksy-url"
