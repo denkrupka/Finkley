@@ -170,7 +170,34 @@ function runRules(data: SalonData): RawFinding[] {
 // AI polish: ранжируем + улучшаем формулировки
 // =============================================================================
 
-async function polishWithAi(findings: RawFinding[]): Promise<RawFinding[]> {
+function systemForLocale(locale: 'ru' | 'pl' | 'en'): string {
+  const langInstruction = {
+    ru: 'Title and body — in Russian (русский).',
+    pl: 'Title and body — in Polish (polski).',
+    en: 'Title and body — in English.',
+  }[locale]
+  return `You help a beauty salon owner make sense of data. I'll give you an array of "raw" findings from a rules-engine. You need to:
+1) Pick top-3 MOST important (priority: critical > warning > info, PLUS real action-ability — what to actually do).
+2) Rewrite title and body to sound natural, human, no jargon. Body — 1-2 sentences with a concrete recommendation.
+3) Preserve kind, severity, area, payload unchanged.
+
+${langInstruction}
+
+Return ONLY a JSON array of top-3 findings in the same shape (no wrapper, no explanations around it).`
+}
+
+function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
+
+async function polishWithAi(
+  findings: RawFinding[],
+  locale: 'ru' | 'pl' | 'en' = 'ru',
+): Promise<RawFinding[]> {
   if (!ANTHROPIC_KEY || findings.length === 0) return findings.slice(0, 3)
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -183,12 +210,7 @@ async function polishWithAi(findings: RawFinding[]): Promise<RawFinding[]> {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
-        system: `Ты помогаешь владельцу салона красоты понимать данные. Я даю тебе массив "сырых" findings от rules-engine. Тебе нужно:
-1) Выбрать топ-3 САМЫХ важных (приоритет: critical > warning > info, plus реальная action-ability — что конкретно делать).
-2) Переписать title и body более естественно, по-человечески, без жаргона. Body — 1-2 предложения, с конкретной рекомендацией.
-3) Сохранить kind, severity, area, payload без изменений.
-
-Верни ТОЛЬКО JSON-массив топ-3 findings в том же формате (без обёртки, без объяснений вокруг).`,
+        system: systemForLocale(locale),
         messages: [{ role: 'user', content: JSON.stringify(findings) }],
       }),
     })
@@ -223,7 +245,19 @@ async function processSalon(admin: SupabaseClient, salonId: string): Promise<num
   const findings = runRules(data as SalonData)
   if (findings.length === 0) return 0
 
-  const top3 = await polishWithAi(findings)
+  // Подтягиваем locale владельца — AI ответит на нужном языке. Fallback ru.
+  const { data: ownerProfile } = await admin
+    .from('salon_members')
+    .select('user_id, profiles!inner(locale)')
+    .eq('salon_id', salonId)
+    .eq('role', 'owner')
+    .limit(1)
+    .maybeSingle()
+  type OwnerLocaleRaw = { profiles?: { locale?: string | null } | null }
+  const localeRaw = (ownerProfile as OwnerLocaleRaw | null)?.profiles?.locale
+  const ownerLocale = normalizeLocale(localeRaw)
+
+  const top3 = await polishWithAi(findings, ownerLocale)
 
   // Сначала чистим прошлые недосмотренные инсайты (которые юзер не успел dismiss):
   // вместо «копим бесконечно», на каждой неделе — свежие 3.
