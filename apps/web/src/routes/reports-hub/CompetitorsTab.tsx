@@ -433,6 +433,29 @@ function ParamsSection({
 
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy text-base font-bold">
+          {t('reports_hub.competitors.params.watched_title')}
+        </h3>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {t('reports_hub.competitors.params.watched_subtitle')}
+        </p>
+        <div className="mt-4">
+          <Input
+            value={watchedServicesStr}
+            onChange={(e) => setWatchedServicesStr(e.target.value)}
+            placeholder={t('reports_hub.competitors.params.watched_placeholder')}
+          />
+          <Button
+            onClick={saveWatchedServices}
+            disabled={upsertSettings.isPending}
+            className="mt-3"
+          >
+            {t('reports_hub.competitors.params.save_button')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+        <h3 className="text-brand-navy text-base font-bold">
           {t('reports_hub.competitors.params.add_title')}
         </h3>
         <p className="text-muted-foreground mt-1 text-xs">
@@ -501,29 +524,6 @@ function ParamsSection({
           </div>
           <Button onClick={addCompetitor} disabled={createCompetitor.isPending}>
             {t('reports_hub.competitors.params.add_button')}
-          </Button>
-        </div>
-      </div>
-
-      <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-        <h3 className="text-brand-navy text-base font-bold">
-          {t('reports_hub.competitors.params.watched_title')}
-        </h3>
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t('reports_hub.competitors.params.watched_subtitle')}
-        </p>
-        <div className="mt-4">
-          <Input
-            value={watchedServicesStr}
-            onChange={(e) => setWatchedServicesStr(e.target.value)}
-            placeholder={t('reports_hub.competitors.params.watched_placeholder')}
-          />
-          <Button
-            onClick={saveWatchedServices}
-            disabled={upsertSettings.isPending}
-            className="mt-3"
-          >
-            {t('reports_hub.competitors.params.save_button')}
           </Button>
         </div>
       </div>

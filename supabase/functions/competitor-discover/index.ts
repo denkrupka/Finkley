@@ -35,7 +35,17 @@ type SalonGeo = {
   lng: number | null
   address: string | null
   google_place_id: string | null
+  salon_type: string | null
 }
+
+/** Маппинг salon_type → Google Places primary types для фильтрации. */
+const SALON_TYPE_PLACE_TYPES: Record<string, string[]> = {
+  hair: ['hair_salon', 'hair_care', 'beauty_salon'],
+  nails: ['nail_salon', 'beauty_salon'],
+  spa: ['spa', 'beauty_salon'],
+  barber: ['barber_shop'],
+}
+const DEFAULT_PLACE_TYPES = ['beauty_salon', 'hair_care', 'nail_salon', 'spa', 'barber_shop']
 
 /** Geocode адреса через Google Geocoding API (если у салона нет lat/lng). */
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
@@ -54,15 +64,19 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return { lat: loc.lat, lng: loc.lng }
 }
 
+type DiscoveredPlace = { place_id: string; name: string; url: string | null }
+
 /**
- * Places API (New) — POST :searchNearby.
- * Возвращает массив {place_id, name, url}.
+ * Places API (New) — POST :searchNearby. Фильтрует по типу салона
+ * (если задан) — например для nails-салона ищем только nail_salon +
+ * beauty_salon, чтобы не подмешивать парикмахерские.
  */
 async function placesNearby(
   lat: number,
   lng: number,
   radiusM: number,
-): Promise<Array<{ place_id: string; name: string; url: string | null }>> {
+  includedTypes: string[],
+): Promise<DiscoveredPlace[]> {
   if (!GOOGLE_KEY) return []
   const r = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
@@ -72,7 +86,7 @@ async function placesNearby(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      includedPrimaryTypes: ['beauty_salon', 'hair_care', 'nail_salon', 'spa', 'barber_shop'],
+      includedPrimaryTypes: includedTypes,
       maxResultCount: 20,
       locationRestriction: {
         circle: {
@@ -85,6 +99,56 @@ async function placesNearby(
   if (!r.ok) {
     const txt = await r.text()
     console.warn('places searchNearby failed', r.status, txt.slice(0, 300))
+    return []
+  }
+  const data = (await r.json()) as {
+    places?: Array<{
+      id: string
+      displayName?: { text?: string }
+      googleMapsUri?: string
+    }>
+  }
+  return (data.places ?? []).map((p) => ({
+    place_id: p.id,
+    name: p.displayName?.text ?? 'Unknown',
+    url: p.googleMapsUri ?? null,
+  }))
+}
+
+/**
+ * Places API (New) — POST :searchText с locationBias circle.
+ * Используется когда у салона есть watched_services — ищем по конкретной
+ * услуге (например "manicure") в радиусе. Возвращает более релевантные
+ * результаты, чем Nearby по типу.
+ */
+async function placesSearchByService(
+  lat: number,
+  lng: number,
+  radiusM: number,
+  textQuery: string,
+): Promise<DiscoveredPlace[]> {
+  if (!GOOGLE_KEY) return []
+  const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'X-Goog-Api-Key': GOOGLE_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.googleMapsUri,places.primaryType',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      textQuery,
+      maxResultCount: 20,
+      locationBias: {
+        circle: {
+          center: { latitude: lat, longitude: lng },
+          radius: radiusM,
+        },
+      },
+    }),
+  })
+  if (!r.ok) {
+    const txt = await r.text()
+    console.warn('places searchText failed', r.status, txt.slice(0, 300))
     return []
   }
   const data = (await r.json()) as {
@@ -135,7 +199,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: salonRaw } = await admin
     .from('salons')
-    .select('id, name, lat, lng, address, google_place_id')
+    .select('id, name, lat, lng, address, google_place_id, salon_type')
     .eq('id', body.salon_id)
     .maybeSingle()
   if (!salonRaw) return jsonResponse({ error: 'salon_not_found' }, 404)
@@ -159,13 +223,40 @@ Deno.serve(async (req: Request) => {
 
   const { data: settingsRaw } = await admin
     .from('competitor_monitoring_settings')
-    .select('auto_pick_radius_m')
+    .select('auto_pick_radius_m, watched_services')
     .eq('salon_id', salon.id)
     .maybeSingle()
-  const radius = (settingsRaw as { auto_pick_radius_m?: number } | null)?.auto_pick_radius_m ?? 2000
+  const settings = settingsRaw as {
+    auto_pick_radius_m?: number
+    watched_services?: string[] | null
+  } | null
+  const radius = settings?.auto_pick_radius_m ?? 2000
+  const watchedServices = (settings?.watched_services ?? []).filter(
+    (s): s is string => typeof s === 'string' && s.trim().length > 0,
+  )
 
-  // Поиск.
-  const found = await placesNearby(Number(lat), Number(lng), radius)
+  // Тип салона → фильтр по primary types. Default — все beauty-related.
+  const placeTypes =
+    (salon.salon_type && SALON_TYPE_PLACE_TYPES[salon.salon_type]) || DEFAULT_PLACE_TYPES
+
+  // 1. Nearby по типу салона — даёт релевантную «соседнюю выборку».
+  // 2. Если есть watched_services — каждое имя как textQuery с locationBias
+  //    (более прицельный поиск под услугу). Dedup по place_id.
+  // 3. Объединяем результаты. Итоговый cap 20 строк.
+  const nearby = await placesNearby(Number(lat), Number(lng), radius, placeTypes)
+  const byService: DiscoveredPlace[] = []
+  for (const svc of watchedServices.slice(0, 3)) {
+    // Не более 3 service-запросов чтобы не сжечь Google квоту.
+    const svcResults = await placesSearchByService(Number(lat), Number(lng), radius, svc)
+    for (const p of svcResults) byService.push(p)
+  }
+
+  // Объединяем с dedup и приоритетом nearby (Google Nearby точнее по locationRestriction).
+  const merged = new Map<string, DiscoveredPlace>()
+  for (const p of nearby) merged.set(p.place_id, p)
+  for (const p of byService) if (!merged.has(p.place_id)) merged.set(p.place_id, p)
+  const found = Array.from(merged.values())
+
   if (found.length === 0) {
     return jsonResponse({ ok: true, added: 0, total_found: 0 })
   }
