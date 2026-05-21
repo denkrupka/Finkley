@@ -1,21 +1,32 @@
 /**
- * marketing-test-send — отправка тестового сообщения owner'у салона по
- * выбранному каналу (sms/email), чтобы он мог проверить как будет выглядеть
- * реальная рассылка.
+ * marketing-test-send — отправка тестового сообщения owner'у салона
+ * для предпросмотра как будет выглядеть реальная рассылка у клиента.
  *
- * Вызывается из /marketing → таблица рассылок → кнопка «Тест» → модалка.
+ * Использует _shared/broadcast-templates — те же шаблоны, что и
+ * send-review-request / client-overdue-push. Owner получает 1-в-1 то же,
+ * что клиент, с dummy-данными (анна, маникюр, 45 дней).
  *
  * Body:
  *   { salon_id, kind: 'marketing'|'visit_reminder'|'review_request',
  *     channel: 'sms'|'email', to: string }
  *
- * Для SMS — идёт через sendSmsForSalon (списывается баланс салона). Для email —
- * напрямую через Resend (как тестовое; в html — короткий sample-блок).
+ * Для SMS — через sendSmsForSalon (списывается баланс салона). Для email —
+ * напрямую через Resend.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
+import {
+  buildMarketingSampleEmail,
+  buildMarketingSampleSms,
+  buildReviewRequestEmail,
+  buildReviewRequestSms,
+  buildVisitReminderEmail,
+  buildVisitReminderSms,
+  pickLocale,
+  type Locale,
+} from '../_shared/broadcast-templates.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
@@ -23,8 +34,16 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Finkley <noreply@finkley.app>'
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
 
 type Kind = 'marketing' | 'visit_reminder' | 'review_request'
+
+// Dummy данные для тестовой отправки — чтобы шаблоны имели чем подставиться.
+const DUMMY = {
+  ru: { client_name: 'Анна', category: 'маникюр', days_since: 45 },
+  pl: { client_name: 'Anna', category: 'manicure', days_since: 45 },
+  en: { client_name: 'Anna', category: 'manicure', days_since: 45 },
+} as const
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -33,31 +52,40 @@ function json(body: unknown, status = 200) {
   })
 }
 
-const SAMPLE_TEXTS: Record<Kind, Record<'sms' | 'email_subject' | 'email_body', string>> = {
-  marketing: {
-    sms: '{{salon}}: пример маркетингового сообщения. Так клиент увидит вашу акцию. — Finkley тест',
-    email_subject: '[ТЕСТ] Маркетинговая рассылка — {{salon}}',
-    email_body:
-      'Это тестовое маркетинговое сообщение от салона {{salon}}.\n\n' +
-      'Так клиент получит сообщение когда вы запустите реальную акцию.\n\n' +
-      '— Finkley test',
-  },
-  visit_reminder: {
-    sms: '{{salon}}: пример напоминания о визите. Клиент увидит ссылку на запись. — Finkley тест',
-    email_subject: '[ТЕСТ] Напоминание о визите — {{salon}}',
-    email_body:
-      'Это тестовое напоминание о визите от {{salon}}.\n\n' +
-      'Клиент получит такое сообщение если давно не приходил.\n\n' +
-      '— Finkley test',
-  },
-  review_request: {
-    sms: '{{salon}}: пример просьбы оставить отзыв. Клиент увидит короткую форму. — Finkley тест',
-    email_subject: '[ТЕСТ] Просьба оставить отзыв — {{salon}}',
-    email_body:
-      'Это тестовая просьба оставить отзыв от {{salon}}.\n\n' +
-      'Клиент получает такое сообщение через 1-7 дней после оплаченного визита.\n\n' +
-      '— Finkley test',
-  },
+function buildTestMessage(
+  kind: Kind,
+  channel: 'sms' | 'email',
+  salonName: string,
+  salonId: string,
+  locale: Locale,
+): { text?: string; subject?: string; html?: string } {
+  const d = DUMMY[locale]
+  const reviewUrl = `${APP_URL}review/TEST-PREVIEW-TOKEN`
+  const bookUrl = `${APP_URL}${salonId}/visits`
+
+  if (kind === 'review_request') {
+    if (channel === 'sms') return { text: buildReviewRequestSms(reviewUrl, locale) }
+    const e = buildReviewRequestEmail(salonName, reviewUrl, locale)
+    return { subject: e.subject, html: e.html }
+  }
+  if (kind === 'visit_reminder') {
+    if (channel === 'sms') {
+      return { text: buildVisitReminderSms(salonName, d.category, bookUrl, locale) }
+    }
+    const e = buildVisitReminderEmail(
+      salonName,
+      d.client_name,
+      d.days_since,
+      d.category,
+      bookUrl,
+      locale,
+    )
+    return { subject: e.subject, html: e.html }
+  }
+  // marketing
+  if (channel === 'sms') return { text: buildMarketingSampleSms(salonName, locale) }
+  const e = buildMarketingSampleEmail(salonName, locale)
+  return { subject: e.subject, html: e.html, text: e.text }
 }
 
 Deno.serve(async (req: Request) => {
@@ -75,10 +103,10 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'invalid_json' }, 400)
   }
   const { salon_id, kind, channel, to } = body
-  if (!salon_id || !kind || !channel || !to) {
-    return json({ error: 'missing_fields' }, 400)
+  if (!salon_id || !kind || !channel || !to) return json({ error: 'missing_fields' }, 400)
+  if (kind !== 'marketing' && kind !== 'visit_reminder' && kind !== 'review_request') {
+    return json({ error: 'invalid_kind' }, 400)
   }
-  if (!SAMPLE_TEXTS[kind]) return json({ error: 'invalid_kind' }, 400)
   if (channel !== 'sms' && channel !== 'email') return json({ error: 'invalid_channel' }, 400)
 
   const membership = await getSalonMembership(SUPABASE_URL, SERVICE_ROLE, user.userId, salon_id)
@@ -88,17 +116,27 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const { data: salon } = await admin.from('salons').select('name').eq('id', salon_id).maybeSingle()
-  const salonName = (salon as { name: string | null } | null)?.name ?? 'Finkley'
+  const { data: salonRow } = await admin
+    .from('salons')
+    .select('name, locale, country_code')
+    .eq('id', salon_id)
+    .maybeSingle()
+  const salon = salonRow as {
+    name: string | null
+    locale: string | null
+    country_code: string | null
+  } | null
+  const salonName = salon?.name ?? 'Finkley'
+  const locale = pickLocale(salon?.locale ?? null, salon?.country_code ?? null)
 
-  const tpl = SAMPLE_TEXTS[kind]
+  const msg = buildTestMessage(kind, channel, salonName, salon_id, locale)
 
   if (channel === 'sms') {
-    const text = tpl.sms.replaceAll('{{salon}}', salonName)
+    if (!msg.text) return json({ error: 'no_template' }, 500)
     const r = await sendSmsForSalon(admin, {
       salonId: salon_id,
       to,
-      text,
+      text: msg.text,
       messageType: 'manual',
       clientId: null,
     })
@@ -110,13 +148,7 @@ Deno.serve(async (req: Request) => {
 
   // Email через Resend.
   if (!RESEND_API_KEY) return json({ error: 'resend_not_configured' }, 503)
-  const subject = tpl.email_subject.replaceAll('{{salon}}', salonName)
-  const text = tpl.email_body.replaceAll('{{salon}}', salonName)
-  const html = `<p style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5">${text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/\n/g, '<br>')}</p>`
-
+  if (!msg.subject || !msg.html) return json({ error: 'no_template' }, 500)
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -126,9 +158,9 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify({
       from: RESEND_FROM,
       to: [to],
-      subject,
-      text,
-      html,
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text ?? undefined,
     }),
   })
   if (!r.ok) {

@@ -18,8 +18,13 @@
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
-import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { getBroadcastChannels } from '../_shared/broadcast-prefs.ts'
+import {
+  buildReviewRequestEmail,
+  buildReviewRequestSms,
+  pickLocale as pickLocaleShared,
+} from '../_shared/broadcast-templates.ts'
+import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -60,78 +65,9 @@ type SalonRow = {
   country_code: string | null
 }
 
-const REVIEW_TEXTS = {
-  ru: {
-    subject: 'Как прошёл ваш визит?',
-    sms: 'Спасибо за визит! Оцените нас: {{url}}',
-    body_intro: 'Здравствуйте! Спасибо что выбрали',
-    body_cta: 'Оцените ваш визит — это займёт 30 секунд:',
-    body_button: 'Оставить отзыв',
-  },
-  pl: {
-    subject: 'Jak przebiegła Twoja wizyta?',
-    sms: 'Dziękujemy za wizytę! Oceń nas: {{url}}',
-    body_intro: 'Dzień dobry! Dziękujemy, że wybrałaś',
-    body_cta: 'Oceń wizytę — zajmie 30 sekund:',
-    body_button: 'Zostaw opinię',
-  },
-  en: {
-    subject: 'How was your visit?',
-    sms: 'Thanks for your visit! Rate us: {{url}}',
-    body_intro: 'Hello! Thanks for choosing',
-    body_cta: 'Rate your visit — it takes 30 seconds:',
-    body_button: 'Leave a review',
-  },
-}
-
-function pickLocale(
-  locale: string | null | undefined,
-  countryCode: string | null | undefined,
-): 'ru' | 'pl' | 'en' {
-  if (locale) {
-    const base = locale.split('-')[0]?.toLowerCase()
-    if (base === 'pl') return 'pl'
-    if (base === 'en') return 'en'
-    if (base === 'ru') return 'ru'
-  }
-  if (countryCode === 'PL') return 'pl'
-  if (countryCode && ['GB', 'US', 'IE'].includes(countryCode)) return 'en'
-  return 'ru'
-}
-
-function buildReviewEmail(
-  salonName: string,
-  reviewUrl: string,
-  locale: 'ru' | 'pl' | 'en',
-): { subject: string; html: string } {
-  const s = REVIEW_TEXTS[locale]
-  const subject = `${s.subject} · ${salonName}`
-  const html = `<!doctype html>
-<html lang="${locale}"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
-<tr><td align="center">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
-<tr><td style="padding:40px 32px;text-align:center;">
-  <h1 style="margin:0 0 12px 0;font-size:24px;line-height:30px;font-weight:800;color:#1A1A2E;">
-    ${s.subject}
-  </h1>
-  <p style="margin:0 0 24px 0;font-size:15px;line-height:22px;color:#334155;">
-    ${s.body_intro} <strong>${salonName}</strong>. ${s.body_cta}
-  </p>
-  <p style="margin:24px 0;">
-    <a href="${reviewUrl}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;">
-      ${s.body_button}
-    </a>
-  </p>
-  <p style="margin:24px 0 0 0;font-size:12px;color:#94a3b8;">
-    Finkley · ${salonName}
-  </p>
-</td></tr>
-</table>
-</td></tr></table>
-</body></html>`
-  return { subject, html }
-}
+// Шаблоны вынесены в _shared/broadcast-templates.ts — общий источник истины
+// для send-review-request, client-overdue-push и marketing-test-send.
+const pickLocale = pickLocaleShared
 
 async function sendDirectResend(to: string, subject: string, html: string): Promise<boolean> {
   const resendKey = Deno.env.get('RESEND_API_KEY') ?? ''
@@ -205,11 +141,11 @@ async function processOneVisit(admin: SupabaseClient, visit: VisitRow): Promise<
 
   let sent = false
   if (channels.email && (client as ClientRow).email) {
-    const { subject, html } = buildReviewEmail(salonName, reviewUrl, locale)
+    const { subject, html } = buildReviewRequestEmail(salonName, reviewUrl, locale)
     if (await sendDirectResend((client as ClientRow).email!, subject, html)) sent = true
   }
   if (channels.sms && (client as ClientRow).phone) {
-    const smsText = REVIEW_TEXTS[locale].sms.replace('{{url}}', reviewUrl)
+    const smsText = buildReviewRequestSms(reviewUrl, locale)
     const r = await sendSmsForSalon(admin, {
       salonId: visit.salon_id,
       to: (client as ClientRow).phone!,

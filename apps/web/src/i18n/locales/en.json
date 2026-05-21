@@ -3551,7 +3551,7 @@
       "info_button": "Info",
       "test_button": "Test",
       "test_title": "Send test message",
-      "test_subtitle": "Channel: {{kind}}. The message goes straight to you so you see what the client gets.",
+      "test_subtitle": "Campaign type: {{kind}}. You'll get exactly what the client would see.",
       "test_channel_label": "Channel",
       "test_phone_label": "Test phone",
       "test_email_label": "Test email",

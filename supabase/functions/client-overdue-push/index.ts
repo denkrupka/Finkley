@@ -13,8 +13,13 @@
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
-import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { getBroadcastChannels } from '../_shared/broadcast-prefs.ts'
+import {
+  buildVisitReminderEmail,
+  buildVisitReminderSms,
+  pickLocale as pickLocaleShared,
+} from '../_shared/broadcast-templates.ts'
+import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -41,80 +46,9 @@ type RegularityRow = {
   days_overdue: number
 }
 
-const STRINGS = {
-  ru: {
-    subject: 'Соскучились! Пора заглянуть',
-    intro: 'Привет, {{name}}!',
-    body: 'Давно не виделись — {{days}} дней с прошлого визита ({{category}}). Записаться легко по ссылке ниже:',
-    cta: 'Записаться',
-    sms: '{{salon}}: давно не виделись! Запишись на {{category}}: {{url}}',
-  },
-  pl: {
-    subject: 'Tęsknimy! Czas wpaść',
-    intro: 'Cześć, {{name}}!',
-    body: 'Dawno się nie widziałyśmy — {{days}} dni od ostatniej wizyty ({{category}}). Zarezerwuj łatwo poniżej:',
-    cta: 'Zarezerwuj',
-    sms: '{{salon}}: dawno się nie widziałyśmy! Umów {{category}}: {{url}}',
-  },
-  en: {
-    subject: "We've missed you! Time to drop by",
-    intro: 'Hi {{name}}!',
-    body: "It's been a while — {{days}} days since your last visit ({{category}}). Book easily below:",
-    cta: 'Book',
-    sms: '{{salon}}: been a while! Book {{category}}: {{url}}',
-  },
-}
-
-function pickLocale(
-  locale: string | null | undefined,
-  countryCode: string | null | undefined,
-): 'ru' | 'pl' | 'en' {
-  if (locale) {
-    const base = locale.split('-')[0]?.toLowerCase()
-    if (base === 'pl') return 'pl'
-    if (base === 'en') return 'en'
-    if (base === 'ru') return 'ru'
-  }
-  if (countryCode === 'PL') return 'pl'
-  if (countryCode && ['GB', 'US', 'IE'].includes(countryCode)) return 'en'
-  return 'ru'
-}
-
-function interpolate(tmpl: string, vars: Record<string, string | number>): string {
-  return tmpl.replace(/\{\{(\w+)\}\}/g, (_, k) => String(vars[k] ?? ''))
-}
-
-function buildEmail(
-  salonName: string,
-  bookUrl: string,
-  row: RegularityRow,
-  locale: 'ru' | 'pl' | 'en',
-): { subject: string; html: string } {
-  const s = STRINGS[locale]
-  const subject = `${s.subject} — ${salonName}`
-  const html = `<!doctype html>
-<html lang="${locale}"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;"><tr><td align="center">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
-<tr><td style="padding:40px 32px;">
-  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
-    ${interpolate(s.intro, { name: row.client_name })}
-  </h1>
-  <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:#334155;">
-    ${interpolate(s.body, { days: row.days_since_last, category: row.category_name })}
-  </p>
-  <p style="margin:24px 0;">
-    <a href="${bookUrl}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;">
-      ${s.cta}
-    </a>
-  </p>
-  <p style="margin:24px 0 0 0;font-size:12px;color:#94a3b8;">${salonName} · Finkley</p>
-</td></tr>
-</table>
-</td></tr></table>
-</body></html>`
-  return { subject, html }
-}
+// Шаблоны вынесены в _shared/broadcast-templates.ts — общий источник истины
+// для send-review-request, client-overdue-push и marketing-test-send.
+const pickLocale = pickLocaleShared
 
 async function sendResend(to: string, subject: string, html: string): Promise<boolean> {
   const key = Deno.env.get('RESEND_API_KEY') ?? ''
@@ -178,15 +112,18 @@ async function processOneSalon(admin: SupabaseClient, salonId: string): Promise<
 
     let sent = false
     if (channels.email && row.client_email) {
-      const { subject, html } = buildEmail(salonName, bookUrl, row, locale)
+      const { subject, html } = buildVisitReminderEmail(
+        salonName,
+        row.client_name,
+        row.days_since_last,
+        row.category_name,
+        bookUrl,
+        locale,
+      )
       if (await sendResend(row.client_email, subject, html)) sent = true
     }
     if (channels.sms && row.client_phone) {
-      const sms = interpolate(STRINGS[locale].sms, {
-        salon: salonName,
-        category: row.category_name,
-        url: bookUrl,
-      })
+      const sms = buildVisitReminderSms(salonName, row.category_name, bookUrl, locale)
       const r = await sendSmsForSalon(admin, {
         salonId,
         to: row.client_phone,

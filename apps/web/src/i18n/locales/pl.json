@@ -3551,7 +3551,7 @@
       "info_button": "Info",
       "test_button": "Test",
       "test_title": "Wyślij wiadomość testową",
-      "test_subtitle": "Kanał: {{kind}}. Wiadomość trafi prosto do Ciebie — zobaczysz jak będzie wyglądała u klienta.",
+      "test_subtitle": "Typ wysyłki: {{kind}}. Dostaniesz dokładnie to, co zobaczy klient.",
       "test_channel_label": "Kanał",
       "test_phone_label": "Testowy numer",
       "test_email_label": "Testowy email",
