@@ -849,15 +849,145 @@ const TEAM_INVITATION_PL: EmailTemplate = {
 </body></html>`,
 }
 
+const WEEKLY_DIGEST_EN: EmailTemplate = {
+  subject: 'Finkley · weekly summary for {{salon_name}}',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly summary · Finkley</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY · WEEKLY SUMMARY</p>
+
+<h1 style="margin:0 0 8px 0;font-size:22px;line-height:30px;color:#0f172a;">{{salon_name}}</h1>
+{{logo_block}}
+<p style="margin:0 0 24px 0;font-size:14px;color:#64748b;">{{period_start}} — {{period_end}}</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+<tr>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Revenue</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{revenue}}</p>
+<p style="margin:4px 0 0 0;font-size:12px;color:{{revenue_delta_color}};">{{revenue_delta}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Expenses</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{expense}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#ecfdf5;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#047857;">Profit</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#065f46;">{{profit}}</p>
+</td>
+</tr>
+</table>
+
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#334155;">
+This week: <strong>{{visits_count}}</strong> visits.
+</p>
+
+{{top_block}}
+
+{{insight_block}}
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+<tr><td align="center" style="background:#1A1A2E;border-radius:6px;padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">Open reports</a>
+</td></tr>
+</table>
+
+<p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+Don't want digests anymore? Open Settings and turn off 'Weekly digest'.
+</p>
+
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Management accounting for beauty salons<br>info@finkley.app</p>
+</div>
+</body>
+</html>`,
+}
+
+const WEEKLY_DIGEST_PL: EmailTemplate = {
+  subject: 'Finkley · podsumowanie tygodnia dla {{salon_name}}',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podsumowanie tygodnia · Finkley</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY · PODSUMOWANIE TYGODNIA</p>
+
+<h1 style="margin:0 0 8px 0;font-size:22px;line-height:30px;color:#0f172a;">{{salon_name}}</h1>
+{{logo_block}}
+<p style="margin:0 0 24px 0;font-size:14px;color:#64748b;">{{period_start}} — {{period_end}}</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+<tr>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Przychód</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{revenue}}</p>
+<p style="margin:4px 0 0 0;font-size:12px;color:{{revenue_delta_color}};">{{revenue_delta}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#f1f5f9;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;">Wydatki</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#0f172a;">{{expense}}</p>
+</td>
+<td width="2%"></td>
+<td width="33%" style="padding:14px 8px;background:#ecfdf5;border-radius:6px;text-align:center;vertical-align:top;">
+<p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#047857;">Zysk</p>
+<p style="margin:0;font-size:18px;font-weight:700;color:#065f46;">{{profit}}</p>
+</td>
+</tr>
+</table>
+
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#334155;">
+W tym tygodniu: <strong>{{visits_count}}</strong> wizyt.
+</p>
+
+{{top_block}}
+
+{{insight_block}}
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+<tr><td align="center" style="background:#1A1A2E;border-radius:6px;padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">Otwórz raporty</a>
+</td></tr>
+</table>
+
+<p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+Nie chcesz więcej digestów? Otwórz Ustawienia i wyłącz „Cotygodniowy digest".
+</p>
+
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów kosmetycznych<br>info@finkley.app</p>
+</div>
+</body>
+</html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
     welcome: WELCOME_EN,
     team_invitation: TEAM_INVITATION_EN,
+    weekly_digest: WEEKLY_DIGEST_EN,
   },
   pl: {
     welcome: WELCOME_PL,
     team_invitation: TEAM_INVITATION_PL,
+    weekly_digest: WEEKLY_DIGEST_PL,
   },
 }
 

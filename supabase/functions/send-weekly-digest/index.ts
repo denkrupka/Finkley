@@ -79,6 +79,57 @@ type KpiRow = {
  * логирования из cron-режима. Если нет ни одного работающего канала —
  * sent=false с reason='no_active_channel'.
  */
+// Локализованные строки для динамических блоков и Telegram. Email-каркас
+// сам по себе в LOCALE_OVERRIDES в send-email/templates.ts.
+type DigestLocale = 'ru' | 'pl' | 'en'
+
+function normalizeDigestLocale(input: unknown): DigestLocale {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
+
+const DIGEST_STRINGS = {
+  ru: {
+    topMaster: '🏆 Топ-мастер',
+    topService: '⭐ Топ-услуга',
+    noVisits: 'На этой неделе визитов не было — отдыхаешь?',
+    insightLabel: '💡 AI-помощник видит',
+    tgTitle: '📊 <b>Еженедельный дайджест</b>',
+    tgRevenue: 'Выручка',
+    tgExpense: 'Расходы',
+    tgProfit: 'Прибыль',
+    tgVisits: 'Визитов',
+    fallbackSalon: 'Салон',
+  },
+  pl: {
+    topMaster: '🏆 Top-mistrz',
+    topService: '⭐ Top-usługa',
+    noVisits: 'W tym tygodniu brak wizyt — odpoczywasz?',
+    insightLabel: '💡 AI-asystent zauważa',
+    tgTitle: '📊 <b>Cotygodniowy digest</b>',
+    tgRevenue: 'Przychód',
+    tgExpense: 'Wydatki',
+    tgProfit: 'Zysk',
+    tgVisits: 'Wizyt',
+    fallbackSalon: 'Salon',
+  },
+  en: {
+    topMaster: '🏆 Top master',
+    topService: '⭐ Top service',
+    noVisits: 'No visits this week — taking a break?',
+    insightLabel: '💡 AI assistant sees',
+    tgTitle: '📊 <b>Weekly digest</b>',
+    tgRevenue: 'Revenue',
+    tgExpense: 'Expenses',
+    tgProfit: 'Profit',
+    tgVisits: 'Visits',
+    fallbackSalon: 'Salon',
+  },
+} as const
+
 async function sendDigestForSalon(
   admin: SupabaseClient,
   salon: {
@@ -91,6 +142,7 @@ async function sendDigestForSalon(
     email: string
     fullName: string
     telegramId: number | null
+    locale?: string | null
   },
   channels: DigestChannel[],
 ): Promise<{ sent: boolean; reason?: string; via?: DigestChannel[] }> {
@@ -104,19 +156,23 @@ async function sendDigestForSalon(
   const k = kpis as KpiRow
   const currency = salon.currency ?? 'PLN'
   const revDelta = deltaPercent(Number(k.revenue_cents), Number(k.prev_revenue_cents))
+  const locale = normalizeDigestLocale(recipient.locale)
+  const s = DIGEST_STRINGS[locale]
 
   let topBlock = ''
   if (k.top_staff_name && Number(k.top_staff_revenue_cents) > 0) {
-    topBlock += `<p style="margin:0 0 8px 0;font-size:14px;color:#334155;">🏆 Топ-мастер: <strong>${k.top_staff_name}</strong> · ${formatCents(Number(k.top_staff_revenue_cents), currency)}</p>`
+    topBlock += `<p style="margin:0 0 8px 0;font-size:14px;color:#334155;">${s.topMaster}: <strong>${k.top_staff_name}</strong> · ${formatCents(Number(k.top_staff_revenue_cents), currency)}</p>`
   }
   if (k.top_service_name && Number(k.top_service_revenue_cents) > 0) {
-    topBlock += `<p style="margin:0 0 8px 0;font-size:14px;color:#334155;">⭐ Топ-услуга: <strong>${k.top_service_name}</strong> · ${formatCents(Number(k.top_service_revenue_cents), currency)}</p>`
+    topBlock += `<p style="margin:0 0 8px 0;font-size:14px;color:#334155;">${s.topService}: <strong>${k.top_service_name}</strong> · ${formatCents(Number(k.top_service_revenue_cents), currency)}</p>`
   }
   if (Number(k.visits_count) === 0) {
-    topBlock = `<p style="margin:0 0 8px 0;font-size:14px;color:#64748b;font-style:italic;">На этой неделе визитов не было — отдыхаешь?</p>`
+    topBlock = `<p style="margin:0 0 8px 0;font-size:14px;color:#64748b;font-style:italic;">${s.noVisits}</p>`
   }
 
-  // Топ-инсайт текущей недели (если есть) — добавим под top_block
+  // Топ-инсайт текущей недели (если есть) — добавим под top_block.
+  // insight.title/body генерируются в profile.locale (см. generate-insights),
+  // поэтому язык там уже совпадает с recipient.
   const { data: insight } = await admin
     .from('insights')
     .select('title, body, severity')
@@ -129,7 +185,7 @@ async function sendDigestForSalon(
 
   const insightBlock = insight
     ? `<div style="margin:16px 0;padding:14px 16px;background:#FFF8E7;border-left:3px solid #E5C078;border-radius:6px;">
-         <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9A7A1F;">💡 AI-помощник видит</p>
+         <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9A7A1F;">${s.insightLabel}</p>
          <p style="margin:0 0 4px 0;font-size:14px;font-weight:700;color:#0f172a;">${insight.title}</p>
          <p style="margin:0;font-size:13px;line-height:20px;color:#334155;">${insight.body}</p>
        </div>`
@@ -138,39 +194,44 @@ async function sendDigestForSalon(
   const via: DigestChannel[] = []
 
   if (channels.includes('email') && recipient.email) {
-    await sendEmail('weekly_digest', recipient.email, {
-      full_name: recipient.fullName,
-      salon_name: salon.name ?? 'Салон',
-      logo_block: renderLogoBlock((salon as { logo_url?: string | null }).logo_url),
-      period_start: formatDate(k.period_start),
-      period_end: formatDate(k.period_end),
-      revenue: formatCents(Number(k.revenue_cents), currency),
-      expense: formatCents(Number(k.expense_cents), currency),
-      profit: formatCents(Number(k.profit_cents), currency),
-      visits_count: String(k.visits_count),
-      revenue_delta: revDelta.text,
-      revenue_delta_color: revDelta.color,
-      top_block: topBlock,
-      insight_block: insightBlock,
-      app_url: `${APP_URL}${salon.id}/reports`,
-    })
+    await sendEmail(
+      'weekly_digest',
+      recipient.email,
+      {
+        full_name: recipient.fullName,
+        salon_name: salon.name ?? s.fallbackSalon,
+        logo_block: renderLogoBlock((salon as { logo_url?: string | null }).logo_url),
+        period_start: formatDate(k.period_start),
+        period_end: formatDate(k.period_end),
+        revenue: formatCents(Number(k.revenue_cents), currency),
+        expense: formatCents(Number(k.expense_cents), currency),
+        profit: formatCents(Number(k.profit_cents), currency),
+        visits_count: String(k.visits_count),
+        revenue_delta: revDelta.text,
+        revenue_delta_color: revDelta.color,
+        top_block: topBlock,
+        insight_block: insightBlock,
+        app_url: `${APP_URL}${salon.id}/reports`,
+      },
+      locale,
+    )
     via.push('email')
   }
 
   if (channels.includes('telegram') && recipient.telegramId) {
-    const salonName = salon.name ?? 'Салон'
+    const salonName = salon.name ?? s.fallbackSalon
     const tgText =
-      `📊 <b>Еженедельный дайджест</b> · ${salonName}\n` +
+      `${s.tgTitle} · ${salonName}\n` +
       `${formatDate(k.period_start)} — ${formatDate(k.period_end)}\n\n` +
-      `Выручка: <b>${formatCents(Number(k.revenue_cents), currency)}</b> (${revDelta.text})\n` +
-      `Расходы: ${formatCents(Number(k.expense_cents), currency)}\n` +
-      `Прибыль: <b>${formatCents(Number(k.profit_cents), currency)}</b>\n` +
-      `Визитов: ${k.visits_count}\n\n` +
+      `${s.tgRevenue}: <b>${formatCents(Number(k.revenue_cents), currency)}</b> (${revDelta.text})\n` +
+      `${s.tgExpense}: ${formatCents(Number(k.expense_cents), currency)}\n` +
+      `${s.tgProfit}: <b>${formatCents(Number(k.profit_cents), currency)}</b>\n` +
+      `${s.tgVisits}: ${k.visits_count}\n\n` +
       (k.top_staff_name
-        ? `🏆 Топ-мастер: ${k.top_staff_name} · ${formatCents(Number(k.top_staff_revenue_cents ?? 0), currency)}\n`
+        ? `${s.topMaster}: ${k.top_staff_name} · ${formatCents(Number(k.top_staff_revenue_cents ?? 0), currency)}\n`
         : '') +
       (k.top_service_name
-        ? `⭐ Топ-услуга: ${k.top_service_name} · ${formatCents(Number(k.top_service_revenue_cents ?? 0), currency)}\n`
+        ? `${s.topService}: ${k.top_service_name} · ${formatCents(Number(k.top_service_revenue_cents ?? 0), currency)}\n`
         : '') +
       `\n${APP_URL}${salon.id}/reports`
     const ok = await sendTelegramToUser(recipient.telegramId, tgText)
@@ -252,18 +313,20 @@ async function handleCron(admin: SupabaseClient, token: string): Promise<Respons
 
     const { data: profile } = await admin
       .from('profiles')
-      .select('telegram_id')
+      .select('telegram_id, locale')
       .eq('id', ownerId)
       .maybeSingle()
-    const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
-      ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+    type ProfileMin = { telegram_id?: number | string | null; locale?: string | null }
+    const telegramId = (profile as ProfileMin | null)?.telegram_id
+      ? Number((profile as ProfileMin).telegram_id)
       : null
+    const ownerLocale = (profile as ProfileMin | null)?.locale ?? 'ru'
 
     try {
       const r = await sendDigestForSalon(
         admin,
         salon,
-        { email: owner.email!, fullName: ownerName, telegramId },
+        { email: owner.email!, fullName: ownerName, telegramId, locale: ownerLocale },
         channels,
       )
       if (r.sent) stats.sent++
@@ -323,17 +386,19 @@ async function handleManual(
 
   const { data: profile } = await admin
     .from('profiles')
-    .select('telegram_id')
+    .select('telegram_id, locale')
     .eq('id', user.id)
     .maybeSingle()
-  const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
-    ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+  type ProfileMin = { telegram_id?: number | string | null; locale?: string | null }
+  const telegramId = (profile as ProfileMin | null)?.telegram_id
+    ? Number((profile as ProfileMin).telegram_id)
     : null
+  const userLocale = (profile as ProfileMin | null)?.locale ?? 'ru'
 
   const r = await sendDigestForSalon(
     admin,
     salon,
-    { email: userEmail, fullName: userName, telegramId },
+    { email: userEmail, fullName: userName, telegramId, locale: userLocale },
     effectiveChannels,
   )
   if (!r.sent) return jsonResponse({ error: r.reason ?? 'send_failed' }, 500)
