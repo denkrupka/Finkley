@@ -12,11 +12,11 @@ export type BroadcastKind = 'marketing' | 'visit_reminder' | 'review_request'
 
 export type ChannelPrefs = { email: boolean; sms: boolean }
 
-const DEFAULT: ChannelPrefs = { email: true, sms: true }
+const DEFAULT: ChannelPrefs = { email: false, sms: false }
 
 /**
- * Возвращает {email, sms} для конкретного типа рассылки. Если поле в БД
- * пустое/невалидное — default true (не ломаем существующее поведение).
+ * Возвращает {email, sms} для конкретного типа рассылки. Default — оба false
+ * (safe-by-default): владелец явно включает каналы в /marketing UI.
  */
 export async function getBroadcastChannels(
   admin: SupabaseClient,
@@ -34,7 +34,7 @@ export async function getBroadcastChannels(
   if (!v || typeof v !== 'object') return DEFAULT
   const obj = v as Record<string, unknown>
   return {
-    email: obj.email !== false,
-    sms: obj.sms !== false,
+    email: obj.email === true,
+    sms: obj.sms === true,
   }
 }

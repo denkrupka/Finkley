@@ -11,13 +11,17 @@ export type BroadcastPrefs = Record<BroadcastKind, ChannelPrefs>
 export const BROADCAST_KINDS: BroadcastKind[] = ['marketing', 'visit_reminder', 'review_request']
 
 export const DEFAULT_BROADCAST_PREFS: BroadcastPrefs = {
-  marketing: { email: true, sms: true },
-  visit_reminder: { email: true, sms: true },
-  review_request: { email: true, sms: true },
+  marketing: { email: false, sms: false },
+  visit_reminder: { email: false, sms: false },
+  review_request: { email: false, sms: false },
 }
 
 function normalize(raw: unknown): BroadcastPrefs {
-  const out: BroadcastPrefs = { ...DEFAULT_BROADCAST_PREFS }
+  const out: BroadcastPrefs = {
+    marketing: { email: false, sms: false },
+    visit_reminder: { email: false, sms: false },
+    review_request: { email: false, sms: false },
+  }
   if (!raw || typeof raw !== 'object') return out
   const obj = raw as Record<string, unknown>
   for (const k of BROADCAST_KINDS) {
@@ -25,8 +29,8 @@ function normalize(raw: unknown): BroadcastPrefs {
     if (v && typeof v === 'object') {
       const vv = v as Record<string, unknown>
       out[k] = {
-        email: vv.email !== false, // default true
-        sms: vv.sms !== false,
+        email: vv.email === true, // default false (safe)
+        sms: vv.sms === true,
       }
     }
   }
