@@ -30,6 +30,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { sendEmail, type EmailTemplate } from '../_shared/notify.ts'
 import { getOwnerByStripeCustomer, getOwnerBySubscriptionId } from '../_shared/salon-lookup.ts'
 import { captureException } from '../_shared/sentry.ts'
+import { createSmsApiSender } from '../_shared/smsapi-sender.ts'
 import { verifyStripeSignature } from '../_shared/stripe.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -58,8 +59,18 @@ type SubObj = {
 type CheckoutObj = {
   id: string
   customer: string
-  subscription: string
-  metadata?: { salon_id?: string }
+  /** Для mode='subscription' — id подписки. Для one-time покупок (sms_*) — null. */
+  subscription: string | null
+  payment_intent: string | null
+  mode: 'subscription' | 'payment' | 'setup'
+  metadata?: {
+    salon_id?: string
+    kind?: 'sms_package' | 'sms_sender'
+    purchase_id?: string
+    sender_id?: string
+    sender_name?: string
+    package_size?: string
+  }
 }
 
 type InvoiceObj = {
@@ -146,19 +157,110 @@ Deno.serve(async (req: Request) => {
         const session = event.data.object as unknown as CheckoutObj
         const salonId = session.metadata?.salon_id
         if (!salonId) break
-        // Полное состояние подписки получим в customer.subscription.created/updated.
-        await admin.from('salon_subscriptions').upsert(
-          {
-            salon_id: salonId,
-            stripe_customer_id: session.customer,
-            stripe_subscription_id: session.subscription,
-            stripe_price_id: '',
-            status: 'incomplete',
-            current_period_start: new Date().toISOString(),
-            current_period_end: new Date().toISOString(),
-          },
-          { onConflict: 'salon_id' },
-        )
+        const kind = session.metadata?.kind
+
+        // SMS-пакет: пополняем salons.sms_balance на package_size,
+        // помечаем purchase paid. Идемпотентность — ловим по unique
+        // stripe_session_id ниже, если status уже paid — пропускаем.
+        if (kind === 'sms_package') {
+          const purchaseId = session.metadata?.purchase_id
+          if (!purchaseId) break
+          const { data: purchase } = await admin
+            .from('salon_sms_purchases')
+            .select('id, salon_id, package_size, status')
+            .eq('id', purchaseId)
+            .maybeSingle()
+          const pur = purchase as {
+            id: string
+            salon_id: string
+            package_size: number
+            status: string
+          } | null
+          if (!pur) {
+            console.warn('sms_package: purchase not found', purchaseId)
+            break
+          }
+          if (pur.status === 'paid') break // idempotent
+          // Атомарный bump баланса. Считаем .rpc или inline UPDATE с SQL +
+          // через REST .update(... value: balance + size) недоступно —
+          // делаем 2 шага через .select().
+          const { data: salonNow } = await admin
+            .from('salons')
+            .select('sms_balance')
+            .eq('id', pur.salon_id)
+            .maybeSingle()
+          const currentBalance = (salonNow as { sms_balance: number } | null)?.sms_balance ?? 0
+          await admin
+            .from('salons')
+            .update({ sms_balance: currentBalance + pur.package_size })
+            .eq('id', pur.salon_id)
+          await admin
+            .from('salon_sms_purchases')
+            .update({
+              status: 'paid',
+              paid_at: new Date().toISOString(),
+              stripe_payment_intent_id: session.payment_intent,
+            })
+            .eq('id', purchaseId)
+          break
+        }
+
+        // SMS sender: оплата прошла → регистрируем sender в SMSAPI,
+        // status переходит в pending_smsapi до APPROVED.
+        if (kind === 'sms_sender') {
+          const senderId = session.metadata?.sender_id
+          const senderName = session.metadata?.sender_name
+          if (!senderId || !senderName) break
+          const { data: existing } = await admin
+            .from('salon_sms_senders')
+            .select('id, status')
+            .eq('id', senderId)
+            .maybeSingle()
+          const ex = existing as { id: string; status: string } | null
+          if (!ex) break
+          if (ex.status === 'active' || ex.status === 'pending_smsapi') break // idempotent
+
+          // Сначала фиксируем платёж в БД, чтобы потеря SMSAPI не отнимала деньги.
+          await admin
+            .from('salon_sms_senders')
+            .update({
+              status: 'pending_smsapi',
+              paid_at: new Date().toISOString(),
+              stripe_payment_intent_id: session.payment_intent,
+            })
+            .eq('id', senderId)
+
+          // Регистрация в SMSAPI (не блокирующая — если упало, owner
+          // увидит status pending_smsapi и сможет ретраить).
+          const r = await createSmsApiSender(senderName)
+          if (r.ok && r.status === 'APPROVED') {
+            await admin
+              .from('salon_sms_senders')
+              .update({ status: 'active', activated_at: new Date().toISOString() })
+              .eq('id', senderId)
+          } else if (!r.ok) {
+            console.warn('createSmsApiSender failed:', r.error)
+          }
+          // Если PENDING_APPROVAL — ждём, status уже pending_smsapi.
+          break
+        }
+
+        // Subscription (existing flow) — полное состояние подписки получим
+        // в customer.subscription.created/updated.
+        if (session.subscription) {
+          await admin.from('salon_subscriptions').upsert(
+            {
+              salon_id: salonId,
+              stripe_customer_id: session.customer,
+              stripe_subscription_id: session.subscription,
+              stripe_price_id: '',
+              status: 'incomplete',
+              current_period_start: new Date().toISOString(),
+              current_period_end: new Date().toISOString(),
+            },
+            { onConflict: 'salon_id' },
+          )
+        }
         break
       }
 

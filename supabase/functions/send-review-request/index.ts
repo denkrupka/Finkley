@@ -19,7 +19,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { sendSms } from '../_shared/sms.ts'
+import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -206,7 +206,13 @@ async function processOneVisit(admin: SupabaseClient, visit: VisitRow): Promise<
   }
   if ((client as ClientRow).phone) {
     const smsText = REVIEW_TEXTS[locale].sms.replace('{{url}}', reviewUrl)
-    const r = await sendSms((client as ClientRow).phone!, smsText)
+    const r = await sendSmsForSalon(admin, {
+      salonId: visit.salon_id,
+      to: (client as ClientRow).phone!,
+      text: smsText,
+      messageType: 'review_request',
+      clientId: (client as ClientRow).id,
+    })
     if (r.ok) sent = true
   }
   return sent

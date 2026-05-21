@@ -22,7 +22,12 @@
 
 export type SmsResult = { ok: boolean; provider?: string; error?: string }
 
-export async function sendSms(to: string, text: string): Promise<SmsResult> {
+export async function sendSms(
+  to: string,
+  text: string,
+  /** Перебивает SMS_FROM env (используется sms-billing для активного sender салона). */
+  senderOverride?: string,
+): Promise<SmsResult> {
   const provider = (Deno.env.get('SMS_PROVIDER') ?? 'none').toLowerCase()
   if (provider === 'none' || !provider) {
     return { ok: false, error: 'sms_provider_not_configured' }
@@ -33,9 +38,9 @@ export async function sendSms(to: string, text: string): Promise<SmsResult> {
   }
 
   try {
-    if (provider === 'smsapi') return await sendViaSmsApi(phone, text)
-    if (provider === 'flysms') return await sendViaFlySms(phone, text)
-    if (provider === 'twilio') return await sendViaTwilio(phone, text)
+    if (provider === 'smsapi') return await sendViaSmsApi(phone, text, senderOverride)
+    if (provider === 'flysms') return await sendViaFlySms(phone, text, senderOverride)
+    if (provider === 'twilio') return await sendViaTwilio(phone, text, senderOverride)
     return { ok: false, error: `unknown_provider:${provider}` }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -64,7 +69,11 @@ function normalizePhone(raw: string): string | null {
  * (требует регистрации в SMSAPI; по умолчанию `Test` для песочницы).
  * Returns 200 + JSON {count, list, message} при успехе.
  */
-async function sendViaSmsApi(phone: string, text: string): Promise<SmsResult> {
+async function sendViaSmsApi(
+  phone: string,
+  text: string,
+  senderOverride?: string,
+): Promise<SmsResult> {
   const apiKey = Deno.env.get('SMS_API_KEY') ?? ''
   if (!apiKey) return { ok: false, error: 'smsapi_no_api_key' }
   // SMSAPI принимает номер БЕЗ «+» (E.164 без префикса), так что снимаем его.
@@ -72,7 +81,7 @@ async function sendViaSmsApi(phone: string, text: string): Promise<SmsResult> {
   const form = new URLSearchParams({
     to: cleanedPhone,
     message: text,
-    from: Deno.env.get('SMS_FROM') ?? 'Test',
+    from: senderOverride ?? Deno.env.get('SMS_FROM') ?? 'Test',
     format: 'json',
     encoding: 'utf-8',
   })
@@ -104,7 +113,11 @@ async function sendViaSmsApi(phone: string, text: string): Promise<SmsResult> {
   return { ok: true, provider: 'smsapi' }
 }
 
-async function sendViaFlySms(phone: string, text: string): Promise<SmsResult> {
+async function sendViaFlySms(
+  phone: string,
+  text: string,
+  senderOverride?: string,
+): Promise<SmsResult> {
   const apiKey = Deno.env.get('SMS_API_KEY') ?? ''
   if (!apiKey) return { ok: false, error: 'flysms_no_api_key' }
   const r = await fetch('https://api.flysms.com/v1/send', {
@@ -114,7 +127,7 @@ async function sendViaFlySms(phone: string, text: string): Promise<SmsResult> {
       api_key: apiKey,
       phone,
       message: text,
-      from: Deno.env.get('SMS_FROM') ?? 'Finkley',
+      from: senderOverride ?? Deno.env.get('SMS_FROM') ?? 'Finkley',
     }),
   })
   if (!r.ok) {
@@ -124,10 +137,14 @@ async function sendViaFlySms(phone: string, text: string): Promise<SmsResult> {
   return { ok: true, provider: 'flysms' }
 }
 
-async function sendViaTwilio(phone: string, text: string): Promise<SmsResult> {
+async function sendViaTwilio(
+  phone: string,
+  text: string,
+  senderOverride?: string,
+): Promise<SmsResult> {
   const sid = Deno.env.get('SMS_API_KEY') ?? '' // Twilio Account SID
   const token = Deno.env.get('SMS_API_SECRET') ?? '' // Twilio Auth Token
-  const from = Deno.env.get('SMS_FROM') ?? ''
+  const from = senderOverride ?? Deno.env.get('SMS_FROM') ?? ''
   if (!sid || !token || !from) return { ok: false, error: 'twilio_creds_missing' }
   const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
   const form = new URLSearchParams({ To: phone, From: from, Body: text })

@@ -29,7 +29,13 @@ export type IntegrationProvider =
   | 'infakt'
   | 'ksef'
 
-export type IntegrationCategory = 'accounting' | 'booking' | 'banking' | 'messengers' | 'other'
+export type IntegrationCategory =
+  | 'accounting'
+  | 'booking'
+  | 'banking'
+  | 'messengers'
+  | 'sms'
+  | 'other'
 
 export type ConnectField = {
   key: string
@@ -234,6 +240,7 @@ export const CATEGORY_ORDER: IntegrationCategory[] = [
   'booking',
   'accounting',
   'messengers',
+  'sms',
   'banking',
   'other',
 ]

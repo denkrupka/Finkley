@@ -14,7 +14,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { sendSms } from '../_shared/sms.ts'
+import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -182,7 +182,13 @@ async function processOneSalon(admin: SupabaseClient, salonId: string): Promise<
         category: row.category_name,
         url: bookUrl,
       })
-      const r = await sendSms(row.client_phone, sms)
+      const r = await sendSmsForSalon(admin, {
+        salonId,
+        to: row.client_phone,
+        text: sms,
+        messageType: 'visit_reminder',
+        clientId: row.client_id,
+      })
       if (r.ok) sent = true
     }
     if (sent) {

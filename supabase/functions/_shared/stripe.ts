@@ -99,6 +99,58 @@ export async function createCheckoutSession(
   return call<StripeCheckoutSession>('/checkout/sessions', secret, body)
 }
 
+/**
+ * One-time payment checkout (mode=payment) для разовых покупок
+ * с inline price_data — не нужно создавать Product в Stripe Dashboard.
+ * Используется для SMS-пакетов и покупки sender names.
+ */
+export async function createOneTimeCheckout(
+  secret: string,
+  input: {
+    /** Сумма в наименьших единицах валюты (для PLN — гроши). */
+    amountMinor: number
+    currency: string
+    productName: string
+    productDescription?: string
+    customerEmail?: string
+    customerId?: string | null
+    salonId: string
+    /** Произвольные метаданные — попадут в session.metadata в webhook. */
+    metadata: Record<string, string>
+    successUrl: string
+    cancelUrl: string
+  },
+): Promise<StripeCheckoutSession> {
+  const body: Record<string, unknown> = {
+    mode: 'payment',
+    'line_items[0][price_data][currency]': input.currency,
+    'line_items[0][price_data][unit_amount]': input.amountMinor,
+    'line_items[0][price_data][product_data][name]': input.productName,
+    'line_items[0][quantity]': 1,
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    'metadata[salon_id]': input.salonId,
+    'payment_intent_data[metadata][salon_id]': input.salonId,
+    automatic_tax: { enabled: 'true' },
+    billing_address_collection: 'auto',
+    'tax_id_collection[enabled]': 'true',
+  }
+  if (input.productDescription) {
+    body['line_items[0][price_data][product_data][description]'] = input.productDescription
+  }
+  for (const [k, v] of Object.entries(input.metadata)) {
+    body[`metadata[${k}]`] = v
+    body[`payment_intent_data[metadata][${k}]`] = v
+  }
+  if (input.customerId) {
+    body.customer = input.customerId
+    body.customer_update = { address: 'auto', name: 'auto' }
+  } else if (input.customerEmail) {
+    body.customer_email = input.customerEmail
+  }
+  return call<StripeCheckoutSession>('/checkout/sessions', secret, body)
+}
+
 export type StripePortalSession = { id: string; url: string }
 
 export async function createPortalSession(
