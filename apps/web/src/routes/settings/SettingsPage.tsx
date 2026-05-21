@@ -564,6 +564,16 @@ export function SettingsPage() {
                   {t('settings.profile.booksy_url_hint')}
                 </p>
               </div>
+              <div className="sm:col-span-2">
+                <Button
+                  size="lg"
+                  onClick={save}
+                  disabled={!dirty || update.isPending}
+                  data-testid="settings-save-public"
+                >
+                  {update.isPending ? t('common.loading') : t('common.save')}
+                </Button>
+              </div>
             </div>
           </section>
 
