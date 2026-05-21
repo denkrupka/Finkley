@@ -55,7 +55,11 @@
     "profile_aria": "Профиль и настройки",
     "min": "мин",
     "remove": "Удалить",
-    "no_results": "Ничего не найдено"
+    "no_results": "Ничего не найдено",
+    "search": "Szukaj",
+    "add": "Dodaj",
+    "archive": "Archiwum",
+    "restore": "Przywróć"
   },
   "auth": {
     "or": "lub",
@@ -219,7 +223,7 @@
     "more": "Więcej",
     "help": "Pomoc i FAQ",
     "drawer_title": "Menu nawigacji",
-    "messenger": "Мессенджер",
+    "messenger": "Komunikator",
     "report_bug": "Сообщить о баге"
   },
   "services_page": {
@@ -1052,7 +1056,7 @@
       "payment": "Оплачено: {{method}}",
       "paid_at": "Оплачено · {{method}} · {{at}}"
     },
-    "import_csv": "Импорт CSV",
+    "import_csv": "Importuj CSV",
     "sync_now": "Synchronizuj",
     "sync_now_short": "Sync",
     "sync_in_progress": "Synchronizuję…",
@@ -1148,7 +1152,8 @@
       "note_placeholder": "Например: клиент впервые, нужна консультация",
       "total": "Итого",
       "charge": "Рассчитать"
-    }
+    },
+    "add": "Dodaj wizytę"
   },
   "clients": {
     "title": "Klienci",
@@ -1588,10 +1593,10 @@
       "empty_section": "Пока пусто. Жми «+ Добавить позицию».",
       "label_placeholder": "Название",
       "section_monthly_total": "Итого в месяц",
-      "col_label": "Название",
-      "col_amount": "Сумма",
+      "col_label": "Nazwa",
+      "col_amount": "Kwota",
       "col_pct": "%",
-      "col_period": "Период",
+      "col_period": "Okres",
       "col_cash_kind": "Rodzaj środków",
       "col_mapping": "Mapowanie płatności",
       "cash_kind": {
@@ -1876,7 +1881,7 @@
       }
     },
     "daily_digest": {
-      "title": "Ежедневная сводка",
+      "title": "Raport dzienny",
       "subtitle": "Утром: деньги в распоряжении (по кассам), продажи за вчера, фактуры к оплате — короткое письмо на email владельца.",
       "enabled": "Включена — приходит автоматически каждое утро",
       "disabled": "Выключена",
@@ -2458,10 +2463,10 @@
       "pnl": "P&L",
       "cashflow": "Przepływy",
       "payments": "Do zapłaty",
-      "report": "Финансовый отчёт",
-      "budgets": "Бюджеты",
-      "cash": "Касса",
-      "transfers": "Перестановка средств"
+      "report": "Raport finansowy",
+      "budgets": "Budżety",
+      "cash": "Kasy",
+      "transfers": "Przelewy"
     },
     "cashflow_placeholder": "Przepływy pieniężne — sekcja w przygotowaniu.",
     "payments_placeholder": "Kalendarz płatności — sekcja w przygotowaniu.",
@@ -2675,28 +2680,29 @@
       "col_total": "Итого тек. год",
       "col_start": "Старт",
       "section_operating": "Текущая деятельность",
-      "section_investing": "Инвестиционная деятельность",
+      "section_investing": "Działalność inwestycyjna",
       "section_financing": "Финансовая деятельность",
       "section_balance": "Баланс",
-      "col_plan": "План",
-      "col_fact": "Факт",
+      "col_plan": "Plan",
+      "col_fact": "Fakt",
       "uncategorized": "Без категории",
-      "revenue": "Выручка",
-      "revenue_services": "Услуги",
-      "revenue_retail": "Продажи",
-      "revenue_other": "Прочие доходы",
-      "expenses_total": "Расходы",
+      "revenue": "Przychód",
+      "revenue_services": "Usługi",
+      "revenue_retail": "Sprzedaż",
+      "revenue_other": "Inne przychody",
+      "expenses_total": "Wydatki",
       "production": "Производственные расходы",
       "production_master_payout": "ЗП мастера",
       "production_materials": "Расходные материалы",
-      "variable": "Переменные",
-      "fixed": "Постоянные",
-      "taxes": "Налоги",
+      "variable": "Zmienne",
+      "fixed": "Stałe",
+      "taxes": "Podatki",
       "period_saldo": "Сальдо за период",
       "end_balance": "Остаток на конец месяца",
       "end_balance_by_register": "Остаток на конец месяца — по кассам",
       "export_csv": "Excel / CSV",
-      "print": "Печать / PDF"
+      "print": "Печать / PDF",
+      "expenses_other": "Pozostałe kategorie"
     }
   },
   "reports": {
@@ -2761,8 +2767,8 @@
       "revenue": "Przychód",
       "payout": "Do wypłaty",
       "period": "Okres",
-      "advances": "Авансы",
-      "remaining": "Остаток"
+      "advances": "Zaliczki",
+      "remaining": "Pozostało"
     },
     "visits_count_one": "{{count}} wizyta",
     "visits_count_few": "{{count}} wizyty",
