@@ -59,7 +59,20 @@ function fmtMoney(cents: number, currency: string): string {
   return `${n} ${currency}`
 }
 
-function buildSystemPrompt(snapshot: SnapshotRow, currency: string, salonName: string): string {
+function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
+
+function buildSystemPrompt(
+  snapshot: SnapshotRow,
+  currency: string,
+  salonName: string,
+  locale: 'ru' | 'pl' | 'en' = 'ru',
+): string {
   const cur = snapshot.current_month
   const prev = snapshot.prev_month
   const revGrowth =
@@ -67,65 +80,75 @@ function buildSystemPrompt(snapshot: SnapshotRow, currency: string, salonName: s
       ? Math.round(((cur.revenue - prev.revenue) / prev.revenue) * 100)
       : null
 
+  // Универсальный английский каркас + явная language-instruction. Claude
+  // надёжно держит требуемый язык; данные в snapshot (имена услуг/мастеров)
+  // остаются как есть — это контент юзера.
+  const langInstruction = {
+    ru: 'Respond in Russian (русский).',
+    pl: 'Respond in Polish (polski).',
+    en: 'Respond in English.',
+  }[locale]
+
   const lines: string[] = [
-    'Ты — AI-помощник владельца салона красоты. Отвечаешь дружелюбно, по делу, без жаргона.',
-    'Используешь только данные из снапшота ниже. Не выдумываешь цифры.',
-    'Если данных не хватает для ответа — скажи об этом и предложи как добыть.',
-    'Числа форматируешь как "1 234,56 PLN" (с запятой и пробелом-тысячником).',
-    `Салон: "${salonName}". Валюта: ${currency}.`,
+    'You are an AI assistant for a beauty salon owner. Respond in a friendly, on-point manner, without jargon.',
+    langInstruction,
+    'Use only data from the snapshot below. Do not invent numbers.',
+    'If data is insufficient — say so and suggest how to obtain it.',
+    `Format numbers like "1 234,56 ${currency}" (comma decimal, space thousands).`,
+    `Salon: "${salonName}". Currency: ${currency}.`,
     '',
-    '=== СНАПШОТ БИЗНЕС-ДАННЫХ ===',
+    '=== BUSINESS SNAPSHOT ===',
   ]
 
   if (cur) {
     lines.push(
-      `Текущий месяц: выручка ${fmtMoney(cur.revenue, currency)}, ` +
-        `визитов ${cur.visits}, средний чек ${fmtMoney(Math.round(cur.avg_ticket), currency)}`,
+      `Current month: revenue ${fmtMoney(cur.revenue, currency)}, ` +
+        `visits ${cur.visits}, avg ticket ${fmtMoney(Math.round(cur.avg_ticket), currency)}`,
     )
   }
   if (prev) {
-    lines.push(`Прошлый месяц: выручка ${fmtMoney(prev.revenue, currency)}, визитов ${prev.visits}`)
+    lines.push(`Previous month: revenue ${fmtMoney(prev.revenue, currency)}, visits ${prev.visits}`)
   }
   if (revGrowth !== null) {
-    lines.push(`Динамика выручки: ${revGrowth >= 0 ? '+' : ''}${revGrowth}% к прошлому месяцу`)
+    lines.push(`Revenue dynamics: ${revGrowth >= 0 ? '+' : ''}${revGrowth}% vs previous month`)
   }
   if (snapshot.expenses_current_month_cents !== undefined) {
     lines.push(
-      `Расходы текущего месяца: ${fmtMoney(snapshot.expenses_current_month_cents, currency)}`,
+      `Current month expenses: ${fmtMoney(snapshot.expenses_current_month_cents, currency)}`,
     )
     if (cur) {
       const profit = cur.revenue - snapshot.expenses_current_month_cents
-      lines.push(`Чистая прибыль (выручка − расходы): ${fmtMoney(profit, currency)}`)
+      lines.push(`Net profit (revenue − expenses): ${fmtMoney(profit, currency)}`)
     }
   }
   if (snapshot.top_staff?.length) {
-    lines.push('Топ-мастеров текущего месяца:')
+    lines.push('Top masters this month:')
     for (const s of snapshot.top_staff) {
-      lines.push(`  - ${s.name}: ${fmtMoney(s.revenue, currency)} (${s.visits} визитов)`)
+      lines.push(`  - ${s.name}: ${fmtMoney(s.revenue, currency)} (${s.visits} visits)`)
     }
   }
   if (snapshot.top_services?.length) {
-    lines.push('Топ-услуг текущего месяца:')
+    lines.push('Top services this month:')
     for (const s of snapshot.top_services) {
-      lines.push(`  - ${s.name}: ${fmtMoney(s.revenue, currency)} (${s.visits} раз)`)
+      lines.push(`  - ${s.name}: ${fmtMoney(s.revenue, currency)} (${s.visits} times)`)
     }
   }
   if (snapshot.clients) {
     lines.push(
-      `Клиентская база: всего ${snapshot.clients.total}, активных за 90 дней ${snapshot.clients.active}, ни разу не были ${snapshot.clients.never_visited}`,
+      `Client base: total ${snapshot.clients.total}, active in 90 days ${snapshot.clients.active}, never visited ${snapshot.clients.never_visited}`,
     )
   }
   if (snapshot.pending_unbilled_past) {
     lines.push(
-      `⚠ ${snapshot.pending_unbilled_past} прошедших визитов не рассчитаны — выручка занижена`,
+      `⚠ ${snapshot.pending_unbilled_past} past visits are unbilled — revenue is understated`,
     )
   }
 
-  lines.push('', '=== /СНАПШОТ ===')
+  lines.push('', '=== /SNAPSHOT ===')
   lines.push(
     '',
-    'Отвечай кратко: 1-3 абзаца. Если уместно — дай конкретную рекомендацию что сделать.',
-    'Не упоминай "снапшот" или "JSON" в ответе — говори естественно.',
+    'Reply concisely: 1-3 paragraphs. When appropriate — give a concrete recommendation.',
+    'Do not mention "snapshot" or "JSON" in the answer — speak naturally.',
   )
 
   return lines.join('\n')
@@ -187,6 +210,7 @@ async function handleSend(
   salonId: string,
   conversationId: string | undefined,
   message: string,
+  locale: 'ru' | 'pl' | 'en' = 'ru',
 ): Promise<Response> {
   if (!(await ensureMember(admin, userId, salonId))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403)
@@ -254,7 +278,7 @@ async function handleSend(
   })
 
   // Зовём Claude
-  const systemPrompt = buildSystemPrompt(snapshot, currency, salonName)
+  const systemPrompt = buildSystemPrompt(snapshot, currency, salonName, locale)
   let assistantContent: string
   let inputTokens = 0
   let outputTokens = 0
@@ -375,6 +399,7 @@ Deno.serve(
       salon_id?: string
       conversation_id?: string
       message?: string
+      locale?: string
     }
     try {
       body = await req.json()
@@ -390,7 +415,14 @@ Deno.serve(
 
     switch (body.action) {
       case 'send':
-        return handleSend(admin, userId, body.salon_id, body.conversation_id, body.message ?? '')
+        return handleSend(
+          admin,
+          userId,
+          body.salon_id,
+          body.conversation_id,
+          body.message ?? '',
+          normalizeLocale(body.locale),
+        )
       case 'history':
         return handleHistory(admin, userId, body.salon_id, body.conversation_id)
       case 'reset':

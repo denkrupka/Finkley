@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -36,6 +37,8 @@ export function useAIHistory(salonId: string | undefined, conversationId?: strin
 /** Отправить сообщение AI. Возвращает ответ + conversation_id. */
 export function useSendAIMessage(salonId: string | undefined) {
   const qc = useQueryClient()
+  const { i18n } = useTranslation()
+  const locale = i18n.language?.split('-')[0] ?? 'ru'
   return useMutation({
     mutationFn: async (input: { message: string; conversationId?: string | null }) => {
       if (!salonId) throw new Error('no salon')
@@ -45,6 +48,7 @@ export function useSendAIMessage(salonId: string | undefined) {
           salon_id: salonId,
           conversation_id: input.conversationId,
           message: input.message,
+          locale,
         },
       })
       if (error) throw error
