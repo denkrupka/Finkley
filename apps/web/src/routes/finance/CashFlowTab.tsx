@@ -92,6 +92,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  const [openVisitDetail, setOpenVisitDetail] = useState<VisitRow | null>(null)
   const [openSaleDetail, setOpenSaleDetail] = useState<VisitRow | null>(null)
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
   const range = periodToRange(period)
@@ -181,7 +182,9 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
     if (tx.source === 'visit') {
       const v = visits.find((x) => x.id === tx.id)
       if (v) {
-        setEditingVisit(v)
+        // Открываем то же что в календаре — VisitDetailModal (default view,
+        // с табами и действиями), не QuickEntryModal (форма редактирования).
+        setOpenVisitDetail(v)
         return
       }
       navigate(`/${salonId}/income?tab=visits`)
@@ -516,6 +519,15 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         currency={currency}
         initialView="charge"
         onBackFromCharge={(v) => setEditingVisit(v)}
+      />
+
+      {/* Клик по визиту в ДДС (Финансы → ДДС) — открываем ту же модалку
+          что и в календаре, с default view (табы + действия). */}
+      <VisitDetailModal
+        visit={openVisitDetail}
+        onClose={() => setOpenVisitDetail(null)}
+        salonId={salonId}
+        currency={currency}
       />
 
       <ExpenseFormModal
