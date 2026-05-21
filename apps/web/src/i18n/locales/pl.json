@@ -1212,8 +1212,7 @@
       "case4_situation": "Chcę do konkretnego mistrza, ale nie ma wolnego",
       "case4_reply": "Rozumiem, [mistrz] ma stałych klientów — bardzo cenią jej pracę. Dwie opcje: lista oczekujących i powiadomię, gdy się zwolni, albo zaproponuję [innego mistrza] — też robi [usługa] i ma świetne opinie.",
       "case5_situation": "Nie wiem, kiedy będę mogła przyjść",
-      "case5_reply": "Oczywiście! Tylko uprzedzę — [mistrz] zwykle ma zapełniony grafik na 2 tygodnie naprzód, zwłaszcza piątki. Zatrzymam wstępnie [data] — jeśli się nie uda, napisz dzień wcześniej, przesuniemy.",
-      "source_credit": "Skrypt z „Wonderful Beauty — Skrypt administratora”."
+      "case5_reply": "Oczywiście! Tylko uprzedzę — [mistrz] zwykle ma zapełniony grafik na 2 tygodnie naprzód, zwłaszcza piątki. Zatrzymam wstępnie [data] — jeśli się nie uda, napisz dzień wcześniej, przesuniemy."
     }
   },
   "clients": {
@@ -2558,12 +2557,10 @@
       "col_tags": "Tagi",
       "col_next_visit": "Następna wizyta",
       "contacts_hidden": "kontakty ukryte rolą",
-      "col_revenue_ltv": "Revenue LTV",
-      "col_gross_ltv": "Gross LTV",
+      "col_revenue_ltv": "LTV",
       "col_visits_count": "Wizyt",
       "col_lifetime": "Czas trwania",
       "months": "{{count}} mies.",
-      "gross_hint": "Przychód minus koszt usług (services.cost_cents).",
       "regularity": {
         "title": "Klienci, którzy ominęli termin",
         "subtitle": "Klient nie umówił się w okresie return_period_days+3 (grace). Okres ustawiony w Usługi → Parametry.",

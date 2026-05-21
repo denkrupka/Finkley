@@ -945,9 +945,6 @@ function ObjectionsScriptView({
             </div>
           ))}
         </div>
-        <p className="text-muted-foreground mt-4 text-[11px] italic">
-          {t('visits.script.source_credit')}
-        </p>
       </div>
       <div className="border-border bg-muted/10 flex gap-2 border-t px-5 py-4">
         <Button variant="outline" onClick={onBack} className="flex-1">

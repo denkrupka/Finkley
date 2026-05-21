@@ -54,7 +54,6 @@ export function clientsKeys(salonId: string | undefined) {
 export type ClientLtvMetrics = {
   client_id: string
   revenue_ltv_cents: number
-  gross_ltv_cents: number
   visits_count: number
   customer_lifetime_months: number
 }

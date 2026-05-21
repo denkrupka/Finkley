@@ -1212,8 +1212,7 @@
       "case4_situation": "I want a specific master, but she's not available",
       "case4_reply": "I understand — [master] has loyal clients, they really value her work. Two options: put you on the waitlist and notify when a slot opens, or suggest [other master] — she also does [service] and has great reviews.",
       "case5_situation": "I don't know when I can come",
-      "case5_reply": "Of course! Just a heads up — [master]'s schedule is usually full 2 weeks ahead, especially Fridays. Let me hold [date] tentatively — if it doesn't work, message me a day before, we'll reschedule.",
-      "source_credit": "Script from \"Wonderful Beauty — Administrator Script\"."
+      "case5_reply": "Of course! Just a heads up — [master]'s schedule is usually full 2 weeks ahead, especially Fridays. Let me hold [date] tentatively — if it doesn't work, message me a day before, we'll reschedule."
     }
   },
   "clients": {
@@ -2558,12 +2557,10 @@
       "col_tags": "Tags",
       "col_next_visit": "Next visit",
       "contacts_hidden": "contacts hidden by role",
-      "col_revenue_ltv": "Revenue LTV",
-      "col_gross_ltv": "Gross LTV",
+      "col_revenue_ltv": "LTV",
       "col_visits_count": "Visits",
       "col_lifetime": "Lifetime",
       "months": "{{count}} mo",
-      "gross_hint": "Revenue minus service cost (services.cost_cents).",
       "regularity": {
         "title": "Clients who missed their next visit window",
         "subtitle": "Client hasn't booked within return_period_days+3 (grace). Period set in Services → Parameters.",

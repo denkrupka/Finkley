@@ -479,9 +479,6 @@ function ClientsListTab({
                   {t('reports_hub.clients.col_revenue_ltv')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
-                  {t('reports_hub.clients.col_gross_ltv')}
-                </th>
-                <th className="px-3 py-3 text-right font-semibold">
                   {t('reports_hub.clients.col_avg_check')}
                 </th>
                 <th className="px-3 py-3 text-right font-semibold">
@@ -563,26 +560,6 @@ function ClientsListTab({
                     <td className="num text-brand-sage-deep px-3 py-2.5 text-right text-sm font-bold">
                       {formatCurrency(c.total_revenue_cents, currency)}
                     </td>
-                    {(() => {
-                      const ltv = ltvByClient?.get(c.id)
-                      const gross = ltv?.gross_ltv_cents ?? null
-                      return (
-                        <td
-                          className={cn(
-                            'num px-3 py-2.5 text-right',
-                            gross != null && gross > 0
-                              ? 'text-brand-sage-deep font-semibold'
-                              : 'text-muted-foreground/60',
-                          )}
-                          title={t('reports_hub.clients.gross_hint', {
-                            defaultValue:
-                              'Выручка минус себестоимость услуг (services.cost_cents).',
-                          })}
-                        >
-                          {gross != null ? formatCurrency(gross, currency) : '—'}
-                        </td>
-                      )
-                    })()}
                     <td className="num text-muted-foreground px-3 py-2.5 text-right">
                       {formatCurrency(avg, currency)}
                     </td>
