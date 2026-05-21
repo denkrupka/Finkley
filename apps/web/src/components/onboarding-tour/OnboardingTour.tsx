@@ -71,8 +71,9 @@ const STEPS: Step[] = [
  * если в localStorage нет finkley:tour:dismissed. Юзер может пропустить
  * целиком (Skip → запоминаем) или пройти по шагам.
  *
- * Для повторного запуска — кнопка «Показать тур» в /settings?tab=help
- * (TODO: добавить в Help-таб следующим коммитом).
+ * Для повторного запуска — кнопка «Показать тур» в /help (force=true через
+ * ?showTour=1 query, см. HelpPage.relaunchTour). DashboardPage читает
+ * query и пробрасывает force prop, что игнорирует dismissed-флаг.
  */
 export function OnboardingTour({ salonId, force = false }: { salonId: string; force?: boolean }) {
   const { t } = useTranslation()

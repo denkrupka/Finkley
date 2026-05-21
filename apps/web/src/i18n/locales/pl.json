@@ -840,6 +840,11 @@
         "title": "Gdzie pisać z pytaniami i błędami?",
         "body": "Email: support@finkley.app — odpowiadamy w ciągu 24 godzin w dni robocze.\nBłędy: prosto z aplikacji — przycisk z robaczkiem w prawym górnym rogu (lub na Telegramie @finklay_dev_bot). Załącz zrzut ekranu, szybko sprawdzimy."
       }
+    },
+    "relaunch_tour": {
+      "title": "Uruchom tour ponownie",
+      "subtitle": "Przejdź startowy tour jeszcze raz — 5 kroków o kluczowych funkcjach.",
+      "button": "Pokaż tour"
     }
   },
   "ai": {

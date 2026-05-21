@@ -840,6 +840,11 @@
         "title": "Where do I write with questions or bugs?",
         "body": "Email: support@finkley.app — we reply within 24 hours on business days.\nBugs: right from the app — the bug button in the top right (or our Telegram @finklay_dev_bot). Attach a screenshot and we'll look quickly."
       }
+    },
+    "relaunch_tour": {
+      "title": "Relaunch the tour",
+      "subtitle": "Walk through the intro tour again — 5 steps on key features.",
+      "button": "Show tour"
     }
   },
   "ai": {

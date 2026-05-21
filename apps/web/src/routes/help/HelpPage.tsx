@@ -1,6 +1,6 @@
-import { ExternalLink, MessageCircle, Sparkles } from 'lucide-react'
+import { ExternalLink, MessageCircle, PlayCircle, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { LogoLockup } from '@/components/ui/logo'
 
@@ -9,6 +9,18 @@ import { HelpFAQ } from './HelpFAQ'
 export function HelpPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
+  const navigate = useNavigate()
+  function relaunchTour() {
+    if (!salonId) return
+    // Сбрасываем dismissed-флаг чтобы тур не отказался показываться, и
+    // одновременно прокидываем showTour=1 (force) для надёжности.
+    try {
+      localStorage.removeItem('finkley:tour:dismissed')
+    } catch {
+      // localStorage недоступен — query параметр всё равно сработает
+    }
+    navigate(`/${salonId}/dashboard?showTour=1`)
+  }
 
   return (
     <div className="bg-background min-h-screen">
@@ -41,6 +53,30 @@ export function HelpPage() {
             <p className="text-muted-foreground mt-1 text-sm">{t('help.subtitle')}</p>
           </div>
         </div>
+
+        {salonId ? (
+          <div className="border-border bg-card shadow-finsm mb-6 flex items-center gap-3 rounded-lg border p-4">
+            <span
+              className="bg-brand-yellow/30 text-brand-navy grid size-10 place-items-center rounded-full"
+              aria-hidden
+            >
+              <PlayCircle className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-brand-navy text-sm font-bold">{t('help.relaunch_tour.title')}</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {t('help.relaunch_tour.subtitle')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={relaunchTour}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors"
+            >
+              {t('help.relaunch_tour.button')}
+            </button>
+          </div>
+        ) : null}
 
         <HelpFAQ />
 
