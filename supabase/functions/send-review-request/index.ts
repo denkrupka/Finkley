@@ -19,6 +19,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { getBroadcastChannels } from '../_shared/broadcast-prefs.ts'
 import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -199,12 +200,15 @@ async function processOneVisit(admin: SupabaseClient, visit: VisitRow): Promise<
   const locale = pickLocale((salon as SalonRow).locale, (salon as SalonRow).country_code)
   const salonName = (salon as SalonRow).name ?? 'Finkley'
 
+  // Какие каналы включены владельцем в /marketing → Рассылки.
+  const channels = await getBroadcastChannels(admin, visit.salon_id, 'review_request')
+
   let sent = false
-  if ((client as ClientRow).email) {
+  if (channels.email && (client as ClientRow).email) {
     const { subject, html } = buildReviewEmail(salonName, reviewUrl, locale)
     if (await sendDirectResend((client as ClientRow).email!, subject, html)) sent = true
   }
-  if ((client as ClientRow).phone) {
+  if (channels.sms && (client as ClientRow).phone) {
     const smsText = REVIEW_TEXTS[locale].sms.replace('{{url}}', reviewUrl)
     const r = await sendSmsForSalon(admin, {
       salonId: visit.salon_id,

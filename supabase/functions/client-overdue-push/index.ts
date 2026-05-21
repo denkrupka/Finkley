@@ -14,6 +14,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { getBroadcastChannels } from '../_shared/broadcast-prefs.ts'
 import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -158,6 +159,10 @@ async function processOneSalon(admin: SupabaseClient, salonId: string): Promise<
   )
   const bookUrl = `${APP_URL}${salonId}/visits`
 
+  // Какие каналы включены в /marketing → Рассылки для visit_reminder.
+  const channels = await getBroadcastChannels(admin, salonId, 'visit_reminder')
+  if (!channels.email && !channels.sms) return stats
+
   for (const row of rows as RegularityRow[]) {
     if (!row.client_email && !row.client_phone) continue
     // anti-spam: не слали ли push клиенту за последние 7 дней?
@@ -172,11 +177,11 @@ async function processOneSalon(admin: SupabaseClient, salonId: string): Promise<
     if (recent) continue
 
     let sent = false
-    if (row.client_email) {
+    if (channels.email && row.client_email) {
       const { subject, html } = buildEmail(salonName, bookUrl, row, locale)
       if (await sendResend(row.client_email, subject, html)) sent = true
     }
-    if (row.client_phone) {
+    if (channels.sms && row.client_phone) {
       const sms = interpolate(STRINGS[locale].sms, {
         salon: salonName,
         category: row.category_name,

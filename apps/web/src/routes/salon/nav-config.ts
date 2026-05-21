@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   Home,
+  Megaphone,
   MessageCircle,
   Package,
   PiggyBank,
@@ -39,6 +40,7 @@ export type NavItemId =
   | 'reports'
   | 'finance'
   | 'inventory'
+  | 'marketing'
   | 'messenger'
   | 'ai'
   | 'settings'
@@ -99,6 +101,14 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'inventory',
     i18nKey: 'nav.inventory',
     icon: Package,
+    stage: 5,
+    implemented: true,
+    inBottomNav: false,
+  },
+  {
+    id: 'marketing',
+    i18nKey: 'nav.marketing',
+    icon: Megaphone,
     stage: 5,
     implemented: true,
     inBottomNav: false,

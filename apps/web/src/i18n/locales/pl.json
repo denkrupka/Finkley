@@ -214,6 +214,7 @@
     "staff": "Specjaliści",
     "services": "Usługi",
     "inventory": "Magazyn",
+    "marketing": "Marketing",
     "payouts": "Wypłaty",
     "reports": "Raporty",
     "finance": "Finanse",
@@ -3495,6 +3496,39 @@
     "stats_activated": "Aktywowane",
     "activated": "Aktywowane",
     "pending": "Oczekuje"
+  },
+  "marketing": {
+    "title": "Marketing",
+    "subtitle": "Skonfiguruj automatyczne wysyłki do klientów i kontroluj, którymi kanałami idą.",
+    "tabs": {
+      "broadcasts": "Wysyłki"
+    },
+    "broadcasts": {
+      "title": "Typy wysyłek",
+      "subtitle": "Wybierz kanały dla każdego typu. Możesz wyłączyć kanał, żeby klient dostawał tylko email albo tylko SMS.",
+      "col_name": "Nazwa",
+      "col_email": "Email",
+      "col_sms": "SMS",
+      "info_button": "Info",
+      "footer_hint": "SMS rozliczane są z salda salonu (Ustawienia → Integracje → SMS). Gdy saldo się skończy, SMS się nie wyślą; email działa dalej.",
+      "kind": {
+        "marketing": {
+          "title": "Akcje marketingowe",
+          "short": "Jednorazowe wysyłki promocyjne do klientów (akcje, urodziny, zniżki).",
+          "long": "Ręczne wysyłki marketingowe, które uruchamiasz sam — np. «−20% na manicure w tym tygodniu» lub życzenia urodzinowe. Idą tylko do klientów, którzy nie wypisali się. Email przez Resend, SMS przez skonfigurowany kanał SMSAPI.\n\nKiedy się odpala: na razie tylko ręcznie w przyszłej sekcji «Uruchom wysyłkę» (w opracowaniu)."
+        },
+        "visit_reminder": {
+          "title": "Naruszenie regularności",
+          "short": "Klient nie zarezerwował w zwykłym terminie dla swojej usługi — delikatne przypomnienie.",
+          "long": "Codziennie o 09:00 UTC sprawdzamy klientów. Jeśli klient zalega z wizytą w kategorii usługi (np. manicure zwykle co 4 tygodnie, a minęło 6) — wysyłamy łagodne przypomnienie z linkiem do rezerwacji.\n\nAnti-spam: jeden klient nie dostanie więcej niż jednego przypomnienia na kategorię w ciągu 7 dni.\n\nUstawienie: regularność definiujesz w Usługi → kategoria → «Regularność powrotu»."
+        },
+        "review_request": {
+          "title": "Prośba o opinię",
+          "short": "Po opłaconej wizycie klient dostaje link: 5★ → Google Maps, 1–4★ → wewnętrzny formularz.",
+          "long": "Co 6 godzin szukamy opłaconych wizyt, które zakończyły się 1–7 dni temu, i wysyłamy klientowi krótki link «oceń 1–5».\n\n5★ → przekierowanie na Twoją stronę Google Maps (podnosi ocenę w Google).\n1–4★ → wewnętrzny formularz feedbacku (nie wycieknie na zewnątrz).\n\nTa sama wizyta przetwarza się tylko raz — duplikaty są filtrowane."
+        }
+      }
+    }
   },
   "messenger": {
     "title": "Komunikator",

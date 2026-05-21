@@ -214,6 +214,7 @@
     "staff": "Specialists",
     "services": "Services",
     "inventory": "Inventory",
+    "marketing": "Marketing",
     "payouts": "Payroll",
     "reports": "Reports",
     "finance": "Finance",
@@ -3495,6 +3496,39 @@
     "stats_activated": "Activated",
     "activated": "Activated",
     "pending": "Pending"
+  },
+  "marketing": {
+    "title": "Marketing",
+    "subtitle": "Configure automated client campaigns and control which channels they use.",
+    "tabs": {
+      "broadcasts": "Campaigns"
+    },
+    "broadcasts": {
+      "title": "Campaign types",
+      "subtitle": "Pick channels per campaign type. Turn off a channel to send only email or only SMS.",
+      "col_name": "Name",
+      "col_email": "Email",
+      "col_sms": "SMS",
+      "info_button": "Info",
+      "footer_hint": "SMS uses the salon balance (Settings → Integrations → SMS). When it runs out, SMS simply skip; email keeps working.",
+      "kind": {
+        "marketing": {
+          "title": "Marketing campaigns",
+          "short": "One-off promo blasts to clients (offers, birthdays, discounts).",
+          "long": "Manual marketing campaigns you launch yourself — e.g. «−20% on manicure this week» or a birthday greeting. Goes only to clients who haven't opted out. Email via Resend, SMS via your configured SMSAPI channel.\n\nWhen it fires: for now only manually via the upcoming «Launch campaign» section (work in progress)."
+        },
+        "visit_reminder": {
+          "title": "Visit cadence breached",
+          "short": "Client hasn't booked again within the usual cadence for their service — gentle reminder.",
+          "long": "Every day at 09:00 UTC we check your clients. If a client is overdue for a service category (e.g. manicure cadence is 4 weeks but 6 have passed) we send a soft reminder with a booking link.\n\nAnti-spam: a single client won't get more than one reminder per category in 7 days.\n\nSetup: cadence is defined in Services → category → «Return cadence»."
+        },
+        "review_request": {
+          "title": "Review request",
+          "short": "After a paid visit the client receives a link: 5★ → Google Maps, 1–4★ → internal form.",
+          "long": "Every 6 hours we find paid visits that completed 1–7 days ago and send the client a short link «rate 1 to 5».\n\n5★ → redirect to your Google Maps page (boosts Google rating).\n1–4★ → internal feedback form (won't leak publicly).\n\nThe same visit is processed only once — duplicates are filtered."
+        }
+      }
+    }
   },
   "messenger": {
     "title": "Messenger",

@@ -89,6 +89,9 @@ const ServicesPage = lazyWithRetry(() =>
 const InventoryPage = lazyWithRetry(() =>
   import('@/routes/inventory/InventoryPage').then((m) => ({ default: m.InventoryPage })),
 )
+const MarketingPage = lazyWithRetry(() =>
+  import('@/routes/marketing/MarketingPage').then((m) => ({ default: m.MarketingPage })),
+)
 const MessengerPage = lazyWithRetry(() =>
   import('@/routes/messenger/MessengerPage').then((m) => ({ default: m.MessengerPage })),
 )
@@ -268,6 +271,7 @@ function App() {
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="services" element={lazyRoute(<ServicesPage />)} />
         <Route path="inventory" element={lazyRoute(<InventoryPage />)} />
+        <Route path="marketing" element={lazyRoute(<MarketingPage />)} />
         <Route path="messenger" element={lazyRoute(<MessengerPage />)} />
         <Route path="knowledge" element={lazyRoute(<KnowledgePage />)} />
         <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />

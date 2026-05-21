@@ -1,0 +1,223 @@
+import { Calendar, Info, Mail, MessageSquare, Star, X } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  BROADCAST_KINDS,
+  useBroadcastPrefs,
+  useUpdateBroadcastPref,
+  type BroadcastKind,
+} from '@/hooks/useBroadcastPrefs'
+import { cn } from '@/lib/utils/cn'
+
+type MarketingSubTab = 'broadcasts'
+
+const MARKETING_TABS: PageTab<MarketingSubTab>[] = [
+  { id: 'broadcasts', labelKey: 'marketing.tabs.broadcasts', icon: Mail },
+]
+
+const KIND_META: Record<BroadcastKind, { icon: typeof Mail }> = {
+  marketing: { icon: Star },
+  visit_reminder: { icon: Calendar },
+  review_request: { icon: MessageSquare },
+}
+
+/**
+ * /:salonId/marketing — Маркетинг. Сейчас одна табa «Рассылки» с таблицей
+ * типов рассылок и чекбоксами Email / SMS на каждый. Кнопка «i» открывает
+ * модалку с объяснением как работает этот тип.
+ *
+ * Какие cron'ы шлют что:
+ *   marketing       — будущие массовые акции (пока нет cron)
+ *   visit_reminder  — client-overdue-push (09:00 UTC, ежедневно)
+ *   review_request  — send-review-request (каждые 6 ч)
+ */
+export function MarketingPage() {
+  const { t } = useTranslation()
+  const { salonId } = useParams<{ salonId: string }>()
+  const [active, setActive] = useState<MarketingSubTab>('broadcasts')
+  const [infoKind, setInfoKind] = useState<BroadcastKind | null>(null)
+
+  const prefs = useBroadcastPrefs(salonId)
+  const update = useUpdateBroadcastPref(salonId)
+
+  if (!salonId) return null
+
+  function toggle(kind: BroadcastKind, channel: 'email' | 'sms', enabled: boolean) {
+    update.mutate(
+      { kind, channel, enabled },
+      {
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  return (
+    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+      <header className="mb-6">
+        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+          {t('marketing.title')}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t('marketing.subtitle')}</p>
+      </header>
+
+      <PageTabsNav tabs={MARKETING_TABS} active={active} onChange={setActive} t={t} />
+
+      <section className="border-border bg-card shadow-finsm mt-4 rounded-lg border">
+        <div className="border-border/40 border-b p-4">
+          <h2 className="text-brand-navy text-base font-bold tracking-tight">
+            {t('marketing.broadcasts.title')}
+          </h2>
+          <p className="text-muted-foreground mt-1 text-xs">{t('marketing.broadcasts.subtitle')}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="bg-muted/30 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('marketing.broadcasts.col_name')}
+                </th>
+                <th className="px-4 py-3 text-center font-semibold">
+                  {t('marketing.broadcasts.col_email')}
+                </th>
+                <th className="px-4 py-3 text-center font-semibold">
+                  {t('marketing.broadcasts.col_sms')}
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">{/* info button */}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BROADCAST_KINDS.map((kind) => {
+                const Icon = KIND_META[kind].icon
+                const channelPrefs = prefs.data?.[kind] ?? { email: true, sms: true }
+                return (
+                  <tr key={kind} className="border-border/40 border-t">
+                    <td className="px-4 py-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-brand-sage-soft text-brand-sage-deep grid size-9 shrink-0 place-items-center rounded-md">
+                          <Icon className="size-4" strokeWidth={2} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-foreground text-sm font-semibold">
+                            {t(`marketing.broadcasts.kind.${kind}.title`)}
+                          </p>
+                          <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                            {t(`marketing.broadcasts.kind.${kind}.short`)}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <ChannelCheckbox
+                        checked={channelPrefs.email}
+                        onChange={(v) => toggle(kind, 'email', v)}
+                        disabled={update.isPending}
+                      />
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <ChannelCheckbox
+                        checked={channelPrefs.sms}
+                        onChange={(v) => toggle(kind, 'sms', v)}
+                        disabled={update.isPending}
+                      />
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setInfoKind(kind)}
+                        className="text-muted-foreground hover:bg-muted/60 hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                      >
+                        <Info className="size-3.5" strokeWidth={2} />
+                        {t('marketing.broadcasts.info_button')}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="border-border/40 border-t p-4">
+          <p className="text-muted-foreground flex items-start gap-1.5 text-[11px]">
+            <Info className="mt-0.5 size-3 shrink-0" strokeWidth={2} />
+            {t('marketing.broadcasts.footer_hint')}
+          </p>
+        </div>
+      </section>
+
+      <Dialog open={infoKind !== null} onOpenChange={(open) => !open && setInfoKind(null)}>
+        <DialogContent>
+          {infoKind ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t(`marketing.broadcasts.kind.${infoKind}.title`)}</DialogTitle>
+                <DialogDescription>
+                  {t(`marketing.broadcasts.kind.${infoKind}.short`)}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm leading-relaxed">
+                <p className="text-foreground whitespace-pre-line">
+                  {t(`marketing.broadcasts.kind.${infoKind}.long`)}
+                </p>
+              </div>
+              <DialogClose className="absolute right-4 top-4">
+                <X className="size-4" strokeWidth={2} />
+              </DialogClose>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function ChannelCheckbox({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'inline-flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+        checked
+          ? 'border-brand-sage bg-brand-sage text-white'
+          : 'border-muted-foreground/40 bg-card hover:border-brand-sage/50',
+        disabled && 'opacity-50',
+      )}
+    >
+      {checked ? (
+        <svg
+          viewBox="0 0 20 20"
+          className="size-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+        >
+          <path d="M4 10l4 4 8-8" />
+        </svg>
+      ) : null}
+    </button>
+  )
+}
