@@ -44,15 +44,30 @@ Deno.serve(async (req: Request) => {
   if (!email) return jsonResponse({ error: 'no_email' }, 400)
   const fullName = (userRes?.user?.user_metadata?.full_name as string | undefined) ?? ''
 
-  // body опц.: { salon_id, salon_name }
+  // body опц.: { salon_id, salon_name, locale }
   let salonId: string | null = null
   let salonName = ''
+  let bodyLocale: string | undefined
   try {
     const body = await req.json()
     salonId = body.salon_id ?? null
     salonName = body.salon_name ?? ''
+    bodyLocale = body.locale
   } catch {
     // body не обязательный
+  }
+
+  // Locale precedence: body.locale (передан из клиентского onboarding) →
+  // profiles.locale → 'ru'. profiles может не существовать в момент онбординга,
+  // поэтому body.locale — основной источник.
+  let locale = bodyLocale
+  if (!locale) {
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('locale')
+      .eq('id', user.userId)
+      .maybeSingle()
+    locale = (profile?.locale as string | undefined) ?? 'ru'
   }
 
   // Если salon_id пришёл — проверяем что юзер реально owner этого салона
@@ -79,13 +94,29 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  await sendEmail('welcome', email, {
-    full_name: fullName || (email.split('@')[0] ?? ''),
-    salon_name: salonName,
-    logo_block: renderLogoBlock(logoUrl),
-    app_url: salonId ? `${APP_URL}${salonId}/dashboard` : APP_URL,
-    owner_name: 'команда Finkley',
-  })
+  // Подписи на разных языках. Для EN/PL — общая formula «Finkley team»,
+  // для RU — «команда Finkley». Если позже сделаем persona-based copy
+  // (например, имя founder'а), это место расширится.
+  const ownerNameByLocale: Record<string, string> = {
+    ru: 'команда Finkley',
+    pl: 'zespół Finkley',
+    en: 'Finkley team',
+  }
+  const localeBase = locale.split('-')[0]?.toLowerCase() ?? 'ru'
+  const ownerName = ownerNameByLocale[localeBase] ?? ownerNameByLocale.ru
+
+  await sendEmail(
+    'welcome',
+    email,
+    {
+      full_name: fullName || (email.split('@')[0] ?? ''),
+      salon_name: salonName,
+      logo_block: renderLogoBlock(logoUrl),
+      app_url: salonId ? `${APP_URL}${salonId}/dashboard` : APP_URL,
+      owner_name: ownerName,
+    },
+    locale,
+  )
 
   return jsonResponse({ ok: true })
 })

@@ -22,7 +22,13 @@
  */
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { ALLOWED_TEMPLATES, render, TEMPLATES, type TemplateAlias } from './templates.ts'
+import {
+  ALLOWED_TEMPLATES,
+  normalizeEmailLocale,
+  pickTemplate,
+  render,
+  type TemplateAlias,
+} from './templates.ts'
 
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Finkley <info@finkley.app>'
@@ -32,6 +38,8 @@ type SendInput = {
   template: TemplateAlias
   to: string
   vars?: Record<string, string | number | null>
+  /** BCP-47 lang code; нормализуется до ru/pl/en. Дефолт ru. */
+  locale?: string
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -77,7 +85,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'invalid_to' }, 400)
   }
 
-  const tpl = TEMPLATES[body.template]
+  const locale = normalizeEmailLocale(body.locale)
+  const tpl = pickTemplate(body.template, locale)
   const vars = body.vars ?? {}
   const subject = render(tpl.subject, vars)
   const html = render(tpl.html, vars)

@@ -55,7 +55,7 @@ const INITIAL: OnboardingState = {
 }
 
 export function OnboardingPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { signOut } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -156,13 +156,16 @@ export function OnboardingPage() {
       const token = sessionData.session?.access_token
       if (!token) return
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+      // i18n.language: подхватываем язык интерфейса в момент онбординга,
+      // чтобы welcome пришёл на нужном языке (а не на дефолтном ru).
+      const locale = i18n.language?.split('-')[0] ?? 'ru'
       await fetch(`${SUPABASE_URL}/functions/v1/notify-welcome`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ salon_id: salonId, salon_name: salonName }),
+        body: JSON.stringify({ salon_id: salonId, salon_name: salonName, locale }),
       })
     } catch (err) {
       console.warn('welcome email trigger failed', err)

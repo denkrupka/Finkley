@@ -611,6 +611,183 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 export const ALLOWED_TEMPLATES = new Set<TemplateAlias>(Object.keys(TEMPLATES) as TemplateAlias[])
 
 /**
+ * Локализованные варианты шаблонов. Ключ — locale, значение — частичная карта
+ * (можно покрывать не все шаблоны, отсутствующие наследуют RU из TEMPLATES).
+ *
+ * Pattern roadmap:
+ *   - сейчас: только `welcome` переведено EN/PL, остальные — RU fallback.
+ *   - дальше: переводим weekly_digest, team_invitation, trial_ending.
+ *   - в последнюю очередь: payment_*, gdpr_export, bank_consent_expiring.
+ */
+export type EmailLocale = 'ru' | 'pl' | 'en'
+
+const WELCOME_EN: EmailTemplate = {
+  subject: 'Hi from Finkley 👋',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome to Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+
+{{logo_block}}
+
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Hi {{full_name}}!
+</h1>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Thanks for joining Finkley. Glad you're here.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Finkley helps you see the real profit of <strong>{{salon_name}}</strong> — after all expenses, without spreadsheets or a calculator.
+</p>
+
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+To get started, add your first visit. Takes less than a minute:
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Open Finkley
+</a>
+</td></tr>
+</table>
+
+<p style="margin:32px 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+You have a <strong>14-day free trial</strong>. No card, no tricks. If you don't like it — just don't pay.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Got questions or something not working — email me directly at <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>. I reply personally.
+</p>
+
+<p style="margin:0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+
+</td></tr>
+</table>
+
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland<br>
+This is a transactional email. Questions about data processing — info@finkley.app
+</p>
+
+</td></tr>
+</table>
+
+</body>
+</html>`,
+}
+
+const WELCOME_PL: EmailTemplate = {
+  subject: 'Cześć od Finkley 👋',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Witamy w Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+
+{{logo_block}}
+
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Cześć, {{full_name}}!
+</h1>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Dzięki, że dołączasz do Finkley. Cieszymy się, że jesteś z nami.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Finkley pomoże Ci zobaczyć realny zysk Twojego salonu <strong>{{salon_name}}</strong> — po wszystkich wydatkach, bez arkuszy i kalkulatora.
+</p>
+
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Aby zacząć, dodaj pierwszą wizytę. Zajmie to mniej niż minutę:
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Otwórz Finkley
+</a>
+</td></tr>
+</table>
+
+<p style="margin:32px 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Masz <strong>14 dni bezpłatnego okresu próbnego</strong>. Bez karty, bez kruczków. Jeśli coś Ci się nie spodoba — po prostu nie płacisz.
+</p>
+
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Pytania albo coś nie działa — napisz na <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>. Odpowiadam osobiście.
+</p>
+
+<p style="margin:0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+
+</td></tr>
+</table>
+
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska<br>
+To wiadomość transakcyjna. Pytania o przetwarzanie danych — info@finkley.app
+</p>
+
+</td></tr>
+</table>
+
+</body>
+</html>`,
+}
+
+const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
+  ru: {}, // RU — основной набор в TEMPLATES
+  en: { welcome: WELCOME_EN },
+  pl: { welcome: WELCOME_PL },
+}
+
+export function normalizeEmailLocale(input: unknown): EmailLocale {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
+
+/**
+ * Возвращает шаблон с учётом локали; если для локали перевод не сделан, падает
+ * обратно на RU. Так юзер всегда получит письмо, даже если EN/PL ещё не
+ * переведён для конкретного alias.
+ */
+export function pickTemplate(alias: TemplateAlias, locale: EmailLocale): EmailTemplate {
+  const localized = LOCALE_OVERRIDES[locale]?.[alias]
+  return localized ?? TEMPLATES[alias]
+}
+
+/**
  * Простая `{{var}}` подстановка. Незаданные ключи заменяются пустой строкой.
  */
 export function render(template: string, vars: Record<string, string | number | null>): string {

@@ -184,6 +184,8 @@ export async function sendEmail(
   template: EmailTemplate,
   to: string,
   vars: Record<string, string | number | null>,
+  /** BCP-47 lang получателя (ru/pl/en). Дефолт ru, если не задан. */
+  locale?: string,
 ): Promise<void> {
   if (!SUPABASE_URL || !FUNCTION_SECRET) {
     console.warn('sendEmail: not configured (missing SUPABASE_URL or FUNCTION_INTERNAL_SECRET)')
@@ -200,7 +202,7 @@ export async function sendEmail(
         'Content-Type': 'application/json',
         'X-Finkley-Secret': FUNCTION_SECRET,
       },
-      body: JSON.stringify({ template, to, vars }),
+      body: JSON.stringify({ template, to, vars, locale }),
     })
     if (!res.ok) {
       const body = await res.text()
