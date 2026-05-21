@@ -170,6 +170,63 @@ function shouldOverwrite<T>(localValue: T, booksyPrev: T | undefined, booksyNow:
   return undefined
 }
 
+/**
+ * Booksy услуги в /service_categories отдаются в двух схемах:
+ *
+ *   1) Legacy v1 (старые salons):  service.price.amount + service.duration
+ *   2) Current v2: service.variants[0].service_price.amount + variants[0].duration
+ *
+ * Без defensive разбора оба значения уезжали как `undefined` → в БД писалось 0 и
+ * null, и в /reports → услуги колонки «Время / Доход/час / Маржа» показывали «—»
+ * (bug-screenshot 2026-05-21). Берём первое непустое значение по очереди:
+ * top-level → variants[0].duration / service_price → variants[0].price.
+ */
+function extractServicePriceDuration(s: {
+  price?: { amount?: number | string } | number | string | null
+  duration?: number | null
+  variants?: Array<{
+    duration?: number | null
+    service_price?: { amount?: number | string } | null
+    price?: number | string | null
+  }> | null
+}): { priceCents: number; durationMin: number | null } {
+  const parsePrice = (v: unknown): number => {
+    if (v == null) return 0
+    if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 100) : 0
+    if (typeof v === 'string') {
+      const n = Number.parseFloat(v)
+      return Number.isFinite(n) ? Math.round(n * 100) : 0
+    }
+    if (typeof v === 'object' && v !== null && 'amount' in v) {
+      return parsePrice((v as { amount?: unknown }).amount)
+    }
+    return 0
+  }
+
+  // Price: top-level → variants[0].service_price → variants[0].price
+  let priceCents = parsePrice(s.price)
+  if (priceCents === 0) {
+    const v0 = s.variants?.[0]
+    if (v0) {
+      priceCents = parsePrice(v0.service_price)
+      if (priceCents === 0) priceCents = parsePrice(v0.price)
+    }
+  }
+
+  // Duration: top-level → variants[0]
+  let durationMin: number | null = null
+  if (typeof s.duration === 'number' && s.duration > 0) {
+    durationMin = s.duration
+  } else {
+    const v0 = s.variants?.[0]
+    if (v0 && typeof v0.duration === 'number' && v0.duration > 0) {
+      durationMin = v0.duration
+    }
+  }
+
+  return { priceCents, durationMin }
+}
+
 // =============================================================================
 // Booksy data types
 // =============================================================================
@@ -524,11 +581,29 @@ async function syncCatalog(
   }
 
   // ── Services ──────────────────────────────────────────────────────────
+  // Booksy сменили схему: цена и длительность теперь лежат внутри `variants[0]`
+  // (а не top-level). Старая схема ещё встречается у некоторых endpoint'ов,
+  // поэтому пробуем оба варианта. См. extractServicePriceDuration ниже.
+  type BooksyServiceRaw = {
+    id: number
+    name: string
+    // legacy v1 — top-level
+    price?: { amount?: number | string } | number | string | null
+    duration?: number | null
+    // current v2 — внутри variants[0]
+    variants?: Array<{
+      id?: number
+      name?: string
+      duration?: number | null
+      service_price?: { amount?: number | string } | null
+      price?: number | string | null
+    }> | null
+  }
   type SvcResp = {
     service_categories?: {
       id: number
       name: string
-      services?: { id: number; name: string; price?: { amount?: number }; duration?: number }[]
+      services?: BooksyServiceRaw[]
     }[]
   }
   const svcRes = await booksyGet<SvcResp>(
@@ -608,8 +683,8 @@ async function syncCatalog(
     const localCatId = categoryMap.get(String(cat.id)) ?? null
     for (const s of cat.services ?? []) {
       const extId = String(s.id)
-      const priceCents = Math.round((s.price?.amount ?? 0) * 100)
-      const booksyNow = { name: s.name, price_cents: priceCents, duration_min: s.duration ?? null }
+      const { priceCents, durationMin } = extractServicePriceDuration(s)
+      const booksyNow = { name: s.name, price_cents: priceCents, duration_min: durationMin }
 
       let { data: existing } = await admin
         .from('services')
@@ -672,7 +747,7 @@ async function syncCatalog(
           salon_id: salonId,
           name: s.name,
           default_price_cents: priceCents,
-          default_duration_min: s.duration ?? null,
+          default_duration_min: durationMin,
           category_id: localCatId,
           external_source: 'booksy',
           external_id: extId,
@@ -2485,11 +2560,24 @@ async function handleBackfillServiceCategories(
   if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
   const creds = integration.credentials as { access_token: string; business_id: number }
 
+  // То же определение что в syncCatalog — поддерживаем оба варианта schemа
+  // (legacy v1 и variants[0]).
+  type BackfillBooksyServiceRaw = {
+    id: number
+    name: string
+    price?: { amount?: number | string } | number | string | null
+    duration?: number | null
+    variants?: Array<{
+      duration?: number | null
+      service_price?: { amount?: number | string } | null
+      price?: number | string | null
+    }> | null
+  }
   type SvcResp = {
     service_categories?: {
       id: number
       name: string
-      services?: { id: number; name: string }[]
+      services?: BackfillBooksyServiceRaw[]
     }[]
   }
   const svcRes = await booksyGet<SvcResp>(
@@ -2502,6 +2590,8 @@ async function handleBackfillServiceCategories(
 
   let categoriesUpserted = 0
   let servicesPatched = 0
+  let durationsPatched = 0
+  let pricesPatched = 0
   const categoryMap = new Map<string, string>() // booksy cat id → local uuid
 
   // 1) Категории: ensure rows + map booksy id → local uuid
@@ -2556,7 +2646,9 @@ async function handleBackfillServiceCategories(
     if (existingCat) categoryMap.set(catExtId, existingCat.id)
   }
 
-  // 2) Услуги: проставляем category_id где сейчас null.
+  // 2) Услуги: проставляем category_id где сейчас null, и заодно patch'им
+  // duration_min/price из variants[0] если в БД они 0/null (старый bug —
+  // service.price/duration не парсились).
   for (const cat of svcRes.data.service_categories ?? []) {
     const localCatId = categoryMap.get(String(cat.id))
     if (!localCatId) continue
@@ -2564,19 +2656,32 @@ async function handleBackfillServiceCategories(
       const extId = String(s.id)
       const { data: svc } = await admin
         .from('services')
-        .select('id, category_id')
+        .select('id, category_id, default_price_cents, default_duration_min')
         .eq('salon_id', salonId)
         .eq('external_source', 'booksy')
         .eq('external_id', extId)
         .maybeSingle()
       if (!svc) continue
-      if (svc.category_id) continue // не перетираем выбор юзера
-      const { error } = await admin
-        .from('services')
-        .update({ category_id: localCatId })
-        .eq('id', svc.id)
-        .is('category_id', null)
-      if (!error) servicesPatched += 1
+
+      const update: Record<string, unknown> = {}
+      if (!svc.category_id) update.category_id = localCatId
+      const { priceCents, durationMin } = extractServicePriceDuration(s)
+      // duration: ставим только если в БД null — не перетираем ручную правку
+      if ((svc.default_duration_min == null || svc.default_duration_min === 0) && durationMin) {
+        update.default_duration_min = durationMin
+      }
+      // price: ставим только если в БД 0 — defensible default ценой не перетираем
+      if ((svc.default_price_cents == null || svc.default_price_cents === 0) && priceCents > 0) {
+        update.default_price_cents = priceCents
+      }
+      if (Object.keys(update).length === 0) continue
+
+      const { error } = await admin.from('services').update(update).eq('id', svc.id)
+      if (!error) {
+        if ('category_id' in update) servicesPatched += 1
+        if ('default_duration_min' in update) durationsPatched += 1
+        if ('default_price_cents' in update) pricesPatched += 1
+      }
     }
   }
 
@@ -2584,6 +2689,8 @@ async function handleBackfillServiceCategories(
     ok: true,
     categories_upserted: categoriesUpserted,
     services_patched: servicesPatched,
+    durations_patched: durationsPatched,
+    prices_patched: pricesPatched,
   })
 }
 

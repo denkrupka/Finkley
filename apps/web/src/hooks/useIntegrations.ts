@@ -356,6 +356,8 @@ export function useBackfillBooksyServiceCategories(salonId: string | undefined) 
         ok?: boolean
         categories_upserted?: number
         services_patched?: number
+        durations_patched?: number
+        prices_patched?: number
         message?: string
         error?: string
       }
@@ -363,6 +365,8 @@ export function useBackfillBooksyServiceCategories(salonId: string | undefined) 
       return {
         categoriesUpserted: json.categories_upserted ?? 0,
         servicesPatched: json.services_patched ?? 0,
+        durationsPatched: json.durations_patched ?? 0,
+        pricesPatched: json.prices_patched ?? 0,
       }
     },
     onSuccess: () => {

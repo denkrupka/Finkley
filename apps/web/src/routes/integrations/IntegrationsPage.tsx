@@ -489,13 +489,20 @@ function IntegrationCard({
                   type="button"
                   onClick={() => {
                     backfillSvcCats.mutate(undefined, {
-                      onSuccess: ({ categoriesUpserted, servicesPatched }) =>
+                      onSuccess: ({
+                        categoriesUpserted,
+                        servicesPatched,
+                        durationsPatched,
+                        pricesPatched,
+                      }) =>
                         toast.success(
                           t('integrations.toast_backfill_svc_cats_done', {
                             defaultValue:
-                              'Категории: {{categoriesUpserted}} создано, услуг привязано: {{servicesPatched}}',
+                              'Категории: {{categoriesUpserted}}, услуг: {{servicesPatched}}, ⏱ {{durationsPatched}}, 💰 {{pricesPatched}}',
                             categoriesUpserted,
                             servicesPatched,
+                            durationsPatched,
+                            pricesPatched,
                           }),
                         ),
                       onError: (err) =>
