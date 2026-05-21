@@ -2790,7 +2790,12 @@
       "not_finished": "Okres jeszcze się nie zakończył — za wcześnie na zamykanie"
     },
     "cash_register_placeholder": "Z której kasy wypłacono",
-    "cash_register_none": "Nie określono"
+    "cash_register_none": "Nie określono",
+    "staff_visits_modal": {
+      "title_fallback": "Wizyty mistrza",
+      "subtitle": "{{count}} wizyt · {{revenue}} w okresie",
+      "empty": "Brak wizyt w tym okresie"
+    }
   },
   "expenses": {
     "title": "Wydatki",

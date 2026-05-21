@@ -402,7 +402,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     ...(otherExpenseCategories.length > 0
       ? [
           {
-            label: t('finance.report.expenses_other', { defaultValue: 'Прочие категории' }),
+            label: t('finance.report.expenses_other'),
             values: otherExpenseCategories.reduce(
               (acc: number[], cat) => acc.map((v, i) => v - (cat.values[i] ?? 0)),
               Array.from({ length: 12 }, () => 0),

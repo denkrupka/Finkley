@@ -365,7 +365,6 @@
     "client_linked_tooltip": "Клиент привязан к карточке в базе салона",
     "client_unlinked": "+ В клиенты",
     "client_unlinked_tooltip": "Добавить в базу клиентов — переписка автоматически привяжется",
-
     "bulk_button": "Рассылка",
     "bulk": {
       "title": "Массовая рассылка",
@@ -1635,7 +1634,6 @@
       "continue_hint": "Можешь сразу вводить следующий — мастер и оплата сохранены."
     },
     "toast_added": "Визит добавлен",
-    "toast_updated": "Визит обновлён",
     "toast_deleted": "Визит удалён",
     "toast_undo": "Откатить",
     "toast_undone": "Визит удалён",
@@ -2525,9 +2523,8 @@
       "days": "дней"
     },
     "errors": {
-      "name_too_short": "Имя слишком короткое",
-      "percent_invalid": "% должен быть от 0 до 100",
-      "retention_invalid": "Окно ретеншна — от 7 до 365 дней"
+      "name_too_short": "Имя должно быть не менее 2 символов",
+      "percent_invalid": "Процент должен быть от 0 до 100"
     },
     "scheme_label": "Схема выплат",
     "schemes": {
@@ -2565,10 +2562,6 @@
       "no_services": "Сначала добавь услуги в настройках салона.",
       "save_first": "Сохрани мастера, чтобы настроить ставки за услуги.",
       "clear": "Сбросить"
-    },
-    "errors": {
-      "name_too_short": "Имя должно быть не менее 2 символов",
-      "percent_invalid": "Процент должен быть от 0 до 100"
     }
   },
   "notifications": {
@@ -3277,7 +3270,8 @@
       "end_balance": "Остаток на конец месяца",
       "end_balance_by_register": "Остаток на конец месяца — по кассам",
       "export_csv": "Excel / CSV",
-      "print": "Печать / PDF"
+      "print": "Печать / PDF",
+      "expenses_other": "Прочие категории"
     },
     "cashflow_placeholder": "Движение денежных средств (ДДС) — раздел в разработке.",
     "payments_placeholder": "Платёжный календарь — раздел в разработке.",
@@ -3459,6 +3453,11 @@
     "errors": {
       "already_closed": "Период уже закрыт",
       "not_finished": "Период ещё не завершился — закрывать рано"
+    },
+    "staff_visits_modal": {
+      "title_fallback": "Визиты мастера",
+      "subtitle": "{{count}} визитов · {{revenue}} за период",
+      "empty": "Визитов за период нет"
     }
   },
   "cash_transfer": {

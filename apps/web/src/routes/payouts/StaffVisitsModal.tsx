@@ -83,13 +83,9 @@ export function StaffVisitsModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[85vh] sm:!w-[640px] sm:!max-w-[640px]">
           <DialogHeader>
-            <DialogTitle>
-              {staffName ??
-                t('payouts.staff_visits_modal.title_fallback', { defaultValue: 'Визиты мастера' })}
-            </DialogTitle>
+            <DialogTitle>{staffName ?? t('payouts.staff_visits_modal.title_fallback')}</DialogTitle>
             <DialogDescription>
               {t('payouts.staff_visits_modal.subtitle', {
-                defaultValue: '{{count}} визитов · {{revenue}} за период',
                 count: visits.length,
                 revenue: formatCurrency(totalRevenue, currency),
               })}
@@ -98,7 +94,7 @@ export function StaffVisitsModal({
           <div className="-mx-5 max-h-[60vh] overflow-y-auto px-5 pb-2">
             {byDay.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center text-sm">
-                {t('payouts.staff_visits_modal.empty', { defaultValue: 'Визитов за период нет' })}
+                {t('payouts.staff_visits_modal.empty')}
               </p>
             ) : (
               <div className="flex flex-col gap-4">

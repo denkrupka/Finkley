@@ -2790,7 +2790,12 @@
       "not_finished": "Period hasn't ended yet — too early to close"
     },
     "cash_register_placeholder": "Which register paid from",
-    "cash_register_none": "Not specified"
+    "cash_register_none": "Not specified",
+    "staff_visits_modal": {
+      "title_fallback": "Master's visits",
+      "subtitle": "{{count}} visits · {{revenue}} for the period",
+      "empty": "No visits in this period"
+    }
   },
   "expenses": {
     "title": "Expenses",
