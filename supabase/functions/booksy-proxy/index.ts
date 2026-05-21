@@ -2192,6 +2192,97 @@ async function handleClearVisits(
   return jsonResponse({ ok: true, deleted: count ?? 0 })
 }
 
+/**
+ * Бэкфилл visits.external_reservation_id для legacy записей которые
+ * импортировались до фикса где этот ID начал сохраняться. Без него
+ * delete визита в портале не каскадит в Booksy.
+ *
+ * Алгоритм:
+ *   1. Берём все source='booksy' визиты с external_reservation_id IS NULL.
+ *   2. Группируем по дате (UTC). Для каждой даты — один /calendar GET.
+ *   3. Внутри ответа находим subbooking с матчем по external_id ('subbk:{id}').
+ *   4. UPDATE visits.external_reservation_id = appointment_uid.
+ *
+ * Идемпотентно — повторный запуск только заполняет оставшиеся пустыми.
+ */
+async function handleBackfillApptUids(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const { data: integration } = await admin
+    .from('salon_integrations')
+    .select('credentials')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .eq('status', 'connected')
+    .maybeSingle()
+  if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+  const creds = integration.credentials as { access_token: string; business_id: number }
+
+  const { data: legacy } = await admin
+    .from('visits')
+    .select('id, visit_at, external_id')
+    .eq('salon_id', salonId)
+    .eq('source', 'booksy')
+    .is('external_reservation_id', null)
+    .is('deleted_at', null)
+  if (!legacy || legacy.length === 0) {
+    return jsonResponse({ ok: true, scanned: 0, patched: 0 })
+  }
+
+  // Группируем по date (yyyy-mm-dd)
+  const byDate = new Map<string, Array<{ id: string; bookingId: string }>>()
+  for (const v of legacy) {
+    if (!v.external_id || !v.external_id.startsWith('subbk:')) continue
+    const day = String(v.visit_at).slice(0, 10)
+    const bookingId = v.external_id.slice('subbk:'.length)
+    const arr = byDate.get(day) ?? []
+    arr.push({ id: v.id, bookingId })
+    byDate.set(day, arr)
+  }
+
+  let patched = 0
+  for (const [day, items] of byDate) {
+    const calRes = await booksyGet<{
+      bookings?: Record<string, { id: number; appointment_uid: number }>
+    }>(
+      `/me/businesses/${creds.business_id}/calendar?start_date=${day}&end_date=${day}&include_unconfirmed=true&version=3&resources_per_page=100`,
+      creds.access_token,
+    )
+    if (!calRes.ok) {
+      console.warn(`backfill ${day}: calendar fetch ${calRes.reason}`)
+      continue
+    }
+    const bks = Object.values(calRes.data.bookings ?? {})
+    const byBookingId = new Map<string, string>()
+    for (const b of bks) {
+      if (b.id && b.appointment_uid) byBookingId.set(String(b.id), String(b.appointment_uid))
+    }
+    const updates: Array<{ id: string; appt_uid: string }> = []
+    for (const it of items) {
+      const uid = byBookingId.get(it.bookingId)
+      if (uid) updates.push({ id: it.id, appt_uid: uid })
+    }
+    if (updates.length === 0) continue
+    await Promise.all(
+      updates.map((u) =>
+        admin
+          .from('visits')
+          .update({ external_reservation_id: u.appt_uid })
+          .eq('id', u.id)
+          .is('external_reservation_id', null),
+      ),
+    )
+    patched += updates.length
+  }
+
+  return jsonResponse({ ok: true, scanned: legacy.length, patched })
+}
+
 // ── reservation actions ─────────────────────────────────────────────────
 // POST /me/businesses/{biz}/reservations/ body:
 //   {id:null, reserved_from:"YYYY-MM-DDTHH:MM", reserved_till:"YYYY-MM-DDTHH:MM",
@@ -2695,6 +2786,8 @@ Deno.serve(
         return handleSync(admin, userId, body.salon_id, body.day)
       case 'clear_visits':
         return handleClearVisits(admin, userId, body.salon_id)
+      case 'backfill_appt_uids':
+        return handleBackfillApptUids(admin, userId, body.salon_id)
       case 'update_interval':
         if (typeof body.interval_minutes !== 'number') {
           return jsonResponse({ ok: false, error: 'interval_minutes_required' }, 400)
