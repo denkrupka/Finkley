@@ -16,7 +16,18 @@
 10. **Settings → Интеграции → Booksy** → новая кнопка «Починить legacy связь». Нажми один раз чтобы каскадное удаление работало для старых импортированных визитов.
 11. **/clients** → теги вместо `#booksy:app_user` — «Клиент Booksy», «Часто не приходит».
 
-## 📦 Что было сделано (24 коммита, c24b9e2 → 7cbfcf1)
+## 📦 Что было сделано (24 коммита, c24b9e2 → 7cbfcf1 + утренние фиксы → cac3ceb)
+
+### Утренние фиксы 2026-05-21 (по баг-репортам со скриншотов)
+
+- **Booksy услуги без категории** (скриншот 28 услуг в «Без категории»): syncCatalog игнорировал `service_categories[]` верхний уровень → не записывал `services.category_id`. Починено: миграция `service_categories.external_source/external_id`, маппим Booksy cat-id → local uuid, проставляем при insert + при существующей услуге если `category_id=null` (ручной выбор не перетираем).
+- **Booksy услуги: пустые «Время / Доход/час / Маржа»**: Booksy сменил schema — `duration`/`price` теперь в `variants[0]`, а не на top-level. `extractServicePriceDuration()` парсит обе схемы (legacy v1 + v2 variants). 12 unit-тестов.
+- **Cash mapping unit-тесты**: `buildCashRegisterByMethod`/`cashRegisterFor` извлечены в `apps/web/src/lib/booksy-cash-mapping.ts` как pure shadow-helper. 10 тестов на archived, null, дубли, неизвестные методы.
+- **TODO cleanup**: stale TODO в `payment-reminders.ts` (push уже сделан) и `daily-notifications.ts` (calendar_conflicts реализован) почищены.
+
+После `git pull` в проде достаточно один раз нажать «Sync now» в Settings → Интеграции → Booksy — все 28 услуг получат категории, duration, price. `shouldOverwrite` не тронет ручные правки.
+
+## 📦 Что было сделано — основное (24 коммита, c24b9e2 → 7cbfcf1)
 
 ### Booksy
 
