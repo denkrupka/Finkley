@@ -112,6 +112,15 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                     {t('reports_hub.staff.col_name')}
                   </th>
                   <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_visits_revenue')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_retail_revenue')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
+                    {t('reports_hub.staff.col_tips')}
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold">
                     {t('reports_hub.staff.col_revenue')}
                   </th>
                   <th className="px-3 py-3 text-right font-semibold">
@@ -178,7 +187,19 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
                           ) : null}
                         </div>
                       </td>
-                      {/* Выручка + width bar */}
+                      {/* Визиты: выручка от kind='visit' */}
+                      <td className="num text-foreground px-3 py-3 text-right text-sm font-semibold">
+                        {formatCurrency(r.visits_revenue_cents, currency)}
+                      </td>
+                      {/* Доп. продажи: kind='retail' */}
+                      <td className="num text-foreground px-3 py-3 text-right text-sm font-semibold">
+                        {formatCurrency(r.retail_revenue_cents, currency)}
+                      </td>
+                      {/* Чаевые */}
+                      <td className="num text-brand-gold-deep px-3 py-3 text-right text-sm font-semibold">
+                        {r.tips_cents > 0 ? formatCurrency(r.tips_cents, currency) : '—'}
+                      </td>
+                      {/* Итого выручка + width bar */}
                       <td className="px-3 py-3 text-right">
                         <div className="num text-brand-sage-deep text-sm font-bold">
                           {formatCurrency(r.total_revenue_cents, currency)}

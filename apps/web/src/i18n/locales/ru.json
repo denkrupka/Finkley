@@ -3098,7 +3098,10 @@
       "visits_short": "виз",
       "retail_short": "ритейл",
       "returned_short": "вернулось",
-      "tenure": "{{years}} лет работы"
+      "tenure": "{{years}} лет работы",
+      "col_visits_revenue": "Визиты",
+      "col_retail_revenue": "Доп. продажи",
+      "col_tips": "Чаевые"
     },
     "services": {
       "title": "Услуги по группам",
@@ -3456,7 +3459,8 @@
       "payout": "Начислено",
       "advances": "Авансы",
       "remaining": "Остаток",
-      "period": "Период"
+      "period": "Период",
+      "tips": "Чаевые"
     },
     "visits_count_one": "{{count}} визит",
     "visits_count_few": "{{count}} визита",

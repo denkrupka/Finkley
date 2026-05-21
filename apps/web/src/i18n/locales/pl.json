@@ -2434,7 +2434,10 @@
       "visits_short": "wiz",
       "retail_short": "retail",
       "returned_short": "wróciło",
-      "tenure": "{{years}} lat pracy"
+      "tenure": "{{years}} lat pracy",
+      "col_visits_revenue": "Wizyty",
+      "col_retail_revenue": "Dosprzedaż",
+      "col_tips": "Napiwki"
     },
     "services": {
       "title": "Przychód wg usług",
@@ -2793,7 +2796,8 @@
       "payout": "Do wypłaty",
       "period": "Okres",
       "advances": "Zaliczki",
-      "remaining": "Pozostało"
+      "remaining": "Pozostało",
+      "tips": "Napiwki"
     },
     "visits_count_one": "{{count}} wizyta",
     "visits_count_few": "{{count}} wizyty",

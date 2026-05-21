@@ -10,6 +10,9 @@ export type PayoutPreviewRow = {
   payout_scheme: StaffPayoutScheme
   visit_count: number
   revenue_cents: number
+  /** Сумма чаевых за период. Добавлено в миграции 20260521000012 — нужно
+   *  отображать в /payouts отдельной колонкой (чаевые идут мастеру 100%). */
+  tips_cents: number
   payout_cents: number
 }
 
@@ -37,6 +40,7 @@ export function usePayoutsPreview(
         // Postgres bigint → JS number (безопасно до 9 трлн копеек = 90 млрд €)
         visit_count: Number(r.visit_count),
         revenue_cents: Number(r.revenue_cents),
+        tips_cents: Number(r.tips_cents ?? 0),
         payout_cents: Number(r.payout_cents),
       }))
     },

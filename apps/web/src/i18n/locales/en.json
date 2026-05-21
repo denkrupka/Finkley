@@ -2434,7 +2434,10 @@
       "visits_short": "vis",
       "retail_short": "retail",
       "returned_short": "returned",
-      "tenure": "{{years}} years of work"
+      "tenure": "{{years}} years of work",
+      "col_visits_revenue": "Visits",
+      "col_retail_revenue": "Add-ons",
+      "col_tips": "Tips"
     },
     "services": {
       "title": "Revenue by service",
@@ -2793,7 +2796,8 @@
       "payout": "To pay",
       "period": "Period",
       "advances": "Advances",
-      "remaining": "Remaining"
+      "remaining": "Remaining",
+      "tips": "Tips"
     },
     "visits_count_one": "{{count}} visit",
     "visits_count_few": "{{count}} visits",

@@ -9,6 +9,9 @@ export type StaffPerformanceRow = {
   total_revenue_cents: number
   visits_revenue_cents: number
   retail_revenue_cents: number
+  /** Сумма чаевых за период (только visit-kind). Добавлено в миграции
+   *  20260521000011_staff_performance_tips. */
+  tips_cents: number
   visits_count: number
   unique_clients_count: number
   returned_clients_count: number
