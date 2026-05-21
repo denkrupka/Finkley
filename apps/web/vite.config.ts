@@ -49,6 +49,10 @@ export default defineConfig({
           forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
           // date-fns тяжёлый, нужен только на страницах с датами
           dates: ['date-fns'],
+          // recharts ~377KB — отдельный chunk. Page-chunks типа ReportsHub/
+          // Dashboard теперь не несут recharts inline. Lazy-routes триггерят
+          // загрузку только при первом открытии страницы с графиками.
+          recharts: ['recharts'],
         },
       },
     },
