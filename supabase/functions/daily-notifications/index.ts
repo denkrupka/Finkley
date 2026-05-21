@@ -4,13 +4,14 @@
  * Текущий объём:
  *   - low_inventory: позиции inventory_items с current_stock <= min_stock,
  *     если notification_prefs.low_inventory !== false.
- *   - calendar_conflicts: TODO — двойные брони у одного мастера на пересекающемся
- *     visit_at. Сложная логика, пока не реализована.
- *   - booksy_new_visits: TODO — лучше через push real-time из booksy-proxy
- *     после успешного импорта (не ждать 24 часа).
+ *   - calendar_conflicts: визиты одного staff_id с пересекающимся интервалом
+ *     по duration_min. Пара отправляется один раз (key = id1<id2).
  *
- * Каналы: Telegram + Email (Resend) — как в payment-reminders.
- * Auth: rendezvous token (daily_notifications_triggers).
+ * booksy_new_visits НЕ обрабатывается тут — это real-time push из
+ * booksy-proxy::notifyBooksyNewVisits сразу после успешного импорта,
+ * чтобы не ждать 24-часовой cron.
+ *
+ * Каналы: Push (VAPID), Telegram, Email (Resend). Auth: rendezvous token.
  */
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'

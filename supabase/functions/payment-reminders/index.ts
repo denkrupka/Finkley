@@ -8,8 +8,9 @@
  *   - 0 → notification_prefs.payment_due_today
  *   - <0 → notification_prefs.payment_overdue (шлётся каждый день)
  *
- * Каналы: Telegram (если у владельца привязан chat) + email (через send-email
- * функцию). Push отдельно — TODO, требует VAPID-perform.
+ * Каналы: Push (VAPID, через sendPushToUser), Telegram (если у владельца
+ * привязан chat), Email (Resend). Каждый канал гасится индивидуально через
+ * notification_prefs.channel_*.
  *
  * Auth: rendezvous token из payment_reminder_triggers. Cron sql-функция
  * генерирует токен и пихает в этот endpoint через pg_net.
