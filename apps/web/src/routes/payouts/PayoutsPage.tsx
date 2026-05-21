@@ -16,6 +16,8 @@ import { useSalon } from '@/hooks/useSalons'
 import { usePayoutsHistory, usePayoutsPreview, type PayoutPreviewRow } from '@/hooks/usePayouts'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
+import { StaffVisitsModal } from './StaffVisitsModal'
+
 const SCHEME_KEY: Record<PayoutPreviewRow['payout_scheme'], string> = {
   percent_revenue: 'staff.schemes.percent_revenue.title',
   fixed: 'staff.schemes.fixed.title',
@@ -44,6 +46,8 @@ export function PayoutsPage() {
     periodStart,
     periodEnd,
   )
+  const [staffModal, setStaffModal] = useState<{ id: string; name: string } | null>(null)
+
   const totals = useMemo(() => {
     let revenue = 0
     let payout = 0
@@ -106,7 +110,11 @@ export function PayoutsPage() {
               return (
                 <div
                   key={r.staff_id}
-                  className="grid min-w-[760px] grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 sm:px-5"
+                  onClick={() => setStaffModal({ id: r.staff_id, name: r.full_name })}
+                  className="hover:bg-muted/30 grid min-w-[760px] cursor-pointer grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 transition-colors sm:px-5"
+                  title={t('payouts.row_click_hint', {
+                    defaultValue: 'Открыть детализацию визитов',
+                  })}
                 >
                   <div className="text-brand-navy truncate text-sm font-bold">{r.full_name}</div>
                   <div className="text-muted-foreground truncate text-xs">
@@ -194,6 +202,18 @@ export function PayoutsPage() {
           </div>
         </section>
       ) : null}
+
+      {salonId && (
+        <StaffVisitsModal
+          salonId={salonId}
+          staffId={staffModal?.id ?? null}
+          staffName={staffModal?.name ?? null}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          open={staffModal !== null}
+          onOpenChange={(v) => !v && setStaffModal(null)}
+        />
+      )}
     </div>
   )
 }

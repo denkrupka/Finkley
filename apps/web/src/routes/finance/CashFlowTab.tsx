@@ -459,7 +459,13 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
                           colSpan={2}
                           className="text-muted-foreground px-4 py-2 text-right text-[11px] uppercase tracking-wider"
                         >
-                          {t(`finance.cashflow.source.${tx.source}`)}
+                          <span className="inline-flex items-center gap-1.5">
+                            {t(`finance.cashflow.source.${tx.source}`)}
+                            <ChevronRight
+                              className="text-muted-foreground/60 size-3"
+                              strokeWidth={2}
+                            />
+                          </span>
                         </td>
                       </tr>
                     )

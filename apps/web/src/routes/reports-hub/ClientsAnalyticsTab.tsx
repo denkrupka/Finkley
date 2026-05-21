@@ -27,6 +27,7 @@ import { useClients, type ClientSort } from '@/hooks/useClients'
 import { useClientIdsWithVisitsInPeriod, useNextVisitsByClient } from '@/hooks/useNextVisits'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { supabase } from '@/lib/supabase/client'
+import { humanizeTag } from '@/lib/client-tags'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
 import { ClientDrawer } from '@/routes/clients/ClientDrawer'
@@ -436,8 +437,9 @@ function ClientsListTab({
                           <span
                             key={tag}
                             className="bg-muted text-muted-foreground inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-medium"
+                            title={tag}
                           >
-                            #{tag}
+                            {humanizeTag(tag)}
                           </span>
                         ))}
                       </div>
