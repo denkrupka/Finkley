@@ -93,28 +93,48 @@ Deno.serve(async (req: Request) => {
     .eq('id', feed.id)
     .then(() => undefined)
 
-  // Salon name для prodid
-  const { data: salon } = await admin
-    .from('salons')
-    .select('name, timezone')
-    .eq('id', feed.salon_id)
-    .single()
+  // Salon + role-based scope. Owner/admin/accountant → видит весь салон
+  // и платежи. Мастер → только свои визиты.
+  const [{ data: salon }, { data: member }] = await Promise.all([
+    admin.from('salons').select('name, timezone').eq('id', feed.salon_id).single(),
+    admin
+      .from('salon_members')
+      .select('role, staff_id')
+      .eq('salon_id', feed.salon_id)
+      .eq('user_id', feed.user_id)
+      .maybeSingle(),
+  ])
   const salonName = salon?.name ?? 'Salon'
+  type Member = { role?: string; staff_id?: string | null }
+  const memberData = member as Member | null
+  const role = memberData?.role ?? 'owner'
+  const isAdmin = role === 'owner' || role === 'admin' || role === 'accountant'
+  const myStaffId = memberData?.staff_id ?? null
 
   // Визиты ±90 дней с client/staff/service для DESCRIPTION
   const now = new Date()
   const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
   const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
 
-  const { data: visits } = await admin
+  let visitsQuery = admin
     .from('visits')
-    .select('id, visit_at, amount_cents, status, service_name_snapshot, staff_id, client_id')
+    .select(
+      'id, visit_at, duration_min, amount_cents, status, service_name_snapshot, staff_id, client_id',
+    )
     .eq('salon_id', feed.salon_id)
     .is('deleted_at', null)
     .gte('visit_at', start.toISOString())
     .lt('visit_at', end.toISOString())
     .order('visit_at', { ascending: true })
     .limit(2000)
+  if (!isAdmin && myStaffId) {
+    // Мастер видит только свои визиты
+    visitsQuery = visitsQuery.eq('staff_id', myStaffId)
+  } else if (!isAdmin) {
+    // У юзера нет привязки к staff и он не admin — отдадим пустой календарь
+    visitsQuery = visitsQuery.eq('staff_id', '00000000-0000-0000-0000-000000000000')
+  }
+  const { data: visits } = await visitsQuery
 
   // Pre-fetch staff/clients map для скорости
   const staffIds = [...new Set((visits ?? []).map((v) => v.staff_id).filter(Boolean))]
@@ -149,8 +169,12 @@ Deno.serve(async (req: Request) => {
 
   for (const v of visits ?? []) {
     const startTs = new Date(v.visit_at)
-    // Длительность в iCal — приблизительная: 60 минут по умолчанию
-    const endTs = new Date(startTs.getTime() + 60 * 60_000)
+    // Длительность из visits.duration_min (если задано) или 60 мин fallback
+    const durMs =
+      typeof v.duration_min === 'number' && v.duration_min > 0
+        ? v.duration_min * 60_000
+        : 60 * 60_000
+    const endTs = new Date(startTs.getTime() + durMs)
     const staffName = v.staff_id ? (staffMap.get(v.staff_id) ?? '') : ''
     const client = v.client_id ? clientMap.get(v.client_id) : null
     const service = v.service_name_snapshot ?? ''
@@ -174,6 +198,54 @@ Deno.serve(async (req: Request) => {
     }
     lines.push(`STATUS:${v.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`)
     lines.push('END:VEVENT')
+  }
+
+  // Платежи из платёжного календаря (only admin) — all-day events
+  if (isAdmin) {
+    const today = new Date().toISOString().slice(0, 10)
+    const horizon = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const { data: payments } = await admin
+      .from('scheduled_payments')
+      .select('id, due_date, amount_cents, vendor_name, invoice_number, status')
+      .eq('salon_id', feed.salon_id)
+      .eq('status', 'pending')
+      .is('deleted_at', null)
+      .gte('due_date', today)
+      .lte('due_date', horizon)
+      .order('due_date', { ascending: true })
+      .limit(500)
+    for (const p of payments ?? []) {
+      const dueDate = p.due_date.replace(/-/g, '')
+      const nextDay = (() => {
+        const d = new Date(`${p.due_date}T00:00:00Z`)
+        d.setUTCDate(d.getUTCDate() + 1)
+        return d.toISOString().slice(0, 10).replace(/-/g, '')
+      })()
+      const amount = `${(p.amount_cents / 100).toFixed(2)}`
+      const who = p.vendor_name?.trim() || '—'
+      const num = p.invoice_number ? ` №${p.invoice_number}` : ''
+      const title = `💸 Оплатить: ${amount} — ${who}${num}`
+      const descParts = [
+        `Сумма: ${amount}`,
+        who !== '—' ? `Поставщик: ${who}` : null,
+        p.invoice_number ? `№ фактуры: ${p.invoice_number}` : null,
+        `Срок: ${p.due_date}`,
+      ].filter(Boolean) as string[]
+      lines.push('BEGIN:VEVENT')
+      lines.push(`UID:pay-${p.id}@finkley.app`)
+      lines.push(`DTSTAMP:${icsTime(new Date().toISOString())}`)
+      lines.push(`DTSTART;VALUE=DATE:${dueDate}`)
+      lines.push(`DTEND;VALUE=DATE:${nextDay}`)
+      lines.push(fold(`SUMMARY:${ic(title)}`))
+      lines.push(fold(`DESCRIPTION:${ic(descParts.join('\\n'))}`))
+      // Будильник за 24 часа до due_date
+      lines.push('BEGIN:VALARM')
+      lines.push('TRIGGER:-P1D')
+      lines.push('ACTION:DISPLAY')
+      lines.push(fold(`DESCRIPTION:${ic(`Платёж завтра: ${title}`)}`))
+      lines.push('END:VALARM')
+      lines.push('END:VEVENT')
+    }
   }
 
   lines.push('END:VCALENDAR')
