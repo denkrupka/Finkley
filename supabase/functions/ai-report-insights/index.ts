@@ -35,22 +35,46 @@ type Insight = {
   action_prompt: string
 }
 
-const SYSTEM_BASE = `Ты — финансовый консультант салона красоты Finkley. По-русски, кратко, без воды.
+/**
+ * SYSTEM prompt параметризован языком вывода. Клиент передаёт locale из своей
+ * i18n.language ('ru'/'pl'/'en'). Fallback на 'ru' если не указан или unsupported.
+ */
+function systemForLocale(locale: 'ru' | 'pl' | 'en'): string {
+  const langInstruction = {
+    ru: 'На русском, кратко, без воды.',
+    pl: 'Po polsku, zwięźle, bez lania wody.',
+    en: 'In English, concise, no fluff.',
+  }[locale]
+  const ownerVoice = {
+    ru: 'от первого лица владельца («Помоги мне ...»)',
+    pl: 'w pierwszej osobie właściciela („Pomóż mi ...")',
+    en: 'in the first person of the owner ("Help me ...")',
+  }[locale]
+  return `You are a financial consultant for the Finkley beauty salon. ${langInstruction}
 
-Формат ответа — СТРОГО JSON:
+Response format — STRICTLY JSON:
 {
   "insights": [
     {
-      "title": "<заголовок 1 фраза до 80 символов>",
-      "body": "<1-3 предложения с конкретной рекомендацией>",
-      "action_prompt": "<вопрос или просьба к ассистенту, который раскроет тему детальнее>"
+      "title": "<headline, 1 phrase up to 80 chars>",
+      "body": "<1-3 sentences with a concrete recommendation>",
+      "action_prompt": "<question or request to the assistant that elaborates on the topic>"
     }
   ]
 }
 
-Только JSON, без markdown, без пояснений вокруг.
-Возвращай 3-5 insights. Каждый body — действие, а не описание.
-action_prompt должен быть от первого лица владельца («Помоги мне ...»).`
+JSON only, no markdown, no explanations around it.
+Return 3-5 insights. Each body — an action, not a description.
+action_prompt must be ${ownerVoice}.`
+}
+
+function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
 
 async function claudeJson(system: string, prompt: string): Promise<{ insights: Insight[] }> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -78,44 +102,46 @@ async function claudeJson(system: string, prompt: string): Promise<{ insights: I
   return JSON.parse(match[0]) as { insights: Insight[] }
 }
 
+// Промпты — на английском с языком ответа в SYSTEM. Так Claude стабильно
+// держит требуемую локаль и одну версию prompt-логики на все языки.
 function promptForServices(payload: unknown): string {
-  return `Данные по услугам салона за выбранный период (JSON):
+  return `Salon services data for the selected period (JSON):
 ${JSON.stringify(payload, null, 2)}
 
-Сделай аналитику по группам услуг (маникюр / брови / стрижки / прочее):
-1. Топ-3 самых продаваемых услуг по КОЛИЧЕСТВУ визитов.
-2. Топ-3 самых ВЫГОДНЫХ услуг по МАРЖЕ (разница цена - себестоимость).
-3. На какую услугу стоит настроить рекламу (растёт спрос или высокая маржа).
-4. Где провисы — что приносит мало денег и не пользуется спросом.
+Analyze by service groups (manicure / brows / haircuts / other):
+1. Top-3 most sold services by NUMBER of visits.
+2. Top-3 most PROFITABLE services by MARGIN (price - cost).
+3. Which service to advertise (growing demand or high margin).
+4. Where the gaps are — what brings little money and has no demand.
 
-Каждый insight — это короткая конкретная рекомендация владельцу.`
+Each insight = short concrete recommendation for the owner.`
 }
 
 function promptForClients(payload: unknown): string {
-  return `Данные по клиентам салона за выбранный период (JSON):
+  return `Salon clients data for the selected period (JSON):
 ${JSON.stringify(payload, null, 2)}
 
-Сделай аналитику по клиентам:
-1. Из каких каналов приходят клиенты (анализируй sources/referrals если есть).
-2. Структура: постоянные (3+ визитов), новые без визитов, давно не были (>60 дней).
-3. На кого настроить рассылку с офферами и каким offer'ом.
-4. Какие услуги у клиентов любимые — какие промо предложить под их интересы.
+Client analytics:
+1. Acquisition channels (analyze sources/referrals if available).
+2. Structure: regulars (3+ visits), new without visits, lapsed (>60 days).
+3. Whom to target with a mailing campaign, with what offer.
+4. Favorite services among clients — promos to suggest based on their interests.
 
-Каждый insight — конкретный сегмент клиентов + что ему предложить.`
+Each insight = specific client segment + what to offer them.`
 }
 
 function promptForStaff(payload: unknown): string {
-  return `Данные по мастерам салона за выбранный период (JSON):
+  return `Salon masters data for the selected period (JSON):
 ${JSON.stringify(payload, null, 2)}
 
-Сделай аналитику по мастерам:
-1. Кто сколько денег принёс и сколько клиентов отработал.
-2. Какова загрузка мастера относительно его рабочего графика (если есть данные).
-3. Какую долю в общей выручке салона занимает каждый.
-4. Топ-мастеров — рекомендации как мотивировать (бонус, ученики, рост ставки).
-5. Аутсайдеры — рекомендации как с ними работать (тренинги, перераспределение клиентов, разговор).
+Master analytics:
+1. Who earned how much money and served how many clients.
+2. Master utilization relative to their schedule (if data available).
+3. Each master's share of total salon revenue.
+4. Top-masters — recommendations on motivation (bonus, students, rate raise).
+5. Underperformers — how to work with them (training, redistribute clients, talk).
 
-Каждый insight — конкретный мастер или группа + действие.`
+Each insight = specific master or group + action.`
 }
 
 Deno.serve(async (req: Request) => {
@@ -128,7 +154,7 @@ Deno.serve(async (req: Request) => {
   const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
   if (!user) return json({ error: 'unauthorized' }, 401)
 
-  let body: { salon_id?: string; kind?: string; payload?: unknown }
+  let body: { salon_id?: string; kind?: string; payload?: unknown; locale?: string }
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -137,6 +163,7 @@ Deno.serve(async (req: Request) => {
   if (!body.salon_id || !body.kind || !body.payload) {
     return json({ error: 'bad_request' }, 400)
   }
+  const locale = normalizeLocale(body.locale)
 
   // RLS-check: юзер должен быть членом салона
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -166,7 +193,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const result = await claudeJson(SYSTEM_BASE, prompt)
+    const result = await claudeJson(systemForLocale(locale), prompt)
     if (!Array.isArray(result.insights)) {
       return json({ error: 'invalid_claude_response' }, 502)
     }
