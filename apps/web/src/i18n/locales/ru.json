@@ -1860,6 +1860,18 @@
       "col_amount": "Сумма",
       "col_pct": "%",
       "col_period": "Период",
+      "col_cash_kind": "Тип средств",
+      "col_mapping": "Маппинг оплаты",
+      "cash_kind": {
+        "cash": "Наличные",
+        "non_cash": "Безналичные"
+      },
+      "mapping": {
+        "cash": "Наличные",
+        "card": "Карта",
+        "transfer": "Перевод",
+        "online": "Online"
+      },
       "period": {
         "day": "в день",
         "month": "в месяц",
