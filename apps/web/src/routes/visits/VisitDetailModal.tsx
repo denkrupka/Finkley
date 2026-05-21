@@ -79,7 +79,9 @@ export function VisitDetailModal({
   onBackFromCharge?: (visit: VisitRow) => void
 }) {
   const { t } = useTranslation()
-  const [view, setView] = useState<'detail' | 'charge' | 'document'>(initialView ?? 'detail')
+  const [view, setView] = useState<'detail' | 'charge' | 'document' | 'next-visit'>(
+    initialView ?? 'detail',
+  )
   const [gateOpen, setGateOpen] = useState(false)
   const [tab, setTab] = useState<'wizyta' | 'info'>('wizyta')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
@@ -249,15 +251,17 @@ export function VisitDetailModal({
             onCharged={() => setView('document')}
             t={t}
           />
-        ) : (
+        ) : view === 'document' ? (
           <DocumentView
             groupLines={groupLines}
             onDone={() => {
               toast.success(t('visits.charge.toast_paid'))
-              onClose()
+              setView('next-visit')
             }}
             t={t}
           />
+        ) : (
+          <NextVisitPromptView onDone={onClose} t={t} />
         )}
       </DialogContent>
       <CashGateRequiredDialog
@@ -840,6 +844,119 @@ function ChargeView({
         action="visit_charge"
         onShiftOpened={() => void chargeAll()}
       />
+    </div>
+  )
+}
+
+// =============================================================================
+// Next-visit prompt — после расчёта и документа, напоминание записать клиента
+// на следующий визит. Скрипт «Работа с возражениями» — отдельная модалка
+// со скриптом администратора (PDF: Раздел 4 + 1.3 + 5.1).
+// =============================================================================
+
+function NextVisitPromptView({
+  onDone,
+  t,
+}: {
+  onDone: () => void
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [showScript, setShowScript] = useState(false)
+  if (showScript) {
+    return <ObjectionsScriptView onBack={() => setShowScript(false)} onDone={onDone} t={t} />
+  }
+  return (
+    <div className="flex flex-col">
+      <div className="border-border flex items-center gap-3 border-b px-5 py-4 pr-12">
+        <span className="bg-brand-yellow/40 text-brand-navy grid size-10 shrink-0 place-items-center rounded-full">
+          <Clock className="size-5" strokeWidth={1.7} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-brand-navy text-base font-bold">{t('visits.next_prompt.title')}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">{t('visits.next_prompt.subtitle')}</p>
+        </div>
+      </div>
+      <div className="px-5 py-6">
+        <div className="border-brand-gold-soft bg-brand-gold-soft/30 mb-4 rounded-lg border p-4">
+          <p className="text-brand-navy text-sm">
+            <strong>{t('visits.next_prompt.script_label')}</strong>
+          </p>
+          <p className="text-foreground mt-2 text-sm italic leading-relaxed">
+            {t('visits.next_prompt.script_body')}
+          </p>
+        </div>
+        <p className="text-muted-foreground text-xs">{t('visits.next_prompt.hint_loss')}</p>
+      </div>
+      <div className="border-border bg-muted/10 flex gap-2 border-t px-5 py-4">
+        <Button variant="outline" onClick={() => setShowScript(true)} className="flex-1">
+          {t('visits.next_prompt.objections_button')}
+        </Button>
+        <Button onClick={onDone} className="flex-1">
+          {t('visits.next_prompt.ok_button')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ObjectionsScriptView({
+  onBack,
+  onDone,
+  t,
+}: {
+  onBack: () => void
+  onDone: () => void
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  // Скрипт из PDF Wonderful Beauty Admin (Раздел 4 — типичные возражения +
+  // Раздел 1.3 — расчёт и следующая запись + Раздел 5 — реактивация).
+  const objections: Array<{ situationKey: string; replyKey: string }> = [
+    { situationKey: 'visits.script.case1_situation', replyKey: 'visits.script.case1_reply' },
+    { situationKey: 'visits.script.case2_situation', replyKey: 'visits.script.case2_reply' },
+    { situationKey: 'visits.script.case3_situation', replyKey: 'visits.script.case3_reply' },
+    { situationKey: 'visits.script.case4_situation', replyKey: 'visits.script.case4_reply' },
+    { situationKey: 'visits.script.case5_situation', replyKey: 'visits.script.case5_reply' },
+  ]
+  return (
+    <div className="flex max-h-[85vh] flex-col">
+      <div className="border-border flex items-center gap-3 border-b px-5 py-4 pr-12">
+        <span className="bg-brand-teal-soft text-brand-teal-deep grid size-10 shrink-0 place-items-center rounded-full">
+          <FileText className="size-5" strokeWidth={1.7} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-brand-navy text-base font-bold">{t('visits.script.title')}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">{t('visits.script.subtitle')}</p>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="border-brand-sage-soft bg-brand-sage-soft/30 mb-4 rounded-lg border p-4">
+          <p className="text-brand-navy text-sm font-bold">
+            ✓ {t('visits.script.golden_rule_title')}
+          </p>
+          <p className="text-foreground mt-1 text-sm">{t('visits.script.golden_rule_body')}</p>
+        </div>
+        <div className="flex flex-col gap-3">
+          {objections.map((o, idx) => (
+            <div key={idx} className="border-border bg-card rounded-lg border p-3">
+              <p className="text-brand-navy mb-1.5 text-xs font-bold italic">
+                «{t(o.situationKey)}»
+              </p>
+              <p className="text-foreground text-sm leading-relaxed">{t(o.replyKey)}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-muted-foreground mt-4 text-[11px] italic">
+          {t('visits.script.source_credit')}
+        </p>
+      </div>
+      <div className="border-border bg-muted/10 flex gap-2 border-t px-5 py-4">
+        <Button variant="outline" onClick={onBack} className="flex-1">
+          {t('common.back')}
+        </Button>
+        <Button onClick={onDone} className="flex-1">
+          {t('visits.next_prompt.ok_button')}
+        </Button>
+      </div>
     </div>
   )
 }
