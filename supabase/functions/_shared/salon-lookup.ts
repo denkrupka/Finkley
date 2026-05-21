@@ -26,9 +26,11 @@ function admin(): SupabaseClient {
 
 async function getOwnerBySalonId(salonId: string): Promise<OwnerInfo | null> {
   const supa = admin()
+  // salon.locale — fallback для приглашённых, у кого profile.locale ещё не задан.
+  // country_code тоже учитываем как 2-й fallback (PL → pl, по странам Booksy).
   const { data: salon } = await supa
     .from('salons')
-    .select('id, name')
+    .select('id, name, locale, country_code')
     .eq('id', salonId)
     .maybeSingle()
   if (!salon) return null
@@ -51,16 +53,44 @@ async function getOwnerBySalonId(salonId: string): Promise<OwnerInfo | null> {
     .select('locale')
     .eq('id', member.user_id)
     .maybeSingle()
-  const locale = (profile as { locale?: string | null } | null)?.locale ?? 'ru'
+  const profileLocale = (profile as { locale?: string | null } | null)?.locale
+  const salonRow = salon as { locale?: string | null; country_code?: string | null; name: string }
+  const locale = pickLocale(profileLocale, salonRow.locale, salonRow.country_code)
 
   return {
     user_id: member.user_id,
     email,
     full_name,
     salon_id: salon.id,
-    salon_name: salon.name,
+    salon_name: salonRow.name,
     locale,
   }
+}
+
+/**
+ * Каскад выбора локали для серверных уведомлений:
+ *   1. profile.locale (явный выбор юзера)
+ *   2. salon.locale (онбординг салона)
+ *   3. country_code → язык (PL → pl, UA → ru как ближайший, etc.)
+ *   4. 'ru' default
+ *
+ * Экспортируется — переиспользуется в callers которые не используют
+ * salon-lookup (notify-welcome, send-weekly-digest, daily-notifications etc.).
+ */
+export function pickLocale(
+  profileLocale?: string | null,
+  salonLocale?: string | null,
+  countryCode?: string | null,
+): string {
+  if (profileLocale) return profileLocale
+  if (salonLocale) return salonLocale
+  if (countryCode) {
+    const cc = countryCode.toUpperCase()
+    if (cc === 'PL') return 'pl'
+    if (['GB', 'US', 'IE', 'AU', 'CA', 'NZ'].includes(cc)) return 'en'
+    if (['RU', 'UA', 'BY', 'KZ', 'KG', 'UZ', 'MD', 'AM', 'AZ'].includes(cc)) return 'ru'
+  }
+  return 'ru'
 }
 
 export async function getOwnerByStripeCustomer(customerId: string): Promise<OwnerInfo | null> {

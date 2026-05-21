@@ -57,18 +57,35 @@ Deno.serve(async (req: Request) => {
     // body не обязательный
   }
 
-  // Locale precedence: body.locale (передан из клиентского onboarding) →
-  // profiles.locale → 'ru'. profiles может не существовать в момент онбординга,
-  // поэтому body.locale — основной источник.
-  let locale = bodyLocale
-  if (!locale) {
+  // Locale precedence: body.locale (i18n.language клиента в онбординге) →
+  // profiles.locale → salon.locale → country_code map → 'ru'.
+  // body.locale — основной источник, т.к. profile может не существовать в момент онбординга.
+  let profileLocale: string | null | undefined
+  let salonLocaleFromDb: string | null | undefined
+  let salonCountryFromDb: string | null | undefined
+  if (!bodyLocale) {
     const { data: profile } = await admin
       .from('profiles')
       .select('locale')
       .eq('id', user.userId)
       .maybeSingle()
-    locale = (profile?.locale as string | undefined) ?? 'ru'
+    profileLocale = (profile as { locale?: string | null } | null)?.locale
+    if (salonId && !profileLocale) {
+      const { data: salonRow } = await admin
+        .from('salons')
+        .select('locale, country_code')
+        .eq('id', salonId)
+        .maybeSingle()
+      salonLocaleFromDb = (salonRow as { locale?: string | null } | null)?.locale
+      salonCountryFromDb = (salonRow as { country_code?: string | null } | null)?.country_code
+    }
   }
+  const locale =
+    bodyLocale ??
+    (profileLocale ? profileLocale : null) ??
+    (salonLocaleFromDb ? salonLocaleFromDb : null) ??
+    (salonCountryFromDb && salonCountryFromDb.toUpperCase() === 'PL' ? 'pl' : null) ??
+    'ru'
 
   // Если salon_id пришёл — проверяем что юзер реально owner этого салона
   // (anti-abuse: чтобы нельзя было передать чужой salon_name в тело письма).
