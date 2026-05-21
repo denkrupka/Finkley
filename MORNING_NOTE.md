@@ -1,120 +1,93 @@
-# MORNING NOTE — ночь 20→21 мая 2026
+# MORNING NOTE — финальный
 
-## ✅ Сделано и задеплоено
+> Все задачи из расширенного списка закрыты. Этот файл — навигация по тому, что появилось/изменилось.
 
-### Booksy интеграция
+## 🎯 Главное — что протестировать в первую очередь
 
-- **Длительность визитов** — из `booked_till - booked_from` (раньше всегда 60 мин).
-- **«Rezerwacja czasu»** — резервы мастеров импортируются как штрихованные блоки.
-- **Кнопка «Синхронизировать»** + автосинк при смене дня в календаре (debounce 600мс).
-- **Reverse-sync create/delete визитов и блоков**: портал ↔ Booksy. Cancel через `POST /appointments/{uid}/action/`.
-- **Move в Booksy** → обновляется в портале (раньше ignoreDuplicates пропускал).
-- **Paid/Pending** — по `basket_id` в Booksy appointment, pending→paid апгрейд на sync.
-- **Portal-owned reservations** не импортируются обратно, cancelled (status=C) пропускаются.
+1. **Ctrl+Shift+R** в браузере чтобы выкинуть старый SW.
+2. **KSeF** — Settings → Интеграции → KSeF → «Подключить» с твоим токеном. Sync должен импортировать фактуры в Расходы.
+3. **Booksy paid статус** — «Синхронизировать» на визитах → визиты с зелёным $ в Booksy станут «оплачено».
+4. **Move в Booksy** → перенос дня → portal обновится через autosync.
+5. **Settings → Кассы**: новая колонка «Маппинг оплаты». Выбери Конверт = cash, Bank/Karta = card. Все импорты/новые визиты будут зачисляться по маппингу.
+6. **Settings → Уведомления**: 2 подвкладки «Каналы» / «Типы». В «Типах» — чек-лист 10 событий.
+7. **Финансы → Финансовый отчёт** → раздел «Расходы» теперь включает Прочие категории (твои кастомные).
+8. **Финансы → ДДС**: только paid визиты + actual expenses, клик по визиту → карточка визита.
+9. **Зарплаты** → клик по мастеру → модалка визитов разбитых по дням.
+10. **Settings → Интеграции → Booksy** → новая кнопка «Починить legacy связь». Нажми один раз чтобы каскадное удаление работало для старых импортированных визитов.
+11. **/clients** → теги вместо `#booksy:app_user` — «Клиент Booksy», «Часто не приходит».
 
-### KSeF
+## 📦 Что было сделано (24 коммита, c24b9e2 → 7cbfcf1)
 
-- **Подключение работает** — фикс ISO timestamp + async auth polling.
-- **Invoice query shape** — `subjectType` + `dateRange` на корне body. Новые поля `ksefNumber`, `seller.nip`, `grossAmount`.
-- **E2E проверено** с твоим токеном (NIP 7831854263) — 12+ фактур заносятся в expenses.
+### Booksy
 
-### Отчёты
+- Маппинг касс при импорте: `payment_method` → `cash_register_id` через `salons.financial_settings.cash_registers[*].payment_method_mapping`. И для INSERT, и для UPDATE paid-апгрейда, и для historic backfill через клиента.
+- Real-time push «Новые визиты из Booksy (N)» owner'у после успешного импорта.
+- Backfill `external_reservation_id` для legacy визитов — UI-кнопка + edge endpoint `backfill_appt_uids`.
 
-- **ДДС**: только paid визиты + actual expenses. Pending не попадают.
-- **Фин-отчёт plan/fact**:
-  - План = все визиты (paid+pending) + expenses + scheduled_payments.
-  - Факт = только paid + expenses.
-  - Строка «Расходы» наконец показывает реальные суммы из БД.
-- **P&L «Способы оплаты»** — лейблы из маппинга касс. «Конверт→cash» = строка «Конверт» вместо «Наличные».
+### Отчёты / Аналитика
 
-### Кассы
-
-- Колонка **«Тип средств»** (Наличные / Безналичные) с авто-эвристикой по названию.
-- Колонка **«Маппинг оплаты»** — один payment_method на кассу (cash / card / transfer / online), уникальность через UI. Используется в P&L breakdown.
+- ДДС: визуальный hint (chevron) что строка кликабельна → VisitDetailModal.
+- Фин-отчёт: новая группа «Прочие категории» под Расходами — кастомные категории из `expense_categories` которых нет в settings.fixed/variable/taxes.
+- Фин-отчёт: реальные expenses факт в строке «Расходы».
+- Зарплаты: StaffVisitsModal — клик по мастеру → модалка визитов сгруппированных по дням → клик по визиту → VisitDetailModal.
+- Клиенты: humanizeTag — booksy:app_user → «Клиент Booksy», RFM tags переведены.
+- P&L «Способы оплаты»: лейблы строк — имена касс из маппинга.
 
 ### Уведомления
 
-- **Подвкладки «Каналы» / «Типы»** в Settings → Уведомления.
-- Каналы: push, email/telegram для Еженедельного и Ежедневного дайджеста.
-- Типы: чек-лист 10 типов с группировкой (Сводки / Платежи / События салона). Хранится в `salons.notification_prefs` jsonb.
-- **Cron уведомлений о платежах** (`payment-reminders` edge function + pg_cron 08:00 UTC ежедневно): bucket'ы 2д/1д/сегодня/просрочка → Telegram + Email через Resend. Просроченные шлются каждый день пока не paid.
+- Settings → Уведомления: 2 подвкладки «Каналы»/«Типы».
+- `salons.notification_prefs` jsonb — какие 10 типов событий включены.
+- `payment-reminders` edge function + pg_cron 08:00 UTC: bucket'ы 2д/1д/0/просрочка → push + email (Resend) + Telegram.
+- `daily-notifications` edge function + pg_cron 08:30 UTC: low_inventory + calendar_conflicts.
+- `generate-insights` (существующий cron) теперь шлёт push с top-1 AI-инсайтом.
+- Web Push helper `_shared/web-push.ts` (VAPID + RFC 8291 + 8188) — переиспользуется во всех cron-функциях.
 
 ### Google / Apple Calendar
 
-- Расширил существующий `calendar-feed` (RFC 5545 ICS). Role-based:
-  - Owner/admin → все визиты + платежи из платёжного календаря (с VALARM за 24ч).
-  - Мастер → только свои визиты.
-- Использует `visits.duration_min` для DTEND (раньше всегда +60 мин).
-- Подписка по URL из Settings → Календарь. Google Calendar / Apple Calendar / Outlook нативно.
+- `calendar-feed` (RFC 5545 ICS) — role-based: owner/admin видит ВСЕ визиты + платежи (VALARM за 24ч); мастер только свои.
+- `visits.duration_min` используется для DTEND вместо +60 мин.
 
-### Conflict-check
+### KSeF / Booksy / Прочее
 
-- Игнорирует soft-deleted визиты (раньше «у мастера уже есть визит» вылезало после удаления).
+- См. предыдущие коммиты ночи (challenge ISO, async auth polling, invoice query shape, paid by basket_id, conflict-check soft-deleted, move/delete cascade, day-sync, reverse-delete) — всё это уже было.
 
-### Лендинг finkley.app
+### Тесты
 
-- Главная: 15 фич (вместо 6), секция «Сколько часов вернёшь» (~15-20ч/мес), 11 интеграций, 12 отчётов.
-
-### SPA stability
-
-- **Stale-chunk reload** очищает caches + unregister SW → больше не залипает «Что-то сломалось» после деплоя.
-- **404 для navigation** — SW возвращает cached APP_SHELL вместо 404.
-- **CSP** — добавлен `static.cloudflareinsights.com`.
+- 17 новых unit-тестов (humanizeTag, dueOffset/classifyOffset, computeDurationMin). Все 97 тестов проходят.
 
 ### i18n
 
-- 1735 ключей RU → EN, 1731 → PL (как заглушки). Лучше fallback на raw-key — юзер видит русский на en/pl.
-- Сверху руками переведены 33 критичных ключа сессии (notifications, cash mapping, sync кнопка, reservation modal).
+- 1735 ключей в EN/PL добавлены как заглушки (rus-fallback).
+- 60+33 = 93 видимых лейбла переведены вручную (nav, тaбы, формы, notifications, cash mapping, visits sync).
 
-## ⚠ Что важно протестировать первым делом
+### SPA stability
 
-1. **Hard reload** (Ctrl+Shift+R) — старый SW обновится.
-2. **KSeF**: «Подключить» с твоим токеном. Потом «Синхронизировать» — должны прилететь фактуры.
-3. **Booksy paid статус**: Sync → визиты с зелёным $ в Booksy станут «оплачено».
-4. **Move в Booksy** → перенос дня → portal обновится.
-5. **Финансовый отчёт** → Финансы → Финансовый отчёт. В Расходах числа.
-6. **ДДС** → только paid визиты.
-7. **Settings → Уведомления → Типы**: чек-лист, можно отключать.
-8. **Settings → Кассы → колонка «Маппинг оплаты»**: выбери для «Конверт» = cash, для «Bank/Karta» = card. Тогда в P&L «Способы оплаты» лейблы превратятся в имена касс.
-9. **Settings → Календарь**: скопируй URL подписки, добавь в Google Calendar — увидишь визиты + платежи (для admin).
+- Stale-chunk reload чистит SW caches.
+- CSP добавлен Cloudflare Insights.
+- Push payload.url включает `/app/{salonId}/...` префикс — SW.navigate корректно открывает SPA.
 
-## 🐛 Известные ограничения
+## ⚙️ Что нужно настроить в Supabase env (если ещё нет)
 
-- **Legacy визиты/блоки** созданные до фикса с `external_reservation_id=null` — их удаление в портале не каскадит в Booksy. Один раз убери в Booksy руками.
-- **Push для платёжных reminders** не реализован — пока Email (Resend) + Telegram. Push требует VAPID-helper рефактор `send-push`.
-- **i18n EN/PL** — 1735 заглушек на русском. Профессиональный перевод оставшихся ключей — отдельной партией.
-- **RESEND_API_KEY** должен быть настроен в Supabase env, иначе email напоминания пропускаются (silent fail).
+Без них соответствующие каналы silent-skip:
 
-## Все коммиты ночи (по порядку, новые → старые)
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — Web Push
+- `RESEND_API_KEY` — email через resend.com
+- `TELEGRAM_BOT_TOKEN` — TG канал
+- `ANTHROPIC_API_KEY` — AI polish инсайтов
 
-```
-d52197f i18n: синхр ключей RU → EN/PL + перевод 33 критичных
-4665d9d feat(calendar-feed): role-based фильтр + платежи
-b8306d8 feat(notifications): cron уведомлений о платежах
-eb6934a feat(settings): уведомления — Каналы/Типы вкладки
-e47a777 feat(reports): P&L Способы оплаты — лейблы из маппинга касс
-f13f704 feat(settings): кассы — Маппинг оплаты колонка
-01ea88d docs(landing): главная — фичи, экономия, отчёты, интеграции
-a9050ce docs: MORNING_NOTE
-a044df7 fix(reports): expenses_total — реальные расходы
-625fa73 fix(spa): stale-chunk reload + caches + SW unregister
-fbcf8f4 fix(spa): SW отдаёт cached shell вместо 404
-59a490e feat(settings): тип кассы Наличные/Безналичные
-79d68c9 fix(booksy): pending→paid upgrade при sync
-2c5c855 fix(booksy): move обновляет портал + delete cascade
-b6341d9 fix(booksy): paid status по basket_id
-b2a5717 fix(visits): conflict-check игнорирует soft-deleted
-2b39ebd fix(ksef): invoices/query/metadata — новый shape
-7e2f01c fix(ksef): challenge timestamp ISO + async polling
-c00f552 fix(reports): ДДС/Фин-отчёт — только фактические
-a2a839e fix(booksy): external_reservation_id на визите
-f1abbf5 feat(booksy): delete визита → delete reservation
-8992683 fix(booksy): не импортировать portal-owned резервации
-e1f7cfa fix(booksy): не-partial unique index staff_time_blocks
-bc36770 fix(booksy): резервы из /calendar + fallback
-442f7c0 feat(booksy): day-sync кнопка + auto на смене дня
-0e139d5 feat(booksy): reverse-delete пропавших
-9be6e69 chore: prettier
-0d3efca fix(booksy): syncClients renamed loader
-c68fdc3 feat(booksy): длительность визитов + резервы времени
-```
+## 🐛 Известные мелочи
+
+- **i18n EN/PL** — ~1640 ключей лежат как русские заглушки. Полный перевод — отдельная итерация через LLM-batch.
+- **Integration-тесты** для calendar-feed / маппинг касс — pure unit покрыты, но без реального Booksy stub'а интеграционных нет.
+- **historic insertHistoricalBooking** — не шлёт push real-time (импорт прошлого не критичен).
+
+## 🚀 Финальное состояние
+
+Все 4 раунда задач закрыты:
+
+- Раунд 1 (моя ночь): 11 задач ✅
+- Раунд 2 («доделывай»): 10 задач ✅
+- Раунд 3 (осознанные TODO): 4 задачи ✅
+- Раунд 4 (мелкие хвосты): 3 задачи ✅
+
+Все коммиты в `main`. CI зелёный. Deploy на проде.
