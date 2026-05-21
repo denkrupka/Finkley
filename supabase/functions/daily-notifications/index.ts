@@ -118,7 +118,7 @@ async function processLowInventory(
     const pushed = await sendPushToUser(admin, owner.user_id, {
       title: `Низкие остатки — ${salonName}`,
       body: lines.slice(0, 3).join('\n'),
-      url: '/inventory',
+      url: `/app/${salon.id}/inventory`,
       tag: 'low-inventory',
     })
     sent += pushed
@@ -232,7 +232,7 @@ async function processCalendarConflicts(
     const pushed = await sendPushToUser(admin, owner.user_id, {
       title: `Конфликты в календаре — ${salonName}`,
       body: lines.slice(0, 3).join('\n'),
-      url: '/visits',
+      url: `/app/${salon.id}/visits`,
       tag: 'calendar-conflicts',
     })
     sent += pushed

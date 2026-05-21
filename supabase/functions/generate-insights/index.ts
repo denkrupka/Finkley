@@ -267,7 +267,7 @@ async function processSalon(admin: SupabaseClient, salonId: string): Promise<num
         await sendPushToUser(admin, userId, {
           title: `🧠 ${top3[0].title}`,
           body: top3[0].body.slice(0, 200),
-          url: '/dashboard',
+          url: `/app/${salonId}/dashboard`,
           tag: `insights-${salonId}`,
         })
       }

@@ -308,6 +308,36 @@ export function useClearBooksyVisits(salonId: string | undefined) {
   })
 }
 
+/**
+ * Одноразовый backfill external_reservation_id для legacy визитов,
+ * импортированных до фикса сохранения appointment_uid. Без этого
+ * delete визита в портале не каскадит в Booksy.
+ */
+export function useBackfillBooksyApptUids(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: { action: 'backfill_appt_uids', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as {
+        ok?: boolean
+        scanned?: number
+        patched?: number
+        message?: string
+        error?: string
+      }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'backfill_failed')
+      return { scanned: json.scanned ?? 0, patched: json.patched ?? 0 }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
+  })
+}
+
 /** Отключить интеграцию (удалить credentials). */
 export function useDisconnectIntegration(salonId: string | undefined) {
   const qc = useQueryClient()

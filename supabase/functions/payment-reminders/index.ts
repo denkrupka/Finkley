@@ -219,7 +219,7 @@ async function processOneSalon(
       const pushed = await sendPushToUser(admin, ownerData.user_id, {
         title: subject,
         body: text.split('\n').slice(2).join('\n').slice(0, 200),
-        url: '/finance?tab=payments',
+        url: `/app/${salon.id}/finance?tab=payments`,
         tag: `payments-${bucketKey}`,
         requireInteraction: bucketKey === 'payment_due_today' || bucketKey === 'payment_overdue',
       })

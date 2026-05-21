@@ -24,6 +24,7 @@ import {
   BOOKSY_SYNC_INTERVAL_OPTIONS,
   useAccountingSync,
   useBooksySync,
+  useBackfillBooksyApptUids,
   useClearBooksyVisits,
   useDisconnectIntegration,
   useKsefSync,
@@ -246,6 +247,7 @@ function IntegrationCard({
   const accountingSync = useAccountingSync(accountingProviderId, salonId)
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
+  const backfillAppts = useBackfillBooksyApptUids(salonId)
   const updateInterval = useUpdateBooksyInterval(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
@@ -434,21 +436,54 @@ function IntegrationCard({
               {t('integrations.sync_now')}
             </button>
             {provider.id === 'booksy' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirm(t('integrations.confirm_clear_visits'))) return
-                  clearVisits.mutate(undefined, {
-                    onSuccess: (n) => toast.success(t('integrations.toast_visits_cleared', { n })),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }}
-                disabled={clearVisits.isPending}
-                className="text-muted-foreground hover:text-destructive text-xs underline disabled:opacity-50"
-                title={t('integrations.clear_visits')}
-              >
-                {t('integrations.clear_visits')}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm(t('integrations.confirm_clear_visits'))) return
+                    clearVisits.mutate(undefined, {
+                      onSuccess: (n) =>
+                        toast.success(t('integrations.toast_visits_cleared', { n })),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }}
+                  disabled={clearVisits.isPending}
+                  className="text-muted-foreground hover:text-destructive text-xs underline disabled:opacity-50"
+                  title={t('integrations.clear_visits')}
+                >
+                  {t('integrations.clear_visits')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    backfillAppts.mutate(undefined, {
+                      onSuccess: ({ scanned, patched }) =>
+                        toast.success(
+                          t('integrations.toast_backfill_done', {
+                            defaultValue: 'Починено {{patched}} визитов из {{scanned}}',
+                            patched,
+                            scanned,
+                          }),
+                        ),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }}
+                  disabled={backfillAppts.isPending}
+                  className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
+                  title={t('integrations.backfill_appt_uids_hint', {
+                    defaultValue:
+                      'Восстановить связь legacy-визитов с Booksy чтобы delete каскадил',
+                  })}
+                >
+                  {backfillAppts.isPending
+                    ? t('common.loading')
+                    : t('integrations.backfill_appt_uids', {
+                        defaultValue: 'Починить legacy связь',
+                      })}
+                </button>
+              </>
             ) : null}
             <button
               type="button"

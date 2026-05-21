@@ -1781,7 +1781,7 @@ async function notifyBooksyNewVisits(
     await sendPushToUser(admin, (ownerRow as { user_id: string }).user_id, {
       title: `Новые визиты из Booksy (${newVisits.length})`,
       body: `${lines}${more}`,
-      url: '/visits',
+      url: `/app/${salonId}/visits`,
       tag: 'booksy-new-visits',
     })
   } catch (e) {
