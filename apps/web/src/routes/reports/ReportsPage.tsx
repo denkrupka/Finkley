@@ -22,6 +22,7 @@ import {
   type ServiceRevenueRow,
   type StaffRevenueRow,
 } from '@/hooks/useAnalytics'
+import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { downloadAsXls, type XlsTable } from './export-xls'
@@ -75,6 +76,7 @@ export function ReportsPage() {
   const byStaff = useRevenueByStaff(salonId, periodStartIso, periodEndIso)
   const byService = useRevenueByService(salonId, periodStartIso, periodEndIso)
   const byPayment = useRevenueByPayment(salonId, periodStartIso, periodEndIso)
+  const { data: financialSettings } = useFinancialSettings(salonId)
   const heatmap = useVisitsHeatmap(salonId, periodStartIso, periodEndIso, timezone)
 
   if (!salonId) return null
@@ -188,7 +190,11 @@ export function ReportsPage() {
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <RevenueByStaffCard rows={byStaff.data ?? []} currency={currency} />
-        <RevenueByPaymentCard rows={byPayment.data ?? []} currency={currency} />
+        <RevenueByPaymentCard
+          rows={byPayment.data ?? []}
+          currency={currency}
+          cashRegisters={financialSettings?.cash_registers.items ?? []}
+        />
       </section>
 
       <section className="mt-4">
@@ -281,9 +287,28 @@ function RevenueByStaffCard({ rows, currency }: { rows: StaffRevenueRow[]; curre
   )
 }
 
-function RevenueByPaymentCard({ rows, currency }: { rows: PaymentMethodRow[]; currency: string }) {
+function RevenueByPaymentCard({
+  rows,
+  currency,
+  cashRegisters,
+}: {
+  rows: PaymentMethodRow[]
+  currency: string
+  cashRegisters: Array<{
+    id: string
+    label: string
+    payment_method_mapping?: 'cash' | 'card' | 'transfer' | 'online' | null
+    archived?: boolean
+  }>
+}) {
   const { t } = useTranslation()
   const total = rows.reduce((s, r) => s + r.revenue_cents, 0)
+  // Маппинг payment_method → касса (settings). Берём не-архивные позиции.
+  const registerByMethod = new Map<string, string>()
+  for (const r of cashRegisters) {
+    if (r.archived) continue
+    if (r.payment_method_mapping) registerByMethod.set(r.payment_method_mapping, r.label)
+  }
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border p-4">
       <h2 className="text-brand-navy mb-3 text-sm font-bold uppercase tracking-wider">
@@ -295,12 +320,15 @@ function RevenueByPaymentCard({ rows, currency }: { rows: PaymentMethodRow[]; cu
         <div className="flex flex-col gap-2.5">
           {rows.map((r) => {
             const share = total > 0 ? (r.revenue_cents / total) * 100 : 0
+            // Если на этот payment_method замаплена касса в settings —
+            // показываем имя кассы. Иначе fallback на канонический тип.
+            const mappedLabel = r.payment_method ? registerByMethod.get(r.payment_method) : null
+            const label =
+              mappedLabel ?? t(PAYMENT_METHOD_KEY[r.payment_method] ?? 'reports.payment.unknown')
             return (
               <div key={r.payment_method ?? 'null'} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-brand-navy font-semibold">
-                    {t(PAYMENT_METHOD_KEY[r.payment_method] ?? 'reports.payment.unknown')}
-                  </span>
+                  <span className="text-brand-navy font-semibold">{label}</span>
                   <span className="num">
                     {formatCurrency(r.revenue_cents, currency)}{' '}
                     <span className="text-muted-foreground text-xs">({share.toFixed(0)}%)</span>
