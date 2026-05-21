@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   CheckCircle2,
   Clock,
@@ -18,6 +17,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -269,7 +269,7 @@ function DetailView({
   t,
 }: DetailViewProps) {
   const headerLabel = allPaid ? t('visits.detail.status_paid') : t('visits.detail.status_confirmed')
-  const dateLabel = format(new Date(visit.visit_at), 'EEEE, d MMMM', { locale: ru })
+  const dateLabel = format(new Date(visit.visit_at), 'EEEE, d MMMM', { locale: getDateLocale() })
 
   return (
     <div className="flex max-h-[85vh] flex-col">

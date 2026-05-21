@@ -7,12 +7,12 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useClients } from '@/hooks/useClients'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useServices } from '@/hooks/useServices'
 import { useVisits } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -78,8 +78,8 @@ export function MiniCalendarWidget({ salonId, currency }: Props) {
 
   const today = new Date()
   const monthLabel =
-    format(cursor, 'LLLL yyyy', { locale: ru }).charAt(0).toUpperCase() +
-    format(cursor, 'LLLL yyyy', { locale: ru }).slice(1)
+    format(cursor, 'LLLL yyyy', { locale: getDateLocale() }).charAt(0).toUpperCase() +
+    format(cursor, 'LLLL yyyy', { locale: getDateLocale() }).slice(1)
 
   function dayVisits(day: Date) {
     return byDay.get(format(day, 'yyyy-MM-dd')) ?? []
@@ -141,7 +141,7 @@ export function MiniCalendarWidget({ salonId, currency }: Props) {
                 onClick={() => setOpenDay((prev) => (prev === dayKey ? null : dayKey))}
                 disabled={!hasVisits}
                 aria-label={t('dashboard.calendar.day_aria', {
-                  date: format(day, 'd MMMM', { locale: ru }),
+                  date: format(day, 'd MMMM', { locale: getDateLocale() }),
                   count: dvs.length,
                 })}
                 className={cn(
@@ -170,10 +170,10 @@ export function MiniCalendarWidget({ salonId, currency }: Props) {
                 <div
                   className="border-border bg-card shadow-finmd absolute left-1/2 top-full z-20 mt-1 w-64 -translate-x-1/2 rounded-lg border p-3"
                   role="dialog"
-                  aria-label={format(day, 'd MMMM yyyy', { locale: ru })}
+                  aria-label={format(day, 'd MMMM yyyy', { locale: getDateLocale() })}
                 >
                   <div className="text-brand-navy mb-2 text-xs font-bold uppercase">
-                    {format(day, 'd MMMM, EEEE', { locale: ru })}
+                    {format(day, 'd MMMM, EEEE', { locale: getDateLocale() })}
                   </div>
                   <ul className="flex flex-col gap-1.5 text-xs">
                     {dvs.slice(0, 6).map((v) => (

@@ -1,9 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { Suspense, useEffect, useState } from 'react'
 
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 
@@ -149,7 +149,7 @@ export function SalonLayout() {
       .map((s: string) => s.charAt(0).toUpperCase())
       .join('') || '?'
 
-  const todayLabel = format(new Date(), 'EEEE, d MMMM', { locale: ru })
+  const todayLabel = format(new Date(), 'EEEE, d MMMM', { locale: getDateLocale() })
 
   return (
     <div className="bg-background min-h-screen">

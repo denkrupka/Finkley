@@ -9,12 +9,12 @@ import {
   addDays as addD,
   format,
 } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
+import { getDateLocale } from '@/lib/utils/format-date'
 
 /**
  * Мини-календарь для popover'а под кнопкой «Сегодня» в VisitsCalendarView.
@@ -60,7 +60,7 @@ export function MiniMonthCalendar({
           <ChevronLeft className="size-4" strokeWidth={2} />
         </button>
         <span className="text-foreground text-sm font-semibold capitalize">
-          {format(monthCursor, 'LLLL yyyy', { locale: ru })}
+          {format(monthCursor, 'LLLL yyyy', { locale: getDateLocale() })}
         </span>
         <button
           type="button"

@@ -1,10 +1,10 @@
 import { addDays, format, isSameDay, startOfDay } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DAY_KEYS, useStaff, type StaffRow, type WeeklyDay } from '@/hooks/useStaff'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useServices } from '@/hooks/useServices'
 import { useVisits } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -206,7 +206,7 @@ export function FreeSlotsPanel({ salonId }: Props) {
                     {days.map((d) => {
                       const slots = freeSlotsForDay(s, d)
                       const isToday = isSameDay(d, new Date())
-                      const dLabel = format(d, 'EEEE, d MMMM', { locale: ru })
+                      const dLabel = format(d, 'EEEE, d MMMM', { locale: getDateLocale() })
                       return (
                         <div
                           key={d.toISOString()}

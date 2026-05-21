@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -10,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useSalon } from '@/hooks/useSalons'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -108,7 +108,9 @@ export function StaffVisitsModal({
                     <div key={day}>
                       <div className="border-border flex items-center justify-between border-b pb-1.5">
                         <h3 className="text-brand-navy text-sm font-bold tracking-tight">
-                          {format(new Date(`${day}T00:00:00Z`), 'd MMMM, EEEE', { locale: ru })}
+                          {format(new Date(`${day}T00:00:00Z`), 'd MMMM, EEEE', {
+                            locale: getDateLocale(),
+                          })}
                         </h3>
                         <span className="num text-brand-sage-deep text-sm font-bold">
                           {formatCurrency(daySum, currency)}

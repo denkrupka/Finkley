@@ -1,5 +1,4 @@
 import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
 
 import { ClientTemplatesSection } from './ClientTemplatesSection'
 import { Facebook, Instagram, Link2, Mail, Pencil, Phone, Send, Trash2 } from 'lucide-react'
@@ -8,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Sheet,
   SheetBody,
@@ -58,7 +58,7 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
     const oldest = visits.at(-1)
     if (!oldest) return null
     try {
-      return format(parseISO(oldest.visit_at), 'MMMM yyyy', { locale: ru })
+      return format(parseISO(oldest.visit_at), 'MMMM yyyy', { locale: getDateLocale() })
     } catch {
       return null
     }
@@ -148,7 +148,7 @@ export function ClientDrawer({ open, onOpenChange, salonId, client, currency }: 
                         {v.service_name_snapshot ?? t('clients.drawer.no_service')}
                       </p>
                       <p className="num text-muted-foreground text-xs">
-                        {format(parseISO(v.visit_at), 'd MMM yyyy', { locale: ru })}
+                        {format(parseISO(v.visit_at), 'd MMM yyyy', { locale: getDateLocale() })}
                       </p>
                     </div>
                     <span className="num text-foreground text-sm font-bold">

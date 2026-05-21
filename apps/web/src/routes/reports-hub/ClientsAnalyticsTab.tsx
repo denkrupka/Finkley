@@ -1,11 +1,11 @@
 import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { Cake, EyeOff, ListChecks, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 
 import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
@@ -461,7 +461,9 @@ function ClientsListTab({
                     <td className="px-3 py-2.5 text-right">
                       {c.last_visit_at ? (
                         <span className="num text-foreground text-xs font-medium">
-                          {format(parseISO(c.last_visit_at), 'd MMM yyyy', { locale: ru })}
+                          {format(parseISO(c.last_visit_at), 'd MMM yyyy', {
+                            locale: getDateLocale(),
+                          })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
@@ -470,7 +472,9 @@ function ClientsListTab({
                     <td className="px-3 py-2.5 text-right">
                       {nextVisit ? (
                         <span className="num text-foreground text-xs font-medium">
-                          {format(parseISO(nextVisit), 'd MMM yyyy, HH:mm', { locale: ru })}
+                          {format(parseISO(nextVisit), 'd MMM yyyy, HH:mm', {
+                            locale: getDateLocale(),
+                          })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>

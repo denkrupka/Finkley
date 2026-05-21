@@ -1,11 +1,11 @@
 import { format, formatDistanceToNow } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ArrowLeft, FileText, History, User as UserIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 
 import { Input } from '@/components/ui/input'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { Label } from '@/components/ui/label'
 import { useAuditLog, type AuditEntry, type AuditFilters } from '@/hooks/useAuditLog'
 
@@ -128,8 +128,8 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
   const { t } = useTranslation()
   const icon = ACTION_ICON[entry.action] ?? '•'
   const date = new Date(entry.created_at)
-  const ago = formatDistanceToNow(date, { addSuffix: true, locale: ru })
-  const fullDate = format(date, 'd MMMM yyyy, HH:mm', { locale: ru })
+  const ago = formatDistanceToNow(date, { addSuffix: true, locale: getDateLocale() })
+  const fullDate = format(date, 'd MMMM yyyy, HH:mm', { locale: getDateLocale() })
 
   const author = entry.user_full_name || entry.user_email || t('audit.unknown_author')
 

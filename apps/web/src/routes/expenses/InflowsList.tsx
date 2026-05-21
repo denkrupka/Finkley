@@ -1,10 +1,10 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ArrowDownToLine, Banknote, Building2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { useBankInflows } from '@/hooks/useBanking'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 type Props = {
@@ -67,7 +67,7 @@ export function InflowsList({ salonId, period, currency }: Props) {
                 style={{ borderLeftWidth: 3, borderLeftColor: '#2E9E6B' }}
               >
                 <span className="num text-muted-foreground text-xs">
-                  {format(new Date(tx.executed_at), 'd MMM', { locale: ru })}
+                  {format(new Date(tx.executed_at), 'd MMM', { locale: getDateLocale() })}
                 </span>
                 <span className="min-w-0">
                   <span className="text-foreground truncate text-sm font-semibold">

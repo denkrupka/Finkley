@@ -1,5 +1,4 @@
 import { formatDistanceToNowStrict } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   CalendarPlus,
   Check,
@@ -30,6 +29,7 @@ import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Dialog,
   DialogContent,
@@ -709,7 +709,7 @@ function ConversationRow({
 }) {
   const time = formatDistanceToNowStrict(new Date(conversation.last_message_at), {
     addSuffix: false,
-    locale: ru,
+    locale: getDateLocale(),
   })
 
   return (

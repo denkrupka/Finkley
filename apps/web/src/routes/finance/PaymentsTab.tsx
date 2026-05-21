@@ -11,7 +11,6 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   AlertTriangle,
   CalendarCheck,
@@ -28,6 +27,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   useDeleteScheduledPayment,
   useScheduledPayments,
@@ -331,7 +331,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
                 <ChevronLeft className="size-4" strokeWidth={2} />
               </button>
               <span className="text-brand-navy min-w-[170px] text-center text-base font-bold capitalize tracking-tight">
-                {format(monthCursor, 'LLLL yyyy', { locale: ru })}
+                {format(monthCursor, 'LLLL yyyy', { locale: getDateLocale() })}
               </span>
               <button
                 type="button"
@@ -406,7 +406,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
                   : t('finance.payments.day_label')}
               </span>
               <span className="text-brand-navy text-sm font-bold capitalize tracking-tight">
-                {format(selectedDate, 'd MMMM yyyy', { locale: ru })}
+                {format(selectedDate, 'd MMMM yyyy', { locale: getDateLocale() })}
               </span>
             </div>
             <button

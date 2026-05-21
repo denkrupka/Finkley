@@ -1,5 +1,6 @@
 import { addYears, endOfMonth, endOfYear, format, startOfMonth, startOfYear } from 'date-fns'
-import { ru } from 'date-fns/locale'
+
+import { getDateLocale } from '@/lib/utils/format-date'
 
 /**
  * Универсальный тип для PeriodPickerPopover. Хранится в URL search params
@@ -31,14 +32,14 @@ export function periodToRange(p: PeriodValue): PeriodRange {
 
 export function periodLabel(p: PeriodValue): string {
   if (p.kind === 'month') {
-    return format(new Date(p.year, p.month - 1, 1), 'LLLL yyyy', { locale: ru })
+    return format(new Date(p.year, p.month - 1, 1), 'LLLL yyyy', { locale: getDateLocale() })
   }
   if (p.kind === 'year') return String(p.year)
   if (p.kind === 'range') {
-    return `${format(new Date(p.from), 'd MMM', { locale: ru })} — ${format(
+    return `${format(new Date(p.from), 'd MMM', { locale: getDateLocale() })} — ${format(
       new Date(p.to),
       'd MMM yyyy',
-      { locale: ru },
+      { locale: getDateLocale() },
     )}`
   }
   return `Последние ${p.days} дн.`

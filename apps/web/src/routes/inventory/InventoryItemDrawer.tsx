@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { Archive, ArrowDown, ArrowUp, Pencil, ShoppingCart, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Sheet,
   SheetBody,
@@ -306,7 +306,7 @@ function TxRow({
           {t(meta.label_key)}
         </span>
         <span className="text-muted-foreground text-[11px]">
-          {format(new Date(tx.created_at), 'd MMM HH:mm', { locale: ru })}
+          {format(new Date(tx.created_at), 'd MMM HH:mm', { locale: getDateLocale() })}
           {tx.notes ? ` · ${tx.notes}` : ''}
         </span>
       </div>

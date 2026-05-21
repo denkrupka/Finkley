@@ -1,11 +1,11 @@
 import { format, parseISO, startOfMonth } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils/cn'
 
@@ -70,7 +70,7 @@ export function PeriodToggle() {
 
   const customLabel =
     value === 'custom' && params.get('from') && params.get('to')
-      ? `${format(parseISO(params.get('from')!), 'd MMM', { locale: ru })} — ${format(parseISO(params.get('to')!), 'd MMM', { locale: ru })}`
+      ? `${format(parseISO(params.get('from')!), 'd MMM', { locale: getDateLocale() })} — ${format(parseISO(params.get('to')!), 'd MMM', { locale: getDateLocale() })}`
       : t('dashboard.period.custom')
 
   return (

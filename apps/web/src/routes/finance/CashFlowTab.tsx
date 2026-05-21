@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { Banknote, ChevronRight, CreditCard, Globe, Send, User2, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +20,7 @@ import {
   periodToRange,
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useCashFlowDaily } from '@/hooks/useCashFlow'
 import { useClients } from '@/hooks/useClients'
@@ -271,7 +271,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart
               data={withRunning.map((r) => ({
-                day: format(new Date(r.day), 'd MMM', { locale: ru }),
+                day: format(new Date(r.day), 'd MMM', { locale: getDateLocale() }),
                 inflow: r.inflow_cents / 100,
                 outflow: -(r.outflow_cents / 100),
                 running: r.running_cents / 100,
@@ -376,7 +376,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
                             className={`size-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`}
                             strokeWidth={2.2}
                           />
-                          {format(new Date(r.day), 'd MMM, EEEEEE', { locale: ru })}
+                          {format(new Date(r.day), 'd MMM, EEEEEE', { locale: getDateLocale() })}
                         </span>
                       </td>
                       <td className="num text-brand-sage-deep px-4 py-2 text-right font-semibold">

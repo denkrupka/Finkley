@@ -1,5 +1,4 @@
 import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -18,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Dialog,
   DialogContent,
@@ -96,7 +96,7 @@ export function CashTab({ salonId }: { salonId: string }) {
   const expected = computeExpected(currentShift ?? null, txns, cashRegisters)
   const opening = currentShift?.opening_amount_cents ?? 0
   const cashNow = expected.expected_cash_cents
-  const todayLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: ru })
+  const todayLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: getDateLocale() })
 
   /** Универсальный extractor описания ошибки. Supabase возвращает плейн-
    *  объект {message,details,hint,code}, не Error instance — поэтому
@@ -242,7 +242,7 @@ export function CashTab({ salonId }: { salonId: string }) {
           }
           hint={
             lastClosed?.closed_at
-              ? format(parseISO(lastClosed.closed_at), 'd MMM, HH:mm', { locale: ru })
+              ? format(parseISO(lastClosed.closed_at), 'd MMM, HH:mm', { locale: getDateLocale() })
               : undefined
           }
           tone="muted"
@@ -1026,7 +1026,7 @@ function ShiftHistoryTable({
               className="border-border/60 hover:bg-muted/30 cursor-pointer border-t text-xs"
             >
               <td className="num text-foreground px-3 py-2 font-semibold">
-                {format(parseISO(s.opened_at), 'd MMM yyyy', { locale: ru })}
+                {format(parseISO(s.opened_at), 'd MMM yyyy', { locale: getDateLocale() })}
               </td>
               <td className="text-muted-foreground px-3 py-2">
                 {s.opened_by_user_id ? (userNameById.get(s.opened_by_user_id) ?? '—') : '—'}
@@ -1110,7 +1110,7 @@ function ShiftDetailDrawer({
         <DialogHeader>
           <DialogTitle>
             {t('finance.cash.detail_title', {
-              date: format(parseISO(shift.opened_at), 'd MMM yyyy', { locale: ru }),
+              date: format(parseISO(shift.opened_at), 'd MMM yyyy', { locale: getDateLocale() }),
             })}
           </DialogTitle>
           <DialogDescription>

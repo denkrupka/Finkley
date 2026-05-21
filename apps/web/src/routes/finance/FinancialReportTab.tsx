@@ -1,5 +1,4 @@
 import { endOfMonth, format, startOfMonth, startOfYear } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   BarChart3,
   ChevronDown,
@@ -13,6 +12,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
@@ -475,7 +475,9 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     const headers = [
       t('finance.report.col_row'),
       t('finance.report.col_total'),
-      ...months.map((m) => format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })),
+      ...months.map((m) =>
+        format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() }),
+      ),
     ]
     const lines = [headers.join(';')]
     for (const row of [...rows, ...balanceRows]) {
@@ -693,7 +695,7 @@ function CashRegistersTable({
                 m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
-              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
+              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() })}
             </th>
           ))}
         </tr>
@@ -784,7 +786,7 @@ function ReportTable({
                 m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
-              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: ru })}
+              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() })}
             </th>
           ))}
         </tr>

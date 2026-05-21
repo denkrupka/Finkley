@@ -1,5 +1,4 @@
 import { addDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   CheckCircle2,
   ChevronLeft,
@@ -15,6 +14,7 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Dialog,
   DialogContent,
@@ -388,7 +388,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                   день открыт. Теперь label = «Сегодня» только если cursor
                   совпадает с сегодняшней датой, иначе — короткая дата. */}
               <Button variant="outline" size="sm">
-                {today ? t('visits.calendar.today') : format(cursor, 'EEE, d MMM', { locale: ru })}
+                {today
+                  ? t('visits.calendar.today')
+                  : format(cursor, 'EEE, d MMM', { locale: getDateLocale() })}
               </Button>
             </PopoverTrigger>
             <PopoverContent align="center" className="w-auto p-3">
@@ -409,7 +411,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
           </Button>
         </div>
         <h2 className="text-brand-navy text-base font-bold tracking-tight">
-          {format(cursor, 'EEEE, d MMMM yyyy', { locale: ru })}
+          {format(cursor, 'EEEE, d MMMM yyyy', { locale: getDateLocale() })}
         </h2>
         <Button
           variant="outline"
@@ -758,12 +760,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                               style={{ top: ghostTop, height: ghostHeight }}
                             >
                               <span className="num text-primary absolute left-1 top-0.5 text-[10px] font-bold">
-                                {format(ghostStart, 'HH:mm', { locale: ru })}
+                                {format(ghostStart, 'HH:mm', { locale: getDateLocale() })}
                                 {' – '}
                                 {format(
                                   new Date(dragHover.visitAtMs + ghostDur * 60_000),
                                   'HH:mm',
-                                  { locale: ru },
+                                  { locale: getDateLocale() },
                                 )}
                               </span>
                             </div>
@@ -838,9 +840,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                             />
                           ) : null}
                           <p className="num text-foreground/80 truncate text-[11px] font-semibold leading-tight">
-                            {format(visitDate, 'HH:mm', { locale: ru })} –{' '}
+                            {format(visitDate, 'HH:mm', { locale: getDateLocale() })} –{' '}
                             {format(new Date(visitDate.getTime() + dur * 60000), 'HH:mm', {
-                              locale: ru,
+                              locale: getDateLocale(),
                             })}
                           </p>
                           <p className="text-foreground truncate text-xs font-semibold">
@@ -990,9 +992,9 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             }}
           >
             <p className="text-muted-foreground border-border mb-1.5 border-b px-2 pb-1.5 text-[11px] uppercase tracking-wider">
-              {format(subslotMenu.when, 'd MMM, HH:mm', { locale: ru })}
+              {format(subslotMenu.when, 'd MMM, HH:mm', { locale: getDateLocale() })}
               {subslotMenu.endAt
-                ? ` – ${format(subslotMenu.endAt, 'HH:mm', { locale: ru })}`
+                ? ` – ${format(subslotMenu.endAt, 'HH:mm', { locale: getDateLocale() })}`
                 : ''}{' '}
               · {staff.find((s) => s.id === subslotMenu.staffId)?.full_name ?? ''}
             </p>
@@ -1065,10 +1067,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                 const oldStaff = staff.find((s) => s.id === pendingMove.visit.staff_id)
                 const newStaff = staff.find((s) => s.id === pendingMove.targetStaffId)
                 const oldTime = format(new Date(pendingMove.visit.visit_at), 'd MMM, HH:mm', {
-                  locale: ru,
+                  locale: getDateLocale(),
                 })
                 const newTime = format(new Date(pendingMove.targetVisitAt), 'd MMM, HH:mm', {
-                  locale: ru,
+                  locale: getDateLocale(),
                 })
                 const staffChanged = pendingMove.visit.staff_id !== pendingMove.targetStaffId
                 return (

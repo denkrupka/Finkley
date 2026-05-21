@@ -1,8 +1,8 @@
 import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useClients } from '@/hooks/useClients'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
@@ -41,15 +41,15 @@ export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
   const stf = visit.staff_id ? staff.find((s) => s.id === visit.staff_id) : null
 
   const at = parseISO(visit.visit_at)
-  const dateLabel = format(at, 'd MMMM yyyy', { locale: ru })
+  const dateLabel = format(at, 'd MMMM yyyy', { locale: getDateLocale() })
   const timeLabel = format(at, 'HH:mm')
   const gross = visit.amount_cents
   const tip = visit.tip_cents
   const discount = visit.discount_cents
   const total = gross - discount + tip
   const paidAtLabel = visit.updated_at
-    ? format(parseISO(visit.updated_at), 'dd.MM.yyyy, HH:mm', { locale: ru })
-    : `${format(at, 'dd.MM.yyyy', { locale: ru })}, ${timeLabel}`
+    ? format(parseISO(visit.updated_at), 'dd.MM.yyyy, HH:mm', { locale: getDateLocale() })
+    : `${format(at, 'dd.MM.yyyy', { locale: getDateLocale() })}, ${timeLabel}`
 
   const methodLabel = visit.payment_method
     ? t(`payment_methods.${visit.payment_method}`, { defaultValue: visit.payment_method })

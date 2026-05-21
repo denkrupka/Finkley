@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import {
   AlertTriangle,
   Banknote,
@@ -14,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { getDateLocale } from '@/lib/utils/format-date'
 import {
   useBankAccountsForConnections,
   useBankConnections,
@@ -170,7 +170,9 @@ export function BankingSection({ salonId }: Props) {
                     {c.last_synced_at ? (
                       <span>
                         {t('banking.last_synced')}:{' '}
-                        {format(new Date(c.last_synced_at), 'd MMM, HH:mm', { locale: ru })}
+                        {format(new Date(c.last_synced_at), 'd MMM, HH:mm', {
+                          locale: getDateLocale(),
+                        })}
                       </span>
                     ) : (
                       <span>{t('banking.never_synced')}</span>
@@ -178,7 +180,7 @@ export function BankingSection({ salonId }: Props) {
                     {c.valid_until ? (
                       <span>
                         {t('banking.valid_until')}:{' '}
-                        {format(new Date(c.valid_until), 'd MMM yyyy', { locale: ru })}
+                        {format(new Date(c.valid_until), 'd MMM yyyy', { locale: getDateLocale() })}
                       </span>
                     ) : null}
                     {c.last_error ? (

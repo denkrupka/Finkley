@@ -1,17 +1,28 @@
-import { format, parseISO } from 'date-fns'
-import { ru } from 'date-fns/locale'
+import { format, parseISO, type Locale } from 'date-fns'
+import { enUS, pl, ru } from 'date-fns/locale'
+import i18n from 'i18next'
 
 /**
- * Минимальные хелперы дат с локалью ru.
+ * Минимальные хелперы дат с локалью из i18n.
  * Внутренний формат — ISO; на UI рендерим через эти функции.
+ *
+ * getDateLocale() читает текущий язык из i18next и возвращает соответствующую
+ * date-fns локаль. Использовать ВСЕГДА вместо прямого импорта `ru/pl/enUS` —
+ * иначе EN/PL юзеры видят русские дни недели.
  */
+export function getDateLocale(): Locale {
+  const lng = i18n.language?.split('-')[0] ?? 'ru'
+  if (lng === 'pl') return pl
+  if (lng === 'en') return enUS
+  return ru
+}
 
 export function formatVisitDate(iso: string): string {
-  return format(parseISO(iso), 'dd.MM', { locale: ru })
+  return format(parseISO(iso), 'dd.MM', { locale: getDateLocale() })
 }
 
 export function formatVisitDayHeading(iso: string): string {
-  return format(parseISO(iso), 'EEEE, d MMMM', { locale: ru })
+  return format(parseISO(iso), 'EEEE, d MMMM', { locale: getDateLocale() })
 }
 
 /**
