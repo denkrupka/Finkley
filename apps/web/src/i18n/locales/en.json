@@ -2459,7 +2459,8 @@
       "clients": "Clients",
       "staff": "Specialists",
       "payouts": "Payroll",
-      "reviews": "Reviews"
+      "reviews": "Reviews",
+      "competitors": "Competitors"
     },
     "clients_placeholder": "Client analytics — section in development.",
     "staff": {
@@ -2551,6 +2552,44 @@
       "no_text": "(no text, only rating)",
       "import_button": "Import from Booksy/Google",
       "imported": "Imported {{count}} reviews"
+    },
+    "competitors": {
+      "tabs": {
+        "prices": "Prices",
+        "occupancy": "Occupancy",
+        "rating": "Rating",
+        "content": "Content",
+        "params": "Parameters"
+      },
+      "no_competitors": "No competitors added yet",
+      "no_competitors_hint": "Go to the «Parameters» tab and add at least one.",
+      "sync_pending": "Data will sync ~24 h after adding. Sync feature in development.",
+      "empty_prices": "No competitor prices yet.",
+      "empty_occupancy": "No occupancy data.",
+      "empty_rating": "No ratings.",
+      "empty_content": "No social media data.",
+      "col_name": "Salon",
+      "col_data": "Data",
+      "col_date": "Updated",
+      "no_data": "—",
+      "params": {
+        "add_title": "Add competitor",
+        "add_subtitle": "Provide links to Booksy, Google Maps, Instagram, Facebook. More links = better data.",
+        "name_label": "Salon name",
+        "name_placeholder": "e.g. Nail Studio Marszałkowska",
+        "name_required": "Enter a name",
+        "add_button": "Add",
+        "added": "Competitor added",
+        "watched_title": "Which services to monitor",
+        "watched_subtitle": "Comma-separated service names. Empty = top-3 by revenue.",
+        "watched_placeholder": "Hybrid manicure, Pedicure, Brows…",
+        "save_button": "Save",
+        "saved": "Saved",
+        "list_title": "Current competitors",
+        "no_links": "No links",
+        "confirm_archive": "Remove competitor from monitoring?",
+        "archived": "Removed"
+      }
     }
   },
   "finance": {

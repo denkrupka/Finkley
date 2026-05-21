@@ -2459,7 +2459,8 @@
       "clients": "Klienci",
       "staff": "Specjaliści",
       "payouts": "Wynagrodzenia",
-      "reviews": "Opinie"
+      "reviews": "Opinie",
+      "competitors": "Konkurenci"
     },
     "clients_placeholder": "Analityka klientów — sekcja w przygotowaniu.",
     "staff": {
@@ -2551,6 +2552,44 @@
       "no_text": "(bez tekstu, tylko ocena)",
       "import_button": "Import z Booksy/Google",
       "imported": "Zaimportowano {{count}} opinii"
+    },
+    "competitors": {
+      "tabs": {
+        "prices": "Ceny",
+        "occupancy": "Obłożenie",
+        "rating": "Ocena",
+        "content": "Treść",
+        "params": "Parametry"
+      },
+      "no_competitors": "Brak konkurentów",
+      "no_competitors_hint": "Przejdź do zakładki „Parametry” i dodaj co najmniej jednego.",
+      "sync_pending": "Dane zsynchronizują się ~24 h po dodaniu. Funkcja w rozwoju.",
+      "empty_prices": "Brak cen konkurencji.",
+      "empty_occupancy": "Brak danych o obłożeniu.",
+      "empty_rating": "Brak ocen.",
+      "empty_content": "Brak danych o mediach społecznościowych.",
+      "col_name": "Salon",
+      "col_data": "Dane",
+      "col_date": "Zaktualizowano",
+      "no_data": "—",
+      "params": {
+        "add_title": "Dodaj konkurenta",
+        "add_subtitle": "Podaj linki do Booksy, Google Maps, Instagrama, Facebooka. Więcej linków = lepsze dane.",
+        "name_label": "Nazwa salonu",
+        "name_placeholder": "Np. Nail Studio Marszałkowska",
+        "name_required": "Podaj nazwę",
+        "add_button": "Dodaj",
+        "added": "Konkurent dodany",
+        "watched_title": "Które usługi monitorować",
+        "watched_subtitle": "Lista nazw usług oddzielona przecinkami. Pusto = top-3 wg przychodu.",
+        "watched_placeholder": "Manicure hybrydowy, Pedicure, Brwi…",
+        "save_button": "Zapisz",
+        "saved": "Zapisano",
+        "list_title": "Aktualni konkurenci",
+        "no_links": "Brak linków",
+        "confirm_archive": "Usunąć konkurenta z monitoringu?",
+        "archived": "Usunięto"
+      }
     }
   },
   "finance": {

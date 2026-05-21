@@ -3123,7 +3123,8 @@
       "clients": "Клиенты",
       "staff": "Мастера",
       "payouts": "Зарплата",
-      "reviews": "Отзывы"
+      "reviews": "Отзывы",
+      "competitors": "Конкуренты"
     },
     "clients_placeholder": "Аналитика клиентов — раздел в разработке.",
     "staff": {
@@ -3214,6 +3215,44 @@
       "no_text": "(без текста, только оценка)",
       "import_button": "Импорт с Booksy/Google",
       "imported": "Импортировано {{count}} отзывов"
+    },
+    "competitors": {
+      "tabs": {
+        "prices": "Цены",
+        "occupancy": "Загруженность",
+        "rating": "Рейтинг",
+        "content": "Контент",
+        "params": "Параметры"
+      },
+      "no_competitors": "Конкуренты ещё не добавлены",
+      "no_competitors_hint": "Перейди на вкладку «Параметры» и добавь хотя бы одного.",
+      "sync_pending": "Данные подтянутся через ~24 ч после добавления конкурента. Синхр в разработке.",
+      "empty_prices": "Цен конкурентов пока нет.",
+      "empty_occupancy": "Данных по загруженности нет.",
+      "empty_rating": "Рейтингов нет.",
+      "empty_content": "Данных по соцсетям нет.",
+      "col_name": "Салон",
+      "col_data": "Данные",
+      "col_date": "Обновлено",
+      "no_data": "—",
+      "params": {
+        "add_title": "Добавить конкурента",
+        "add_subtitle": "Дай ссылки на Booksy, Google Maps, Instagram, Facebook. Чем больше — тем точнее сводка.",
+        "name_label": "Название салона",
+        "name_placeholder": "Например: Nail Studio Marszałkowska",
+        "name_required": "Введи название",
+        "add_button": "Добавить",
+        "added": "Конкурент добавлен",
+        "watched_title": "Какие услуги мониторить",
+        "watched_subtitle": "Список названий услуг через запятую. Пусто = Топ-3 по выручке.",
+        "watched_placeholder": "Маникюр гибридный, Педикюр, Брови…",
+        "save_button": "Сохранить",
+        "saved": "Сохранено",
+        "list_title": "Текущие конкуренты",
+        "no_links": "Нет ссылок",
+        "confirm_archive": "Удалить конкурента из мониторинга?",
+        "archived": "Удалён"
+      }
     }
   },
   "finance": {
