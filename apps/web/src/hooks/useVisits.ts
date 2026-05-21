@@ -197,6 +197,10 @@ export type UpdateVisitInput = {
   duration_min?: number | null
   /** ID кассы (image #82). */
   cash_register_id?: string | null
+  /** Группа связанных визитов. Нужен когда VisitDetailModal добавляет
+   *  «+ услугу» к одиночному визиту: устанавливаем group_key на текущем и
+   *  даём тот же на новом — UI начинает рендерить их как группу. */
+  group_key?: string | null
 }
 
 export function useUpdateVisit(salonId: string | undefined) {

@@ -29,6 +29,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import {
+  useCreateVisit,
   useDeleteVisit,
   useUpdateVisit,
   useVisits,
@@ -131,6 +132,7 @@ export function VisitDetailModal({
 
   const update = useUpdateVisit(salonId)
   const remove = useDeleteVisit(salonId)
+  const createVisit = useCreateVisit(salonId)
 
   const allPaid = groupLines.length > 0 && groupLines.every((v) => v.status === 'paid')
   const total = groupLines.reduce(
@@ -170,6 +172,52 @@ export function VisitDetailModal({
               remove.mutate(id, {
                 onSuccess: () => toast.success(t('visits.toast_deleted')),
               })
+            }}
+            onAddService={async (serviceId) => {
+              const svc = services.find((s) => s.id === serviceId)
+              if (!svc || !visit) return
+              // 1. Гарантируем group_key — если у текущего визита его ещё нет,
+              //    генерим новый и патчим существующий, иначе берём из visit.
+              let groupKey = visit.group_key
+              if (!groupKey) {
+                groupKey =
+                  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                    ? crypto.randomUUID()
+                    : `g-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+                try {
+                  await update.mutateAsync({ id: visit.id, group_key: groupKey })
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : String(e))
+                  return
+                }
+              }
+              // 2. Время — после последней линии группы. duration_min или 60.
+              const last = groupLines[groupLines.length - 1] ?? visit
+              const lastDur = last.duration_min ?? svc.default_duration_min ?? 60
+              const newAt = new Date(
+                new Date(last.visit_at).getTime() + lastDur * 60_000,
+              ).toISOString()
+              try {
+                await createVisit.mutateAsync({
+                  salon_id: salonId,
+                  visit_at: newAt,
+                  staff_id: last.staff_id ?? null,
+                  client_id: last.client_id ?? null,
+                  service_id: svc.id,
+                  service_name_snapshot: svc.name,
+                  amount_cents: svc.default_price_cents ?? 0,
+                  payment_method: last.payment_method,
+                  group_key: groupKey,
+                  duration_min: svc.default_duration_min ?? null,
+                  // Новая услуга — pending: владелец сам решит когда charge'нуть
+                  // всю группу (allPaid становится false и появится кнопка Рассчитать).
+                  status: 'pending',
+                  cash_register_id: last.cash_register_id ?? null,
+                })
+                toast.success(t('visits.detail.toast_service_added'))
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : String(e))
+              }
             }}
             onChargeClick={() => {
               if (!hasOpenShiftTop) {
@@ -231,7 +279,13 @@ type DetailViewProps = {
   visit: VisitRow
   client: { id: string; name: string } | null
   groupLines: VisitRow[]
-  services: Array<{ id: string; name: string; default_duration_min: number | null }>
+  services: Array<{
+    id: string
+    name: string
+    default_duration_min: number | null
+    default_price_cents?: number
+    is_archived?: boolean
+  }>
   staff: Array<{ id: string; full_name: string }>
   paymentMethods: Array<{ code: PaymentMethod; label: string }>
   currency: string
@@ -243,6 +297,7 @@ type DetailViewProps = {
   onEdit: (id: string | null) => void
   onPatchLine: (id: string, patch: Partial<VisitRow>) => void
   onDeleteLine: (id: string) => void
+  onAddService: (serviceId: string) => void | Promise<void>
   onChargeClick: () => void
   onClose: () => void
   t: (key: string, opts?: Record<string, unknown>) => string
@@ -264,10 +319,13 @@ function DetailView({
   onEdit,
   onPatchLine,
   onDeleteLine,
+  onAddService,
   onChargeClick,
   onClose,
   t,
 }: DetailViewProps) {
+  const [addingService, setAddingService] = useState(false)
+  const [addingValue, setAddingValue] = useState('')
   const headerLabel = allPaid ? t('visits.detail.status_paid') : t('visits.detail.status_confirmed')
   const dateLabel = format(new Date(visit.visit_at), 'EEEE, d MMMM', { locale: getDateLocale() })
 
@@ -394,16 +452,73 @@ function DetailView({
               )
             })}
 
-            {/* TODO «+ Добавить услугу» — создаёт новый visit с тем же group_key.
-                Сейчас not yet — нужна модалка выбора услуги. Поставлю заглушку. */}
-            <button
-              type="button"
-              onClick={() => toast.info(t('visits.detail.add_service_coming_soon'))}
-              className="border-border text-muted-foreground hover:border-primary hover:text-primary inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-semibold transition-colors"
-            >
-              <Plus className="size-4" strokeWidth={2} />
-              {t('visits.detail.add_service')}
-            </button>
+            {/* «+ Добавить услугу» — inline picker. Создаёт новый visit с тем
+                же group_key (или генерит group_key если его ещё нет — тогда
+                и текущий визит, и новый объединяются в группу). */}
+            {addingService ? (
+              <div className="border-primary/30 bg-card rounded-lg border-2 border-dashed p-3">
+                <Label
+                  htmlFor="detail-add-service"
+                  className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider"
+                >
+                  {t('visits.detail.add_service_label')}
+                </Label>
+                <select
+                  id="detail-add-service"
+                  autoFocus
+                  value={addingValue}
+                  onChange={(e) => setAddingValue(e.target.value)}
+                  className="border-border bg-background focus:border-primary mt-1.5 h-10 w-full rounded-md border px-3 text-sm outline-none"
+                >
+                  <option value="">{t('visits.detail.add_service_placeholder')}</option>
+                  {services
+                    .filter((s) => !s.is_archived)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.default_price_cents
+                          ? ` · ${formatCurrency(s.default_price_cents, currency)}`
+                          : ''}
+                      </option>
+                    ))}
+                </select>
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAddingService(false)
+                      setAddingValue('')
+                    }}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!addingValue}
+                    onClick={async () => {
+                      if (!addingValue) return
+                      const id = addingValue
+                      setAddingService(false)
+                      setAddingValue('')
+                      await onAddService(id)
+                    }}
+                  >
+                    {t('visits.detail.add_service_submit')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingService(true)}
+                className="border-border text-muted-foreground hover:border-primary hover:text-primary inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-semibold transition-colors"
+              >
+                <Plus className="size-4" strokeWidth={2} />
+                {t('visits.detail.add_service')}
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3">

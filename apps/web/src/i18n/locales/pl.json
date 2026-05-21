@@ -1151,7 +1151,11 @@
       "note_label": "Notatka dla mistrza",
       "note_placeholder": "Np. klient pierwszy raz, potrzebna konsultacja",
       "total": "Razem",
-      "charge": "Rozlicz"
+      "charge": "Rozlicz",
+      "add_service_label": "Wybierz usługę",
+      "add_service_placeholder": "— Usługa —",
+      "add_service_submit": "Dodaj",
+      "toast_service_added": "Usługa dodana"
     },
     "add": "Dodaj wizytę"
   },

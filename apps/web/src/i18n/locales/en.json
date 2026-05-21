@@ -1151,7 +1151,11 @@
       "note_label": "Note for master",
       "note_placeholder": "E.g. first-time client, needs consultation",
       "total": "Total",
-      "charge": "Calculate"
+      "charge": "Calculate",
+      "add_service_label": "Pick a service",
+      "add_service_placeholder": "— Service —",
+      "add_service_submit": "Add",
+      "toast_service_added": "Service added"
     },
     "add": "Add visit"
   },

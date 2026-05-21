@@ -1587,7 +1587,11 @@
       "note_label": "Заметка для мастера",
       "note_placeholder": "Например: клиент впервые, нужна консультация",
       "total": "Итого",
-      "charge": "Рассчитать"
+      "charge": "Рассчитать",
+      "add_service_label": "Выбери услугу",
+      "add_service_placeholder": "— Услуга —",
+      "add_service_submit": "Добавить",
+      "toast_service_added": "Услуга добавлена"
     },
     "form": {
       "title_new": "Новый визит",
