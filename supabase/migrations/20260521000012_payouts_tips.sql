@@ -4,7 +4,12 @@
 -- Расширяем calculate_payouts_for_period колонкой tips_cents.
 -- Юзер хочет видеть в /payouts сколько чаевых отдать каждому мастеру отдельно
 -- (чаевые передаются мастеру 100%, не идут в commission).
+--
+-- DROP перед CREATE — иначе Postgres 42P13 «cannot change return type of
+-- existing function» (расширяем return table колонкой tips_cents).
 -- =============================================================================
+
+drop function if exists public.calculate_payouts_for_period(uuid, date, date);
 
 create or replace function public.calculate_payouts_for_period(
   p_salon_id uuid,

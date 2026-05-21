@@ -6,7 +6,14 @@
 --
 -- Юзер просит видеть чаевые отдельно в /reports → мастера, а также в /payouts
 -- для расчёта выплат (чаевые отдаются мастеру 100%, не входят в commission).
+--
+-- ВАЖНО: `create or replace function` НЕ переопределяет return type —
+-- Postgres падает с 42P13. Поэтому сначала DROP старой версии (она была
+-- создана в миграции 20260515000013_staff_performance_advanced.sql) и
+-- только потом создаём заново с новой сигнатурой (добавлен tips_cents).
 -- =============================================================================
+
+drop function if exists public.staff_performance_advanced(uuid, timestamptz, timestamptz);
 
 create or replace function public.staff_performance_advanced(
   p_salon_id uuid,
