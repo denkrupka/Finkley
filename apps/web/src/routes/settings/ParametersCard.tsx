@@ -396,6 +396,11 @@ function SectionTable({
                   ? t('settings.parameters.col_amount')
                   : t('settings.parameters.col_pct')}
               </th>
+              {def.key === 'cash_registers' ? (
+                <th className="w-40 px-4 py-2 text-left font-semibold">
+                  {t('settings.parameters.col_cash_kind', { defaultValue: 'Тип средств' })}
+                </th>
+              ) : null}
               {def.showPeriod ? (
                 <th className="w-40 px-4 py-2 text-left font-semibold">
                   {t('settings.parameters.col_period')}
@@ -408,7 +413,7 @@ function SectionTable({
             {rootItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={def.showPeriod ? 4 : 3}
+                  colSpan={(def.showPeriod ? 1 : 0) + (def.key === 'cash_registers' ? 1 : 0) + 3}
                   className="text-muted-foreground px-4 py-6 text-center text-xs italic"
                 >
                   {t('settings.parameters.empty_section')}
@@ -577,6 +582,24 @@ function ParameterRow({
           </span>
         </div>
       </td>
+
+      {def.key === 'cash_registers' ? (
+        <td className="px-4 py-1.5 align-middle">
+          <select
+            value={item.cash_kind ?? 'non_cash'}
+            onChange={(e) => onPatch({ cash_kind: e.target.value as 'cash' | 'non_cash' })}
+            disabled={item.archived}
+            className="border-border bg-card h-8 w-full rounded-md border px-2 text-sm disabled:opacity-50"
+          >
+            <option value="cash">
+              {t('settings.parameters.cash_kind.cash', { defaultValue: 'Наличные' })}
+            </option>
+            <option value="non_cash">
+              {t('settings.parameters.cash_kind.non_cash', { defaultValue: 'Безналичные' })}
+            </option>
+          </select>
+        </td>
+      ) : null}
 
       {def.showPeriod ? (
         <td className="px-4 py-1.5 align-middle">

@@ -39,6 +39,13 @@ export type ParameterItem = {
   /** Soft-delete — позиция скрыта из новых отчётов, но название сохраняется. */
   archived?: boolean
   /**
+   * Только для cash_registers: тип средств в кассе. cash = физические
+   * деньги (наличные/конверт/сейф); non_cash = безналичные (счёт, карта,
+   * терминал). Используется в P&L для разбивки cash vs cashless и в
+   * cash-shift discipline (наличные нуждаются в смене, безнал — нет).
+   */
+  cash_kind?: 'cash' | 'non_cash'
+  /**
    * Маркер preset-позиции (системной). Только для миграции — не показывается
    * юзеру и не влияет на UI. После рефакторинга все позиции редактируются
    * одинаково.
@@ -76,11 +83,11 @@ function preset(id: string, label: string, extra: Partial<ParameterItem> = {}): 
 export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   cash_registers: {
     items: [
-      preset('director', 'Касса директора', { amount_cents: 0 }),
-      preset('safe', 'Сейф', { amount_cents: 0 }),
-      preset('gotowka', 'Gotówka', { amount_cents: 0 }),
-      preset('bank_karta', 'Bank/Karta', { amount_cents: 0 }),
-      preset('karta_terminal', 'Karta / Terminal', { amount_cents: 0 }),
+      preset('director', 'Касса директора', { amount_cents: 0, cash_kind: 'cash' }),
+      preset('safe', 'Сейф', { amount_cents: 0, cash_kind: 'cash' }),
+      preset('gotowka', 'Gotówka', { amount_cents: 0, cash_kind: 'cash' }),
+      preset('bank_karta', 'Bank/Karta', { amount_cents: 0, cash_kind: 'non_cash' }),
+      preset('karta_terminal', 'Karta / Terminal', { amount_cents: 0, cash_kind: 'non_cash' }),
     ],
   },
   fixed: {
@@ -257,7 +264,19 @@ function migrateLegacySection(defaults: ParameterItem[], stored: unknown): Param
     stored !== null &&
     Array.isArray((stored as { items?: unknown }).items)
   ) {
-    return ((stored as { items: ParameterItem[] }).items ?? []).map((it) => ({ ...it }))
+    return ((stored as { items: ParameterItem[] }).items ?? []).map((it) => {
+      // Авто-эвристика cash_kind для существующих касс без типа: матчим
+      // на «наличные/gotówka/готівка/cash/сейф/конверт/касс» → cash, иначе
+      // non_cash. Юзер может переопределить руками в Settings.
+      if (it.cash_kind === undefined && typeof it.label === 'string') {
+        const lbl = it.label.toLowerCase()
+        const isCash =
+          /налич|got[óo]wk|готівк|cash|сейф|конверт|касс/i.test(lbl) &&
+          !/(карт|karta|terminal|счёт|счет|bank|безнал|транс|przelew)/i.test(lbl)
+        return { ...it, cash_kind: isCash ? ('cash' as const) : ('non_cash' as const) }
+      }
+      return { ...it }
+    })
   }
 
   // Legacy: preset-поля + опц. custom[]
