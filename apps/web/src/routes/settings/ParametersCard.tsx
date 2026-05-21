@@ -329,7 +329,20 @@ function SectionTable({
   }
 
   function patchItem(id: string, patch: Partial<ParameterItem>) {
-    onChange((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+    onChange((prev) =>
+      prev.map((it) => {
+        // payment_method_mapping должен быть уникальным в секции:
+        // если ставим на текущую кассу значение X — у других сбрасываем.
+        if (
+          patch.payment_method_mapping &&
+          it.id !== id &&
+          it.payment_method_mapping === patch.payment_method_mapping
+        ) {
+          return { ...it, payment_method_mapping: null }
+        }
+        return it.id === id ? { ...it, ...patch } : it
+      }),
+    )
   }
 
   function archiveItem(id: string) {
@@ -596,6 +609,36 @@ function ParameterRow({
             </option>
             <option value="non_cash">
               {t('settings.parameters.cash_kind.non_cash', { defaultValue: 'Безналичные' })}
+            </option>
+          </select>
+        </td>
+      ) : null}
+
+      {def.key === 'cash_registers' ? (
+        <td className="px-4 py-1.5 align-middle">
+          <select
+            value={item.payment_method_mapping ?? ''}
+            onChange={(e) => {
+              const v = e.target.value || null
+              onPatch({
+                payment_method_mapping: v as 'cash' | 'card' | 'transfer' | 'online' | null,
+              })
+            }}
+            disabled={item.archived}
+            className="border-border bg-card h-8 w-full rounded-md border px-2 text-sm disabled:opacity-50"
+          >
+            <option value="">—</option>
+            <option value="cash">
+              {t('settings.parameters.mapping.cash', { defaultValue: 'Наличные' })}
+            </option>
+            <option value="card">
+              {t('settings.parameters.mapping.card', { defaultValue: 'Карта' })}
+            </option>
+            <option value="transfer">
+              {t('settings.parameters.mapping.transfer', { defaultValue: 'Перевод' })}
+            </option>
+            <option value="online">
+              {t('settings.parameters.mapping.online', { defaultValue: 'Online' })}
             </option>
           </select>
         </td>
