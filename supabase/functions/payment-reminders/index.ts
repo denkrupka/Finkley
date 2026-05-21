@@ -21,6 +21,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { makeT, normalizeNotifLocale, type NotifLocale } from '../_shared/notifications-i18n.ts'
 import { sendTelegramToUser } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
@@ -92,36 +93,56 @@ function isEnabled(prefs: Record<string, boolean> | null, key: NotificationPrefK
   return prefs[key] !== false
 }
 
+const BUCKET_HEADER_KEY: Record<NotificationPrefKey, string> = {
+  payment_due_2d: 'payment.header.due_2d',
+  payment_due_1d: 'payment.header.due_1d',
+  payment_due_today: 'payment.header.due_today',
+  payment_overdue: 'payment.header.overdue',
+}
+
 function buildMessage(
   salonName: string,
   payments: ScheduledPaymentRow[],
   bucket: NotificationPrefKey,
   currency: string,
+  locale: NotifLocale,
 ): { text: string; html: string } {
-  const header = {
-    payment_due_2d: `📅 Через 2 дня — платежи по фактурам (${salonName})`,
-    payment_due_1d: `⏰ Завтра — платежи по фактурам (${salonName})`,
-    payment_due_today: `🔔 Сегодня — платежи по фактурам (${salonName})`,
-    payment_overdue: `⚠️ Просрочены платежи (${salonName})`,
-  }[bucket]
-  const lines = payments.map((p) => {
-    const who = p.vendor_name?.trim() || 'без поставщика'
-    const num = p.invoice_number ? ` №${p.invoice_number}` : ''
-    return `• ${formatCents(p.amount_cents, currency)} — ${who}${num} (до ${p.due_date})`
-  })
-  const text = `${header}\n\n${lines.join('\n')}`
+  const t = makeT(locale)
+  const header = t(BUCKET_HEADER_KEY[bucket], { salonName })
+
+  // Для plain-text шлём как есть. Для HTML — заворачиваем сумму в <strong>
+  // через placeholder, иначе бы пришлось дублировать шаблон в локалях.
+  const AMT_TOKEN = '___AMT___'
+  const renderLine = (p: ScheduledPaymentRow, amountValue: string) => {
+    const vendor = p.vendor_name?.trim() || t('payment.no_vendor')
+    const invoiceSuffix = p.invoice_number
+      ? t('payment.invoice_suffix', { number: p.invoice_number })
+      : ''
+    return t('payment.line', {
+      amount: amountValue,
+      vendor,
+      invoiceSuffix,
+      dueDate: p.due_date,
+    })
+  }
+
+  const text = [
+    header,
+    '',
+    ...payments.map((p) => renderLine(p, formatCents(p.amount_cents, currency))),
+  ].join('\n')
+
+  const htmlItems = payments
+    .map((p) => {
+      const tmpl = renderLine(p, AMT_TOKEN)
+      const amount = formatCents(p.amount_cents, currency)
+      return `<li>${tmpl.replace(AMT_TOKEN, `<strong>${amount}</strong>`)}</li>`
+    })
+    .join('')
   const html =
     `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">${header}</h2>` +
-    `<ul style="padding-left:20px;color:#1A1A2E;font-size:14px;line-height:1.6">` +
-    payments
-      .map((p) => {
-        const who = p.vendor_name?.trim() || 'без поставщика'
-        const num = p.invoice_number ? ` №${p.invoice_number}` : ''
-        return `<li><strong>${formatCents(p.amount_cents, currency)}</strong> — ${who}${num} (до ${p.due_date})</li>`
-      })
-      .join('') +
-    `</ul>` +
-    `<p style="color:#6b7280;font-size:12px;margin-top:16px">Открой <a href="https://finkley.app/app/">Finkley → Платёжный календарь</a> чтобы пометить оплаченными.</p>`
+    `<ul style="padding-left:20px;color:#1A1A2E;font-size:14px;line-height:1.6">${htmlItems}</ul>` +
+    `<p style="color:#6b7280;font-size:12px;margin-top:16px">${t('payment.email_footer')}</p>`
   return { text, html }
 }
 
@@ -188,14 +209,19 @@ async function processOneSalon(
   // Owner получает уведомления. Берём первого owner из salon_members.
   const { data: ownerRow } = await admin
     .from('salon_members')
-    .select('user_id, profiles!inner(email, full_name, telegram_id)')
+    .select('user_id, profiles!inner(email, full_name, telegram_id, locale)')
     .eq('salon_id', salon.id)
     .eq('role', 'owner')
     .limit(1)
     .maybeSingle()
   type OwnerRaw = {
     user_id: string
-    profiles: { email?: string; full_name?: string; telegram_id?: number | null } | null
+    profiles: {
+      email?: string
+      full_name?: string
+      telegram_id?: number | null
+      locale?: string | null
+    } | null
   }
   const owner = ownerRow as OwnerRaw | null
   if (!owner) return stats
@@ -205,6 +231,7 @@ async function processOneSalon(
     full_name: owner.profiles?.full_name ?? null,
     telegram_id: owner.profiles?.telegram_id ?? null,
   }
+  const ownerLocale = normalizeNotifLocale(owner.profiles?.locale)
   const salonName = salon.name ?? 'Salon'
 
   for (const bucketKey of Object.keys(buckets) as NotificationPrefKey[]) {
@@ -214,7 +241,7 @@ async function processOneSalon(
       stats.skipped += list.length
       continue
     }
-    const { text, html } = buildMessage(salonName, list, bucketKey, currency)
+    const { text, html } = buildMessage(salonName, list, bucketKey, currency, ownerLocale)
     const subject = text.split('\n')[0]
 
     // Push (browser/PWA) — все подписки владельца

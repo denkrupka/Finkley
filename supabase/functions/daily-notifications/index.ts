@@ -17,6 +17,12 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import {
+  bcp47,
+  makeT,
+  normalizeNotifLocale,
+  type NotifLocale,
+} from '../_shared/notifications-i18n.ts'
 import { sendTelegramToUser } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
@@ -86,7 +92,9 @@ async function processLowInventory(
   admin: SupabaseClient,
   salon: SalonRow,
   owner: { user_id: string; email: string | null; telegram_id: number | null },
+  locale: NotifLocale,
 ): Promise<number> {
+  const t = makeT(locale)
   if (!isEnabled(salon.notification_prefs, 'low_inventory')) return 0
   const { data: items } = await admin
     .from('inventory_items')
@@ -98,26 +106,37 @@ async function processLowInventory(
   const lowList = (items ?? []) as InventoryRow[]
   if (lowList.length === 0) return 0
   const salonName = salon.name ?? 'Salon'
-  const lines = lowList.map((it) => {
-    const unit = it.unit ?? ''
-    return `• ${it.name}: ${it.current_stock} ${unit} (порог ${it.min_stock} ${unit})`
-  })
-  const text = `📦 Низкие остатки на складе (${salonName})\n\n${lines.join('\n')}`
+  const header = t('lowinv.header', { salonName })
+  const lines = lowList.map((it) =>
+    t('lowinv.line', {
+      name: it.name,
+      stock: it.current_stock,
+      min: it.min_stock,
+      unit: it.unit ?? '',
+    }),
+  )
+  const text = `${header}\n\n${lines.join('\n')}`
   const html =
-    `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">📦 Низкие остатки на складе (${salonName})</h2>` +
+    `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">${header}</h2>` +
     `<ul style="padding-left:20px;color:#1A1A2E;font-size:14px;line-height:1.6">` +
     lowList
       .map(
         (it) =>
-          `<li><strong>${it.name}</strong>: ${it.current_stock} ${it.unit ?? ''} (порог ${it.min_stock} ${it.unit ?? ''})</li>`,
+          `<li>${t('lowinv.line', {
+            name: `<strong>${it.name}</strong>`,
+            stock: it.current_stock,
+            min: it.min_stock,
+            unit: it.unit ?? '',
+          }).replace(/^•\s*/, '')}</li>`,
       )
       .join('') +
     `</ul>` +
-    `<p style="color:#6b7280;font-size:12px;margin-top:16px">Открой <a href="https://finkley.app/app/">Finkley → Склад</a> чтобы оприходовать закупку.</p>`
+    `<p style="color:#6b7280;font-size:12px;margin-top:16px">${t('lowinv.email_footer')}</p>`
+  const pushTitle = t('lowinv.push_title', { salonName })
   let sent = 0
   try {
     const pushed = await sendPushToUser(admin, owner.user_id, {
-      title: `Низкие остатки — ${salonName}`,
+      title: pushTitle,
       body: lines.slice(0, 3).join('\n'),
       url: `/app/${salon.id}/inventory`,
       tag: 'low-inventory',
@@ -130,7 +149,7 @@ async function processLowInventory(
     if (await sendTelegramToUser(owner.telegram_id, text)) sent++
   }
   if (owner.email) {
-    const r = await sendEmail(owner.email, `Низкие остатки — ${salonName}`, html)
+    const r = await sendEmail(owner.email, pushTitle, html)
     if (r.ok) sent++
   }
   return sent
@@ -140,7 +159,9 @@ async function processCalendarConflicts(
   admin: SupabaseClient,
   salon: SalonRow,
   owner: { user_id: string; email: string | null; telegram_id: number | null },
+  locale: NotifLocale,
 ): Promise<number> {
+  const t = makeT(locale)
   if (!isEnabled(salon.notification_prefs, 'calendar_conflicts')) return 0
   // Берём БУДУЩИЕ визиты на 14 дней вперёд — этого окна достаточно для
   // утреннего предупреждения, дальше юзер сам корректирует.
@@ -195,43 +216,41 @@ async function processCalendarConflicts(
   )
 
   const salonName = salon.name ?? 'Salon'
-  const lines = conflicts.slice(0, 10).map((c) => {
-    const staff = staffName.get(c.a.staff_id!) ?? '—'
-    const fmt = (iso: string) =>
-      new Date(iso).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    return `• ${staff}: ${fmt(c.a.visit_at)} «${c.a.service_name_snapshot ?? '—'}» × ${fmt(c.b.visit_at)} «${c.b.service_name_snapshot ?? '—'}»`
+  const dash = t('common.dash')
+  const dtLocale = bcp47(locale)
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString(dtLocale, {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  const lineVars = (c: { a: V; b: V }) => ({
+    staff: staffName.get(c.a.staff_id!) ?? dash,
+    aTime: fmt(c.a.visit_at),
+    aService: c.a.service_name_snapshot ?? dash,
+    bTime: fmt(c.b.visit_at),
+    bService: c.b.service_name_snapshot ?? dash,
   })
-  const more = conflicts.length > 10 ? `\n…ещё ${conflicts.length - 10}` : ''
-  const text = `⚠️ Конфликты в календаре (${salonName})\n\n${lines.join('\n')}${more}`
+  const lines = conflicts.slice(0, 10).map((c) => t('conflict.line', lineVars(c)))
+  const moreText =
+    conflicts.length > 10 ? `\n${t('conflict.more', { count: conflicts.length - 10 })}` : ''
+  const header = t('conflict.header', { salonName })
+  const text = `${header}\n\n${lines.join('\n')}${moreText}`
   const html =
-    `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">⚠️ Конфликты в календаре (${salonName})</h2>` +
+    `<h2 style="font-size:18px;margin:0 0 12px 0;color:#1A1A2E">${header}</h2>` +
     `<ul style="padding-left:20px;color:#1A1A2E;font-size:14px;line-height:1.6">` +
     conflicts
       .slice(0, 20)
-      .map((c) => {
-        const staff = staffName.get(c.a.staff_id!) ?? '—'
-        const fmt = (iso: string) =>
-          new Date(iso).toLocaleString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        return `<li><strong>${staff}</strong>: ${fmt(c.a.visit_at)} «${c.a.service_name_snapshot ?? '—'}» пересекается с ${fmt(c.b.visit_at)} «${c.b.service_name_snapshot ?? '—'}»</li>`
-      })
+      .map((c) => `<li>${t('conflict.line_html', lineVars(c))}</li>`)
       .join('') +
     `</ul>` +
-    `<p style="color:#6b7280;font-size:12px;margin-top:16px">Открой <a href="https://finkley.app/app/">Finkley → Визиты</a> чтобы исправить.</p>`
+    `<p style="color:#6b7280;font-size:12px;margin-top:16px">${t('conflict.email_footer')}</p>`
 
   let sent = 0
   try {
     const pushed = await sendPushToUser(admin, owner.user_id, {
-      title: `Конфликты в календаре — ${salonName}`,
+      title: t('conflict.push_title', { salonName }),
       body: lines.slice(0, 3).join('\n'),
       url: `/app/${salon.id}/visits`,
       tag: 'calendar-conflicts',
@@ -244,7 +263,7 @@ async function processCalendarConflicts(
     if (await sendTelegramToUser(owner.telegram_id, text)) sent++
   }
   if (owner.email) {
-    const r = await sendEmail(owner.email, `Конфликты в календаре — ${salonName}`, html)
+    const r = await sendEmail(owner.email, t('conflict.push_title', { salonName }), html)
     if (r.ok) sent++
   }
   return sent
@@ -252,17 +271,17 @@ async function processCalendarConflicts(
 
 async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<{ sent: number }> {
   const stats = { sent: 0 }
-  // Owner
+  // Owner — берём locale из profiles для локализации уведомлений.
   const { data: ownerRow } = await admin
     .from('salon_members')
-    .select('user_id, profiles!inner(email, telegram_id)')
+    .select('user_id, profiles!inner(email, telegram_id, locale)')
     .eq('salon_id', salon.id)
     .eq('role', 'owner')
     .limit(1)
     .maybeSingle()
   type OwnerRaw = {
     user_id: string
-    profiles: { email?: string; telegram_id?: number | null } | null
+    profiles: { email?: string; telegram_id?: number | null; locale?: string | null } | null
   }
   const owner = ownerRow as OwnerRaw | null
   if (!owner) return stats
@@ -271,8 +290,9 @@ async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<
     email: owner.profiles?.email ?? null,
     telegram_id: owner.profiles?.telegram_id ?? null,
   }
-  stats.sent += await processLowInventory(admin, salon, ownerData)
-  stats.sent += await processCalendarConflicts(admin, salon, ownerData)
+  const locale = normalizeNotifLocale(owner.profiles?.locale)
+  stats.sent += await processLowInventory(admin, salon, ownerData, locale)
+  stats.sent += await processCalendarConflicts(admin, salon, ownerData, locale)
   return stats
 }
 
