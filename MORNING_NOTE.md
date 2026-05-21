@@ -57,8 +57,8 @@
 
 ### i18n
 
-- 1735 ключей в EN/PL добавлены как заглушки (rus-fallback).
-- 60+33 = 93 видимых лейбла переведены вручную (nav, тaбы, формы, notifications, cash mapping, visits sync).
+- **Полный перевод EN + PL** — 1635 ключей переведены вручную (0 русских fallback осталось).
+- Покрыто: visits, finance, dashboard, staff, clients, reports_hub, inventory, expenses, services_page, integrations, banking, messenger, income_categories, settings (включая parameters, accounting, telegram, opening_hours, daily_digest), cash_transfer, retail_wizard, counterparties, team, audit, tour, dictate, roles, tester, referral, blocked, admin.
 
 ### SPA stability
 
@@ -77,7 +77,6 @@
 
 ## 🐛 Известные мелочи
 
-- **i18n EN/PL** — ~1640 ключей лежат как русские заглушки. Полный перевод — отдельная итерация через LLM-batch.
 - **Integration-тесты** для calendar-feed / маппинг касс — pure unit покрыты, но без реального Booksy stub'а интеграционных нет.
 - **historic insertHistoricalBooking** — не шлёт push real-time (импорт прошлого не критичен).
 
