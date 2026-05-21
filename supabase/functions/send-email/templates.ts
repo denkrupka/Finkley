@@ -1283,6 +1283,250 @@ Dzięki, że próbowałeś.<br>{{owner_name}}
 </td></tr></table></body></html>`,
 }
 
+const GDPR_EXPORT_EN: EmailTemplate = {
+  subject: 'Your Finkley data archive is ready',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finkley data archive</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY</p>
+<h1 style="margin:0 0 16px 0;font-size:22px;line-height:30px;color:#0f172a;">Archive ready</h1>
+<p style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#334155;">
+Hi {{full_name}}. We've packed all your Finkley data into one ZIP archive.
+</p>
+<p style="margin:0 0 24px 0;font-size:16px;line-height:24px;color:#334155;">
+The link is valid for 24 hours. After that, you'll need to request a new export.
+</p>
+<p style="margin:0 0 24px 0;">
+<a href="{{download_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Download archive</a>
+</p>
+<p style="margin:24px 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+Inside — CSVs of your visits, expenses, clients, masters, services and categories. README.txt explains every column.
+</p>
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+If you want to delete the account after downloading — email info@finkley.app, we'll reply within 5 business days.
+</p>
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Management accounting for beauty salons<br>Questions — info@finkley.app</p>
+</div>
+</body>
+</html>`,
+}
+
+const GDPR_EXPORT_PL: EmailTemplate = {
+  subject: 'Twoje archiwum danych Finkley jest gotowe',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archiwum danych Finkley</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+<div style="background:#ffffff;border-radius:8px;padding:40px;">
+<p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY</p>
+<h1 style="margin:0 0 16px 0;font-size:22px;line-height:30px;color:#0f172a;">Archiwum gotowe</h1>
+<p style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#334155;">
+Cześć, {{full_name}}. Spakowaliśmy wszystkie Twoje dane Finkley w jedno archiwum ZIP.
+</p>
+<p style="margin:0 0 24px 0;font-size:16px;line-height:24px;color:#334155;">
+Link jest ważny 24 godziny. Później trzeba poprosić o nowy eksport.
+</p>
+<p style="margin:0 0 24px 0;">
+<a href="{{download_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Pobierz archiwum</a>
+</p>
+<p style="margin:24px 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+W środku — CSV z wizytami, wydatkami, klientami, mistrzami, usługami i kategoriami. README.txt wyjaśnia każdą kolumnę.
+</p>
+<p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
+Chcesz usunąć konto po pobraniu? — napisz na info@finkley.app, odpowiemy w ciągu 5 dni roboczych.
+</p>
+</div>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów kosmetycznych<br>Pytania — info@finkley.app</p>
+</div>
+</body>
+</html>`,
+}
+
+const PRIVACY_ALERT_EN: EmailTemplate = {
+  subject: '🔒 Admin {{actor_name}} viewed contacts of {{client_count}}+ clients',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Privacy notice</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    Admin viewed contacts of {{client_count}}+ clients
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Today admin <strong>{{actor_name}}</strong> opened the client list of salon
+    <strong>{{salon_name}}</strong>, which showed contact details of more than
+    {{client_count}} clients.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    This is a standard action for the 'admin' role — it has full access to the
+    client base by default. If you want to hide contacts specifically from this
+    person, or change their role to 'master' / 'accountant', go to the 'Team'
+    section in salon settings.
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{team_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Open 'Team' section
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    This automatic notification comes at most once a day — even if admin opened the list multiple times.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · management accounting for beauty salons
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
+const PRIVACY_ALERT_PL: EmailTemplate = {
+  subject: '🔒 Administrator {{actor_name}} przejrzał kontakty {{client_count}}+ klientów',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Powiadomienie o prywatności</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    Administrator przejrzał kontakty {{client_count}}+ klientów
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Dziś administrator <strong>{{actor_name}}</strong> otworzył listę klientów
+    salonu <strong>{{salon_name}}</strong>, gdzie były widoczne dane kontaktowe
+    ponad {{client_count}} klientów.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    To standardowe działanie dla roli „administrator" — ma pełny dostęp do bazy
+    klientów domyślnie. Jeśli chcesz ukryć kontakty konkretnie przed tą osobą lub
+    zmienić jej rolę na „mistrz" / „księgowy", przejdź do sekcji „Zespół"
+    w ustawieniach salonu.
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{team_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Otwórz sekcję „Zespół"
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    To automatyczne powiadomienie przychodzi maksymalnie raz dziennie — nawet jeśli administrator otwierał listę wielokrotnie.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · księgowość zarządcza dla salonów kosmetycznych
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
+const BANK_CONSENT_EXPIRING_EN: EmailTemplate = {
+  subject: "'{{bank_name}}' connection expires in {{days_left}} days",
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Action in {{days_left}} days</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    '{{bank_name}}' bank connection is about to expire
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Per PSD2 rules, the bank requires you to personally re-authorize Finkley's
+    access to transactions at least every 6 months. The current authorization for
+    '{{bank_name}}' ({{salon_name}}) expires on <strong>{{valid_until}}</strong>.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Without re-authorization — auto-import of expenses will stop. Nothing scary:
+    transactions already pulled remain, you simply won't receive new ones. To
+    continue, click the button and pass the bank's confirmation (30 seconds).
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{reconnect_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Reconnect bank
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    If you no longer use this bank — you can simply disconnect it in integration
+    settings. Previously imported expenses will remain.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · management accounting for beauty salons
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
+const BANK_CONSENT_EXPIRING_PL: EmailTemplate = {
+  subject: 'Połączenie z „{{bank_name}}" wygasa za {{days_left}} dni',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0;padding:0;background:#F7F4EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F4EE;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E5E1D8;overflow:hidden;">
+<tr><td style="padding:32px 32px 16px;">
+  <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#C9A24B;">Akcja za {{days_left}} dni</p>
+  <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;font-weight:800;color:#1A1A2E;">
+    Połączenie z bankiem „{{bank_name}}" wkrótce wygaśnie
+  </h1>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Zgodnie z PSD2 bank wymaga, abyś osobiście potwierdzał dostęp Finkley do
+    transakcji co najmniej raz na 6 miesięcy. Obecne potwierdzenie dla
+    „{{bank_name}}" ({{salon_name}}) wygasa <strong>{{valid_until}}</strong>.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
+    Bez ponownego połączenia — auto-import wydatków się zatrzyma. Nie martw się:
+    transakcje już pobrane pozostaną, po prostu nie będziesz otrzymywać nowych.
+    Aby kontynuować, kliknij przycisk i przejdź potwierdzenie w banku (zajmie 30 sekund).
+  </p>
+  <p style="margin:24px 0;">
+    <a href="{{reconnect_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+      Połącz bank ponownie
+    </a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;">
+    Jeśli już nie korzystasz z tego banku — możesz po prostu go odłączyć w
+    ustawieniach integracji. Wcześniej zaimportowane wydatki pozostaną.
+  </p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
+  <p style="margin:0;font-size:12px;color:#94a3b8;">
+    Finkley · księgowość zarządcza dla salonów kosmetycznych
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
@@ -1293,6 +1537,9 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     payment_succeeded: PAYMENT_SUCCEEDED_EN,
     payment_failed: PAYMENT_FAILED_EN,
     subscription_canceled: SUBSCRIPTION_CANCELED_EN,
+    gdpr_export: GDPR_EXPORT_EN,
+    privacy_alert: PRIVACY_ALERT_EN,
+    bank_consent_expiring: BANK_CONSENT_EXPIRING_EN,
   },
   pl: {
     welcome: WELCOME_PL,
@@ -1302,6 +1549,9 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     payment_succeeded: PAYMENT_SUCCEEDED_PL,
     payment_failed: PAYMENT_FAILED_PL,
     subscription_canceled: SUBSCRIPTION_CANCELED_PL,
+    gdpr_export: GDPR_EXPORT_PL,
+    privacy_alert: PRIVACY_ALERT_PL,
+    bank_consent_expiring: BANK_CONSENT_EXPIRING_PL,
   },
 }
 

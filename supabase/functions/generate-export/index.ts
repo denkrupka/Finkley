@@ -331,6 +331,8 @@ Deno.serve(async (req: Request) => {
             expires_at: expiresAt,
             app_url: APP_URL,
           },
+          // profile уже подгрузили выше для CSV; используем его locale.
+          locale: ((profile as { locale?: string | null } | null)?.locale ?? 'ru') as string,
         }),
       })
       if (!emailRes.ok) {

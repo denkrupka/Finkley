@@ -123,14 +123,22 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true, skipped: 'no_owner' })
   }
 
-  // Owner profile (email + telegram_id).
+  // Owner profile (email + telegram_id + locale).
   const { data: ownerProfile } = await admin
     .from('profiles')
-    .select('email, full_name, telegram_id')
+    .select('email, full_name, telegram_id, locale')
     .eq('id', ownerId)
     .maybeSingle()
-  const ownerEmail = (ownerProfile as { email: string | null } | null)?.email ?? null
-  const ownerTgId = (ownerProfile as { telegram_id: number | null } | null)?.telegram_id ?? null
+  type OwnerProf = {
+    email: string | null
+    full_name: string | null
+    telegram_id: number | null
+    locale: string | null
+  }
+  const ownerEmail = (ownerProfile as OwnerProf | null)?.email ?? null
+  const ownerTgId = (ownerProfile as OwnerProf | null)?.telegram_id ?? null
+  const ownerLocale = (ownerProfile as OwnerProf | null)?.locale ?? 'ru'
+  const localeBase = ownerLocale.split('-')[0]?.toLowerCase() ?? 'ru'
 
   // Salon name (for nicer copy).
   const { data: salonRow } = await admin
@@ -151,12 +159,23 @@ Deno.serve(async (req: Request) => {
     (actorProfile as { email: string | null } | null)?.email ??
     'admin'
 
-  // Telegram: send if linked.
-  if (ownerTgId && BOT_TOKEN) {
-    const text =
+  // Telegram: send if linked. Локализуем по owner.locale.
+  const tgTexts = {
+    ru:
       `🔒 *Уведомление о приватности*\n\n` +
       `Администратор *${actorName}* открыл список клиентов салона *${salonName}* и просмотрел контактные данные более чем 50 клиентов (${count} шт.) за сегодня.\n\n` +
-      `Это штатное действие для роли «администратор», но при необходимости можно пересмотреть права: ${APP_URL}/${salonId}/settings?tab=team`
+      `Это штатное действие для роли «администратор», но при необходимости можно пересмотреть права: ${APP_URL}/${salonId}/settings?tab=team`,
+    pl:
+      `🔒 *Powiadomienie o prywatności*\n\n` +
+      `Administrator *${actorName}* otworzył listę klientów salonu *${salonName}* i przejrzał dane kontaktowe ponad 50 klientów (${count} szt.) dziś.\n\n` +
+      `To standardowe działanie dla roli „administrator", ale w razie potrzeby możesz przejrzeć uprawnienia: ${APP_URL}/${salonId}/settings?tab=team`,
+    en:
+      `🔒 *Privacy notice*\n\n` +
+      `Admin *${actorName}* opened the client list of salon *${salonName}* and viewed contact details of more than 50 clients (${count} total) today.\n\n` +
+      `This is a standard action for the 'admin' role, but you can review permissions if needed: ${APP_URL}/${salonId}/settings?tab=team`,
+  }
+  if (ownerTgId && BOT_TOKEN) {
+    const text = tgTexts[localeBase as 'ru' | 'pl' | 'en'] ?? tgTexts.ru
     try {
       await fetch(`${TELEGRAM_API}/sendMessage`, {
         method: 'POST',
@@ -191,6 +210,7 @@ Deno.serve(async (req: Request) => {
             client_count: count,
             team_url: `${APP_URL}/${salonId}/settings?tab=team`,
           },
+          locale: ownerLocale,
         }),
       })
     } catch (e) {
