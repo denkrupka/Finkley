@@ -141,6 +141,28 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     return factByLabel.get(normName(label)) ?? Array.from({ length: 12 }, () => 0)
   }
 
+  // Категории расходов которые НЕ matched в settings.fixed/variable/taxes —
+  // их юзер ввёл сам в /settings/expenses-catalog или через ExpenseFormModal.
+  // Без этого блока такие расходы появлялись только в общей сумме «Расходы»,
+  // без разбивки. Group key `expenses_other`.
+  const otherExpenseCategories = useMemo<Array<{ label: string; values: number[] }>>(() => {
+    const presetLabels = new Set<string>()
+    for (const it of settings.fixed.items) if (!it.archived) presetLabels.add(normName(it.label))
+    for (const it of settings.variable.items) if (!it.archived) presetLabels.add(normName(it.label))
+    for (const it of settings.taxes.items) if (!it.archived) presetLabels.add(normName(it.label))
+    const result: Array<{ label: string; values: number[] }> = []
+    for (const cat of expenseCategories) {
+      const key = normName(cat.name)
+      if (presetLabels.has(key)) continue
+      const arr = factByLabel.get(key)
+      if (!arr || arr.every((v) => v === 0)) continue
+      result.push({ label: cat.name, values: arr })
+    }
+    return result.sort(
+      (a, b) => b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0),
+    )
+  }, [expenseCategories, factByLabel, settings])
+
   const retailByCategory = useMemo<Map<string, number[]>>(() => {
     const invCatById = new Map<string, string>()
     const invCatByName = new Map<string, string>()
@@ -373,6 +395,32 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       ...r,
       parentGroupKey: 'taxes',
     })),
+
+    // «Прочие категории» — expense_categories из БД, которых нет в
+    // settings.fixed/variable/taxes. Без них custom-категории были не
+    // видны в раскрытии расходов (фикс по запросу image #57).
+    ...(otherExpenseCategories.length > 0
+      ? [
+          {
+            label: t('finance.report.expenses_other', { defaultValue: 'Прочие категории' }),
+            values: otherExpenseCategories.reduce(
+              (acc: number[], cat) => acc.map((v, i) => v - (cat.values[i] ?? 0)),
+              Array.from({ length: 12 }, () => 0),
+            ),
+            indent: 1,
+            bold: true,
+            color: 'destructive' as RowColor,
+            groupKey: 'expenses_other',
+            parentGroupKey: 'expenses',
+          },
+          ...otherExpenseCategories.map((cat) => ({
+            label: cat.label,
+            values: cat.values.map((v) => -v),
+            indent: 2,
+            parentGroupKey: 'expenses_other',
+          })),
+        ]
+      : []),
 
     {
       label: t('finance.report.section_investing'),
