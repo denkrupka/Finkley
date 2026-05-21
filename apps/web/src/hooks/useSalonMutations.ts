@@ -24,6 +24,10 @@ export type UpdateSalonInput = {
   city?: string | null
   lat?: number | null
   lng?: number | null
+  /** Миграция 20260522000002. Соцсети салона — для метрик
+   *  контента в Reports → Конкуренты. */
+  instagram_url?: string | null
+  facebook_url?: string | null
 }
 
 export function useUpdateSalon() {

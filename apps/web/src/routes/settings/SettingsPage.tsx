@@ -145,6 +145,8 @@ export function SettingsPage() {
   const [googlePlaceUrl, setGooglePlaceUrl] = useState('')
   const [googlePlaceId, setGooglePlaceId] = useState('')
   const [booksyUrl, setBooksyUrl] = useState('')
+  const [instagramUrl, setInstagramUrl] = useState('')
+  const [facebookUrl, setFacebookUrl] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   // Если URL = /settings/integrations — это вкладка интеграций. Иначе
@@ -225,6 +227,8 @@ export function SettingsPage() {
     setGooglePlaceUrl(salon.google_place_url ?? '')
     setGooglePlaceId(salon.google_place_id ?? '')
     setBooksyUrl(salon.booksy_url ?? '')
+    setInstagramUrl(salon.instagram_url ?? '')
+    setFacebookUrl(salon.facebook_url ?? '')
   }, [salon])
 
   if (!salon || !salonId) return null
@@ -240,7 +244,9 @@ export function SettingsPage() {
     lng !== (salon.lng != null ? String(salon.lng) : '') ||
     googlePlaceUrl !== (salon.google_place_url ?? '') ||
     googlePlaceId !== (salon.google_place_id ?? '') ||
-    booksyUrl !== (salon.booksy_url ?? '')
+    booksyUrl !== (salon.booksy_url ?? '') ||
+    instagramUrl !== (salon.instagram_url ?? '') ||
+    facebookUrl !== (salon.facebook_url ?? '')
 
   function save() {
     if (!salon) return
@@ -276,6 +282,8 @@ export function SettingsPage() {
         google_place_url: googlePlaceUrl.trim() || null,
         google_place_id: googlePlaceId.trim() || null,
         booksy_url: booksyUrl.trim() || null,
+        instagram_url: instagramUrl.trim() || null,
+        facebook_url: facebookUrl.trim() || null,
       },
       {
         onSuccess: () => toast.success(t('settings.toast_saved')),
@@ -562,6 +570,30 @@ export function SettingsPage() {
                 />
                 <p className="text-muted-foreground text-xs">
                   {t('settings.profile.booksy_url_hint')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="set-instagram-url">Instagram</Label>
+                <Input
+                  id="set-instagram-url"
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="https://instagram.com/yoursalon"
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.instagram_url_hint')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="set-facebook-url">Facebook</Label>
+                <Input
+                  id="set-facebook-url"
+                  value={facebookUrl}
+                  onChange={(e) => setFacebookUrl(e.target.value)}
+                  placeholder="https://facebook.com/yoursalon"
+                />
+                <p className="text-muted-foreground text-xs">
+                  {t('settings.profile.facebook_url_hint')}
                 </p>
               </div>
               <div className="sm:col-span-2">

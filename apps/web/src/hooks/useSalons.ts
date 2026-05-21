@@ -44,6 +44,10 @@ export type SalonRow = {
   city?: string | null
   lat?: number | null
   lng?: number | null
+  /** Optional — миграция 20260522000002. URLs соцсетей салона
+   *  для метрик контента в Reports → Конкуренты. */
+  instagram_url?: string | null
+  facebook_url?: string | null
 }
 
 /** Полный список типов уведомлений с человекочитаемыми i18n-ключами. */

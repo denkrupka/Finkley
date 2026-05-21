@@ -1442,6 +1442,8 @@
       "google_url_hint": "Where the client lands after a 5★ rating. Example: Google Maps «Share» link.",
       "google_id_hint": "Places API identifier. Find your salon on Google and copy ChIJ... from the URL.",
       "booksy_url_hint": "Public Booksy page for your salon. Used for importing reviews and comparing prices.",
+      "instagram_url_hint": "Instagram page for your salon. Used for content metrics (followers, posts) in Reports → Competitors.",
+      "facebook_url_hint": "Facebook page for your salon. Used for likes/followers metrics in Reports → Competitors.",
       "place_search": {
         "label": "Find your salon on Google Maps",
         "placeholder": "Start typing the salon name — e.g. «Zefir salon Warsaw»",
