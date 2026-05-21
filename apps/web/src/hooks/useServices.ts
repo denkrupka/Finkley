@@ -123,6 +123,56 @@ export function useBulkUpdateServicePlanning(salonId: string | undefined) {
   })
 }
 
+/**
+ * Bulk-assign cost_cents для всех неархивных услуг где cost_cents=null.
+ * UI: «Задать себестоимость для всех» в /services.
+ *
+ * input.percent — процент от default_price_cents (типичное salon-средне 25-40%).
+ * input.overwrite — если true, перезаписывает даже непустые. По умолчанию false:
+ *   уважаем уже выставленные cost'ы (юзер мог точно знать про конкретные услуги).
+ *
+ * Возвращает количество обновлённых строк.
+ */
+export function useBulkSetServiceCost(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { percent: number; overwrite: boolean }) => {
+      if (!salonId) throw new Error('no_salon')
+      if (input.percent < 0 || input.percent > 100) {
+        throw new Error('percent должен быть 0–100')
+      }
+      // Подгружаем услуги с default_price_cents — нужно считать cost client-side.
+      let query = supabase
+        .from('services')
+        .select('id, default_price_cents, cost_cents')
+        .eq('salon_id', salonId)
+        .eq('is_archived', false)
+        .gt('default_price_cents', 0)
+      if (!input.overwrite) query = query.is('cost_cents', null)
+      const { data: rows, error } = await query
+      if (error) throw error
+      if (!rows || rows.length === 0) return 0
+
+      // Patch батчем — Promise.all чтобы не блокировать на каждой строке.
+      const ratio = input.percent / 100
+      const updates = rows.map((r) => {
+        const cost = Math.round((r.default_price_cents as number) * ratio)
+        return supabase
+          .from('services')
+          .update({ cost_cents: cost })
+          .eq('id', r.id as string)
+      })
+      const results = await Promise.all(updates)
+      const failed = results.filter((r) => r.error).length
+      if (failed > 0) console.warn(`bulk cost: ${failed}/${rows.length} update failed`)
+      return rows.length - failed
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['services', salonId] })
+    },
+  })
+}
+
 export function useCreateService(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

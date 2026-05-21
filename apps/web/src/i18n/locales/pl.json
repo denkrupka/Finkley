@@ -329,6 +329,16 @@
       "empty": "Gdy dodasz usługi, pojawią się tu pogrupowane.",
       "uncategorized": "Bez kategorii",
       "min_short": "min"
+    },
+    "bulk_cost": {
+      "button": "Ustaw koszt",
+      "title": "Koszt dla wszystkich usług",
+      "subtitle": "Ustawi cost_cents = cena × procent. Pomaga zobaczyć marżę w /reports → usługi.",
+      "percent_label": "Procent ceny",
+      "percent_hint": "Zazwyczaj 25–40% dla salonów (materiały + czas). Można poprawić później w karcie usługi.",
+      "overwrite_label": "Nadpisz już ustawione koszty",
+      "submit": "Zastosuj",
+      "toast_done": "Zastosowano do {{count}} usług"
     }
   },
   "inventory": {

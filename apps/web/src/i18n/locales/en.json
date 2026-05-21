@@ -329,6 +329,16 @@
       "empty": "Once you add services, they'll appear here grouped.",
       "uncategorized": "Uncategorized",
       "min_short": "min"
+    },
+    "bulk_cost": {
+      "button": "Set cost",
+      "title": "Cost for all services",
+      "subtitle": "Sets cost_cents = price × percent. Helps margin appear in /reports → services.",
+      "percent_label": "Percent of price",
+      "percent_hint": "Typically 25–40% for salons (materials + time). Can be adjusted later in service card.",
+      "overwrite_label": "Overwrite already set costs",
+      "submit": "Apply",
+      "toast_done": "Applied to {{count}} services"
     }
   },
   "inventory": {

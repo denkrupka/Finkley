@@ -1,4 +1,4 @@
-import { Archive, FlaskConical, Loader2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Archive, FlaskConical, Loader2, Percent, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useSalon } from '@/hooks/useSalons'
 import {
+  useBulkSetServiceCost,
   useCreateService,
   useCreateServiceCategory,
   useServiceCategories,
@@ -62,6 +63,7 @@ export function ServicesPage() {
 
   const [openDetail, setOpenDetail] = useState<ServiceRow | null>(null)
   const [openNew, setOpenNew] = useState(false)
+  const [openBulkCost, setOpenBulkCost] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [archived, setArchived] = useState<ServiceRow[]>([])
 
@@ -96,10 +98,18 @@ export function ServicesPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">{t('services_page.subtitle')}</p>
         </div>
-        <Button onClick={() => setOpenNew(true)}>
-          <Plus className="size-4" strokeWidth={2} />
-          {t('services_page.add')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {services.length > 0 ? (
+            <Button variant="outline" onClick={() => setOpenBulkCost(true)}>
+              <Percent className="size-4" strokeWidth={2} />
+              {t('services_page.bulk_cost.button')}
+            </Button>
+          ) : null}
+          <Button onClick={() => setOpenNew(true)}>
+            <Plus className="size-4" strokeWidth={2} />
+            {t('services_page.add')}
+          </Button>
+        </div>
       </header>
 
       <section className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
@@ -241,7 +251,96 @@ export function ServicesPage() {
         salonId={salonId}
         onClose={() => setOpenNew(false)}
       />
+
+      <BulkCostDialog
+        open={openBulkCost}
+        salonId={salonId}
+        onClose={() => setOpenBulkCost(false)}
+      />
     </div>
+  )
+}
+
+function BulkCostDialog({
+  open,
+  salonId,
+  onClose,
+}: {
+  open: boolean
+  salonId: string
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const bulk = useBulkSetServiceCost(salonId)
+  const [percent, setPercent] = useState(30)
+  const [overwrite, setOverwrite] = useState(false)
+
+  if (!open) return null
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:!max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>{t('services_page.bulk_cost.title')}</DialogTitle>
+          <DialogDescription>{t('services_page.bulk_cost.subtitle')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 py-2">
+          <div>
+            <Label htmlFor="bulk-cost-pct">{t('services_page.bulk_cost.percent_label')}</Label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Input
+                id="bulk-cost-pct"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                value={percent}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  if (Number.isFinite(v)) setPercent(Math.max(0, Math.min(100, v)))
+                }}
+                className="w-24 text-right"
+              />
+              <span className="text-muted-foreground text-sm">%</span>
+            </div>
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              {t('services_page.bulk_cost.percent_hint')}
+            </p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={overwrite}
+              onChange={(e) => setOverwrite(e.target.checked)}
+              className="size-4"
+            />
+            <span>{t('services_page.bulk_cost.overwrite_label')}</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={bulk.isPending}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={() => {
+              bulk.mutate(
+                { percent, overwrite },
+                {
+                  onSuccess: (n) => {
+                    toast.success(t('services_page.bulk_cost.toast_done', { count: n }))
+                    onClose()
+                  },
+                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                },
+              )
+            }}
+            disabled={bulk.isPending}
+          >
+            {bulk.isPending ? t('common.loading') : t('services_page.bulk_cost.submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
