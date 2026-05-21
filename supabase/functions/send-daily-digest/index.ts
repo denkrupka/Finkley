@@ -28,6 +28,101 @@ import { renderLogoBlock, sendEmail, sendTelegramToUser } from '../_shared/notif
 
 type DigestChannel = 'email' | 'telegram'
 
+// Серверные строки для daily-digest. Inline HTML, отдельно от send-email/templates
+// потому что в этом digest почти всё динамическое (KPI таблицы). Один источник
+// правды для email и Telegram.
+type DigestLocale = 'ru' | 'pl' | 'en'
+
+function normalizeLocale(input: unknown): DigestLocale {
+  if (typeof input !== 'string') return 'ru'
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  return 'ru'
+}
+
+function bcp47(locale: DigestLocale): string {
+  if (locale === 'pl') return 'pl-PL'
+  if (locale === 'en') return 'en-US'
+  return 'ru-RU'
+}
+
+const STR = {
+  ru: {
+    header: 'Текущие показатели салона',
+    moneyAvail: 'Денег в распоряжении',
+    cashDirector: 'Касса директора',
+    cashSafe: 'Сейф',
+    cashGotowka: 'Gotówka',
+    cashBank: 'Bank/Karta',
+    cashTerminal: 'Karta / Terminal',
+    salesToday: 'Продажи за сегодня',
+    invoicesDue: 'Фактуры к оплате',
+    noInvoices: 'Нет ожидающих фактур к оплате 👌',
+    counterparty: 'Контрагент',
+    dueDate: 'Срок',
+    amount: 'Сумма',
+    ctaOpen: 'Открыть финансовый отчёт',
+    footer:
+      'Finkley — твой ежедневный финансовый помощник. Отключить рассылку: Настройки → Профиль.',
+    subjectPrefix: 'Сводка по салону',
+    fallbackSalon: 'Салон',
+    tgTitle: '📊 <b>Сводка по салону</b>',
+    tgMoney: '💰 Денег в распоряжении',
+    tgSales: '🛒 Продажи за сегодня',
+    tgInvoices: '📋 Фактуры к оплате',
+    summary: 'сводка',
+  },
+  pl: {
+    header: 'Bieżące wskaźniki salonu',
+    moneyAvail: 'Dostępne środki',
+    cashDirector: 'Kasa dyrektora',
+    cashSafe: 'Sejf',
+    cashGotowka: 'Gotówka',
+    cashBank: 'Bank/Karta',
+    cashTerminal: 'Karta / Terminal',
+    salesToday: 'Sprzedaż dziś',
+    invoicesDue: 'Faktury do zapłaty',
+    noInvoices: 'Brak oczekujących faktur 👌',
+    counterparty: 'Kontrahent',
+    dueDate: 'Termin',
+    amount: 'Kwota',
+    ctaOpen: 'Otwórz raport finansowy',
+    footer: 'Finkley — Twój codzienny asystent finansowy. Wyłącz rozsyłkę: Ustawienia → Profil.',
+    subjectPrefix: 'Podsumowanie salonu',
+    fallbackSalon: 'Salon',
+    tgTitle: '📊 <b>Podsumowanie salonu</b>',
+    tgMoney: '💰 Dostępne środki',
+    tgSales: '🛒 Sprzedaż dziś',
+    tgInvoices: '📋 Faktury do zapłaty',
+    summary: 'podsumowanie',
+  },
+  en: {
+    header: 'Current salon metrics',
+    moneyAvail: 'Available funds',
+    cashDirector: 'Director register',
+    cashSafe: 'Safe',
+    cashGotowka: 'Cash (PLN)',
+    cashBank: 'Bank/Card',
+    cashTerminal: 'Card / Terminal',
+    salesToday: 'Sales today',
+    invoicesDue: 'Invoices to pay',
+    noInvoices: 'No pending invoices 👌',
+    counterparty: 'Counterparty',
+    dueDate: 'Due',
+    amount: 'Amount',
+    ctaOpen: 'Open financial report',
+    footer: 'Finkley — your daily financial assistant. Disable: Settings → Profile.',
+    subjectPrefix: 'Salon summary',
+    fallbackSalon: 'Salon',
+    tgTitle: '📊 <b>Salon summary</b>',
+    tgMoney: '💰 Available funds',
+    tgSales: '🛒 Sales today',
+    tgInvoices: '📋 Invoices to pay',
+    summary: 'summary',
+  },
+} as const
+
 function normalizeChannels(raw: unknown): DigestChannel[] {
   if (!Array.isArray(raw)) return []
   return raw.filter((c): c is DigestChannel => c === 'email' || c === 'telegram')
@@ -44,15 +139,14 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function formatCents(cents: number, currency: string): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency }).format(cents / 100)
+function formatCents(cents: number, currency: string, locale: DigestLocale = 'ru'): string {
+  return new Intl.NumberFormat(bcp47(locale), { style: 'currency', currency }).format(cents / 100)
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: DigestLocale = 'ru'): string {
   if (!iso) return ''
-  const d = iso.slice(0, 10)
-  const [y, m, day] = d.split('-')
-  return `${day}.${m}.${y}`
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  return d.toLocaleDateString(bcp47(locale), { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 type CashRegisters = {
@@ -75,10 +169,12 @@ type SalonForDigest = {
 async function sendDigestForSalon(
   admin: SupabaseClient,
   salon: SalonForDigest,
-  recipient: { email: string; fullName: string; telegramId: number | null },
+  recipient: { email: string; fullName: string; telegramId: number | null; locale?: string | null },
   channels: DigestChannel[],
 ): Promise<{ sent: boolean; reason?: string; via?: DigestChannel[] }> {
   if (channels.length === 0) return { sent: false, reason: 'no_channels' }
+  const locale = normalizeLocale(recipient.locale)
+  const s = STR[locale]
 
   const currency = salon.currency ?? 'PLN'
   const cr = (salon.financial_settings?.cash_registers ?? {}) as CashRegisters
@@ -129,8 +225,8 @@ async function sendDigestForSalon(
           const name = (p.counterparty as string) ?? '—'
           return `<tr>
             <td style="padding:6px 10px;font-size:13px;color:#334155;">${escapeHtml(name)}</td>
-            <td style="padding:6px 10px;font-size:13px;color:#94a3b8;text-align:right;white-space:nowrap;">${formatDate((p.due_date as string) ?? '')}</td>
-            <td style="padding:6px 10px;font-size:13px;color:#dc2626;text-align:right;white-space:nowrap;font-weight:700;">${formatCents(p.amount_cents ?? 0, currency)}</td>
+            <td style="padding:6px 10px;font-size:13px;color:#94a3b8;text-align:right;white-space:nowrap;">${formatDate((p.due_date as string) ?? '', locale)}</td>
+            <td style="padding:6px 10px;font-size:13px;color:#dc2626;text-align:right;white-space:nowrap;font-weight:700;">${formatCents(p.amount_cents ?? 0, currency, locale)}</td>
           </tr>`
         })
         .join('')
@@ -140,14 +236,14 @@ async function sendDigestForSalon(
   }
 
   const logo = renderLogoBlock(salon.logo_url)
-  const salonName = salon.name ?? 'Салон'
+  const salonName = salon.name ?? s.fallbackSalon
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(salonName)} — сводка</title></head>
+  const html = `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>${escapeHtml(salonName)} — ${s.summary}</title></head>
 <body style="margin:0;padding:24px;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
     ${logo}
     <div style="background:#0F4C5C;padding:20px 24px;color:#ffffff;">
-      <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">Текущие показатели салона</p>
+      <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">${s.header}</p>
       <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">${escapeHtml(salonName)}</h1>
     </div>
 
@@ -157,27 +253,27 @@ async function sendDigestForSalon(
         <div style="display:flex;align-items:center;gap:14px;">
           <span style="font-size:36px;line-height:1;">💰</span>
           <div style="flex:1;">
-            <p style="margin:0;font-size:11px;color:#92400e;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Денег в распоряжении</p>
-            <p style="margin:4px 0 0 0;font-size:30px;font-weight:800;color:#0F4C5C;line-height:1;">${formatCents(totalAvailable, currency)}</p>
+            <p style="margin:0;font-size:11px;color:#92400e;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">${s.moneyAvail}</p>
+            <p style="margin:4px 0 0 0;font-size:30px;font-weight:800;color:#0F4C5C;line-height:1;">${formatCents(totalAvailable, currency, locale)}</p>
           </div>
         </div>
         <table style="width:100%;margin-top:14px;border-collapse:collapse;font-size:13px;">
-          ${cashRow('Касса директора', cr.director_cents ?? 0, currency)}
-          ${cashRow('Сейф', cr.safe_cents ?? 0, currency)}
-          ${cashRow('Gotówka', cr.gotowka_cents ?? 0, currency)}
-          ${cashRow('Bank/Karta', cr.bank_karta_cents ?? 0, currency)}
-          ${cashRow('Karta / Terminal', cr.karta_terminal_cents ?? 0, currency)}
+          ${cashRow(s.cashDirector, cr.director_cents ?? 0, currency, locale)}
+          ${cashRow(s.cashSafe, cr.safe_cents ?? 0, currency, locale)}
+          ${cashRow(s.cashGotowka, cr.gotowka_cents ?? 0, currency, locale)}
+          ${cashRow(s.cashBank, cr.bank_karta_cents ?? 0, currency, locale)}
+          ${cashRow(s.cashTerminal, cr.karta_terminal_cents ?? 0, currency, locale)}
         </table>
       </div>
 
       <!-- Продажи за сегодня -->
       <div style="background:#ecfeff;border-radius:10px;padding:18px;margin-bottom:16px;">
-        <p style="margin:0;font-size:11px;color:#0e7490;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Продажи за сегодня</p>
-        <p style="margin:4px 0 8px 0;font-size:30px;font-weight:800;color:#0F4C5C;line-height:1;">${formatCents(salesTotal, currency)}</p>
+        <p style="margin:0;font-size:11px;color:#0e7490;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">${s.salesToday}</p>
+        <p style="margin:4px 0 8px 0;font-size:30px;font-weight:800;color:#0F4C5C;line-height:1;">${formatCents(salesTotal, currency, locale)}</p>
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          ${paymentRow('Karta / Terminal', salesByMethod.card ?? 0, currency)}
-          ${paymentRow('Gotówka', salesByMethod.cash ?? 0, currency)}
-          ${paymentRow('Transfer', salesByMethod.transfer ?? 0, currency)}
+          ${paymentRow(s.cashTerminal, salesByMethod.card ?? 0, currency, locale)}
+          ${paymentRow(s.cashGotowka, salesByMethod.cash ?? 0, currency, locale)}
+          ${paymentRow('Transfer', salesByMethod.transfer ?? 0, currency, locale)}
         </table>
       </div>
 
@@ -186,41 +282,43 @@ async function sendDigestForSalon(
         invoicesHtml
           ? `<div style="background:#fef2f2;border-radius:10px;padding:18px;">
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-                <p style="margin:0;font-size:11px;color:#991b1b;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">Фактуры к оплате</p>
-                <p style="margin:0;font-size:18px;font-weight:800;color:#dc2626;">${formatCents(invoicesTotal, currency)}</p>
+                <p style="margin:0;font-size:11px;color:#991b1b;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">${s.invoicesDue}</p>
+                <p style="margin:0;font-size:18px;font-weight:800;color:#dc2626;">${formatCents(invoicesTotal, currency, locale)}</p>
               </div>
               <table style="width:100%;border-collapse:collapse;">
                 <thead>
                   <tr>
-                    <th style="text-align:left;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Kontrahent</th>
-                    <th style="text-align:right;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Termin</th>
-                    <th style="text-align:right;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Kwota</th>
+                    <th style="text-align:left;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">${s.counterparty}</th>
+                    <th style="text-align:right;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">${s.dueDate}</th>
+                    <th style="text-align:right;padding:4px 10px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">${s.amount}</th>
                   </tr>
                 </thead>
                 <tbody>${invoicesHtml}</tbody>
               </table>
             </div>`
-          : `<p style="margin:0;font-size:13px;color:#64748b;text-align:center;padding:14px;">Нет ожидающих фактур к оплате 👌</p>`
+          : `<p style="margin:0;font-size:13px;color:#64748b;text-align:center;padding:14px;">${s.noInvoices}</p>`
       }
 
       <p style="margin:20px 0 0 0;text-align:center;">
-        <a href="${APP_URL}/${salon.id}/finance?tab=report" style="display:inline-block;background:#0F4C5C;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">Открыть финансовый отчёт</a>
+        <a href="${APP_URL}/${salon.id}/finance?tab=report" style="display:inline-block;background:#0F4C5C;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">${s.ctaOpen}</a>
       </p>
 
       <p style="margin:18px 0 0 0;font-size:11px;color:#94a3b8;text-align:center;">
-        Финки — твой ежедневный финансовый помощник. Отключить рассылку: Настройки → Профиль.
+        ${s.footer}
       </p>
     </div>
   </div>
 </body></html>`
 
-  const subject = `Сводка по салону «${salonName}» — ${formatDate(today.toISOString())}`
+  const subject = `${s.subjectPrefix} «${salonName}» — ${formatDate(today.toISOString(), locale)}`
   const text =
-    `Сводка по салону ${salonName}\n\n` +
-    `Денег в распоряжении: ${formatCents(totalAvailable, currency)}\n` +
-    `Продажи за сегодня: ${formatCents(salesTotal, currency)}\n` +
-    (invoicesTotal > 0 ? `Фактуры к оплате: ${formatCents(invoicesTotal, currency)}\n` : '') +
-    `\nОткрыть: ${APP_URL}/${salon.id}/finance?tab=report`
+    `${s.subjectPrefix} ${salonName}\n\n` +
+    `${s.moneyAvail}: ${formatCents(totalAvailable, currency, locale)}\n` +
+    `${s.salesToday}: ${formatCents(salesTotal, currency, locale)}\n` +
+    (invoicesTotal > 0
+      ? `${s.invoicesDue}: ${formatCents(invoicesTotal, currency, locale)}\n`
+      : '') +
+    `\n${APP_URL}/${salon.id}/finance?tab=report`
 
   const via: DigestChannel[] = []
 
@@ -242,13 +340,13 @@ async function sendDigestForSalon(
 
   if (channels.includes('telegram') && recipient.telegramId) {
     const lines: string[] = []
-    lines.push(`📊 <b>Сводка по салону</b> · ${salonName}`)
-    lines.push(`${formatDate(today.toISOString())}`)
+    lines.push(`${s.tgTitle} · ${salonName}`)
+    lines.push(`${formatDate(today.toISOString(), locale)}`)
     lines.push('')
-    lines.push(`💰 Денег в распоряжении: <b>${formatCents(totalAvailable, currency)}</b>`)
-    lines.push(`🛒 Продажи за сегодня: <b>${formatCents(salesTotal, currency)}</b>`)
+    lines.push(`${s.tgMoney}: <b>${formatCents(totalAvailable, currency, locale)}</b>`)
+    lines.push(`${s.tgSales}: <b>${formatCents(salesTotal, currency, locale)}</b>`)
     if (invoicesTotal > 0) {
-      lines.push(`📋 Фактуры к оплате: <b>${formatCents(invoicesTotal, currency)}</b>`)
+      lines.push(`${s.tgInvoices}: <b>${formatCents(invoicesTotal, currency, locale)}</b>`)
     }
     lines.push('')
     lines.push(`${APP_URL}/${salon.id}/finance?tab=report`)
@@ -269,17 +367,27 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#039;')
 }
 
-function cashRow(label: string, cents: number, currency: string): string {
+function cashRow(
+  label: string,
+  cents: number,
+  currency: string,
+  locale: DigestLocale = 'ru',
+): string {
   return `<tr>
     <td style="padding:3px 10px;color:#92400e;">${escapeHtml(label)}:</td>
-    <td style="padding:3px 10px;text-align:right;color:#0F4C5C;font-weight:600;white-space:nowrap;">${formatCents(cents, currency)}</td>
+    <td style="padding:3px 10px;text-align:right;color:#0F4C5C;font-weight:600;white-space:nowrap;">${formatCents(cents, currency, locale)}</td>
   </tr>`
 }
 
-function paymentRow(label: string, cents: number, currency: string): string {
+function paymentRow(
+  label: string,
+  cents: number,
+  currency: string,
+  locale: DigestLocale = 'ru',
+): string {
   return `<tr>
     <td style="padding:3px 10px;color:#0e7490;">${escapeHtml(label)}:</td>
-    <td style="padding:3px 10px;text-align:right;color:#0F4C5C;font-weight:600;white-space:nowrap;">${formatCents(cents, currency)}</td>
+    <td style="padding:3px 10px;text-align:right;color:#0F4C5C;font-weight:600;white-space:nowrap;">${formatCents(cents, currency, locale)}</td>
   </tr>`
 }
 
@@ -346,18 +454,20 @@ async function handleCron(admin: SupabaseClient, token: string): Promise<Respons
 
     const { data: profile } = await admin
       .from('profiles')
-      .select('telegram_id')
+      .select('telegram_id, locale')
       .eq('id', ownerId)
       .maybeSingle()
-    const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
-      ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+    type Prof = { telegram_id?: number | string | null; locale?: string | null }
+    const telegramId = (profile as Prof | null)?.telegram_id
+      ? Number((profile as Prof).telegram_id)
       : null
+    const ownerLocale = (profile as Prof | null)?.locale ?? 'ru'
 
     try {
       const r = await sendDigestForSalon(
         admin,
         salon as SalonForDigest,
-        { email: owner.email, fullName: name, telegramId },
+        { email: owner.email, fullName: name, telegramId, locale: ownerLocale },
         channels,
       )
       if (r.sent) stats.sent++
@@ -412,17 +522,19 @@ async function handleManual(
 
   const { data: profile } = await admin
     .from('profiles')
-    .select('telegram_id')
+    .select('telegram_id, locale')
     .eq('id', user.id)
     .maybeSingle()
-  const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id
-    ? Number((profile as { telegram_id?: number | string | null }).telegram_id)
+  type Prof = { telegram_id?: number | string | null; locale?: string | null }
+  const telegramId = (profile as Prof | null)?.telegram_id
+    ? Number((profile as Prof).telegram_id)
     : null
+  const userLocale = (profile as Prof | null)?.locale ?? 'ru'
 
   const r = await sendDigestForSalon(
     admin,
     salon as SalonForDigest,
-    { email: userEmail, fullName: userName, telegramId },
+    { email: userEmail, fullName: userName, telegramId, locale: userLocale },
     effectiveChannels,
   )
   if (!r.sent) return jsonResponse({ error: r.reason ?? 'send_failed' }, 500)
