@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
 import { RouteErrorBoundary } from '@/components/error-boundary/ErrorBoundary'
+import { useI18nSync } from '@/i18n/useI18nSync'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LoginPage } from '@/routes/auth/Login'
 import { RootRedirect } from '@/routes/RootRedirect'
@@ -160,6 +161,9 @@ function lazyRoute(node: React.ReactNode, label?: string) {
 }
 
 function App() {
+  // Подтягиваем язык интерфейса из profiles.locale (если задан и поддерживается).
+  // Без этого выбор в онбординге игнорировался — i18next читал только localStorage.
+  useI18nSync()
   return (
     <Routes>
       {/* Гостевые */}

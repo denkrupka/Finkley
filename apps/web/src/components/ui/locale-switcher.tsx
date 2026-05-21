@@ -2,13 +2,17 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Check, Globe } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase/client'
+
 /**
- * Переключатель языка интерфейса. В стадии 1 — только русский,
- * но компонент уже готов к добавлению PL/EN/DE в стадии 5 (TASK-43):
- * нужно только дополнить i18n/config supportedLngs + добавить файлы переводов.
+ * Переключатель языка интерфейса. RU/PL/EN — полные переводы (1635 ключей).
  *
- * Хранит выбор в localStorage через i18next-browser-languagedetector
- * (см. i18n/index.ts).
+ * Двойная персистенция:
+ * 1. localStorage (через i18next-browser-languagedetector) — мгновенный отклик
+ *    и работает без сети.
+ * 2. profiles.locale (если юзер залогинен) — авторитативный источник; при
+ *    первом заходе на новом устройстве язык подтянется из БД (см. useI18nSync).
  */
 const LOCALES = [
   { code: 'ru', label: 'Русский', flag: '🇷🇺' },
@@ -18,7 +22,24 @@ const LOCALES = [
 
 export function LocaleSwitcher() {
   const { i18n } = useTranslation()
+  const { user } = useAuth()
   const current = LOCALES.find((l) => l.code === i18n.language) ?? LOCALES[0]
+
+  async function setLocale(code: string) {
+    if (code === i18n.language) return
+    await i18n.changeLanguage(code)
+    // Best-effort persist в profiles.locale — silent fail если нет сети / RLS.
+    // Без авторизации просто пропускаем (гостевые страницы тоже используют свитчер).
+    if (user) {
+      void supabase
+        .from('profiles')
+        .update({ locale: code })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) console.warn('locale persist failed', error.message)
+        })
+    }
+  }
 
   return (
     <DropdownMenu.Root>
@@ -42,7 +63,7 @@ export function LocaleSwitcher() {
             return (
               <DropdownMenu.Item
                 key={l.code}
-                onSelect={() => void i18n.changeLanguage(l.code)}
+                onSelect={() => void setLocale(l.code)}
                 className="data-[highlighted]:bg-accent flex cursor-pointer items-center justify-between gap-2 rounded-sm px-3 py-2 text-sm outline-none"
               >
                 <span className="flex items-center gap-2">
