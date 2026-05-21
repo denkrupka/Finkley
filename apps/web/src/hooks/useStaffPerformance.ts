@@ -47,3 +47,36 @@ export function useStaffPerformanceAdvanced(
     enabled: !!salonId,
   })
 }
+
+export type StaffTipsSummaryRow = {
+  staff_id: string
+  full_name: string
+  is_active: boolean
+  tips_cents: number
+  tipped_visits_count: number
+  visits_count: number
+  avg_tip_cents: number
+  visits_revenue_cents: number
+  tip_share_pct: number
+}
+
+/**
+ * Per-staff агрегаты по чаевым за период.
+ * Wraps RPC staff_tips_summary (миграция 20260521000018).
+ */
+export function useStaffTipsSummary(salonId: string | undefined, startIso: string, endIso: string) {
+  return useQuery<StaffTipsSummaryRow[]>({
+    queryKey: ['staff-tips-summary', salonId, startIso, endIso],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase.rpc('staff_tips_summary', {
+        p_salon_id: salonId,
+        p_start_ts: startIso,
+        p_end_ts: endIso,
+      })
+      if (error) throw error
+      return (data ?? []) as StaffTipsSummaryRow[]
+    },
+    enabled: !!salonId,
+  })
+}

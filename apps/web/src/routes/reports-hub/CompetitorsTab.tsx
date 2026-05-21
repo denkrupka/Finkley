@@ -3,6 +3,7 @@ import {
   DollarSign,
   Image as ImageIcon,
   Settings as SettingsIcon,
+  Sparkles,
   Star,
   Trash2,
 } from 'lucide-react'
@@ -15,14 +16,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
   useCompetitors,
   useCompetitorSettings,
   useCompetitorSnapshots,
   useCreateCompetitor,
+  useDiscoverCompetitors,
+  useOwnSalonMetrics,
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
 } from '@/hooks/useCompetitors'
 import { useSalon } from '@/hooks/useSalons'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 type CompetitorsSubTab = 'prices' | 'occupancy' | 'rating' | 'content' | 'params'
@@ -61,6 +71,7 @@ export function CompetitorsTab({ salonId }: { salonId: string }) {
             salonId={salonId}
             competitors={competitors}
             currency={currency}
+            salon={salon}
             t={t}
           />
         )}
@@ -71,24 +82,38 @@ export function CompetitorsTab({ salonId }: { salonId: string }) {
 
 function DataSection({
   kind,
+  salonId,
   competitors,
   currency,
+  salon,
   t,
 }: {
   kind: 'prices' | 'occupancy' | 'rating' | 'content'
   salonId: string
   competitors: ReturnType<typeof useCompetitors>['data']
   currency: string
+  salon: ReturnType<typeof useSalon>['data']
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const competitorIds = useMemo(() => competitors?.map((c) => c.id) ?? [], [competitors])
   const apiKind = kind === 'prices' ? 'price' : kind
+  // Период применяется ко всем подвкладкам, не только к occupancy — это позволяет
+  // смотреть исторические цены/рейтинги/контент за выбранный диапазон.
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const range = periodToRange(period)
+  const dateFilter = useMemo(
+    () => ({
+      startIso: range.start.toISOString().slice(0, 10),
+      endIso: range.end.toISOString().slice(0, 10),
+    }),
+    [range.start, range.end],
+  )
   const { data: snapshots = [], isLoading } = useCompetitorSnapshots(
     competitorIds,
-    apiKind === 'occupancy' || apiKind === 'rating' || apiKind === 'content' || apiKind === 'price'
-      ? apiKind
-      : undefined,
+    apiKind,
+    dateFilter,
   )
+  const { data: ownMetrics } = useOwnSalonMetrics(salonId)
 
   if (!competitors || competitors.length === 0) {
     return (
@@ -103,26 +128,7 @@ function DataSection({
     )
   }
 
-  if (isLoading) {
-    return (
-      <p className="text-muted-foreground px-5 py-8 text-center text-sm">{t('common.loading')}</p>
-    )
-  }
-
-  if (snapshots.length === 0) {
-    return (
-      <div className="border-border bg-card shadow-finsm rounded-lg border px-5 py-12 text-center">
-        <p className="text-muted-foreground text-sm">
-          {t(`reports_hub.competitors.empty_${kind}`)}
-        </p>
-        <p className="text-muted-foreground/70 mt-1 text-xs">
-          {t('reports_hub.competitors.sync_pending')}
-        </p>
-      </div>
-    )
-  }
-
-  // Группируем snapshots по competitor → последний за каждую категорию.
+  // Группируем snapshots по competitor → последний за каждую категорию в окне.
   const latestPerCompetitor = new Map<string, typeof snapshots>()
   for (const s of snapshots) {
     const list = latestPerCompetitor.get(s.competitor_id) ?? []
@@ -131,42 +137,125 @@ function DataSection({
   }
 
   return (
-    <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-          <tr>
-            <th className="px-4 py-3 text-left font-semibold">
-              {t('reports_hub.competitors.col_name')}
-            </th>
-            <th className="px-4 py-3 text-left font-semibold">
-              {t('reports_hub.competitors.col_data')}
-            </th>
-            <th className="px-3 py-3 text-right font-semibold">
-              {t('reports_hub.competitors.col_date')}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {competitors.map((c) => {
-            const items = latestPerCompetitor.get(c.id) ?? []
-            const latest = items[0]
-            return (
-              <tr key={c.id}>
-                <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                <td className="text-muted-foreground px-4 py-3 text-xs">
-                  {latest
-                    ? renderSnapshotData(latest, currency)
-                    : t('reports_hub.competitors.no_data')}
-                </td>
-                <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                  {latest ? latest.snapshot_date : '—'}
-                </td>
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.period_hint')}</p>
+        <PeriodPickerPopover value={period} onChange={setPeriod} />
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground px-5 py-8 text-center text-sm">{t('common.loading')}</p>
+      ) : (
+        <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.competitors.col_name')}
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.competitors.col_data')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.competitors.col_date')}
+                </th>
               </tr>
-            )
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody className="divide-border divide-y">
+              <OwnSalonRow
+                kind={kind}
+                salon={salon}
+                ownMetrics={ownMetrics ?? null}
+                currency={currency}
+                t={t}
+              />
+              {competitors.map((c) => {
+                const items = latestPerCompetitor.get(c.id) ?? []
+                const latest = items[0]
+                return (
+                  <tr key={c.id}>
+                    <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                    <td className="text-muted-foreground px-4 py-3 text-xs">
+                      {latest
+                        ? renderSnapshotData(latest, currency)
+                        : t('reports_hub.competitors.no_data')}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                      {latest ? latest.snapshot_date : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {snapshots.length === 0 ? (
+            <div className="border-border bg-muted/20 border-t px-5 py-4 text-center">
+              <p className="text-muted-foreground text-xs">
+                {t('reports_hub.competitors.sync_pending')}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
+  )
+}
+
+/**
+ * Первая строка таблицы «Ваш салон» — для прямого визуального сравнения с
+ * конкурентами. Источники данных:
+ *   - rating: avg(reviews.rating) по reviews салона
+ *   - content: пока — instagram_url наличие (полные метрики требуют Meta Graph)
+ *   - prices/occupancy: для своего салона показываем «настройте» — это
+ *     метрики которые нужно тянуть отдельным RPC (на следующей итерации).
+ */
+function OwnSalonRow({
+  kind,
+  salon,
+  ownMetrics,
+  t,
+}: {
+  kind: 'prices' | 'occupancy' | 'rating' | 'content'
+  salon: ReturnType<typeof useSalon>['data']
+  ownMetrics: { rating_avg: number | null; rating_count: number } | null
+  currency: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  let dataCell: React.ReactNode = (
+    <span className="text-muted-foreground/60">{t('reports_hub.competitors.own_no_data')}</span>
+  )
+  if (kind === 'rating' && ownMetrics) {
+    if (ownMetrics.rating_avg != null) {
+      dataCell = (
+        <span>
+          ⭐ {ownMetrics.rating_avg.toFixed(1)} ({ownMetrics.rating_count})
+        </span>
+      )
+    }
+  }
+  if (kind === 'content') {
+    dataCell = (
+      <span className="text-muted-foreground/70">
+        {t('reports_hub.competitors.own_content_hint')}
+      </span>
+    )
+  }
+  return (
+    <tr className={cn('bg-brand-sage-soft/30 border-brand-sage-soft border-l-4')}>
+      <td className="text-brand-sage-deep px-4 py-3 font-bold">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-3.5" strokeWidth={2} />
+          {salon?.name ?? t('reports_hub.competitors.own_label')}
+          <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+            {t('reports_hub.competitors.own_badge')}
+          </span>
+        </div>
+      </td>
+      <td className="text-foreground px-4 py-3 text-xs">{dataCell}</td>
+      <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+        {t('reports_hub.competitors.now')}
+      </td>
+    </tr>
   )
 }
 
@@ -212,6 +301,7 @@ function ParamsSection({
   const upsertSettings = useUpsertCompetitorSettings(salonId)
   const createCompetitor = useCreateCompetitor(salonId)
   const updateCompetitor = useUpdateCompetitor(salonId)
+  const discoverCompetitors = useDiscoverCompetitors(salonId)
   const [newName, setNewName] = useState('')
   const [newBooksy, setNewBooksy] = useState('')
   const [newGoogle, setNewGoogle] = useState('')
@@ -264,6 +354,32 @@ function ParamsSection({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="border-brand-teal-soft bg-brand-teal-soft/30 rounded-lg border p-5">
+        <h3 className="text-brand-teal-deep flex items-center gap-2 text-base font-bold">
+          <Sparkles className="size-4" strokeWidth={2} />
+          {t('reports_hub.competitors.params.discover_title')}
+        </h3>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {t('reports_hub.competitors.params.discover_subtitle')}
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => {
+            discoverCompetitors.mutate(undefined, {
+              onSuccess: (n) =>
+                toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
+              onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+            })
+          }}
+          disabled={discoverCompetitors.isPending}
+          className="mt-3"
+        >
+          {discoverCompetitors.isPending
+            ? t('common.loading')
+            : t('reports_hub.competitors.params.discover_button')}
+        </Button>
+      </div>
+
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy text-base font-bold">
           {t('reports_hub.competitors.params.add_title')}

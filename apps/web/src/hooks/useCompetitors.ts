@@ -56,10 +56,17 @@ export function useCompetitors(salonId: string | undefined) {
 export function useCompetitorSnapshots(
   competitorIds: string[] | undefined,
   kind?: 'price' | 'occupancy' | 'rating' | 'content',
+  dateFilter?: { startIso: string; endIso: string } | null,
 ) {
   const key = competitorIds?.slice().sort().join(',') ?? ''
   return useQuery<CompetitorSnapshot[]>({
-    queryKey: ['competitor-snapshots', key, kind ?? 'all'],
+    queryKey: [
+      'competitor-snapshots',
+      key,
+      kind ?? 'all',
+      dateFilter?.startIso ?? null,
+      dateFilter?.endIso ?? null,
+    ],
     queryFn: async () => {
       if (!competitorIds || competitorIds.length === 0) return []
       let q = supabase
@@ -67,14 +74,88 @@ export function useCompetitorSnapshots(
         .select('*')
         .in('competitor_id', competitorIds)
         .order('snapshot_date', { ascending: false })
-        .limit(200)
+        .limit(500)
       if (kind) q = q.eq('kind', kind)
+      if (dateFilter) {
+        q = q.gte('snapshot_date', dateFilter.startIso).lte('snapshot_date', dateFilter.endIso)
+      }
       const { data, error } = await q
       if (error) throw error
       return (data ?? []) as CompetitorSnapshot[]
     },
     enabled: !!competitorIds && competitorIds.length > 0,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * Триггер edge function reviews-sync для импорта отзывов с Booksy/Google.
+ * Возвращает кол-во импортированных отзывов.
+ */
+export function useTriggerReviewsSync(salonId: string | undefined) {
+  return useMutation({
+    mutationFn: async (): Promise<number> => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase.functions.invoke('reviews-sync', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      return (data as { imported?: number } | null)?.imported ?? 0
+    },
+  })
+}
+
+/**
+ * Триггер автоподбора конкурентов через Google Places Nearby Search.
+ * Возвращает кол-во добавленных конкурентов.
+ */
+export function useDiscoverCompetitors(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<number> => {
+      if (!salonId) throw new Error('no_salon')
+      const { data, error } = await supabase.functions.invoke('competitor-discover', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      return (data as { added?: number } | null)?.added ?? 0
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['competitors', salonId] }),
+  })
+}
+
+/** Метрики «своего салона» для сравнения с конкурентами (rating + content). */
+export type OwnSalonMetrics = {
+  rating_avg: number | null
+  rating_count: number
+  internal_review_count: number
+}
+
+export function useOwnSalonMetrics(salonId: string | undefined) {
+  return useQuery<OwnSalonMetrics>({
+    queryKey: ['own-salon-metrics', salonId],
+    queryFn: async () => {
+      if (!salonId)
+        return { rating_avg: null, rating_count: 0, internal_review_count: 0 } as OwnSalonMetrics
+      // Берём все отзывы салона; rating_avg считаем по non-null рейтингам.
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('rating,source')
+        .eq('salon_id', salonId)
+        .limit(2000)
+      if (error) throw error
+      const rows = (data ?? []) as Array<{ rating: number | null; source: string }>
+      const rated = rows.filter((r) => r.rating != null)
+      const avg =
+        rated.length > 0 ? rated.reduce((s, r) => s + (r.rating as number), 0) / rated.length : null
+      return {
+        rating_avg: avg != null ? Math.round(avg * 100) / 100 : null,
+        rating_count: rated.length,
+        internal_review_count: rows.filter((r) => r.source === 'internal').length,
+      }
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
   })
 }
 

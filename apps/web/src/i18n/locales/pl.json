@@ -2481,7 +2481,23 @@
       "tenure": "{{years}} lat pracy",
       "col_visits_revenue": "Wizyty",
       "col_retail_revenue": "Dosprzedaż",
-      "col_tips": "Napiwki"
+      "col_tips": "Napiwki",
+      "tabs": {
+        "performance": "Wydajność",
+        "tips": "Napiwki"
+      },
+      "tips": {
+        "title": "Napiwki dla pracowników",
+        "empty": "Brak napiwków w tym okresie.",
+        "empty_hint": "Napiwki rejestrowane są przy rozliczeniu wizyty — pole «Tip».",
+        "kpi_total": "Łącznie napiwków",
+        "kpi_tipped_visits": "Wizyt z napiwkami",
+        "kpi_avg_tip": "Średni napiwek",
+        "col_tips": "Kwota napiwków",
+        "col_tipped": "Wizyt z napiwkami",
+        "col_avg": "Średnio",
+        "col_share": "Udział w przychodzie"
+      }
     },
     "services": {
       "title": "Przychód wg usług",
@@ -2551,7 +2567,13 @@
       "anonymous": "Anonimowa opinia",
       "no_text": "(bez tekstu, tylko ocena)",
       "import_button": "Import z Booksy/Google",
-      "imported": "Zaimportowano {{count}} opinii"
+      "imported": "Zaimportowano {{count}} opinii",
+      "sort": {
+        "newest": "Najnowsze",
+        "oldest": "Najstarsze",
+        "rating_asc": "Ocena ↑",
+        "rating_desc": "Ocena ↓"
+      }
     },
     "competitors": {
       "tabs": {
@@ -2563,7 +2585,7 @@
       },
       "no_competitors": "Brak konkurentów",
       "no_competitors_hint": "Przejdź do zakładki „Parametry” i dodaj co najmniej jednego.",
-      "sync_pending": "Dane zsynchronizują się ~24 h po dodaniu. Funkcja w rozwoju.",
+      "sync_pending": "Dane zsynchronizują się ~24 h po dodaniu konkurenta.",
       "empty_prices": "Brak cen konkurencji.",
       "empty_occupancy": "Brak danych o obłożeniu.",
       "empty_rating": "Brak ocen.",
@@ -2572,7 +2594,17 @@
       "col_data": "Dane",
       "col_date": "Zaktualizowano",
       "no_data": "—",
+      "period_hint": "Okres snapshotów:",
+      "own_label": "Twój salon",
+      "own_badge": "ty",
+      "own_no_data": "—",
+      "own_content_hint": "Podłącz Instagram/Facebook w Ustawieniach, aby zobaczyć metryki treści.",
+      "now": "teraz",
       "params": {
+        "discover_title": "Auto-dobór salonów w pobliżu",
+        "discover_subtitle": "Google Places Nearby — znajdziemy co najmniej 10 salonów w promieniu 2 km od Twojego adresu (uzupełnij adres/współrzędne w Ustawieniach). Pomijamy już dodane.",
+        "discover_button": "Uruchom auto-dobór",
+        "discover_done": "Dodano {{count}} nowych konkurentów",
         "add_title": "Dodaj konkurenta",
         "add_subtitle": "Podaj linki do Booksy, Google Maps, Instagrama, Facebooka. Więcej linków = lepsze dane.",
         "name_label": "Nazwa salonu",

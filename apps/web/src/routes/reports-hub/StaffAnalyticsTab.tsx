@@ -1,8 +1,9 @@
-import { Clock, ShoppingBag, TrendingUp, Users, Wallet } from 'lucide-react'
+import { BarChart2, Clock, Coins, ShoppingBag, TrendingUp, Users, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AiInsightsPanel } from '@/components/reports/AiInsightsPanel'
+import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
   currentMonthPeriod,
   periodToRange,
@@ -12,10 +13,17 @@ import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { usePayoutsPreview } from '@/hooks/usePayouts'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
-import { useStaffPerformanceAdvanced } from '@/hooks/useStaffPerformance'
+import { useStaffPerformanceAdvanced, useStaffTipsSummary } from '@/hooks/useStaffPerformance'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { StaffPerformanceSection } from '@/routes/staff/StaffPerformanceSection'
+
+type StaffSubTab = 'performance' | 'tips'
+
+const STAFF_SUB_TABS: PageTab<StaffSubTab>[] = [
+  { id: 'performance', labelKey: 'reports_hub.staff.tabs.performance', icon: BarChart2 },
+  { id: 'tips', labelKey: 'reports_hub.staff.tabs.tips', icon: Coins },
+]
 
 /**
  * Reports → Мастера. Расширенная аналитика эффективности:
@@ -31,11 +39,58 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
-
+  const [sub, setSub] = useState<StaffSubTab>('performance')
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const range = periodToRange(period)
   const startIso = range.start.toISOString()
   const endIso = range.end.toISOString()
+
+  return (
+    <div>
+      <PageTabsNav tabs={STAFF_SUB_TABS} active={sub} onChange={setSub} t={t} />
+      {sub === 'tips' ? (
+        <TipsSubTab
+          salonId={salonId}
+          currency={currency}
+          period={period}
+          onPeriodChange={setPeriod}
+          startIso={startIso}
+          endIso={endIso}
+          t={t}
+        />
+      ) : (
+        <PerformanceSubTab
+          salonId={salonId}
+          currency={currency}
+          period={period}
+          onPeriodChange={setPeriod}
+          startIso={startIso}
+          endIso={endIso}
+          t={t}
+        />
+      )}
+    </div>
+  )
+}
+
+function PerformanceSubTab({
+  salonId,
+  currency,
+  period,
+  onPeriodChange,
+  startIso,
+  endIso,
+  t,
+}: {
+  salonId: string
+  currency: string
+  period: PeriodValue
+  onPeriodChange: (p: PeriodValue) => void
+  startIso: string
+  endIso: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const setPeriod = onPeriodChange
   const { data: rows = [], isLoading } = useStaffPerformanceAdvanced(salonId, startIso, endIso)
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   // Заработок мастера за период: usePayoutsPreview считает по тому же
@@ -309,6 +364,176 @@ export function StaffAnalyticsTab({ salonId }: { salonId: string }) {
           headerRight={<PeriodPickerPopover value={period} onChange={setPeriod} />}
         />
       </div>
+    </div>
+  )
+}
+
+/**
+ * Reports → мастера → Чаевые.
+ * Per-staff агрегаты: сумма чаевых, кол-во визитов с чаевыми, средний размер
+ * чаевых, доля чаевых от выручки мастера. Источник — RPC staff_tips_summary.
+ */
+function TipsSubTab({
+  salonId,
+  currency,
+  period,
+  onPeriodChange,
+  startIso,
+  endIso,
+  t,
+}: {
+  salonId: string
+  currency: string
+  period: PeriodValue
+  onPeriodChange: (p: PeriodValue) => void
+  startIso: string
+  endIso: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const { data: rows = [], isLoading } = useStaffTipsSummary(salonId, startIso, endIso)
+  const totalTips = rows.reduce((s, r) => s + r.tips_cents, 0)
+  const totalTipped = rows.reduce((s, r) => s + r.tipped_visits_count, 0)
+  const totalVisits = rows.reduce((s, r) => s + r.visits_count, 0)
+  const tippedShare = totalVisits > 0 ? Math.round((totalTipped * 100) / totalVisits) : 0
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="text-brand-navy text-lg font-bold tracking-tight">
+          {t('reports_hub.staff.tips.title')}
+        </h2>
+        <PeriodPickerPopover value={period} onChange={onPeriodChange} />
+      </div>
+
+      {totalTips > 0 ? (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard
+            label={t('reports_hub.staff.tips.kpi_total')}
+            value={formatCurrency(totalTips, currency)}
+            tone="gold"
+          />
+          <KpiCard
+            label={t('reports_hub.staff.tips.kpi_tipped_visits')}
+            value={`${totalTipped} / ${totalVisits}`}
+            sub={`${tippedShare}%`}
+          />
+          <KpiCard
+            label={t('reports_hub.staff.tips.kpi_avg_tip')}
+            value={formatCurrency(
+              totalTipped > 0 ? Math.round(totalTips / totalTipped) : 0,
+              currency,
+            )}
+          />
+        </div>
+      ) : null}
+
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        {isLoading ? (
+          <p className="text-muted-foreground px-5 py-8 text-center text-sm">
+            {t('common.loading')}
+          </p>
+        ) : rows.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <p className="text-muted-foreground text-sm">{t('reports_hub.staff.tips.empty')}</p>
+            <p className="text-muted-foreground/70 mt-1 text-xs">
+              {t('reports_hub.staff.tips.empty_hint')}
+            </p>
+          </div>
+        ) : (
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.staff.col_name')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.staff.tips.col_tips')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.staff.tips.col_tipped')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.staff.tips.col_avg')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.staff.tips.col_share')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const tippedShareRow =
+                  r.visits_count > 0
+                    ? Math.round((r.tipped_visits_count * 100) / r.visits_count)
+                    : 0
+                return (
+                  <tr key={r.staff_id} className="border-border/60 hover:bg-muted/20 border-t">
+                    <td className="px-4 py-3">
+                      <div className="text-foreground text-sm font-semibold">
+                        {r.full_name}
+                        {!r.is_active ? (
+                          <span className="bg-muted text-muted-foreground ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                            архив
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="num text-brand-gold-deep px-3 py-3 text-right text-sm font-bold">
+                      {r.tips_cents > 0 ? formatCurrency(r.tips_cents, currency) : '—'}
+                    </td>
+                    <td className="num text-foreground px-3 py-3 text-right text-sm">
+                      {r.tipped_visits_count} / {r.visits_count}
+                      <span className="text-muted-foreground ml-1 text-[10.5px]">
+                        ({tippedShareRow}%)
+                      </span>
+                    </td>
+                    <td className="num text-foreground px-3 py-3 text-right text-sm">
+                      {r.avg_tip_cents > 0 ? formatCurrency(r.avg_tip_cents, currency) : '—'}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-3 text-right">
+                      {r.tip_share_pct}%
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string
+  value: string
+  sub?: string
+  tone?: 'gold'
+}) {
+  return (
+    <div
+      className={cn(
+        'border-border bg-card shadow-finsm rounded-lg border p-4',
+        tone === 'gold' && 'bg-brand-gold-soft/30 border-brand-gold-soft',
+      )}
+    >
+      <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+        {label}
+      </p>
+      <p
+        className={cn(
+          'num mt-1 text-xl font-bold tracking-tight',
+          tone === 'gold' ? 'text-brand-gold-deep' : 'text-brand-navy',
+        )}
+      >
+        {value}
+      </p>
+      {sub ? <p className="text-muted-foreground mt-0.5 text-xs">{sub}</p> : null}
     </div>
   )
 }

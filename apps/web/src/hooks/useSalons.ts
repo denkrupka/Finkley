@@ -35,6 +35,15 @@ export type SalonRow = {
   /** Optional — миграция 20260521000002. Какие ТИПЫ уведомлений включены.
    *  Отсутствующие ключи трактуются как true (показывать). */
   notification_prefs?: Record<string, boolean>
+  /** Optional — миграция 20260521000014. URL Google Maps места салона. */
+  google_place_url?: string | null
+  /** Optional — миграция 20260521000019. Гео-поля и партнёрские URL. */
+  google_place_id?: string | null
+  booksy_url?: string | null
+  address?: string | null
+  city?: string | null
+  lat?: number | null
+  lng?: number | null
 }
 
 /** Полный список типов уведомлений с человекочитаемыми i18n-ключами. */

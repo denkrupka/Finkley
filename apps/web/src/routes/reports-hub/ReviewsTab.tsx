@@ -6,9 +6,18 @@ import { toast } from 'sonner'
 
 import { Input } from '@/components/ui/input'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useReviews, useReviewsImport, useMarkReviewRead } from '@/hooks/useReviews'
 import { cn } from '@/lib/utils/cn'
 import { getDateLocale } from '@/lib/utils/format-date'
+
+type ReviewSort = 'newest' | 'oldest' | 'rating_asc' | 'rating_desc'
 
 /**
  * /reports → Отзывы.
@@ -27,6 +36,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const [sub, setSub] = useState<ReviewsSubTab>('external')
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<ReviewSort>('newest')
   const { data: rows = [], isLoading } = useReviews(salonId)
   const markRead = useMarkReviewRead(salonId)
 
@@ -42,8 +52,16 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
           (x.author_name ?? '').toLowerCase().includes(q),
       )
     }
-    return r
-  }, [rows, sub, search])
+    // Сортировка. Для rating null трактуем как 0.
+    const sorted = [...r]
+    sorted.sort((a, b) => {
+      if (sort === 'newest') return b.posted_at.localeCompare(a.posted_at)
+      if (sort === 'oldest') return a.posted_at.localeCompare(b.posted_at)
+      if (sort === 'rating_asc') return (a.rating ?? 0) - (b.rating ?? 0)
+      return (b.rating ?? 0) - (a.rating ?? 0)
+    })
+    return sorted
+  }, [rows, sub, search, sort])
 
   const negativeUnread =
     sub === 'external'
@@ -54,13 +72,24 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
     <div>
       <PageTabsNav tabs={SUB_TABS} active={sub} onChange={setSub} t={t} />
 
-      <div className="mb-3 mt-4 flex items-center justify-between gap-3">
+      <div className="mb-3 mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <Input
           placeholder={t('reports_hub.reviews.search_placeholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
+          className="sm:max-w-sm"
         />
+        <Select value={sort} onValueChange={(v) => setSort(v as ReviewSort)}>
+          <SelectTrigger className="sm:w-56" data-testid="reviews-sort">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">{t('reports_hub.reviews.sort.newest')}</SelectItem>
+            <SelectItem value="oldest">{t('reports_hub.reviews.sort.oldest')}</SelectItem>
+            <SelectItem value="rating_asc">{t('reports_hub.reviews.sort.rating_asc')}</SelectItem>
+            <SelectItem value="rating_desc">{t('reports_hub.reviews.sort.rating_desc')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {negativeUnread.length > 0 ? (

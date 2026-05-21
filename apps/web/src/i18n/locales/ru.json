@@ -3145,7 +3145,23 @@
       "tenure": "{{years}} лет работы",
       "col_visits_revenue": "Визиты",
       "col_retail_revenue": "Доп. продажи",
-      "col_tips": "Чаевые"
+      "col_tips": "Чаевые",
+      "tabs": {
+        "performance": "Эффективность",
+        "tips": "Чаевые"
+      },
+      "tips": {
+        "title": "Чаевые мастерам",
+        "empty": "За этот период чаевых не было.",
+        "empty_hint": "Чаевые фиксируются в визите при расчёте — поле «Tip».",
+        "kpi_total": "Всего чаевых",
+        "kpi_tipped_visits": "Визитов с чаевыми",
+        "kpi_avg_tip": "Средние чаевые",
+        "col_tips": "Сумма чаевых",
+        "col_tipped": "Визитов с tip",
+        "col_avg": "Средние",
+        "col_share": "Доля от выручки"
+      }
     },
     "services": {
       "title": "Услуги по группам",
@@ -3214,7 +3230,13 @@
       "anonymous": "Анонимный отзыв",
       "no_text": "(без текста, только оценка)",
       "import_button": "Импорт с Booksy/Google",
-      "imported": "Импортировано {{count}} отзывов"
+      "imported": "Импортировано {{count}} отзывов",
+      "sort": {
+        "newest": "Сначала новые",
+        "oldest": "Сначала старые",
+        "rating_asc": "По рейтингу ↑",
+        "rating_desc": "По рейтингу ↓"
+      }
     },
     "competitors": {
       "tabs": {
@@ -3226,7 +3248,7 @@
       },
       "no_competitors": "Конкуренты ещё не добавлены",
       "no_competitors_hint": "Перейди на вкладку «Параметры» и добавь хотя бы одного.",
-      "sync_pending": "Данные подтянутся через ~24 ч после добавления конкурента. Синхр в разработке.",
+      "sync_pending": "Данные подтянутся через ~24 ч после добавления конкурента.",
       "empty_prices": "Цен конкурентов пока нет.",
       "empty_occupancy": "Данных по загруженности нет.",
       "empty_rating": "Рейтингов нет.",
@@ -3235,7 +3257,17 @@
       "col_data": "Данные",
       "col_date": "Обновлено",
       "no_data": "—",
+      "period_hint": "Период snapshot'ов:",
+      "own_label": "Ваш салон",
+      "own_badge": "вы",
+      "own_no_data": "—",
+      "own_content_hint": "Подключите Instagram/Facebook в Настройках для контент-метрик.",
+      "now": "сейчас",
       "params": {
+        "discover_title": "Автоподбор салонов рядом",
+        "discover_subtitle": "Google Places Nearby — найдём минимум 10 салонов в радиусе 2 км от вашего адреса (заполните адрес/координаты в Настройках). Уже добавленные пропускаются.",
+        "discover_button": "Запустить автоподбор",
+        "discover_done": "Добавлено {{count}} новых конкурентов",
         "add_title": "Добавить конкурента",
         "add_subtitle": "Дай ссылки на Booksy, Google Maps, Instagram, Facebook. Чем больше — тем точнее сводка.",
         "name_label": "Название салона",

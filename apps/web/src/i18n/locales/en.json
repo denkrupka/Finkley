@@ -2481,7 +2481,23 @@
       "tenure": "{{years}} years of work",
       "col_visits_revenue": "Visits",
       "col_retail_revenue": "Add-ons",
-      "col_tips": "Tips"
+      "col_tips": "Tips",
+      "tabs": {
+        "performance": "Performance",
+        "tips": "Tips"
+      },
+      "tips": {
+        "title": "Staff tips",
+        "empty": "No tips for this period.",
+        "empty_hint": "Tips are captured on visit checkout — field «Tip».",
+        "kpi_total": "Total tips",
+        "kpi_tipped_visits": "Visits with tips",
+        "kpi_avg_tip": "Average tip",
+        "col_tips": "Tips amount",
+        "col_tipped": "Tipped visits",
+        "col_avg": "Average",
+        "col_share": "Share of revenue"
+      }
     },
     "services": {
       "title": "Revenue by service",
@@ -2551,7 +2567,13 @@
       "anonymous": "Anonymous review",
       "no_text": "(no text, only rating)",
       "import_button": "Import from Booksy/Google",
-      "imported": "Imported {{count}} reviews"
+      "imported": "Imported {{count}} reviews",
+      "sort": {
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "rating_asc": "Rating ↑",
+        "rating_desc": "Rating ↓"
+      }
     },
     "competitors": {
       "tabs": {
@@ -2563,7 +2585,7 @@
       },
       "no_competitors": "No competitors added yet",
       "no_competitors_hint": "Go to the «Parameters» tab and add at least one.",
-      "sync_pending": "Data will sync ~24 h after adding. Sync feature in development.",
+      "sync_pending": "Data will sync ~24 h after adding a competitor.",
       "empty_prices": "No competitor prices yet.",
       "empty_occupancy": "No occupancy data.",
       "empty_rating": "No ratings.",
@@ -2572,7 +2594,17 @@
       "col_data": "Data",
       "col_date": "Updated",
       "no_data": "—",
+      "period_hint": "Snapshot period:",
+      "own_label": "Your salon",
+      "own_badge": "you",
+      "own_no_data": "—",
+      "own_content_hint": "Connect Instagram/Facebook in Settings for content metrics.",
+      "now": "now",
       "params": {
+        "discover_title": "Auto-discover nearby salons",
+        "discover_subtitle": "Google Places Nearby — find at least 10 salons within 2 km of your address (fill in address/coords in Settings). Already-added ones are skipped.",
+        "discover_button": "Run auto-discovery",
+        "discover_done": "Added {{count}} new competitors",
         "add_title": "Add competitor",
         "add_subtitle": "Provide links to Booksy, Google Maps, Instagram, Facebook. More links = better data.",
         "name_label": "Salon name",

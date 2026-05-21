@@ -59,16 +59,24 @@ export function useMarkReviewRead(salonId: string | undefined) {
   })
 }
 
-/** Импорт отзывов с Booksy/Google (через будущую edge function reviews-sync).
- *  Пока stub — возвращает 0; UI кнопка показывает «не реализовано». */
+/**
+ * Импорт отзывов с Booksy + Google Places.
+ * Дёргает edge function reviews-sync с salon_id. Возвращает кол-во импортированных.
+ *
+ * Требования по env на Supabase: GOOGLE_PLACES_API_KEY (опционально — Google skip
+ * если не задано). Salon должен иметь google_place_id и/или booksy_url.
+ */
 export function useReviewsImport(salonId: string | undefined) {
+  const qc = useQueryClient()
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<number> => {
       if (!salonId) throw new Error('no_salon')
-      // TODO: edge function reviews-sync для скрапинга Booksy + Google Places API
-      throw new Error(
-        'Импорт отзывов с Booksy/Google пока в разработке. Внутренние отзывы (FlySMS-flow) уже работают.',
-      )
+      const { data, error } = await supabase.functions.invoke('reviews-sync', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      return (data as { imported?: number } | null)?.imported ?? 0
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reviews', salonId] }),
   })
 }
