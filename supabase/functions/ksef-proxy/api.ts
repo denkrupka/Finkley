@@ -402,18 +402,18 @@ export async function querySubjectInvoices(
   accessToken: string,
   opts: { dateFrom: string; dateTo: string; subjectType: 'subject1' | 'subject2' },
 ): Promise<{ ok: true; invoices: KsefInvoiceListItem[] } | KsefError> {
-  // KSeF 2.0: POST /invoices/query/metadata, body содержит InvoiceQueryFilters.
-  // pageOffset/pageSize в query string или в body — docs неявны; пробуем body.
+  // KSeF 2.0: POST /invoices/query/metadata. С 2026 фильтры на top-level
+  // (не в обёртке invoiceQueryFilters): subjectType + dateRange прямо в body.
+  // E2E проверено с реальным токеном — обёртка filters/invoiceQueryFilters
+  // даёт 400 "filters.subjectType must not be empty".
   const body = {
     pageOffset: 0,
     pageSize: 100,
-    invoiceQueryFilters: {
-      subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
-      dateRange: {
-        dateType: 'Invoicing',
-        from: `${opts.dateFrom}T00:00:00.000Z`,
-        to: `${opts.dateTo}T23:59:59.999Z`,
-      },
+    subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
+    dateRange: {
+      dateType: 'Invoicing',
+      from: `${opts.dateFrom}T00:00:00.000Z`,
+      to: `${opts.dateTo}T23:59:59.999Z`,
     },
   }
   try {
@@ -439,40 +439,61 @@ export async function querySubjectInvoices(
       invoiceHeaderList?: Array<Record<string, unknown>>
       invoices?: Array<Record<string, unknown>>
     }
-    const list = json.invoiceHeaderList ?? json.invoices ?? []
+    const list = json.invoices ?? json.invoiceHeaderList ?? []
     const invoices: KsefInvoiceListItem[] = list.map((row) => {
+      // Новый формат (2026+): seller/buyer прямо на корне с {nip, name} или
+      // {identifier:{type, value}, name}. Legacy форматы (subject1/subject2)
+      // на всякий случай поддерживаем как fallback.
       const ksefNum =
         (typeof row.ksefNumber === 'string' ? row.ksefNumber : null) ??
         (typeof row.ksefReferenceNumber === 'string' ? row.ksefReferenceNumber : null) ??
         ''
-      const seller = (row.subject1 ?? row.seller ?? {}) as Record<string, unknown>
-      const buyer = (row.subject2 ?? row.buyer ?? {}) as Record<string, unknown>
-      const sellerIdent = (seller.identifier ?? {}) as { identifier?: string }
-      const buyerIdent = (buyer.identifier ?? {}) as { identifier?: string }
+      const seller = (row.seller ?? row.subject1 ?? {}) as Record<string, unknown>
+      const buyer = (row.buyer ?? row.subject2 ?? {}) as Record<string, unknown>
+      const sellerIdent = (seller.identifier ?? {}) as { value?: string; identifier?: string }
+      const buyerIdent = (buyer.identifier ?? {}) as { value?: string; identifier?: string }
+      const sellerNip =
+        (typeof seller.nip === 'string' ? seller.nip : null) ??
+        sellerIdent.value ??
+        sellerIdent.identifier ??
+        null
+      const buyerNip =
+        (typeof buyer.nip === 'string' ? buyer.nip : null) ??
+        buyerIdent.value ??
+        buyerIdent.identifier ??
+        null
       const gross =
-        typeof row.gross === 'number'
-          ? row.gross
-          : typeof row.gross === 'string'
-            ? parseFloat(row.gross)
-            : typeof row.totalGross === 'number'
-              ? row.totalGross
-              : null
+        typeof row.grossAmount === 'number'
+          ? row.grossAmount
+          : typeof row.grossAmount === 'string'
+            ? parseFloat(row.grossAmount)
+            : typeof row.gross === 'number'
+              ? row.gross
+              : typeof row.gross === 'string'
+                ? parseFloat(row.gross)
+                : typeof row.totalGross === 'number'
+                  ? row.totalGross
+                  : null
       const issueDate =
-        typeof row.invoicingDate === 'string'
-          ? row.invoicingDate.slice(0, 10)
-          : typeof row.issueDate === 'string'
-            ? row.issueDate.slice(0, 10)
+        typeof row.issueDate === 'string'
+          ? row.issueDate.slice(0, 10)
+          : typeof row.invoicingDate === 'string'
+            ? row.invoicingDate.slice(0, 10)
             : null
       const acquisitionDate =
-        typeof row.acquisitionTimestamp === 'string' ? row.acquisitionTimestamp.slice(0, 10) : null
+        typeof row.acquisitionDate === 'string'
+          ? row.acquisitionDate.slice(0, 10)
+          : typeof row.acquisitionTimestamp === 'string'
+            ? row.acquisitionTimestamp.slice(0, 10)
+            : null
       return {
         ksefReferenceNumber: ksefNum,
         invoiceNumber: typeof row.invoiceNumber === 'string' ? row.invoiceNumber : null,
         issueDate,
         acquisitionDate,
-        sellerNip: sellerIdent.identifier ?? null,
+        sellerNip,
         sellerName: typeof seller.name === 'string' ? seller.name : null,
-        buyerNip: buyerIdent.identifier ?? null,
+        buyerNip,
         totalGross: typeof gross === 'number' && isFinite(gross) ? gross : null,
         currency: typeof row.currency === 'string' ? row.currency.toUpperCase() : 'PLN',
       }
