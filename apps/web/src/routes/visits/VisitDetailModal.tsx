@@ -261,7 +261,13 @@ export function VisitDetailModal({
             t={t}
           />
         ) : (
-          <NextVisitPromptView onDone={onClose} t={t} />
+          <NextVisitPromptView
+            visit={visit}
+            services={services}
+            staff={staff}
+            onDone={onClose}
+            t={t}
+          />
         )}
       </DialogContent>
       <CashGateRequiredDialog
@@ -956,16 +962,65 @@ function ChargeView({
 // со скриптом администратора (PDF: Раздел 4 + 1.3 + 5.1).
 // =============================================================================
 
+/** Парсит строку **text** в <strong className="text-foreground font-bold">text</strong>. */
+function renderWithBold(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={i} className="text-foreground font-bold">
+          {part.slice(2, -2)}
+        </strong>
+      )
+    }
+    return <span key={i}>{part}</span>
+  })
+}
+
 function NextVisitPromptView({
+  visit,
+  services,
+  staff,
   onDone,
   t,
 }: {
+  visit: VisitRow
+  services: Array<{ id: string; name: string; default_duration_min: number | null }>
+  staff: Array<{ id: string; full_name: string }>
   onDone: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const [showScript, setShowScript] = useState(false)
+  // Дата = visit.visit_at + 3 недели (21 день).
+  const futureDate = new Date(new Date(visit.visit_at).getTime() + 21 * 24 * 60 * 60 * 1000)
+  const dateLabel = format(futureDate, 'd MMMM yyyy', { locale: getDateLocale() })
+  const masterName = staff.find((s) => s.id === visit.staff_id)?.full_name ?? '—'
+  const serviceName =
+    services.find((s) => s.id === visit.service_id)?.name ?? visit.service_name_snapshot ?? '—'
+  const otherMaster =
+    staff.find((s) => s.id !== visit.staff_id)?.full_name ??
+    t('visits.script.other_master_fallback')
+  const duration = String(
+    services.find((s) => s.id === visit.service_id)?.default_duration_min ??
+      visit.duration_min ??
+      30,
+  )
+  const scriptVars = {
+    date: dateLabel,
+    master: masterName,
+    service: serviceName,
+    otherMaster,
+    duration,
+  }
   if (showScript) {
-    return <ObjectionsScriptView onBack={() => setShowScript(false)} onDone={onDone} t={t} />
+    return (
+      <ObjectionsScriptView
+        onBack={() => setShowScript(false)}
+        onDone={onDone}
+        t={t}
+        vars={scriptVars}
+      />
+    )
   }
   return (
     <div className="flex flex-col">
@@ -984,7 +1039,7 @@ function NextVisitPromptView({
             <strong>{t('visits.next_prompt.script_label')}</strong>
           </p>
           <p className="text-foreground mt-2 text-sm italic leading-relaxed">
-            {t('visits.next_prompt.script_body')}
+            {renderWithBold(t('visits.next_prompt.script_body', { date: dateLabel }))}
           </p>
         </div>
         <p className="text-muted-foreground text-xs">{t('visits.next_prompt.hint_loss')}</p>
@@ -1005,10 +1060,12 @@ function ObjectionsScriptView({
   onBack,
   onDone,
   t,
+  vars,
 }: {
   onBack: () => void
   onDone: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
+  vars: { date: string; master: string; service: string; otherMaster: string; duration: string }
 }) {
   // Скрипт из PDF Wonderful Beauty Admin (Раздел 4 — типичные возражения +
   // Раздел 1.3 — расчёт и следующая запись + Раздел 5 — реактивация).
@@ -1043,7 +1100,9 @@ function ObjectionsScriptView({
               <p className="text-brand-navy mb-1.5 text-xs font-bold italic">
                 «{t(o.situationKey)}»
               </p>
-              <p className="text-foreground text-sm leading-relaxed">{t(o.replyKey)}</p>
+              <p className="text-foreground text-sm leading-relaxed">
+                {renderWithBold(t(o.replyKey, vars))}
+              </p>
             </div>
           ))}
         </div>

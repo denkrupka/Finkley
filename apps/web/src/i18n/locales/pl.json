@@ -1264,7 +1264,7 @@
       "title": "Zarezerwuj klientowi następną wizytę",
       "subtitle": "„Zarezerwuję później” to 30-40% utraconych powrotnych wizyt.",
       "script_label": "ADMINISTRATOR:",
-      "script_body": "„Czy zapisać Panią na kolejny raz? Za 3 tygodnie — to będzie [konkretna data]. Wygodniej rano czy wieczorem?”",
+      "script_body": "„Czy zapisać Panią na kolejny raz? Za 3 tygodnie — to będzie **{{date}}**. Wygodniej rano czy wieczorem?”",
       "hint_loss": "Alternatywne pytanie („kiedy wygodniej?”) zamiast otwartego („chcesz zarezerwować?”) obniża próg.",
       "ok_button": "OK, rozumiem",
       "objections_button": "Praca z obiekcjami"
@@ -1275,15 +1275,16 @@
       "golden_rule_title": "Cel: zarezerwować klienta zanim wyjdzie.",
       "golden_rule_body": "NIGDY nie mów „napisz, gdy będziesz gotowa”. To przerzuca inicjatywę — tracisz kontrolę.",
       "case1_situation": "Sama się później umówię…",
-      "case1_reply": "Oczywiście! Ale szczerze — popularne sloty u [mistrza] szybko się zapełniają. Zatrzymam wstępnie miejsce dla Pani, a jeśli plany się zmienią — napisz, przesuniemy.",
+      "case1_reply": "Oczywiście! Ale szczerze — popularne sloty u **{{master}}** szybko się zapełniają. Zatrzymam wstępnie miejsce dla Pani, a jeśli plany się zmienią — napisz, przesuniemy.",
       "case2_situation": "Drogo, w sąsiednim salonie taniej",
       "case2_reply": "Rozumiem. Nasze ceny są nieco wyższe — używamy profesjonalnych materiałów, mistrzowie regularnie się szkolą. Wielu klientów, którzy próbowali innych salonów, wraca do nas właśnie ze względu na jakość i trwałość.",
       "case3_situation": "Nie mam czasu na dodatkowe usługi",
-      "case3_reply": "Wszystko rozumiem! [Usługa] zajmie dosłownie [czas] minut — mistrz zrobi to równolegle albo na końcu. Zdąży Pani na czas.",
+      "case3_reply": "Wszystko rozumiem! **{{service}}** zajmie dosłownie **{{duration}}** minut — mistrz zrobi to równolegle albo na końcu. Zdąży Pani na czas.",
       "case4_situation": "Chcę do konkretnego mistrza, ale nie ma wolnego",
-      "case4_reply": "Rozumiem, [mistrz] ma stałych klientów — bardzo cenią jej pracę. Dwie opcje: lista oczekujących i powiadomię, gdy się zwolni, albo zaproponuję [innego mistrza] — też robi [usługa] i ma świetne opinie.",
+      "case4_reply": "Rozumiem, **{{master}}** ma stałych klientów — bardzo cenią jej pracę. Dwie opcje: lista oczekujących i powiadomię, gdy się zwolni, albo zaproponuję **{{otherMaster}}** — też robi **{{service}}** i ma świetne opinie.",
       "case5_situation": "Nie wiem, kiedy będę mogła przyjść",
-      "case5_reply": "Oczywiście! Tylko uprzedzę — [mistrz] zwykle ma zapełniony grafik na 2 tygodnie naprzód, zwłaszcza piątki. Zatrzymam wstępnie [data] — jeśli się nie uda, napisz dzień wcześniej, przesuniemy."
+      "case5_reply": "Oczywiście! Tylko uprzedzę — **{{master}}** zwykle ma zapełniony grafik na 2 tygodnie naprzód, zwłaszcza piątki. Zatrzymam wstępnie **{{date}}** — jeśli się nie uda, napisz dzień wcześniej, przesuniemy.",
+      "other_master_fallback": "inny mistrz"
     }
   },
   "clients": {

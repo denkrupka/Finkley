@@ -1264,7 +1264,7 @@
       "title": "Book the client for the next visit",
       "subtitle": "\"I will book later\" = 30-40% lost repeat visits.",
       "script_label": "ADMINISTRATOR:",
-      "script_body": "\"Shall I book you for next time? In 3 weeks — that is [specific date]. Mornings or evenings work better for you?\"",
+      "script_body": "\"Shall I book you for next time? In 3 weeks — that is **{{date}}**. Mornings or evenings work better for you?\"",
       "hint_loss": "Alternative question (\"when's better?\") instead of open (\"want to book?\") lowers the barrier.",
       "ok_button": "OK, got it",
       "objections_button": "Handling objections"
@@ -1275,15 +1275,16 @@
       "golden_rule_title": "Goal: book the client before they leave.",
       "golden_rule_body": "NEVER say \"text us when you're ready\". That shifts initiative — you lose control.",
       "case1_situation": "I'll book myself later…",
-      "case1_reply": "Of course! But honestly — popular slots with [master] go fast. Let me hold a slot for you tentatively, and if plans change — just text me, we'll reschedule.",
+      "case1_reply": "Of course! But honestly — popular slots with **{{master}}** go fast. Let me hold a slot for you tentatively, and if plans change — just text me, we'll reschedule.",
       "case2_situation": "Expensive, the salon next door is cheaper",
       "case2_reply": "I understand. Our prices are slightly higher — we use professional materials, our masters train regularly. Many clients who tried other salons came back to us because of quality and durability.",
       "case3_situation": "I don't have time for extras",
-      "case3_reply": "I totally get it! [Service] takes only [time] min — master can do it in parallel or right at the end. You'll be on time.",
+      "case3_reply": "I totally get it! **{{service}}** takes only **{{duration}}** min — master can do it in parallel or right at the end. You'll be on time.",
       "case4_situation": "I want a specific master, but she's not available",
-      "case4_reply": "I understand — [master] has loyal clients, they really value her work. Two options: put you on the waitlist and notify when a slot opens, or suggest [other master] — she also does [service] and has great reviews.",
+      "case4_reply": "I understand — **{{master}}** has loyal clients, they really value her work. Two options: put you on the waitlist and notify when a slot opens, or suggest **{{otherMaster}}** — she also does **{{service}}** and has great reviews.",
       "case5_situation": "I don't know when I can come",
-      "case5_reply": "Of course! Just a heads up — [master]'s schedule is usually full 2 weeks ahead, especially Fridays. Let me hold [date] tentatively — if it doesn't work, message me a day before, we'll reschedule."
+      "case5_reply": "Of course! Just a heads up — **{{master}}**'s schedule is usually full 2 weeks ahead, especially Fridays. Let me hold **{{date}}** tentatively — if it doesn't work, message me a day before, we'll reschedule.",
+      "other_master_fallback": "another master"
     }
   },
   "clients": {
