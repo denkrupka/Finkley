@@ -200,12 +200,34 @@ function parseBooksyUrl(url: string): { region: string; businessId: string } | n
 // =============================================================================
 type BooksyVariant = {
   id?: number
+  /** Полное имя варианта (base + label) — то, что показывалось на Booksy. */
   name: string
+  /** Имя «головной» услуги без label варианта — для группировки в UI. */
+  parent_name: string
   treatment_name?: string
+  /** Финальная цена для клиента (после промо/saver-скидки если есть). */
   price_cents: number
+  /** Original price до скидки — нужно для отображения зачёркнутого. */
+  original_price_cents: number
+  /** Размер скидки в % если есть активный promotion (или null). */
+  discount_pct: number | null
+  /** Omnibus — минимальная цена за последние 30 дней (regulatory). */
   omnibus_cents?: number | null
   duration_min: number
   staffer_ids: number[]
+}
+
+/** Booksy возвращает omnibus_price иногда числом (159), иногда строкой ("159,00 zł"). */
+function parseBooksyMoney(v: unknown): number | null {
+  if (v == null) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 100) : null
+  if (typeof v === 'string') {
+    // "159,00 zł" → 159.00
+    const m = v.replace(/\s|zł|PLN|€|\$/g, '').replace(',', '.')
+    const n = Number.parseFloat(m)
+    return Number.isFinite(n) ? Math.round(n * 100) : null
+  }
+  return null
 }
 
 async function fetchBooksyCatalog(booksyUrl: string): Promise<{
@@ -240,8 +262,14 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
               label?: string
               duration?: number
               price?: number
-              omnibus_price?: number | null
+              omnibus_price?: number | string | null
               staffer_id?: number[]
+              // Активная promo-скидка (saver / app promotion): {rate, discount_amount, price:{price:number}}
+              promotion?: {
+                rate?: number
+                discount_amount?: number
+                price?: { price?: number; formatted_price?: string }
+              } | null
             }>
           }>
         }>
@@ -260,23 +288,41 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
         if (svc.variants && svc.variants.length > 0) {
           for (const v of svc.variants) {
             if (typeof v.price !== 'number') continue
+            const originalCents = Math.round(v.price * 100)
+            // Booksy promotion = saver/app-promo скидка. price.price — финальная
+            // цена клиента (то что зачёркивает оригинал на странице). Если promotion
+            // нет — используем оригинальную цену.
+            const promoPrice = v.promotion?.price?.price
+            const finalCents =
+              typeof promoPrice === 'number' && promoPrice > 0
+                ? Math.round(promoPrice * 100)
+                : originalCents
             const label = v.label ? `${baseName} — ${v.label}` : baseName
             services.push({
               id: typeof v.id === 'number' ? v.id : undefined,
               name: label,
+              parent_name: baseName,
               treatment_name: treatmentName,
-              price_cents: Math.round(v.price * 100),
-              omnibus_cents:
-                typeof v.omnibus_price === 'number' ? Math.round(v.omnibus_price * 100) : null,
+              price_cents: finalCents,
+              original_price_cents: originalCents,
+              discount_pct:
+                typeof v.promotion?.rate === 'number' && v.promotion.rate > 0
+                  ? v.promotion.rate
+                  : null,
+              omnibus_cents: parseBooksyMoney(v.omnibus_price),
               duration_min: typeof v.duration === 'number' ? v.duration : 0,
               staffer_ids: Array.isArray(v.staffer_id) ? v.staffer_id : [],
             })
           }
         } else if (typeof svc.price === 'number') {
+          const cents = Math.round(svc.price * 100)
           services.push({
             name: baseName,
+            parent_name: baseName,
             treatment_name: treatmentName,
-            price_cents: Math.round(svc.price * 100),
+            price_cents: cents,
+            original_price_cents: cents,
+            discount_pct: null,
             duration_min: 0,
             staffer_ids: [],
           })

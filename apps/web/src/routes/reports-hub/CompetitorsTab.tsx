@@ -117,11 +117,12 @@ function DataSection({
   const apiKind = kind === 'prices' ? 'price' : kind
 
   // Авто-sync при открытии любой data-вкладки. Условия:
-  //   - между запусками минимум 3 минуты (lastSyncAt в localStorage),
+  //   - между запусками минимум 30 секунд (защита от 5-кратного sync при быстром
+  //     переключении вкладок и от Booksy/Google rate-limit),
   //   - если юзер ушёл с вкладки/закрыл tab — фоновый запрос остаётся, но UI его игнорирует
   //     (через aborted-флаг в cleanup useEffect; повторного mutate не будет).
   const syncCompetitors = useSyncCompetitors(salonId)
-  const SYNC_COOLDOWN_MS = 3 * 60 * 1000
+  const SYNC_COOLDOWN_MS = 30 * 1000
   const lastSyncKey = `competitors-last-sync-${salonId}`
   const [showStatusBar, setShowStatusBar] = useState(false)
   useEffect(() => {
@@ -1565,13 +1566,28 @@ function tokenSimilarity(a: string[], b: string[]): number {
 
 type CompetitorService = {
   name: string
+  parent_name?: string
   price_cents: number
+  original_price_cents?: number
+  discount_pct?: number | null
   duration_min?: number
+}
+
+type CompetitorMatch = {
+  competitorId: string
+  competitorName: string
+  /** Анкорный variant из AI-матчинга (или fuzzy fallback). */
+  service: CompetitorService
+  /** Если у конкурента несколько variants одной услуги (по мастерам/тарифам) —
+   *  показываем диапазон min-max финальных клиентских цен. */
+  priceMin: number
+  priceMax: number
+  variantCount: number
 }
 
 type PriceMatchRow = {
   ownService: { id: string; name: string; price_cents: number; duration_min: number }
-  matches: Array<{ competitorId: string; competitorName: string; service: CompetitorService }>
+  matches: CompetitorMatch[]
   competitorMin: number | null
   competitorMax: number | null
   competitorAvg: number | null
@@ -1628,7 +1644,11 @@ function PricesTable({
           if (typeof v.name === 'string' && typeof v.price_cents === 'number') {
             list.push({
               name: v.name,
+              parent_name: typeof v.parent_name === 'string' ? v.parent_name : undefined,
               price_cents: v.price_cents,
+              original_price_cents:
+                typeof v.original_price_cents === 'number' ? v.original_price_cents : undefined,
+              discount_pct: typeof v.discount_pct === 'number' ? v.discount_pct : null,
               duration_min: typeof v.duration_min === 'number' ? v.duration_min : 0,
             })
           }
@@ -1718,10 +1738,32 @@ function PricesTable({
 
   const rows = useMemo<PriceMatchRow[]>(() => {
     const result: PriceMatchRow[] = []
+
+    /** Группа variants одной услуги у одного конкурента: min-max финальных цен. */
+    function buildMatch(
+      competitor: { id: string; name: string },
+      anchor: CompetitorService,
+      allVariants: CompetitorService[],
+    ): CompetitorMatch {
+      const groupKey = anchor.parent_name ?? anchor.name
+      // Берём все variants, имеющие тот же parent_name (или совпадающее name —
+      // если parent_name не пришёл, как со старых snapshot'ов).
+      const siblings = allVariants.filter((v) => (v.parent_name ?? v.name) === groupKey)
+      const prices = (siblings.length > 0 ? siblings : [anchor]).map((s) => s.price_cents)
+      return {
+        competitorId: competitor.id,
+        competitorName: competitor.name,
+        service: anchor,
+        priceMin: Math.min(...prices),
+        priceMax: Math.max(...prices),
+        variantCount: siblings.length || 1,
+      }
+    }
+
     for (const ownSvc of ownServices) {
       if (ownSvc.is_archived) continue
       if (watchedNames && !watchedNames.has(ownSvc.name)) continue
-      const matches: PriceMatchRow['matches'] = []
+      const matches: CompetitorMatch[] = []
 
       // Если есть AI-матчинг — используем его. Иначе fallback на fuzzy Jaccard.
       const aiForThis = aiMatches?.find((m) => m.our_service === ownSvc.name)
@@ -1733,7 +1775,7 @@ function PricesTable({
           if (!svc) continue
           const comp = competitors.find((c) => c.id === cm.competitor_id)
           if (!comp) continue
-          matches.push({ competitorId: comp.id, competitorName: comp.name, service: svc })
+          matches.push(buildMatch(comp, svc, compServices))
         }
       } else {
         const ownTokens = normalizeServiceName(ownSvc.name)
@@ -1744,14 +1786,22 @@ function PricesTable({
             const sim = tokenSimilarity(ownTokens, normalizeServiceName(svc.name))
             if (sim >= 0.4 && (!best || sim > best.score)) best = { score: sim, svc }
           }
-          if (best) matches.push({ competitorId: c.id, competitorName: c.name, service: best.svc })
+          if (best) matches.push(buildMatch(c, best.svc, list))
         }
       }
 
-      const prices = matches.map((m) => m.service.price_cents)
-      const min = prices.length > 0 ? Math.min(...prices) : null
-      const max = prices.length > 0 ? Math.max(...prices) : null
-      const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : null
+      // Для итоговых min/max/avg по строке берём ВСЕ цены (min..max каждого
+      // конкурента уплощены), а не только anchor.price_cents — так диапазон
+      // отражает реальную картину.
+      const allPrices: number[] = []
+      for (const m of matches) {
+        allPrices.push(m.priceMin)
+        if (m.priceMax !== m.priceMin) allPrices.push(m.priceMax)
+      }
+      const min = allPrices.length > 0 ? Math.min(...allPrices) : null
+      const max = allPrices.length > 0 ? Math.max(...allPrices) : null
+      const avg =
+        allPrices.length > 0 ? allPrices.reduce((s, x) => s + x, 0) / allPrices.length : null
       const diffPct =
         avg != null && avg > 0 ? Math.round(((ownSvc.default_price_cents - avg) / avg) * 100) : null
       result.push({
@@ -1890,7 +1940,10 @@ function PricesTable({
                   <td className="num text-foreground px-3 py-3 text-right">
                     {formatCurrency(r.ownService.price_cents, currency, locale)}
                   </td>
-                  {/* Цена у каждого конкурента + eye-link на страницу */}
+                  {/* Цена у каждого конкурента + eye-link на страницу.
+                      Если у конкурента >1 variant'а — показываем диапазон min-max.
+                      Если активна promo-скидка на anchor variant'е — показываем
+                      зачёркнутую оригинальную цену сверху. */}
                   {competitors.map((c) => {
                     const m = r.matches.find((x) => x.competitorId === c.id)
                     if (!m) {
@@ -1901,24 +1954,50 @@ function PricesTable({
                       )
                     }
                     const url = competitorServiceUrl(c.id)
+                    const hasRange = m.priceMax > m.priceMin
+                    const hasDiscount =
+                      typeof m.service.discount_pct === 'number' &&
+                      m.service.discount_pct > 0 &&
+                      typeof m.service.original_price_cents === 'number' &&
+                      m.service.original_price_cents > m.service.price_cents
                     return (
                       <td key={c.id} className="num text-foreground px-3 py-3 text-right">
-                        <span className="inline-flex items-center justify-end gap-1.5">
-                          {formatCurrency(m.service.price_cents, currency, locale)}
-                          {url ? (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-foreground"
-                              title={t('reports_hub.competitors.open_competitor', {
-                                name: c.name,
-                              })}
-                            >
-                              <Eye className="size-3" strokeWidth={2} />
-                            </a>
+                        <div className="flex flex-col items-end">
+                          {hasDiscount && !hasRange ? (
+                            <span className="text-muted-foreground/60 text-[10px] line-through">
+                              {formatCurrency(
+                                m.service.original_price_cents as number,
+                                currency,
+                                locale,
+                              )}
+                            </span>
                           ) : null}
-                        </span>
+                          <span className="inline-flex items-center justify-end gap-1.5">
+                            {hasRange
+                              ? `${formatCurrency(m.priceMin, currency, locale)} – ${formatCurrency(m.priceMax, currency, locale)}`
+                              : formatCurrency(m.service.price_cents, currency, locale)}
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground"
+                                title={t('reports_hub.competitors.open_competitor', {
+                                  name: c.name,
+                                })}
+                              >
+                                <Eye className="size-3" strokeWidth={2} />
+                              </a>
+                            ) : null}
+                          </span>
+                          {m.variantCount > 1 ? (
+                            <span className="text-muted-foreground/60 text-[10px]">
+                              {t('reports_hub.competitors.variants_count', {
+                                count: m.variantCount,
+                              })}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                     )
                   })}
