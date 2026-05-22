@@ -203,6 +203,82 @@ async function fetchContent(
   return Object.keys(out).length > 0 ? out : null
 }
 
+/**
+ * Sync метрик для своего салона (для отображения первой строкой в
+ * Reports → Конкуренты — справедливое сравнение со списком). Источники
+ * те же что у конкурентов — scrape Instagram/Facebook + Google rating
+ * (если задан place_id). Запись в отдельную таблицу own_salon_metrics
+ * (миграция 20260522000003) с upsert на (salon, kind, source, date).
+ */
+type OwnSalonRow = {
+  id: string
+  google_place_id: string | null
+  instagram_url: string | null
+  facebook_url: string | null
+}
+
+async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<number> {
+  type OwnInsert = {
+    salon_id: string
+    kind: 'rating' | 'content' | 'occupancy'
+    data: Record<string, unknown>
+    source: 'scrape_instagram' | 'scrape_facebook' | 'google'
+    snapshot_date: string
+  }
+  const inserts: OwnInsert[] = []
+
+  if (s.google_place_id) {
+    const rating = await fetchGoogleRating(s.google_place_id)
+    if (rating) {
+      inserts.push({
+        salon_id: s.id,
+        kind: 'rating',
+        data: rating,
+        source: 'google',
+        snapshot_date: TODAY,
+      })
+    }
+  }
+
+  // Content (Insta + FB scrape). Один row на источник — для прозрачности.
+  if (s.instagram_url) {
+    const c = await fetchContent(s.instagram_url, null)
+    if (c) {
+      inserts.push({
+        salon_id: s.id,
+        kind: 'content',
+        data: c,
+        source: 'scrape_instagram',
+        snapshot_date: TODAY,
+      })
+    }
+  }
+  if (s.facebook_url) {
+    const c = await fetchContent(null, s.facebook_url)
+    if (c) {
+      inserts.push({
+        salon_id: s.id,
+        kind: 'content',
+        data: c,
+        source: 'scrape_facebook',
+        snapshot_date: TODAY,
+      })
+    }
+  }
+
+  if (inserts.length === 0) return 0
+  // Идемпотентный upsert на уникальный ключ (salon, kind, source, date).
+  // Если today уже есть запись — overwrite (новый run перезапишет старые числа).
+  const { error } = await admin
+    .from('own_salon_metrics')
+    .upsert(inserts, { onConflict: 'salon_id,kind,source,snapshot_date' })
+  if (error) {
+    console.warn('own_salon_metrics upsert failed', s.id, error.message)
+    return 0
+  }
+  return inserts.length
+}
+
 // =============================================================================
 // Per-competitor sync.
 // =============================================================================
@@ -316,9 +392,25 @@ Deno.serve(async (req: Request) => {
   for (const c of (competitors ?? []) as CompetitorRow[]) {
     snapshots += await syncOneCompetitor(admin, c)
   }
+
+  // Также метрики СВОЕГО салона — для отображения первой строкой
+  // в Reports → Конкуренты (справедливое сравнение).
+  let ownSnapshots = 0
+  let ownQ = admin
+    .from('salons')
+    .select('id, google_place_id, instagram_url, facebook_url')
+    .or('google_place_id.not.is.null,instagram_url.not.is.null,facebook_url.not.is.null')
+  if (body.salon_id) ownQ = ownQ.eq('id', body.salon_id)
+  const { data: ownSalons } = await ownQ
+  for (const s of (ownSalons ?? []) as OwnSalonRow[]) {
+    ownSnapshots += await syncOwnSalon(admin, s)
+  }
+
   return jsonResponse({
     ok: true,
     competitors: competitors?.length ?? 0,
     snapshots,
+    own_salons: ownSalons?.length ?? 0,
+    own_snapshots: ownSnapshots,
   })
 })

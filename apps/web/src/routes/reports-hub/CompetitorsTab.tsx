@@ -28,7 +28,9 @@ import {
   useCompetitorSnapshots,
   useCreateCompetitor,
   useDiscoverCompetitors,
+  useOwnSalonContent,
   useOwnSalonMetrics,
+  type OwnSalonContent,
   useSyncCompetitors,
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
@@ -116,6 +118,7 @@ function DataSection({
     dateFilter,
   )
   const { data: ownMetrics } = useOwnSalonMetrics(salonId)
+  const { data: ownContent } = useOwnSalonContent(salonId)
 
   if (!competitors || competitors.length === 0) {
     return (
@@ -168,6 +171,7 @@ function DataSection({
                 kind={kind}
                 salon={salon}
                 ownMetrics={ownMetrics ?? null}
+                ownContent={ownContent ?? null}
                 currency={currency}
                 t={t}
               />
@@ -215,11 +219,13 @@ function OwnSalonRow({
   kind,
   salon,
   ownMetrics,
+  ownContent,
   t,
 }: {
   kind: 'prices' | 'occupancy' | 'rating' | 'content'
   salon: ReturnType<typeof useSalon>['data']
   ownMetrics: { rating_avg: number | null; rating_count: number } | null
+  ownContent: OwnSalonContent | null
   currency: string
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
@@ -236,11 +242,21 @@ function OwnSalonRow({
     }
   }
   if (kind === 'content') {
-    dataCell = (
-      <span className="text-muted-foreground/70">
-        {t('reports_hub.competitors.own_content_hint')}
-      </span>
-    )
+    if (ownContent?.has_data) {
+      const parts: string[] = []
+      if (ownContent.followers != null) parts.push(`👥 ${ownContent.followers}`)
+      if (ownContent.posts != null) parts.push(`📷 ${ownContent.posts}`)
+      if (ownContent.following != null) parts.push(`➡ ${ownContent.following}`)
+      if (ownContent.posts_per_month != null) parts.push(`📅 ${ownContent.posts_per_month}/мес`)
+      if (ownContent.fb_likes != null) parts.push(`👍 ${ownContent.fb_likes}`)
+      dataCell = <span>{parts.join(' · ')}</span>
+    } else {
+      dataCell = (
+        <span className="text-muted-foreground/70">
+          {t('reports_hub.competitors.own_content_hint')}
+        </span>
+      )
+    }
   }
   return (
     <tr className={cn('bg-brand-sage-soft/30 border-brand-sage-soft border-l-4')}>

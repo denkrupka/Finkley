@@ -199,6 +199,73 @@ export function useOwnSalonMetrics(salonId: string | undefined) {
   })
 }
 
+/** Content-метрики своего салона (followers/posts/likes/posts_per_month)
+ *  собираются competitor-sync cron'ом в own_salon_metrics. Возвращаем
+ *  последний snapshot kind='content' (любой source — берём свежий). */
+export type OwnSalonContent = {
+  followers: number | null
+  posts: number | null
+  following: number | null
+  posts_per_month: number | null
+  fb_likes: number | null
+  snapshot_date: string | null
+  has_data: boolean
+}
+
+export function useOwnSalonContent(salonId: string | undefined) {
+  return useQuery<OwnSalonContent>({
+    queryKey: ['own-salon-content', salonId],
+    queryFn: async () => {
+      const empty: OwnSalonContent = {
+        followers: null,
+        posts: null,
+        following: null,
+        posts_per_month: null,
+        fb_likes: null,
+        snapshot_date: null,
+        has_data: false,
+      }
+      if (!salonId) return empty
+      const { data, error } = await supabase
+        .from('own_salon_metrics')
+        .select('data, source, snapshot_date')
+        .eq('salon_id', salonId)
+        .eq('kind', 'content')
+        .order('snapshot_date', { ascending: false })
+        .limit(2) // оба источника (insta + fb), берём свежие
+      if (error) throw error
+      const rows = (data ?? []) as Array<{
+        data: Record<string, unknown>
+        source: string
+        snapshot_date: string
+      }>
+      if (rows.length === 0) return empty
+      // Мерджим: одно поле может быть на одном источнике, другое — на другом.
+      const merged: OwnSalonContent = { ...empty }
+      for (const r of rows) {
+        const d = r.data
+        if (merged.followers == null && typeof d.followers === 'number')
+          merged.followers = d.followers
+        if (merged.posts == null && typeof d.posts === 'number') merged.posts = d.posts
+        if (merged.following == null && typeof d.following === 'number')
+          merged.following = d.following
+        if (merged.posts_per_month == null && typeof d.posts_per_month === 'number')
+          merged.posts_per_month = d.posts_per_month
+        if (merged.fb_likes == null && typeof d.fb_likes === 'number') merged.fb_likes = d.fb_likes
+        if (!merged.snapshot_date) merged.snapshot_date = r.snapshot_date
+      }
+      merged.has_data =
+        merged.followers != null ||
+        merged.posts != null ||
+        merged.fb_likes != null ||
+        merged.posts_per_month != null
+      return merged
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
 export function useCompetitorSettings(salonId: string | undefined) {
   return useQuery<CompetitorMonitoringSettings | null>({
     queryKey: ['competitor-settings', salonId],
