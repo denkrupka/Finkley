@@ -2739,6 +2739,7 @@
         "refresh": "Przelicz",
         "cached": "z cache",
         "copy": "Kopiuj",
+        "reply_lang": "Język odpowiedzi",
         "internal_block_title": "Analiza AI wewnętrznych opinii ({{count}})",
         "internal_block_hint": "Wewnętrzne opinie widzimy tylko my. AI znajdzie przyczynę, oceni mistrza i podpowie jak zatrzymać klienta.",
         "s": {

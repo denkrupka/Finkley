@@ -2739,6 +2739,7 @@
         "refresh": "Recompute",
         "cached": "from cache",
         "copy": "Copy",
+        "reply_lang": "Reply language",
         "internal_block_title": "AI review of internal feedback ({{count}})",
         "internal_block_hint": "Internal reviews are private — only the owner sees them. AI finds the root cause, assesses the master and suggests how to retain the client.",
         "s": {

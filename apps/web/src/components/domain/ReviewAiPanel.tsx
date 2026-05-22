@@ -7,10 +7,26 @@ import {
   type BulkContent,
   type ReviewAiResponse,
   type ReviewAiScope,
+  type ReviewReplyLocale,
   type SingleExternalContent,
   type SingleInternalContent,
   useReviewAiAnalyze,
 } from '@/hooks/useReviewAi'
+
+const REPLY_LOCALES: { code: ReviewReplyLocale; flag: string; label: string }[] = [
+  { code: 'ru', flag: '🇷🇺', label: 'RU' },
+  { code: 'uk', flag: '🇺🇦', label: 'UK' },
+  { code: 'pl', flag: '🇵🇱', label: 'PL' },
+  { code: 'en', flag: '🇬🇧', label: 'EN' },
+]
+
+function uiToReplyLocale(uiLang: string): ReviewReplyLocale {
+  const base = uiLang.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  if (base === 'uk') return 'uk'
+  return 'ru'
+}
 
 type Props = {
   salonId: string
@@ -23,20 +39,31 @@ type Props = {
 }
 
 export function ReviewAiPanel({ salonId, scope, reviewId, reviewSource, compact }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<ReviewAiResponse | null>(null)
+  const [replyLocale, setReplyLocale] = useState<ReviewReplyLocale>(() =>
+    uiToReplyLocale(i18n.language ?? 'ru'),
+  )
   const analyze = useReviewAiAnalyze(salonId)
 
-  function run(force = false) {
+  function run(force = false, locale?: ReviewReplyLocale) {
     setOpen(true)
     analyze.mutate(
-      { scope, review_id: reviewId, force },
+      { scope, review_id: reviewId, reply_locale: locale ?? replyLocale, force },
       {
         onSuccess: (res) => setResult(res),
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
       },
     )
+  }
+
+  function changeReplyLocale(loc: ReviewReplyLocale) {
+    if (loc === replyLocale) return
+    setReplyLocale(loc)
+    // force=true: payload_hash другой из-за reply_locale, но мы хотим явно
+    // показать юзеру что генерируем новый ответ — а не ждать кеш-miss скрытно.
+    run(true, loc)
   }
 
   if (!open) {
@@ -58,12 +85,37 @@ export function ReviewAiPanel({ salonId, scope, reviewId, reviewSource, compact 
 
   return (
     <div className="border-brand-sage-deep/30 from-brand-sage/5 mt-3 rounded-lg border bg-gradient-to-br to-transparent p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
           <Brain className="text-brand-sage-deep size-4" strokeWidth={2} />
           {t('reports_hub.reviews.ai.title')}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {scope === 'single' ? (
+            <div className="border-border bg-card flex items-center gap-0.5 rounded-md border p-0.5">
+              <span className="text-muted-foreground px-1.5 text-[10px] font-semibold uppercase tracking-wider">
+                {t('reports_hub.reviews.ai.reply_lang')}
+              </span>
+              {REPLY_LOCALES.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => changeReplyLocale(l.code)}
+                  disabled={analyze.isPending}
+                  className={
+                    'rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors disabled:opacity-50 ' +
+                    (replyLocale === l.code
+                      ? 'bg-brand-sage-deep text-white'
+                      : 'text-muted-foreground hover:bg-muted/60')
+                  }
+                  title={l.label}
+                >
+                  <span className="mr-0.5">{l.flag}</span>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => run(true)}

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 
 export type ReviewAiScope = 'single' | 'negative_external' | 'internal_all' | 'internal_unread'
+export type ReviewReplyLocale = 'ru' | 'uk' | 'pl' | 'en'
 
 export type SingleExternalContent = {
   situation: string
@@ -67,14 +68,39 @@ export function useReviewAiAnalyze(salonId: string | undefined) {
   return useMutation<
     ReviewAiResponse,
     Error,
-    { scope: ReviewAiScope; review_id?: string; force?: boolean }
+    {
+      scope: ReviewAiScope
+      review_id?: string
+      reply_locale?: ReviewReplyLocale
+      force?: boolean
+    }
   >({
-    mutationFn: async ({ scope, review_id, force }) => {
+    mutationFn: async ({ scope, review_id, reply_locale, force }) => {
       if (!salonId) throw new Error('no_salon')
       const { data, error } = await supabase.functions.invoke('reviews-ai-analyze', {
-        body: { salon_id: salonId, scope, review_id, locale, force },
+        body: { salon_id: salonId, scope, review_id, locale, reply_locale, force },
       })
-      if (error) throw error
+      if (error) {
+        // Supabase возвращает FunctionsHttpError с context.response — пытаемся
+        // достать читаемый detail из body, чтобы не показывать сухое «non-2xx».
+        const ctx = (error as { context?: { response?: Response } }).context
+        if (ctx?.response) {
+          try {
+            const body = await ctx.response.clone().json()
+            const detail = (body as { detail?: string; error?: string }).detail
+            const code = (body as { error?: string }).error
+            const msg = detail ?? code ?? error.message
+            throw new Error(msg)
+          } catch {
+            // fall through на оригинальный error.message
+          }
+        }
+        throw error
+      }
+      if (data && (data as { error?: string }).error) {
+        const body = data as { error?: string; detail?: string }
+        throw new Error(body.detail ?? body.error ?? 'unknown_error')
+      }
       return data as ReviewAiResponse
     },
   })

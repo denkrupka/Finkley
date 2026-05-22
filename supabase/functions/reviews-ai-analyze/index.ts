@@ -38,6 +38,7 @@ const MODEL = 'claude-haiku-4-5-20251001'
 
 type Scope = 'single' | 'negative_external' | 'internal_all' | 'internal_unread'
 type Locale = 'ru' | 'pl' | 'en'
+type ReplyLocale = 'ru' | 'uk' | 'pl' | 'en'
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -54,6 +55,25 @@ function normalizeLocale(input: unknown): Locale {
   return 'ru'
 }
 
+function normalizeReplyLocale(input: unknown, fallback: Locale): ReplyLocale {
+  if (typeof input !== 'string') return fallback
+  const base = input.split('-')[0]?.toLowerCase()
+  if (base === 'pl') return 'pl'
+  if (base === 'en') return 'en'
+  if (base === 'uk') return 'uk'
+  if (base === 'ru') return 'ru'
+  return fallback
+}
+
+function replyLanguageName(rl: ReplyLocale): string {
+  return {
+    ru: 'Russian',
+    uk: 'Ukrainian',
+    pl: 'Polish',
+    en: 'English',
+  }[rl]
+}
+
 async function sha256Hex(text: string): Promise<string> {
   const enc = new TextEncoder().encode(text)
   const buf = await crypto.subtle.digest('SHA-256', enc)
@@ -63,16 +83,25 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 function langInstruction(locale: Locale): string {
+  // Жёсткая инструкция — Claude часто скатывается в английский при иноязычном
+  // input, особенно если основной prompt по-английски. Поэтому требуем явно.
   return {
-    ru: 'Отвечай на русском, кратко и по делу, без пустых фраз.',
-    pl: 'Odpowiadaj po polsku, zwięźle i konkretnie, bez lania wody.',
-    en: 'Reply in English, concise and to the point, no fluff.',
+    ru: 'ОТВЕЧАЙ ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ. Это критично — все аналитические поля (situation, root_cause, prevention, public_impact, psychological_profile.*, response_strategy.*, retention_strategy.*, staff_action, segments[].name, segments[].approach, patterns[].*, top_actions[], overview, risk_assessment) должны быть НА РУССКОМ. Никаких английских слов, никакого микса языков. Если оригинальный отзыв на другом языке — всё равно анализируешь на русском.',
+    pl: 'ODPOWIADAJ WYŁĄCZNIE PO POLSKU. To krytyczne — wszystkie pola analityczne (situation, root_cause, prevention, public_impact, psychological_profile.*, response_strategy.*, retention_strategy.*, staff_action, segments[].name, segments[].approach, patterns[].*, top_actions[], overview, risk_assessment) muszą być PO POLSKU. Żadnego angielskiego, żadnego mieszania języków.',
+    en: 'REPLY ONLY IN ENGLISH. This is critical — all analytical fields (situation, root_cause, prevention, public_impact, psychological_profile.*, response_strategy.*, retention_strategy.*, staff_action, segments[].name, segments[].approach, patterns[].*, top_actions[], overview, risk_assessment) MUST be in English. No language mixing.',
   }[locale]
 }
 
+function replyLanguageInstruction(locale: Locale, replyLocale: ReplyLocale): string {
+  // Аналитические поля пишем на locale (UI юзера), сами тексты ответа клиенту —
+  // на replyLocale.
+  const name = replyLanguageName(replyLocale)
+  return ` REPLY LANGUAGE FOR CLIENT MESSAGES: fields "suggested_public_reply" and "suggested_private_message" MUST be written in ${name} — these are texts the salon will send to the client. ALL OTHER fields (analysis, profile, strategy) stay in the main response language defined above. Do not confuse the two language rules.`
+}
+
 // SINGLE (external — Booksy/Google) — публичный отзыв.
-function systemSingleExternal(locale: Locale): string {
-  return `You are a senior salon reputation manager. ${langInstruction(locale)}
+function systemSingleExternal(locale: Locale, replyLocale: ReplyLocale): string {
+  return `You are a senior salon reputation manager. ${langInstruction(locale)}${replyLanguageInstruction(locale, replyLocale)}
 
 You analyze a PUBLIC review (Booksy or Google) that the whole world can read.
 Your goal:
@@ -106,8 +135,8 @@ Respond STRICTLY as JSON (no markdown, no preface):
 }
 
 // SINGLE (internal — forma after visit) — приватный отзыв.
-function systemSingleInternal(locale: Locale): string {
-  return `You are a senior salon operations consultant. ${langInstruction(locale)}
+function systemSingleInternal(locale: Locale, replyLocale: ReplyLocale): string {
+  return `You are a senior salon operations consultant. ${langInstruction(locale)}${replyLanguageInstruction(locale, replyLocale)}
 
 You analyze a PRIVATE review submitted via the salon's internal post-visit form.
 This review is visible ONLY to the salon owner — clients won't see it.
@@ -141,7 +170,10 @@ Respond STRICTLY as JSON (no markdown, no preface):
 }
 
 // BULK — агрегатный разбор группы отзывов.
-function systemBulk(locale: Locale, scope: Scope): string {
+function systemBulk(locale: Locale, scope: Scope, replyLocale: ReplyLocale): string {
+  // В bulk нет полей-сообщений клиенту, но для будущего расширения
+  // оставляем единый сигнатур. replyLocale пока игнорируется.
+  void replyLocale
   const audience =
     scope === 'negative_external'
       ? 'These are PUBLIC negative reviews from Booksy/Google. The whole world can read them — reputation is at stake.'
@@ -179,7 +211,7 @@ async function claudeJson(system: string, prompt: string): Promise<Record<string
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2200,
+      max_tokens: 4096,
       system,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -234,6 +266,7 @@ Deno.serve(async (req: Request) => {
     scope?: Scope
     review_id?: string
     locale?: string
+    reply_locale?: string
     force?: boolean
   }
   try {
@@ -243,6 +276,7 @@ Deno.serve(async (req: Request) => {
   }
   if (!body.salon_id || !body.scope) return json({ error: 'bad_request' }, 400)
   const locale = normalizeLocale(body.locale)
+  const replyLocale = normalizeReplyLocale(body.reply_locale, locale)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -326,9 +360,11 @@ Deno.serve(async (req: Request) => {
     .map((r) => `${r.id}|${r.rating ?? ''}|${(r.body ?? '').trim()}`)
     .sort()
     .join('||')
-  const payloadHash = await sha256Hex(`${body.scope}|${locale}|${normalized}`)
+  const payloadHash = await sha256Hex(`${body.scope}|${locale}|${replyLocale}|${normalized}`)
 
   // --- Кеш ---
+  // payload_hash уже включает replyLocale, поэтому смена языка ответа
+  // даёт другой hash и попадает в miss.
   if (!body.force) {
     let cacheQ = admin
       .from('review_ai_analyses')
@@ -352,24 +388,47 @@ Deno.serve(async (req: Request) => {
   let system: string
   if (body.scope === 'single') {
     system =
-      reviews[0].source === 'internal' ? systemSingleInternal(locale) : systemSingleExternal(locale)
+      reviews[0].source === 'internal'
+        ? systemSingleInternal(locale, replyLocale)
+        : systemSingleExternal(locale, replyLocale)
   } else {
-    system = systemBulk(locale, body.scope)
+    system = systemBulk(locale, body.scope, replyLocale)
   }
+
+  // Лимит длины отзыва — иначе bulk с 50 лонгридами на 3к символов уносит за лимит токенов.
+  const MAX_BODY = 800
+  const trimmedReviews = reviews.map((r) => ({
+    ...r,
+    body: r.body && r.body.length > MAX_BODY ? r.body.slice(0, MAX_BODY) + '…' : r.body,
+  }))
+
+  // Финальное напоминание языка в самом user-prompt — Claude чаще слушает
+  // последнюю инструкцию, особенно при не-локальном input.
+  const langReminder = {
+    ru: 'Финальное напоминание: ВЕСЬ анализ — НА РУССКОМ языке.',
+    pl: 'Końcowe przypomnienie: CAŁA analiza — PO POLSKU.',
+    en: 'Final reminder: ALL analysis MUST be in English.',
+  }[locale]
 
   const userPrompt =
     body.scope === 'single'
-      ? `Analyze this single review:\n\n${renderReviewForPrompt(reviews[0])}`
-      : `Analyze these ${reviews.length} reviews together:\n\n${reviews
+      ? `Analyze this single review:\n\n${renderReviewForPrompt(trimmedReviews[0])}\n\n${langReminder}`
+      : `Analyze these ${trimmedReviews.length} reviews together:\n\n${trimmedReviews
           .map(renderReviewForPrompt)
-          .join('\n---\n')}`
+          .join('\n---\n')}\n\n${langReminder}`
 
   let content: Record<string, unknown>
   try {
     content = await claudeJson(system, userPrompt)
   } catch (e) {
     console.error('reviews-ai-analyze claude error', e)
-    return json({ error: e instanceof Error ? e.message : String(e) }, 502)
+    return json(
+      {
+        error: 'claude_failed',
+        detail: e instanceof Error ? e.message : String(e),
+      },
+      502,
+    )
   }
 
   // --- Сохраняем в кеш ---
