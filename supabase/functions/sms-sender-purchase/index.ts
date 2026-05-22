@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
 
     await admin
       .from('salon_sms_senders')
-      .update({ stripe_session_id: session.id })
+      .update({ stripe_session_id: session.id, stripe_checkout_url: session.url })
       .eq('id', senderId)
 
     return jsonResponse({ url: session.url, sender_id: senderId })

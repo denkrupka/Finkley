@@ -1,4 +1,13 @@
-import { Check, Info, Loader2, MessageSquare, Pause, Play, ShoppingCart } from 'lucide-react'
+import {
+  Check,
+  CreditCard,
+  Info,
+  Loader2,
+  MessageSquare,
+  Pause,
+  Play,
+  ShoppingCart,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -202,12 +211,12 @@ export function SmsSection({ salonId }: { salonId: string }) {
           ))}
           {pendingSenders.map((s) => {
             const ageMs = Date.now() - new Date(s.created_at).getTime()
-            const ageHours = Math.floor(ageMs / 3_600_000)
-            const isStale = ageHours >= 1 && s.status === 'pending_payment'
+            const ageMin = Math.floor(ageMs / 60_000)
+            const isStale = ageMin >= 5 && s.status === 'pending_payment'
             return (
               <div
                 key={s.id}
-                className="border-border/40 bg-muted/20 flex items-start gap-3 rounded-md border p-3"
+                className="border-border/40 bg-muted/20 flex flex-wrap items-start gap-3 rounded-md border p-3"
               >
                 <Loader2 className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin" />
                 <div className="min-w-0 flex-1">
@@ -218,20 +227,31 @@ export function SmsSection({ salonId }: { salonId: string }) {
                       : t('integrations.sms.sender_pending_smsapi')}
                     {isStale ? (
                       <span className="text-muted-foreground/70 ml-1">
-                        · {t('integrations.sms.sender_age_hours', { count: ageHours })}
+                        · {t('integrations.sms.sender_age_min', { count: ageMin })}
                       </span>
                     ) : null}
                   </p>
                 </div>
                 {s.status === 'pending_payment' ? (
-                  <button
-                    type="button"
-                    onClick={() => cancelSender.mutate(s.id)}
-                    disabled={cancelSender.isPending}
-                    className="text-destructive hover:bg-destructive/10 shrink-0 rounded px-2 py-1 text-[11px] font-semibold"
-                  >
-                    {t('integrations.sms.sender_cancel')}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {s.stripe_checkout_url ? (
+                      <a
+                        href={s.stripe_checkout_url}
+                        className="bg-brand-navy hover:bg-brand-navy/90 inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold text-white"
+                      >
+                        <CreditCard className="size-3" strokeWidth={2.2} />
+                        {t('integrations.sms.sender_pay_now')}
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => cancelSender.mutate(s.id)}
+                      disabled={cancelSender.isPending}
+                      className="text-destructive hover:bg-destructive/10 rounded px-2 py-1 text-[11px] font-semibold"
+                    >
+                      {t('integrations.sms.sender_cancel')}
+                    </button>
+                  </div>
                 ) : null}
               </div>
             )

@@ -22,6 +22,7 @@ export type SmsSender = {
   status: 'pending_payment' | 'pending_smsapi' | 'active' | 'rejected'
   price_grosz: number
   rejection_reason: string | null
+  stripe_checkout_url: string | null
   created_at: string
   paid_at: string | null
   activated_at: string | null
