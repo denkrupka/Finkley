@@ -1021,7 +1021,7 @@ export function QuickEntryModal({
                           ) : null}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <Input
                           type="number"
                           min={1}
@@ -1032,7 +1032,7 @@ export function QuickEntryModal({
                             })
                           }
                           aria-label={t('visits.form.addon_qty')}
-                          className="num h-9 w-16 text-center text-sm"
+                          className="num h-9 w-16 shrink-0 text-center text-sm"
                         />
                         <Input
                           type="text"
@@ -1046,13 +1046,13 @@ export function QuickEntryModal({
                             })
                           }
                           aria-label={t('visits.form.addon_price')}
-                          className="num h-9 w-20 text-sm"
+                          className="num h-9 w-20 shrink-0 text-sm"
                         />
                         <Select
                           value={a.staff_id ?? ''}
                           onValueChange={(v) => updateAddonLine(a.uid, { staff_id: v })}
                         >
-                          <SelectTrigger className="h-9 w-[160px] text-sm">
+                          <SelectTrigger className="h-9 min-w-0 flex-1 text-sm sm:w-[160px] sm:flex-none">
                             <span className="flex items-center gap-2">
                               <span
                                 className="text-brand-navy grid size-5 place-items-center rounded-full text-[10px] font-bold"
