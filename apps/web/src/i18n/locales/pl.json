@@ -125,6 +125,7 @@
     "step_of": "Krok {{current}} z {{total}}",
     "skip": "Pomiń — dodam później",
     "open_dashboard": "Otwórz panel",
+    "activate_subscription": "Zapisz i aktywuj subskrypcję →",
     "country": {
       "PL": "Polska",
       "DE": "Niemcy",
@@ -143,6 +144,9 @@
     "steps": {
       "path": "Start",
       "salon": "Salon",
+      "address": "Adres",
+      "accounting": "Księgowość",
+      "integrations": "Integracje",
       "staff": "Pracownicy",
       "services": "Usługi",
       "expenses": "Wydatki",
@@ -167,10 +171,40 @@
     },
     "tutorial": {
       "salon": "Nazwa salonu będzie widoczna dla klientów w mailach i SMS-ach. Kraj określa walutę, strefę czasową i format adresu. Typ salonu napędza szablony usług i porównanie z konkurencją.",
+      "address": "Adres salonu jest potrzebny do automatycznego znajdowania konkurencji w pobliżu, importu opinii Google Maps i przekierowania ocen 5★ do Google Reviews. Wpisz ręcznie lub znajdź przez wyszukiwarkę poniżej.",
+      "accounting": "Dane podatkowe. NIP jest potrzebny do eksportu wydatków jako faktury do wFirma/KSeF (PL) i raportów P&L. Możesz pominąć, dodać później w Ustawienia → Księgowość.",
+      "integrations": "Połączenia z zewnętrznymi serwisami. Jeśli wybierzesz — po onboardingu od razu trafisz do ich konfiguracji. Jeśli pominiesz — wszystko jest dostępne w Ustawienia → Integracje w dowolnym momencie.",
       "staff": "Dodaj co najmniej jednego pracownika — jest potrzebny do zapisywania wizyt. Procent od przychodu używany jest w /payouts do wyliczania wypłat. Później można zaimportować z Booksy.",
       "services": "Usługi z ceną — podstawa raportów i rezerwacji online. Czas trwania potrzebny do kalendarza. Te usługi zasugerowane dla Twojego typu salonu — zostaw potrzebne, ceny edytujesz później.",
       "expenses": "Kategorie wydatków — używane w P&L i raportach przepływów pieniężnych. Usuń niepotrzebne lub dodaj swoje. Kategoria «Wypłaty» tworzy się automatycznie.",
-      "done": "Gotowe! Przycisk poniżej zapisze salon i otworzy panel. Następnie podłącz Booksy/bank/wFirma w Ustawienia → Integracje i aktywuj subskrypcję (14 dni za darmo)."
+      "done": "Gotowe! Przycisk poniżej zapisze salon. Jeśli subskrypcja z trial jest aktywna — otworzy się Stripe do dodania karty (pierwsza opłata po 14 dniach, anulujesz w 1 kliknięciu)."
+    },
+    "step_address": {
+      "title": "Gdzie znajduje się salon?",
+      "subtitle": "Adres umożliwia automatyczne znajdowanie konkurencji w pobliżu i import opinii Google.",
+      "search_label": "Znajdź w Google Maps",
+      "address_label": "Adres salonu",
+      "address_placeholder": "ul. Marszałkowska 100, 00-001 Warszawa",
+      "city_label": "Miasto",
+      "city_placeholder": "Warszawa",
+      "coords_label": "Współrzędne (lat / lng)",
+      "hint_skip": "Można pominąć i wypełnić później w Ustawienia → Profil."
+    },
+    "step_accounting": {
+      "title": "Dane podatkowe",
+      "subtitle": "Potrzebne do integracji księgowych i raportów P&L. Można pominąć.",
+      "nip_label": "NIP / VAT ID",
+      "nip_hint": "10 cyfr bez myślników. Używany do auto-eksportu wFirma/KSeF.",
+      "company_label": "Nazwa firmy (prawna)",
+      "company_placeholder": "Np. JANE DOE BEAUTY",
+      "integrations_note_title": "Integracje księgowe podłączasz po",
+      "integrations_note_body": "wFirma (PL), KSeF (PL e-faktury), Fakturownia, inFakt — wybierz w Ustawienia → Integracje → Księgowość. Tam będą auto-eksportowane paragony i wydatki jako faktury.",
+      "hint_skip": "Pola opcjonalne. Wypełnisz później w Ustawienia → Księgowość."
+    },
+    "step_integrations": {
+      "title": "Które integracje podłączymy?",
+      "subtitle": "Zaznacz potrzebne — po onboardingu od razu trafisz do ich konfiguracji. Nie musisz wszystkiego podłączać teraz.",
+      "hint_skip": "Jeśli nie masz pewności — pomiń. Wszystko dostępne w Ustawienia → Integracje w dowolnym momencie."
     },
     "step1": {
       "title": "Opowiedz o salonie",
@@ -212,6 +246,9 @@
       "expenses": "kategorii wydatków",
       "benchmarks_title": "Zobacz porównanie z podobnymi salonami",
       "benchmarks_subtitle": "Pokażę, jak Twoje wskaźniki wyglądają na tle innych — średni rachunek, obłożenie, % powrotów. Tylko uśrednione liczby z branży, żadnych imion ani adresów. Możesz wyłączyć w każdej chwili.",
+      "paywall_title": "14 dni gratis, potem 15 €/mies.",
+      "paywall_subtitle": "Wszystkie funkcje, bez limitów. Kartę dodajesz teraz — pierwsza opłata po 14 dniach. Anulujesz w jednym kliknięciu w każdej chwili.",
+      "paywall_optin": "Aktywuj subskrypcję z 14-dniowym okresem próbnym (zalecane). Bez zaznaczenia trafisz do panelu bez płatności — możesz aktywować później w Ustawienia → Rozliczenia.",
       "integrations": {
         "title": "Połącz integracje",
         "subtitle": "Możesz teraz — zaznacz potrzebne, a przejdziesz wprost do konfiguracji. Lub pomiń i podłącz później w ustawieniach.",

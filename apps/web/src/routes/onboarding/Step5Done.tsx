@@ -1,4 +1,4 @@
-import { Banknote, Calendar, Check, FileText, Plug, TrendingUp } from 'lucide-react'
+import { Banknote, Calendar, Check, FileText, Plug, Sparkles, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OnboardingIntegration } from './OnboardingPage'
@@ -14,6 +14,10 @@ type Props = {
   onBenchmarksToggle: (value: boolean) => void
   selectedIntegrations: OnboardingIntegration[]
   onIntegrationsToggle: (value: OnboardingIntegration[]) => void
+  /** Подписаться в Stripe после submit: true = редирект в Stripe Checkout
+   *  (trial 14 дней включён), false = просто dashboard. */
+  subscribeAfterSubmit: boolean
+  onSubscribeToggle: (value: boolean) => void
 }
 
 const INTEGRATIONS: ReadonlyArray<{
@@ -32,6 +36,8 @@ export function Step5Done({
   onBenchmarksToggle,
   selectedIntegrations,
   onIntegrationsToggle,
+  subscribeAfterSubmit,
+  onSubscribeToggle,
 }: Props) {
   const { t } = useTranslation()
 
@@ -60,6 +66,33 @@ export function Step5Done({
         <Card label={t('onboarding.step5.services')} value={summary.servicesCount} />
         <Card label={t('onboarding.step5.expenses')} value={summary.expensesCount} />
       </ul>
+
+      {/* Paywall: 14 дней trial, дальше платно. По умолчанию включено —
+          юзер увидит Stripe Checkout сразу после submit. Можно снять. */}
+      <div className="border-brand-gold-deep bg-brand-gold-soft/40 mx-auto mt-6 max-w-md rounded-xl border-2 p-5 text-left">
+        <div className="text-brand-navy flex items-start gap-3">
+          <div className="bg-brand-gold-deep grid size-10 shrink-0 place-items-center rounded-lg text-white">
+            <Sparkles className="size-5" strokeWidth={2} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold">{t('onboarding.step5.paywall_title')}</p>
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              {t('onboarding.step5.paywall_subtitle')}
+            </p>
+          </div>
+        </div>
+        <label className="border-border bg-card mt-3 flex cursor-pointer items-start gap-3 rounded-md border p-3">
+          <input
+            type="checkbox"
+            checked={subscribeAfterSubmit}
+            onChange={(e) => onSubscribeToggle(e.target.checked)}
+            className="mt-0.5 size-4 cursor-pointer"
+          />
+          <div className="text-foreground flex-1 text-[12.5px] leading-snug">
+            {t('onboarding.step5.paywall_optin')}
+          </div>
+        </label>
+      </div>
 
       {/* Бенчмарки opt-in — дружелюбный копирайт, по умолчанию включено */}
       <label

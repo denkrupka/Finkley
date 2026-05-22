@@ -18,14 +18,27 @@ import {
 } from './onboarding-defaults'
 import { Step0Path, type OnboardingPath } from './Step0Path'
 import { Step1Salon } from './Step1Salon'
+import { Step2Address, type AddressDraft } from './Step2Address'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
+import { Step3Accounting } from './Step3Accounting'
 import { Step3Services, type ServiceDraft } from './Step3Services'
 import { Step4Expenses } from './Step4Expenses'
 import { Step5Done } from './Step5Done'
+import { StepIntegrationsChoice } from './StepIntegrationsChoice'
 import { TutorialNote } from './TutorialNote'
 
 const STEPS_QUICK = ['path', 'salon', 'done'] as const
-const STEPS_FULL = ['path', 'salon', 'staff', 'services', 'expenses', 'done'] as const
+const STEPS_FULL = [
+  'path',
+  'salon',
+  'address',
+  'accounting',
+  'integrations',
+  'staff',
+  'services',
+  'expenses',
+  'done',
+] as const
 type StepId = (typeof STEPS_FULL)[number]
 
 export type OnboardingIntegration = 'booksy' | 'wfirma' | 'banking'
@@ -37,15 +50,22 @@ export type OnboardingState = {
   name: string
   country_code: CountryCode
   salon_type: SalonTypeId
-  // Шаг 2
+  // Шаг 2 — Address (только full path)
+  address: AddressDraft
+  // Шаг 3 — Accounting (только full path)
+  nip: string
+  company_name: string
+  // Staff
   staff: StaffDraft[]
-  // Шаг 3
+  // Services
   services: ServiceDraft[]
-  // Шаг 4
+  // Expenses
   expense_categories: string[]
-  // Шаг 5
+  // Done
   benchmarks_opt_in: boolean
   selected_integrations: OnboardingIntegration[]
+  /** В Done step: после submit редиректить в Stripe Checkout (trial 14д). */
+  subscribe_after_submit: boolean
 }
 
 const INITIAL: OnboardingState = {
@@ -53,11 +73,22 @@ const INITIAL: OnboardingState = {
   name: '',
   country_code: 'PL',
   salon_type: 'hair',
+  address: {
+    address: '',
+    city: '',
+    lat: '',
+    lng: '',
+    google_place_id: null,
+    google_place_url: null,
+  },
+  nip: '',
+  company_name: '',
   staff: [],
   services: [],
   expense_categories: [...DEFAULT_EXPENSE_CATEGORIES],
   benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
   selected_integrations: [],
+  subscribe_after_submit: true, // paywall opt-out: можно снять и зайти в trial без card
 }
 
 export function OnboardingPage() {
@@ -132,9 +163,42 @@ export function OnboardingPage() {
       return
     }
     const newSalonId = data as unknown as string
-    // Если юзер снял галочку «сравнение с рынком» — обновляем (default=true).
-    if (!state.benchmarks_opt_in) {
-      await supabase.from('salons').update({ benchmarks_opt_in: false }).eq('id', newSalonId)
+    // Доп. поля из full path (если заданы) — обновляем салон после создания.
+    // create_salon_with_setup RPC принимает только базовые параметры; address,
+    // координаты, NIP — настройки которые юзер мог пропустить на quick path.
+    const extraPatch: Record<string, unknown> = {}
+    if (!state.benchmarks_opt_in) extraPatch.benchmarks_opt_in = false
+    if (state.address.address.trim()) extraPatch.address = state.address.address.trim()
+    if (state.address.city.trim()) extraPatch.city = state.address.city.trim()
+    if (state.address.lat.trim()) {
+      const v = Number(state.address.lat.replace(',', '.'))
+      if (Number.isFinite(v)) extraPatch.lat = v
+    }
+    if (state.address.lng.trim()) {
+      const v = Number(state.address.lng.replace(',', '.'))
+      if (Number.isFinite(v)) extraPatch.lng = v
+    }
+    if (state.address.google_place_id) extraPatch.google_place_id = state.address.google_place_id
+    if (state.address.google_place_url) extraPatch.google_place_url = state.address.google_place_url
+    if (state.nip.trim()) {
+      // Бухгалтерия живёт в accounting_settings jsonb (миграция 20260516000002).
+      // Merge через accounting_settings — но проще держать в отдельных колонках:
+      // если их нет, накопится в local-only поле. Используем JSON merge.
+      const { data: cur } = await supabase
+        .from('salons')
+        .select('accounting_settings')
+        .eq('id', newSalonId)
+        .maybeSingle()
+      const acc = ((cur as { accounting_settings?: Record<string, unknown> } | null)
+        ?.accounting_settings ?? {}) as Record<string, unknown>
+      extraPatch.accounting_settings = {
+        ...acc,
+        nip: state.nip.trim(),
+        company_name: state.company_name.trim() || null,
+      }
+    }
+    if (Object.keys(extraPatch).length > 0) {
+      await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
     }
     rememberLastSalon(newSalonId)
     // Кэш `useMySalons` не знает о только что созданном салоне.
@@ -145,6 +209,28 @@ export function OnboardingPage() {
     // Welcome-письмо в фоне — не блокирует navigate, ошибка email не должна
     // ломать UX онбординга (Postmark может тупить, sender signature пропасть).
     void triggerWelcomeEmail(newSalonId, state.name.trim())
+
+    // Paywall: если юзер не снял чек-бокс «активировать trial» — редиректим
+    // в Stripe Checkout (мode=subscription, trialDays=14). Стандартный
+    // success_url возвращает на settings?stripe=success → дальше dashboard.
+    if (state.subscribe_after_submit) {
+      try {
+        const { data: checkoutData, error: checkoutErr } = await supabase.functions.invoke(
+          'create-checkout-session',
+          { body: { salonId: newSalonId } },
+        )
+        const url = (checkoutData as { url?: string } | null)?.url
+        if (url && !checkoutErr) {
+          window.location.href = url
+          return
+        }
+        // Если что-то пошло не так — не валим онбординг, просто едем на dashboard.
+        console.warn('create-checkout-session failed:', checkoutErr)
+      } catch (e) {
+        console.warn('create-checkout-session threw:', e)
+      }
+    }
+
     // Если юзер выбрал интеграции — отправляем сразу на settings/integrations,
     // чтобы он подключил их (там полноценные OAuth-флоу). Иначе — на dashboard.
     if (state.selected_integrations.length > 0) {
@@ -259,6 +345,32 @@ export function OnboardingPage() {
                 />
               </>
             )}
+            {stepId === 'address' && (
+              <>
+                <TutorialNote>{t('onboarding.tutorial.address')}</TutorialNote>
+                <Step2Address value={state.address} onChange={(v) => patch('address', v)} />
+              </>
+            )}
+            {stepId === 'accounting' && (
+              <>
+                <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
+                <Step3Accounting
+                  value={{ nip: state.nip, company_name: state.company_name }}
+                  onChange={(v) =>
+                    setState((prev) => ({ ...prev, nip: v.nip, company_name: v.company_name }))
+                  }
+                />
+              </>
+            )}
+            {stepId === 'integrations' && (
+              <>
+                <TutorialNote>{t('onboarding.tutorial.integrations')}</TutorialNote>
+                <StepIntegrationsChoice
+                  selected={state.selected_integrations}
+                  onChange={(v) => patch('selected_integrations', v)}
+                />
+              </>
+            )}
             {stepId === 'staff' && (
               <>
                 <TutorialNote>{t('onboarding.tutorial.staff')}</TutorialNote>
@@ -298,6 +410,8 @@ export function OnboardingPage() {
                   onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
                   selectedIntegrations={state.selected_integrations}
                   onIntegrationsToggle={(v) => patch('selected_integrations', v)}
+                  subscribeAfterSubmit={state.subscribe_after_submit}
+                  onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
                 />
               </>
             )}
@@ -339,7 +453,11 @@ export function OnboardingPage() {
                   disabled={submitting}
                   data-testid="onboarding-submit"
                 >
-                  {submitting ? t('common.loading') : t('onboarding.open_dashboard')}
+                  {submitting
+                    ? t('common.loading')
+                    : state.subscribe_after_submit
+                      ? t('onboarding.activate_subscription')
+                      : t('onboarding.open_dashboard')}
                 </Button>
               ) : (
                 <Button

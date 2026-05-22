@@ -125,6 +125,7 @@
     "step_of": "Step {{current}} of {{total}}",
     "skip": "Skip — I'll add it later",
     "open_dashboard": "Open dashboard",
+    "activate_subscription": "Save & start subscription →",
     "country": {
       "PL": "Poland",
       "DE": "Germany",
@@ -143,6 +144,9 @@
     "steps": {
       "path": "Start",
       "salon": "Salon",
+      "address": "Address",
+      "accounting": "Accounting",
+      "integrations": "Integrations",
       "staff": "Specialists",
       "services": "Services",
       "expenses": "Expenses",
@@ -167,10 +171,40 @@
     },
     "tutorial": {
       "salon": "Salon name will be visible to clients in emails and SMS. Country sets currency, timezone and address format. Salon type drives service templates and competitor benchmarks.",
+      "address": "Salon address is needed for auto-discovering nearby competitors, importing Google Maps reviews and redirecting 5★ ratings to Google Reviews. Type manually or search below.",
+      "accounting": "Tax info. NIP/VAT ID is needed to push expenses as invoices to wFirma/KSeF (PL) and for P&L reports. You can skip and add later in Settings → Accounting.",
+      "integrations": "External service connections. If selected — you'll land on their setup right after onboarding. If skipped — everything is available in Settings → Integrations anytime.",
       "staff": "Add at least one specialist — needed to record visits. Revenue percentage is used in /payouts for salary calculations. You can later import from Booksy.",
       "services": "Services with price are the basis for reports and online booking. Duration is needed for the calendar. These services are suggested for your salon type — keep what's relevant, prices can be edited later.",
       "expenses": "Expense categories — used in P&L and cash flow reports. Remove unneeded or add your own. «Salaries» category is created automatically.",
-      "done": "All set! The button below saves your salon and opens the dashboard. After that, connect Booksy/bank/wFirma in Settings → Integrations and start your subscription (14 days free trial)."
+      "done": "All set! The button below saves your salon. If subscription with trial is on — Stripe opens to add your card (first charge in 14 days, cancel in 1 click)."
+    },
+    "step_address": {
+      "title": "Where is your salon?",
+      "subtitle": "Address enables nearby competitor discovery and Google reviews import.",
+      "search_label": "Find on Google Maps",
+      "address_label": "Salon address",
+      "address_placeholder": "100 Main St, 12345 City",
+      "city_label": "City",
+      "city_placeholder": "Warsaw",
+      "coords_label": "Coordinates (lat / lng)",
+      "hint_skip": "Can be skipped and added later in Settings → Profile."
+    },
+    "step_accounting": {
+      "title": "Tax information",
+      "subtitle": "Needed for accounting integrations and P&L reports. Can be skipped.",
+      "nip_label": "NIP / VAT ID",
+      "nip_hint": "10 digits, no dashes. Used for wFirma/KSeF auto-export.",
+      "company_label": "Legal company name",
+      "company_placeholder": "e.g. JANE DOE BEAUTY",
+      "integrations_note_title": "Accounting integrations connect afterwards",
+      "integrations_note_body": "wFirma (PL), KSeF (PL e-invoices), Fakturownia, inFakt — pick in Settings → Integrations → Accounting. Receipts and expenses auto-export there as invoices.",
+      "hint_skip": "Fields are optional. Fill later in Settings → Accounting."
+    },
+    "step_integrations": {
+      "title": "Which integrations to connect?",
+      "subtitle": "Check what you need — you'll land on their setup right after onboarding. No need to connect everything now.",
+      "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime."
     },
     "step1": {
       "title": "Tell us about your salon",
@@ -212,6 +246,9 @@
       "expenses": "expense categories",
       "benchmarks_title": "See how you compare to similar salons",
       "benchmarks_subtitle": "I'll show you how your metrics look against the rest — average ticket, occupancy, return rate. Just industry averages, no names or addresses. You can turn it off any time.",
+      "paywall_title": "14 days free, then €15/mo",
+      "paywall_subtitle": "All features, no limits. You add the card now — first charge in 14 days. Cancel any time in one click.",
+      "paywall_optin": "Start subscription with 14-day trial (recommended). Uncheck to land in dashboard without payment — you can subscribe later in Settings → Billing.",
       "integrations": {
         "title": "Connect integrations",
         "subtitle": "You can do it now — check what you need and you'll go straight to setup. Or skip and connect later from settings.",
