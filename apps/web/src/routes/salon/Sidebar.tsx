@@ -6,6 +6,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { LogoLockup } from '@/components/ui/logo'
 import { ReferralButton } from '@/components/ui/ReferralButton'
 import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
+import { useUnreadNegativeReviewsCount } from '@/hooks/useReviews'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
 
@@ -27,6 +28,7 @@ type Props = {
 export function Sidebar({ salonId, onNavigate }: Props) {
   const { t } = useTranslation()
   const [bugOpen, setBugOpen] = useState(false)
+  const { data: unreadNegative = 0 } = useUnreadNegativeReviewsCount(salonId)
 
   return (
     <aside className="border-border bg-card flex h-screen w-[232px] flex-shrink-0 flex-col border-r px-3.5 pb-4 pt-5">
@@ -62,7 +64,20 @@ export function Sidebar({ salonId, onNavigate }: Props) {
                     )}
                     strokeWidth={1.7}
                   />
-                  <span>{t(item.i18nKey)}</span>
+                  <span className="flex-1">{t(item.i18nKey)}</span>
+                  {item.id === 'reports' && unreadNegative > 0 ? (
+                    <span
+                      className={cn(
+                        'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none',
+                        isActive
+                          ? 'bg-primary-foreground text-primary'
+                          : 'bg-destructive text-destructive-foreground',
+                      )}
+                      title={t('nav.reports_unread_negative', { count: unreadNegative })}
+                    >
+                      {unreadNegative > 99 ? '99+' : unreadNegative}
+                    </span>
+                  ) : null}
                 </>
               )}
             </NavLink>

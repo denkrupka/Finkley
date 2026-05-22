@@ -280,6 +280,7 @@
     "marketing": "Marketing",
     "payouts": "Payroll",
     "reports": "Reports",
+    "reports_unread_negative": "New negative reviews: {{count}}",
     "finance": "Finance",
     "knowledge": "Knowledge base",
     "ai": "AI assistant",

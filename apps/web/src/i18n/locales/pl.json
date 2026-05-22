@@ -280,6 +280,7 @@
     "marketing": "Marketing",
     "payouts": "Wypłaty",
     "reports": "Raporty",
+    "reports_unread_negative": "Nowych negatywnych opinii: {{count}}",
     "finance": "Finanse",
     "knowledge": "Baza wiedzy",
     "ai": "AI-asystent",

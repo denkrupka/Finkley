@@ -45,6 +45,35 @@ export function useReviews(salonId: string | undefined) {
   })
 }
 
+/**
+ * Кол-во непрочитанных НЕГАТИВНЫХ внешних отзывов (Booksy/Google rating < 5,
+ * read_at IS NULL). Используется sidebar-badge на пункте «Отчёты» — юзер
+ * сразу видит сколько новых негативных отзывов ждут реакции.
+ *
+ * Считается через PostgREST count=exact + head=true — payload не возвращается,
+ * только count в headers, поэтому дёшево.
+ */
+export function useUnreadNegativeReviewsCount(salonId: string | undefined) {
+  return useQuery<number>({
+    queryKey: ['reviews-unread-negative-count', salonId],
+    queryFn: async () => {
+      if (!salonId) return 0
+      const { count, error } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact', head: true })
+        .eq('salon_id', salonId)
+        .neq('source', 'internal')
+        .lt('rating', 5)
+        .is('read_at', null)
+      if (error) throw error
+      return count ?? 0
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  })
+}
+
 /** Массово помечает все непрочитанные отзывы салона как прочитанные. */
 export function useMarkAllReviewsRead(salonId: string | undefined) {
   const qc = useQueryClient()

@@ -863,6 +863,7 @@
     "messenger": "Мессенджер",
     "payouts": "Зарплаты",
     "reports": "Отчёты",
+    "reports_unread_negative": "Новых негативных отзывов: {{count}}",
     "finance": "Финансы",
     "knowledge": "База знаний",
     "ai": "AI-помощник",
