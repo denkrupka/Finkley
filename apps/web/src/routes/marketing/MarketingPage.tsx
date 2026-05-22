@@ -261,7 +261,7 @@ function TestSendDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto px-5 py-4">
               <div>
                 <Label className="mb-2 block text-sm font-semibold">
                   {t('marketing.broadcasts.test_channel_label')}
@@ -309,25 +309,21 @@ function TestSendDialog({
                     : t('marketing.broadcasts.test_email_hint')}
                 </p>
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={onClose} disabled={send.isPending}>
-                  {t('common.cancel')}
-                </Button>
-                <Button onClick={handleSend} disabled={send.isPending}>
-                  {send.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Send className="size-4" strokeWidth={2} />
-                  )}
-                  {t('marketing.broadcasts.test_send_button')}
-                </Button>
-              </div>
             </div>
 
-            <DialogClose className="absolute right-4 top-4">
-              <X className="size-4" strokeWidth={2} />
-            </DialogClose>
+            <div className="border-border flex justify-end gap-2 border-t px-5 py-4">
+              <Button variant="outline" onClick={onClose} disabled={send.isPending}>
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleSend} disabled={send.isPending}>
+                {send.isPending ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <Send className="mr-1.5 size-4" strokeWidth={2} />
+                )}
+                {t('marketing.broadcasts.test_send_button')}
+              </Button>
+            </div>
           </>
         ) : null}
       </DialogContent>

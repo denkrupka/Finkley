@@ -4,6 +4,7 @@ import {
   DollarSign,
   Eye,
   Image as ImageIcon,
+  Loader2,
   Pencil,
   Settings as SettingsIcon,
   Sparkles,
@@ -11,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -40,7 +41,9 @@ import {
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
 } from '@/hooks/useCompetitors'
+import { useRefreshReportInsights, useServiceMatchAi } from '@/hooks/useReportInsights'
 import { useSalon } from '@/hooks/useSalons'
+import { useServices } from '@/hooks/useServices'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
@@ -107,19 +110,49 @@ function DataSection({
   const competitorIds = useMemo(() => competitors?.map((c) => c.id) ?? [], [competitors])
   const apiKind = kind === 'prices' ? 'price' : kind
 
-  // Авто-sync при открытии любой data-вкладки: тянем актуальные snapshots Booksy/IG/Google.
-  // One-shot per session — повторный заход в Reports не дёргает edge function.
+  // Авто-sync при открытии любой data-вкладки. Условия:
+  //   - между запусками минимум 3 минуты (lastSyncAt в localStorage),
+  //   - если юзер ушёл с вкладки/закрыл tab — фоновый запрос остаётся, но UI его игнорирует
+  //     (через aborted-флаг в cleanup useEffect; повторного mutate не будет).
   const syncCompetitors = useSyncCompetitors(salonId)
-  const autoSyncedRef = useRef(false)
+  const SYNC_COOLDOWN_MS = 3 * 60 * 1000
+  const lastSyncKey = `competitors-last-sync-${salonId}`
+  const [showStatusBar, setShowStatusBar] = useState(false)
   useEffect(() => {
-    if (autoSyncedRef.current) return
     if (!competitors || competitors.length === 0) return
-    autoSyncedRef.current = true
+    let lastAt = 0
+    try {
+      const raw = localStorage.getItem(lastSyncKey)
+      lastAt = raw ? parseInt(raw, 10) : 0
+    } catch {
+      /* ignore */
+    }
+    const now = Date.now()
+    if (now - lastAt < SYNC_COOLDOWN_MS) return
+    let aborted = false
+    try {
+      localStorage.setItem(lastSyncKey, String(now))
+    } catch {
+      /* ignore */
+    }
+    setShowStatusBar(true)
     syncCompetitors.mutate(undefined, {
-      onError: (e) => console.warn('competitors auto-sync failed:', e),
+      onSuccess: () => {
+        if (aborted) return
+        setShowStatusBar(false)
+      },
+      onError: (e) => {
+        if (aborted) return
+        setShowStatusBar(false)
+        console.warn('competitors auto-sync failed:', e)
+      },
     })
+    return () => {
+      aborted = true
+      setShowStatusBar(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [competitors?.length])
+  }, [competitors?.length, kind])
   // Период применяется ко всем подвкладкам, не только к occupancy — это позволяет
   // смотреть исторические цены/рейтинги/контент за выбранный диапазон.
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
@@ -167,6 +200,7 @@ function DataSection({
         <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.period_hint')}</p>
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
+      {showStatusBar ? <CompetitorsSyncStatusBar t={t} /> : null}
 
       {isLoading ? (
         <p className="text-muted-foreground px-5 py-8 text-center text-sm">{t('common.loading')}</p>
@@ -185,6 +219,14 @@ function DataSection({
           snapshots={snapshots}
           ownSalon={salon}
           ownContent={ownContent ?? null}
+          t={t}
+        />
+      ) : kind === 'prices' ? (
+        <PricesTable
+          salonId={salonId}
+          competitors={competitors}
+          snapshots={snapshots}
+          currency={currency}
           t={t}
         />
       ) : (
@@ -450,25 +492,25 @@ function ContentTable({
               className="px-3 py-3 text-right font-semibold"
               title={t('reports_hub.competitors.col_posts_hint')}
             >
-              📷 {t('reports_hub.competitors.col_posts')}
+              {t('reports_hub.competitors.col_posts')}
             </th>
             <th
               className="px-3 py-3 text-right font-semibold"
               title={t('reports_hub.competitors.col_reels_views_hint')}
             >
-              ▶ {t('reports_hub.competitors.col_reels_views')}
+              {t('reports_hub.competitors.col_reels_views')}
             </th>
             <th
               className="px-3 py-3 text-right font-semibold"
               title={t('reports_hub.competitors.col_freq_hint')}
             >
-              📅 {t('reports_hub.competitors.col_freq')}
+              {t('reports_hub.competitors.col_freq')}
             </th>
             <th className="px-3 py-3 text-right font-semibold">
-              👥 {t('reports_hub.competitors.col_followers')}
+              {t('reports_hub.competitors.col_followers')}
             </th>
             <th className="px-3 py-3 text-right font-semibold">
-              ➡ {t('reports_hub.competitors.col_following')}
+              {t('reports_hub.competitors.col_following')}
             </th>
           </tr>
         </thead>
@@ -509,11 +551,6 @@ function ContentTable({
           })}
         </tbody>
       </table>
-      <div className="border-border/40 bg-muted/10 border-t px-5 py-3">
-        <p className="text-muted-foreground text-[11px]">
-          ▶ {t('reports_hub.competitors.col_reels_views_footer')}
-        </p>
-      </div>
     </div>
   )
 }
@@ -644,9 +681,32 @@ function ParamsSection({
   const [newGoogle, setNewGoogle] = useState('')
   const [newInsta, setNewInsta] = useState('')
   const [newFb, setNewFb] = useState('')
-  const [watchedServicesStr, setWatchedServicesStr] = useState(
-    settings?.watched_services.join(', ') ?? '',
-  )
+  // Watched services: чекбоксы услуг салона + textarea для ручных дополнений.
+  // Храним один массив строк (имена). UI разделяет: name есть среди services →
+  // ставит чекбокс, иначе попадает в textarea «дополнительные».
+  const { data: salonServices = [] } = useServices(salonId)
+  const watchedInitial = settings?.watched_services ?? []
+  const [watchedSet, setWatchedSet] = useState<Set<string>>(() => new Set(watchedInitial))
+  const [manualStr, setManualStr] = useState('')
+  // Один раз при загрузке settings — синкаем стейт.
+  useEffect(() => {
+    if (!settings) return
+    const all = new Set(settings.watched_services)
+    setWatchedSet(all)
+    const knownNames = new Set(salonServices.map((s) => s.name))
+    const manual = settings.watched_services.filter((n) => !knownNames.has(n))
+    setManualStr(manual.join(', '))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.salon_id, salonServices.length])
+
+  function toggleWatched(name: string) {
+    setWatchedSet((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   function addCompetitor() {
     if (!newName.trim()) {
@@ -678,12 +738,17 @@ function ParamsSection({
   }
 
   function saveWatchedServices() {
-    const arr = watchedServicesStr
+    const knownNames = new Set(salonServices.map((s) => s.name))
+    // Из чекбоксов берём только те имена что есть в services салона.
+    const fromCheckboxes = Array.from(watchedSet).filter((n) => knownNames.has(n))
+    const fromManual = manualStr
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
+    // Дедуп + порядок: сначала из услуг салона, потом ручные.
+    const all = Array.from(new Set([...fromCheckboxes, ...fromManual]))
     upsertSettings.mutate(
-      { watched_services: arr },
+      { watched_services: all },
       {
         onSuccess: () => toast.success(t('reports_hub.competitors.params.saved')),
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
@@ -700,19 +765,63 @@ function ParamsSection({
         <p className="text-muted-foreground mt-1 text-xs">
           {t('reports_hub.competitors.params.watched_subtitle')}
         </p>
-        <div className="mt-4">
-          <Input
-            value={watchedServicesStr}
-            onChange={(e) => setWatchedServicesStr(e.target.value)}
-            placeholder={t('reports_hub.competitors.params.watched_placeholder')}
-          />
-          <Button
-            onClick={saveWatchedServices}
-            disabled={upsertSettings.isPending}
-            className="mt-3"
-          >
-            {t('reports_hub.competitors.params.save_button')}
-          </Button>
+        <div className="mt-4 flex flex-col gap-4">
+          {salonServices.length > 0 ? (
+            <div>
+              <Label className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+                {t('reports_hub.competitors.params.watched_from_salon')}
+              </Label>
+              <div className="border-border bg-muted/10 mt-1.5 grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto rounded-md border p-2 sm:grid-cols-2 lg:grid-cols-3">
+                {salonServices
+                  .filter((s) => !s.is_archived)
+                  .map((s) => {
+                    const checked = watchedSet.has(s.name)
+                    return (
+                      <label
+                        key={s.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs transition-colors',
+                          checked
+                            ? 'bg-brand-sage-soft/40 text-brand-sage-deep font-semibold'
+                            : 'hover:bg-muted/40 text-foreground',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleWatched(s.name)}
+                          className="accent-brand-sage-deep size-3.5"
+                        />
+                        <span className="truncate">{s.name}</span>
+                      </label>
+                    )
+                  })}
+              </div>
+            </div>
+          ) : null}
+          <div>
+            <Label
+              htmlFor="watched-manual"
+              className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {t('reports_hub.competitors.params.watched_manual')}
+            </Label>
+            <Input
+              id="watched-manual"
+              value={manualStr}
+              onChange={(e) => setManualStr(e.target.value)}
+              placeholder={t('reports_hub.competitors.params.watched_placeholder')}
+              className="mt-1.5"
+            />
+            <p className="text-muted-foreground/70 mt-1 text-[10px]">
+              {t('reports_hub.competitors.params.watched_manual_hint')}
+            </p>
+          </div>
+          <div>
+            <Button onClick={saveWatchedServices} disabled={upsertSettings.isPending}>
+              {t('reports_hub.competitors.params.save_button')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -987,5 +1096,454 @@ function CompetitorListItem({
         </div>
       </div>
     </li>
+  )
+}
+
+function CompetitorsSyncStatusBar({
+  t,
+}: {
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  return (
+    <div className="border-brand-sage-soft bg-brand-sage-soft/30 text-brand-sage-deep mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
+      <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+      <span className="font-semibold">{t('reports_hub.competitors.sync_status_bar')}</span>
+    </div>
+  )
+}
+
+// =============================================================================
+// PricesTable — матчинг наших услуг с услугами конкурентов через fuzzy-name.
+// =============================================================================
+
+/** Нормализация имени услуги для матча: lowercase, заменяем диакритику,
+ * выкидываем не-буквенные символы и стоп-слова. */
+function normalizeServiceName(s: string): string[] {
+  const stripDiacritics = s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ł/gi, 'l')
+    .replace(/ё/gi, 'е')
+  const STOP = new Set([
+    'и',
+    'на',
+    'с',
+    'для',
+    'от',
+    'до',
+    'без',
+    'usługa',
+    'serwis',
+    'service',
+    'услуга',
+    'salonu',
+    'cena',
+    'price',
+    'oraz',
+    'pl',
+    'ru',
+    'en',
+  ])
+  return stripDiacritics
+    .toLowerCase()
+    .replace(/[^a-zа-яёії\s+]/giu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP.has(w))
+}
+
+/** Jaccard-similarity по токенам [0..1]. */
+function tokenSimilarity(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0
+  const sa = new Set(a)
+  const sb = new Set(b)
+  let inter = 0
+  for (const x of sa) if (sb.has(x)) inter++
+  const union = sa.size + sb.size - inter
+  return inter / union
+}
+
+type CompetitorService = {
+  name: string
+  price_cents: number
+  duration_min?: number
+}
+
+type PriceMatchRow = {
+  ownService: { id: string; name: string; price_cents: number; duration_min: number }
+  matches: Array<{ competitorId: string; competitorName: string; service: CompetitorService }>
+  competitorMin: number | null
+  competitorMax: number | null
+  competitorAvg: number | null
+  diffPct: number | null
+}
+
+function PricesTable({
+  salonId,
+  competitors,
+  snapshots,
+  currency,
+  t,
+}: {
+  salonId: string
+  competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
+  snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
+  currency: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const { data: ownServices = [] } = useServices(salonId)
+  const { data: settings } = useCompetitorSettings(salonId)
+  const { i18n } = useTranslation()
+  const refresh = useRefreshReportInsights(salonId)
+  const matchAi = useServiceMatchAi(salonId)
+  const [insights, setInsights] = useState<{ title: string; body: string }[] | null>(null)
+  const [aiMatches, setAiMatches] = useState<Array<{
+    our_service: string
+    competitors: Array<{ competitor_id: string; competitor_service: string; confidence: string }>
+  }> | null>(null)
+
+  // Собираем «последний на конкурента» snapshot kind='price'.
+  const latestByCompetitor = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof snapshots>[number]>()
+    for (const s of snapshots ?? []) {
+      if (s.kind !== 'price') continue
+      const prev = map.get(s.competitor_id)
+      if (!prev || prev.snapshot_date < s.snapshot_date) {
+        map.set(s.competitor_id, s)
+      }
+    }
+    return map
+  }, [snapshots])
+
+  // Парсим services из snapshot.data — поддерживаем оба формата:
+  //   - новый: { services: [{name, price_cents, duration_min, ...}] }
+  //   - старый: { prices: {<name>: <cents>} }
+  const competitorServices = useMemo(() => {
+    const out = new Map<string, CompetitorService[]>()
+    for (const [compId, snap] of latestByCompetitor.entries()) {
+      const data = snap.data as Record<string, unknown>
+      const list: CompetitorService[] = []
+      if (Array.isArray(data.services)) {
+        for (const v of data.services as Record<string, unknown>[]) {
+          if (typeof v.name === 'string' && typeof v.price_cents === 'number') {
+            list.push({
+              name: v.name,
+              price_cents: v.price_cents,
+              duration_min: typeof v.duration_min === 'number' ? v.duration_min : 0,
+            })
+          }
+        }
+      } else if (data.prices && typeof data.prices === 'object') {
+        for (const [name, cents] of Object.entries(data.prices as Record<string, number>)) {
+          if (typeof cents === 'number') list.push({ name, price_cents: cents })
+        }
+      }
+      out.set(compId, list)
+    }
+    return out
+  }, [latestByCompetitor])
+
+  // Какие услуги отслеживаем — из watched_services настроек (если пусто, берём все из salon).
+  const watched = settings?.watched_services ?? []
+  const watchedNames = useMemo(() => {
+    if (watched.length === 0) return null
+    return new Set(watched)
+  }, [watched])
+
+  // Загружаем кеш AI-матчинга из localStorage по hash от inputs.
+  const cacheKey = useMemo(() => {
+    if (!salonId) return null
+    const our = ownServices
+      .filter((s) => !s.is_archived && (!watchedNames || watchedNames.has(s.name)))
+      .map((s) => s.name)
+      .sort()
+      .join('|')
+    const comp = competitors
+      .map((c) => {
+        const list = (competitorServices.get(c.id) ?? [])
+          .map((s) => s.name)
+          .sort()
+          .join(',')
+        return `${c.id}:${list}`
+      })
+      .sort()
+      .join(';;')
+    return `svc-match:${salonId}:${our}:${comp}`
+  }, [salonId, ownServices, competitors, competitorServices, watchedNames])
+
+  useEffect(() => {
+    if (!cacheKey) return
+    try {
+      const raw = localStorage.getItem(cacheKey)
+      if (raw) {
+        setAiMatches(JSON.parse(raw))
+        return
+      }
+    } catch {
+      /* ignore */
+    }
+    setAiMatches(null)
+  }, [cacheKey])
+
+  function runAiMatch() {
+    const our_services = ownServices
+      .filter((s) => !s.is_archived && (!watchedNames || watchedNames.has(s.name)))
+      .map((s) => s.name)
+    if (our_services.length === 0) {
+      toast.error(t('reports_hub.competitors.no_services_to_match'))
+      return
+    }
+    const compsInput = competitors.map((c) => ({
+      competitor_id: c.id,
+      services: (competitorServices.get(c.id) ?? []).map((s) => s.name),
+    }))
+    matchAi.mutate(
+      { our_services, competitors: compsInput },
+      {
+        onSuccess: (matches) => {
+          setAiMatches(matches)
+          if (cacheKey) {
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(matches))
+            } catch {
+              /* quota → пофиг */
+            }
+          }
+          toast.success(t('reports_hub.competitors.ai_match_done', { count: matches.length }))
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  const rows = useMemo<PriceMatchRow[]>(() => {
+    const result: PriceMatchRow[] = []
+    for (const ownSvc of ownServices) {
+      if (ownSvc.is_archived) continue
+      if (watchedNames && !watchedNames.has(ownSvc.name)) continue
+      const matches: PriceMatchRow['matches'] = []
+
+      // Если есть AI-матчинг — используем его. Иначе fallback на fuzzy Jaccard.
+      const aiForThis = aiMatches?.find((m) => m.our_service === ownSvc.name)
+      if (aiForThis) {
+        for (const cm of aiForThis.competitors) {
+          if (cm.confidence === 'low') continue
+          const compServices = competitorServices.get(cm.competitor_id) ?? []
+          const svc = compServices.find((s) => s.name === cm.competitor_service)
+          if (!svc) continue
+          const comp = competitors.find((c) => c.id === cm.competitor_id)
+          if (!comp) continue
+          matches.push({ competitorId: comp.id, competitorName: comp.name, service: svc })
+        }
+      } else {
+        const ownTokens = normalizeServiceName(ownSvc.name)
+        for (const c of competitors) {
+          const list = competitorServices.get(c.id) ?? []
+          let best: { score: number; svc: CompetitorService } | null = null
+          for (const svc of list) {
+            const sim = tokenSimilarity(ownTokens, normalizeServiceName(svc.name))
+            if (sim >= 0.4 && (!best || sim > best.score)) best = { score: sim, svc }
+          }
+          if (best) matches.push({ competitorId: c.id, competitorName: c.name, service: best.svc })
+        }
+      }
+
+      const prices = matches.map((m) => m.service.price_cents)
+      const min = prices.length > 0 ? Math.min(...prices) : null
+      const max = prices.length > 0 ? Math.max(...prices) : null
+      const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : null
+      const diffPct =
+        avg != null && avg > 0 ? Math.round(((ownSvc.default_price_cents - avg) / avg) * 100) : null
+      result.push({
+        ownService: {
+          id: ownSvc.id,
+          name: ownSvc.name,
+          price_cents: ownSvc.default_price_cents,
+          duration_min: ownSvc.default_duration_min ?? 0,
+        },
+        matches,
+        competitorMin: min,
+        competitorMax: max,
+        competitorAvg: avg,
+        diffPct,
+      })
+    }
+    result.sort((a, b) => {
+      const am = a.matches.length > 0 ? 1 : 0
+      const bm = b.matches.length > 0 ? 1 : 0
+      if (am !== bm) return bm - am
+      return Math.abs(b.diffPct ?? 0) - Math.abs(a.diffPct ?? 0)
+    })
+    return result
+  }, [ownServices, competitors, competitorServices, aiMatches, watchedNames])
+
+  function runAi() {
+    const payload = {
+      our_services: rows.map((r) => ({
+        name: r.ownService.name,
+        our_price: r.ownService.price_cents / 100,
+        competitor_min: r.competitorMin != null ? r.competitorMin / 100 : null,
+        competitor_max: r.competitorMax != null ? r.competitorMax / 100 : null,
+        competitor_avg: r.competitorAvg != null ? Math.round(r.competitorAvg) / 100 : null,
+        diff_pct: r.diffPct,
+        matched_competitors: r.matches.length,
+      })),
+      currency,
+    }
+    refresh.mutate(
+      { kind: 'competitors_prices', payload },
+      {
+        onSuccess: (list) => setInsights(list),
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  const locale = i18n.language?.split('-')[0] ?? 'ru'
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted-foreground text-xs">
+          {aiMatches
+            ? t('reports_hub.competitors.ai_match_active', { count: aiMatches.length })
+            : t('reports_hub.competitors.ai_match_hint')}
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={runAiMatch}
+          disabled={matchAi.isPending || competitors.length === 0}
+        >
+          <Sparkles className="mr-1.5 size-3.5" strokeWidth={2} />
+          {matchAi.isPending
+            ? t('common.loading')
+            : aiMatches
+              ? t('reports_hub.competitors.ai_match_refresh')
+              : t('reports_hub.competitors.ai_match_run')}
+        </Button>
+      </div>
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">
+                {t('reports_hub.competitors.col_service')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_our_price')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_competitor_range')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_competitor_avg')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_diff_pct')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-muted-foreground px-5 py-12 text-center text-sm">
+                  {t('reports_hub.competitors.no_services_to_compare')}
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.ownService.id}>
+                  <td className="text-foreground px-4 py-3 font-semibold">
+                    {r.ownService.name}
+                    {r.matches.length === 0 ? (
+                      <span className="text-muted-foreground/60 ml-2 text-[10px] font-normal italic">
+                        {t('reports_hub.competitors.no_match')}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/60 ml-2 text-[10px] font-normal">
+                        ({r.matches.length})
+                      </span>
+                    )}
+                  </td>
+                  <td className="num text-foreground px-3 py-3 text-right">
+                    {formatCurrency(r.ownService.price_cents, currency, locale)}
+                  </td>
+                  <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                    {r.competitorMin != null && r.competitorMax != null
+                      ? `${formatCurrency(r.competitorMin, currency, locale)} – ${formatCurrency(r.competitorMax, currency, locale)}`
+                      : '—'}
+                  </td>
+                  <td className="num text-foreground px-3 py-3 text-right">
+                    {r.competitorAvg != null
+                      ? formatCurrency(Math.round(r.competitorAvg), currency, locale)
+                      : '—'}
+                  </td>
+                  <td
+                    className={cn(
+                      'num px-3 py-3 text-right font-bold',
+                      r.diffPct == null
+                        ? 'text-muted-foreground/60'
+                        : r.diffPct > 5
+                          ? 'text-rose-600'
+                          : r.diffPct < -5
+                            ? 'text-amber-600'
+                            : 'text-emerald-700',
+                    )}
+                    title={
+                      r.diffPct == null
+                        ? undefined
+                        : r.diffPct > 0
+                          ? t('reports_hub.competitors.diff_hint_higher')
+                          : r.diffPct < 0
+                            ? t('reports_hub.competitors.diff_hint_lower')
+                            : t('reports_hub.competitors.diff_hint_eq')
+                    }
+                  >
+                    {r.diffPct == null ? '—' : `${r.diffPct > 0 ? '+' : ''}${r.diffPct}%`}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="border-brand-sage-deep/30 from-brand-sage/5 rounded-lg border bg-gradient-to-br to-transparent p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
+            <Sparkles className="text-brand-sage-deep size-4" strokeWidth={2} />
+            {t('reports_hub.competitors.ai_title')}
+          </h4>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={runAi}
+            disabled={refresh.isPending || rows.length === 0}
+          >
+            {refresh.isPending
+              ? t('common.loading')
+              : insights
+                ? t('reports_hub.competitors.ai_refresh')
+                : t('reports_hub.competitors.ai_generate')}
+          </Button>
+        </div>
+        {insights == null ? (
+          <p className="text-muted-foreground text-xs">
+            {t('reports_hub.competitors.ai_prices_hint')}
+          </p>
+        ) : insights.length === 0 ? (
+          <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.ai_empty')}</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {insights.map((it, i) => (
+              <li key={i} className="border-border bg-card rounded-md border p-3">
+                <p className="text-foreground text-xs font-bold">{it.title}</p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{it.body}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   )
 }

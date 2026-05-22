@@ -130,6 +130,92 @@ Client analytics:
 Each insight = specific client segment + what to offer them.`
 }
 
+function promptForServiceMatch(payload: unknown): string {
+  return `You are matching salon service names between our salon and competitors.
+Names vary: "manicure" vs "Маникюр с гель-лаком" — these are the SAME core service.
+"manicure" vs "manicure express" — also same family.
+"manicure" vs "pedicure" — DIFFERENT (different body part).
+"hair cut" vs "Strzyżenie męskie" — same (Polish for haircut).
+"depilation" vs "массаж" — different.
+
+Payload (JSON):
+${JSON.stringify(payload, null, 2)}
+
+For EACH of our services, return matches across competitors. Even partial matches count
+if the core treatment is the same (a competitor's "manicure + gel polish" matches our
+"manicure" — gel is a variant of the same service).
+
+Respond STRICTLY as JSON (no markdown, no preface):
+{
+  "matches": [
+    {
+      "our_service": "<exact name from our_services>",
+      "competitors": [
+        {
+          "competitor_id": "<id from input>",
+          "competitor_service": "<exact name from their list>",
+          "confidence": "high" | "medium" | "low",
+          "reason": "<1 short sentence why this matches>"
+        }
+      ]
+    }
+  ]
+}
+
+Only include matches where confidence is high or medium. If no competitor has a match
+for a given our_service — return empty "competitors" array. Be strict — do NOT match
+different treatments just because the words look similar.`
+}
+
+function promptForCompetitorsPrices(payload: unknown): string {
+  return `Salon competitor pricing data (JSON):
+${JSON.stringify(payload, null, 2)}
+
+You are advising the salon owner on PRICING strategy versus competitors.
+The payload contains: our services with prices + matched competitor variants
+with min/max/avg competitor prices and % difference.
+
+Analyze:
+1. Услуги где мы ЗАВЫШЕНЫ — где конкуренты значимо дешевле и можем терять клиентов на цене.
+2. Услуги где мы ЗАНИЖЕНЫ — где можно поднять цену без потери конкурентоспособности.
+3. Услуги без матча — где мы единственные / где конкуренты делают то чего нет у нас.
+4. Pricing-стратегия: позиционирование (премиум / средний / эконом) и где якорь.
+
+Each insight = specific service or segment + concrete price action (e.g. «поднять Маникюр гибрид с 120 до 140 zł — конкуренты в среднем берут 150 zł»).`
+}
+
+function promptForCompetitorsContent(payload: unknown): string {
+  return `Salon competitor social media content data (JSON):
+${JSON.stringify(payload, null, 2)}
+
+Compare our salon's content presence to competitors. Payload has posts count,
+followers, following, posts_per_month for own salon and each competitor.
+
+Analyze:
+1. Где мы отстаём по охвату (followers) и что делать.
+2. Частота публикаций vs конкуренты — нужно ли поднимать или мы и так в норме.
+3. Перекосы: больше подписок чем подписчиков (плохой сигнал) и наоборот.
+4. Конкурент-эталон по соцсетям — что у них работает.
+
+Each insight = specific metric or competitor + concrete content action.`
+}
+
+function promptForCompetitorsRating(payload: unknown): string {
+  return `Salon competitor ratings data (JSON):
+${JSON.stringify(payload, null, 2)}
+
+Compare our salon's Booksy + Google ratings to competitors. Payload has rating
+and review count per source for own salon and each competitor.
+
+Analyze:
+1. Где мы ниже среднего по округе — приоритет на улучшение.
+2. Где мы превосходим — наш козырь, использовать в маркетинге.
+3. Соотношение Booksy vs Google — где платформа недополучает отзывов.
+4. Конкуренты с подозрительно высокой ratings — учиться или сомневаться.
+
+Each insight = source/metric + concrete action (e.g. «попросить 5 текущих клиентов оставить Google отзыв — поднимем с 4.6 до 4.7»).`
+}
+
 function promptForStaff(payload: unknown): string {
   return `Salon masters data for the selected period (JSON):
 ${JSON.stringify(payload, null, 2)}
@@ -188,12 +274,31 @@ Deno.serve(async (req: Request) => {
     case 'staff':
       prompt = promptForStaff(body.payload)
       break
+    case 'service_match':
+      prompt = promptForServiceMatch(body.payload)
+      break
+    case 'competitors_prices':
+      prompt = promptForCompetitorsPrices(body.payload)
+      break
+    case 'competitors_content':
+      prompt = promptForCompetitorsContent(body.payload)
+      break
+    case 'competitors_rating':
+      prompt = promptForCompetitorsRating(body.payload)
+      break
     default:
       return json({ error: 'unknown_kind' }, 400)
   }
 
   try {
     const result = await claudeJson(systemForLocale(locale), prompt)
+    if (body.kind === 'service_match') {
+      // У service_match другая схема ответа — пропускаем через как есть.
+      if (!Array.isArray((result as unknown as { matches?: unknown }).matches)) {
+        return json({ error: 'invalid_claude_response' }, 502)
+      }
+      return json(result)
+    }
     if (!Array.isArray(result.insights)) {
       return json({ error: 'invalid_claude_response' }, 502)
     }

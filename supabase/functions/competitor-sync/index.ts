@@ -166,6 +166,104 @@ function parseBooksyUrl(url: string): { region: string; businessId: string } | n
   return { region, businessId: m[3] }
 }
 
+// =============================================================================
+// Booksy services catalog через customer_api/businesses/{id}.
+// Возвращает массив бронируемых variants с ценами/длительностью/staff_ids.
+// Покрывает все услуги конкурента — основа для матча с нашими услугами в UI Цены.
+// =============================================================================
+type BooksyVariant = {
+  name: string
+  treatment_name?: string
+  price_cents: number
+  omnibus_cents?: number | null
+  duration_min: number
+  staffer_ids: number[]
+}
+
+async function fetchBooksyCatalog(booksyUrl: string): Promise<{
+  services: BooksyVariant[]
+  staff: Array<{ id: number; name: string }>
+} | null> {
+  const parsed = parseBooksyUrl(booksyUrl)
+  if (!parsed) return null
+  try {
+    const u = `https://${parsed.region}.booksy.com/core/v2/customer_api/businesses/${parsed.businessId}`
+    const r = await fetch(u, {
+      headers: {
+        accept: 'application/json',
+        'x-api-key': BOOKSY_WEB_API_KEY,
+        'x-app-version': '3.0',
+        'x-fingerprint': crypto.randomUUID(),
+        referer: 'https://booksy.com/',
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+      },
+    })
+    if (!r.ok) return null
+    const data = (await r.json()) as {
+      business?: {
+        service_categories?: Array<{
+          services?: Array<{
+            name?: string
+            treatment?: { name?: string }
+            price?: number
+            variants?: Array<{
+              label?: string
+              duration?: number
+              price?: number
+              omnibus_price?: number | null
+              staffer_id?: number[]
+            }>
+          }>
+        }>
+        staff?: Array<{ id?: number; name?: string }>
+      }
+    }
+    const biz = data.business
+    if (!biz) return null
+
+    const services: BooksyVariant[] = []
+    for (const cat of biz.service_categories ?? []) {
+      for (const svc of cat.services ?? []) {
+        const treatmentName = svc.treatment?.name
+        const baseName = svc.name ?? treatmentName ?? ''
+        if (!baseName) continue
+        if (svc.variants && svc.variants.length > 0) {
+          for (const v of svc.variants) {
+            if (typeof v.price !== 'number') continue
+            const label = v.label ? `${baseName} — ${v.label}` : baseName
+            services.push({
+              name: label,
+              treatment_name: treatmentName,
+              price_cents: Math.round(v.price * 100),
+              omnibus_cents:
+                typeof v.omnibus_price === 'number' ? Math.round(v.omnibus_price * 100) : null,
+              duration_min: typeof v.duration === 'number' ? v.duration : 0,
+              staffer_ids: Array.isArray(v.staffer_id) ? v.staffer_id : [],
+            })
+          }
+        } else if (typeof svc.price === 'number') {
+          services.push({
+            name: baseName,
+            treatment_name: treatmentName,
+            price_cents: Math.round(svc.price * 100),
+            duration_min: 0,
+            staffer_ids: [],
+          })
+        }
+      }
+    }
+    const staff = (biz.staff ?? [])
+      .filter((s) => typeof s.id === 'number' && typeof s.name === 'string')
+      .map((s) => ({ id: s.id as number, name: s.name as string }))
+    if (services.length === 0) return null
+    return { services, staff }
+  } catch (e) {
+    console.warn('fetchBooksyCatalog failed', e)
+    return null
+  }
+}
+
 async function fetchBooksyAggregate(
   booksyUrl: string,
 ): Promise<{ rating: number; count: number } | null> {
@@ -377,24 +475,38 @@ async function syncOneCompetitor(admin: SupabaseClient, c: CompetitorRow): Promi
   }
 
   if (c.booksy_url) {
-    const b = await fetchBooksyData(c.booksy_url)
-    if (b.prices) {
+    // Новый путь — customer_api/businesses/{id} (REST). Покрывает все услуги с
+    // ценами + variants + staff_ids. Если упало (старый формат URL и т.п.) —
+    // fallback на старый HTML scrape через __NEXT_DATA__.
+    const catalog = await fetchBooksyCatalog(c.booksy_url)
+    if (catalog) {
       snapshots.push({
         competitor_id: c.id,
         kind: 'price',
-        data: b.prices,
+        data: { services: catalog.services, staff: catalog.staff },
         source: 'booksy',
         snapshot_date: TODAY,
       })
-    }
-    if (b.occupancy) {
-      snapshots.push({
-        competitor_id: c.id,
-        kind: 'occupancy',
-        data: b.occupancy,
-        source: 'booksy',
-        snapshot_date: TODAY,
-      })
+    } else {
+      const b = await fetchBooksyData(c.booksy_url)
+      if (b.prices) {
+        snapshots.push({
+          competitor_id: c.id,
+          kind: 'price',
+          data: b.prices,
+          source: 'booksy',
+          snapshot_date: TODAY,
+        })
+      }
+      if (b.occupancy) {
+        snapshots.push({
+          competitor_id: c.id,
+          kind: 'occupancy',
+          data: b.occupancy,
+          source: 'booksy',
+          snapshot_date: TODAY,
+        })
+      }
     }
   }
 
