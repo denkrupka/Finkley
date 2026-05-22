@@ -2924,7 +2924,8 @@
       "ai_panel_shown": "{{count}} AI insights shown.",
       "ai_panel_show": "Show",
       "ai_panel_refresh": "Refresh",
-      "open_competitor": "Open «{{name}}» page"
+      "open_competitor": "Open «{{name}}» page",
+      "content_no_social_hint": "For Content data to load — add your salon's Instagram or Facebook page URL in Settings → Profile, and connect Instagram Business OAuth in Settings → Social. Without that we don't know which pages to analyze."
     }
   },
   "finance": {

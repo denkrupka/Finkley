@@ -3695,7 +3695,8 @@
       "ai_panel_shown": "Показано {{count}} ИИ-выводов.",
       "ai_panel_show": "Показать",
       "ai_panel_refresh": "Обновить",
-      "open_competitor": "Открыть страницу «{{name}}»"
+      "open_competitor": "Открыть страницу «{{name}}»",
+      "content_no_social_hint": "Чтобы данные о Контенте подгрузились — добавь у своего салона ссылку на Instagram или Facebook страницу в Settings → Профиль, и подключи OAuth Instagram Business в Settings → Соцсети. Без этого мы не знаем какие страницы анализировать."
     }
   },
   "finance": {

@@ -2924,7 +2924,8 @@
       "ai_panel_shown": "Pokazano {{count}} wniosków AI.",
       "ai_panel_show": "Pokaż",
       "ai_panel_refresh": "Odśwież",
-      "open_competitor": "Otwórz stronę «{{name}}»"
+      "open_competitor": "Otwórz stronę «{{name}}»",
+      "content_no_social_hint": "Aby dane Treści się załadowały — dodaj URL strony Instagram lub Facebook salonu w Settings → Profil, i podłącz OAuth Instagram Business w Settings → Sieci społecznościowe. Inaczej nie wiemy które strony analizować."
     }
   },
   "finance": {

@@ -495,77 +495,94 @@ function ContentTable({
     return v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
   }
 
+  // Если у своего салона все content-поля null + ни у одного конкурента нет
+  // content-snapshot — показываем хинт что нужно подключить Instagram/Facebook.
+  const ownEmpty =
+    !ownContent ||
+    (ownContent.posts == null &&
+      ownContent.followers == null &&
+      ownContent.following == null &&
+      ownContent.posts_per_month == null)
+  const noOwnSocial = !ownSalon?.instagram_url && !ownSalon?.facebook_url
+
   return (
-    <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-[720px] text-sm">
-        <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-          <tr>
-            <th className="px-4 py-3 text-left font-semibold">
-              {t('reports_hub.competitors.col_name')}
-            </th>
-            <th
-              className="px-3 py-3 text-right font-semibold"
-              title={t('reports_hub.competitors.col_posts_hint')}
-            >
-              {t('reports_hub.competitors.col_posts')}
-            </th>
-            <th
-              className="px-3 py-3 text-right font-semibold"
-              title={t('reports_hub.competitors.col_reels_views_hint')}
-            >
-              {t('reports_hub.competitors.col_reels_views')}
-            </th>
-            <th
-              className="px-3 py-3 text-right font-semibold"
-              title={t('reports_hub.competitors.col_freq_hint')}
-            >
-              {t('reports_hub.competitors.col_freq')}
-            </th>
-            <th className="px-3 py-3 text-right font-semibold">
-              {t('reports_hub.competitors.col_followers')}
-            </th>
-            <th className="px-3 py-3 text-right font-semibold">
-              {t('reports_hub.competitors.col_following')}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {/* Own salon */}
-          <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
-            <td className="text-brand-sage-deep px-4 py-3 font-bold">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-3.5" strokeWidth={2} />
-                {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
-                <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
-                  {t('reports_hub.competitors.own_badge')}
-                </span>
-              </div>
-            </td>
-            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.posts ?? null)}</td>
-            <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
-            <td className="num px-3 py-3 text-right">
-              {ownContent?.posts_per_month != null ? `${ownContent.posts_per_month}/мес` : '—'}
-            </td>
-            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.followers ?? null)}</td>
-            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.following ?? null)}</td>
-          </tr>
-          {competitors.map((c) => {
-            const d = byCompetitor.get(c.id)
-            return (
-              <tr key={c.id}>
-                <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                <td className="num px-3 py-3 text-right">{fmtNum(d?.posts ?? null)}</td>
-                <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
-                <td className="num px-3 py-3 text-right">
-                  {d?.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
-                </td>
-                <td className="num px-3 py-3 text-right">{fmtNum(d?.followers ?? null)}</td>
-                <td className="num px-3 py-3 text-right">{fmtNum(d?.following ?? null)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-3">
+      {ownEmpty && noOwnSocial ? (
+        <div className="border-brand-yellow-deep/40 bg-brand-yellow/30 rounded-lg border p-3 text-xs">
+          {t('reports_hub.competitors.content_no_social_hint')}
+        </div>
+      ) : null}
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">
+                {t('reports_hub.competitors.col_name')}
+              </th>
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_posts_hint')}
+              >
+                {t('reports_hub.competitors.col_posts')}
+              </th>
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_reels_views_hint')}
+              >
+                {t('reports_hub.competitors.col_reels_views')}
+              </th>
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_freq_hint')}
+              >
+                {t('reports_hub.competitors.col_freq')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_followers')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_following')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {/* Own salon */}
+            <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+              <td className="text-brand-sage-deep px-4 py-3 font-bold">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5" strokeWidth={2} />
+                  {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                  <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                    {t('reports_hub.competitors.own_badge')}
+                  </span>
+                </div>
+              </td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.posts ?? null)}</td>
+              <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
+              <td className="num px-3 py-3 text-right">
+                {ownContent?.posts_per_month != null ? `${ownContent.posts_per_month}/мес` : '—'}
+              </td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.followers ?? null)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.following ?? null)}</td>
+            </tr>
+            {competitors.map((c) => {
+              const d = byCompetitor.get(c.id)
+              return (
+                <tr key={c.id}>
+                  <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d?.posts ?? null)}</td>
+                  <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
+                  <td className="num px-3 py-3 text-right">
+                    {d?.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
+                  </td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d?.followers ?? null)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d?.following ?? null)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
