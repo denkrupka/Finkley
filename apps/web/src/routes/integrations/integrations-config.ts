@@ -241,7 +241,6 @@ export const CATEGORY_ORDER: IntegrationCategory[] = [
   'booking',
   'accounting',
   'messengers',
-  'social',
   'sms',
   'banking',
   'other',
