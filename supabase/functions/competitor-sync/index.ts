@@ -63,11 +63,13 @@ const TODAY = new Date().toISOString().slice(0, 10)
 // =============================================================================
 /**
  * Резолвит Google Place ID из имени конкурента через Text Search API v1.
- * Возвращает null если API key не задан или ничего не найдено.
+ * Если задан city — добавляем его в запрос для точности (несколько салонов
+ * с одинаковым именем в разных городах — разрешим в пользу того что в нашем).
  * Используется fallback'ом для конкурентов добавленных ручным URL без place_id.
  */
-async function resolveGooglePlaceId(name: string): Promise<string | null> {
+async function resolveGooglePlaceId(name: string, city?: string | null): Promise<string | null> {
   if (!GOOGLE_KEY) return null
+  const textQuery = city ? `${name}, ${city}` : name
   try {
     const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
@@ -76,7 +78,7 @@ async function resolveGooglePlaceId(name: string): Promise<string | null> {
         'X-Goog-Api-Key': GOOGLE_KEY,
         'X-Goog-FieldMask': 'places.id',
       },
-      body: JSON.stringify({ textQuery: name, maxResultCount: 1 }),
+      body: JSON.stringify({ textQuery, maxResultCount: 1 }),
     })
     if (!r.ok) return null
     const data = (await r.json()) as { places?: Array<{ id?: string }> }
@@ -579,15 +581,19 @@ async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<numb
 // =============================================================================
 // Per-competitor sync.
 // =============================================================================
-async function syncOneCompetitor(admin: SupabaseClient, c: CompetitorRow): Promise<number> {
+async function syncOneCompetitor(
+  admin: SupabaseClient,
+  c: CompetitorRow,
+  ownSalonCity: string | null,
+): Promise<number> {
   const snapshots: Snapshot[] = []
 
-  // Если place_id не задан, но есть place_url — попробуем резолвить через
-  // Places Text Search по имени. Если получилось — сохраняем place_id в БД
-  // чтобы следующий sync пошёл по быстрому пути.
+  // Если place_id не задан — попробуем резолвить через Places Text Search.
+  // С передачей city нашего салона: несколько BURO SPA в Польше → выбираем
+  // того что в нашем городе (предположение «конкурент в том же городе»).
   let placeId = c.google_place_id
   if (!placeId && c.name) {
-    placeId = await resolveGooglePlaceId(c.name)
+    placeId = await resolveGooglePlaceId(c.name, ownSalonCity)
     if (placeId) {
       await admin.from('competitors').update({ google_place_id: placeId }).eq('id', c.id)
     }
@@ -743,9 +749,21 @@ Deno.serve(async (req: Request) => {
   if (body.salon_id) q = q.eq('salon_id', body.salon_id)
   const { data: competitors } = await q
 
+  // Подгружаем city для каждого салона у которого есть конкуренты — нужен
+  // для точного резолва Google Place ID (Text Search по «name, city»).
+  const salonIds = Array.from(new Set((competitors ?? []).map((c) => c.salon_id)))
+  const salonCityMap = new Map<string, string | null>()
+  if (salonIds.length > 0) {
+    const { data: salons } = await admin.from('salons').select('id, city').in('id', salonIds)
+    for (const s of (salons ?? []) as Array<{ id: string; city: string | null }>) {
+      salonCityMap.set(s.id, s.city)
+    }
+  }
+
   let snapshots = 0
   for (const c of (competitors ?? []) as CompetitorRow[]) {
-    snapshots += await syncOneCompetitor(admin, c)
+    const city = salonCityMap.get(c.salon_id) ?? null
+    snapshots += await syncOneCompetitor(admin, c, city)
   }
 
   // Также метрики СВОЕГО салона — для отображения первой строкой

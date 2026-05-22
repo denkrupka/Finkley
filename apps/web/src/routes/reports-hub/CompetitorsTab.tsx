@@ -322,85 +322,93 @@ function RatingTable({
   }
 
   return (
-    <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-          <tr>
-            <th rowSpan={2} className="border-border/40 border-r px-4 py-3 text-left font-semibold">
-              {t('reports_hub.competitors.col_name')}
-            </th>
-            <th
-              colSpan={2}
-              className="border-border/40 border-r px-3 py-2 text-center font-bold text-blue-700"
-            >
-              Booksy
-            </th>
-            <th colSpan={2} className="px-3 py-2 text-center font-bold text-red-700">
-              Google
-            </th>
-          </tr>
-          <tr>
-            <th className="px-3 py-2 text-right font-semibold">
-              {t('reports_hub.competitors.col_rating')}
-            </th>
-            <th className="border-border/40 border-r px-3 py-2 text-right font-semibold">
-              {t('reports_hub.competitors.col_reviews_count')}
-            </th>
-            <th className="px-3 py-2 text-right font-semibold">
-              {t('reports_hub.competitors.col_rating')}
-            </th>
-            <th className="px-3 py-2 text-right font-semibold">
-              {t('reports_hub.competitors.col_reviews_count')}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {/* Own salon row */}
-          <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
-            <td className="text-brand-sage-deep px-4 py-3 font-bold">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-3.5" strokeWidth={2} />
-                {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
-                <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
-                  {t('reports_hub.competitors.own_badge')}
-                </span>
-              </div>
-            </td>
-            <RatingCells
-              rating={ownBooksy?.rating ?? null}
-              count={ownBooksy?.count ?? null}
-              url={ownSalon?.booksy_url ?? null}
-            />
-            <RatingCells
-              rating={ownGoogle?.rating_avg ?? null}
-              count={ownGoogle?.rating_count ?? null}
-              url={ownSalon?.google_place_url ?? null}
-            />
-          </tr>
-          {competitors.map((c) => {
-            const snaps = byCompetitor.get(c.id) ?? []
-            const booksy = bySource(snaps, 'booksy')
-            const google = bySource(snaps, 'google')
-            const bData = booksy?.data as { rating?: number; count?: number } | undefined
-            const gData = google?.data as { rating?: number; count?: number } | undefined
-            return (
-              <tr key={c.id}>
-                <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                <RatingCells
-                  rating={bData?.rating ?? null}
-                  count={bData?.count ?? null}
-                  url={c.booksy_url}
-                />
-                <RatingCells
-                  rating={gData?.rating ?? null}
-                  count={gData?.count ?? null}
-                  url={c.google_place_url}
-                />
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-2">
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+            <tr>
+              <th
+                rowSpan={2}
+                className="border-border/40 border-r px-4 py-3 text-left font-semibold"
+              >
+                {t('reports_hub.competitors.col_name')}
+              </th>
+              <th
+                colSpan={2}
+                className="border-border/40 border-r px-3 py-2 text-center font-bold text-blue-700"
+              >
+                Booksy
+              </th>
+              <th colSpan={2} className="px-3 py-2 text-center font-bold text-red-700">
+                Google
+              </th>
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-right font-semibold">
+                {t('reports_hub.competitors.col_rating')}
+              </th>
+              <th className="border-border/40 border-r px-3 py-2 text-right font-semibold">
+                {t('reports_hub.competitors.col_reviews_count')}
+              </th>
+              <th className="px-3 py-2 text-right font-semibold">
+                {t('reports_hub.competitors.col_rating')}
+              </th>
+              <th className="px-3 py-2 text-right font-semibold">
+                {t('reports_hub.competitors.col_reviews_count')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {/* Own salon row */}
+            <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+              <td className="text-brand-sage-deep px-4 py-3 font-bold">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5" strokeWidth={2} />
+                  {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                  <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                    {t('reports_hub.competitors.own_badge')}
+                  </span>
+                </div>
+              </td>
+              <RatingCells
+                rating={ownBooksy?.rating ?? null}
+                count={ownBooksy?.count ?? null}
+                url={ownSalon?.booksy_url ?? null}
+              />
+              <RatingCells
+                rating={ownGoogle?.rating_avg ?? null}
+                count={ownGoogle?.rating_count ?? null}
+                url={ownSalon?.google_place_url ?? null}
+              />
+            </tr>
+            {competitors.map((c) => {
+              const snaps = byCompetitor.get(c.id) ?? []
+              const booksy = bySource(snaps, 'booksy')
+              const google = bySource(snaps, 'google')
+              const bData = booksy?.data as { rating?: number; count?: number } | undefined
+              const gData = google?.data as { rating?: number; count?: number } | undefined
+              return (
+                <tr key={c.id}>
+                  <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                  <RatingCells
+                    rating={bData?.rating ?? null}
+                    count={bData?.count ?? null}
+                    url={c.booksy_url}
+                  />
+                  <RatingCells
+                    rating={gData?.rating ?? null}
+                    count={gData?.count ?? null}
+                    url={c.google_place_url}
+                  />
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-muted-foreground/80 text-[10.5px] leading-relaxed">
+        {t('reports_hub.competitors.google_reviews_limit_hint')}
+      </p>
     </div>
   )
 }
