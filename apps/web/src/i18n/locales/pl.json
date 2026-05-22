@@ -2714,6 +2714,8 @@
       "anonymous": "Anonimowa opinia",
       "no_text": "(bez tekstu, tylko ocena)",
       "import_button": "Import z Booksy/Google",
+      "auto_importing": "Pobieramy świeże opinie…",
+      "pagination_info": "{{from}}–{{to}} z {{total}}",
       "imported": "Zaimportowano {{count}} opinii",
       "sort": {
         "newest": "Najnowsze",

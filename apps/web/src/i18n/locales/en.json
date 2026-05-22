@@ -2714,6 +2714,8 @@
       "anonymous": "Anonymous review",
       "no_text": "(no text, only rating)",
       "import_button": "Import from Booksy/Google",
+      "auto_importing": "Fetching latest reviews…",
+      "pagination_info": "{{from}}–{{to}} of {{total}}",
       "imported": "Imported {{count}} reviews",
       "sort": {
         "newest": "Newest first",

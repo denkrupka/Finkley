@@ -182,11 +182,13 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
     external_url: string | null
   }> = []
 
-  // 2 страницы × 50 = до 100 отзывов за вызов. Cron каждый день добивает
-  // постепенно (manual dedup в processSalon отсекает дубликаты).
-  for (const page of [1, 2]) {
+  // Тянем все страницы пока есть. Safety cap 30 × 50 = 1500 отзывов.
+  // Manual dedup в processSalon отсекает дубликаты при повторных запусках.
+  const MAX_PAGES = 30
+  const PER_PAGE = 50
+  for (let page = 1; page <= MAX_PAGES; page++) {
     try {
-      const u = `https://${region}.booksy.com/core/v2/customer_api/businesses/${businessId}/reviews/?reviews_page=${page}&reviews_per_page=50&ordering=-created`
+      const u = `https://${region}.booksy.com/core/v2/customer_api/businesses/${businessId}/reviews/?reviews_page=${page}&reviews_per_page=${PER_PAGE}&ordering=-created`
       const r = await fetch(u, {
         headers: {
           accept: 'application/json',
@@ -225,7 +227,7 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
           external_url: booksyUrl,
         })
       }
-      if (list.length < 50) break
+      if (list.length < PER_PAGE) break
     } catch (e) {
       console.warn(`booksy reviews page=${page} failed:`, e)
       break

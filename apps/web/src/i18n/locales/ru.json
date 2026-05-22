@@ -3461,6 +3461,8 @@
       "anonymous": "Анонимный отзыв",
       "no_text": "(без текста, только оценка)",
       "import_button": "Импорт с Booksy/Google",
+      "auto_importing": "Подгружаем свежие отзывы…",
+      "pagination_info": "{{from}}–{{to}} из {{total}}",
       "imported": "Импортировано {{count}} отзывов",
       "sort": {
         "newest": "Сначала новые",
