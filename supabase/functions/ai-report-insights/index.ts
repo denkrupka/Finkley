@@ -200,6 +200,33 @@ Analyze:
 Each insight = specific metric or competitor + concrete content action.`
 }
 
+function promptForCompetitorsOccupancy(payload: unknown): string {
+  return `Salon competitor availability/occupancy data for the next 7 days (JSON):
+${JSON.stringify(payload, null, 2)}
+
+You are advising the salon owner on COMPETITION FOR CLIENT TIME.
+Payload contains per-competitor per-service:
+  - free_slots_7d: how many bookable slots competitor has free in the next 7 days
+  - days_with_slots: how many days (0..7) have at least one free slot
+  - staff_count: how many masters perform this service
+  - duration_min: service duration
+
+Interpretation:
+  - Many free slots + many days_with_slots = competitor is UNDERLOADED → we can attract
+    their clients with timing convenience message
+  - Few free slots = competitor is BOOKED solid → they're the leader, lessons to learn,
+    OR clients spill over to us when they can't get a slot there
+  - 0 days_with_slots → competitor likely closed booking or fully booked → opportunity
+
+Analyze:
+1. Где у нас преимущество — где конкуренты загружены и клиенты выбирают нас.
+2. Где они доступнее нас — что они делают (больше мастеров? выходные?) и что предпринять.
+3. Где спрос явно превышает предложение в районе — какую услугу нам усилить.
+4. Сегмент клиентов кому продавать «у нас всегда есть слот» как УТП.
+
+Each insight = specific competitor or service + concrete action.`
+}
+
 function promptForCompetitorsRating(payload: unknown): string {
   return `Salon competitor ratings data (JSON):
 ${JSON.stringify(payload, null, 2)}
@@ -279,6 +306,9 @@ Deno.serve(async (req: Request) => {
       break
     case 'competitors_prices':
       prompt = promptForCompetitorsPrices(body.payload)
+      break
+    case 'competitors_occupancy':
+      prompt = promptForCompetitorsOccupancy(body.payload)
       break
     case 'competitors_content':
       prompt = promptForCompetitorsContent(body.payload)

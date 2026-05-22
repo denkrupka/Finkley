@@ -373,6 +373,7 @@
       "loyalty_regular": "Постоянный",
       "loyalty_returning": "Возвращающийся",
       "loyalty_new": "Новый",
+      "run_button": "Запустить рассылку",
       "templates_title": "Готовые шаблоны",
       "templates_subtitle": "Кликни на шаблон — заполнит SMS, тему и тело письма. Дальше отредактируй под себя.",
       "template_applied": "Шаблон «{{name}}» применён — отредактируй под себя",

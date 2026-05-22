@@ -1250,7 +1250,7 @@ function OccupancyTable({
       })),
     }
     refresh.mutate(
-      { kind: 'competitors_prices' as const, payload },
+      { kind: 'competitors_occupancy' as const, payload },
       {
         onSuccess: (list) => setInsights(list),
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),

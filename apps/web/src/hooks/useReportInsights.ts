@@ -14,6 +14,7 @@ export type InsightKind =
   | 'clients'
   | 'staff'
   | 'competitors_prices'
+  | 'competitors_occupancy'
   | 'competitors_content'
   | 'competitors_rating'
 

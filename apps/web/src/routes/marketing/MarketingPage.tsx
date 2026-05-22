@@ -1,4 +1,4 @@
-import { Calendar, Info, Loader2, Mail, MessageSquare, Send, Sparkles, Star, X } from 'lucide-react'
+import { Calendar, Info, Loader2, Mail, MessageSquare, Send, Sparkles, Star } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -193,14 +192,24 @@ export function MarketingPage() {
                   {t(`marketing.broadcasts.kind.${infoKind}.short`)}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 text-sm leading-relaxed">
+              <div className="space-y-3 overflow-y-auto px-5 py-4 text-sm leading-relaxed">
                 <p className="text-foreground whitespace-pre-line">
                   {t(`marketing.broadcasts.kind.${infoKind}.long`)}
                 </p>
               </div>
-              <DialogClose className="absolute right-4 top-4">
-                <X className="size-4" strokeWidth={2} />
-              </DialogClose>
+              {infoKind === 'marketing' ? (
+                <div className="border-border bg-muted/10 flex justify-end gap-2 border-t px-5 py-4">
+                  <Button
+                    onClick={() => {
+                      setInfoKind(null)
+                      setActive('compose')
+                    }}
+                  >
+                    <Sparkles className="mr-1.5 size-4" strokeWidth={2} />
+                    {t('marketing.compose.run_button')}
+                  </Button>
+                </div>
+              ) : null}
             </>
           ) : null}
         </DialogContent>

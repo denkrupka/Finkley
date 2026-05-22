@@ -3730,6 +3730,7 @@
       "loyalty_regular": "Stały",
       "loyalty_returning": "Powracający",
       "loyalty_new": "Nowy",
+      "run_button": "Utwórz wysyłkę",
       "templates_title": "Gotowe szablony",
       "templates_subtitle": "Kliknij szablon — wypełni SMS, temat i treść. Potem dostosuj.",
       "template_applied": "Szablon «{{name}}» zastosowany — dostosuj",
