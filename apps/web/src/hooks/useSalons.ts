@@ -79,7 +79,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -122,7 +122,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url',
         )
         .eq('id', salonId)
         .maybeSingle()
