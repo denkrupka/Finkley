@@ -2,11 +2,20 @@
  * Готовые шаблоны для рассылок. Кнопка в UI клик-заполняет SMS + email subject +
  * email body одним нажатием. Юзер потом редактирует под себя.
  *
- * Все HTML-тела для email — простые inline-стили, чтобы Gmail / Outlook их
- * корректно отрендерили (CSS в <style> часть писем выкидывают).
+ * Шаблоны персонализированы — используют переменные:
+ *   {name}        — полное имя клиента
+ *   {firstName}   — только первое имя
+ *   {salon}       — название салона
+ *   {date}        — сегодняшняя дата в локали
  *
- * 3 локали: RU / EN / PL. Возвращаем шаблоны на текущей локали юзера —
- * клиенты Polish-рынка должны получать письма на польском.
+ * Подстановка происходит на бэкенде marketing-send-broadcast.ts. Если у клиента
+ * нет имени — fallback на 'клиент'.
+ *
+ * Email-тела — карточный inline-styled HTML который корректно рендерят Gmail,
+ * Outlook, Apple Mail (всё в inline стилях, никаких <style>, CTA-кнопки через
+ * div+border-radius — даже без поддержки CSS будут читаемы).
+ *
+ * 3 локали: RU / EN / PL.
  */
 
 export type BroadcastTemplate = {
@@ -18,78 +27,148 @@ export type BroadcastTemplate = {
   bodyHtml: string
 }
 
+/** Базовый layout email: контейнер с тенью + brand-цвета + footer. */
+function emailCard(opts: {
+  accentBg: string
+  accentText: string
+  emoji: string
+  heading: string
+  body: string
+  ctaLabel: string
+  signature: string
+}): string {
+  return `<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #eef0f4">
+  <div style="background:${opts.accentBg};padding:36px 32px;text-align:center">
+    <div style="font-size:48px;line-height:1;margin-bottom:8px">${opts.emoji}</div>
+    <h1 style="margin:0;color:${opts.accentText};font-size:24px;font-weight:700;letter-spacing:-0.5px">${opts.heading}</h1>
+  </div>
+  <div style="padding:28px 32px;color:#1a2540;font-size:15px;line-height:1.65">
+    ${opts.body}
+    <div style="text-align:center;margin:28px 0 8px">
+      <a href="#" style="display:inline-block;background:#1a2540;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.2px">${opts.ctaLabel}</a>
+    </div>
+  </div>
+  <div style="background:#fafbfc;padding:16px 32px;text-align:center;border-top:1px solid #eef0f4">
+    <p style="margin:0;color:#7a8294;font-size:13px;line-height:1.5">${opts.signature}</p>
+  </div>
+</div>`
+}
+
 const TEMPLATES_RU: BroadcastTemplate[] = [
   {
     id: 'promo20',
     label: 'Акция −20%',
     emoji: '💸',
-    sms: '{salon}: −20% на маникюр всю эту неделю! Запишись в ответ или по ссылке.',
-    subject: '−20% на маникюр — только до воскресенья 💸',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Привет!</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">У нас неделя выгодных предложений — всё это время мы делаем <strong>−20% на классический и гель-маникюр</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Время идеальное чтобы освежить руки перед выходными.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться на маникюр</a></p>
-<p style="color:#888;font-size:13px;margin:0">Спасибо, что выбираете нас ❤️</p>`,
+    sms: '{salon}: {firstName}, −20% на маникюр всю эту неделю! Запишись в ответ или по ссылке.',
+    subject: '{firstName}, −20% на маникюр — только до воскресенья 💸',
+    bodyHtml: emailCard({
+      accentBg: '#fef3c7',
+      accentText: '#1a2540',
+      emoji: '💸',
+      heading: 'Неделя выгоды',
+      body: `<p style="margin:0 0 14px">Привет, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">У нас неделя выгодных предложений — всё это время делаем <strong style="color:#d97706">−20% на классический и гель-маникюр</strong>.</p>
+<p style="margin:0 0 14px">Идеальный момент освежить руки перед выходными — приходи к нам ✨</p>`,
+      ctaLabel: 'Записаться на маникюр',
+      signature: 'Спасибо что выбираешь {salon} ❤️',
+    }),
   },
   {
     id: 'birthday',
     label: 'День рождения',
     emoji: '🎂',
-    sms: '{salon}: с Днём рождения! 🎉 Дарим −30% на любую услугу в эту неделю — подари себе праздник.',
-    subject: 'С Днём рождения! Наш подарок — внутри 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">С Днём рождения! 🎂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Желаем тебе яркого года, новых побед и моментов которые хочется повторить.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">А чтобы праздник был ещё ярче — дарим <strong>−30% на любую процедуру</strong>. Промо действует всю неделю с твоего дня рождения.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться на подарок</a></p>
-<p style="color:#888;font-size:13px;margin:0">С любовью, твой салон ❤️</p>`,
+    sms: '{firstName}, с Днём рождения от {salon}! 🎉 Дарим −30% на любую услугу всю эту неделю — твой подарок ждёт.',
+    subject: '{firstName}, с Днём рождения! Наш подарок — внутри 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fce7f3',
+      accentText: '#9d174d',
+      emoji: '🎂',
+      heading: 'С Днём рождения, {firstName}!',
+      body: `<p style="margin:0 0 14px">Желаем тебе яркого года, новых побед и моментов, к которым хочется возвращаться.</p>
+<p style="margin:0 0 14px">А чтобы праздник был ещё ярче — дарим <strong style="color:#d97706">−30% на любую процедуру</strong>. Промо действует всю неделю с твоего дня рождения.</p>
+<p style="margin:0 0 0;color:#7a8294;font-size:13px">Просто запишись и скажи администратору при визите.</p>`,
+      ctaLabel: 'Записаться на подарок',
+      signature: 'С любовью, команда {salon} ❤️',
+    }),
   },
   {
     id: 'winback',
     label: 'Возвращайся',
     emoji: '💌',
-    sms: '{salon}: давно не виделись! Скучаем. Возвращайся на маникюр — у нас новые цвета сезона.',
-    subject: 'Мы скучаем 💌',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Давно не виделись 👋</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Хотим напомнить о себе и предложить вернуться — у нас новая коллекция цветов сезона, обновлённый прайс и пара новых мастеров.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Возвращайся, и мы сделаем визит особенным.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться сейчас</a></p>`,
+    sms: '{firstName}, давно не виделись! {salon} скучает. Возвращайся на маникюр — у нас новые цвета сезона 💅',
+    subject: '{firstName}, мы скучаем 💌',
+    bodyHtml: emailCard({
+      accentBg: '#e0f2fe',
+      accentText: '#0c4a6e',
+      emoji: '💌',
+      heading: '{firstName}, давно не виделись',
+      body: `<p style="margin:0 0 14px">Хотим напомнить о себе и предложить вернуться. За это время:</p>
+<ul style="margin:0 0 14px;padding-left:24px;line-height:1.8">
+  <li>📌 Обновили коллекцию цветов сезона</li>
+  <li>📌 Обновили меню процедур</li>
+  <li>📌 К команде пришли новые мастера</li>
+</ul>
+<p style="margin:0 0 14px">Возвращайся — и мы сделаем визит особенным.</p>`,
+      ctaLabel: 'Записаться сейчас',
+      signature: 'До встречи, {salon}',
+    }),
   },
   {
     id: 'new_service',
     label: 'Новая услуга',
     emoji: '✨',
-    sms: '{salon}: новая услуга в каталоге! Запишись по ссылке и попробуй первой.',
-    subject: 'Новинка в нашем каталоге ✨',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Встречай новинку ✨</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Мы расширили меню — теперь у нас новая процедура которую мы очень советуем попробовать.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Для всех клиентов кто запишется в течение 7 дней — <strong>специальная стартовая цена</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться первой</a></p>`,
+    sms: '{firstName}, в {salon} новая услуга! Запишись по ссылке и попробуй первой по специальной цене.',
+    subject: 'Новинка в {salon} — {firstName}, посмотри ✨',
+    bodyHtml: emailCard({
+      accentBg: '#ede9fe',
+      accentText: '#5b21b6',
+      emoji: '✨',
+      heading: 'Встречай новинку',
+      body: `<p style="margin:0 0 14px">Привет, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Мы расширили меню — теперь у нас новая процедура, которую очень советуем попробовать.</p>
+<p style="margin:0 0 14px">Для всех клиентов кто запишется в течение 7 дней — <strong style="color:#d97706">специальная стартовая цена</strong>.</p>`,
+      ctaLabel: 'Записаться первой',
+      signature: '{salon} · {date}',
+    }),
   },
   {
     id: 'seasonal',
     label: 'Сезонная распродажа',
     emoji: '🍂',
-    sms: '{salon}: сезонная распродажа! Скидки до 35% на топ-услуги — только эту неделю.',
-    subject: 'Сезонная распродажа: до −35%',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Сезонная распродажа 🍂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Готовимся к новому сезону вместе. На этой неделе скидки на топовые процедуры — <strong>до −35%</strong>.</p>
-<ul style="font-size:16px;line-height:1.7;margin:0 0 16px;padding-left:20px">
-<li>Маникюр + педикюр в комплексе — −25%</li>
-<li>Покрытие гель-лаком — −20%</li>
-<li>Окрашивание бровей — −35%</li>
-</ul>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться сейчас</a></p>`,
+    sms: '{firstName}, сезонная распродажа в {salon}! Скидки до 35% на топ-услуги — только эту неделю.',
+    subject: 'Сезонная распродажа: до −35% — {firstName}, успей 🍂',
+    bodyHtml: emailCard({
+      accentBg: '#fed7aa',
+      accentText: '#7c2d12',
+      emoji: '🍂',
+      heading: 'Сезонная распродажа',
+      body: `<p style="margin:0 0 14px">Привет, <strong>{firstName}</strong>! Готовимся к новому сезону вместе. На этой неделе скидки на топовые процедуры — <strong style="color:#c2410c">до −35%</strong>.</p>
+<table style="width:100%;margin:0 0 14px;border-collapse:collapse">
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Маникюр + педикюр в комплексе</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−25%</td></tr>
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Покрытие гель-лаком</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−20%</td></tr>
+  <tr><td style="padding:8px 0">Окрашивание бровей</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#c2410c">−35%</td></tr>
+</table>`,
+      ctaLabel: 'Записаться сейчас',
+      signature: 'Только до конца недели · {salon}',
+    }),
   },
   {
     id: 'holiday',
     label: 'Праздничная акция',
     emoji: '🎁',
-    sms: '{salon}: праздник близко 🎁 Запишись заранее — лучшие слоты разбирают первыми.',
-    subject: 'Праздничные слоты заканчиваются 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Праздник близко 🎁</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Хорошие слоты разбирают первыми — а перед праздниками поток клиентов всегда плотный. Запишись заранее, чтобы получить любимое время.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">А для тех кто запишется на этой неделе — <strong>бонусная процедура в подарок</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Записаться к празднику</a></p>`,
+    sms: '{firstName}, праздник близко 🎁 {salon}: запишись заранее — лучшие слоты разбирают первыми.',
+    subject: 'Праздничные слоты заканчиваются — {firstName}, успей 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fee2e2',
+      accentText: '#991b1b',
+      emoji: '🎁',
+      heading: 'Праздник близко',
+      body: `<p style="margin:0 0 14px">Привет, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Хорошие слоты разбирают первыми, а перед праздниками поток клиентов всегда плотный. Запишись заранее, чтобы получить любимое время.</p>
+<p style="margin:0 0 14px">А для тех кто запишется на этой неделе — <strong style="color:#dc2626">бонусная процедура в подарок</strong> 🎁</p>`,
+      ctaLabel: 'Записаться к празднику',
+      signature: '{salon} ждёт тебя',
+    }),
   },
 ]
 
@@ -98,73 +177,116 @@ const TEMPLATES_PL: BroadcastTemplate[] = [
     id: 'promo20',
     label: 'Promocja −20%',
     emoji: '💸',
-    sms: '{salon}: −20% na manicure przez cały tydzień! Zapisz się w odpowiedzi lub po linku.',
-    subject: '−20% na manicure — tylko do niedzieli 💸',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Cześć!</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Mamy tydzień atrakcyjnych ofert — przez cały ten czas robimy <strong>−20% na manicure klasyczny i hybrydowy</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Idealny moment, żeby odświeżyć paznokcie przed weekendem.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Zapisz się na manicure</a></p>
-<p style="color:#888;font-size:13px;margin:0">Dziękujemy, że nas wybierasz ❤️</p>`,
+    sms: '{salon}: {firstName}, −20% na manicure cały tydzień! Zapisz się w odpowiedzi lub po linku.',
+    subject: '{firstName}, −20% na manicure — tylko do niedzieli 💸',
+    bodyHtml: emailCard({
+      accentBg: '#fef3c7',
+      accentText: '#1a2540',
+      emoji: '💸',
+      heading: 'Tydzień korzystnych ofert',
+      body: `<p style="margin:0 0 14px">Cześć, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Mamy tydzień promocji — przez cały ten czas <strong style="color:#d97706">−20% na manicure klasyczny i hybrydowy</strong>.</p>
+<p style="margin:0 0 14px">Idealny moment, by odświeżyć paznokcie przed weekendem ✨</p>`,
+      ctaLabel: 'Zapisz się na manicure',
+      signature: 'Dziękujemy że wybierasz {salon} ❤️',
+    }),
   },
   {
     id: 'birthday',
     label: 'Urodziny',
     emoji: '🎂',
-    sms: '{salon}: Wszystkiego najlepszego! 🎉 −30% na dowolną usługę przez cały tydzień — sprezentuj sobie chwilę.',
-    subject: 'Wszystkiego najlepszego! Twój prezent w środku 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Wszystkiego najlepszego! 🎂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Życzymy jasnego roku, nowych sukcesów i chwil, do których chce się wracać.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">A żeby święto było jeszcze radośniejsze — dajemy <strong>−30% na dowolny zabieg</strong>. Promocja działa przez cały tydzień od Twoich urodzin.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Odbierz prezent</a></p>
-<p style="color:#888;font-size:13px;margin:0">Z miłością, Twój salon ❤️</p>`,
+    sms: '{firstName}, wszystkiego najlepszego od {salon}! 🎉 −30% na dowolną usługę cały tydzień — twój prezent czeka.',
+    subject: '{firstName}, wszystkiego najlepszego! Prezent w środku 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fce7f3',
+      accentText: '#9d174d',
+      emoji: '🎂',
+      heading: 'Wszystkiego najlepszego, {firstName}!',
+      body: `<p style="margin:0 0 14px">Życzymy Ci jasnego roku, nowych sukcesów i chwil, do których chce się wracać.</p>
+<p style="margin:0 0 14px">A żeby święto było jeszcze radośniejsze — dajemy <strong style="color:#d97706">−30% na dowolny zabieg</strong>. Promocja działa cały tydzień od Twoich urodzin.</p>
+<p style="margin:0;color:#7a8294;font-size:13px">Po prostu zapisz się i powiedz administratorowi przy wizycie.</p>`,
+      ctaLabel: 'Odbierz prezent',
+      signature: 'Z miłością, zespół {salon} ❤️',
+    }),
   },
   {
     id: 'winback',
     label: 'Wróć do nas',
     emoji: '💌',
-    sms: '{salon}: dawno się nie widzieliśmy! Tęsknimy. Wróć na manicure — mamy nowe kolory sezonu.',
-    subject: 'Tęsknimy 💌',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Dawno się nie widzieliśmy 👋</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Chcemy przypomnieć o sobie i zaprosić Cię z powrotem — mamy nową kolekcję kolorów sezonu, zaktualizowany cennik i kilku nowych mistrzów.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Wróć, a my zadbamy, by wizyta była wyjątkowa.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Zapisz się teraz</a></p>`,
+    sms: '{firstName}, dawno się nie widzieliśmy! {salon} tęskni. Wróć na manicure — mamy nowe kolory sezonu 💅',
+    subject: '{firstName}, tęsknimy 💌',
+    bodyHtml: emailCard({
+      accentBg: '#e0f2fe',
+      accentText: '#0c4a6e',
+      emoji: '💌',
+      heading: '{firstName}, dawno się nie widzieliśmy',
+      body: `<p style="margin:0 0 14px">Chcemy przypomnieć o sobie i zaprosić Cię z powrotem. W tym czasie:</p>
+<ul style="margin:0 0 14px;padding-left:24px;line-height:1.8">
+  <li>📌 Odświeżyliśmy kolekcję kolorów sezonu</li>
+  <li>📌 Zaktualizowaliśmy menu zabiegów</li>
+  <li>📌 Do zespołu dołączyli nowi mistrzowie</li>
+</ul>
+<p style="margin:0 0 14px">Wróć — a my zadbamy, by wizyta była wyjątkowa.</p>`,
+      ctaLabel: 'Zapisz się teraz',
+      signature: 'Do zobaczenia, {salon}',
+    }),
   },
   {
     id: 'new_service',
     label: 'Nowa usługa',
     emoji: '✨',
-    sms: '{salon}: nowa usługa w katalogu! Zapisz się po linku i wypróbuj jako pierwsza.',
-    subject: 'Nowość w naszym katalogu ✨',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Poznaj nowość ✨</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Rozszerzyliśmy menu — mamy nowy zabieg, który gorąco polecamy wypróbować.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Dla wszystkich klientek, które zapiszą się w ciągu 7 dni — <strong>specjalna cena startowa</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Zapisz się pierwsza</a></p>`,
+    sms: '{firstName}, w {salon} nowa usługa! Zapisz się i wypróbuj jako pierwsza po specjalnej cenie.',
+    subject: 'Nowość w {salon} — {firstName}, sprawdź ✨',
+    bodyHtml: emailCard({
+      accentBg: '#ede9fe',
+      accentText: '#5b21b6',
+      emoji: '✨',
+      heading: 'Poznaj nowość',
+      body: `<p style="margin:0 0 14px">Cześć, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Rozszerzyliśmy menu — mamy nowy zabieg, który gorąco polecamy wypróbować.</p>
+<p style="margin:0 0 14px">Dla wszystkich klientek, które zapiszą się w ciągu 7 dni — <strong style="color:#d97706">specjalna cena startowa</strong>.</p>`,
+      ctaLabel: 'Zapisz się pierwsza',
+      signature: '{salon} · {date}',
+    }),
   },
   {
     id: 'seasonal',
     label: 'Sezonowa wyprzedaż',
     emoji: '🍂',
-    sms: '{salon}: sezonowa wyprzedaż! Rabaty do 35% na top-usługi — tylko ten tydzień.',
-    subject: 'Sezonowa wyprzedaż: do −35%',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Sezonowa wyprzedaż 🍂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Przygotowujemy się do nowego sezonu razem. W tym tygodniu rabaty na top-zabiegi — <strong>do −35%</strong>.</p>
-<ul style="font-size:16px;line-height:1.7;margin:0 0 16px;padding-left:20px">
-<li>Manicure + pedicure w komplecie — −25%</li>
-<li>Hybryda — −20%</li>
-<li>Henna brwi — −35%</li>
-</ul>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Zapisz się teraz</a></p>`,
+    sms: '{firstName}, sezonowa wyprzedaż w {salon}! Rabaty do 35% na top-usługi — tylko ten tydzień.',
+    subject: 'Sezonowa wyprzedaż: do −35% — {firstName}, zdąż 🍂',
+    bodyHtml: emailCard({
+      accentBg: '#fed7aa',
+      accentText: '#7c2d12',
+      emoji: '🍂',
+      heading: 'Sezonowa wyprzedaż',
+      body: `<p style="margin:0 0 14px">Cześć, <strong>{firstName}</strong>! Przygotowujemy się do nowego sezonu razem. W tym tygodniu rabaty na top-zabiegi — <strong style="color:#c2410c">do −35%</strong>.</p>
+<table style="width:100%;margin:0 0 14px;border-collapse:collapse">
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Manicure + pedicure w komplecie</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−25%</td></tr>
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Hybryda</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−20%</td></tr>
+  <tr><td style="padding:8px 0">Henna brwi</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#c2410c">−35%</td></tr>
+</table>`,
+      ctaLabel: 'Zapisz się teraz',
+      signature: 'Tylko do końca tygodnia · {salon}',
+    }),
   },
   {
     id: 'holiday',
     label: 'Promocja świąteczna',
     emoji: '🎁',
-    sms: '{salon}: święta się zbliżają 🎁 Zapisz się z wyprzedzeniem — najlepsze sloty znikają pierwsze.',
-    subject: 'Świąteczne sloty się kończą 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Święta się zbliżają 🎁</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Najlepsze sloty znikają pierwsze — a przed świętami ruch klientek jest zawsze duży. Zapisz się z wyprzedzeniem, żeby dostać ulubioną godzinę.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">A dla tych, które zapiszą się w tym tygodniu — <strong>bonusowy zabieg w prezencie</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Zapisz się na święta</a></p>`,
+    sms: '{firstName}, święta się zbliżają 🎁 {salon}: zapisz się z wyprzedzeniem — najlepsze sloty znikają pierwsze.',
+    subject: 'Świąteczne sloty się kończą — {firstName}, zdąż 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fee2e2',
+      accentText: '#991b1b',
+      emoji: '🎁',
+      heading: 'Święta się zbliżają',
+      body: `<p style="margin:0 0 14px">Cześć, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Najlepsze sloty znikają pierwsze, a przed świętami ruch klientek jest zawsze duży. Zapisz się z wyprzedzeniem, żeby dostać ulubioną godzinę.</p>
+<p style="margin:0 0 14px">A dla tych kto zapisze się w tym tygodniu — <strong style="color:#dc2626">bonusowy zabieg w prezencie</strong> 🎁</p>`,
+      ctaLabel: 'Zapisz się na święta',
+      signature: '{salon} czeka na Ciebie',
+    }),
   },
 ]
 
@@ -173,73 +295,116 @@ const TEMPLATES_EN: BroadcastTemplate[] = [
     id: 'promo20',
     label: '−20% promo',
     emoji: '💸',
-    sms: '{salon}: −20% off manicure all week! Reply or tap the link to book.',
-    subject: '−20% off manicure — through Sunday 💸',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Hi!</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">It's promo week — we're running <strong>−20% off classic and gel manicure</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Perfect time to refresh your nails before the weekend.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Book a manicure</a></p>
-<p style="color:#888;font-size:13px;margin:0">Thanks for choosing us ❤️</p>`,
+    sms: '{salon}: {firstName}, −20% off manicure all week! Reply or tap the link to book.',
+    subject: '{firstName}, −20% off manicure — through Sunday 💸',
+    bodyHtml: emailCard({
+      accentBg: '#fef3c7',
+      accentText: '#1a2540',
+      emoji: '💸',
+      heading: 'Promo week',
+      body: `<p style="margin:0 0 14px">Hi, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">It's promo week — we're running <strong style="color:#d97706">−20% off classic and gel manicure</strong>.</p>
+<p style="margin:0 0 14px">Perfect time to refresh your nails before the weekend ✨</p>`,
+      ctaLabel: 'Book a manicure',
+      signature: 'Thanks for choosing {salon} ❤️',
+    }),
   },
   {
     id: 'birthday',
     label: 'Birthday',
     emoji: '🎂',
-    sms: '{salon}: Happy birthday! 🎉 We are gifting −30% on any service this week — treat yourself.',
-    subject: 'Happy birthday! Your gift inside 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Happy birthday! 🎂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Wishing you a bright year, new wins and moments you'll want to relive.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">To make the celebration brighter — we are gifting <strong>−30% on any treatment</strong>. Valid for the full week from your birthday.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Claim your gift</a></p>
-<p style="color:#888;font-size:13px;margin:0">Love, your salon ❤️</p>`,
+    sms: '{firstName}, happy birthday from {salon}! 🎉 −30% off any service this week — your gift is waiting.',
+    subject: '{firstName}, happy birthday! Your gift inside 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fce7f3',
+      accentText: '#9d174d',
+      emoji: '🎂',
+      heading: 'Happy birthday, {firstName}!',
+      body: `<p style="margin:0 0 14px">Wishing you a bright year, new wins and moments you'll want to relive.</p>
+<p style="margin:0 0 14px">To make the celebration brighter — we're gifting <strong style="color:#d97706">−30% on any treatment</strong>. Valid for the full week from your birthday.</p>
+<p style="margin:0;color:#7a8294;font-size:13px">Just book and mention it at the visit.</p>`,
+      ctaLabel: 'Claim your gift',
+      signature: 'With love, the {salon} team ❤️',
+    }),
   },
   {
     id: 'winback',
     label: 'Win-back',
     emoji: '💌',
-    sms: '{salon}: long time no see! We miss you. Come back for a manicure — new seasonal colors are in.',
-    subject: 'We miss you 💌',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Long time no see 👋</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Just a friendly reminder — we have a fresh seasonal palette, updated menu, and a couple of new masters.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Come back, and we'll make your visit special.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Book now</a></p>`,
+    sms: '{firstName}, long time no see! {salon} misses you. Come back for a manicure — new seasonal colors are in 💅',
+    subject: '{firstName}, we miss you 💌',
+    bodyHtml: emailCard({
+      accentBg: '#e0f2fe',
+      accentText: '#0c4a6e',
+      emoji: '💌',
+      heading: '{firstName}, long time no see',
+      body: `<p style="margin:0 0 14px">A friendly reminder. While you've been away:</p>
+<ul style="margin:0 0 14px;padding-left:24px;line-height:1.8">
+  <li>📌 New seasonal color palette</li>
+  <li>📌 Updated treatment menu</li>
+  <li>📌 A couple of new masters on the team</li>
+</ul>
+<p style="margin:0 0 14px">Come back, and we'll make your visit special.</p>`,
+      ctaLabel: 'Book now',
+      signature: 'See you soon, {salon}',
+    }),
   },
   {
     id: 'new_service',
     label: 'New service',
     emoji: '✨',
-    sms: '{salon}: new service in our menu! Tap the link to be the first to try.',
-    subject: 'New addition to our menu ✨',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Meet the new ✨</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">We've expanded our menu — there's a new treatment we strongly recommend trying.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Anyone who books within the next 7 days gets a <strong>special intro price</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Be the first</a></p>`,
+    sms: '{firstName}, new service at {salon}! Tap the link to be the first to try at intro pricing.',
+    subject: 'New at {salon} — {firstName}, check it out ✨',
+    bodyHtml: emailCard({
+      accentBg: '#ede9fe',
+      accentText: '#5b21b6',
+      emoji: '✨',
+      heading: 'Meet the new',
+      body: `<p style="margin:0 0 14px">Hi, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">We've expanded our menu — there's a new treatment we strongly recommend trying.</p>
+<p style="margin:0 0 14px">Anyone who books within the next 7 days gets a <strong style="color:#d97706">special intro price</strong>.</p>`,
+      ctaLabel: 'Be the first',
+      signature: '{salon} · {date}',
+    }),
   },
   {
     id: 'seasonal',
     label: 'Seasonal sale',
     emoji: '🍂',
-    sms: '{salon}: seasonal sale! Up to 35% off top services — this week only.',
-    subject: 'Seasonal sale: up to −35%',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Seasonal sale 🍂</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Getting ready for the new season together. This week — discounts on top treatments <strong>up to −35%</strong>.</p>
-<ul style="font-size:16px;line-height:1.7;margin:0 0 16px;padding-left:20px">
-<li>Manicure + pedicure combo — −25%</li>
-<li>Gel polish — −20%</li>
-<li>Brow tinting — −35%</li>
-</ul>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#d96b6b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Book now</a></p>`,
+    sms: '{firstName}, seasonal sale at {salon}! Up to 35% off top services — this week only.',
+    subject: 'Seasonal sale: up to −35% — {firstName}, hurry 🍂',
+    bodyHtml: emailCard({
+      accentBg: '#fed7aa',
+      accentText: '#7c2d12',
+      emoji: '🍂',
+      heading: 'Seasonal sale',
+      body: `<p style="margin:0 0 14px">Hi, <strong>{firstName}</strong>! Getting ready for the new season together. This week — top treatments <strong style="color:#c2410c">up to −35%</strong>.</p>
+<table style="width:100%;margin:0 0 14px;border-collapse:collapse">
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Manicure + pedicure combo</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−25%</td></tr>
+  <tr><td style="padding:8px 0;border-bottom:1px solid #fed7aa">Gel polish</td><td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;font-weight:700;color:#c2410c">−20%</td></tr>
+  <tr><td style="padding:8px 0">Brow tinting</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#c2410c">−35%</td></tr>
+</table>`,
+      ctaLabel: 'Book now',
+      signature: 'Until end of week · {salon}',
+    }),
   },
   {
     id: 'holiday',
     label: 'Holiday promo',
     emoji: '🎁',
-    sms: '{salon}: holidays are coming 🎁 Book early — best slots go first.',
-    subject: 'Holiday slots filling up 🎁',
-    bodyHtml: `<h2 style="color:#1a2540;margin:0 0 12px">Holidays are coming 🎁</h2>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Best slots go first — and pre-holiday traffic is always heavy. Book early to get your favorite time.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Anyone who books this week — <strong>bonus treatment as a gift</strong>.</p>
-<p style="font-size:16px;line-height:1.6;margin:0 0 24px"><a href="#" style="background:#1a2540;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Book for the holidays</a></p>`,
+    sms: '{firstName}, holidays are coming 🎁 {salon}: book early — best slots go first.',
+    subject: 'Holiday slots filling up — {firstName}, hurry 🎁',
+    bodyHtml: emailCard({
+      accentBg: '#fee2e2',
+      accentText: '#991b1b',
+      emoji: '🎁',
+      heading: 'Holidays are coming',
+      body: `<p style="margin:0 0 14px">Hi, <strong>{firstName}</strong>!</p>
+<p style="margin:0 0 14px">Best slots go first, and pre-holiday traffic is heavy. Book early to get your favorite time.</p>
+<p style="margin:0 0 14px">Anyone who books this week — <strong style="color:#dc2626">bonus treatment as a gift</strong> 🎁</p>`,
+      ctaLabel: 'Book for the holidays',
+      signature: '{salon} is waiting for you',
+    }),
   },
 ]
 

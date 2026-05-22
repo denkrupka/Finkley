@@ -3839,7 +3839,7 @@
         "review_request": {
           "title": "Review request",
           "short": "After a paid visit the client receives a link: 5★ → Google Maps, 1–4★ → internal form.",
-          "long": "Right after the visit is marked paid, the client automatically receives a short «rate 1 to 5» link — sent simultaneously to SMS and Email (only on channels enabled in the table below).\n\n5★ → redirect to your Google Maps page (boosts Google rating).\n1–4★ → internal feedback form (won't leak publicly).\n\nThe same visit is processed only once — no duplicate messages."
+          "long": "Right after the visit is marked paid, the client automatically receives a short «rate 1 to 5» link. Channel — SMS and/or Email depending on what's enabled in this Marketing → Broadcasts table. If both are on, the client gets SMS and Email at the same time.\n\nLogic by rating:\n— 5★ → redirect to your Google Maps page (boosts Google rating).\n— 1–4★ → internal feedback form (won't leak publicly, visible only to you in Reports → Reviews → Internal).\n\nThe same visit is processed only once — no duplicate messages."
         }
       }
     }

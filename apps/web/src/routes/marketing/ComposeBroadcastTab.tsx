@@ -503,6 +503,31 @@ function PreviewStat({
  * Селект тега клиента: тянем уникальные теги по всем клиентам салона + опция
  * для свободного ввода (если нужного тега ещё нет в системе).
  */
+/**
+ * Booksy импорт приходит с техническими тегами вроде `booksy:app_user`,
+ * `booksy:blacklisted`. Юзер видит человекочитаемый перевод, value
+ * остаётся техническим (для filter в backend).
+ */
+function humanizeTag(tag: string, t: (k: string) => string): string {
+  const map: Record<string, string> = {
+    'booksy:app_user': t('marketing.compose.tag_booksy_app_user'),
+    'booksy:blacklisted': t('marketing.compose.tag_booksy_blacklisted'),
+    'booksy:frequent_no_show': t('marketing.compose.tag_booksy_no_show'),
+    'booksy:from_promo': t('marketing.compose.tag_booksy_from_promo'),
+    'booksy:vip': t('marketing.compose.tag_booksy_vip'),
+    'booksy:new': t('marketing.compose.tag_booksy_new'),
+    'booksy:returning': t('marketing.compose.tag_booksy_returning'),
+    'booksy:loyal': t('marketing.compose.tag_booksy_loyal'),
+  }
+  if (map[tag]) return map[tag]
+  // Booksy неизвестные теги: «booksy:something_else» → «Booksy: Something else»
+  if (tag.startsWith('booksy:')) {
+    const rest = tag.slice(7).replace(/_/g, ' ')
+    return `Booksy: ${rest.charAt(0).toUpperCase()}${rest.slice(1)}`
+  }
+  return tag
+}
+
 function TagSelect({
   salonId,
   value,
@@ -547,12 +572,14 @@ function TagSelect({
               ? t('marketing.compose.tag_no_tags')
               : t('marketing.compose.tag_placeholder')
           }
-        />
+        >
+          {value ? humanizeTag(value, t) : null}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((tag) => (
           <SelectItem key={tag} value={tag}>
-            {tag}
+            {humanizeTag(tag, t)}
           </SelectItem>
         ))}
       </SelectContent>

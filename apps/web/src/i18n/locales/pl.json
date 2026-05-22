@@ -3839,7 +3839,7 @@
         "review_request": {
           "title": "Prośba o opinię",
           "short": "Po opłaconej wizycie klient dostaje link: 5★ → Google Maps, 1–4★ → wewnętrzny formularz.",
-          "long": "Zaraz po oznaczeniu wizyty jako opłacona klient automatycznie otrzymuje krótki link «oceń 1–5» — wysyłany jednocześnie na SMS i Email (tylko na kanały włączone w tabeli poniżej).\n\n5★ → przekierowanie na Twoją stronę Google Maps (podnosi ocenę w Google).\n1–4★ → wewnętrzny formularz feedbacku (nie wycieknie na zewnątrz).\n\nTa sama wizyta przetwarza się tylko raz — bez duplikatów."
+          "long": "Zaraz po rozliczeniu wizyty klient automatycznie dostaje krótki link «oceń 1–5». Kanał — SMS i/lub Email, w zależności od tego co włączone w tej tabeli Marketing → Wysyłki. Jeśli oba — klient dostanie SMS i Email naraz.\n\nLogika według oceny:\n— 5★ → przekierowanie na Twoją stronę Google Maps (podnosi ocenę w Google).\n— 1–4★ → wewnętrzny formularz feedbacku (nie wycieknie na zewnątrz, widoczny tylko Tobie w Reports → Opinie → Wewnętrzne).\n\nTa sama wizyta przetwarza się tylko raz — bez duplikatów."
         }
       }
     }

@@ -164,12 +164,46 @@ Deno.serve(async (req: Request) => {
   let skippedNoBalance = 0
   let skippedPaused = 0
 
+  /**
+   * Подставляет переменные {name}, {firstName}, {salon}, {date} в текст.
+   * Используется для SMS, email subject и email body.
+   */
+  function interpolate(text: string, client: ClientRow): string {
+    const fullName = (client.name ?? '').trim()
+    const firstName = fullName.split(/\s+/)[0] ?? fullName
+    const today = new Date().toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+    })
+    return text
+      .replace(/\{name\}/g, fullName || firstName || 'клиент')
+      .replace(/\{firstName\}/g, firstName || fullName || 'клиент')
+      .replace(/\{salon\}/g, salonName)
+      .replace(/\{date\}/g, today)
+  }
+
+  /**
+   * Если текст уже содержит HTML-теги — отдаём как есть (шаблоны из rich-text
+   * editor приходят с <p>/<strong>/<a>). Иначе обёртываем в простой <p> и
+   * заменяем \n → <br>.
+   */
+  function ensureHtml(body: string): string {
+    if (/<\w+[\s>]/.test(body)) return body
+    return `<p style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5">${escapeHtml(
+      body,
+    ).replace(/\n/g, '<br>')}</p>`
+  }
+
   for (const c of eligible) {
-    if (channels.sms && c.phone && sms_text) {
+    const personalizedSms = sms_text ? interpolate(sms_text, c) : undefined
+    const personalizedSubject = email_subject ? interpolate(email_subject, c) : undefined
+    const personalizedBody = email_body ? interpolate(email_body, c) : undefined
+
+    if (channels.sms && c.phone && personalizedSms) {
       const r = await sendSmsForSalon(admin, {
         salonId: salon_id,
         to: c.phone,
-        text: sms_text,
+        text: personalizedSms,
         messageType: 'manual',
         clientId: c.id,
       })
@@ -183,10 +217,8 @@ Deno.serve(async (req: Request) => {
         failedSms++
       }
     }
-    if (channels.email && c.email && email_subject && email_body && RESEND_API_KEY) {
-      const html = `<p style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5">${escapeHtml(
-        email_body,
-      ).replace(/\n/g, '<br>')}</p>`
+    if (channels.email && c.email && personalizedSubject && personalizedBody && RESEND_API_KEY) {
+      const html = ensureHtml(personalizedBody)
       try {
         const rEmail = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -197,8 +229,10 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             from: RESEND_FROM,
             to: [c.email],
-            subject: email_subject,
-            text: email_body,
+            subject: personalizedSubject,
+            // text-версия — без HTML, для клиентов без поддержки. Берём тот же
+            // body но если он HTML — strip tags грубо.
+            text: personalizedBody.replace(/<[^>]+>/g, ''),
             html,
             headers: { 'X-Finkley-Salon': salonName },
           }),
