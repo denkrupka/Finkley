@@ -1,79 +1,130 @@
-# MORNING NOTE — финал i18n-цикла
+# MORNING NOTE — ночь 21→22 мая 2026
 
-> Финальный summary всей i18n-перестройки и сопутствующих фиксов. После этого
-> приложение полностью локализовано RU/PL/EN — от UI до email/push и backend AI.
+> Ночная серия из 18 задач (TaskList #32..#48). Юзер ушёл спать со словами
+> «доделывай всё, не останавливайся, на спорных моментах выбирай сам».
+> Доделано всё, кроме явных follow-up'ов (выписаны в конце).
 
-## 🎯 Главное — что протестировать в первую очередь
+## 🎯 Что протестировать в первую очередь
 
-1. **Ctrl+Shift+R** в браузере (новый SW + размеры chunk'ов).
-2. **Сменить язык** через 🌐 dropdown — должно автосохраниться в profiles.locale, на новом устройстве должно подтянуться.
-3. **Booksy → Sync now** — все 28 услуг должны разлететься по категориям, получить duration/price.
-4. **/services → «Задать себестоимость»** — поставить 30%, маржа моментально появится в /reports → услуги.
-5. **VisitDetailModal → «+ Добавить услугу»** — выбрать услугу из списка, должна добавиться в группу.
-6. **EN/PL email**: создать тестового invitee на en/pl → должен прийти EN/PL welcome/team_invitation.
+1. **`/marketing` → таб «Рассылки»** — теперь по дефолту все каналы ВЫКЛЮЧЕНЫ
+   (safe-by-default). Включи нужные галочки, потом жми «Тест» → выбор
+   SMS/Email + ввод своего номера → реальная отправка с теми же
+   шаблонами, что получают клиенты.
+2. **SMSAPI «Тест» работает** — был баг с endpoint .com vs .pl, твой
+   токен в PL-регионе, теперь подключено правильно. Аккаунт
+   `biuro@maxmaster.info`, баланс 6.63 SMS.
+3. **`/marketing` → новая таба «Создать рассылку»** — сегмент клиентов
+   (все/новые 1 визит/постоянные 5+/давно не были 90+/по тегу) + SMS/
+   email тексты + превью «сколько уйдёт» + отправка.
+4. **Онбординг переделан** — выбор «Быстрая (3 шага) / Полная (9 шагов)».
+   В Done — paywall-блок с trial 14 дней, после submit → Stripe Checkout.
+5. **Reports → Конкуренты → Контент** — свой салон теперь в первой строке
+   с реальными числами (followers/posts/likes), если есть instagram_url/
+   facebook_url в Settings → Профиль. Cron собирает каждую ночь.
+6. **Reports → Мастера** — таблица «Эффективность мастеров» переделана:
+   убрана колонка «Возвраты», вместо неё «Возврат новых» (% клиентов
+   с 1-м визитом, которые вернулись) и «Удержание постоянных» (% от
+   ≥2-визитов, кто пришёл в этом периоде). Плюс колонки «Услуги» /
+   «Доп.продажи» / «Чаевые».
 
-## 📦 Что сделано в этом цикле (60+ коммитов)
+## 📦 18 закатанных задач (по TaskList)
 
-### Booksy fixes
+### Фиксы
 
-- Категории импортируются (миграция `service_categories.external_*` + syncCatalog маппит cat → service).
-- duration_min/price извлекаются из `variants[0]` (Booksy сменили schema).
-- Cash mapping `payment_method → cash_register_id` через `salons.financial_settings.cash_registers[*].payment_method_mapping`.
+- **#37** Отзывы импорт 0 → 5: partial unique index ломал `ON CONFLICT`,
+  переписал на manual dedup. Google API работает, Wondefrul: 5 отзывов.
+- **#40+#41** `permission denied for create_salon_with_setup` — добавлен
+  grant для anon role (функция сама проверяет `auth.uid()`). Кнопка
+  «Открыть дашборд» теперь работает.
+- **#46** SMSAPI 401 — был `.com`, нужно `.pl` (регион токена).
+- **#34** «return_period_days+3 (грейс)» → человеческий текст.
 
-### UI i18n (1635 ключей RU/PL/EN)
+### Новые UI
 
-- Полный перевод EN+PL вручную.
-- `useI18nSync()` — авто-подтягивание `profile.locale`. LocaleSwitcher сохраняет обратно.
-- `getDateLocale()` + `getCurrencyLocale()` — даты и валюта по `i18n.language`.
-- `useBulkSetServiceCost(percent, overwrite)` — UI-кнопка «Задать себестоимость» в /services.
-- VisitDetailModal: «+ Добавить услугу» работает (inline picker, создаёт visit в той же группе).
+- **#33** Reports/Услуги: колонка «Цена» + Доход/час теперь unit-rate
+  (price/duration\*60), а не агрегат от выручки.
+- **#35** Reports/Мастера: 2 retention-метрики + Услуги/Доп.продажи/Чаевые.
+- **#36** Финансы/ДДС: клик на визит → открывает VisitDetailModal
+  (как в календаре, не QuickEntryModal).
+- **#21** «Добавить конкурента» — Google Maps поиск.
+- **#23** Скрипт работы с возражениями: убрана подпись «Wonderful Beauty».
+- **#39** Reports/Конкуренты: автоподбор учитывает тип салона и
+  watched_services. Блок «Какие услуги мониторить» перемещён на 2-е место.
 
-### Edge functions i18n
+### SMS-биллинг (ещё с прошлой сессии)
 
-- **AI** (3): `ai-report-insights`, `ai-assistant`, `generate-insights` — отвечают на языке юзера, system prompts параметризованы.
-- **Push/Telegram/Email cron** (3): `payment-reminders`, `daily-notifications`, `send-daily-digest`. STR-dicts в `_shared/notifications-i18n.ts`.
-- **Email templates** (11/11): welcome, team*invitation, weekly_digest, trial_ending, payment*\*, subscription_canceled, gdpr_export, bank_consent_expiring, privacy_alert. LOCALE_OVERRIDES в `send-email/templates.ts`.
-- **Каскад выбора локали** `pickLocale()` в `_shared/salon-lookup.ts`: profile.locale → salon.locale → country_code → 'ru'.
+- **#42** Онбординг: 2 пути (Быстрая/Полная) + TutorialNote на каждом
+  шаге + Stripe paywall в финале.
+- **#43** Paywall: trial 14 дней, opt-out чек-бокс, после submit →
+  Stripe Checkout, graceful fallback на dashboard если Stripe фейлит.
+- **#44** Доп. шаги Full path: Адрес (Google Maps), Бухгалтерия (NIP),
+  Интеграции (opt-in Booksy/wFirma/Banking).
 
-### Performance
+### Интеграции
 
-- **Lazy locales**: `ru.json` eager, `en.json`/`pl.json` через dynamic `import()`. Main bundle 535KB → **273KB** (gzip 188KB → **98KB**).
-- **Recharts chunk**: вытащен из page-chunks, отдельный 406KB chunk (110KB gzip). FinancePage -23KB.
+- **#38** salons.instagram_url, salons.facebook_url + UI поля в Settings.
+- **#45** Settings → Интеграции → новая вкладка «Соцсети» (статус FB+IG
+  с messenger_integrations + кнопка Connect → Messengers таб).
+- **#47** Reports/Конкуренты/Контент — свой салон через scrape.
+  Новая таблица `own_salon_metrics`, расширена `competitor-sync`.
 
-### Tests (155 → 187, всё зелёное)
+### Refactor
 
-- `booksy-cash-mapping` (10) — payment_method → cash_register_id
-- `booksy-overwrite` (18) — anti-overwrite snapshot policy ADR-017 §4
-- `booksy-service-extract` (12) — variants[0] vs legacy schema
-- `ics-helpers` (21) — RFC 5545 ICS serialization
-- `notifications-i18n` (12) — makeT + normalizeNotifLocale
-- `format-currency` (5 new) — getCurrencyLocale auto-detect
-- `pick-locale` (12) — каскад profile→salon→country→ru
+- **#32** Шаблоны рассылок вынесены в `_shared/broadcast-templates.ts` —
+  один источник истины для send-review-request / client-overdue-push /
+  marketing-test-send. «Тест» теперь шлёт 1-в-1 клиентский текст.
 
-## ⚙️ Что нужно настроить в Supabase env
+### Тесты
 
-Без них соответствующие каналы silent-skip:
+- **#48** 29 новых unit-тестов для критичных helpers:
+  filterBySegment (10), gateSendDecision (12), normalize prefs (7).
+  Всего тестов: 245.
 
-- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — Web Push
-- `RESEND_API_KEY` — email через resend.com
-- `TELEGRAM_BOT_TOKEN` — TG канал
-- `ANTHROPIC_API_KEY` — AI polish инсайтов
+## 🚀 Прод состояние (8 коммитов за ночь)
 
-## 🐛 Что осталось (мелочи, можно ignorить)
+| Commit    | Что                                           |
+| --------- | --------------------------------------------- |
+| `909da55` | 29 тестов для марketing/sms/broadcast helpers |
+| `f215502` | Свой салон в Reports/Конкуренты через scrape  |
+| `16aba95` | SMSAPI endpoint .pl фикс                      |
+| `b0f75db` | Settings → Интеграции → Соцсети               |
+| `eead721` | Stripe paywall + 3 шага в Full онбординг      |
+| `3f83542` | Reports/Мастера retention split               |
+| `2f4b29a` | Клик-визит в ДДС                              |
+| `437f9fa` | IG/FB поля салона                             |
+| `4e14079` | Отзывы 0→5 фикс                               |
+| `e2a6782` | 2-путь онбординг                              |
+| `76f62ea` | Конкуренты по типу+услугам                    |
+| `40d3d78` | Reports/Услуги: Цена + unit-rate              |
+| `ff771d2` | broadcast-templates refactor                  |
 
-- `AdminMediaPage` 423KB chunk — admin-only lazy, приемлемо.
-- `TesterBugModal` 236KB chunk — tester-only.
-- `ai-seo-helper`, `ocr-receipt`, `telegram-bug-collector` — admin/internal, RU-only.
-- "Show tour" из Help-таба — не реализовано (комментарий в OnboardingTour:75).
-- `salon.locale` UI — нет UI-выбора, только онбординг и BD-fallback.
+## 🗃️ Миграции в проде (применены через Management API)
 
-## 🚀 Финальное состояние
+- `20260521000023` — broadcast_prefs default OFF
+- `20260522000001` — anon grant create_salon_with_setup
+- `20260522000002` — salons.instagram_url, facebook_url
+- `20260522000003` — own_salon_metrics
 
-- **187 тестов** проходят (1 skipIf для remote Supabase).
-- **typecheck + lint** зелёные.
-- **build** собирается, главный chunk 273KB.
-- 11/11 email шаблонов локализованы (3 локали).
-- Все user-visible AI ответы на языке юзера.
-- Каскад `profile → salon → country → ru` работает для серверных уведомлений.
+## ⚠️ Открытые follow-up'ы (явно НЕ доделаны, требуют решения)
 
-Все коммиты в `main`. Deploy ушёл.
+- **Booksy URL у Wondefrul обрезан** до `/a` — обнови на полный URL и
+  ручной импорт даст 702 booksy-отзыва (если парсер Booksy не сломан).
+- **Шаги Склад/Доходы в Full онбординг** — оставлены как Settings-flow
+  после онбординга (иначе 11 шагов, слишком длинно). Если нужно
+  отдельными шагами — скажи, добавлю как info-промо.
+- **Meta Graph API через токены** — сейчас метрики тянутся scrape'ом
+  (быстро, без OAuth). Точнее было бы через access_token из
+  messenger_integrations.credentials (encrypted). Требует расширения
+  decrypt-helper'а и FB Pages scope. Низкий приоритет — scrape работает.
+- **E2E тесты в браузере** — не запускал. typecheck + lint + 245 unit-
+  тестов passed, но кликать руками не проверял.
+
+## 💡 Что ещё могу сделать без твоего участия
+
+- ADR-документы для значимых решений (broadcast safe-by-default, SMSAPI
+  region detection, partial unique index)
+- Polish UI (find visible bugs / consistency)
+- Performance optimization (lazy-load больших chunks)
+- Документация для новых функций (sms-billing.md, marketing-broadcasts.md)
+
+Скажи приоритет — продолжу.
