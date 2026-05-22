@@ -17,9 +17,14 @@ export function SubscriptionBanner() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const { data: salon } = useSalon(salonId)
-  const { data: sub } = useSubscription(salonId)
+  const { data: sub, isLoading: subLoading } = useSubscription(salonId)
 
   if (!salon || !salonId) return null
+  // Пока подписка ещё грузится — баннер не показываем. Иначе вспышка
+  // «Подписка не активна» на каждой загрузке страницы у юзеров с активной
+  // подпиской, чей салон старше 14-дневного grace-period (isSubscriptionActive
+  // вернёт false для null sub в этом случае).
+  if (subLoading) return null
 
   const active = isSubscriptionActive(sub ?? null, salon.created_at)
 
