@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -44,6 +44,24 @@ export function BankingSection({ salonId }: Props) {
   const disconnect = useBankDisconnect(salonId)
   const [connectOpen, setConnectOpen] = useState(false)
   const [reconnectFor, setReconnectFor] = useState<BankConnectionRow | null>(null)
+  const autoSyncedRef = useRef<Set<string>>(new Set())
+
+  // Auto-sync свежеподключённых connections. Когда юзер вернулся из OAuth
+  // callback, server-side trigger мог не сработать (FUNCTION_INTERNAL_SECRET
+  // не задан / banking-sync упал). UI сам дёрнет sync если есть connection
+  // с status='connected' но без last_synced_at. One-shot per session per id.
+  useEffect(() => {
+    for (const c of connections) {
+      if (c.status !== 'connected') continue
+      if (c.last_synced_at) continue
+      if (autoSyncedRef.current.has(c.id)) continue
+      autoSyncedRef.current.add(c.id)
+      sync.mutate(c.id, {
+        onError: (e) => console.warn('bank auto-sync failed:', c.id, e),
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections])
 
   function accountsFor(connectionId: string) {
     return accounts.filter((a) => a.connection_id === connectionId)
