@@ -1,11 +1,19 @@
 import { AlertCircle, Loader2, Mail, MessageSquare, Send, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useClients } from '@/hooks/useClients'
 import { useBroadcastPreview, useSendBroadcast, type BroadcastSegment } from '@/hooks/useMarketing'
 import { cn } from '@/lib/utils/cn'
 
@@ -138,12 +146,11 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
             />
             {t('marketing.compose.segment_by_tag')}
           </Label>
-          <Input
+          <TagSelect
+            salonId={salonId}
             value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
+            onChange={setTagInput}
             disabled={!useTagSegment}
-            placeholder={t('marketing.compose.tag_placeholder')}
-            className="max-w-[260px]"
           />
         </div>
       </section>
@@ -395,5 +402,66 @@ function PreviewStat({
         {value}
       </p>
     </div>
+  )
+}
+
+/**
+ * Селект тега клиента: тянем уникальные теги по всем клиентам салона + опция
+ * для свободного ввода (если нужного тега ещё нет в системе).
+ */
+function TagSelect({
+  salonId,
+  value,
+  onChange,
+  disabled,
+}: {
+  salonId: string
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+}) {
+  const { t } = useTranslation()
+  const { data: clients = [] } = useClients(salonId, { search: '', sort: 'name' })
+  const tags = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of clients) {
+      for (const tag of c.tags ?? []) {
+        const tr = tag.trim()
+        if (tr) set.add(tr)
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [clients])
+
+  // Если value не пустое и его нет в tags — добавим как «свой тег» в начало
+  // списка, чтобы юзер видел свой выбор.
+  const options = useMemo(() => {
+    if (value && !tags.includes(value)) return [value, ...tags]
+    return tags
+  }, [value, tags])
+
+  return (
+    <Select
+      value={value || undefined}
+      onValueChange={(v) => onChange(v)}
+      disabled={disabled || tags.length === 0}
+    >
+      <SelectTrigger className="max-w-[260px]">
+        <SelectValue
+          placeholder={
+            tags.length === 0
+              ? t('marketing.compose.tag_no_tags')
+              : t('marketing.compose.tag_placeholder')
+          }
+        />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((tag) => (
+          <SelectItem key={tag} value={tag}>
+            {tag}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
