@@ -229,6 +229,8 @@ function DataSection({
           currency={currency}
           t={t}
         />
+      ) : kind === 'occupancy' ? (
+        <OccupancyTable salonId={salonId} competitors={competitors} snapshots={snapshots} t={t} />
       ) : (
         <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
@@ -1150,6 +1152,228 @@ function CompetitorsSyncStatusBar({
     <div className="border-brand-sage-soft bg-brand-sage-soft/30 text-brand-sage-deep mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
       <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
       <span className="font-semibold">{t('reports_hub.competitors.sync_status_bar')}</span>
+    </div>
+  )
+}
+
+// =============================================================================
+// OccupancyTable — слоты конкурентов на ближайшие 7 дней по top-5 услугам.
+// =============================================================================
+
+type OccupancyService = {
+  name: string
+  duration_min: number
+  staff_count: number
+  free_slots_7d: number
+  days_covered: number
+}
+
+function OccupancyTable({
+  salonId,
+  competitors,
+  snapshots,
+  t,
+}: {
+  salonId: string
+  competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
+  snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const refresh = useRefreshReportInsights(salonId)
+  const [insights, setInsights] = useState<{ title: string; body: string }[] | null>(null)
+
+  // Собираем последний occupancy-snapshot на каждого конкурента.
+  const latestByCompetitor = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof snapshots>[number]>()
+    for (const s of snapshots ?? []) {
+      if (s.kind !== 'occupancy') continue
+      const prev = map.get(s.competitor_id)
+      if (!prev || prev.snapshot_date < s.snapshot_date) {
+        map.set(s.competitor_id, s)
+      }
+    }
+    return map
+  }, [snapshots])
+
+  // Уплощаем: каждая строка = (competitor × его услуга-snapshot).
+  type Row = {
+    competitorId: string
+    competitorName: string
+    service: OccupancyService
+    totalStaff: number
+  }
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = []
+    for (const c of competitors) {
+      const snap = latestByCompetitor.get(c.id)
+      if (!snap) continue
+      const data = snap.data as { services?: OccupancyService[]; total_staff?: number }
+      const services = Array.isArray(data.services) ? data.services : []
+      for (const svc of services) {
+        out.push({
+          competitorId: c.id,
+          competitorName: c.name,
+          service: svc,
+          totalStaff: data.total_staff ?? 0,
+        })
+      }
+    }
+    return out
+  }, [competitors, latestByCompetitor])
+
+  // Среднее по всем — для % vs средний.
+  const avgSlotsByService = useMemo(() => {
+    const map = new Map<string, number>()
+    const buckets = new Map<string, number[]>()
+    for (const r of rows) {
+      const list = buckets.get(r.service.name) ?? []
+      list.push(r.service.free_slots_7d)
+      buckets.set(r.service.name, list)
+    }
+    for (const [name, list] of buckets.entries()) {
+      const avg = list.reduce((s, x) => s + x, 0) / list.length
+      map.set(name, avg)
+    }
+    return map
+  }, [rows])
+
+  function runAi() {
+    const payload = {
+      week_days: 7,
+      services: rows.map((r) => ({
+        competitor: r.competitorName,
+        service: r.service.name,
+        duration_min: r.service.duration_min,
+        staff_count: r.service.staff_count,
+        free_slots_7d: r.service.free_slots_7d,
+        days_with_slots: r.service.days_covered,
+      })),
+    }
+    refresh.mutate(
+      { kind: 'competitors_prices' as const, payload },
+      {
+        onSuccess: (list) => setInsights(list),
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">
+                {t('reports_hub.competitors.col_competitor')}
+              </th>
+              <th className="px-4 py-3 text-left font-semibold">
+                {t('reports_hub.competitors.col_service')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_staff_count')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_slots_7d')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_days_covered')}
+              </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_vs_avg')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-muted-foreground px-5 py-12 text-center text-sm">
+                  {t('reports_hub.competitors.occupancy_empty')}
+                </td>
+              </tr>
+            ) : (
+              rows.map((r, i) => {
+                const avg = avgSlotsByService.get(r.service.name) ?? 0
+                const diffPct =
+                  avg > 0 ? Math.round(((r.service.free_slots_7d - avg) / avg) * 100) : null
+                return (
+                  <tr key={`${r.competitorId}_${i}`}>
+                    <td className="text-foreground px-4 py-3 font-semibold">{r.competitorName}</td>
+                    <td className="text-foreground px-4 py-3 text-xs">
+                      {r.service.name}
+                      {r.service.duration_min ? (
+                        <span className="text-muted-foreground ml-1">
+                          · {r.service.duration_min} {t('common.min')}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="num text-foreground px-3 py-3 text-right">
+                      {r.service.staff_count}
+                    </td>
+                    <td className="num text-foreground px-3 py-3 text-right font-bold">
+                      {r.service.free_slots_7d}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                      {r.service.days_covered} / 7
+                    </td>
+                    <td
+                      className={cn(
+                        'num px-3 py-3 text-right font-bold',
+                        diffPct == null
+                          ? 'text-muted-foreground/60'
+                          : diffPct > 10
+                            ? 'text-emerald-700'
+                            : diffPct < -10
+                              ? 'text-rose-600'
+                              : 'text-muted-foreground',
+                      )}
+                    >
+                      {diffPct == null ? '—' : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="border-brand-sage-deep/30 from-brand-sage/5 rounded-lg border bg-gradient-to-br to-transparent p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
+            <Sparkles className="text-brand-sage-deep size-4" strokeWidth={2} />
+            {t('reports_hub.competitors.ai_title')}
+          </h4>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={runAi}
+            disabled={refresh.isPending || rows.length === 0}
+          >
+            {refresh.isPending
+              ? t('common.loading')
+              : insights
+                ? t('reports_hub.competitors.ai_refresh')
+                : t('reports_hub.competitors.ai_generate')}
+          </Button>
+        </div>
+        {insights == null ? (
+          <p className="text-muted-foreground text-xs">
+            {t('reports_hub.competitors.ai_occupancy_hint')}
+          </p>
+        ) : insights.length === 0 ? (
+          <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.ai_empty')}</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {insights.map((it, i) => (
+              <li key={i} className="border-border bg-card rounded-md border p-3">
+                <p className="text-foreground text-xs font-bold">{it.title}</p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{it.body}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }

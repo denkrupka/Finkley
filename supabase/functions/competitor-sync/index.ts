@@ -172,6 +172,7 @@ function parseBooksyUrl(url: string): { region: string; businessId: string } | n
 // Покрывает все услуги конкурента — основа для матча с нашими услугами в UI Цены.
 // =============================================================================
 type BooksyVariant = {
+  id?: number
   name: string
   treatment_name?: string
   price_cents: number
@@ -208,6 +209,7 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
             treatment?: { name?: string }
             price?: number
             variants?: Array<{
+              id?: number
               label?: string
               duration?: number
               price?: number
@@ -233,6 +235,7 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
             if (typeof v.price !== 'number') continue
             const label = v.label ? `${baseName} — ${v.label}` : baseName
             services.push({
+              id: typeof v.id === 'number' ? v.id : undefined,
               name: label,
               treatment_name: treatmentName,
               price_cents: Math.round(v.price * 100),
@@ -262,6 +265,113 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
     console.warn('fetchBooksyCatalog failed', e)
     return null
   }
+}
+
+// =============================================================================
+// Booksy occupancy: draft-flow (create + timeslots) для топ-N variants за 7 дней.
+// На каждый variant создаём draft, тянем timeslots на ближайшие 7 дней,
+// считаем свободные слоты. Чем меньше слотов = тем выше загрузка.
+// =============================================================================
+
+type OccupancyService = {
+  name: string
+  variant_id: number | undefined
+  duration_min: number
+  staff_count: number
+  free_slots_7d: number
+  days_covered: number
+}
+
+async function fetchBooksyOccupancy(
+  parsed: { region: string; businessId: string },
+  variants: BooksyVariant[],
+): Promise<OccupancyService[]> {
+  const out: OccupancyService[] = []
+  const fingerprint = crypto.randomUUID()
+  const today = new Date()
+  const end = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const startStr = today.toISOString().slice(0, 10)
+  const endStr = end.toISOString().slice(0, 10)
+
+  for (const v of variants) {
+    if (!v.id) continue // вариант без id — нет смысла дёргать draft
+    try {
+      // 1. Create draft
+      const draftRes = await fetch(
+        `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/create`,
+        {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'x-api-key': BOOKSY_WEB_API_KEY,
+            'x-app-version': '3.0',
+            'x-fingerprint': fingerprint,
+            referer: 'https://booksy.com/',
+            'user-agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+          },
+          body: JSON.stringify({
+            staffer_id: null,
+            business_id: Number(parsed.businessId),
+            service_variant_id: v.id,
+            meta: {},
+          }),
+        },
+      )
+      if (!draftRes.ok) {
+        console.warn(`booksy draft.create variant=${v.id} HTTP ${draftRes.status}`)
+        continue
+      }
+      const draft = (await draftRes.json()) as { appointment?: { id?: string } }
+      const apptId = draft.appointment?.id
+      if (!apptId) continue
+
+      // 2. Timeslots на 7 дней
+      const slotsRes = await fetch(
+        `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/${apptId}/timeslots`,
+        {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'x-api-key': BOOKSY_WEB_API_KEY,
+            'x-app-version': '3.0',
+            'x-fingerprint': fingerprint,
+            referer: 'https://booksy.com/',
+            'user-agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+          },
+          body: JSON.stringify({ start: startStr, end: endStr }),
+        },
+      )
+      if (!slotsRes.ok) {
+        console.warn(`booksy timeslots variant=${v.id} HTTP ${slotsRes.status}`)
+        continue
+      }
+      const slotsData = (await slotsRes.json()) as {
+        timeslots?: Record<string, Array<{ t: string }>>
+      }
+      const days = Object.entries(slotsData.timeslots ?? {})
+      const freeSlots = days.reduce((s, [, arr]) => s + (arr?.length ?? 0), 0)
+      const daysCovered = days.filter(([, arr]) => (arr?.length ?? 0) > 0).length
+
+      out.push({
+        name: v.name,
+        variant_id: v.id,
+        duration_min: v.duration_min,
+        staff_count: v.staffer_ids.length,
+        free_slots_7d: freeSlots,
+        days_covered: daysCovered,
+      })
+
+      // Маленькая пауза чтобы не получить rate-limit.
+      await new Promise((r) => setTimeout(r, 200))
+    } catch (e) {
+      console.warn(`booksy occupancy variant=${v.id} failed`, e)
+    }
+  }
+  return out
 }
 
 async function fetchBooksyAggregate(
@@ -487,6 +597,26 @@ async function syncOneCompetitor(admin: SupabaseClient, c: CompetitorRow): Promi
         source: 'booksy',
         snapshot_date: TODAY,
       })
+
+      // Загруженность: для top-5 variants создаём draft + тянем timeslots на 7 дней.
+      // Это даёт нам сравнимый метрик «свободные слоты у конкурента». Ограничение
+      // 5 — чтобы не дёргать Booksy 100 раз и не словить rate-limit.
+      const parsed = parseBooksyUrl(c.booksy_url)
+      if (parsed) {
+        const topVariants = catalog.services.filter((v) => v.id).slice(0, 5)
+        if (topVariants.length > 0) {
+          const occ = await fetchBooksyOccupancy(parsed, topVariants)
+          if (occ.length > 0) {
+            snapshots.push({
+              competitor_id: c.id,
+              kind: 'occupancy',
+              data: { services: occ, total_staff: catalog.staff.length },
+              source: 'booksy',
+              snapshot_date: TODAY,
+            })
+          }
+        }
+      }
     } else {
       const b = await fetchBooksyData(c.booksy_url)
       if (b.prices) {

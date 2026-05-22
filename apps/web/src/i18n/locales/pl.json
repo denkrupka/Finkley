@@ -2874,6 +2874,13 @@
         "ai_match_run": "AI dopasowanie usług",
         "ai_match_refresh": "Odśwież dopasowanie AI",
         "ai_match_done": "Dopasowano: {{count}} naszych usług",
+        "col_competitor": "Konkurent",
+        "col_staff_count": "Mistrzów",
+        "col_slots_7d": "Slotów (7d)",
+        "col_days_covered": "Dni z wolnymi",
+        "col_vs_avg": "vs średnia",
+        "occupancy_empty": "Obłożenie jeszcze nie pobrane. Poczekaj na autosync lub dodaj konkurenta Booksy.",
+        "ai_occupancy_hint": "Naciśnij «Wygeneruj wniosek AI» — AI przeanalizuje wolne sloty konkurentów i powie gdzie wygrywamy dostępnością, a gdzie trzeba popracować.",
         "confirm_archive": "Usunąć konkurenta z monitoringu?",
         "archived": "Usunięto"
       }
