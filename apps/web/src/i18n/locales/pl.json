@@ -3753,7 +3753,7 @@
         "review_request": {
           "title": "Prośba o opinię",
           "short": "Po opłaconej wizycie klient dostaje link: 5★ → Google Maps, 1–4★ → wewnętrzny formularz.",
-          "long": "Co 6 godzin szukamy opłaconych wizyt, które zakończyły się 1–7 dni temu, i wysyłamy klientowi krótki link «oceń 1–5».\n\n5★ → przekierowanie na Twoją stronę Google Maps (podnosi ocenę w Google).\n1–4★ → wewnętrzny formularz feedbacku (nie wycieknie na zewnątrz).\n\nTa sama wizyta przetwarza się tylko raz — duplikaty są filtrowane."
+          "long": "Zaraz po oznaczeniu wizyty jako opłacona klient automatycznie otrzymuje krótki link «oceń 1–5» — wysyłany jednocześnie na SMS i Email (tylko na kanały włączone w tabeli poniżej).\n\n5★ → przekierowanie na Twoją stronę Google Maps (podnosi ocenę w Google).\n1–4★ → wewnętrzny formularz feedbacku (nie wycieknie na zewnątrz).\n\nTa sama wizyta przetwarza się tylko raz — bez duplikatów."
         }
       }
     }

@@ -3756,7 +3756,7 @@
         "review_request": {
           "title": "Review request",
           "short": "After a paid visit the client receives a link: 5★ → Google Maps, 1–4★ → internal form.",
-          "long": "Every 6 hours we find paid visits that completed 1–7 days ago and send the client a short link «rate 1 to 5».\n\n5★ → redirect to your Google Maps page (boosts Google rating).\n1–4★ → internal feedback form (won't leak publicly).\n\nThe same visit is processed only once — duplicates are filtered."
+          "long": "Right after the visit is marked paid, the client automatically receives a short «rate 1 to 5» link — sent simultaneously to SMS and Email (only on channels enabled in the table below).\n\n5★ → redirect to your Google Maps page (boosts Google rating).\n1–4★ → internal feedback form (won't leak publicly).\n\nThe same visit is processed only once — no duplicate messages."
         }
       }
     }
