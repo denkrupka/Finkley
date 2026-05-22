@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useOwnSalonBooksyRating, useOwnSalonGoogleRating } from '@/hooks/useCompetitors'
 import {
   useMarkAllReviewsRead,
   useMarkReviewRead,
@@ -62,6 +63,8 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
   const [readFilter, setReadFilter] = useState<ReadFilter>('all')
   const [page, setPage] = useState(1)
   const { data: rows = [], isLoading } = useReviews(salonId)
+  const { data: googleAggregate } = useOwnSalonGoogleRating(salonId)
+  const { data: booksyAggregate } = useOwnSalonBooksyRating(salonId)
   const markRead = useMarkReviewRead(salonId)
   const markAllRead = useMarkAllReviewsRead(salonId)
   const importMutation = useReviewsImport(salonId)
@@ -171,14 +174,14 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
           <>
             <KpiCard
               label="Booksy"
-              rating={kpi.booksy.avg}
-              count={kpi.booksy.count}
+              rating={booksyAggregate?.rating ?? kpi.booksy.avg}
+              count={booksyAggregate?.count ?? kpi.booksy.count}
               color="text-blue-700"
             />
             <KpiCard
               label="Google"
-              rating={kpi.google.avg}
-              count={kpi.google.count}
+              rating={googleAggregate?.rating ?? kpi.google.avg}
+              count={googleAggregate?.count ?? kpi.google.count}
               color="text-red-700"
             />
           </>

@@ -35,6 +35,7 @@ import {
   useDiscoverCompetitors,
   useOwnSalonBooksyRating,
   useOwnSalonContent,
+  useOwnSalonGoogleRating,
   useOwnSalonMetrics,
   type OwnSalonContent,
   useSyncCompetitors,
@@ -177,6 +178,7 @@ function DataSection({
   const { data: ownMetrics } = useOwnSalonMetrics(salonId)
   const { data: ownContent } = useOwnSalonContent(salonId)
   const { data: ownBooksyRating } = useOwnSalonBooksyRating(salonId)
+  const { data: ownGoogleRating } = useOwnSalonGoogleRating(salonId)
 
   if (!competitors || competitors.length === 0) {
     return (
@@ -215,7 +217,8 @@ function DataSection({
           snapshots={snapshots}
           ownSalon={salon}
           ownBooksy={ownBooksyRating ?? null}
-          ownGoogle={ownMetrics ?? null}
+          ownGoogle={ownGoogleRating ?? null}
+          ownGoogleFallback={ownMetrics ?? null}
           t={t}
         />
       ) : kind === 'content' ? (
@@ -303,13 +306,15 @@ function RatingTable({
   ownSalon,
   ownBooksy,
   ownGoogle,
+  ownGoogleFallback,
   t,
 }: {
   competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
   snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
   ownSalon: ReturnType<typeof useSalon>['data']
   ownBooksy: { rating: number; count: number } | null
-  ownGoogle: { rating_avg: number | null; rating_count: number } | null
+  ownGoogle: { rating: number; count: number } | null
+  ownGoogleFallback: { rating_avg: number | null; rating_count: number } | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   function bySource(items: ReturnType<typeof useCompetitorSnapshots>['data'], src: string) {
@@ -377,8 +382,8 @@ function RatingTable({
                 url={ownSalon?.booksy_url ?? null}
               />
               <RatingCells
-                rating={ownGoogle?.rating_avg ?? null}
-                count={ownGoogle?.rating_count ?? null}
+                rating={ownGoogle?.rating ?? ownGoogleFallback?.rating_avg ?? null}
+                count={ownGoogle?.count ?? ownGoogleFallback?.rating_count ?? null}
                 url={ownSalon?.google_place_url ?? null}
               />
             </tr>
@@ -1293,6 +1298,12 @@ function OccupancyTable({
 }) {
   const refresh = useRefreshReportInsights(salonId)
   const [insights, setInsights] = useState<{ title: string; body: string }[] | null>(null)
+  const syncCompetitors = useSyncCompetitors(salonId)
+
+  // Загруженность приходит только от Booksy — если у конкурента нет
+  // booksy_url, источника нет. Считаем чтобы отличить «нет Booksy-источника»
+  // от «sync ещё не отработал».
+  const booksyCompetitors = useMemo(() => competitors.filter((c) => c.booksy_url), [competitors])
 
   // Собираем последний occupancy-snapshot на каждого конкурента.
   const latestByCompetitor = useMemo(() => {
@@ -1407,7 +1418,47 @@ function OccupancyTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-muted-foreground px-5 py-12 text-center text-sm">
-                  {t('reports_hub.competitors.occupancy_empty')}
+                  {booksyCompetitors.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <p>{t('reports_hub.competitors.occupancy_no_booksy')}</p>
+                      <p className="text-muted-foreground/70 text-xs">
+                        {t('reports_hub.competitors.occupancy_no_booksy_hint')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <p>{t('reports_hub.competitors.occupancy_empty')}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Сбрасываем cooldown, чтобы DataSection effect не блокировал ручной запуск.
+                          try {
+                            localStorage.removeItem(`competitors-last-sync-${salonId}`)
+                          } catch {
+                            /* ignore */
+                          }
+                          syncCompetitors.mutate(undefined, {
+                            onSuccess: (res) =>
+                              toast.success(
+                                t('reports_hub.competitors.sync_done', {
+                                  count: res.snapshots,
+                                }),
+                              ),
+                            onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                          })
+                        }}
+                        disabled={syncCompetitors.isPending}
+                        className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {syncCompetitors.isPending ? (
+                          <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+                        ) : null}
+                        {syncCompetitors.isPending
+                          ? t('reports_hub.competitors.sync_running')
+                          : t('reports_hub.competitors.sync_now')}
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ) : (
