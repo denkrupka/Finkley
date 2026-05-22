@@ -67,6 +67,27 @@ export function useMarkAllReviewsRead(salonId: string | undefined) {
   })
 }
 
+/** Сохраняет ответ салона на отзыв в БД (reply_text / reply_author / reply_posted_at). */
+export function useSaveReviewReply(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { reviewId: string; text: string; author?: string }) => {
+      const { error } = await supabase
+        .from('reviews')
+        .update({
+          reply_text: input.text,
+          reply_author: input.author ?? 'Salon',
+          reply_posted_at: new Date().toISOString(),
+        })
+        .eq('id', input.reviewId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+    },
+  })
+}
+
 /** Помечает review как прочитанный (read_at=now()). */
 export function useMarkReviewRead(salonId: string | undefined) {
   const qc = useQueryClient()

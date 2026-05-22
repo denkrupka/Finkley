@@ -1,5 +1,13 @@
 import { format, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, Eye, Loader2, MessageCircle, Star } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Loader2,
+  MessageCircle,
+  Sparkles,
+  Star,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -19,7 +27,9 @@ import {
   useMarkReviewRead,
   useReviews,
   useReviewsImport,
+  useSaveReviewReply,
 } from '@/hooks/useReviews'
+import { useReviewAiAnalyze } from '@/hooks/useReviewAi'
 import { cn } from '@/lib/utils/cn'
 import { getDateLocale } from '@/lib/utils/format-date'
 
@@ -473,7 +483,130 @@ function ReviewRow({
           compact
         />
       </div>
-      {review.reply_text ? <ReviewReplyTree review={review} t={t} /> : null}
+      {review.reply_text ? (
+        <ReviewReplyTree review={review} t={t} />
+      ) : (
+        <ReviewReplyForm salonId={salonId} reviewId={review.id} t={t} />
+      )}
+    </div>
+  )
+}
+
+function ReviewReplyForm({
+  salonId,
+  reviewId,
+  t,
+}: {
+  salonId: string
+  reviewId: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const save = useSaveReviewReply(salonId)
+  const aiAnalyze = useReviewAiAnalyze(salonId)
+
+  if (!open) {
+    return (
+      <div className="pl-12">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+        >
+          <MessageCircle className="size-3" strokeWidth={2} />
+          {t('reports_hub.reviews.reply_button')}
+        </button>
+      </div>
+    )
+  }
+
+  function generateAi() {
+    aiAnalyze.mutate(
+      { scope: 'single', review_id: reviewId },
+      {
+        onSuccess: (res) => {
+          const content = res.content as { suggested_public_reply?: string }
+          if (content?.suggested_public_reply) {
+            setText(content.suggested_public_reply)
+            toast.success(t('reports_hub.reviews.reply_ai_filled'))
+          } else {
+            toast.error(t('reports_hub.reviews.reply_ai_empty'))
+          }
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  function handleSave() {
+    if (!text.trim()) return
+    save.mutate(
+      { reviewId, text: text.trim() },
+      {
+        onSuccess: () => {
+          toast.success(t('reports_hub.reviews.reply_saved'))
+          setOpen(false)
+          setText('')
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+      },
+    )
+  }
+
+  return (
+    <div className="border-brand-sage-soft bg-brand-sage-soft/15 ml-12 mt-2 rounded-lg border p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-brand-sage-deep text-xs font-bold">
+          {t('reports_hub.reviews.reply_form_title')}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            setText('')
+          }}
+          className="text-muted-foreground hover:text-foreground text-[11px] font-semibold"
+        >
+          ✕
+        </button>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t('reports_hub.reviews.reply_placeholder')}
+        rows={4}
+        className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2"
+      />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={generateAi}
+          disabled={aiAnalyze.isPending}
+          className="border-brand-sage-deep/40 bg-card text-brand-sage-deep hover:bg-brand-sage-soft/40 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {aiAnalyze.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+          ) : (
+            <Sparkles className="size-3.5" strokeWidth={2} />
+          )}
+          {aiAnalyze.isPending
+            ? t('reports_hub.reviews.reply_ai_loading')
+            : t('reports_hub.reviews.reply_ai_button')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={save.isPending || !text.trim()}
+          className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[11px] font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {save.isPending ? <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} /> : null}
+          {t('reports_hub.reviews.reply_save')}
+        </button>
+      </div>
+      <p className="text-muted-foreground/70 mt-1.5 text-[10px]">
+        {t('reports_hub.reviews.reply_publish_hint')}
+      </p>
     </div>
   )
 }
