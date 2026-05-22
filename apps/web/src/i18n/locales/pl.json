@@ -2374,7 +2374,7 @@
       "other_subtitle": "Inne ustawienia aplikacji — instalacja jako aplikacja natywna itp."
     },
     "social": {
-      "info": "Podłączenie Facebook/Instagram daje dwie korzyści: (1) klienci piszą w jednym komunikatorze FinSalon, (2) Raporty → Konkurenci → Treść pokażą metryki Twojej strony (followers/posty/polubienia) do uczciwego porównania z konkurencją.",
+      "info": "Podłączenie Facebook/Instagram daje dwie korzyści: (1) klienci piszą w jednym komunikatorze Finkley, (2) Raporty → Konkurenci → Treść pokażą metryki Twojej strony (followers/posty/polubienia) do uczciwego porównania z konkurencją.",
       "fb_subtitle": "Biznesowa strona Facebook. Autoryzacja przez Facebook Login.",
       "ig_subtitle": "Konto Instagram Business. Autoryzacja przez Facebook (Instagram należy do Meta).",
       "connected_badge": "Połączone",
@@ -2392,7 +2392,7 @@
       "pause_hint": "Przydatne na urlopie. E-mail i push działają nadal; SMS nie.",
       "sender_title": "Nazwa nadawcy",
       "sender_subtitle": "Wybierz, pod jaką nazwą wychodzą SMS (zamiast numeru telefonu).",
-      "sender_finkley_hint": "Wspólny darmowy nadawca dla wszystkich salonów FinSalon.",
+      "sender_finkley_hint": "Wspólny darmowy nadawca dla wszystkich salonów Finkley.",
       "sender_active_hint": "Twój prywatny nadawca w SMSAPI.",
       "sender_pending_payment": "Oczekuje na płatność",
       "sender_pending_smsapi": "Czeka na akceptację SMSAPI (od godzin do 1–2 dni)",
@@ -3280,14 +3280,14 @@
   "blocked": {
     "account": {
       "title": "Twoje konto jest zablokowane",
-      "body": "Dostęp do tego konta został zawieszony przez administrację FinSalon. Obecnie nie można się zalogować.",
+      "body": "Dostęp do tego konta został zawieszony przez administrację Finkley. Obecnie nie można się zalogować.",
       "contact": "Jeśli uważasz, że to pomyłka — napisz do nas:",
       "sign_out": "Wyloguj",
       "back_to_login": "← Powrót do strony logowania"
     },
     "salon": {
       "title": "Salon '{{name}}' jest zablokowany",
-      "body": "Dostęp do tego salonu został zawieszony przez administrację FinSalon. Dane są zachowane — wszystko wróci po odblokowaniu.",
+      "body": "Dostęp do tego salonu został zawieszony przez administrację Finkley. Dane są zachowane — wszystko wróci po odblokowaniu.",
       "reason_label": "Powód",
       "contact": "Jeśli uważasz, że to pomyłka — napisz do nas:",
       "switch_to": "Przejdź do innego swojego salonu:"

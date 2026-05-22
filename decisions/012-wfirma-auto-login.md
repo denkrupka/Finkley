@@ -1,7 +1,7 @@
 # 012 — wFirma auto-login через web-flow + ручной fallback (Hybrid X3)
 
 **Статус:** Принято · 2026-05-08
-**Контекст:** wFirma API (`api2.wfirma.pl`) требует 3 ключа: `accessKey`, `secretKey` (юзерские, 32 hex) + `appKey` (наш, общий для всех инсталляций FinSalon). Юзер должен сгенерировать пару `accessKey`/`secretKey` сам в **Ustawienia → OAuth → Klucze API**, что:
+**Контекст:** wFirma API (`api2.wfirma.pl`) требует 3 ключа: `accessKey`, `secretKey` (юзерские, 32 hex) + `appKey` (наш, общий для всех инсталляций Finkley). Юзер должен сгенерировать пару `accessKey`/`secretKey` сам в **Ustawienia → OAuth → Klucze API**, что:
 
 - требует от юзера 5 кликов и попасть в нужную скрытую панель
 - блокирует подключение для пользователей, кто не разработчик и не привык к словам «API key»

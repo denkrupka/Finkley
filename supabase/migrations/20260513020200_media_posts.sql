@@ -1,4 +1,4 @@
--- Media blog posts (finsalon.app/media) — Supabase-backed.
+-- Media blog posts (finkley.app/media) — Supabase-backed.
 -- Storage: markdown source-of-truth + metadata in media_posts.
 -- Public anon-key SELECT allowed for published posts so Astro landing builds
 -- can fetch them at build time.
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS media_posts (
 CREATE INDEX IF NOT EXISTS idx_media_posts_pub ON media_posts (published_at DESC) WHERE draft = false;
 
 -- App-admin gate: только пользователи в app_admins могут редактировать.
--- Salon owners НЕ имеют доступа автоматически — это FinSalon-side blog.
+-- Salon owners НЕ имеют доступа автоматически — это Finkley-side blog.
 CREATE TABLE IF NOT EXISTS app_admins (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   granted_at timestamptz NOT NULL DEFAULT now(),
