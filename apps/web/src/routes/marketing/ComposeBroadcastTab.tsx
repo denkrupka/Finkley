@@ -1,11 +1,14 @@
-import { AlertCircle, Loader2, Mail, MessageSquare, Send, Users } from 'lucide-react'
+import { AlertCircle, Loader2, Mail, MessageSquare, Send, Sparkles, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
+import { getBroadcastTemplates, type BroadcastTemplate } from './broadcast-templates'
 import {
   Select,
   SelectContent,
@@ -112,8 +115,42 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
     )
   }
 
+  function applyTemplate(tpl: BroadcastTemplate) {
+    setSmsText(tpl.sms)
+    setEmailSubject(tpl.subject)
+    setEmailBody(tpl.bodyHtml)
+    // Если юзер выбрал шаблон — включаем оба канала (он явно хочет рассылать).
+    if (!smsEnabled) setSmsEnabled(true)
+    if (!emailEnabled) setEmailEnabled(true)
+    toast.success(t('marketing.compose.template_applied', { name: tpl.label }))
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {/* ----------- Шаблоны ----------- */}
+      <section className="border-brand-sage-soft bg-brand-sage-soft/15 rounded-lg border p-5">
+        <h3 className="text-brand-navy flex items-center gap-2 text-base font-bold tracking-tight">
+          <Sparkles className="size-4" strokeWidth={2} />
+          {t('marketing.compose.templates_title')}
+        </h3>
+        <p className="text-muted-foreground mb-3 mt-1 text-xs">
+          {t('marketing.compose.templates_subtitle')}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {getBroadcastTemplates().map((tpl) => (
+            <button
+              key={tpl.id}
+              type="button"
+              onClick={() => applyTemplate(tpl)}
+              className="border-border bg-card text-foreground hover:border-brand-sage hover:bg-brand-sage-soft/30 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors"
+            >
+              <span className="text-base leading-none">{tpl.emoji}</span>
+              {tpl.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* ----------- Сегмент ----------- */}
       <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy flex items-center gap-2 text-base font-bold tracking-tight">
@@ -234,16 +271,13 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
               />
             </div>
             <div>
-              <Label htmlFor="compose-body" className="mb-1.5 block text-xs font-semibold">
+              <Label className="mb-1.5 block text-xs font-semibold">
                 {t('marketing.compose.email_body_label')}
               </Label>
-              <textarea
-                id="compose-body"
+              <RichTextEditor
                 value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
+                onChange={setEmailBody}
                 placeholder={t('marketing.compose.email_body_placeholder')}
-                rows={8}
-                className={cn(textareaClass, 'resize-y')}
               />
             </div>
           </div>
