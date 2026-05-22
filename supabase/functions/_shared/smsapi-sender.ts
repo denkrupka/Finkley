@@ -13,7 +13,16 @@
  *   3. Когда APPROVED — sender можно использовать в from-поле sms.do.
  */
 
-const API_BASE = 'https://api.smsapi.com'
+/**
+ * Регион SMSAPI: .pl (Польша, default) или .com (международный).
+ * Токен issued на одном регионе не работает на другом — отсюда 401.
+ * См. _shared/sms.ts для подробностей.
+ */
+function apiBase(): string {
+  return Deno.env.get('SMS_API_REGION') === 'com'
+    ? 'https://api.smsapi.com'
+    : 'https://api.smsapi.pl'
+}
 
 export type SmsApiSenderStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'UNKNOWN'
 
@@ -32,7 +41,7 @@ function apiKey(): string {
 export async function createSmsApiSender(name: string): Promise<SmsApiSenderResult> {
   const key = apiKey()
   if (!key) return { ok: false, error: 'sms_api_key_missing' }
-  const r = await fetch(`${API_BASE}/sms/sendernames`, {
+  const r = await fetch(`${apiBase()}/sms/sendernames`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${key}`,
@@ -58,7 +67,7 @@ export async function createSmsApiSender(name: string): Promise<SmsApiSenderResu
 export async function getSmsApiSenderStatus(name: string): Promise<SmsApiSenderResult> {
   const key = apiKey()
   if (!key) return { ok: false, error: 'sms_api_key_missing' }
-  const r = await fetch(`${API_BASE}/sms/sendernames/${encodeURIComponent(name)}`, {
+  const r = await fetch(`${apiBase()}/sms/sendernames/${encodeURIComponent(name)}`, {
     method: 'GET',
     headers: { authorization: `Bearer ${key}`, accept: 'application/json' },
   })

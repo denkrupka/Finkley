@@ -76,6 +76,12 @@ async function sendViaSmsApi(
 ): Promise<SmsResult> {
   const apiKey = Deno.env.get('SMS_API_KEY') ?? ''
   if (!apiKey) return { ok: false, error: 'smsapi_no_api_key' }
+  // SMSAPI имеет 2 региона: .com (international) и .pl (Польша).
+  // Токены, созданные на ssl.smsapi.pl Dashboard, работают ТОЛЬКО на .pl
+  // endpoint (на .com дают 401 authorization_failed). По умолчанию — .pl,
+  // т.к. наш основной рынок PL и SMSAPI чаще регистрируются там.
+  const base =
+    Deno.env.get('SMS_API_REGION') === 'com' ? 'https://api.smsapi.com' : 'https://api.smsapi.pl'
   // SMSAPI принимает номер БЕЗ «+» (E.164 без префикса), так что снимаем его.
   const cleanedPhone = phone.startsWith('+') ? phone.slice(1) : phone
   const form = new URLSearchParams({
@@ -85,7 +91,7 @@ async function sendViaSmsApi(
     format: 'json',
     encoding: 'utf-8',
   })
-  const r = await fetch('https://api.smsapi.com/sms.do', {
+  const r = await fetch(`${base}/sms.do`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
