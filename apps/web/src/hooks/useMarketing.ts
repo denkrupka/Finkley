@@ -4,7 +4,13 @@ import { supabase } from '@/lib/supabase/client'
 
 import type { BroadcastKind } from './useBroadcastPrefs'
 
-export type BroadcastSegment = 'all' | 'new' | 'regular' | 'dormant' | { tag: string }
+export type BroadcastSegment =
+  | 'all'
+  | 'new'
+  | 'regular'
+  | 'dormant'
+  | { tag: string }
+  | { client_ids: string[] }
 
 export type BroadcastSendRequest = {
   segment: BroadcastSegment
@@ -66,7 +72,12 @@ export function useBroadcastPreview(
   channels: { sms?: boolean; email?: boolean },
 ) {
   const channelsKey = `${channels.sms ? '1' : '0'}${channels.email ? '1' : '0'}`
-  const segmentKey = typeof segment === 'object' ? `tag:${segment.tag}` : segment
+  const segmentKey =
+    typeof segment === 'object'
+      ? 'tag' in segment
+        ? `tag:${segment.tag}`
+        : `manual:${segment.client_ids.slice().sort().join(',')}`
+      : segment
   return useQuery<BroadcastPreviewResult>({
     queryKey: ['broadcast-preview', salonId, segmentKey, channelsKey],
     enabled: !!salonId && (channels.sms === true || channels.email === true),

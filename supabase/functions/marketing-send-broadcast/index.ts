@@ -50,7 +50,7 @@ type ClientRow = {
   tags: string[] | null
 }
 
-type Segment = 'all' | 'new' | 'regular' | 'dormant' | { tag: string }
+type Segment = 'all' | 'new' | 'regular' | 'dormant' | { tag: string } | { client_ids: string[] }
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -74,8 +74,11 @@ function filterBySegment(clients: ClientRow[], seg: Segment): ClientRow[] {
       const days = (now - new Date(c.last_visit_at).getTime()) / 86_400_000
       return days >= DORMANT_DAYS
     }
-    if (typeof seg === 'object' && seg.tag) {
+    if (typeof seg === 'object' && 'tag' in seg && seg.tag) {
       return Array.isArray(c.tags) && c.tags.includes(seg.tag)
+    }
+    if (typeof seg === 'object' && 'client_ids' in seg && Array.isArray(seg.client_ids)) {
+      return seg.client_ids.includes(c.id)
     }
     return false
   })

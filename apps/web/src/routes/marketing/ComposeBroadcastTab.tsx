@@ -16,14 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useClients } from '@/hooks/useClients'
+import { useClients, useClientLtvMetrics } from '@/hooks/useClients'
 import { useBroadcastPreview, useSendBroadcast, type BroadcastSegment } from '@/hooks/useMarketing'
 import { cn } from '@/lib/utils/cn'
 
 const textareaClass =
   'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
 
-const SEGMENT_OPTIONS: { value: Exclude<BroadcastSegment, { tag: string }>; key: string }[] = [
+type SegmentPreset = 'all' | 'new' | 'regular' | 'dormant'
+const SEGMENT_OPTIONS: { value: SegmentPreset; key: string }[] = [
   { value: 'all', key: 'marketing.compose.segment_all' },
   { value: 'new', key: 'marketing.compose.segment_new' },
   { value: 'regular', key: 'marketing.compose.segment_regular' },
@@ -41,6 +42,9 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
   const [segment, setSegment] = useState<BroadcastSegment>('all')
   const [tagInput, setTagInput] = useState('')
   const [useTagSegment, setUseTagSegment] = useState(false)
+  const [useManualSegment, setUseManualSegment] = useState(false)
+  const [manualClientIds, setManualClientIds] = useState<string[]>([])
+  const [manualPickerOpen, setManualPickerOpen] = useState(false)
   const [smsEnabled, setSmsEnabled] = useState(true)
   const [emailEnabled, setEmailEnabled] = useState(false)
   const [smsText, setSmsText] = useState('')
@@ -48,10 +52,17 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
   const [emailBody, setEmailBody] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  const effectiveSegment: BroadcastSegment = useTagSegment ? { tag: tagInput.trim() } : segment
+  const effectiveSegment: BroadcastSegment = useManualSegment
+    ? { client_ids: manualClientIds }
+    : useTagSegment
+      ? { tag: tagInput.trim() }
+      : segment
 
   const channels = { sms: smsEnabled, email: emailEnabled }
-  const canPreview = (smsEnabled || emailEnabled) && (!useTagSegment || tagInput.trim().length > 0)
+  const canPreview =
+    (smsEnabled || emailEnabled) &&
+    (!useTagSegment || tagInput.trim().length > 0) &&
+    (!useManualSegment || manualClientIds.length > 0)
 
   const preview = useBroadcastPreview(salonId, effectiveSegment, channels)
   const send = useSendBroadcast(salonId)
@@ -67,6 +78,9 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
       return t('marketing.compose.err_email_required')
     }
     if (useTagSegment && !tagInput.trim()) return t('marketing.compose.err_tag_required')
+    if (useManualSegment && manualClientIds.length === 0) {
+      return t('marketing.compose.err_manual_required')
+    }
     if (preview.data && preview.data.eligible === 0) {
       return t('marketing.compose.err_no_recipients')
     }
@@ -165,9 +179,10 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
             <SegmentPill
               key={opt.value}
               label={t(opt.key)}
-              active={!useTagSegment && segment === opt.value}
+              active={!useTagSegment && !useManualSegment && segment === opt.value}
               onClick={() => {
                 setUseTagSegment(false)
+                setUseManualSegment(false)
                 setSegment(opt.value)
               }}
             />
@@ -178,7 +193,10 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
             <input
               type="checkbox"
               checked={useTagSegment}
-              onChange={(e) => setUseTagSegment(e.target.checked)}
+              onChange={(e) => {
+                setUseTagSegment(e.target.checked)
+                if (e.target.checked) setUseManualSegment(false)
+              }}
               className="size-4"
             />
             {t('marketing.compose.segment_by_tag')}
@@ -190,7 +208,44 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
             disabled={!useTagSegment}
           />
         </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Label className="flex items-center gap-2 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={useManualSegment}
+              onChange={(e) => {
+                setUseManualSegment(e.target.checked)
+                if (e.target.checked) setUseTagSegment(false)
+              }}
+              className="size-4"
+            />
+            {t('marketing.compose.segment_manual')}
+          </Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!useManualSegment}
+            onClick={() => setManualPickerOpen(true)}
+          >
+            {manualClientIds.length === 0
+              ? t('marketing.compose.segment_manual_pick')
+              : t('marketing.compose.segment_manual_pick_n', { count: manualClientIds.length })}
+          </Button>
+        </div>
       </section>
+
+      {manualPickerOpen ? (
+        <ManualClientPickerDialog
+          salonId={salonId}
+          selected={manualClientIds}
+          onClose={() => setManualPickerOpen(false)}
+          onConfirm={(ids) => {
+            setManualClientIds(ids)
+            setManualPickerOpen(false)
+          }}
+        />
+      ) : null}
 
       {/* ----------- Каналы ----------- */}
       <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
@@ -497,5 +552,165 @@ function TagSelect({
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+/**
+ * Модалка для ручного выбора клиентов в рассылку. Показывает имя, число
+ * визитов, LTV, лояльность (по visits_count), чекбоксы. Поиск по имени.
+ */
+function ManualClientPickerDialog({
+  salonId,
+  selected,
+  onClose,
+  onConfirm,
+}: {
+  salonId: string
+  selected: string[]
+  onClose: () => void
+  onConfirm: (ids: string[]) => void
+}) {
+  const { t } = useTranslation()
+  const { data: clients = [] } = useClients(salonId, { search: '', sort: 'name' })
+  const { data: ltvMap } = useClientLtvMetrics(salonId)
+  const [search, setSearch] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(selected))
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return clients
+    return clients.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [clients, search])
+
+  function toggle(id: string) {
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  function selectAll() {
+    setPicked(new Set(filtered.map((c) => c.id)))
+  }
+  function clearAll() {
+    setPicked(new Set())
+  }
+  function loyaltyLabel(visits: number): string {
+    if (visits >= 10) return t('marketing.compose.loyalty_vip')
+    if (visits >= 5) return t('marketing.compose.loyalty_regular')
+    if (visits >= 2) return t('marketing.compose.loyalty_returning')
+    return t('marketing.compose.loyalty_new')
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-card shadow-finxl flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl"
+      >
+        <div className="border-border flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <p className="text-brand-navy text-base font-bold">
+              {t('marketing.compose.manual_picker_title')}
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {t('marketing.compose.manual_picker_subtitle', { count: picked.size })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={clearAll}>
+              {t('marketing.compose.manual_picker_clear')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={selectAll}>
+              {t('marketing.compose.manual_picker_all')}
+            </Button>
+          </div>
+        </div>
+        <div className="border-border border-b px-5 py-3">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('marketing.compose.manual_picker_search')}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-muted-foreground sticky top-0 border-b text-[10px] uppercase tracking-wider">
+              <tr>
+                <th className="w-10 px-3 py-2"></th>
+                <th className="px-3 py-2 text-left font-semibold">
+                  {t('marketing.compose.manual_col_name')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('marketing.compose.manual_col_visits')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('marketing.compose.manual_col_ltv')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('marketing.compose.manual_col_loyalty')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              {filtered.map((c) => {
+                const checked = picked.has(c.id)
+                const ltv = ltvMap?.get(c.id)
+                const visits = ltv?.visits_count ?? c.visit_count
+                const revenueCents = ltv?.revenue_ltv_cents ?? c.total_revenue_cents
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => toggle(c.id)}
+                    className={cn(
+                      'hover:bg-muted/30 cursor-pointer',
+                      checked && 'bg-brand-sage-soft/30',
+                    )}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(c.id)}
+                        className="accent-brand-sage-deep size-4"
+                      />
+                    </td>
+                    <td className="text-foreground px-3 py-2 font-semibold">{c.name ?? '—'}</td>
+                    <td className="num text-foreground px-3 py-2 text-right">{visits}</td>
+                    <td className="num text-foreground px-3 py-2 text-right">
+                      {(revenueCents / 100).toFixed(0)} zł
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="bg-muted/60 text-foreground inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                        {loyaltyLabel(visits)}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-muted-foreground px-5 py-12 text-center">
+                    {t('marketing.compose.manual_picker_empty')}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-border bg-muted/10 flex items-center justify-end gap-2 border-t px-5 py-4">
+          <Button variant="outline" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={() => onConfirm(Array.from(picked))}>
+            {t('marketing.compose.manual_picker_confirm', { count: picked.size })}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
