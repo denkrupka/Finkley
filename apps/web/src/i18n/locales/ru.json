@@ -3036,6 +3036,8 @@
       "sender_active_hint": "Твой приватный sender. Использует SMSAPI.",
       "sender_pending_payment": "Ожидает оплаты",
       "sender_pending_smsapi": "Ожидает одобрения SMSAPI (от часов до 1–2 дней)",
+      "sender_age_hours": "висит {{count}} ч",
+      "sender_cancel": "Отменить",
       "buy_sender_title": "Купить приватное имя отправителя",
       "buy_sender_subtitle": "Разово {{price}} за каждое имя. После одобрения SMSAPI станет доступно в списке выше.",
       "sender_name_placeholder": "Например MOJSALON",

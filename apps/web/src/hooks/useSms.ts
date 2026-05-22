@@ -157,6 +157,26 @@ export function useBuySmsPackage(salonId: string | undefined) {
   })
 }
 
+/** Отмена pending sender (юзер закрыл вкладку Stripe или передумал).
+ *  Простой UPDATE status=rejected — RLS allows admin/owner.
+ *  pg_cron делает то же автоматом для висящих >24ч. */
+export function useCancelSmsSender(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (senderId: string) => {
+      const { error } = await supabase
+        .from('salon_sms_senders')
+        .update({
+          status: 'rejected',
+          rejection_reason: 'cancelled_by_user',
+        })
+        .eq('id', senderId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sms-senders', salonId] }),
+  })
+}
+
 /** Покупка sender name (Stripe Checkout 100 zł). */
 export function useBuySmsSender(salonId: string | undefined) {
   const qc = useQueryClient()

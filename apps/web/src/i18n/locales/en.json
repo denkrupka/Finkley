@@ -2396,6 +2396,8 @@
       "sender_active_hint": "Your private sender via SMSAPI.",
       "sender_pending_payment": "Awaiting payment",
       "sender_pending_smsapi": "Awaiting SMSAPI approval (hours to 1–2 days)",
+      "sender_age_hours": "stuck for {{count}} h",
+      "sender_cancel": "Cancel",
       "buy_sender_title": "Buy a private sender name",
       "buy_sender_subtitle": "One-time {{price}} per name. After SMSAPI approves it, you can pick it above.",
       "sender_name_placeholder": "e.g. MYSALON",

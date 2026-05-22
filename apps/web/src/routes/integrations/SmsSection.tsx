@@ -12,6 +12,7 @@ import {
   SMS_SENDER_PRICE_GROSZ,
   useBuySmsPackage,
   useBuySmsSender,
+  useCancelSmsSender,
   useSetActiveSender,
   useSmsPurchases,
   useSmsSalonStatus,
@@ -39,6 +40,7 @@ export function SmsSection({ salonId }: { salonId: string }) {
   const setActiveSender = useSetActiveSender(salonId)
   const buyPackage = useBuySmsPackage(salonId)
   const buySender = useBuySmsSender(salonId)
+  const cancelSender = useCancelSmsSender(salonId)
 
   const [newSenderName, setNewSenderName] = useState('')
 
@@ -198,22 +200,42 @@ export function SmsSection({ salonId }: { salonId: string }) {
               onClick={() => setActiveSender.mutate(s.id)}
             />
           ))}
-          {pendingSenders.map((s) => (
-            <div
-              key={s.id}
-              className="border-border/40 bg-muted/20 flex items-start gap-3 rounded-md border p-3"
-            >
-              <Loader2 className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin" />
-              <div className="min-w-0 flex-1">
-                <p className="text-foreground text-sm font-semibold">{s.sender_name}</p>
-                <p className="text-muted-foreground text-[11px]">
-                  {s.status === 'pending_payment'
-                    ? t('integrations.sms.sender_pending_payment')
-                    : t('integrations.sms.sender_pending_smsapi')}
-                </p>
+          {pendingSenders.map((s) => {
+            const ageMs = Date.now() - new Date(s.created_at).getTime()
+            const ageHours = Math.floor(ageMs / 3_600_000)
+            const isStale = ageHours >= 1 && s.status === 'pending_payment'
+            return (
+              <div
+                key={s.id}
+                className="border-border/40 bg-muted/20 flex items-start gap-3 rounded-md border p-3"
+              >
+                <Loader2 className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground text-sm font-semibold">{s.sender_name}</p>
+                  <p className="text-muted-foreground text-[11px]">
+                    {s.status === 'pending_payment'
+                      ? t('integrations.sms.sender_pending_payment')
+                      : t('integrations.sms.sender_pending_smsapi')}
+                    {isStale ? (
+                      <span className="text-muted-foreground/70 ml-1">
+                        · {t('integrations.sms.sender_age_hours', { count: ageHours })}
+                      </span>
+                    ) : null}
+                  </p>
+                </div>
+                {s.status === 'pending_payment' ? (
+                  <button
+                    type="button"
+                    onClick={() => cancelSender.mutate(s.id)}
+                    disabled={cancelSender.isPending}
+                    className="text-destructive hover:bg-destructive/10 shrink-0 rounded px-2 py-1 text-[11px] font-semibold"
+                  >
+                    {t('integrations.sms.sender_cancel')}
+                  </button>
+                ) : null}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 

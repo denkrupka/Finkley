@@ -111,11 +111,24 @@ async function syncGooglePlace(placeId: string): Promise<{
 }
 
 /**
- * Booksy — best-effort. Скрейпим публичную страницу салона и пытаемся
- * вытянуть отзывы из встроенного `__NEXT_DATA__`. Структура их сайта
- * меняется, поэтому всё в try/catch — silent skip на любой ошибке.
+ * Booksy — НЕ ПОДДЕРЖИВАЕТСЯ начиная с 2026-05-22.
+ *
+ * Booksy переехали на client-side rendering: HTML от их сервера —
+ * пустой скелет без `__NEXT_DATA__`, без ld+json schema.org. Все
+ * данные (отзывы, рейтинг, цены) подгружаются их JS в браузере.
+ *
+ * Scrape без headless-браузера (Puppeteer / Browserless / Playwright)
+ * технически невозможен. Эти решения стоят $$$/мес или сложный self-host.
+ *
+ * Для Booksy reviews сейчас доступны 2 пути:
+ *   1. Партнёрский API Booksy (require business agreement) — нам недоступен
+ *   2. OAuth-интеграция Booksy (есть в Settings → Интеграции → Booksy) —
+ *      даёт визиты/клиентов/услуги, но НЕ отзывы (нет в их Partner API).
+ *
+ * Поэтому функция возвращает [] явно (не silent skip — выдаёт debug info
+ * в response, чтобы UI мог показать честное сообщение).
  */
-async function syncBooksyReviews(booksyUrl: string): Promise<
+async function syncBooksyReviews(_booksyUrl: string): Promise<
   Array<{
     external_id: string
     rating: number | null
@@ -125,67 +138,19 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
     external_url: string | null
   }>
 > {
-  try {
-    const r = await fetch(booksyUrl, {
-      headers: {
-        'user-agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        accept: 'text/html',
-      },
-    })
-    if (!r.ok) return []
-    const html = await r.text()
-    // __NEXT_DATA__ Booksy инжектит как <script id="__NEXT_DATA__" type="application/json">...</script>
-    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]+?)<\/script>/)
-    if (!m || !m[1]) return []
-    const next = JSON.parse(m[1]) as Record<string, unknown>
-    // Best-effort: рекурсивно ищем массив reviews с полями rating + comment/text.
-    const found: Array<Record<string, unknown>> = []
-    const visit = (v: unknown, depth = 0) => {
-      if (depth > 12 || !v) return
-      if (Array.isArray(v)) {
-        for (const x of v) visit(x, depth + 1)
-        return
-      }
-      if (typeof v === 'object') {
-        const o = v as Record<string, unknown>
-        if (
-          ('rating' in o || 'stars' in o) &&
-          ('comment' in o || 'text' in o || 'body' in o) &&
-          typeof (o.rating ?? o.stars) !== 'undefined'
-        ) {
-          found.push(o)
-        }
-        for (const k of Object.keys(o)) visit(o[k], depth + 1)
-      }
-    }
-    visit(next)
-    return found.slice(0, 50).map((row, i) => {
-      const rating = (row.rating ?? row.stars) as number | null
-      const body = (row.comment ?? row.text ?? row.body ?? null) as string | null
-      const name = (row.author_name ??
-        row.client_name ??
-        (row.client as Record<string, string>)?.name ??
-        null) as string | null
-      const ts = (row.created_at ?? row.date ?? row.created ?? null) as string | null
-      return {
-        external_id: String(row.id ?? row._id ?? `b_${i}_${String(body ?? '').slice(0, 20)}`),
-        rating: typeof rating === 'number' ? Math.round(rating) : null,
-        body: body ? String(body) : null,
-        author_name: name ? String(name) : null,
-        posted_at: ts ? new Date(ts).toISOString() : new Date().toISOString(),
-        external_url: null,
-      }
-    })
-  } catch {
-    return []
-  }
+  // Возвращаем пусто — Booksy CSR делает scrape невозможным.
+  // См. ADR-024 (будущий) или комментарий выше.
+  return []
 }
 
 type ProcessResult = {
   imported: number
   google_reviews_fetched: number
   booksy_reviews_fetched: number
+  /** Booksy reviews технически невозможны через scrape (CSR с 2026-05).
+   *  UI должен показать честное сообщение если booksy_url задан, но
+   *  fetched=0 — это не баг, это лимит. */
+  booksy_supported: false
   upsert_error?: string
   google_error?: string
 }
@@ -278,6 +243,7 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
     imported,
     google_reviews_fetched: googleFetched,
     booksy_reviews_fetched: booksyFetched,
+    booksy_supported: false,
     ...(upsertError ? { upsert_error: upsertError } : {}),
     ...(googleError ? { google_error: googleError } : {}),
   }

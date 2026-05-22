@@ -2396,6 +2396,8 @@
       "sender_active_hint": "Twój prywatny nadawca w SMSAPI.",
       "sender_pending_payment": "Oczekuje na płatność",
       "sender_pending_smsapi": "Czeka na akceptację SMSAPI (od godzin do 1–2 dni)",
+      "sender_age_hours": "wisi {{count}} h",
+      "sender_cancel": "Anuluj",
       "buy_sender_title": "Kup prywatną nazwę nadawcy",
       "buy_sender_subtitle": "Jednorazowo {{price}} za nazwę. Po akceptacji SMSAPI pojawi się na liście wyżej.",
       "sender_name_placeholder": "np. MOJSALON",
