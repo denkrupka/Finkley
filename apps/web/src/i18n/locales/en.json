@@ -56,6 +56,7 @@
     "min": "min",
     "remove": "Remove",
     "no_results": "No results",
+    "copied": "Copied",
     "search": "Search",
     "add": "Add",
     "archive": "Archive",
@@ -2730,6 +2731,45 @@
         "all": "All",
         "unread": "Unread",
         "read": "Read"
+      },
+      "ai": {
+        "button": "AI analysis",
+        "title": "AI analysis",
+        "loading": "AI is reading the review and building the client psychological profile…",
+        "refresh": "Recompute",
+        "cached": "from cache",
+        "copy": "Copy",
+        "internal_block_title": "AI review of internal feedback ({{count}})",
+        "internal_block_hint": "Internal reviews are private — only the owner sees them. AI finds the root cause, assesses the master and suggests how to retain the client.",
+        "s": {
+          "situation": "What happened",
+          "root_cause": "Root cause",
+          "prevention": "How to prevent it",
+          "public_impact": "How other clients will perceive it",
+          "profile": "Client psychological profile",
+          "response": "Response strategy",
+          "retention": "Retention strategy",
+          "staff_action": "What to do with the master",
+          "approach": "Approach",
+          "offer": "Offer",
+          "hook": "Hook",
+          "public_reply": "Ready-to-paste public reply",
+          "private_message": "Personal message to client"
+        },
+        "profile": {
+          "tone": "Tone",
+          "emotion": "Emotion",
+          "temperament": "Temperament",
+          "style": "Communication style",
+          "service_context": "Service context"
+        },
+        "b": {
+          "overview": "Overview",
+          "patterns": "Patterns",
+          "top_actions": "Top actions",
+          "segments": "Client segments",
+          "risk": "Risk assessment"
+        }
       }
     },
     "competitors": {

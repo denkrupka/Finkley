@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { ReviewAiPanel } from '@/components/domain/ReviewAiPanel'
 import { Input } from '@/components/ui/input'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import {
@@ -132,6 +133,8 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
       ? rows.filter((r) => r.source !== 'internal' && (r.rating ?? 0) < 5 && !r.read_at)
       : []
 
+  const internalReviews = sub === 'internal' ? rows.filter((r) => r.source === 'internal') : []
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageStart = (page - 1) * PAGE_SIZE
   const pageRows = filtered.slice(pageStart, pageStart + PAGE_SIZE)
@@ -209,16 +212,35 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
         ) : null}
       </div>
 
+      {sub === 'internal' && internalReviews.length > 0 ? (
+        <div className="border-brand-sage-deep/30 bg-brand-sage/5 mb-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-foreground text-sm font-bold">
+              💡{' '}
+              {t('reports_hub.reviews.ai.internal_block_title', { count: internalReviews.length })}
+            </p>
+            <ReviewAiPanel salonId={salonId} scope="internal_all" />
+          </div>
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t('reports_hub.reviews.ai.internal_block_hint')}
+          </p>
+        </div>
+      ) : null}
+
       {negativeUnread.length > 0 ? (
         <div className="border-destructive/40 bg-destructive/5 mb-4 rounded-lg border p-4">
-          <p className="text-destructive text-sm font-bold">
-            🚨 {t('reports_hub.reviews.negative_unread_title', { count: negativeUnread.length })}
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-destructive text-sm font-bold">
+              🚨 {t('reports_hub.reviews.negative_unread_title', { count: negativeUnread.length })}
+            </p>
+            <ReviewAiPanel salonId={salonId} scope="negative_external" />
+          </div>
           <div className="mt-3 flex flex-col gap-2">
             {negativeUnread.slice(0, 5).map((r) => (
               <ReviewRow
                 key={r.id}
                 review={r}
+                salonId={salonId}
                 onMarkRead={() => {
                   markRead.mutate(r.id, {
                     onSuccess: () => toast.success(t('reports_hub.reviews.marked_read')),
@@ -249,6 +271,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
                 <ReviewRow
                   key={r.id}
                   review={r}
+                  salonId={salonId}
                   onMarkRead={() => {
                     markRead.mutate(r.id, {
                       onSuccess: () => toast.success(t('reports_hub.reviews.marked_read')),
@@ -326,11 +349,13 @@ function KpiCard({
 
 function ReviewRow({
   review,
+  salonId,
   onMarkRead,
   compact,
   t,
 }: {
   review: ReturnType<typeof useReviews>['data'] extends (infer R)[] | undefined ? R : never
+  salonId: string
   onMarkRead: () => void
   compact?: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
@@ -338,54 +363,65 @@ function ReviewRow({
   return (
     <div
       className={cn(
-        'flex items-start gap-3 px-4 py-3',
+        'flex flex-col gap-2 px-4 py-3',
         compact && 'border-border bg-card rounded-md border',
       )}
     >
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <Star
-              key={n}
-              className={cn(
-                'size-3.5',
-                n <= (review.rating ?? 0)
-                  ? 'text-brand-gold-deep fill-current'
-                  : 'text-muted-foreground/30',
-              )}
-              strokeWidth={1.5}
-            />
-          ))}
+      <div className="flex items-start gap-3">
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Star
+                key={n}
+                className={cn(
+                  'size-3.5',
+                  n <= (review.rating ?? 0)
+                    ? 'text-brand-gold-deep fill-current'
+                    : 'text-muted-foreground/30',
+                )}
+                strokeWidth={1.5}
+              />
+            ))}
+          </div>
+          <SourceBadge source={review.source} />
         </div>
-        <SourceBadge source={review.source} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="text-foreground text-sm font-semibold">
-            {review.author_name ?? t('reports_hub.reviews.anonymous')}
-          </p>
-          <p className="text-muted-foreground text-[10px]">
-            {format(parseISO(review.posted_at), 'd MMM yyyy', { locale: getDateLocale() })}
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-foreground text-sm font-semibold">
+              {review.author_name ?? t('reports_hub.reviews.anonymous')}
+            </p>
+            <p className="text-muted-foreground text-[10px]">
+              {format(parseISO(review.posted_at), 'd MMM yyyy', { locale: getDateLocale() })}
+            </p>
+          </div>
+          {review.body ? (
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{review.body}</p>
+          ) : (
+            <p className="text-muted-foreground/60 mt-1 text-xs italic">
+              {t('reports_hub.reviews.no_text')}
+            </p>
+          )}
         </div>
-        {review.body ? (
-          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{review.body}</p>
-        ) : (
-          <p className="text-muted-foreground/60 mt-1 text-xs italic">
-            {t('reports_hub.reviews.no_text')}
-          </p>
-        )}
+        {!review.read_at ? (
+          <button
+            type="button"
+            onClick={onMarkRead}
+            className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+          >
+            <Eye className="size-3" strokeWidth={2} />
+            {t('reports_hub.reviews.mark_read')}
+          </button>
+        ) : null}
       </div>
-      {!review.read_at ? (
-        <button
-          type="button"
-          onClick={onMarkRead}
-          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
-        >
-          <Eye className="size-3" strokeWidth={2} />
-          {t('reports_hub.reviews.mark_read')}
-        </button>
-      ) : null}
+      <div className="pl-12">
+        <ReviewAiPanel
+          salonId={salonId}
+          scope="single"
+          reviewId={review.id}
+          reviewSource={review.source as 'booksy' | 'google' | 'internal'}
+          compact
+        />
+      </div>
     </div>
   )
 }
