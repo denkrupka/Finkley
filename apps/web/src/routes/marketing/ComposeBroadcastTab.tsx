@@ -18,7 +18,9 @@ import {
 } from '@/components/ui/select'
 import { useClients, useClientLtvMetrics } from '@/hooks/useClients'
 import { useBroadcastPreview, useSendBroadcast, type BroadcastSegment } from '@/hooks/useMarketing'
+import { useSalon } from '@/hooks/useSalons'
 import { cn } from '@/lib/utils/cn'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 const textareaClass =
   'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
@@ -38,7 +40,9 @@ const SMS_LIMIT = 160
  * Сегмент → каналы → тексты → превью → отправка.
  */
 export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { data: salon } = useSalon(salonId)
+  const currency = salon?.currency ?? 'PLN'
   const [segment, setSegment] = useState<BroadcastSegment>('all')
   const [tagInput, setTagInput] = useState('')
   const [useTagSegment, setUseTagSegment] = useState(false)
@@ -151,7 +155,7 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
           {t('marketing.compose.templates_subtitle')}
         </p>
         <div className="flex flex-wrap gap-2">
-          {getBroadcastTemplates().map((tpl) => (
+          {getBroadcastTemplates(i18n.language).map((tpl) => (
             <button
               key={tpl.id}
               type="button"
@@ -238,6 +242,7 @@ export function ComposeBroadcastTab({ salonId }: { salonId: string }) {
       {manualPickerOpen ? (
         <ManualClientPickerDialog
           salonId={salonId}
+          currency={currency}
           selected={manualClientIds}
           onClose={() => setManualPickerOpen(false)}
           onConfirm={(ids) => {
@@ -561,11 +566,13 @@ function TagSelect({
  */
 function ManualClientPickerDialog({
   salonId,
+  currency,
   selected,
   onClose,
   onConfirm,
 }: {
   salonId: string
+  currency: string
   selected: string[]
   onClose: () => void
   onConfirm: (ids: string[]) => void
@@ -682,7 +689,7 @@ function ManualClientPickerDialog({
                     <td className="text-foreground px-3 py-2 font-semibold">{c.name ?? '—'}</td>
                     <td className="num text-foreground px-3 py-2 text-right">{visits}</td>
                     <td className="num text-foreground px-3 py-2 text-right">
-                      {(revenueCents / 100).toFixed(0)} zł
+                      {formatCurrency(revenueCents, currency)}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className="bg-muted/60 text-foreground inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">
