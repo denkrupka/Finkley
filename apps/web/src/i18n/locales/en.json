@@ -2720,6 +2720,8 @@
       "negative_unread_title": "New negative reviews: {{count}}",
       "mark_read": "Mark read",
       "marked_read": "Marked as read",
+      "mark_all_read": "Mark all ({{count}}) as read",
+      "mark_all_read_done": "Marked {{count}} as read",
       "anonymous": "Anonymous review",
       "no_text": "(no text, only rating)",
       "import_button": "Import from Booksy/Google",

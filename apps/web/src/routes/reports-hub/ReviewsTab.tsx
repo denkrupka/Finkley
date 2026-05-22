@@ -14,7 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useReviews, useReviewsImport, useMarkReviewRead } from '@/hooks/useReviews'
+import {
+  useMarkAllReviewsRead,
+  useMarkReviewRead,
+  useReviews,
+  useReviewsImport,
+} from '@/hooks/useReviews'
 import { cn } from '@/lib/utils/cn'
 import { getDateLocale } from '@/lib/utils/format-date'
 
@@ -48,6 +53,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
   const [page, setPage] = useState(1)
   const { data: rows = [], isLoading } = useReviews(salonId)
   const markRead = useMarkReviewRead(salonId)
+  const markAllRead = useMarkAllReviewsRead(salonId)
   const importMutation = useReviewsImport(salonId)
   const autoImportedRef = useRef(false)
 
@@ -143,26 +149,37 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
     <div>
       <PageTabsNav tabs={SUB_TABS} active={sub} onChange={setSub} t={t} />
 
-      {/* KPI по источникам — отдельный блок над фильтрами. */}
-      <div className="mb-3 mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <KpiCard
-          label="Booksy"
-          rating={kpi.booksy.avg}
-          count={kpi.booksy.count}
-          color="text-blue-700"
-        />
-        <KpiCard
-          label="Google"
-          rating={kpi.google.avg}
-          count={kpi.google.count}
-          color="text-red-700"
-        />
-        <KpiCard
-          label={t('reports_hub.reviews.tabs.internal')}
-          rating={kpi.internal.avg}
-          count={kpi.internal.count}
-          color="text-brand-sage-deep"
-        />
+      {/* KPI по источникам — показываем только релевантные подвкладке.
+          external → Booksy + Google; internal → только внутренние. */}
+      <div
+        className={cn(
+          'mb-3 mt-4 grid grid-cols-1 gap-2',
+          sub === 'external' ? 'sm:grid-cols-2' : 'sm:grid-cols-1',
+        )}
+      >
+        {sub === 'external' ? (
+          <>
+            <KpiCard
+              label="Booksy"
+              rating={kpi.booksy.avg}
+              count={kpi.booksy.count}
+              color="text-blue-700"
+            />
+            <KpiCard
+              label="Google"
+              rating={kpi.google.avg}
+              count={kpi.google.count}
+              color="text-red-700"
+            />
+          </>
+        ) : (
+          <KpiCard
+            label={t('reports_hub.reviews.tabs.internal')}
+            rating={kpi.internal.avg}
+            count={kpi.internal.count}
+            color="text-brand-sage-deep"
+          />
+        )}
       </div>
 
       <div className="mb-3 mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -205,6 +222,34 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
             <SelectItem value="read">{t('reports_hub.reviews.read.read')}</SelectItem>
           </SelectContent>
         </Select>
+        {(() => {
+          // Кнопка «Отметить все как прочитанные» — активна когда есть unread
+          // в текущей подвкладке (external или internal).
+          const unreadCount = filtered.filter((r) => !r.read_at).length
+          if (unreadCount === 0) return null
+          return (
+            <button
+              type="button"
+              onClick={() => {
+                markAllRead.mutate(
+                  { source: sub === 'internal' ? 'internal' : 'external' },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t('reports_hub.reviews.mark_all_read_done', { count: unreadCount }),
+                      ),
+                    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                  },
+                )
+              }}
+              disabled={markAllRead.isPending}
+              className="border-border bg-card text-foreground hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Eye className="size-3.5" strokeWidth={2} />
+              {t('reports_hub.reviews.mark_all_read', { count: unreadCount })}
+            </button>
+          )
+        })()}
         {importMutation.isPending ? (
           <span className="text-brand-sage-deep border-brand-sage-soft bg-brand-sage-soft/30 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold sm:ml-auto">
             <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />

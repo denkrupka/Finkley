@@ -3491,6 +3491,8 @@
       "negative_unread_title": "Новых негативных отзывов: {{count}}",
       "mark_read": "Прочитано",
       "marked_read": "Отмечено прочитанным",
+      "mark_all_read": "Отметить все ({{count}}) прочитанными",
+      "mark_all_read_done": "Отмечено прочитанными: {{count}}",
       "anonymous": "Анонимный отзыв",
       "no_text": "(без текста, только оценка)",
       "import_button": "Импорт с Booksy/Google",

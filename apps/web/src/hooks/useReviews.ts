@@ -45,6 +45,28 @@ export function useReviews(salonId: string | undefined) {
   })
 }
 
+/** Массово помечает все непрочитанные отзывы салона как прочитанные. */
+export function useMarkAllReviewsRead(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (filter?: { source?: 'internal' | 'external' }) => {
+      if (!salonId) throw new Error('no_salon')
+      let q = supabase
+        .from('reviews')
+        .update({ read_at: new Date().toISOString() })
+        .eq('salon_id', salonId)
+        .is('read_at', null)
+      if (filter?.source === 'internal') q = q.eq('source', 'internal')
+      else if (filter?.source === 'external') q = q.neq('source', 'internal')
+      const { error } = await q
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+    },
+  })
+}
+
 /** Помечает review как прочитанный (read_at=now()). */
 export function useMarkReviewRead(salonId: string | undefined) {
   const qc = useQueryClient()

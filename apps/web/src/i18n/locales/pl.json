@@ -2720,6 +2720,8 @@
       "negative_unread_title": "Nowe negatywne opinie: {{count}}",
       "mark_read": "Oznacz przeczytane",
       "marked_read": "Oznaczono jako przeczytane",
+      "mark_all_read": "Oznacz wszystkie ({{count}}) jako przeczytane",
+      "mark_all_read_done": "Oznaczono jako przeczytane: {{count}}",
       "anonymous": "Anonimowa opinia",
       "no_text": "(bez tekstu, tylko ocena)",
       "import_button": "Import z Booksy/Google",
