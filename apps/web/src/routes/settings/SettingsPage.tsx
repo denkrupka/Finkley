@@ -50,6 +50,7 @@ import { Link } from 'react-router-dom'
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
 
 import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
+import { useSyncCompetitors } from '@/hooks/useCompetitors'
 import { TelegramLinkCard } from '@/components/settings/TelegramLinkCard'
 import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
 import { CashDisciplineCard } from '@/routes/settings/CashDisciplineCard'
@@ -118,6 +119,7 @@ export function SettingsPage() {
   const { data: salon } = useSalon(salonId)
   const update = useUpdateSalon()
   const remove = useDeleteSalon()
+  const syncCompetitors = useSyncCompetitors(salonId)
   const { data: subscription } = useSubscription(salonId)
   const sendDigest = useSendWeeklyDigest(salonId)
   const updateWeeklyChannels = useUpdateDigestChannels(salonId, 'weekly')
@@ -286,7 +288,19 @@ export function SettingsPage() {
         facebook_url: facebookUrl.trim() || null,
       },
       {
-        onSuccess: () => toast.success(t('settings.toast_saved')),
+        onSuccess: () => {
+          toast.success(t('settings.toast_saved'))
+          // Если поменялся place_id / booksy_url — дёрнем competitor-sync чтобы
+          // own_salon_metrics обновились без ожидания cron'а. Иначе юзер видит
+          // старые числа в Reports → Конкуренты → Рейтинг.
+          const placeIdChanged = googlePlaceId.trim() !== (salon?.google_place_id ?? '')
+          const booksyChanged = booksyUrl.trim() !== (salon?.booksy_url ?? '')
+          if (placeIdChanged || booksyChanged) {
+            syncCompetitors.mutate(undefined, {
+              onError: (e) => console.warn('competitor-sync after place update failed:', e),
+            })
+          }
+        },
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
       },
     )
