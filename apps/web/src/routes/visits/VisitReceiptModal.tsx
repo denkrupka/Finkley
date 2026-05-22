@@ -73,12 +73,12 @@ export function VisitReceiptModal({ open, onClose, salonId, visit }: Props) {
             paddingBottom: 22,
           }}
         >
-          {/* 1. Статус + дата */}
-          <div className="mb-3 flex items-start justify-between">
+          {/* 1. Статус + дата. pr-12 — чтобы дата не залезла под крестик закрытия модалки. */}
+          <div className="mb-3 flex items-start justify-between pr-12">
             <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
               {t('visits.receipt.paid')}
             </span>
-            <p className="text-muted-foreground text-xs">{dateLabel}</p>
+            <p className="text-muted-foreground whitespace-nowrap text-xs">{dateLabel}</p>
           </div>
 
           {/* 2. Заголовок */}
