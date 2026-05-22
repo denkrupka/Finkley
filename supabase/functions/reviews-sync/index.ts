@@ -114,24 +114,52 @@ async function syncGooglePlace(placeId: string): Promise<{
 }
 
 /**
- * Booksy — НЕ ПОДДЕРЖИВАЕТСЯ начиная с 2026-05-22.
+ * Booksy reviews через customer_api REST endpoint.
  *
- * Booksy переехали на client-side rendering: HTML от их сервера —
- * пустой скелет без `__NEXT_DATA__`, без ld+json schema.org. Все
- * данные (отзывы, рейтинг, цены) подгружаются их JS в браузере.
+ * Booksy SPA дёргает этот же endpoint при загрузке отзывов на странице
+ * салона. Web-API key публичный (вшит в их frontend), не требует OAuth.
+ * Найден через HAR-анализ страницы pl.booksy.com.
  *
- * Scrape без headless-браузера (Puppeteer / Browserless / Playwright)
- * технически невозможен. Эти решения стоят $$$/мес или сложный self-host.
+ * Endpoint:
+ *   GET https://{region}.booksy.com/core/v2/customer_api/businesses/{id}/reviews/
+ *     ?reviews_page=N&reviews_per_page=50&ordering=-created
  *
- * Для Booksy reviews сейчас доступны 2 пути:
- *   1. Партнёрский API Booksy (require business agreement) — нам недоступен
- *   2. OAuth-интеграция Booksy (есть в Settings → Интеграции → Booksy) —
- *      даёт визиты/клиентов/услуги, но НЕ отзывы (нет в их Partner API).
+ * Region выбирается по locale prefix в URL салона:
+ *   /pl-pl/... → pl.booksy.com
+ *   /en-gb/... → us.booksy.com (Booksy us — основной EN регион)
+ *   etc.
  *
- * Поэтому функция возвращает [] явно (не silent skip — выдаёт debug info
- * в response, чтобы UI мог показать честное сообщение).
+ * Business_id — первое число в slug-сегменте URL:
+ *   .../135992_wonderful-beauty_... → 135992
+ *
+ * Возвращает массив отзывов в нашем формате. Тянет до 100 (2 страницы)
+ * за один вызов, чтобы не перегружать SMSAPI rate-limit Booksy.
  */
-async function syncBooksyReviews(_booksyUrl: string): Promise<
+const BOOKSY_WEB_API_KEY = 'web-e3d812bf-d7a2-445d-ab38-55589ae6a121'
+
+type BooksyReviewItem = {
+  id: number
+  rank: number
+  review: string | null
+  title: string | null
+  user?: { first_name?: string; last_name?: string }
+  created: string
+  reply_content?: string | null
+}
+
+function parseBooksyUrl(url: string): { region: string; businessId: string } | null {
+  // https://booksy.com/pl-pl/135992_wonderful-beauty_... или
+  // https://pl.booksy.com/pl-pl/135992_... (новый формат)
+  const m = url.match(/booksy\.com\/([a-z]{2})-([a-z]{2})\/(\d+)_/i)
+  if (!m) return null
+  const lang = m[1].toLowerCase()
+  const businessId = m[3]
+  // pl-pl → pl, en-gb → us (для EN Booksy использует us-регион)
+  const region = lang === 'pl' ? 'pl' : lang === 'en' ? 'us' : lang
+  return { region, businessId }
+}
+
+async function syncBooksyReviews(booksyUrl: string): Promise<
   Array<{
     external_id: string
     rating: number | null
@@ -141,19 +169,77 @@ async function syncBooksyReviews(_booksyUrl: string): Promise<
     external_url: string | null
   }>
 > {
-  // Возвращаем пусто — Booksy CSR делает scrape невозможным.
-  // См. ADR-024 (будущий) или комментарий выше.
-  return []
+  const parsed = parseBooksyUrl(booksyUrl)
+  if (!parsed) return []
+  const { region, businessId } = parsed
+
+  const out: Array<{
+    external_id: string
+    rating: number | null
+    body: string | null
+    author_name: string | null
+    posted_at: string
+    external_url: string | null
+  }> = []
+
+  // 2 страницы × 50 = до 100 отзывов за вызов. Cron каждый день добивает
+  // постепенно (manual dedup в processSalon отсекает дубликаты).
+  for (const page of [1, 2]) {
+    try {
+      const u = `https://${region}.booksy.com/core/v2/customer_api/businesses/${businessId}/reviews/?reviews_page=${page}&reviews_per_page=50&ordering=-created`
+      const r = await fetch(u, {
+        headers: {
+          accept: 'application/json',
+          'accept-language': 'pl-PL, pl',
+          'user-agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          referer: 'https://booksy.com/',
+          'x-api-key': BOOKSY_WEB_API_KEY,
+          'x-app-version': '3.0',
+        },
+      })
+      if (!r.ok) {
+        console.warn(`booksy reviews page=${page} HTTP ${r.status}`)
+        break
+      }
+      const data = (await r.json()) as { reviews?: BooksyReviewItem[] }
+      const list = data.reviews ?? []
+      if (list.length === 0) break
+      for (const rv of list) {
+        const author = [rv.user?.first_name, rv.user?.last_name].filter(Boolean).join(' ').trim()
+        out.push({
+          external_id: `booksy_${rv.id}`,
+          rating: typeof rv.rank === 'number' ? Math.round(rv.rank) : null,
+          // Booksy: review.title — заголовок (часто пуст), review.review — тело.
+          // Если есть reply от салона — приклеиваем как «— Ответ салона: ...».
+          body:
+            (rv.title ? `${rv.title}\n\n` : '') +
+            (rv.review ?? '') +
+            (rv.reply_content ? `\n\n— Ответ салона: ${rv.reply_content}` : ''),
+          author_name: author || null,
+          posted_at: rv.created
+            ? new Date(
+                rv.created.includes('T') ? rv.created : `${rv.created}T00:00:00`,
+              ).toISOString()
+            : new Date().toISOString(),
+          external_url: booksyUrl,
+        })
+      }
+      if (list.length < 50) break
+    } catch (e) {
+      console.warn(`booksy reviews page=${page} failed:`, e)
+      break
+    }
+  }
+  return out
 }
 
 type ProcessResult = {
   imported: number
   google_reviews_fetched: number
   booksy_reviews_fetched: number
-  /** Booksy reviews технически невозможны через scrape (CSR с 2026-05).
-   *  UI должен показать честное сообщение если booksy_url задан, но
-   *  fetched=0 — это не баг, это лимит. */
-  booksy_supported: false
+  /** Booksy reviews через customer_api REST endpoint (web-key, no OAuth). */
+  booksy_supported: boolean
   upsert_error?: string
   google_error?: string
 }
@@ -246,7 +332,7 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
     imported,
     google_reviews_fetched: googleFetched,
     booksy_reviews_fetched: booksyFetched,
-    booksy_supported: false,
+    booksy_supported: true,
     ...(upsertError ? { upsert_error: upsertError } : {}),
     ...(googleError ? { google_error: googleError } : {}),
   }
