@@ -3481,6 +3481,8 @@
       "months": "{{count}} mies.",
       "avg_profit": "Śr. mies. zysk",
       "portal_revenue": "Przychód portalu",
+      "sms_balance": "Saldo SMS",
+      "sms_grant_button": "Doładuj SMS",
       "status": "Status",
       "valid_until": "Ważne do",
       "created": "Utworzony",
@@ -3505,7 +3507,8 @@
         "deleted": "Salon usunięty (usuniętych użytkowników: {{users}})",
         "user_attached": "Użytkownik dodany do salonu",
         "user_invited": "Zaproszenie wysłane na email",
-        "demo_extended": "Trial przedłużony"
+        "demo_extended": "Trial przedłużony",
+        "sms_granted": "Doładowano {{amount}} SMS. Nowe saldo: {{balance}}."
       },
       "modal": {
         "block_title": "Zablokuj '{{name}}'",
@@ -3534,7 +3537,13 @@
         "delete_step3_title": "Ostatnie potwierdzenie",
         "delete_step3_body": "Salon '{{name}}' zostanie usunięty. Przycisk stanie się aktywny po 3 sekundach — żebyś nie kliknął przypadkiem.",
         "delete_step3_cooldown": "Poczekaj {{sec}} sek",
-        "delete_step3_ready": "Możesz kliknąć 'Usuń na zawsze'"
+        "delete_step3_ready": "Możesz kliknąć 'Usuń na zawsze'",
+        "sms_grant_title": "Doładuj SMS '{{name}}'",
+        "sms_grant_body": "Bonus-SMS dodadzą się do salda salonu bez opłaty. Bieżące saldo: {{balance}}. Zapisane w audit z Twoim user_id.",
+        "sms_grant_amount": "Liczba SMS",
+        "sms_grant_reason_placeholder": "Np. rekompensata za awarię / promo / test",
+        "sms_grant_preview": "Doładowanych zostanie {{amount}} SMS → nowe saldo {{total}}.",
+        "sms_grant_confirm": "Doładuj"
       }
     },
     "user_card": {

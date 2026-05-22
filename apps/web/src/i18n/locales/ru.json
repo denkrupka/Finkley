@@ -82,6 +82,8 @@
       "months": "{{count}} мес",
       "avg_profit": "Ср. месяч. прибыль салона",
       "portal_revenue": "Доход портала",
+      "sms_balance": "Баланс SMS",
+      "sms_grant_button": "Начислить SMS",
       "status": "Статус",
       "valid_until": "Действителен до",
       "created": "Создан",
@@ -106,7 +108,8 @@
         "deleted": "Салон удалён (юзеров удалено: {{users}})",
         "user_attached": "Пользователь добавлен в салон",
         "user_invited": "Приглашение отправлено на email",
-        "demo_extended": "Демо продлено"
+        "demo_extended": "Демо продлено",
+        "sms_granted": "Начислено {{amount}} SMS. Новый баланс: {{balance}}."
       },
       "modal": {
         "block_title": "Заблокировать «{{name}}»",
@@ -135,7 +138,13 @@
         "delete_step3_title": "Последнее подтверждение",
         "delete_step3_body": "Сейчас будет удалён салон «{{name}}». Кнопка станет активной через 3 секунды — чтобы вы не нажали случайно.",
         "delete_step3_cooldown": "Подождите {{sec}} сек",
-        "delete_step3_ready": "Можно нажимать «Удалить навсегда»"
+        "delete_step3_ready": "Можно нажимать «Удалить навсегда»",
+        "sms_grant_title": "Начислить SMS «{{name}}»",
+        "sms_grant_body": "Bonus-SMS добавятся к балансу салона без оплаты. Текущий баланс: {{balance}}. Запишется в audit с твоим user_id.",
+        "sms_grant_amount": "Количество SMS",
+        "sms_grant_reason_placeholder": "Например: компенсация за сбой / promo / тест",
+        "sms_grant_preview": "Будет начислено {{amount}} SMS → новый баланс {{total}}.",
+        "sms_grant_confirm": "Начислить"
       }
     },
     "user_card": {

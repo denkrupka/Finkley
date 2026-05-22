@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
     if (action === 'salon_delete') return handleSalonDelete(admin, body)
     if (action === 'salon_add_user') return handleSalonAddUser(admin, body)
     if (action === 'salon_extend_demo') return handleSalonExtendDemo(admin, body, user.userId)
+    if (action === 'salon_sms_grant') return handleSalonSmsGrant(admin, body, user.userId)
     if (action === 'user_block') return handleUserBlock(admin, body, user.userId)
     if (action === 'user_unblock') return handleUserUnblock(admin, body)
     if (action === 'member_role_change') return handleMemberRoleChange(admin, body)
@@ -257,7 +258,9 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
 
   const { data: salons, error } = await admin
     .from('salons')
-    .select('id, name, currency, salon_type, created_at, created_by, blocked_at, blocked_reason')
+    .select(
+      'id, name, currency, salon_type, created_at, created_by, blocked_at, blocked_reason, sms_balance',
+    )
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) return jsonResponse({ error: error.message }, 500)
@@ -449,9 +452,62 @@ async function handleSalons(admin: AdminClient): Promise<Response> {
         period_months: periodMonths,
         avg_profit_cents: Math.round((revenue - expense) / kpiMonths),
         portal_revenue_cents: portalRevenueCents,
+        sms_balance: (s as { sms_balance: number | null }).sms_balance ?? 0,
       }
     }),
   })
+}
+
+/**
+ * Super-admin начисляет bonus-SMS салону (без оплаты).
+ * Body: { salon_id: uuid, amount: number > 0, reason?: string }
+ * Атомарно: UPDATE salons.sms_balance += amount + INSERT в salon_sms_purchases
+ * со status='bonus' для audit.
+ */
+async function handleSalonSmsGrant(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+  adminId: string,
+): Promise<Response> {
+  const salonId = body.salon_id
+  const amount = body.amount
+  const reason = typeof body.reason === 'string' ? body.reason : null
+  if (typeof salonId !== 'string') return jsonResponse({ error: 'salon_id_required' }, 400)
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+    return jsonResponse({ error: 'amount_must_be_positive_integer' }, 400)
+  }
+  if (amount > 100_000) {
+    return jsonResponse({ error: 'amount_too_large' }, 400)
+  }
+
+  const { data: salon } = await admin
+    .from('salons')
+    .select('id, sms_balance')
+    .eq('id', salonId)
+    .maybeSingle()
+  if (!salon) return jsonResponse({ error: 'salon_not_found' }, 404)
+
+  const currentBalance = (salon as { sms_balance: number | null }).sms_balance ?? 0
+  const newBalance = currentBalance + amount
+
+  const { error: updateErr } = await admin
+    .from('salons')
+    .update({ sms_balance: newBalance })
+    .eq('id', salonId)
+  if (updateErr) return jsonResponse({ error: updateErr.message }, 500)
+
+  await admin.from('salon_sms_purchases').insert({
+    salon_id: salonId,
+    package_size: amount,
+    price_per_sms_grosz: 0,
+    total_grosz: 0,
+    status: 'bonus',
+    paid_at: new Date().toISOString(),
+    granted_by: adminId,
+    granted_reason: reason,
+  })
+
+  return jsonResponse({ ok: true, new_balance: newBalance })
 }
 
 async function handleUsers(admin: AdminClient): Promise<Response> {

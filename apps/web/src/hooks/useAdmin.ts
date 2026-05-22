@@ -83,6 +83,7 @@ export type AdminSalonRow = {
   portal_revenue_cents: number
   effective_status: 'blocked' | 'subscribed' | 'on_trial' | 'trial_expired' | 'inactive'
   valid_until: string | null
+  sms_balance: number
 }
 
 export type AdminUserRow = {
@@ -338,6 +339,16 @@ export function useSalonExtendDemo() {
   return useMutation({
     mutationFn: (vars: { salon_id: string; until_iso: string; reason?: string }) =>
       postAdmin<{ ok: true; mode: 'create' | 'bonus' | 'extend_trial' }>('salon_extend_demo', vars),
+    onSuccess: invalidate,
+  })
+}
+
+/** Super-admin начисляет bonus-SMS салону без оплаты. */
+export function useSalonSmsGrant() {
+  const invalidate = useInvalidateSalons()
+  return useMutation({
+    mutationFn: (vars: { salon_id: string; amount: number; reason?: string }) =>
+      postAdmin<{ ok: true; new_balance: number }>('salon_sms_grant', vars),
     onSuccess: invalidate,
   })
 }

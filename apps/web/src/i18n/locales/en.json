@@ -3481,6 +3481,8 @@
       "months": "{{count}} mo",
       "avg_profit": "Avg monthly profit",
       "portal_revenue": "Portal revenue",
+      "sms_balance": "SMS balance",
+      "sms_grant_button": "Grant SMS",
       "status": "Status",
       "valid_until": "Valid until",
       "created": "Created",
@@ -3505,7 +3507,8 @@
         "deleted": "Salon deleted (users deleted: {{users}})",
         "user_attached": "User added to salon",
         "user_invited": "Invitation sent to email",
-        "demo_extended": "Trial extended"
+        "demo_extended": "Trial extended",
+        "sms_granted": "Granted {{amount}} SMS. New balance: {{balance}}."
       },
       "modal": {
         "block_title": "Block '{{name}}'",
@@ -3534,7 +3537,13 @@
         "delete_step3_title": "Final confirmation",
         "delete_step3_body": "Salon '{{name}}' is about to be deleted. The button will become active after 3 seconds — so you don't click by accident.",
         "delete_step3_cooldown": "Wait {{sec}} sec",
-        "delete_step3_ready": "You can press 'Delete forever'"
+        "delete_step3_ready": "You can press 'Delete forever'",
+        "sms_grant_title": "Grant SMS to '{{name}}'",
+        "sms_grant_body": "Bonus SMS will be added to the salon balance without payment. Current balance: {{balance}}. Recorded in audit with your user_id.",
+        "sms_grant_amount": "Number of SMS",
+        "sms_grant_reason_placeholder": "E.g. compensation for outage / promo / test",
+        "sms_grant_preview": "Will grant {{amount}} SMS → new balance {{total}}.",
+        "sms_grant_confirm": "Grant"
       }
     },
     "user_card": {

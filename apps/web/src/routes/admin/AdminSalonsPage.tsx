@@ -1,5 +1,13 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { AlertTriangle, Ban, CalendarClock, MoreVertical, Trash2, UserPlus } from 'lucide-react'
+import {
+  AlertTriangle,
+  Ban,
+  CalendarClock,
+  MessageSquarePlus,
+  MoreVertical,
+  Trash2,
+  UserPlus,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -16,6 +24,7 @@ import {
   useSalonBlock,
   useSalonDelete,
   useSalonExtendDemo,
+  useSalonSmsGrant,
   useSalonUnblock,
   type AdminSalonRow,
   type AdminUserRow,
@@ -23,7 +32,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { SALON_TYPES } from '@/routes/onboarding/onboarding-defaults'
 
-type ModalKind = 'block' | 'addUser' | 'extendDemo' | 'delete' | null
+type ModalKind = 'block' | 'addUser' | 'extendDemo' | 'delete' | 'smsGrant' | null
 
 const STATUS_TONE: Record<string, string> = {
   green: 'bg-emerald-100 text-emerald-700',
@@ -86,6 +95,7 @@ export function AdminSalonsPage() {
                 <th className="px-4 py-3 text-right">{t('admin.salons.period_months')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.avg_profit')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.salons.portal_revenue')}</th>
+                <th className="px-4 py-3 text-right">{t('admin.salons.sms_balance')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.status')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.valid_until')}</th>
                 <th className="px-4 py-3 text-left">{t('admin.salons.created')}</th>
@@ -103,7 +113,7 @@ export function AdminSalonsPage() {
               ))}
               {data.salons.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-muted-foreground px-4 py-8 text-center">
+                  <td colSpan={11} className="text-muted-foreground px-4 py-8 text-center">
                     {t('admin.salons.empty')}
                   </td>
                 </tr>
@@ -123,6 +133,7 @@ export function AdminSalonsPage() {
           <AddUserModal open={modal.kind === 'addUser'} salon={modal.salon} onClose={close} />
           <ExtendDemoModal open={modal.kind === 'extendDemo'} salon={modal.salon} onClose={close} />
           <DeleteModal open={modal.kind === 'delete'} salon={modal.salon} onClose={close} />
+          <SmsGrantModal open={modal.kind === 'smsGrant'} salon={modal.salon} onClose={close} />
         </>
       ) : null}
     </div>
@@ -197,6 +208,26 @@ function SalonRow({
       </td>
       <td className="num text-brand-navy px-4 py-3 text-right font-semibold">
         {formatCurrency(salon.portal_revenue_cents, 'EUR')}
+      </td>
+      <td className="num px-4 py-3 text-right">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className={
+              salon.sms_balance <= 2 ? 'font-bold text-rose-600' : 'text-foreground font-semibold'
+            }
+          >
+            {salon.sms_balance}
+          </span>
+          <button
+            type="button"
+            onClick={() => onAction('smsGrant', salon)}
+            className="text-muted-foreground hover:text-brand-sage-deep grid size-6 place-items-center rounded-md hover:bg-emerald-50"
+            title={t('admin.salons.sms_grant_button')}
+            aria-label={t('admin.salons.sms_grant_button')}
+          >
+            <MessageSquarePlus className="size-3.5" strokeWidth={2} />
+          </button>
+        </span>
       </td>
       <td className="px-4 py-3">
         <span
@@ -675,6 +706,97 @@ function DeleteModal({
                 : t('admin.salons.modal.delete_confirm')}
             </Button>
           )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Super-admin начисляет bonus-SMS салону без оплаты. Поле amount (integer > 0)
+ * + опц. reason. Backend salon_sms_grant атомарно UPDATE salons.sms_balance
+ * и INSERT salon_sms_purchases со status='bonus' для audit.
+ */
+function SmsGrantModal({
+  open,
+  salon,
+  onClose,
+}: {
+  open: boolean
+  salon: AdminSalonRow
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [amount, setAmount] = useState('100')
+  const [reason, setReason] = useState('')
+  const grant = useSalonSmsGrant()
+
+  const amountNum = Math.max(0, Math.floor(Number(amount) || 0))
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('admin.salons.modal.sms_grant_title', { name: salon.name })}</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-y-auto px-5 py-4">
+          <p className="text-muted-foreground text-sm">
+            {t('admin.salons.modal.sms_grant_body', { balance: salon.sms_balance })}
+          </p>
+          <Label className="mt-3 block text-xs">{t('admin.salons.modal.sms_grant_amount')}</Label>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="mt-1 h-10"
+            autoFocus
+          />
+          <Label className="mt-3 block text-xs">{t('admin.salons.modal.reason')}</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t('admin.salons.modal.sms_grant_reason_placeholder')}
+            className="mt-1 h-10"
+          />
+          {amountNum > 0 ? (
+            <p className="text-muted-foreground mt-3 text-xs">
+              {t('admin.salons.modal.sms_grant_preview', {
+                amount: amountNum,
+                total: salon.sms_balance + amountNum,
+              })}
+            </p>
+          ) : null}
+        </div>
+        <div className="border-border flex justify-end gap-2 border-t px-5 py-3">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={grant.isPending || amountNum <= 0}
+            onClick={() => {
+              grant.mutate(
+                { salon_id: salon.id, amount: amountNum, reason: reason || undefined },
+                {
+                  onSuccess: (r) => {
+                    toast.success(
+                      t('admin.salons.toast.sms_granted', {
+                        amount: amountNum,
+                        balance: r.new_balance,
+                      }),
+                    )
+                    onClose()
+                  },
+                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                },
+              )
+            }}
+          >
+            {t('admin.salons.modal.sms_grant_confirm')}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
