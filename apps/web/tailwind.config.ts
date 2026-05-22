@@ -76,6 +76,7 @@ const config: Config = {
           sage: {
             DEFAULT: 'hsl(var(--brand-sage))',
             soft: 'hsl(var(--brand-sage-soft))',
+            deep: 'hsl(var(--brand-sage-deep))',
           },
           red: {
             DEFAULT: 'hsl(var(--brand-red))',

@@ -526,9 +526,15 @@ function ReviewReplyForm({
       { scope: 'single', review_id: reviewId },
       {
         onSuccess: (res) => {
-          const content = res.content as { suggested_public_reply?: string }
-          if (content?.suggested_public_reply) {
-            setText(content.suggested_public_reply)
+          // External отзыв (Booksy/Google) → берём suggested_public_reply.
+          // Internal (форма после визита) → suggested_private_message (там нет public_reply).
+          const content = res.content as {
+            suggested_public_reply?: string
+            suggested_private_message?: string
+          }
+          const reply = content?.suggested_public_reply ?? content?.suggested_private_message
+          if (reply) {
+            setText(reply)
             toast.success(t('reports_hub.reviews.reply_ai_filled'))
           } else {
             toast.error(t('reports_hub.reviews.reply_ai_empty'))

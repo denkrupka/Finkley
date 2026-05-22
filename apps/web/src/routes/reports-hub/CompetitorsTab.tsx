@@ -67,7 +67,10 @@ const SUB_TABS: PageTab<CompetitorsSubTab>[] = [
  */
 export function CompetitorsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<CompetitorsSubTab>('prices')
+  // Дефолт «Рейтинг» — там сразу видны данные (Booksy/Google ratings собираются
+  // автосинком сразу). Цены / Загруженность требуют AI-матчинга → пустые при
+  // первом открытии, что выглядит как «не работает».
+  const [sub, setSub] = useState<CompetitorsSubTab>('rating')
   const { data: salon } = useSalon(salonId)
   const { data: competitors = [] } = useCompetitors(salonId)
   const currency = salon?.currency ?? 'PLN'
@@ -797,7 +800,7 @@ function ParamsSection({
       hint: t('reports_hub.competitors.params.conn_instagram_hint'),
       connected: igStatus,
       linkLabel: t('reports_hub.competitors.params.conn_go_to_integrations'),
-      linkTo: `/${salonId}/integrations?cat=messengers`,
+      linkTo: `/${salonId}/integrations?tab=messengers`,
     },
     {
       key: 'facebook',
@@ -805,7 +808,7 @@ function ParamsSection({
       hint: t('reports_hub.competitors.params.conn_facebook_hint'),
       connected: fbStatus,
       linkLabel: t('reports_hub.competitors.params.conn_go_to_integrations'),
-      linkTo: `/${salonId}/integrations?cat=messengers`,
+      linkTo: `/${salonId}/integrations?tab=messengers`,
     },
   ]
 

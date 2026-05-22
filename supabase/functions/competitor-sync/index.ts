@@ -61,6 +61,31 @@ const TODAY = new Date().toISOString().slice(0, 10)
 // =============================================================================
 // Google Places — rating + count.
 // =============================================================================
+/**
+ * Резолвит Google Place ID из имени конкурента через Text Search API v1.
+ * Возвращает null если API key не задан или ничего не найдено.
+ * Используется fallback'ом для конкурентов добавленных ручным URL без place_id.
+ */
+async function resolveGooglePlaceId(name: string): Promise<string | null> {
+  if (!GOOGLE_KEY) return null
+  try {
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_KEY,
+        'X-Goog-FieldMask': 'places.id',
+      },
+      body: JSON.stringify({ textQuery: name, maxResultCount: 1 }),
+    })
+    if (!r.ok) return null
+    const data = (await r.json()) as { places?: Array<{ id?: string }> }
+    return data.places?.[0]?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 async function fetchGoogleRating(placeId: string): Promise<Snapshot['data'] | null> {
   if (!GOOGLE_KEY) return null
   const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`
@@ -557,8 +582,18 @@ async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<numb
 async function syncOneCompetitor(admin: SupabaseClient, c: CompetitorRow): Promise<number> {
   const snapshots: Snapshot[] = []
 
-  if (c.google_place_id) {
-    const rating = await fetchGoogleRating(c.google_place_id)
+  // Если place_id не задан, но есть place_url — попробуем резолвить через
+  // Places Text Search по имени. Если получилось — сохраняем place_id в БД
+  // чтобы следующий sync пошёл по быстрому пути.
+  let placeId = c.google_place_id
+  if (!placeId && c.name) {
+    placeId = await resolveGooglePlaceId(c.name)
+    if (placeId) {
+      await admin.from('competitors').update({ google_place_id: placeId }).eq('id', c.id)
+    }
+  }
+  if (placeId) {
+    const rating = await fetchGoogleRating(placeId)
     if (rating) {
       snapshots.push({
         competitor_id: c.id,
