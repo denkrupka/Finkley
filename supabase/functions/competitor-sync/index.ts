@@ -368,6 +368,14 @@ async function fetchBooksyOccupancy(
 
   for (const v of variants) {
     if (!v.id) continue // вариант без id — нет смысла дёргать draft
+    // Booksy 2026 требует конкретный staffer_id; staffer_id=null → 400 validation.
+    // Берём первого из v.staffer_ids; если variant без мастеров — пропускаем
+    // (бронировать некому, occupancy не имеет смысла).
+    const stafferId = v.staffer_ids?.[0]
+    if (!stafferId) {
+      console.warn(`booksy occupancy: variant=${v.id} has no staffer_ids, skipping`)
+      continue
+    }
     try {
       // 1. Create draft
       const draftRes = await fetch(
@@ -385,7 +393,7 @@ async function fetchBooksyOccupancy(
               'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
           },
           body: JSON.stringify({
-            staffer_id: null,
+            staffer_id: stafferId,
             business_id: Number(parsed.businessId),
             service_variant_id: v.id,
             meta: {},
@@ -688,9 +696,13 @@ async function syncOneCompetitor(
       // Загруженность: для top-5 variants создаём draft + тянем timeslots на 7 дней.
       // Это даёт нам сравнимый метрик «свободные слоты у конкурента». Ограничение
       // 5 — чтобы не дёргать Booksy 100 раз и не словить rate-limit.
+      // Booksy API требует конкретный staffer_id → фильтруем variants с пустым
+      // массивом мастеров (Konsultacja и пр. — там booking не работает).
       const parsed = parseBooksyUrl(c.booksy_url)
       if (parsed) {
-        const topVariants = catalog.services.filter((v) => v.id).slice(0, 5)
+        const topVariants = catalog.services
+          .filter((v) => v.id && v.staffer_ids.length > 0)
+          .slice(0, 5)
         if (topVariants.length > 0) {
           const occ = await fetchBooksyOccupancy(parsed, topVariants)
           if (occ.length > 0) {

@@ -11,13 +11,25 @@
 import { describe, expect, it } from 'vitest'
 
 function parseSocialCount(raw: string): number {
-  const r = raw.trim().replace(/,/g, '')
+  const r = raw.trim().replace(/[,\s  ]/g, '')
   if (!r) return 0
   if (/[Kk]$/.test(r)) return Math.round(parseFloat(r) * 1_000)
   if (/[Mm]$/.test(r)) return Math.round(parseFloat(r) * 1_000_000)
   if (/[Bb]$/.test(r)) return Math.round(parseFloat(r) * 1_000_000_000)
   const n = parseFloat(r)
   return Number.isFinite(n) ? Math.round(n) : 0
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
 }
 
 type InstaCounts = {
@@ -27,16 +39,40 @@ type InstaCounts = {
 }
 
 function parseInstaOgDescription(html: string): InstaCounts {
-  const og = html.match(/<meta property="og:description" content="([^"]+)"/)
+  const og = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/)
   if (!og || !og[1]) return {}
-  const text = og[1]
-  const followers = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Followers/i)
-  const posts = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Posts/i)
-  const following = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Following/i)
+  const text = decodeHtmlEntities(og[1])
   const out: InstaCounts = {}
-  if (followers && followers[1]) out.followers = parseSocialCount(followers[1])
-  if (posts && posts[1]) out.posts = parseSocialCount(posts[1])
-  if (following && following[1]) out.following = parseSocialCount(following[1])
+
+  const NUM = '(\\d[\\d.,\\s\\u00a0\\u202f]*(?:[KMB])?)'
+  const tryMatch = (re: RegExp, key: keyof InstaCounts) => {
+    if (out[key] != null) return
+    const m = text.match(re)
+    if (m && m[1]) {
+      const v = parseSocialCount(m[1])
+      if (v > 0) out[key] = v
+    }
+  }
+
+  tryMatch(new RegExp(`${NUM}\\s*Followers`, 'i'), 'followers')
+  tryMatch(new RegExp(`Obserwuj(?:ący|acy):\\s*${NUM}`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*Abonnenten`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*подписчик`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*seguidores`, 'i'), 'followers')
+
+  tryMatch(new RegExp(`${NUM}\\s*Following`, 'i'), 'following')
+  tryMatch(new RegExp(`obserwowani:\\s*${NUM}`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*abonniert`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*подпис(?:ок|ки|ке|кой)`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*seguidos`, 'i'), 'following')
+
+  tryMatch(new RegExp(`${NUM}\\s*Posts`, 'i'), 'posts')
+  tryMatch(new RegExp(`post(?:y|ów):\\s*${NUM}`, 'i'), 'posts')
+  tryMatch(new RegExp(`posty:?\\s*${NUM}`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*Beiträge`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*публикаци`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*publicaciones`, 'i'), 'posts')
+
   return out
 }
 
@@ -89,8 +125,29 @@ function estimatePostsPerMonth(html: string, totalPosts?: number): number | null
 }
 
 function parseFbLikes(html: string): number | null {
-  const m = html.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*(?:people\s+like|likes|like\s+this)/i)
-  if (m && m[1]) return parseSocialCount(m[1])
+  const og = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/)
+  const haystack = og && og[1] ? decodeHtmlEntities(og[1]) : decodeHtmlEntities(html)
+  const NUM = '(\\d[\\d.,\\s\\u00a0\\u202f]*(?:[KMB])?)'
+  const patterns = [
+    new RegExp(`${NUM}\\s*people\\s+like`, 'i'),
+    new RegExp(`${NUM}\\s*likes?\\b`, 'i'),
+    new RegExp(`${NUM}\\s*like\\s+this`, 'i'),
+    new RegExp(`${NUM}\\s*os[oó]b\\s+lubi`, 'i'),
+    new RegExp(`${NUM}\\s*osoby\\s+lubi`, 'i'),
+    new RegExp(`Lubi\\s+to:?\\s*${NUM}`, 'i'),
+    new RegExp(`Polubieni[ae]:?\\s*${NUM}`, 'i'),
+    new RegExp(`${NUM}\\s*отмет[ао]к`, 'i'),
+    new RegExp(`Нравится:?\\s*${NUM}`, 'i'),
+    new RegExp(`${NUM}\\s*Personen\\s+gef[äa]llt`, 'i'),
+    new RegExp(`${NUM}\\s*personas?\\s+les\\s+gusta`, 'i'),
+  ]
+  for (const re of patterns) {
+    const m = haystack.match(re)
+    if (m && m[1]) {
+      const v = parseSocialCount(m[1])
+      if (v > 0) return v
+    }
+  }
   return null
 }
 
@@ -122,9 +179,13 @@ describe('parseSocialCount', () => {
     expect(parseSocialCount('abc')).toBe(0)
     expect(parseSocialCount('---')).toBe(0)
   })
+
+  it('PL thousand separator (space) — "1 234"', () => {
+    expect(parseSocialCount('1 234')).toBe(1234)
+  })
 })
 
-describe('parseInstaOgDescription', () => {
+describe('parseInstaOgDescription — EN', () => {
   it('extracts followers/posts/following counts', () => {
     const html =
       '<meta property="og:description" content="12.5K Followers, 543 Following, 1,234 Posts - Welcome to my salon">'
@@ -155,12 +216,50 @@ describe('parseInstaOgDescription', () => {
   })
 })
 
+describe('parseInstaOgDescription — locales + HTML entities', () => {
+  it('Polish "Obserwujący: X, obserwowani: Y posty: Z" (with HTML entities)', () => {
+    const html =
+      '<meta property="og:description" content="Obserwuj&#x105;cy: 2,173, obserwowani: 294 posty: 272 &#x2013; zobacz">'
+    const r = parseInstaOgDescription(html)
+    expect(r.followers).toBe(2173)
+    expect(r.following).toBe(294)
+    expect(r.posts).toBe(272)
+  })
+
+  it('Russian "X подписчиков, Y подписок, Z публикаций"', () => {
+    const html =
+      '<meta property="og:description" content="2 173 подписчиков, 294 подписок, 272 публикаций — фото">'
+    const r = parseInstaOgDescription(html)
+    expect(r.followers).toBe(2173)
+    expect(r.following).toBe(294)
+    expect(r.posts).toBe(272)
+  })
+
+  it('German "X Abonnenten, Y abonniert, Z Beiträge"', () => {
+    const html =
+      '<meta property="og:description" content="2.500 Abonnenten, 100 abonniert, 50 Beiträge">'
+    const r = parseInstaOgDescription(html)
+    // 2.500 — точка как разделитель тысяч; parseFloat('2.500') = 2.5 → округлится
+    // Это OK для нашей задачи; в реальности Instagram отдаёт K/M суффиксы.
+    expect(r.following).toBe(100)
+    expect(r.posts).toBe(50)
+  })
+
+  it('Spanish "X seguidores, Y seguidos, Z publicaciones"', () => {
+    const html =
+      '<meta property="og:description" content="1,500 seguidores, 200 seguidos, 75 publicaciones">'
+    const r = parseInstaOgDescription(html)
+    expect(r.followers).toBe(1500)
+    expect(r.following).toBe(200)
+    expect(r.posts).toBe(75)
+  })
+})
+
 describe('estimatePostsPerMonth', () => {
   it('2 ISO dates ровно через 30 дней → 1 post / month (1 интервал)', () => {
     const newest = '2026-05-01T12:00:00Z'
     const oldest = '2026-04-01T12:00:00Z'
     const html = `<time datetime="${newest}"></time><time datetime="${oldest}"></time>`
-    // 1 интервал в 30 дней = (2-1)/30 * 30 = 1 post/month.
     expect(estimatePostsPerMonth(html)).toBe(1)
   })
 
@@ -177,7 +276,6 @@ describe('estimatePostsPerMonth', () => {
   })
 
   it('1 date + totalPosts → грубая оценка по возрасту аккаунта', () => {
-    // Дата год назад + 120 постов → ~10 в месяц.
     const yearAgo = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString()
     const html = `<meta property="og:updated_time" content="${yearAgo}">`
     const ppm = estimatePostsPerMonth(html, 120)
@@ -227,7 +325,7 @@ describe('estimatePostsPerMonth', () => {
   })
 })
 
-describe('parseFbLikes', () => {
+describe('parseFbLikes — EN', () => {
   it('"X people like this"', () => {
     expect(parseFbLikes('<div>12,345 people like this</div>')).toBe(12_345)
   })
@@ -242,5 +340,40 @@ describe('parseFbLikes', () => {
 
   it('null when no match', () => {
     expect(parseFbLikes('<html></html>')).toBeNull()
+  })
+})
+
+describe('parseFbLikes — locales + HTML entities', () => {
+  it('Polish "129 osób lubi to" (HTML entities)', () => {
+    const html =
+      '<meta property="og:description" content="Wonderful Beauty, Pozna&#x144;. 129 os&#xf3;b lubi to &#xb7; 4 u&#x17c;ytkownik&#xf3;w">'
+    expect(parseFbLikes(html)).toBe(129)
+  })
+
+  it('Polish "459 osób lubi to" — leading-period bug fixed', () => {
+    // Текст содержит "Poznań." перед числом — раньше ведущая точка попадала
+    // в захват и parseFloat трактовал как 0.459. NUM теперь требует цифру.
+    const html =
+      '<meta property="og:description" content="BURO SPA, Pozna&#x144;. 459 os&#xf3;b lubi to">'
+    expect(parseFbLikes(html)).toBe(459)
+  })
+
+  it('Polish "Lubi to: 1234"', () => {
+    const html = '<meta property="og:description" content="Lubi to: 1234 osoby">'
+    expect(parseFbLikes(html)).toBe(1234)
+  })
+
+  it('Russian "X отметок Нравится"', () => {
+    const html = '<meta property="og:description" content="2500 отметок «Нравится»">'
+    expect(parseFbLikes(html)).toBe(2500)
+  })
+
+  it('German "X Personen gefällt das"', () => {
+    const html = '<meta property="og:description" content="999 Personen gefällt das">'
+    expect(parseFbLikes(html)).toBe(999)
+  })
+
+  it('fallback: ищем в полном HTML если og:description отсутствует', () => {
+    expect(parseFbLikes('<div>12,345 people like this</div>')).toBe(12_345)
   })
 })

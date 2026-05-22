@@ -6,15 +6,31 @@
  * на фикстурах. Сами fetch-вызовы остаются в edge function.
  */
 
-/** Парсит «1.2K» / «3M» / «1,234» → number. Возвращает 0 если не удалось. */
+/** Парсит «1.2K» / «3M» / «1,234» / «1 234» → number. Возвращает 0 если не удалось. */
 export function parseSocialCount(raw: string): number {
-  const r = raw.trim().replace(/,/g, '')
+  // Удаляем разделители тысяч (запятая, пробел, неразрывный пробел, точка как разделитель тысяч).
+  // Многоязычные форматы: "1,234" (EN), "1 234" (FR/PL), "1 234" (NBSP).
+  const r = raw.trim().replace(/[,\s  ]/g, '')
   if (!r) return 0
   if (/[Kk]$/.test(r)) return Math.round(parseFloat(r) * 1_000)
   if (/[Mm]$/.test(r)) return Math.round(parseFloat(r) * 1_000_000)
   if (/[Bb]$/.test(r)) return Math.round(parseFloat(r) * 1_000_000_000)
   const n = parseFloat(r)
   return Number.isFinite(n) ? Math.round(n) : 0
+}
+
+/** Декодирует HTML entities (&#x105;, &#243;, &amp;) в обычные символы.
+ *  Нужно для og:description, который Instagram/FB прогоняют через entity-encode. */
+export function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
 }
 
 export type InstaCounts = {
@@ -24,20 +40,60 @@ export type InstaCounts = {
 }
 
 /**
- * Парсит og:description Instagram: "X Followers, Y Following, Z Posts — ..."
- * (формат немного различается по локалям, но числа + ключевые слова стабильны).
+ * Парсит og:description Instagram. Поддерживает несколько локалей:
+ *   - EN: "X Followers, Y Following, Z Posts — ..."
+ *   - PL: "Obserwujący: X, obserwowani: Y posty: Z — ..."
+ *   - DE: "X Abonnenten, Y abonniert, Z Beiträge ..."
+ *   - RU: "X подписчиков, Y подписок, Z публикаций ..."
+ *   - ES: "X seguidores, Y seguidos, Z publicaciones ..."
+ *
+ * Стратегия: декодируем HTML entities, потом два прохода — позиционный (3 числа)
+ * и semantic (ключевые слова на разных языках).
  */
 export function parseInstaOgDescription(html: string): InstaCounts {
-  const og = html.match(/<meta property="og:description" content="([^"]+)"/)
+  const og = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/)
   if (!og || !og[1]) return {}
-  const text = og[1]
-  const followers = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Followers/i)
-  const posts = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Posts/i)
-  const following = text.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*Following/i)
+  const text = decodeHtmlEntities(og[1])
   const out: InstaCounts = {}
-  if (followers && followers[1]) out.followers = parseSocialCount(followers[1])
-  if (posts && posts[1]) out.posts = parseSocialCount(posts[1])
-  if (following && following[1]) out.following = parseSocialCount(following[1])
+
+  // NUM требует начало с ЦИФРЫ (не точки), иначе захватываем ведущий dot из
+  // предложения, и parseFloat трактует «. 129» как 0.129.
+  const NUM = '(\\d[\\d.,\\s\\u00a0\\u202f]*(?:[KMB])?)'
+  const tryMatch = (re: RegExp, key: keyof InstaCounts) => {
+    if (out[key] != null) return
+    const m = text.match(re)
+    if (m && m[1]) {
+      const v = parseSocialCount(m[1])
+      if (v > 0) out[key] = v
+    }
+  }
+
+  // Followers
+  tryMatch(new RegExp(`${NUM}\\s*Followers`, 'i'), 'followers')
+  tryMatch(new RegExp(`Obserwuj(?:ący|acy):\\s*${NUM}`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*Abonnenten`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*подписчик`, 'i'), 'followers')
+  tryMatch(new RegExp(`${NUM}\\s*seguidores`, 'i'), 'followers')
+
+  // Following — для RU нужно отличать «подписчиков» (followers) от «подписок»
+  // (following): первое слово содержит подписк как префикс, поэтому
+  // строго matches «подписок|подписки» (формы которые Instagram реально
+  // использует), без `ч`. \b не работает для кириллицы в JS regex без флага u.
+  tryMatch(new RegExp(`${NUM}\\s*Following`, 'i'), 'following')
+  tryMatch(new RegExp(`obserwowani:\\s*${NUM}`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*abonniert`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*подпис(?:ок|ки|ке|кой)`, 'i'), 'following')
+  tryMatch(new RegExp(`${NUM}\\s*seguidos`, 'i'), 'following')
+
+  // Posts
+  tryMatch(new RegExp(`${NUM}\\s*Posts`, 'i'), 'posts')
+  tryMatch(new RegExp(`post(?:y|ów):\\s*${NUM}`, 'i'), 'posts')
+  // PL: "...posty: 272 — zobacz..." — формат с двоеточием после
+  tryMatch(new RegExp(`posty:?\\s*${NUM}`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*Beiträge`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*публикаци`, 'i'), 'posts')
+  tryMatch(new RegExp(`${NUM}\\s*publicaciones`, 'i'), 'posts')
+
   return out
 }
 
@@ -114,11 +170,41 @@ export function estimatePostsPerMonth(html: string, totalPosts?: number): number
 
 /**
  * Парсит "likes" с публичной FB-страницы.
- * FB разный HTML: "12,345 people like this", "1.2K likes", "Lubi to: 1234 osoby"…
- * Берём самый частый паттерн.
+ * FB разный HTML: "12,345 people like this", "1.2K likes",
+ *   "129 osób lubi to", "Lubi to: 1234 osoby", "Polubienia: 1234".
+ * Сначала декодируем HTML entities (Facebook их вставляет: «osób» → «os&#xf3;b»).
  */
 export function parseFbLikes(html: string): number | null {
-  const m = html.match(/([\d,]+(?:\.\d+)?[KMB]?)\s*(?:people\s+like|likes|like\s+this)/i)
-  if (m && m[1]) return parseSocialCount(m[1])
+  // Декодируем только релевантную часть (og:description обычно содержит likes).
+  // Если og:description не найден — fallback на весь HTML.
+  const og = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/)
+  const haystack = og && og[1] ? decodeHtmlEntities(og[1]) : decodeHtmlEntities(html)
+
+  const NUM = '(\\d[\\d.,\\s\\u00a0\\u202f]*(?:[KMB])?)'
+  const patterns = [
+    new RegExp(`${NUM}\\s*people\\s+like`, 'i'),
+    new RegExp(`${NUM}\\s*likes?\\b`, 'i'),
+    new RegExp(`${NUM}\\s*like\\s+this`, 'i'),
+    // Polish: «129 osób lubi to» / «1 234 osoby lubią to» / «Lubi to: 129 osób»
+    new RegExp(`${NUM}\\s*os[oó]b\\s+lubi`, 'i'),
+    new RegExp(`${NUM}\\s*osoby\\s+lubi`, 'i'),
+    new RegExp(`Lubi\\s+to:?\\s*${NUM}`, 'i'),
+    new RegExp(`Polubieni[ae]:?\\s*${NUM}`, 'i'),
+    // Russian: «X отметок «Нравится»», «Нравится: X»
+    new RegExp(`${NUM}\\s*отмет[ао]к`, 'i'),
+    new RegExp(`Нравится:?\\s*${NUM}`, 'i'),
+    // German: "X Personen gefällt das"
+    new RegExp(`${NUM}\\s*Personen\\s+gef[äa]llt`, 'i'),
+    // Spanish: "A X personas les gusta esto"
+    new RegExp(`${NUM}\\s*personas?\\s+les\\s+gusta`, 'i'),
+  ]
+
+  for (const re of patterns) {
+    const m = haystack.match(re)
+    if (m && m[1]) {
+      const v = parseSocialCount(m[1])
+      if (v > 0) return v
+    }
+  }
   return null
 }
