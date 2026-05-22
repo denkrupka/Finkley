@@ -373,6 +373,7 @@
       "manual_picker_all": "Выбрать всех",
       "manual_picker_search": "Поиск по имени…",
       "manual_picker_empty": "Никого не нашли",
+      "manual_picker_truncated": "Показано {{visible}} клиентов · ещё {{hidden}} скрыто — уточни поиск",
       "manual_picker_confirm": "Применить ({{count}})",
       "manual_col_name": "Клиент",
       "manual_col_visits": "Визитов",

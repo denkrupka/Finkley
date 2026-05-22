@@ -1,5 +1,5 @@
 import { AlertCircle, Loader2, Mail, MessageSquare, Send, Sparkles, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -608,13 +608,28 @@ function ManualClientPickerDialog({
   const { data: clients = [] } = useClients(salonId, { search: '', sort: 'name' })
   const { data: ltvMap } = useClientLtvMetrics(salonId)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [picked, setPicked] = useState<Set<string>>(() => new Set(selected))
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return clients
-    return clients.filter((c) => c.name?.toLowerCase().includes(q))
-  }, [clients, search])
+  // Debounce поиска на 200ms — иначе фильтрация 5000 строк на каждый keystroke
+  // блокирует UI thread и поле «зависает».
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Лимит отображаемых строк — 300. При больших базах рендер всех 5000 строк
+  // (даже без скролла) ест 100ms+. 300 строк хватает чтобы найти кого надо
+  // через поиск; если нет — юзер уточнит запрос.
+  const MAX_VISIBLE = 300
+  const { filtered, truncated } = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    const base = q ? clients.filter((c) => c.name?.toLowerCase().includes(q)) : clients
+    return {
+      filtered: base.slice(0, MAX_VISIBLE),
+      truncated: base.length > MAX_VISIBLE ? base.length - MAX_VISIBLE : 0,
+    }
+  }, [clients, debouncedSearch])
 
   function toggle(id: string) {
     setPicked((prev) => {
@@ -673,7 +688,7 @@ function ManualClientPickerDialog({
         </div>
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/30 text-muted-foreground sticky top-0 border-b text-[10px] uppercase tracking-wider">
+            <thead className="bg-card text-muted-foreground border-border sticky top-0 z-10 border-b text-[10px] uppercase tracking-wider shadow-sm">
               <tr>
                 <th className="w-10 px-3 py-2"></th>
                 <th className="px-3 py-2 text-left font-semibold">
@@ -730,6 +745,19 @@ function ManualClientPickerDialog({
                 <tr>
                   <td colSpan={5} className="text-muted-foreground px-5 py-12 text-center">
                     {t('marketing.compose.manual_picker_empty')}
+                  </td>
+                </tr>
+              ) : null}
+              {truncated > 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-muted-foreground/70 bg-muted/20 px-5 py-3 text-center text-[11px] italic"
+                  >
+                    {t('marketing.compose.manual_picker_truncated', {
+                      hidden: truncated,
+                      visible: MAX_VISIBLE,
+                    })}
                   </td>
                 </tr>
               ) : null}

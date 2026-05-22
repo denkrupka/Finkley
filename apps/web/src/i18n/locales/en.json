@@ -3772,6 +3772,7 @@
       "manual_picker_all": "Pick all",
       "manual_picker_search": "Search by name…",
       "manual_picker_empty": "Nobody found",
+      "manual_picker_truncated": "Showing {{visible}} clients · {{hidden}} more hidden — refine search",
       "manual_picker_confirm": "Apply ({{count}})",
       "manual_col_name": "Client",
       "manual_col_visits": "Visits",
