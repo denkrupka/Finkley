@@ -664,12 +664,32 @@ function ChargeView({
 }) {
   const qc = useQueryClient()
   const { hasOpenShift } = useRequireCashShift(salonId)
-  const baseTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents - v.discount_cents, 0)
+  // grossTotalCents — сумма amount_cents всех линий (до скидки), на ней считаем
+  // процентную скидку. discount применяется ко всему чеку.
+  const grossTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
   const [chargeGateOpen, setChargeGateOpen] = useState(false)
   const [cashRegisterId, setCashRegisterId] = useState<string>(cashRegisters[0]?.id ?? '')
   const [busy, setBusy] = useState(false)
+
+  // ---- Скидка ----
+  const [discountMode, setDiscountMode] = useState<'none' | 'percent' | 'amount'>('none')
+  const [discountPctStr, setDiscountPctStr] = useState('')
+  const [discountAmountStr, setDiscountAmountStr] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
+  const discountCents = useMemo(() => {
+    if (discountMode === 'percent') {
+      const pct = Math.max(0, Math.min(100, Number(discountPctStr.replace(',', '.')) || 0))
+      return Math.round((grossTotalCents * pct) / 100)
+    }
+    if (discountMode === 'amount') {
+      const amt = Math.max(0, Math.round(Number(discountAmountStr.replace(',', '.')) * 100) || 0)
+      return Math.min(amt, grossTotalCents)
+    }
+    return 0
+  }, [discountMode, discountPctStr, discountAmountStr, grossTotalCents])
+  const baseTotalCents = grossTotalCents - discountCents
 
   const customTipCents = Math.max(0, Math.round(Number(customTipStr.replace(',', '.')) * 100)) || 0
   const presetTipCents = useMemo(() => {
@@ -686,19 +706,27 @@ function ChargeView({
       setChargeGateOpen(true)
       return
     }
+    if (discountMode !== 'none' && discountCents > 0 && !discountReason.trim()) {
+      toast.error(t('visits.charge.discount_reason_required'))
+      return
+    }
     setBusy(true)
     try {
-      // Распределяем tip пропорционально по линиям (если их несколько).
-      const totalBase = baseTotalCents || 1
+      // Распределяем tip + discount пропорционально по линиям (если их несколько).
+      const totalGross = grossTotalCents || 1
       for (const v of groupLines) {
         if (v.status === 'paid') continue
-        const lineBase = v.amount_cents - v.discount_cents
-        const lineTip = tipCents > 0 ? Math.round((tipCents * lineBase) / totalBase) : 0
+        const lineDiscount =
+          discountCents > 0 ? Math.round((discountCents * v.amount_cents) / totalGross) : 0
+        const lineBase = v.amount_cents - lineDiscount
+        const lineTip = tipCents > 0 ? Math.round((tipCents * lineBase) / baseTotalCents) : 0
         const { error } = await supabase
           .from('visits')
           .update({
             cash_register_id: cashRegisterId || null,
             tip_cents: lineTip,
+            discount_cents: lineDiscount,
+            discount_reason: discountCents > 0 ? discountReason.trim() : null,
             status: 'paid',
           })
           .eq('id', v.id)
@@ -742,15 +770,89 @@ function ChargeView({
           <p className="num text-brand-navy mt-1 text-3xl font-bold">
             {formatCurrency(grandTotal, currency)}
           </p>
-          {tipCents > 0 ? (
+          {discountCents > 0 || tipCents > 0 ? (
             <p className="text-brand-navy/70 mt-1 text-[11px]">
-              {t('visits.charge.base')}: {formatCurrency(baseTotalCents, currency)} +{' '}
-              {t('visits.charge.tip')}: {formatCurrency(tipCents, currency)}
+              {formatCurrency(grossTotalCents, currency)}
+              {discountCents > 0 ? ` − ${formatCurrency(discountCents, currency)}` : ''}
+              {tipCents > 0 ? ` + ${formatCurrency(tipCents, currency)}` : ''}
             </p>
           ) : null}
         </div>
 
         <Label className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
+          {t('visits.charge.discount_label')}
+        </Label>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => setDiscountMode('none')}
+            className={cn(
+              'border-border rounded-md border-[1.5px] py-2 text-xs font-semibold transition-colors',
+              discountMode === 'none'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'bg-card',
+            )}
+          >
+            {t('visits.charge.discount_none')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDiscountMode('percent')}
+            className={cn(
+              'border-border rounded-md border-[1.5px] py-2 text-xs font-semibold transition-colors',
+              discountMode === 'percent'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'bg-card',
+            )}
+          >
+            {t('visits.charge.discount_percent')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDiscountMode('amount')}
+            className={cn(
+              'border-border rounded-md border-[1.5px] py-2 text-xs font-semibold transition-colors',
+              discountMode === 'amount'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'bg-card',
+            )}
+          >
+            {t('visits.charge.discount_amount')}
+          </button>
+        </div>
+        {discountMode === 'percent' ? (
+          <Input
+            inputMode="decimal"
+            value={discountPctStr}
+            onChange={(e) => setDiscountPctStr(e.target.value)}
+            placeholder="10"
+            className="mt-2"
+          />
+        ) : null}
+        {discountMode === 'amount' ? (
+          <Input
+            inputMode="decimal"
+            value={discountAmountStr}
+            onChange={(e) => setDiscountAmountStr(e.target.value)}
+            placeholder="20"
+            className="mt-2"
+          />
+        ) : null}
+        {discountMode !== 'none' && discountCents > 0 ? (
+          <div className="mt-2">
+            <Label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+              {t('visits.charge.discount_reason')} *
+            </Label>
+            <Input
+              value={discountReason}
+              onChange={(e) => setDiscountReason(e.target.value)}
+              placeholder={t('visits.charge.discount_reason_placeholder')}
+              className="mt-1"
+            />
+          </div>
+        ) : null}
+
+        <Label className="text-muted-foreground mt-5 block text-[11px] font-bold uppercase tracking-wider">
           {t('visits.charge.tip_label')}
         </Label>
         <div className="mt-2 grid grid-cols-5 gap-2">
