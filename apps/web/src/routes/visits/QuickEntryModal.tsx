@@ -948,17 +948,17 @@ export function QuickEntryModal({
             {addonLines.length === 0 ? (
               <p className="text-muted-foreground text-xs">{t('visits.form.addon_empty')}</p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="border-border bg-card divide-border/60 flex flex-col divide-y rounded-md border">
                 {addonLines.map((a) => {
                   const stock = a.inventory_item_id
                     ? inventory.find((i) => i.id === a.inventory_item_id)
                     : null
-                  return (
-                    <li
-                      key={a.uid}
-                      className="border-border bg-card flex flex-col gap-2 rounded-md border p-2.5 text-sm"
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  const av = staffAvatar(a.staff_id)
+                  // Если inventory_item_id ещё не выбран — показываем select для выбора.
+                  // Иначе — компактная карточка как у услуг.
+                  if (!a.inventory_item_id && !a.name) {
+                    return (
+                      <li key={a.uid} className="flex items-center gap-2 px-3 py-2">
                         <div className="flex-1">
                           <SearchableSelect
                             value={a.inventory_item_id ?? ''}
@@ -975,93 +975,110 @@ export function QuickEntryModal({
                             placeholder={t('visits.form.addon_inventory_placeholder')}
                             searchPlaceholder={t('visits.form.addon_search')}
                           />
-                          {/* Manual mode: если inventory не выбран, поле name редактируемое */}
-                          {!a.inventory_item_id ? (
-                            <Input
-                              value={a.name}
-                              onChange={(e) => updateAddonLine(a.uid, { name: e.target.value })}
-                              placeholder={t('visits.form.addon_manual_name')}
-                              className="mt-1.5 h-9 text-sm"
-                            />
-                          ) : null}
+                          <Input
+                            value={a.name}
+                            onChange={(e) => updateAddonLine(a.uid, { name: e.target.value })}
+                            placeholder={t('visits.form.addon_manual_name')}
+                            className="mt-1.5 h-9 text-sm"
+                          />
                         </div>
                         <button
                           type="button"
                           onClick={() => removeAddonLine(a.uid)}
                           aria-label={t('common.remove')}
-                          className="text-muted-foreground hover:text-destructive grid size-8 shrink-0 place-items-center rounded-md"
+                          className="text-muted-foreground hover:text-destructive grid size-7 shrink-0 place-items-center rounded-md"
                         >
                           <Trash2 className="size-3.5" strokeWidth={1.8} />
                         </button>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li
+                      key={a.uid}
+                      className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground truncate text-sm font-semibold">{a.name}</p>
+                        <p className="text-muted-foreground text-[11px]">
+                          <span className="num">
+                            {a.qty} × {formatCurrency(a.unit_price_cents, currency)}
+                          </span>
+                          {' · '}
+                          <span className="num text-foreground font-bold">
+                            {formatCurrency(a.qty * a.unit_price_cents, currency)}
+                          </span>
+                          {stock ? (
+                            <>
+                              {' · '}
+                              <span className="text-muted-foreground/70">
+                                {t('visits.form.addon_stock_left', {
+                                  qty: stock.current_stock,
+                                  unit: stock.unit ?? '',
+                                })}
+                              </span>
+                            </>
+                          ) : null}
+                        </p>
                       </div>
-                      <div className="grid grid-cols-[80px_1fr_1fr] gap-2">
-                        <div>
-                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
-                            {t('visits.form.addon_qty')}
-                          </label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={a.qty}
-                            onChange={(e) =>
-                              updateAddonLine(a.uid, {
-                                qty: Math.max(1, Math.round(Number(e.target.value) || 1)),
-                              })
-                            }
-                            className="num h-9 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
-                            {t('visits.form.addon_price')}
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={(a.unit_price_cents / 100).toFixed(2)}
-                            onChange={(e) =>
-                              updateAddonLine(a.uid, {
-                                unit_price_cents: Math.round(
-                                  (parseFloat(e.target.value.replace(',', '.')) || 0) * 100,
-                                ),
-                              })
-                            }
-                            className="num h-9 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-muted-foreground mb-1 block text-[10px] font-semibold uppercase">
-                            {t('visits.form.addon_sold_by')}
-                          </label>
-                          <Select
-                            value={a.staff_id ?? ''}
-                            onValueChange={(v) => updateAddonLine(a.uid, { staff_id: v })}
-                          >
-                            <SelectTrigger className="h-9 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={a.qty}
+                          onChange={(e) =>
+                            updateAddonLine(a.uid, {
+                              qty: Math.max(1, Math.round(Number(e.target.value) || 1)),
+                            })
+                          }
+                          aria-label={t('visits.form.addon_qty')}
+                          className="num h-9 w-16 text-center text-sm"
+                        />
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={(a.unit_price_cents / 100).toFixed(2)}
+                          onChange={(e) =>
+                            updateAddonLine(a.uid, {
+                              unit_price_cents: Math.round(
+                                (parseFloat(e.target.value.replace(',', '.')) || 0) * 100,
+                              ),
+                            })
+                          }
+                          aria-label={t('visits.form.addon_price')}
+                          className="num h-9 w-20 text-sm"
+                        />
+                        <Select
+                          value={a.staff_id ?? ''}
+                          onValueChange={(v) => updateAddonLine(a.uid, { staff_id: v })}
+                        >
+                          <SelectTrigger className="h-9 w-[160px] text-sm">
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="text-brand-navy grid size-5 place-items-center rounded-full text-[10px] font-bold"
+                                style={{ background: av.color }}
+                              >
+                                {av.initial}
+                              </span>
                               <SelectValue placeholder={t('visits.form.staff_placeholder')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {staff.map((s) => (
-                                <SelectItem key={s.id} value={s.id}>
-                                  {s.full_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {stock
-                            ? t('visits.form.addon_stock_left', {
-                                qty: stock.current_stock,
-                                unit: stock.unit ?? '',
-                              })
-                            : t('visits.form.addon_manual_hint')}
-                        </span>
-                        <span className="num text-foreground font-bold">
-                          {formatCurrency(a.qty * a.unit_price_cents, currency)}
-                        </span>
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {staff.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <button
+                          type="button"
+                          onClick={() => removeAddonLine(a.uid)}
+                          aria-label={t('common.remove')}
+                          className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md"
+                        >
+                          <Trash2 className="size-3.5" strokeWidth={1.8} />
+                        </button>
                       </div>
                     </li>
                   )
