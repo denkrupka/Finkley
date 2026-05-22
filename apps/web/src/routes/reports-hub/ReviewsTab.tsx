@@ -1,5 +1,5 @@
 import { format, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, Eye, MessageCircle, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, Loader2, MessageCircle, Star } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -206,8 +206,14 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
           </SelectContent>
         </Select>
         {importMutation.isPending ? (
-          <span className="text-muted-foreground text-xs sm:ml-auto">
-            {t('reports_hub.reviews.auto_importing')}
+          <span className="text-brand-sage-deep border-brand-sage-soft bg-brand-sage-soft/30 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold sm:ml-auto">
+            <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+            <span className="reviews-shimmer">{t('reports_hub.reviews.auto_importing')}</span>
+            <span className="reviews-dots inline-flex items-end gap-0.5">
+              <span className="bg-brand-sage-deep size-1 rounded-full" />
+              <span className="bg-brand-sage-deep size-1 rounded-full" />
+              <span className="bg-brand-sage-deep size-1 rounded-full" />
+            </span>
           </span>
         ) : null}
       </div>

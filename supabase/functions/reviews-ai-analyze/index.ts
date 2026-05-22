@@ -55,14 +55,15 @@ function normalizeLocale(input: unknown): Locale {
   return 'ru'
 }
 
-function normalizeReplyLocale(input: unknown, fallback: Locale): ReplyLocale {
-  if (typeof input !== 'string') return fallback
+/** Если юзер передал явный reply_locale — используем его, иначе null = «match original review language». */
+function normalizeReplyLocale(input: unknown): ReplyLocale | null {
+  if (typeof input !== 'string') return null
   const base = input.split('-')[0]?.toLowerCase()
   if (base === 'pl') return 'pl'
   if (base === 'en') return 'en'
   if (base === 'uk') return 'uk'
   if (base === 'ru') return 'ru'
-  return fallback
+  return null
 }
 
 function replyLanguageName(rl: ReplyLocale): string {
@@ -92,15 +93,18 @@ function langInstruction(locale: Locale): string {
   }[locale]
 }
 
-function replyLanguageInstruction(locale: Locale, replyLocale: ReplyLocale): string {
-  // Аналитические поля пишем на locale (UI юзера), сами тексты ответа клиенту —
-  // на replyLocale.
+function replyLanguageInstruction(_locale: Locale, replyLocale: ReplyLocale | null): string {
+  // Аналитические поля пишем на _locale (UI юзера), сами тексты ответа клиенту —
+  // на replyLocale ЕСЛИ передан, иначе авто-детект из языка оригинального отзыва.
+  if (replyLocale == null) {
+    return ` REPLY LANGUAGE FOR CLIENT MESSAGES: detect the language of the original review text and write fields "suggested_public_reply" and "suggested_private_message" in THE SAME language as the client wrote in. If the review is in Polish — reply in Polish; in Ukrainian — Ukrainian; in English — English; in Russian — Russian. ALL OTHER fields (analysis, profile, strategy) stay in the main response language defined above. Do not confuse the two language rules.`
+  }
   const name = replyLanguageName(replyLocale)
   return ` REPLY LANGUAGE FOR CLIENT MESSAGES: fields "suggested_public_reply" and "suggested_private_message" MUST be written in ${name} — these are texts the salon will send to the client. ALL OTHER fields (analysis, profile, strategy) stay in the main response language defined above. Do not confuse the two language rules.`
 }
 
 // SINGLE (external — Booksy/Google) — публичный отзыв.
-function systemSingleExternal(locale: Locale, replyLocale: ReplyLocale): string {
+function systemSingleExternal(locale: Locale, replyLocale: ReplyLocale | null): string {
   return `You are a senior salon reputation manager. ${langInstruction(locale)}${replyLanguageInstruction(locale, replyLocale)}
 
 You analyze a PUBLIC review (Booksy or Google) that the whole world can read.
@@ -135,7 +139,7 @@ Respond STRICTLY as JSON (no markdown, no preface):
 }
 
 // SINGLE (internal — forma after visit) — приватный отзыв.
-function systemSingleInternal(locale: Locale, replyLocale: ReplyLocale): string {
+function systemSingleInternal(locale: Locale, replyLocale: ReplyLocale | null): string {
   return `You are a senior salon operations consultant. ${langInstruction(locale)}${replyLanguageInstruction(locale, replyLocale)}
 
 You analyze a PRIVATE review submitted via the salon's internal post-visit form.
@@ -170,9 +174,9 @@ Respond STRICTLY as JSON (no markdown, no preface):
 }
 
 // BULK — агрегатный разбор группы отзывов.
-function systemBulk(locale: Locale, scope: Scope, replyLocale: ReplyLocale): string {
+function systemBulk(locale: Locale, scope: Scope, replyLocale: ReplyLocale | null): string {
   // В bulk нет полей-сообщений клиенту, но для будущего расширения
-  // оставляем единый сигнатур. replyLocale пока игнорируется.
+  // оставляем единый signature. replyLocale пока игнорируется.
   void replyLocale
   const audience =
     scope === 'negative_external'
@@ -276,7 +280,7 @@ Deno.serve(async (req: Request) => {
   }
   if (!body.salon_id || !body.scope) return json({ error: 'bad_request' }, 400)
   const locale = normalizeLocale(body.locale)
-  const replyLocale = normalizeReplyLocale(body.reply_locale, locale)
+  const replyLocale = normalizeReplyLocale(body.reply_locale)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -360,7 +364,9 @@ Deno.serve(async (req: Request) => {
     .map((r) => `${r.id}|${r.rating ?? ''}|${(r.body ?? '').trim()}`)
     .sort()
     .join('||')
-  const payloadHash = await sha256Hex(`${body.scope}|${locale}|${replyLocale}|${normalized}`)
+  const payloadHash = await sha256Hex(
+    `${body.scope}|${locale}|${replyLocale ?? 'auto'}|${normalized}`,
+  )
 
   // --- Кеш ---
   // payload_hash уже включает replyLocale, поэтому смена языка ответа

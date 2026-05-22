@@ -183,3 +183,41 @@
     box-shadow: none !important;
   }
 }
+
+/* ---- Reviews auto-import progress анимации ---- */
+@keyframes reviews-shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.reviews-shimmer {
+  animation: reviews-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes reviews-dot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.reviews-dots > span {
+  animation: reviews-dot-bounce 1.2s ease-in-out infinite;
+}
+.reviews-dots > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.reviews-dots > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
