@@ -682,31 +682,48 @@ function ParamsSection({
   const [newInsta, setNewInsta] = useState('')
   const [newFb, setNewFb] = useState('')
   // Watched services: чекбоксы услуг салона + textarea для ручных дополнений.
-  // Храним один массив строк (имена). UI разделяет: name есть среди services →
-  // ставит чекбокс, иначе попадает в textarea «дополнительные».
+  // Tag-picker для услуг мониторинга. Максимум 3, выпадающий список с
+  // автокомплитом из services салона, ручной ввод (Enter) если такой услуги
+  // нет в каталоге. Хранится один упорядоченный массив строк.
   const { data: salonServices = [] } = useServices(salonId)
-  const watchedInitial = settings?.watched_services ?? []
-  const [watchedSet, setWatchedSet] = useState<Set<string>>(() => new Set(watchedInitial))
-  const [manualStr, setManualStr] = useState('')
-  // Один раз при загрузке settings — синкаем стейт.
+  const MAX_WATCHED = 3
+  const [watchedItems, setWatchedItems] = useState<string[]>(() => settings?.watched_services ?? [])
+  const [watchedQuery, setWatchedQuery] = useState('')
+  const [watchedSuggestionsOpen, setWatchedSuggestionsOpen] = useState(false)
+  // Синкаем стейт когда settings подгрузились или поменялся салон.
   useEffect(() => {
     if (!settings) return
-    const all = new Set(settings.watched_services)
-    setWatchedSet(all)
-    const knownNames = new Set(salonServices.map((s) => s.name))
-    const manual = settings.watched_services.filter((n) => !knownNames.has(n))
-    setManualStr(manual.join(', '))
+    setWatchedItems(settings.watched_services ?? [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.salon_id, salonServices.length])
+  }, [settings?.salon_id])
 
-  function toggleWatched(name: string) {
-    setWatchedSet((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+  function addWatched(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (watchedItems.includes(trimmed)) {
+      toast.error(t('reports_hub.competitors.params.watched_already'))
+      return
+    }
+    if (watchedItems.length >= MAX_WATCHED) {
+      toast.error(t('reports_hub.competitors.params.watched_max', { max: MAX_WATCHED }))
+      return
+    }
+    setWatchedItems([...watchedItems, trimmed])
+    setWatchedQuery('')
+    setWatchedSuggestionsOpen(false)
   }
+
+  function removeWatched(name: string) {
+    setWatchedItems(watchedItems.filter((n) => n !== name))
+  }
+
+  const watchedSuggestions = useMemo(() => {
+    const q = watchedQuery.trim().toLowerCase()
+    return salonServices
+      .filter((s) => !s.is_archived && !watchedItems.includes(s.name))
+      .filter((s) => (q ? s.name.toLowerCase().includes(q) : true))
+      .slice(0, 10)
+  }, [salonServices, watchedItems, watchedQuery])
 
   function addCompetitor() {
     if (!newName.trim()) {
@@ -738,17 +755,8 @@ function ParamsSection({
   }
 
   function saveWatchedServices() {
-    const knownNames = new Set(salonServices.map((s) => s.name))
-    // Из чекбоксов берём только те имена что есть в services салона.
-    const fromCheckboxes = Array.from(watchedSet).filter((n) => knownNames.has(n))
-    const fromManual = manualStr
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    // Дедуп + порядок: сначала из услуг салона, потом ручные.
-    const all = Array.from(new Set([...fromCheckboxes, ...fromManual]))
     upsertSettings.mutate(
-      { watched_services: all },
+      { watched_services: watchedItems },
       {
         onSuccess: () => toast.success(t('reports_hub.competitors.params.saved')),
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
@@ -765,58 +773,92 @@ function ParamsSection({
         <p className="text-muted-foreground mt-1 text-xs">
           {t('reports_hub.competitors.params.watched_subtitle')}
         </p>
-        <div className="mt-4 flex flex-col gap-4">
-          {salonServices.length > 0 ? (
-            <div>
-              <Label className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-                {t('reports_hub.competitors.params.watched_from_salon')}
-              </Label>
-              <div className="border-border bg-muted/10 mt-1.5 grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto rounded-md border p-2 sm:grid-cols-2 lg:grid-cols-3">
-                {salonServices
-                  .filter((s) => !s.is_archived)
-                  .map((s) => {
-                    const checked = watchedSet.has(s.name)
-                    return (
-                      <label
-                        key={s.id}
-                        className={cn(
-                          'flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs transition-colors',
-                          checked
-                            ? 'bg-brand-sage-soft/40 text-brand-sage-deep font-semibold'
-                            : 'hover:bg-muted/40 text-foreground',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleWatched(s.name)}
-                          className="accent-brand-sage-deep size-3.5"
-                        />
-                        <span className="truncate">{s.name}</span>
-                      </label>
-                    )
-                  })}
-              </div>
-            </div>
-          ) : null}
-          <div>
-            <Label
-              htmlFor="watched-manual"
-              className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+        <div className="mt-4 flex flex-col gap-3">
+          <Label className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+            {t('reports_hub.competitors.params.watched_picker_label', { max: MAX_WATCHED })}
+          </Label>
+          {/* Поле для tag-picker с chips внутри + input + dropdown снизу */}
+          <div className="relative">
+            <div
+              className={cn(
+                'border-input bg-background flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 transition-colors focus-within:ring-2',
+                watchedItems.length >= MAX_WATCHED
+                  ? 'focus-within:ring-amber-300'
+                  : 'focus-within:ring-brand-sage-deep/40',
+              )}
             >
-              {t('reports_hub.competitors.params.watched_manual')}
-            </Label>
-            <Input
-              id="watched-manual"
-              value={manualStr}
-              onChange={(e) => setManualStr(e.target.value)}
-              placeholder={t('reports_hub.competitors.params.watched_placeholder')}
-              className="mt-1.5"
-            />
-            <p className="text-muted-foreground/70 mt-1 text-[10px]">
-              {t('reports_hub.competitors.params.watched_manual_hint')}
-            </p>
+              {watchedItems.map((name) => (
+                <span
+                  key={name}
+                  className="bg-brand-sage-deep inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-white"
+                >
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => removeWatched(name)}
+                    className="grid size-4 place-items-center rounded-full transition-colors hover:bg-white/20"
+                    aria-label="remove"
+                  >
+                    <X className="size-3" strokeWidth={2.5} />
+                  </button>
+                </span>
+              ))}
+              {watchedItems.length < MAX_WATCHED ? (
+                <input
+                  type="text"
+                  value={watchedQuery}
+                  onChange={(e) => {
+                    setWatchedQuery(e.target.value)
+                    setWatchedSuggestionsOpen(true)
+                  }}
+                  onFocus={() => setWatchedSuggestionsOpen(true)}
+                  onBlur={() => {
+                    // Задержка чтобы клик по suggestion успел сработать.
+                    setTimeout(() => setWatchedSuggestionsOpen(false), 150)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && watchedQuery.trim()) {
+                      e.preventDefault()
+                      addWatched(watchedQuery)
+                    } else if (
+                      e.key === 'Backspace' &&
+                      watchedQuery === '' &&
+                      watchedItems.length > 0
+                    ) {
+                      // Удалить последний chip backspace'ом в пустом поле.
+                      const last = watchedItems[watchedItems.length - 1]
+                      if (last) removeWatched(last)
+                    }
+                  }}
+                  placeholder={
+                    watchedItems.length === 0
+                      ? t('reports_hub.competitors.params.watched_picker_placeholder_empty')
+                      : t('reports_hub.competitors.params.watched_picker_placeholder_more')
+                  }
+                  className="placeholder:text-muted-foreground min-w-[140px] flex-1 bg-transparent text-sm outline-none"
+                />
+              ) : null}
+            </div>
+            {watchedSuggestionsOpen &&
+            watchedItems.length < MAX_WATCHED &&
+            watchedSuggestions.length > 0 ? (
+              <div className="border-border bg-card shadow-finsm absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-md border">
+                {watchedSuggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => addWatched(s.name)}
+                    className="hover:bg-muted/40 text-foreground block w-full px-3 py-1.5 text-left text-sm transition-colors"
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
+          <p className="text-muted-foreground/70 text-[10px]">
+            {t('reports_hub.competitors.params.watched_picker_hint', { max: MAX_WATCHED })}
+          </p>
           <div>
             <Button onClick={saveWatchedServices} disabled={upsertSettings.isPending}>
               {t('reports_hub.competitors.params.save_button')}
