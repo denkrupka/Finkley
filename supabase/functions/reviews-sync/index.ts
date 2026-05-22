@@ -98,7 +98,10 @@ async function syncGooglePlace(placeId: string): Promise<{
     // name: places/PLACE/reviews/REVIEW — берём последний segment как external_id
     external_id: g.name?.split('/').pop() ?? `g_${placeId}_${i}`,
     rating: g.rating ?? null,
-    body: g.text?.text ?? g.originalText?.text ?? null,
+    // ВАЖНО: originalText (язык клиента) приоритет над text (Google
+    // авто-перевод на язык запроса). Юзер хочет видеть оригинал —
+    // что реально написал клиент.
+    body: g.originalText?.text ?? g.text?.text ?? null,
     author_name: g.authorAttribution?.displayName ?? null,
     posted_at: g.publishTime ?? new Date().toISOString(),
     external_url: g.authorAttribution?.uri ?? null,

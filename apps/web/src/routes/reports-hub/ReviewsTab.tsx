@@ -32,11 +32,16 @@ const SUB_TABS: PageTab<ReviewsSubTab>[] = [
   { id: 'internal', labelKey: 'reports_hub.reviews.tabs.internal', icon: MessageCircle },
 ]
 
+type SourceFilter = 'all' | 'google' | 'booksy' | 'internal'
+type ReadFilter = 'all' | 'unread' | 'read'
+
 export function ReviewsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const [sub, setSub] = useState<ReviewsSubTab>('external')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<ReviewSort>('newest')
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [readFilter, setReadFilter] = useState<ReadFilter>('all')
   const { data: rows = [], isLoading } = useReviews(salonId)
   const markRead = useMarkReviewRead(salonId)
 
@@ -44,6 +49,13 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
     let r = rows
     if (sub === 'external') r = r.filter((x) => x.source !== 'internal')
     else r = r.filter((x) => x.source === 'internal')
+    // Источник (вторичный фильтр — work внутри active sub).
+    if (sourceFilter !== 'all') {
+      r = r.filter((x) => x.source === sourceFilter)
+    }
+    // Прочитано/Не прочитано.
+    if (readFilter === 'unread') r = r.filter((x) => !x.read_at)
+    else if (readFilter === 'read') r = r.filter((x) => !!x.read_at)
     const q = search.trim().toLowerCase()
     if (q) {
       r = r.filter(
@@ -61,7 +73,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
       return (b.rating ?? 0) - (a.rating ?? 0)
     })
     return sorted
-  }, [rows, sub, search, sort])
+  }, [rows, sub, search, sort, sourceFilter, readFilter])
 
   const negativeUnread =
     sub === 'external'
@@ -80,7 +92,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
           className="sm:max-w-sm"
         />
         <Select value={sort} onValueChange={(v) => setSort(v as ReviewSort)}>
-          <SelectTrigger className="sm:w-56" data-testid="reviews-sort">
+          <SelectTrigger className="sm:w-44" data-testid="reviews-sort">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -88,6 +100,28 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
             <SelectItem value="oldest">{t('reports_hub.reviews.sort.oldest')}</SelectItem>
             <SelectItem value="rating_asc">{t('reports_hub.reviews.sort.rating_asc')}</SelectItem>
             <SelectItem value="rating_desc">{t('reports_hub.reviews.sort.rating_desc')}</SelectItem>
+          </SelectContent>
+        </Select>
+        {sub === 'external' ? (
+          <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
+            <SelectTrigger className="sm:w-40" data-testid="reviews-source-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('reports_hub.reviews.source.all')}</SelectItem>
+              <SelectItem value="google">Google</SelectItem>
+              <SelectItem value="booksy">Booksy</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Select value={readFilter} onValueChange={(v) => setReadFilter(v as ReadFilter)}>
+          <SelectTrigger className="sm:w-40" data-testid="reviews-read-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('reports_hub.reviews.read.all')}</SelectItem>
+            <SelectItem value="unread">{t('reports_hub.reviews.read.unread')}</SelectItem>
+            <SelectItem value="read">{t('reports_hub.reviews.read.read')}</SelectItem>
           </SelectContent>
         </Select>
         <div className="sm:ml-auto">

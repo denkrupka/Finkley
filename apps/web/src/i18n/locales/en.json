@@ -2720,6 +2720,14 @@
         "oldest": "Oldest first",
         "rating_asc": "Rating ↑",
         "rating_desc": "Rating ↓"
+      },
+      "source": {
+        "all": "All sources"
+      },
+      "read": {
+        "all": "All",
+        "unread": "Unread",
+        "read": "Read"
       }
     },
     "competitors": {
