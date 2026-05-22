@@ -212,6 +212,30 @@ export type OwnSalonContent = {
   has_data: boolean
 }
 
+/** Booksy aggregate rating своего салона из own_salon_metrics. */
+export function useOwnSalonBooksyRating(salonId: string | undefined) {
+  return useQuery<{ rating: number; count: number } | null>({
+    queryKey: ['own-salon-booksy-rating', salonId],
+    enabled: !!salonId,
+    queryFn: async () => {
+      if (!salonId) return null
+      const { data } = await supabase
+        .from('own_salon_metrics')
+        .select('data')
+        .eq('salon_id', salonId)
+        .eq('kind', 'rating')
+        .eq('source', 'booksy')
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const d = (data as { data?: { rating?: number; count?: number } } | null)?.data
+      if (!d || d.rating == null || d.count == null) return null
+      return { rating: d.rating, count: d.count }
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useOwnSalonContent(salonId: string | undefined) {
   return useQuery<OwnSalonContent>({
     queryKey: ['own-salon-content', salonId],

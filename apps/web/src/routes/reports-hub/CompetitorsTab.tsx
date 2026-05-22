@@ -1,6 +1,7 @@
 import {
   BarChart2,
   DollarSign,
+  Eye,
   Image as ImageIcon,
   Settings as SettingsIcon,
   Sparkles,
@@ -28,6 +29,7 @@ import {
   useCompetitorSnapshots,
   useCreateCompetitor,
   useDiscoverCompetitors,
+  useOwnSalonBooksyRating,
   useOwnSalonContent,
   useOwnSalonMetrics,
   type OwnSalonContent,
@@ -119,6 +121,7 @@ function DataSection({
   )
   const { data: ownMetrics } = useOwnSalonMetrics(salonId)
   const { data: ownContent } = useOwnSalonContent(salonId)
+  const { data: ownBooksyRating } = useOwnSalonBooksyRating(salonId)
 
   if (!competitors || competitors.length === 0) {
     return (
@@ -150,6 +153,23 @@ function DataSection({
 
       {isLoading ? (
         <p className="text-muted-foreground px-5 py-8 text-center text-sm">{t('common.loading')}</p>
+      ) : kind === 'rating' ? (
+        <RatingTable
+          competitors={competitors}
+          snapshots={snapshots}
+          ownSalon={salon}
+          ownBooksy={ownBooksyRating ?? null}
+          ownGoogle={ownMetrics ?? null}
+          t={t}
+        />
+      ) : kind === 'content' ? (
+        <ContentTable
+          competitors={competitors}
+          snapshots={snapshots}
+          ownSalon={salon}
+          ownContent={ownContent ?? null}
+          t={t}
+        />
       ) : (
         <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
@@ -203,6 +223,280 @@ function DataSection({
           ) : null}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Rating таб — таблица «свой vs конкуренты» с разделёнными Booksy и Google.
+ * 4 data-колонки: Booksy ★+count+👁, Google ★+count+👁.
+ */
+function RatingTable({
+  competitors,
+  snapshots,
+  ownSalon,
+  ownBooksy,
+  ownGoogle,
+  t,
+}: {
+  competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
+  snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
+  ownSalon: ReturnType<typeof useSalon>['data']
+  ownBooksy: { rating: number; count: number } | null
+  ownGoogle: { rating_avg: number | null; rating_count: number } | null
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  function bySource(items: ReturnType<typeof useCompetitorSnapshots>['data'], src: string) {
+    return items?.find((s) => s.source === src) ?? null
+  }
+  const byCompetitor = new Map<string, ReturnType<typeof useCompetitorSnapshots>['data']>()
+  for (const s of snapshots ?? []) {
+    const arr = byCompetitor.get(s.competitor_id) ?? []
+    arr.push(s)
+    byCompetitor.set(s.competitor_id, arr)
+  }
+
+  return (
+    <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+          <tr>
+            <th rowSpan={2} className="border-border/40 border-r px-4 py-3 text-left font-semibold">
+              {t('reports_hub.competitors.col_name')}
+            </th>
+            <th
+              colSpan={2}
+              className="border-border/40 border-r px-3 py-2 text-center font-bold text-blue-700"
+            >
+              Booksy
+            </th>
+            <th colSpan={2} className="px-3 py-2 text-center font-bold text-red-700">
+              Google
+            </th>
+          </tr>
+          <tr>
+            <th className="px-3 py-2 text-right font-semibold">
+              {t('reports_hub.competitors.col_rating')}
+            </th>
+            <th className="border-border/40 border-r px-3 py-2 text-right font-semibold">
+              {t('reports_hub.competitors.col_reviews_count')}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {t('reports_hub.competitors.col_rating')}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {t('reports_hub.competitors.col_reviews_count')}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-border divide-y">
+          {/* Own salon row */}
+          <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+            <td className="text-brand-sage-deep px-4 py-3 font-bold">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-3.5" strokeWidth={2} />
+                {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                  {t('reports_hub.competitors.own_badge')}
+                </span>
+              </div>
+            </td>
+            <RatingCells
+              rating={ownBooksy?.rating ?? null}
+              count={ownBooksy?.count ?? null}
+              url={ownSalon?.booksy_url ?? null}
+            />
+            <RatingCells
+              rating={ownGoogle?.rating_avg ?? null}
+              count={ownGoogle?.rating_count ?? null}
+              url={ownSalon?.google_place_url ?? null}
+            />
+          </tr>
+          {competitors.map((c) => {
+            const snaps = byCompetitor.get(c.id) ?? []
+            const booksy = bySource(snaps, 'booksy')
+            const google = bySource(snaps, 'google')
+            const bData = booksy?.data as { rating?: number; count?: number } | undefined
+            const gData = google?.data as { rating?: number; count?: number } | undefined
+            return (
+              <tr key={c.id}>
+                <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                <RatingCells
+                  rating={bData?.rating ?? null}
+                  count={bData?.count ?? null}
+                  url={c.booksy_url}
+                />
+                <RatingCells
+                  rating={gData?.rating ?? null}
+                  count={gData?.count ?? null}
+                  url={c.google_place_url}
+                />
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** Пара ячеек «★ rating | count» + опц. 👁→external link. */
+function RatingCells({
+  rating,
+  count,
+  url,
+}: {
+  rating: number | null
+  count: number | null
+  url: string | null
+}) {
+  return (
+    <>
+      <td className="num px-3 py-3 text-right text-sm font-semibold">
+        {rating != null ? (
+          <span className="text-brand-gold-deep inline-flex items-center gap-1">
+            ⭐ {rating.toFixed(1)}
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground ml-1"
+                title="Открыть отзывы"
+              >
+                <Eye className="size-3.5" strokeWidth={2} />
+              </a>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/50">—</span>
+        )}
+      </td>
+      <td className="num text-muted-foreground px-3 py-3 text-right text-xs">{count ?? '—'}</td>
+    </>
+  )
+}
+
+/**
+ * Content таб — таблица с 5 колонками: Posts, Reels Views, Frequency, Followers, Following.
+ * «Просмотры рилсов» — недоступно через scrape (требует IG Business Graph API).
+ */
+function ContentTable({
+  competitors,
+  snapshots,
+  ownSalon,
+  ownContent,
+  t,
+}: {
+  competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
+  snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
+  ownSalon: ReturnType<typeof useSalon>['data']
+  ownContent: OwnSalonContent | null
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  // У одного конкурента может быть 2 snapshot (insta + fb) — мержим.
+  type ContentData = {
+    posts?: number
+    followers?: number
+    following?: number
+    posts_per_month?: number
+    fb_likes?: number
+    reels_views?: number
+  }
+  const byCompetitor = new Map<string, ContentData>()
+  for (const s of snapshots ?? []) {
+    if (s.kind !== 'content') continue
+    const cur = byCompetitor.get(s.competitor_id) ?? {}
+    const d = s.data as Record<string, unknown>
+    if (cur.posts == null && typeof d.posts === 'number') cur.posts = d.posts
+    if (cur.followers == null && typeof d.followers === 'number') cur.followers = d.followers
+    if (cur.following == null && typeof d.following === 'number') cur.following = d.following
+    if (cur.posts_per_month == null && typeof d.posts_per_month === 'number')
+      cur.posts_per_month = d.posts_per_month
+    if (cur.fb_likes == null && typeof d.fb_likes === 'number') cur.fb_likes = d.fb_likes
+    byCompetitor.set(s.competitor_id, cur)
+  }
+
+  function fmtNum(v: number | null | undefined): string {
+    return v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
+  }
+
+  return (
+    <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+          <tr>
+            <th className="px-4 py-3 text-left font-semibold">
+              {t('reports_hub.competitors.col_name')}
+            </th>
+            <th
+              className="px-3 py-3 text-right font-semibold"
+              title={t('reports_hub.competitors.col_posts_hint')}
+            >
+              📷 {t('reports_hub.competitors.col_posts')}
+            </th>
+            <th
+              className="px-3 py-3 text-right font-semibold"
+              title={t('reports_hub.competitors.col_reels_views_hint')}
+            >
+              ▶ {t('reports_hub.competitors.col_reels_views')}
+            </th>
+            <th
+              className="px-3 py-3 text-right font-semibold"
+              title={t('reports_hub.competitors.col_freq_hint')}
+            >
+              📅 {t('reports_hub.competitors.col_freq')}
+            </th>
+            <th className="px-3 py-3 text-right font-semibold">
+              👥 {t('reports_hub.competitors.col_followers')}
+            </th>
+            <th className="px-3 py-3 text-right font-semibold">
+              ➡ {t('reports_hub.competitors.col_following')}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-border divide-y">
+          {/* Own salon */}
+          <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+            <td className="text-brand-sage-deep px-4 py-3 font-bold">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-3.5" strokeWidth={2} />
+                {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                  {t('reports_hub.competitors.own_badge')}
+                </span>
+              </div>
+            </td>
+            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.posts ?? null)}</td>
+            <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
+            <td className="num px-3 py-3 text-right">
+              {ownContent?.posts_per_month != null ? `${ownContent.posts_per_month}/мес` : '—'}
+            </td>
+            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.followers ?? null)}</td>
+            <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.following ?? null)}</td>
+          </tr>
+          {competitors.map((c) => {
+            const d = byCompetitor.get(c.id)
+            return (
+              <tr key={c.id}>
+                <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                <td className="num px-3 py-3 text-right">{fmtNum(d?.posts ?? null)}</td>
+                <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
+                <td className="num px-3 py-3 text-right">
+                  {d?.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
+                </td>
+                <td className="num px-3 py-3 text-right">{fmtNum(d?.followers ?? null)}</td>
+                <td className="num px-3 py-3 text-right">{fmtNum(d?.following ?? null)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div className="border-border/40 bg-muted/10 border-t px-5 py-3">
+        <p className="text-muted-foreground text-[11px]">
+          ▶ {t('reports_hub.competitors.col_reels_views_footer')}
+        </p>
+      </div>
     </div>
   )
 }

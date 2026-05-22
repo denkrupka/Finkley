@@ -151,6 +151,54 @@ async function fetchBooksyData(
 }
 
 // =============================================================================
+// Booksy aggregate rating через customer_api REST endpoint.
+// (Тот же endpoint что в reviews-sync для отзывов — но запрашиваем 1 страницу
+// с 1 отзывом, чтобы вытащить `business.reviews_count` + `business.reviews_stars`
+// из обёртки. Это работает на современном Booksy CSR, в отличие от HTML scrape.)
+// =============================================================================
+const BOOKSY_WEB_API_KEY = 'web-e3d812bf-d7a2-445d-ab38-55589ae6a121'
+
+function parseBooksyUrl(url: string): { region: string; businessId: string } | null {
+  const m = url.match(/booksy\.com\/([a-z]{2})-([a-z]{2})\/(\d+)_/i)
+  if (!m) return null
+  const lang = m[1].toLowerCase()
+  const region = lang === 'pl' ? 'pl' : lang === 'en' ? 'us' : lang
+  return { region, businessId: m[3] }
+}
+
+async function fetchBooksyAggregate(
+  booksyUrl: string,
+): Promise<{ rating: number; count: number } | null> {
+  const parsed = parseBooksyUrl(booksyUrl)
+  if (!parsed) return null
+  try {
+    const u = `https://${parsed.region}.booksy.com/core/v2/customer_api/businesses/${parsed.businessId}/reviews/?reviews_page=1&reviews_per_page=1&ordering=-created`
+    const r = await fetch(u, {
+      headers: {
+        accept: 'application/json',
+        'x-api-key': BOOKSY_WEB_API_KEY,
+        'x-app-version': '3.0',
+        referer: 'https://booksy.com/',
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+      },
+    })
+    if (!r.ok) return null
+    const data = (await r.json()) as {
+      reviews?: Array<{ business?: { reviews_count?: number; reviews_stars?: number } }>
+    }
+    const biz = data.reviews?.[0]?.business
+    if (!biz) return null
+    const rating = typeof biz.reviews_stars === 'number' ? biz.reviews_stars : null
+    const count = typeof biz.reviews_count === 'number' ? biz.reviews_count : null
+    if (rating == null || count == null) return null
+    return { rating, count }
+  } catch {
+    return null
+  }
+}
+
+// =============================================================================
 // Instagram / Facebook public — best-effort через og: meta тегов.
 // Полный Meta Graph требует app review; здесь scraping публичной страницы.
 // =============================================================================
@@ -213,6 +261,7 @@ async function fetchContent(
 type OwnSalonRow = {
   id: string
   google_place_id: string | null
+  booksy_url: string | null
   instagram_url: string | null
   facebook_url: string | null
 }
@@ -235,6 +284,21 @@ async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<numb
         kind: 'rating',
         data: rating,
         source: 'google',
+        snapshot_date: TODAY,
+      })
+    }
+  }
+
+  // Booksy aggregate rating для своего салона — для отображения в Reports/
+  // Конкуренты/Рейтинг в одной строке с конкурентами.
+  if (s.booksy_url) {
+    const bRating = await fetchBooksyAggregate(s.booksy_url)
+    if (bRating) {
+      inserts.push({
+        salon_id: s.id,
+        kind: 'rating',
+        data: bRating,
+        source: 'booksy',
         snapshot_date: TODAY,
       })
     }
@@ -293,6 +357,20 @@ async function syncOneCompetitor(admin: SupabaseClient, c: CompetitorRow): Promi
         kind: 'rating',
         data: rating,
         source: 'google',
+        snapshot_date: TODAY,
+      })
+    }
+  }
+
+  // Booksy aggregate rating (через customer_api — не зависит от __NEXT_DATA__).
+  if (c.booksy_url) {
+    const bRating = await fetchBooksyAggregate(c.booksy_url)
+    if (bRating) {
+      snapshots.push({
+        competitor_id: c.id,
+        kind: 'rating',
+        data: bRating,
+        source: 'booksy',
         snapshot_date: TODAY,
       })
     }
@@ -398,8 +476,10 @@ Deno.serve(async (req: Request) => {
   let ownSnapshots = 0
   let ownQ = admin
     .from('salons')
-    .select('id, google_place_id, instagram_url, facebook_url')
-    .or('google_place_id.not.is.null,instagram_url.not.is.null,facebook_url.not.is.null')
+    .select('id, google_place_id, booksy_url, instagram_url, facebook_url')
+    .or(
+      'google_place_id.not.is.null,booksy_url.not.is.null,instagram_url.not.is.null,facebook_url.not.is.null',
+    )
   if (body.salon_id) ownQ = ownQ.eq('id', body.salon_id)
   const { data: ownSalons } = await ownQ
   for (const s of (ownSalons ?? []) as OwnSalonRow[]) {
