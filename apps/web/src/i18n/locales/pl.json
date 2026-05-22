@@ -2724,6 +2724,9 @@
       "no_text": "(bez tekstu, tylko ocena)",
       "import_button": "Import z Booksy/Google",
       "auto_importing": "Pobieramy świeże opinie…",
+      "replies_show": "Odpowiedź salonu ({{count}})",
+      "replies_hide": "Zwiń odpowiedź",
+      "reply_default_author": "Odpowiedź salonu",
       "pagination_info": "{{from}}–{{to}} z {{total}}",
       "imported": "Zaimportowano {{count}} opinii",
       "sort": {

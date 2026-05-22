@@ -145,6 +145,8 @@ type BooksyReviewItem = {
   user?: { first_name?: string; last_name?: string }
   created: string
   reply_content?: string | null
+  reply_created?: string | null
+  reply_author?: string | null
 }
 
 function parseBooksyUrl(url: string): { region: string; businessId: string } | null {
@@ -167,6 +169,9 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
     author_name: string | null
     posted_at: string
     external_url: string | null
+    reply_text: string | null
+    reply_author: string | null
+    reply_posted_at: string | null
   }>
 > {
   const parsed = parseBooksyUrl(booksyUrl)
@@ -180,6 +185,9 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
     author_name: string | null
     posted_at: string
     external_url: string | null
+    reply_text: string | null
+    reply_author: string | null
+    reply_posted_at: string | null
   }> = []
 
   // Тянем все страницы пока есть. Safety cap 30 × 50 = 1500 отзывов.
@@ -213,11 +221,8 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
           external_id: `booksy_${rv.id}`,
           rating: typeof rv.rank === 'number' ? Math.round(rv.rank) : null,
           // Booksy: review.title — заголовок (часто пуст), review.review — тело.
-          // Если есть reply от салона — приклеиваем как «— Ответ салона: ...».
-          body:
-            (rv.title ? `${rv.title}\n\n` : '') +
-            (rv.review ?? '') +
-            (rv.reply_content ? `\n\n— Ответ салона: ${rv.reply_content}` : ''),
+          // Ответ салона хранится отдельно (см. reply_*).
+          body: (rv.title ? `${rv.title}\n\n` : '') + (rv.review ?? ''),
           author_name: author || null,
           posted_at: rv.created
             ? new Date(
@@ -225,6 +230,13 @@ async function syncBooksyReviews(booksyUrl: string): Promise<
               ).toISOString()
             : new Date().toISOString(),
           external_url: booksyUrl,
+          reply_text: rv.reply_content || null,
+          reply_author: rv.reply_author || null,
+          reply_posted_at: rv.reply_created
+            ? new Date(
+                rv.reply_created.includes('T') ? rv.reply_created : `${rv.reply_created}T00:00:00`,
+              ).toISOString()
+            : null,
         })
       }
       if (list.length < PER_PAGE) break
@@ -294,6 +306,9 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
           external_id: r.external_id,
           external_url: salon.booksy_url,
           posted_at: r.posted_at,
+          reply_text: r.reply_text,
+          reply_author: r.reply_author,
+          reply_posted_at: r.reply_posted_at,
         })
       }
     } catch (e) {
@@ -327,6 +342,26 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
         upsertError = error.message
         console.warn(`reviews insert failed for salon ${salon.id}:`, error.message)
       }
+    }
+    // Backfill reply_*: для уже импортированных reviews которые имели только body
+    // без отдельных reply-полей, апдейтим если в свежем payload есть reply_text.
+    const duplicatesWithReply = inserts.filter(
+      (r) =>
+        taken.has(`${r.source}::${r.external_id}`) &&
+        (r as { reply_text?: string | null }).reply_text,
+    )
+    for (const r of duplicatesWithReply) {
+      await admin
+        .from('reviews')
+        .update({
+          reply_text: (r as { reply_text?: string | null }).reply_text,
+          reply_author: (r as { reply_author?: string | null }).reply_author,
+          reply_posted_at: (r as { reply_posted_at?: string | null }).reply_posted_at,
+        })
+        .eq('salon_id', salon.id)
+        .eq('source', r.source)
+        .eq('external_id', r.external_id)
+        .is('reply_text', null)
     }
   }
 

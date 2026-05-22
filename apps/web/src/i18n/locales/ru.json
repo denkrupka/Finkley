@@ -3475,6 +3475,9 @@
       "no_text": "(без текста, только оценка)",
       "import_button": "Импорт с Booksy/Google",
       "auto_importing": "Подгружаем свежие отзывы…",
+      "replies_show": "Ответ салона ({{count}})",
+      "replies_hide": "Свернуть ответ",
+      "reply_default_author": "Ответ салона",
       "pagination_info": "{{from}}–{{to}} из {{total}}",
       "imported": "Импортировано {{count}} отзывов",
       "sort": {

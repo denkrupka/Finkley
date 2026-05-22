@@ -2724,6 +2724,9 @@
       "no_text": "(no text, only rating)",
       "import_button": "Import from Booksy/Google",
       "auto_importing": "Fetching latest reviews…",
+      "replies_show": "Salon reply ({{count}})",
+      "replies_hide": "Hide reply",
+      "reply_default_author": "Salon reply",
       "pagination_info": "{{from}}–{{to}} of {{total}}",
       "imported": "Imported {{count}} reviews",
       "sort": {

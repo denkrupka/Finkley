@@ -428,6 +428,51 @@ function ReviewRow({
           compact
         />
       </div>
+      {review.reply_text ? <ReviewReplyTree review={review} t={t} /> : null}
+    </div>
+  )
+}
+
+function ReviewReplyTree({
+  review,
+  t,
+}: {
+  review: { reply_text: string | null; reply_author: string | null; reply_posted_at: string | null }
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [open, setOpen] = useState(false)
+  if (!review.reply_text) return null
+  return (
+    <div className="pl-12">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+      >
+        <MessageCircle className="size-3" strokeWidth={2} />
+        {open
+          ? t('reports_hub.reviews.replies_hide')
+          : t('reports_hub.reviews.replies_show', { count: 1 })}
+      </button>
+      {open ? (
+        <div className="border-brand-sage-soft bg-brand-sage-soft/15 mt-2 rounded-lg border p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-brand-sage-deep text-xs font-bold">
+              {review.reply_author ?? t('reports_hub.reviews.reply_default_author')}
+            </p>
+            {review.reply_posted_at ? (
+              <p className="text-muted-foreground text-[10px]">
+                {format(parseISO(review.reply_posted_at), 'd MMM yyyy', {
+                  locale: getDateLocale(),
+                })}
+              </p>
+            ) : null}
+          </div>
+          <p className="text-foreground mt-1 whitespace-pre-wrap text-xs leading-relaxed">
+            {review.reply_text}
+          </p>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -21,6 +21,9 @@ export type ReviewRow = {
   read_at: string | null
   posted_at: string
   created_at: string
+  reply_text: string | null
+  reply_author: string | null
+  reply_posted_at: string | null
 }
 
 export function useReviews(salonId: string | undefined) {
