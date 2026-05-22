@@ -1,7 +1,7 @@
 import { Calendar, Info, Loader2, Mail, MessageSquare, Send, Sparkles, Star } from 'lucide-react'
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { Trans, useTranslation } from 'react-i18next'
+import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -194,7 +194,22 @@ export function MarketingPage() {
               </DialogHeader>
               <div className="space-y-3 overflow-y-auto px-5 py-4 text-sm leading-relaxed">
                 <p className="text-foreground whitespace-pre-line">
-                  {t(`marketing.broadcasts.kind.${infoKind}.long`)}
+                  {infoKind === 'visit_reminder' ? (
+                    <Trans
+                      i18nKey={`marketing.broadcasts.kind.${infoKind}.long`}
+                      components={{
+                        servicesLink: (
+                          <Link
+                            to={`/${salonId}/services`}
+                            onClick={() => setInfoKind(null)}
+                            className="text-brand-sage-deep font-semibold underline underline-offset-2"
+                          />
+                        ),
+                      }}
+                    />
+                  ) : (
+                    t(`marketing.broadcasts.kind.${infoKind}.long`)
+                  )}
                 </p>
               </div>
               {infoKind === 'marketing' ? (

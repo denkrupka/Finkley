@@ -2418,6 +2418,15 @@
       "sender_name_dup": "This sender name is already purchased for this salon",
       "buy_sender_button": "Buy for {{price}}",
       "sender_rules_hint": "3–11 chars, A–Z / 0–9, at least 1 letter. No spaces or symbols.",
+      "test_title": "Send test SMS",
+      "test_subtitle": "Verify sender name and channel. 1 SMS is deducted from salon balance.",
+      "test_phone_label": "Test phone number",
+      "test_phone_required": "Enter a phone number",
+      "test_send_button": "Send test",
+      "test_sent": "Test SMS sent — check the phone in 10-30 seconds",
+      "test_failed": "Could not send: {{message}}",
+      "test_hint": "Test sent via current active sender name. 1 SMS deducted.",
+      "test_disabled_hint": "Test unavailable: balance is 0 or broadcasts paused.",
       "packages_title": "Top up balance",
       "packages_subtitle": "Bigger pack — lower per-SMS price. Payment via Stripe (VAT added automatically).",
       "history_title": "Purchase history",
@@ -3817,7 +3826,7 @@
         "visit_reminder": {
           "title": "Visit cadence breached",
           "short": "Client hasn't booked again within the usual cadence for their service — gentle reminder.",
-          "long": "Every day at 09:00 UTC we check your clients. If a client is overdue for a service category (e.g. manicure cadence is 4 weeks but 6 have passed) we send a soft reminder with a booking link.\n\nAnti-spam: a single client won't get more than one reminder per category in 7 days.\n\nSetup: cadence is defined in Services → category → «Return cadence»."
+          "long": "Every day at 09:00 UTC we check your clients. If a client is overdue for a service category (e.g. manicure cadence is 4 weeks but 6 have passed) we send a soft reminder with a booking link.\n\nAnti-spam: a single client won't get more than one reminder per category in 7 days.\n\nSetup: cadence is defined in <servicesLink>Services → category → «Return cadence»</servicesLink>."
         },
         "review_request": {
           "title": "Review request",

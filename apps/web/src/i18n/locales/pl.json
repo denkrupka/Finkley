@@ -2418,6 +2418,15 @@
       "sender_name_dup": "Ta nazwa nadawcy jest już kupiona dla salonu",
       "buy_sender_button": "Kup za {{price}}",
       "sender_rules_hint": "3–11 znaków, A–Z / 0–9, min. 1 litera. Bez spacji i znaków.",
+      "test_title": "Wyślij testowy SMS",
+      "test_subtitle": "Sprawdź nazwę nadawcy i kanał. Z salda salonu odejmie się 1 SMS.",
+      "test_phone_label": "Testowy numer",
+      "test_phone_required": "Podaj numer telefonu",
+      "test_send_button": "Wyślij test",
+      "test_sent": "Testowy SMS wysłany — sprawdź telefon za 10-30 sekund",
+      "test_failed": "Nie udało się wysłać: {{message}}",
+      "test_hint": "Test wysłany przez aktualną aktywną nazwę nadawcy. 1 SMS odjęty.",
+      "test_disabled_hint": "Test niedostępny: saldo 0 lub wysyłki wstrzymane.",
       "packages_title": "Doładuj saldo",
       "packages_subtitle": "Większy pakiet — niższa cena za sztukę. Płatność przez Stripe (VAT dodawany automatycznie).",
       "history_title": "Historia zakupów",
@@ -3817,7 +3826,7 @@
         "visit_reminder": {
           "title": "Naruszenie regularności",
           "short": "Klient nie zarezerwował w zwykłym terminie dla swojej usługi — delikatne przypomnienie.",
-          "long": "Codziennie o 09:00 UTC sprawdzamy klientów. Jeśli klient zalega z wizytą w kategorii usługi (np. manicure zwykle co 4 tygodnie, a minęło 6) — wysyłamy łagodne przypomnienie z linkiem do rezerwacji.\n\nAnti-spam: jeden klient nie dostanie więcej niż jednego przypomnienia na kategorię w ciągu 7 dni.\n\nUstawienie: regularność definiujesz w Usługi → kategoria → «Regularność powrotu»."
+          "long": "Codziennie o 09:00 UTC sprawdzamy klientów. Jeśli klient zalega z wizytą w kategorii usługi (np. manicure zwykle co 4 tygodnie, a minęło 6) — wysyłamy łagodne przypomnienie z linkiem do rezerwacji.\n\nAnti-spam: jeden klient nie dostanie więcej niż jednego przypomnienia na kategorię w ciągu 7 dni.\n\nUstawienie: regularność definiujesz w <servicesLink>Usługi → kategoria → «Regularność powrotu»</servicesLink>."
         },
         "review_request": {
           "title": "Prośba o opinię",

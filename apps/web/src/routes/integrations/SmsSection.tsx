@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useSendBroadcastTest } from '@/hooks/useMarketing'
 import {
   SMS_PACKAGES,
   SMS_SENDER_PRICE_GROSZ,
@@ -294,6 +295,9 @@ export function SmsSection({ salonId }: { salonId: string }) {
         </p>
       </section>
 
+      {/* ----------------- Тестовый SMS ----------------- */}
+      <SmsTestSendBlock salonId={salonId} disabled={balance < 1 || paused} />
+
       {/* ----------------- Купить пакет SMS ----------------- */}
       <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy text-base font-bold tracking-tight">
@@ -438,5 +442,77 @@ function SenderOption({
         <p className="text-muted-foreground text-[11px]">{sub}</p>
       </div>
     </button>
+  )
+}
+
+/**
+ * Блок отправки тестового SMS. Реюзает marketing-test-send edge function
+ * (kind='marketing' — отправляет 1 SMS на указанный номер с тестовым текстом
+ * и списывает с баланса салона как обычный SMS).
+ */
+function SmsTestSendBlock({ salonId, disabled }: { salonId: string; disabled: boolean }) {
+  const { t } = useTranslation()
+  const [to, setTo] = useState('')
+  const send = useSendBroadcastTest(salonId)
+
+  function handleSend() {
+    const trimmed = to.trim()
+    if (!trimmed) {
+      toast.error(t('integrations.sms.test_phone_required'))
+      return
+    }
+    send.mutate(
+      { kind: 'marketing', channel: 'sms', to: trimmed },
+      {
+        onSuccess: () => {
+          toast.success(t('integrations.sms.test_sent'))
+          setTo('')
+        },
+        onError: (e) =>
+          toast.error(
+            t('integrations.sms.test_failed', {
+              message: e instanceof Error ? e.message : String(e),
+            }),
+          ),
+      },
+    )
+  }
+
+  return (
+    <section className="border-border bg-card shadow-finsm rounded-lg border p-5">
+      <h3 className="text-brand-navy text-base font-bold tracking-tight">
+        {t('integrations.sms.test_title')}
+      </h3>
+      <p className="text-muted-foreground mb-4 mt-1 text-xs">
+        {t('integrations.sms.test_subtitle')}
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <Label htmlFor="sms-test-to" className="mb-1.5 block text-xs font-semibold">
+            {t('integrations.sms.test_phone_label')}
+          </Label>
+          <Input
+            id="sms-test-to"
+            type="tel"
+            inputMode="tel"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder="+48 123 456 789"
+          />
+        </div>
+        <Button onClick={handleSend} disabled={send.isPending || disabled}>
+          {send.isPending ? t('common.loading') : t('integrations.sms.test_send_button')}
+        </Button>
+      </div>
+      {disabled ? (
+        <p className="mt-2 text-[11px] text-amber-700">
+          {t('integrations.sms.test_disabled_hint')}
+        </p>
+      ) : (
+        <p className="text-muted-foreground/70 mt-2 text-[10px]">
+          {t('integrations.sms.test_hint')}
+        </p>
+      )}
+    </section>
   )
 }
