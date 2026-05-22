@@ -1,14 +1,17 @@
 import {
   BarChart2,
+  Check,
   DollarSign,
   Eye,
   Image as ImageIcon,
+  Pencil,
   Settings as SettingsIcon,
   Sparkles,
   Star,
   Trash2,
+  X,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -103,6 +106,20 @@ function DataSection({
 }) {
   const competitorIds = useMemo(() => competitors?.map((c) => c.id) ?? [], [competitors])
   const apiKind = kind === 'prices' ? 'price' : kind
+
+  // Авто-sync при открытии любой data-вкладки: тянем актуальные snapshots Booksy/IG/Google.
+  // One-shot per session — повторный заход в Reports не дёргает edge function.
+  const syncCompetitors = useSyncCompetitors(salonId)
+  const autoSyncedRef = useRef(false)
+  useEffect(() => {
+    if (autoSyncedRef.current) return
+    if (!competitors || competitors.length === 0) return
+    autoSyncedRef.current = true
+    syncCompetitors.mutate(undefined, {
+      onError: (e) => console.warn('competitors auto-sync failed:', e),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [competitors?.length])
   // Период применяется ко всем подвкладкам, не только к occupancy — это позволяет
   // смотреть исторические цены/рейтинги/контент за выбранный диапазон.
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
@@ -621,7 +638,6 @@ function ParamsSection({
   const createCompetitor = useCreateCompetitor(salonId)
   const updateCompetitor = useUpdateCompetitor(salonId)
   const discoverCompetitors = useDiscoverCompetitors(salonId)
-  const syncCompetitors = useSyncCompetitors(salonId)
   const [newName, setNewName] = useState('')
   const [newGooglePlaceId, setNewGooglePlaceId] = useState<string | null>(null)
   const [newBooksy, setNewBooksy] = useState('')
@@ -677,70 +693,6 @@ function ParamsSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-brand-teal-soft bg-brand-teal-soft/30 rounded-lg border p-5">
-        <h3 className="text-brand-teal-deep flex items-center gap-2 text-base font-bold">
-          <Sparkles className="size-4" strokeWidth={2} />
-          {t('reports_hub.competitors.params.discover_title')}
-        </h3>
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t('reports_hub.competitors.params.discover_subtitle')}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              discoverCompetitors.mutate(undefined, {
-                onSuccess: (n) =>
-                  toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
-                onError: (e) => {
-                  const code = (e as Error & { code?: string }).code
-                  const message = e instanceof Error ? e.message : String(e)
-                  const key =
-                    code === 'no_geo'
-                      ? 'reports_hub.competitors.params.discover_error_no_geo'
-                      : code === 'forbidden'
-                        ? 'reports_hub.competitors.params.discover_error_forbidden'
-                        : code === 'salon_not_found'
-                          ? 'reports_hub.competitors.params.discover_error_salon_not_found'
-                          : 'reports_hub.competitors.params.discover_error_generic'
-                  toast.error(t(key, { message }))
-                },
-              })
-            }}
-            disabled={discoverCompetitors.isPending}
-          >
-            {discoverCompetitors.isPending
-              ? t('common.loading')
-              : t('reports_hub.competitors.params.discover_button')}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              syncCompetitors.mutate(undefined, {
-                onSuccess: (r) =>
-                  toast.success(
-                    t('reports_hub.competitors.params.sync_done', {
-                      competitors: r.competitors,
-                      snapshots: r.snapshots,
-                    }),
-                  ),
-                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-              })
-            }}
-            disabled={syncCompetitors.isPending || (competitors?.length ?? 0) === 0}
-            title={
-              (competitors?.length ?? 0) === 0
-                ? t('reports_hub.competitors.params.sync_disabled_hint')
-                : undefined
-            }
-          >
-            {syncCompetitors.isPending
-              ? t('common.loading')
-              : t('reports_hub.competitors.params.sync_button')}
-          </Button>
-        </div>
-      </div>
-
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy text-base font-bold">
           {t('reports_hub.competitors.params.watched_title')}
@@ -765,12 +717,45 @@ function ParamsSection({
       </div>
 
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-        <h3 className="text-brand-navy text-base font-bold">
-          {t('reports_hub.competitors.params.add_title')}
-        </h3>
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t('reports_hub.competitors.params.add_subtitle')}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-brand-navy text-base font-bold">
+              {t('reports_hub.competitors.params.add_title')}
+            </h3>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t('reports_hub.competitors.params.add_subtitle')}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              discoverCompetitors.mutate(undefined, {
+                onSuccess: (n) =>
+                  toast.success(t('reports_hub.competitors.params.discover_done', { count: n })),
+                onError: (e) => {
+                  const code = (e as Error & { code?: string }).code
+                  const message = e instanceof Error ? e.message : String(e)
+                  const key =
+                    code === 'no_geo'
+                      ? 'reports_hub.competitors.params.discover_error_no_geo'
+                      : code === 'forbidden'
+                        ? 'reports_hub.competitors.params.discover_error_forbidden'
+                        : code === 'salon_not_found'
+                          ? 'reports_hub.competitors.params.discover_error_salon_not_found'
+                          : 'reports_hub.competitors.params.discover_error_generic'
+                  toast.error(t(key, { message }))
+                },
+              })
+            }}
+            disabled={discoverCompetitors.isPending}
+          >
+            <Sparkles className="mr-1.5 size-3.5" strokeWidth={2} />
+            {discoverCompetitors.isPending
+              ? t('common.loading')
+              : t('reports_hub.competitors.params.discover_button')}
+          </Button>
+        </div>
         <div className="mt-4 flex flex-col gap-3">
           <div>
             <Label>{t('reports_hub.competitors.params.name_label')}</Label>
@@ -845,37 +830,162 @@ function ParamsSection({
           </h3>
           <ul className="divide-border mt-3 divide-y">
             {competitors?.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-2 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground text-sm font-semibold">{c.name}</p>
-                  <p className="text-muted-foreground mt-0.5 truncate text-[11px]">
-                    {[c.booksy_url, c.google_place_url, c.instagram_url, c.facebook_url]
-                      .filter(Boolean)
-                      .join(' · ') || t('reports_hub.competitors.params.no_links')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!confirm(t('reports_hub.competitors.params.confirm_archive'))) return
-                    updateCompetitor.mutate(
-                      { id: c.id, is_archived: true },
-                      {
-                        onSuccess: () =>
-                          toast.success(t('reports_hub.competitors.params.archived')),
-                      },
-                    )
-                  }}
-                  className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                  aria-label={t('common.delete')}
-                >
-                  <Trash2 className="size-4" strokeWidth={1.8} />
-                </button>
-              </li>
+              <CompetitorListItem
+                key={c.id}
+                competitor={c}
+                onSave={(patch) =>
+                  updateCompetitor.mutateAsync({ id: c.id, ...patch }).then(() => {
+                    toast.success(t('reports_hub.competitors.params.saved'))
+                  })
+                }
+                onArchive={() => {
+                  if (!confirm(t('reports_hub.competitors.params.confirm_archive'))) return
+                  updateCompetitor.mutate(
+                    { id: c.id, is_archived: true },
+                    {
+                      onSuccess: () => toast.success(t('reports_hub.competitors.params.archived')),
+                    },
+                  )
+                }}
+                isSaving={updateCompetitor.isPending}
+                t={t}
+              />
             ))}
           </ul>
         </div>
       ) : null}
     </div>
+  )
+}
+
+type CompetitorRow = NonNullable<ReturnType<typeof useCompetitors>['data']>[number]
+
+function CompetitorListItem({
+  competitor,
+  onSave,
+  onArchive,
+  isSaving,
+  t,
+}: {
+  competitor: CompetitorRow
+  onSave: (patch: {
+    name: string
+    booksy_url: string | null
+    google_place_url: string | null
+    instagram_url: string | null
+    facebook_url: string | null
+  }) => Promise<unknown>
+  onArchive: () => void
+  isSaving: boolean
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(competitor.name)
+  const [booksy, setBooksy] = useState(competitor.booksy_url ?? '')
+  const [google, setGoogle] = useState(competitor.google_place_url ?? '')
+  const [insta, setInsta] = useState(competitor.instagram_url ?? '')
+  const [fb, setFb] = useState(competitor.facebook_url ?? '')
+
+  function startEdit() {
+    setName(competitor.name)
+    setBooksy(competitor.booksy_url ?? '')
+    setGoogle(competitor.google_place_url ?? '')
+    setInsta(competitor.instagram_url ?? '')
+    setFb(competitor.facebook_url ?? '')
+    setEditing(true)
+  }
+
+  async function save() {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      toast.error(t('reports_hub.competitors.params.name_required'))
+      return
+    }
+    await onSave({
+      name: trimmed,
+      booksy_url: booksy.trim() || null,
+      google_place_url: google.trim() || null,
+      instagram_url: insta.trim() || null,
+      facebook_url: fb.trim() || null,
+    })
+    setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <li className="flex items-center justify-between gap-2 py-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-sm font-semibold">{competitor.name}</p>
+          <p className="text-muted-foreground mt-0.5 truncate text-[11px]">
+            {[
+              competitor.booksy_url,
+              competitor.google_place_url,
+              competitor.instagram_url,
+              competitor.facebook_url,
+            ]
+              .filter(Boolean)
+              .join(' · ') || t('reports_hub.competitors.params.no_links')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={startEdit}
+          className="text-muted-foreground hover:text-foreground grid size-8 place-items-center rounded-md"
+          aria-label={t('common.edit')}
+        >
+          <Pencil className="size-4" strokeWidth={1.8} />
+        </button>
+        <button
+          type="button"
+          onClick={onArchive}
+          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+          aria-label={t('common.delete')}
+        >
+          <Trash2 className="size-4" strokeWidth={1.8} />
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex flex-col gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t('reports_hub.competitors.params.name_label')}
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Input
+            value={booksy}
+            onChange={(e) => setBooksy(e.target.value)}
+            placeholder="https://booksy.com/..."
+          />
+          <Input
+            value={google}
+            onChange={(e) => setGoogle(e.target.value)}
+            placeholder="https://maps.google.com/..."
+          />
+          <Input
+            value={insta}
+            onChange={(e) => setInsta(e.target.value)}
+            placeholder="https://instagram.com/..."
+          />
+          <Input
+            value={fb}
+            onChange={(e) => setFb(e.target.value)}
+            placeholder="https://facebook.com/..."
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={isSaving}>
+            <X className="mr-1 size-3.5" /> {t('common.cancel')}
+          </Button>
+          <Button size="sm" onClick={save} disabled={isSaving}>
+            <Check className="mr-1 size-3.5" /> {t('common.save')}
+          </Button>
+        </div>
+      </div>
+    </li>
   )
 }
