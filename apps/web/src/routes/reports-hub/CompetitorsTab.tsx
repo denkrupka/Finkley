@@ -1243,11 +1243,11 @@ function PricesTable({
   }, [latestByCompetitor])
 
   // Какие услуги отслеживаем — из watched_services настроек (если пусто, берём все из salon).
-  const watched = settings?.watched_services ?? []
   const watchedNames = useMemo(() => {
+    const watched = settings?.watched_services ?? []
     if (watched.length === 0) return null
     return new Set(watched)
-  }, [watched])
+  }, [settings?.watched_services])
 
   // Загружаем кеш AI-матчинга из localStorage по hash от inputs.
   const cacheKey = useMemo(() => {
