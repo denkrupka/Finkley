@@ -35,6 +35,7 @@ export type IntegrationCategory =
   | 'banking'
   | 'messengers'
   | 'sms'
+  | 'social'
   | 'other'
 
 export type ConnectField = {
@@ -240,6 +241,7 @@ export const CATEGORY_ORDER: IntegrationCategory[] = [
   'booking',
   'accounting',
   'messengers',
+  'social',
   'sms',
   'banking',
   'other',

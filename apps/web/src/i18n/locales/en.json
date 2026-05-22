@@ -2366,10 +2366,21 @@
       "documents_subtitle": "AI receipt and invoice recognition for expenses that didn't land in KSeF.",
       "messengers": "Messengers",
       "messengers_subtitle": "Connect Telegram / WhatsApp / Instagram / Facebook — client messages arrive in unified built-in messenger.",
+      "social": "Social",
+      "social_subtitle": "Connect Facebook Page and Instagram — we'll pull page metrics (followers, posts, likes) for benchmarking in Reports → Competitors → Content.",
       "sms": "SMS",
       "sms_subtitle": "Buy an SMS pack, pick the sender name and pause campaigns when needed.",
       "other": "Other",
       "other_subtitle": "Other app settings — install as native app, etc."
+    },
+    "social": {
+      "info": "Connecting Facebook/Instagram gives two benefits: (1) clients DM in a unified FinSalon messenger, (2) Reports → Competitors → Content will show your page metrics (followers/posts/likes) for fair benchmarking with competitors.",
+      "fb_subtitle": "Business Facebook page. Auth via Facebook Login.",
+      "ig_subtitle": "Instagram Business account. Auth via Facebook (Instagram is owned by Meta).",
+      "connected_badge": "Connected",
+      "connect_button": "Connect",
+      "manage_button": "Manage connection",
+      "footer": "Connection is done in the «Messengers» tab — same access_token is used for reading metrics. If your page is not on Facebook Business — create one first at business.facebook.com."
     },
     "sms": {
       "balance_title": "SMS balance",

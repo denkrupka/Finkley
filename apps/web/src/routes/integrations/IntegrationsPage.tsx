@@ -39,6 +39,7 @@ import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 
 import { BankingSection } from './BankingSection'
 import { SmsSection } from './SmsSection'
+import { SocialSection } from './SocialSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { BooksyStaffInviteModal } from './BooksyStaffInviteModal'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
@@ -185,6 +186,8 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
         <MessengerConnectorsSection salonId={salonId} />
       ) : activeCategory === 'sms' ? (
         <SmsSection salonId={salonId} />
+      ) : activeCategory === 'social' ? (
+        <SocialSection salonId={salonId} />
       ) : activeCategory === 'other' ? (
         <OtherIntegrationsSection />
       ) : tabProviders.length === 0 ? (

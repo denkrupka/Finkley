@@ -5,6 +5,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Plug,
+  Share2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -17,6 +18,7 @@ const TAB_ICONS: Record<IntegrationCategory, LucideIcon> = {
   banking: Banknote,
   messengers: MessageCircle,
   sms: MessageSquare,
+  social: Share2,
   other: MoreHorizontal,
 }
 

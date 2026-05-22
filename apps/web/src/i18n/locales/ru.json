@@ -3006,10 +3006,21 @@
       "documents_subtitle": "Распознавание чеков и фактур через ИИ для расходов, которые не попали в КСеФ.",
       "messengers": "Мессенджеры",
       "messengers_subtitle": "Подключи Telegram / WhatsApp / Instagram / Facebook — сообщения от клиентов придут в единый встроенный мессенджер.",
+      "social": "Соцсети",
+      "social_subtitle": "Подключи Facebook Page и Instagram — будем тянуть метрики страниц (followers, posts, likes) для сравнения в Reports → Конкуренты → Контент.",
       "sms": "SMS",
       "sms_subtitle": "Купи пакет SMS, выбери имя отправителя и приостанови рассылки при необходимости.",
       "other": "Прочее",
       "other_subtitle": "Прочие настройки приложения — установка как нативного приложения и т.п."
+    },
+    "social": {
+      "info": "Подключение Facebook/Instagram даёт две выгоды: (1) клиенты пишут в едином мессенджере FinSalon, (2) в Reports → Конкуренты → Контент будут показатели вашей страницы (followers/posts/likes) для честного сравнения с конкурентами.",
+      "fb_subtitle": "Страница Facebook бизнеса. Авторизация через Facebook Login.",
+      "ig_subtitle": "Instagram Business аккаунт. Авторизация через Facebook (Instagram принадлежит Meta).",
+      "connected_badge": "Подключено",
+      "connect_button": "Подключить",
+      "manage_button": "Управлять подключением",
+      "footer": "Подключение делается в общей вкладке «Мессенджеры» — там же используется access_token для чтения метрик. Если страницы нет в Facebook Business — создайте сначала на business.facebook.com."
     },
     "sms": {
       "balance_title": "Баланс SMS",

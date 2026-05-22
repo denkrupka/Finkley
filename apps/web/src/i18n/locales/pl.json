@@ -2366,10 +2366,21 @@
       "documents_subtitle": "Rozpoznawanie paragonów i faktur przez AI dla wydatków, które nie trafiły do KSeF.",
       "messengers": "Komunikatory",
       "messengers_subtitle": "Podłącz Telegram / WhatsApp / Instagram / Facebook — wiadomości klientów przyjdą do zintegrowanego komunikatora.",
+      "social": "Social",
+      "social_subtitle": "Podłącz Facebook Page i Instagram — pobierzemy metryki strony (followers, posty, polubienia) do porównania w Raporty → Konkurenci → Treść.",
       "sms": "SMS",
       "sms_subtitle": "Kup pakiet SMS, wybierz nazwę nadawcy i wstrzymaj wysyłki, gdy tego potrzebujesz.",
       "other": "Inne",
       "other_subtitle": "Inne ustawienia aplikacji — instalacja jako aplikacja natywna itp."
+    },
+    "social": {
+      "info": "Podłączenie Facebook/Instagram daje dwie korzyści: (1) klienci piszą w jednym komunikatorze FinSalon, (2) Raporty → Konkurenci → Treść pokażą metryki Twojej strony (followers/posty/polubienia) do uczciwego porównania z konkurencją.",
+      "fb_subtitle": "Biznesowa strona Facebook. Autoryzacja przez Facebook Login.",
+      "ig_subtitle": "Konto Instagram Business. Autoryzacja przez Facebook (Instagram należy do Meta).",
+      "connected_badge": "Połączone",
+      "connect_button": "Połącz",
+      "manage_button": "Zarządzaj połączeniem",
+      "footer": "Połączenie realizujesz we wspólnej zakładce «Komunikatory» — ten sam access_token używany jest do odczytu metryk. Jeśli strona nie jest na Facebook Business — utwórz najpierw na business.facebook.com."
     },
     "sms": {
       "balance_title": "Saldo SMS",
