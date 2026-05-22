@@ -2918,7 +2918,13 @@
       "col_vs_avg": "vs średnia",
       "occupancy_empty": "Obłożenie jeszcze nie pobrane. Poczekaj na autosync lub dodaj konkurenta Booksy.",
       "ai_occupancy_hint": "Naciśnij «Wygeneruj wniosek AI» — AI przeanalizuje wolne sloty konkurentów i powie gdzie wygrywamy dostępnością, a gdzie trzeba popracować.",
-      "google_reviews_limit_hint": "Google API zwraca maks. 5 ostatnich opinii na miejsce — kolumna «Opinii» dla Google może pokazać mniej niż rzeczywista liczba w Google Maps. Booksy zwraca pełną historię bez limitu. Jeśli liczba zupełnie nie pasuje do Twojego salonu — kliknij 👁 i sprawdź czy Google wskazuje Twoją wizytówkę. Jeśli to nie ta — Settings → Profil → znajdź salon w Google Maps ponownie."
+      "google_reviews_limit_hint": "Google API zwraca maks. 5 ostatnich opinii na miejsce — kolumna «Opinii» dla Google może pokazać mniej niż rzeczywista liczba w Google Maps. Booksy zwraca pełną historię bez limitu. Jeśli liczba zupełnie nie pasuje do Twojego salonu — kliknij 👁 i sprawdź czy Google wskazuje Twoją wizytówkę. Jeśli to nie ta — Settings → Profil → znajdź salon w Google Maps ponownie.",
+      "ai_panel_title": "Wnioski AI z raportu",
+      "ai_panel_hint": "AI przygotował wnioski z Twojego raportu. Kliknij «Pokaż» gdy zechcesz je zobaczyć.",
+      "ai_panel_shown": "Pokazano {{count}} wniosków AI.",
+      "ai_panel_show": "Pokaż",
+      "ai_panel_refresh": "Odśwież",
+      "open_competitor": "Otwórz stronę «{{name}}»"
     }
   },
   "finance": {

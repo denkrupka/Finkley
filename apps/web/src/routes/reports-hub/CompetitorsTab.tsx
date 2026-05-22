@@ -41,6 +41,7 @@ import {
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
 } from '@/hooks/useCompetitors'
+import { AiReportPanel } from '@/components/domain/AiReportPanel'
 import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useRefreshReportInsights, useServiceMatchAi } from '@/hooks/useReportInsights'
 import { useSalon } from '@/hooks/useSalons'
@@ -1354,6 +1355,13 @@ function OccupancyTable({
 
   return (
     <div className="flex flex-col gap-3">
+      <AiReportPanel
+        insights={insights}
+        isLoading={refresh.isPending}
+        onShow={runAi}
+        hint={t('reports_hub.competitors.ai_occupancy_hint')}
+      />
+
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
@@ -1432,42 +1440,7 @@ function OccupancyTable({
         </table>
       </div>
 
-      <div className="border-brand-sage-deep/30 from-brand-sage/5 rounded-lg border bg-gradient-to-br to-transparent p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
-            <Sparkles className="text-brand-sage-deep size-4" strokeWidth={2} />
-            {t('reports_hub.competitors.ai_title')}
-          </h4>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={runAi}
-            disabled={refresh.isPending || rows.length === 0}
-          >
-            {refresh.isPending
-              ? t('common.loading')
-              : insights
-                ? t('reports_hub.competitors.ai_refresh')
-                : t('reports_hub.competitors.ai_generate')}
-          </Button>
-        </div>
-        {insights == null ? (
-          <p className="text-muted-foreground text-xs">
-            {t('reports_hub.competitors.ai_occupancy_hint')}
-          </p>
-        ) : insights.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.ai_empty')}</p>
-        ) : (
-          <ul className="space-y-2.5">
-            {insights.map((it, i) => (
-              <li key={i} className="border-border bg-card rounded-md border p-3">
-                <p className="text-foreground text-xs font-bold">{it.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{it.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <div className="hidden">{/* prev AI block removed — moved to top */}</div>
     </div>
   )
 }
@@ -1760,8 +1733,23 @@ function PricesTable({
 
   const locale = i18n.language?.split('-')[0] ?? 'ru'
 
+  // Helper для service URL у конкурента — пока нет deep-link на конкретный
+  // service в Booksy/Google, ведём на главную страницу салона.
+  function competitorServiceUrl(competitorId: string): string | null {
+    const c = competitors.find((x) => x.id === competitorId)
+    return c?.booksy_url ?? c?.google_place_url ?? null
+  }
+
   return (
     <div className="flex flex-col gap-3">
+      {/* AI наверху — collapsed pill «Показать» */}
+      <AiReportPanel
+        insights={insights}
+        isLoading={refresh.isPending}
+        onShow={runAi}
+        hint={t('reports_hub.competitors.ai_prices_hint')}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs">
           {aiMatches
@@ -1782,8 +1770,9 @@ function PricesTable({
               : t('reports_hub.competitors.ai_match_run')}
         </Button>
       </div>
+
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">
@@ -1792,6 +1781,12 @@ function PricesTable({
               <th className="px-3 py-3 text-right font-semibold">
                 {t('reports_hub.competitors.col_our_price')}
               </th>
+              {/* Динамическая колонка на каждого конкурента */}
+              {competitors.map((c) => (
+                <th key={c.id} className="px-3 py-3 text-right font-semibold" title={c.name}>
+                  <span className="inline-block max-w-[120px] truncate align-middle">{c.name}</span>
+                </th>
+              ))}
               <th className="px-3 py-3 text-right font-semibold">
                 {t('reports_hub.competitors.col_competitor_range')}
               </th>
@@ -1806,7 +1801,10 @@ function PricesTable({
           <tbody className="divide-border divide-y">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-muted-foreground px-5 py-12 text-center text-sm">
+                <td
+                  colSpan={5 + competitors.length}
+                  className="text-muted-foreground px-5 py-12 text-center text-sm"
+                >
                   {t('reports_hub.competitors.no_services_to_compare')}
                 </td>
               </tr>
@@ -1819,15 +1817,43 @@ function PricesTable({
                       <span className="text-muted-foreground/60 ml-2 text-[10px] font-normal italic">
                         {t('reports_hub.competitors.no_match')}
                       </span>
-                    ) : (
-                      <span className="text-muted-foreground/60 ml-2 text-[10px] font-normal">
-                        ({r.matches.length})
-                      </span>
-                    )}
+                    ) : null}
                   </td>
                   <td className="num text-foreground px-3 py-3 text-right">
                     {formatCurrency(r.ownService.price_cents, currency, locale)}
                   </td>
+                  {/* Цена у каждого конкурента + eye-link на страницу */}
+                  {competitors.map((c) => {
+                    const m = r.matches.find((x) => x.competitorId === c.id)
+                    if (!m) {
+                      return (
+                        <td key={c.id} className="text-muted-foreground/40 px-3 py-3 text-right">
+                          —
+                        </td>
+                      )
+                    }
+                    const url = competitorServiceUrl(c.id)
+                    return (
+                      <td key={c.id} className="num text-foreground px-3 py-3 text-right">
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          {formatCurrency(m.service.price_cents, currency, locale)}
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                              title={t('reports_hub.competitors.open_competitor', {
+                                name: c.name,
+                              })}
+                            >
+                              <Eye className="size-3" strokeWidth={2} />
+                            </a>
+                          ) : null}
+                        </span>
+                      </td>
+                    )
+                  })}
                   <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
                     {r.competitorMin != null && r.competitorMax != null
                       ? `${formatCurrency(r.competitorMin, currency, locale)} – ${formatCurrency(r.competitorMax, currency, locale)}`
@@ -1866,43 +1892,6 @@ function PricesTable({
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="border-brand-sage-deep/30 from-brand-sage/5 rounded-lg border bg-gradient-to-br to-transparent p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
-            <Sparkles className="text-brand-sage-deep size-4" strokeWidth={2} />
-            {t('reports_hub.competitors.ai_title')}
-          </h4>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={runAi}
-            disabled={refresh.isPending || rows.length === 0}
-          >
-            {refresh.isPending
-              ? t('common.loading')
-              : insights
-                ? t('reports_hub.competitors.ai_refresh')
-                : t('reports_hub.competitors.ai_generate')}
-          </Button>
-        </div>
-        {insights == null ? (
-          <p className="text-muted-foreground text-xs">
-            {t('reports_hub.competitors.ai_prices_hint')}
-          </p>
-        ) : insights.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.ai_empty')}</p>
-        ) : (
-          <ul className="space-y-2.5">
-            {insights.map((it, i) => (
-              <li key={i} className="border-border bg-card rounded-md border p-3">
-                <p className="text-foreground text-xs font-bold">{it.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{it.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   )
