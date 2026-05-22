@@ -41,6 +41,7 @@ import {
   useUpdateCompetitor,
   useUpsertCompetitorSettings,
 } from '@/hooks/useCompetitors'
+import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useRefreshReportInsights, useServiceMatchAi } from '@/hooks/useReportInsights'
 import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
@@ -673,6 +674,8 @@ function ParamsSection({
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const { data: settings } = useCompetitorSettings(salonId)
+  const { data: ownSalon } = useSalon(salonId)
+  const { data: messengerInt = [] } = useMessengerIntegrations(salonId)
   const upsertSettings = useUpsertCompetitorSettings(salonId)
   const createCompetitor = useCreateCompetitor(salonId)
   const updateCompetitor = useUpdateCompetitor(salonId)
@@ -766,8 +769,88 @@ function ParamsSection({
     )
   }
 
+  // Статусы подключений для анализа конкурентов. Если у нашего салона нет
+  // google_place_id / booksy_url / Instagram OAuth — соответствующие метрики
+  // в Рейтинг / Контент будут пустыми. Юзеру важно видеть что подключено.
+  const igStatus = messengerInt.find((m) => m.channel === 'instagram')?.status === 'connected'
+  const fbStatus = messengerInt.find((m) => m.channel === 'facebook')?.status === 'connected'
+  const connections = [
+    {
+      key: 'google',
+      label: t('reports_hub.competitors.params.conn_google'),
+      hint: t('reports_hub.competitors.params.conn_google_hint'),
+      connected: !!ownSalon?.google_place_id,
+      linkLabel: t('reports_hub.competitors.params.conn_go_to_settings'),
+      linkTo: `/${salonId}/settings`,
+    },
+    {
+      key: 'booksy',
+      label: t('reports_hub.competitors.params.conn_booksy'),
+      hint: t('reports_hub.competitors.params.conn_booksy_hint'),
+      connected: !!ownSalon?.booksy_url,
+      linkLabel: t('reports_hub.competitors.params.conn_go_to_settings'),
+      linkTo: `/${salonId}/settings`,
+    },
+    {
+      key: 'instagram',
+      label: t('reports_hub.competitors.params.conn_instagram'),
+      hint: t('reports_hub.competitors.params.conn_instagram_hint'),
+      connected: igStatus,
+      linkLabel: t('reports_hub.competitors.params.conn_go_to_integrations'),
+      linkTo: `/${salonId}/integrations?cat=messengers`,
+    },
+    {
+      key: 'facebook',
+      label: t('reports_hub.competitors.params.conn_facebook'),
+      hint: t('reports_hub.competitors.params.conn_facebook_hint'),
+      connected: fbStatus,
+      linkLabel: t('reports_hub.competitors.params.conn_go_to_integrations'),
+      linkTo: `/${salonId}/integrations?cat=messengers`,
+    },
+  ]
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="border-brand-teal-soft bg-brand-teal-soft/15 rounded-lg border p-5">
+        <h3 className="text-brand-navy text-base font-bold">
+          {t('reports_hub.competitors.params.connections_title')}
+        </h3>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {t('reports_hub.competitors.params.connections_subtitle')}
+        </p>
+        <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {connections.map((c) => (
+            <li
+              key={c.key}
+              className={cn(
+                'border-border bg-card flex items-center justify-between gap-3 rounded-md border p-3',
+                c.connected ? 'border-emerald-200' : 'border-amber-200',
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-semibold">
+                  {c.connected ? (
+                    <Check className="size-3.5 text-emerald-600" strokeWidth={2.5} />
+                  ) : (
+                    <X className="size-3.5 text-amber-600" strokeWidth={2.5} />
+                  )}
+                  {c.label}
+                </p>
+                <p className="text-muted-foreground mt-0.5 text-[11px]">{c.hint}</p>
+              </div>
+              {!c.connected ? (
+                <a
+                  href={c.linkTo}
+                  className="text-secondary hover:text-secondary/80 shrink-0 text-[11px] font-semibold underline-offset-2 hover:underline"
+                >
+                  {c.linkLabel} →
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
         <h3 className="text-brand-navy text-base font-bold">
           {t('reports_hub.competitors.params.watched_title')}
