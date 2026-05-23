@@ -347,14 +347,115 @@ async function fetchBooksyCatalog(booksyUrl: string): Promise<{
 // =============================================================================
 
 type OccupancyService = {
+  /** Имя «головной» услуги без label варианта — для отображения и group-key. */
   name: string
-  variant_id: number | undefined
+  /** Список label'ов variants, влитых в эту строку (для tooltip «вкл. варианты»). */
+  variant_labels: string[]
   duration_min: number
+  /** Кол-во уникальных мастеров, способных оказывать любой из variants группы. */
   staff_count: number
+  /** Свободные слоты за 7 дней — СУММА по уникальным staffer'ам (не по variants).
+   *  Это исключает «двойной счёт» когда staffer делает manicure + pedicure: его
+   *  timeslots — это его календарь, общий для всех его услуг. */
   free_slots_7d: number
+  /** Дней с хотя бы одним свободным окном среди объединения всех staffer'ов. */
   days_covered: number
+  /** TRUE если у services вообще не было publicly bookable variants (Stały
+   *  klient / Nowy klient). UI покажет с пометкой «бронирование закрыто». */
+  closed_to_public: boolean
 }
 
+/** Один запрос timeslots на staffer × variant. Возвращает count free + days. */
+async function fetchOneTimeslots(
+  parsed: { region: string; businessId: string },
+  fingerprint: string,
+  stafferId: number,
+  variantId: number,
+  startStr: string,
+  endStr: string,
+): Promise<{ freeSlots: number; daysWithSlots: Set<string> } | null> {
+  try {
+    const draftRes = await fetch(
+      `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/create`,
+      {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': BOOKSY_WEB_API_KEY,
+          'x-app-version': '3.0',
+          'x-fingerprint': fingerprint,
+          referer: 'https://booksy.com/',
+          'user-agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+        },
+        body: JSON.stringify({
+          staffer_id: stafferId,
+          business_id: Number(parsed.businessId),
+          service_variant_id: variantId,
+          meta: {},
+        }),
+      },
+    )
+    if (!draftRes.ok) return null
+    const draft = (await draftRes.json()) as { appointment?: { id?: string } }
+    const apptId = draft.appointment?.id
+    if (!apptId) return null
+    const slotsRes = await fetch(
+      `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/${apptId}/timeslots`,
+      {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': BOOKSY_WEB_API_KEY,
+          'x-app-version': '3.0',
+          'x-fingerprint': fingerprint,
+          referer: 'https://booksy.com/',
+          'user-agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+        },
+        body: JSON.stringify({ start: startStr, end: endStr }),
+      },
+    )
+    if (!slotsRes.ok) return null
+    const slotsData = (await slotsRes.json()) as {
+      timeslots?: Record<string, Array<{ t: string }>>
+    }
+    const daysWithSlots = new Set<string>()
+    let freeSlots = 0
+    for (const [day, arr] of Object.entries(slotsData.timeslots ?? {})) {
+      const n = arr?.length ?? 0
+      if (n > 0) {
+        freeSlots += n
+        daysWithSlots.add(day)
+      }
+    }
+    return { freeSlots, daysWithSlots }
+  } catch (e) {
+    console.warn(`fetchOneTimeslots staffer=${stafferId} variant=${variantId} failed`, e)
+    return null
+  }
+}
+
+/**
+ * Собирает occupancy для группы variants, дедуплицируя по staffer.
+ *
+ * Логика: timeslots Booksy — это календарь staffer'а. Если один и тот же
+ * staffer делает 4 variants (manicure base/+kolor/+french/+koloryzacja), его
+ * timeslots ОДИНАКОВЫЕ для всех variants. Раньше мы дёргали timeslots для
+ * каждого variant отдельно и суммировали → 4× overcount.
+ *
+ * Теперь:
+ *   1. Группируем variants по parent_name (свернём 4 Laminacja brwi в одну группу).
+ *   2. На КАЖДОГО уникального staffer_id в группе делаем 1 запрос timeslots
+ *      (используя любой variant, который он делает).
+ *   3. Свободные слоты = СУММА по этим staffer'ам (их календари независимы).
+ *   4. Дней с окнами = UNION дат, в которых хотя бы один staffer свободен.
+ *
+ * Если ни один staffer не вернул слотов — `closed_to_public: true` (вариант
+ * существует, но публичное бронирование закрыто: Stały klient и т.п.).
+ */
 async function fetchBooksyOccupancy(
   parsed: { region: string; businessId: string },
   variants: BooksyVariant[],
@@ -366,91 +467,85 @@ async function fetchBooksyOccupancy(
   const startStr = today.toISOString().slice(0, 10)
   const endStr = end.toISOString().slice(0, 10)
 
+  // 1. Группируем variants по parent_name.
+  const byParent = new Map<string, BooksyVariant[]>()
   for (const v of variants) {
-    if (!v.id) continue // вариант без id — нет смысла дёргать draft
-    // Booksy 2026 требует конкретный staffer_id; staffer_id=null → 400 validation.
-    // Берём первого из v.staffer_ids; если variant без мастеров — пропускаем
-    // (бронировать некому, occupancy не имеет смысла).
-    const stafferId = v.staffer_ids?.[0]
-    if (!stafferId) {
-      console.warn(`booksy occupancy: variant=${v.id} has no staffer_ids, skipping`)
+    if (!v.id) continue
+    const key = v.parent_name || v.name
+    const list = byParent.get(key) ?? []
+    list.push(v)
+    byParent.set(key, list)
+  }
+
+  // 2. Кэш timeslots по staffer_id — каждый staffer = 1 запрос, ре-используется
+  //    для всех групп где он участвует.
+  const stafferCache = new Map<number, { freeSlots: number; days: Set<string> }>()
+  async function getOrFetchStafferSlots(
+    stafferId: number,
+    sampleVariantId: number,
+  ): Promise<{ freeSlots: number; days: Set<string> } | null> {
+    const cached = stafferCache.get(stafferId)
+    if (cached) return cached
+    const res = await fetchOneTimeslots(
+      parsed,
+      fingerprint,
+      stafferId,
+      sampleVariantId,
+      startStr,
+      endStr,
+    )
+    if (!res) {
+      stafferCache.set(stafferId, { freeSlots: 0, days: new Set() })
+      return null
+    }
+    const entry = { freeSlots: res.freeSlots, days: res.daysWithSlots }
+    stafferCache.set(stafferId, entry)
+    // Пауза между разными staffer'ами — Booksy rate-limit friendly.
+    await new Promise((r) => setTimeout(r, 200))
+    return entry
+  }
+
+  // 3. Для каждой parent-группы — собираем уникальные staffer'ы и тянем их слоты.
+  for (const [parentName, group] of byParent.entries()) {
+    const uniqueStaffers = new Set<number>()
+    for (const v of group) {
+      for (const sid of v.staffer_ids) uniqueStaffers.add(sid)
+    }
+    if (uniqueStaffers.size === 0) {
+      // Нет публичных мастеров — variant exists, but booking restricted.
+      out.push({
+        name: parentName,
+        variant_labels: group.map((v) => v.name.replace(parentName, '').replace(/^\s*[—-]\s*/, '')),
+        duration_min: group[0]?.duration_min ?? 0,
+        staff_count: 0,
+        free_slots_7d: 0,
+        days_covered: 0,
+        closed_to_public: true,
+      })
       continue
     }
-    try {
-      // 1. Create draft
-      const draftRes = await fetch(
-        `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/create`,
-        {
-          method: 'POST',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'x-api-key': BOOKSY_WEB_API_KEY,
-            'x-app-version': '3.0',
-            'x-fingerprint': fingerprint,
-            referer: 'https://booksy.com/',
-            'user-agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
-          },
-          body: JSON.stringify({
-            staffer_id: stafferId,
-            business_id: Number(parsed.businessId),
-            service_variant_id: v.id,
-            meta: {},
-          }),
-        },
-      )
-      if (!draftRes.ok) {
-        console.warn(`booksy draft.create variant=${v.id} HTTP ${draftRes.status}`)
-        continue
-      }
-      const draft = (await draftRes.json()) as { appointment?: { id?: string } }
-      const apptId = draft.appointment?.id
-      if (!apptId) continue
 
-      // 2. Timeslots на 7 дней
-      const slotsRes = await fetch(
-        `https://${parsed.region}.booksy.com/core/v2/customer_api/drafts/${apptId}/timeslots`,
-        {
-          method: 'POST',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'x-api-key': BOOKSY_WEB_API_KEY,
-            'x-app-version': '3.0',
-            'x-fingerprint': fingerprint,
-            referer: 'https://booksy.com/',
-            'user-agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
-          },
-          body: JSON.stringify({ start: startStr, end: endStr }),
-        },
-      )
-      if (!slotsRes.ok) {
-        console.warn(`booksy timeslots variant=${v.id} HTTP ${slotsRes.status}`)
-        continue
-      }
-      const slotsData = (await slotsRes.json()) as {
-        timeslots?: Record<string, Array<{ t: string }>>
-      }
-      const days = Object.entries(slotsData.timeslots ?? {})
-      const freeSlots = days.reduce((s, [, arr]) => s + (arr?.length ?? 0), 0)
-      const daysCovered = days.filter(([, arr]) => (arr?.length ?? 0) > 0).length
-
-      out.push({
-        name: v.name,
-        variant_id: v.id,
-        duration_min: v.duration_min,
-        staff_count: v.staffer_ids.length,
-        free_slots_7d: freeSlots,
-        days_covered: daysCovered,
-      })
-
-      // Маленькая пауза чтобы не получить rate-limit.
-      await new Promise((r) => setTimeout(r, 200))
-    } catch (e) {
-      console.warn(`booksy occupancy variant=${v.id} failed`, e)
+    let totalSlots = 0
+    const allDays = new Set<string>()
+    for (const sid of uniqueStaffers) {
+      // Берём первый variant, который этот staffer может делать.
+      const sampleVariant = group.find((v) => v.staffer_ids.includes(sid))
+      if (!sampleVariant?.id) continue
+      const slots = await getOrFetchStafferSlots(sid, sampleVariant.id)
+      if (!slots) continue
+      totalSlots += slots.freeSlots
+      for (const d of slots.days) allDays.add(d)
     }
+
+    out.push({
+      name: parentName,
+      variant_labels: group.map((v) => v.name.replace(parentName, '').replace(/^\s*[—-]\s*/, '')),
+      duration_min: group[0]?.duration_min ?? 0,
+      staff_count: uniqueStaffers.size,
+      free_slots_7d: totalSlots,
+      days_covered: allDays.size,
+      closed_to_public: totalSlots === 0,
+    })
   }
   return out
 }

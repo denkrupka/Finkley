@@ -1386,10 +1386,15 @@ function CompetitorsSyncStatusBar({
 
 type OccupancyService = {
   name: string
+  /** label'ы свёрнутых variants («+ kolor», «french»). Backend начиная с
+   *  2026-05-23 группирует variants по parent_name. */
+  variant_labels?: string[]
   duration_min: number
   staff_count: number
   free_slots_7d: number
   days_covered: number
+  /** Backend пометил variant существует, но публичное бронирование закрыто. */
+  closed_to_public?: boolean
 }
 
 function OccupancyTable({
@@ -1456,23 +1461,44 @@ function OccupancyTable({
     service: OccupancyService
     totalStaff: number
   }
-  // Пропускаем variants без availability (Booksy «Stały klient» / закрытые
-  // категории — бронируются вне публичного API, free_slots_7d=0, days_covered=0).
-  function isBookable(s: OccupancyService): boolean {
-    return s.free_slots_7d > 0 || s.days_covered > 0
+  /** Backend начиная с 2026-05-23 группирует variants по parent_name и
+   *  возвращает уже агрегированную строку — старые snapshots могут содержать
+   *  per-variant записи. На клиенте делаем доп-fallback group-by-name чтобы
+   *  не было дублей при переходном периоде. */
+  function aggregateLegacy(services: OccupancyService[]): OccupancyService[] {
+    // Если backend пометил variant_labels — данные уже агрегированы, ничего не делаем.
+    if (services.some((s) => Array.isArray(s.variant_labels))) return services
+    // Иначе — fallback: группируем по нормализованному name.
+    const groups = new Map<string, OccupancyService[]>()
+    for (const s of services) {
+      const k = s.name.split(/[—-]/, 1)[0]?.trim() || s.name
+      const list = groups.get(k) ?? []
+      list.push(s)
+      groups.set(k, list)
+    }
+    const out: OccupancyService[] = []
+    for (const [name, list] of groups) {
+      // Берём MAX (pessimistic): один staffer не может одновременно делать 4 variants.
+      const max = list.reduce((m, x) => (x.free_slots_7d > m.free_slots_7d ? x : m), list[0]!)
+      out.push({
+        ...max,
+        name,
+        variant_labels: list.map((s) => s.name).filter((n) => n !== name),
+        closed_to_public: list.every((s) => s.free_slots_7d === 0 && s.days_covered === 0),
+      })
+    }
+    return out
   }
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
-    // Конкуренты
     for (const c of competitors) {
       const snap = latestByCompetitor.get(c.id)
       if (!snap) continue
       const data = snap.data as { services?: OccupancyService[]; total_staff?: number }
-      const services = Array.isArray(data.services) ? data.services : []
+      const services = aggregateLegacy(Array.isArray(data.services) ? data.services : [])
       for (const svc of services) {
         if (!matchesWatched(svc.name)) continue
-        if (!isBookable(svc)) continue
         out.push({
           competitorId: c.id,
           competitorName: c.name,
@@ -1486,27 +1512,28 @@ function OccupancyTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitors, latestByCompetitor, watchedTokens])
 
-  // Строки нашего салона (отдельно, чтобы рисовать сверху + не вмешиваться в фильтр).
   const ownRows = useMemo<Row[]>(() => {
     if (!ownOccupancy) return []
-    return ownOccupancy.services
+    const services = aggregateLegacy(ownOccupancy.services as OccupancyService[])
+    return services
       .filter((s) => matchesWatched(s.name))
-      .filter((s) => isBookable(s as OccupancyService))
       .map((s) => ({
         competitorId: salonId,
         competitorName: ownSalonName,
         isOwn: true,
-        service: s as OccupancyService,
+        service: s,
         totalStaff: ownOccupancy.total_staff,
       }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownOccupancy, salonId, ownSalonName, watchedTokens])
 
   // Среднее по всем (наш + конкуренты) — для % vs средний.
+  // closed_to_public rows исключаем (у них free_slots_7d=0, иначе среднее ушло вниз).
   const avgSlotsByService = useMemo(() => {
     const map = new Map<string, number>()
     const buckets = new Map<string, number[]>()
     for (const r of [...ownRows, ...rows]) {
+      if (r.service.closed_to_public) continue
       const list = buckets.get(r.service.name) ?? []
       list.push(r.service.free_slots_7d)
       buckets.set(r.service.name, list)
@@ -1605,21 +1632,38 @@ function OccupancyTable({
                     </div>
                   </td>
                   <td className="text-foreground px-4 py-3 text-xs">
-                    {r.service.name}
-                    {r.service.duration_min ? (
-                      <span className="text-muted-foreground ml-1">
-                        · {r.service.duration_min} {t('common.min')}
+                    <div className="flex flex-col gap-0.5">
+                      <span>
+                        {r.service.name}
+                        {r.service.duration_min ? (
+                          <span className="text-muted-foreground ml-1">
+                            · {r.service.duration_min} {t('common.min')}
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
+                      {Array.isArray(r.service.variant_labels) &&
+                      r.service.variant_labels.filter(Boolean).length > 0 ? (
+                        <span className="text-muted-foreground/70 text-[10px]">
+                          {t('reports_hub.competitors.occupancy_includes', {
+                            list: r.service.variant_labels.filter(Boolean).join(' · '),
+                          })}
+                        </span>
+                      ) : null}
+                      {r.service.closed_to_public ? (
+                        <span className="text-[10px] text-amber-700">
+                          ⓘ {t('reports_hub.competitors.occupancy_closed_to_public')}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="num text-foreground px-3 py-3 text-right">
                     {r.service.staff_count}
                   </td>
                   <td className="num text-foreground px-3 py-3 text-right font-bold">
-                    {r.service.free_slots_7d}
+                    {r.service.closed_to_public ? '—' : r.service.free_slots_7d}
                   </td>
                   <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                    {r.service.days_covered} / 7
+                    {r.service.closed_to_public ? '—' : `${r.service.days_covered} / 7`}
                   </td>
                   <td
                     className={cn(
@@ -1633,7 +1677,9 @@ function OccupancyTable({
                             : 'text-muted-foreground',
                     )}
                   >
-                    {diffPct == null ? '—' : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
+                    {diffPct == null || r.service.closed_to_public
+                      ? '—'
+                      : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
                   </td>
                 </tr>
               )
@@ -1693,21 +1739,38 @@ function OccupancyTable({
                   <tr key={`${r.competitorId}_${i}`}>
                     <td className="text-foreground px-4 py-3 font-semibold">{r.competitorName}</td>
                     <td className="text-foreground px-4 py-3 text-xs">
-                      {r.service.name}
-                      {r.service.duration_min ? (
-                        <span className="text-muted-foreground ml-1">
-                          · {r.service.duration_min} {t('common.min')}
+                      <div className="flex flex-col gap-0.5">
+                        <span>
+                          {r.service.name}
+                          {r.service.duration_min ? (
+                            <span className="text-muted-foreground ml-1">
+                              · {r.service.duration_min} {t('common.min')}
+                            </span>
+                          ) : null}
                         </span>
-                      ) : null}
+                        {Array.isArray(r.service.variant_labels) &&
+                        r.service.variant_labels.filter(Boolean).length > 0 ? (
+                          <span className="text-muted-foreground/70 text-[10px]">
+                            {t('reports_hub.competitors.occupancy_includes', {
+                              list: r.service.variant_labels.filter(Boolean).join(' · '),
+                            })}
+                          </span>
+                        ) : null}
+                        {r.service.closed_to_public ? (
+                          <span className="text-[10px] text-amber-700">
+                            ⓘ {t('reports_hub.competitors.occupancy_closed_to_public')}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="num text-foreground px-3 py-3 text-right">
                       {r.service.staff_count}
                     </td>
                     <td className="num text-foreground px-3 py-3 text-right font-bold">
-                      {r.service.free_slots_7d}
+                      {r.service.closed_to_public ? '—' : r.service.free_slots_7d}
                     </td>
                     <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                      {r.service.days_covered} / 7
+                      {r.service.closed_to_public ? '—' : `${r.service.days_covered} / 7`}
                     </td>
                     <td
                       className={cn(
@@ -1721,7 +1784,9 @@ function OccupancyTable({
                               : 'text-muted-foreground',
                       )}
                     >
-                      {diffPct == null ? '—' : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
+                      {diffPct == null || r.service.closed_to_public
+                        ? '—'
+                        : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
                     </td>
                   </tr>
                 )

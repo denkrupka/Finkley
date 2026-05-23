@@ -249,11 +249,14 @@ export function useOwnSalonBooksyRating(salonId: string | undefined) {
  *  Структура: { services: OccupancyService[], total_staff } — та же что у конкурентов. */
 export type OwnSalonOccupancyService = {
   name: string
-  variant_id?: number
+  /** label'ы variants свёрнутых в эту parent-группу (Booksy «+ kolor», «french»…). */
+  variant_labels?: string[]
   duration_min: number
   staff_count: number
   free_slots_7d: number
   days_covered: number
+  /** TRUE = все variants публично не бронируются (Stały klient и т.п.). */
+  closed_to_public?: boolean
 }
 export function useOwnSalonOccupancy(
   salonId: string | undefined,
