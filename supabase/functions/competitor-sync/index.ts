@@ -586,7 +586,117 @@ type OwnSalonRow = {
   facebook_url: string | null
 }
 
-async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<number> {
+/** Грубый стемминг + токенизация для name-match (синхронизирован с UI
+ *  apps/web/src/routes/reports-hub/CompetitorsTab.tsx → normalizeServiceName). */
+function syncNormalizeName(s: string): string[] {
+  const STOP = new Set([
+    'и',
+    'на',
+    'с',
+    'для',
+    'от',
+    'до',
+    'без',
+    'innej',
+    'inny',
+    'stylistce',
+    'stylistki',
+  ])
+  const stripped = s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ł/gi, 'l')
+    .replace(/ё/gi, 'е')
+    .toLowerCase()
+    .replace(/[^a-zа-яёії\s+]/giu, ' ')
+  const suffixes = [
+    'ego',
+    'ymi',
+    'ami',
+    'ach',
+    'ych',
+    'owy',
+    'owa',
+    'owe',
+    'ova',
+    'ovy',
+    'ные',
+    'ной',
+    'ная',
+    'ные',
+    'ym',
+    'em',
+    'ej',
+    'ie',
+    'ов',
+    'ой',
+    'ые',
+    'ый',
+    'ая',
+    'ое',
+    'ия',
+    'ия',
+  ]
+  function stem(t: string): string {
+    if (t.length <= 4) return t
+    for (const suf of suffixes) {
+      if (t.length - suf.length >= 4 && t.endsWith(suf)) {
+        return t.slice(0, t.length - suf.length)
+      }
+    }
+    return t
+  }
+  return stripped
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP.has(w))
+    .map(stem)
+}
+
+function jaccard(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0
+  const sa = new Set(a)
+  const sb = new Set(b)
+  let inter = 0
+  for (const x of sa) if (sb.has(x)) inter++
+  return inter / (sa.size + sb.size - inter)
+}
+
+/** Выбирает variants из catalog для занятости.
+ *  Если watched != null/empty — берёт ТОЛЬКО те, чья имя fuzzy-матчит хотя бы
+ *  одну услугу из watched. Иначе fallback на первые `fallbackTopN`. */
+function pickVariantsForOccupancy(
+  catalog: BooksyVariant[],
+  watched: string[] | null,
+  maxCount: number,
+  fallbackTopN: number,
+): BooksyVariant[] {
+  const usable = catalog.filter((v) => v.id && v.staffer_ids.length > 0)
+  if (!watched || watched.length === 0) {
+    return usable.slice(0, fallbackTopN)
+  }
+  const watchedTokens = watched.map((w) => syncNormalizeName(w))
+  const scored: Array<{ v: BooksyVariant; score: number }> = []
+  for (const v of usable) {
+    const t = syncNormalizeName(v.parent_name)
+    let best = 0
+    for (const ws of watchedTokens) {
+      const s = jaccard(ws, t)
+      if (s > best) best = s
+    }
+    if (best >= 0.3) scored.push({ v, score: best })
+  }
+  scored.sort((a, b) => b.score - a.score)
+  // Если ни один не подошёл — fallback на первые fallbackTopN (чтобы хоть что-то
+  // показать; user видит, что watched не пересекается с каталогом конкурента).
+  if (scored.length === 0) return usable.slice(0, fallbackTopN)
+  return scored.slice(0, maxCount).map((x) => x.v)
+}
+
+async function syncOwnSalon(
+  admin: SupabaseClient,
+  s: OwnSalonRow,
+  watchedServices: string[] | null,
+): Promise<number> {
   type OwnInsert = {
     salon_id: string
     kind: 'rating' | 'content' | 'occupancy'
@@ -628,9 +738,7 @@ async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<numb
     const ownCatalog = await fetchBooksyCatalog(s.booksy_url)
     const ownParsed = parseBooksyUrl(s.booksy_url)
     if (ownCatalog && ownParsed) {
-      const topVariants = ownCatalog.services
-        .filter((v) => v.id && v.staffer_ids.length > 0)
-        .slice(0, 5)
+      const topVariants = pickVariantsForOccupancy(ownCatalog.services, watchedServices, 10, 5)
       if (topVariants.length > 0) {
         const occ = await fetchBooksyOccupancy(ownParsed, topVariants)
         if (occ.length > 0) {
@@ -692,6 +800,7 @@ async function syncOneCompetitor(
   admin: SupabaseClient,
   c: CompetitorRow,
   ownSalonCity: string | null,
+  watchedServices: string[] | null,
 ): Promise<number> {
   const snapshots: Snapshot[] = []
 
@@ -746,16 +855,15 @@ async function syncOneCompetitor(
         snapshot_date: TODAY,
       })
 
-      // Загруженность: для top-5 variants создаём draft + тянем timeslots на 7 дней.
-      // Это даёт нам сравнимый метрик «свободные слоты у конкурента». Ограничение
-      // 5 — чтобы не дёргать Booksy 100 раз и не словить rate-limit.
+      // Загруженность: для top-N variants создаём draft + тянем timeslots на 7 дней.
+      // Это даёт нам сравнимый метрик «свободные слоты у конкурента». Если у
+      // юзера задан watched_services — выбираем variants по fuzzy-name-match;
+      // иначе fallback на первые 5 (чтобы хоть что-то показать).
       // Booksy API требует конкретный staffer_id → фильтруем variants с пустым
       // массивом мастеров (Konsultacja и пр. — там booking не работает).
       const parsed = parseBooksyUrl(c.booksy_url)
       if (parsed) {
-        const topVariants = catalog.services
-          .filter((v) => v.id && v.staffer_ids.length > 0)
-          .slice(0, 5)
+        const topVariants = pickVariantsForOccupancy(catalog.services, watchedServices, 10, 5)
         if (topVariants.length > 0) {
           const occ = await fetchBooksyOccupancy(parsed, topVariants)
           if (occ.length > 0) {
@@ -864,17 +972,31 @@ Deno.serve(async (req: Request) => {
   // для точного резолва Google Place ID (Text Search по «name, city»).
   const salonIds = Array.from(new Set((competitors ?? []).map((c) => c.salon_id)))
   const salonCityMap = new Map<string, string | null>()
+  const salonWatchedMap = new Map<string, string[] | null>()
   if (salonIds.length > 0) {
     const { data: salons } = await admin.from('salons').select('id, city').in('id', salonIds)
     for (const s of (salons ?? []) as Array<{ id: string; city: string | null }>) {
       salonCityMap.set(s.id, s.city)
+    }
+    const { data: cms } = await admin
+      .from('competitor_monitoring_settings')
+      .select('salon_id, watched_services')
+      .in('salon_id', salonIds)
+    for (const r of (cms ?? []) as Array<{ salon_id: string; watched_services: string[] | null }>) {
+      salonWatchedMap.set(
+        r.salon_id,
+        Array.isArray(r.watched_services) && r.watched_services.length > 0
+          ? r.watched_services
+          : null,
+      )
     }
   }
 
   let snapshots = 0
   for (const c of (competitors ?? []) as CompetitorRow[]) {
     const city = salonCityMap.get(c.salon_id) ?? null
-    snapshots += await syncOneCompetitor(admin, c, city)
+    const watched = salonWatchedMap.get(c.salon_id) ?? null
+    snapshots += await syncOneCompetitor(admin, c, city, watched)
   }
 
   // Также метрики СВОЕГО салона — для отображения первой строкой
@@ -889,7 +1011,19 @@ Deno.serve(async (req: Request) => {
   if (body.salon_id) ownQ = ownQ.eq('id', body.salon_id)
   const { data: ownSalons } = await ownQ
   for (const s of (ownSalons ?? []) as OwnSalonRow[]) {
-    ownSnapshots += await syncOwnSalon(admin, s)
+    let watched = salonWatchedMap.get(s.id) ?? null
+    // Если в общем map не нашли — пробуем отдельно (на случай own_salon без
+    // конкурентов).
+    if (!watched) {
+      const { data: cmsRow } = await admin
+        .from('competitor_monitoring_settings')
+        .select('watched_services')
+        .eq('salon_id', s.id)
+        .maybeSingle()
+      const ws = (cmsRow as { watched_services?: string[] } | null)?.watched_services
+      if (Array.isArray(ws) && ws.length > 0) watched = ws
+    }
+    ownSnapshots += await syncOwnSalon(admin, s, watched)
   }
 
   return jsonResponse({

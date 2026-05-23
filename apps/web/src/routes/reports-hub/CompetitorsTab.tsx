@@ -48,7 +48,6 @@ import { AiReportPanel } from '@/components/domain/AiReportPanel'
 import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useRefreshReportInsights, useServiceMatchAi } from '@/hooks/useReportInsights'
 import { useSalon } from '@/hooks/useSalons'
-import { useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useServices } from '@/hooks/useServices'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -227,7 +226,6 @@ function DataSection({
         />
       ) : kind === 'content' ? (
         <ContentTable
-          salonId={salonId}
           competitors={competitors}
           snapshots={snapshots}
           ownSalon={salon}
@@ -472,23 +470,18 @@ function RatingCells({
  * «Просмотры рилсов» — недоступно через scrape (требует IG Business Graph API).
  */
 function ContentTable({
-  salonId,
   competitors,
   snapshots,
   ownSalon,
   ownContent,
   t,
 }: {
-  salonId: string
   competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
   snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
   ownSalon: ReturnType<typeof useSalon>['data']
   ownContent: OwnSalonContent | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
-  const updateSalon = useUpdateSalon()
-  const updateCompetitor = useUpdateCompetitor(salonId)
-  const [editing, setEditing] = useState<{ kind: 'own' | 'competitor'; id: string } | null>(null)
   // У одного конкурента может быть 2 snapshot (insta + fb) — мержим.
   type ContentData = {
     posts?: number
@@ -549,9 +542,6 @@ function ContentTable({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-brand-sage-soft bg-brand-sage-soft/20 text-brand-sage-deep rounded-lg border p-3 text-xs">
-        💡 {t('reports_hub.competitors.content_manual_hint')}
-      </div>
       {ownEmpty && noOwnSocial ? (
         <div className="border-brand-yellow-deep/40 bg-brand-yellow/30 rounded-lg border p-3 text-xs">
           {t('reports_hub.competitors.content_no_social_hint')}
@@ -600,14 +590,6 @@ function ContentTable({
                   <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
                     {t('reports_hub.competitors.own_badge')}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setEditing({ kind: 'own', id: ownSalon?.id ?? '' })}
-                    className="text-brand-sage-deep hover:text-brand-sage-deep/70 ml-1"
-                    title={t('reports_hub.competitors.content_edit_btn')}
-                  >
-                    <Pencil className="size-3" strokeWidth={2} />
-                  </button>
                 </div>
               </td>
               <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
@@ -622,19 +604,7 @@ function ContentTable({
               const d = competitorEffective(c)
               return (
                 <tr key={c.id}>
-                  <td className="text-foreground px-4 py-3 font-semibold">
-                    <div className="flex items-center gap-2">
-                      {c.name}
-                      <button
-                        type="button"
-                        onClick={() => setEditing({ kind: 'competitor', id: c.id })}
-                        className="text-muted-foreground hover:text-foreground"
-                        title={t('reports_hub.competitors.content_edit_btn')}
-                      >
-                        <Pencil className="size-3" strokeWidth={2} />
-                      </button>
-                    </div>
-                  </td>
+                  <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
                   <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
                   <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
                   <td className="num px-3 py-3 text-right">
@@ -648,210 +618,6 @@ function ContentTable({
           </tbody>
         </table>
       </div>
-
-      {editing ? (
-        <ContentEditDialog
-          kind={editing.kind}
-          target={
-            editing.kind === 'own'
-              ? {
-                  name: ownSalon?.name ?? '',
-                  content_followers: ownSalon?.content_followers ?? null,
-                  content_posts: ownSalon?.content_posts ?? null,
-                  content_fb_likes: ownSalon?.content_fb_likes ?? null,
-                  content_posts_per_month: ownSalon?.content_posts_per_month ?? null,
-                }
-              : (() => {
-                  const c = competitors.find((x) => x.id === editing.id)
-                  return {
-                    name: c?.name ?? '',
-                    content_followers: c?.content_followers ?? null,
-                    content_posts: c?.content_posts ?? null,
-                    content_fb_likes: c?.content_fb_likes ?? null,
-                    content_posts_per_month: c?.content_posts_per_month ?? null,
-                  }
-                })()
-          }
-          onClose={() => setEditing(null)}
-          onSave={(patch) => {
-            const update = { ...patch, content_updated_at: new Date().toISOString() }
-            if (editing.kind === 'own') {
-              updateSalon.mutate(
-                { id: editing.id, ...update },
-                {
-                  onSuccess: () => {
-                    toast.success(t('reports_hub.competitors.content_saved'))
-                    setEditing(null)
-                  },
-                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                },
-              )
-            } else {
-              updateCompetitor.mutate(
-                { id: editing.id, ...update },
-                {
-                  onSuccess: () => {
-                    toast.success(t('reports_hub.competitors.content_saved'))
-                    setEditing(null)
-                  },
-                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                },
-              )
-            }
-          }}
-          saving={updateSalon.isPending || updateCompetitor.isPending}
-          t={t}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-type ContentEditFields = {
-  content_followers: number | null
-  content_posts: number | null
-  content_fb_likes: number | null
-  content_posts_per_month: number | null
-}
-
-function ContentEditDialog({
-  kind,
-  target,
-  onClose,
-  onSave,
-  saving,
-  t,
-}: {
-  kind: 'own' | 'competitor'
-  target: { name: string } & ContentEditFields
-  onClose: () => void
-  onSave: (patch: ContentEditFields) => void
-  saving: boolean
-  t: (k: string, opts?: Record<string, unknown>) => string
-}) {
-  const [followers, setFollowers] = useState<string>(
-    target.content_followers != null ? String(target.content_followers) : '',
-  )
-  const [posts, setPosts] = useState<string>(
-    target.content_posts != null ? String(target.content_posts) : '',
-  )
-  const [fbLikes, setFbLikes] = useState<string>(
-    target.content_fb_likes != null ? String(target.content_fb_likes) : '',
-  )
-  const [ppm, setPpm] = useState<string>(
-    target.content_posts_per_month != null ? String(target.content_posts_per_month) : '',
-  )
-
-  function toIntOrNull(s: string): number | null {
-    const t = s.trim().replace(/[\s,]/g, '')
-    if (!t) return null
-    const n = parseInt(t, 10)
-    return Number.isFinite(n) && n >= 0 ? n : null
-  }
-  function toFloatOrNull(s: string): number | null {
-    const t = s.trim().replace(/,/g, '.').replace(/\s/g, '')
-    if (!t) return null
-    const n = parseFloat(t)
-    return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-card border-border w-full max-w-md rounded-lg border p-5 shadow-xl">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-foreground text-base font-bold">
-            {kind === 'own'
-              ? t('reports_hub.competitors.content_edit_title_own', { name: target.name })
-              : t('reports_hub.competitors.content_edit_title_competitor', { name: target.name })}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-sm font-bold"
-          >
-            ✕
-          </button>
-        </div>
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t('reports_hub.competitors.content_edit_hint')}
-        </p>
-        <div className="mt-4 flex flex-col gap-3">
-          <FieldRow
-            label={t('reports_hub.competitors.col_followers')}
-            value={followers}
-            onChange={setFollowers}
-            placeholder="2173"
-          />
-          <FieldRow
-            label={t('reports_hub.competitors.col_posts')}
-            value={posts}
-            onChange={setPosts}
-            placeholder="272"
-          />
-          <FieldRow
-            label="Facebook likes"
-            value={fbLikes}
-            onChange={setFbLikes}
-            placeholder="459"
-          />
-          <FieldRow
-            label={t('reports_hub.competitors.col_freq')}
-            value={ppm}
-            onChange={setPpm}
-            placeholder="8.5"
-          />
-        </div>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-border bg-card text-foreground hover:bg-muted/40 h-9 rounded-md border px-3 text-xs font-semibold"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() =>
-              onSave({
-                content_followers: toIntOrNull(followers),
-                content_posts: toIntOrNull(posts),
-                content_fb_likes: toIntOrNull(fbLikes),
-                content_posts_per_month: toFloatOrNull(ppm),
-              })
-            }
-            className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-white disabled:opacity-60"
-          >
-            {saving ? <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} /> : null}
-            {t('common.save')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function FieldRow({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder: string
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Label className="text-foreground flex-1 text-xs font-semibold">{label}</Label>
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        inputMode="numeric"
-        className="num w-32 text-right"
-      />
     </div>
   )
 }
@@ -1887,8 +1653,92 @@ function OccupancyTable({
 // PricesTable — матчинг наших услуг с услугами конкурентов через fuzzy-name.
 // =============================================================================
 
+/** Очень лёгкий стемминг PL/RU/EN — нужен чтобы матч ловил словоформы
+ *  «hybrydowy / hybrydowym / hybrydowa» как одно слово. Не лингвистический,
+ *  но для услуг салонной индустрии — достаточно. */
+function stemToken(t: string): string {
+  // Польские/русские/английские флексии (по убыванию длины — длинные первыми).
+  const suffixes = [
+    'iego',
+    'ego',
+    'iej',
+    'emu',
+    'iego',
+    'ego',
+    'ymi',
+    'imi',
+    'ami',
+    'ach',
+    'ich',
+    'ych',
+    'ego',
+    'ach',
+    'ące',
+    'owy',
+    'owa',
+    'owe',
+    'ova',
+    'owej',
+    'ской',
+    'ская',
+    'ское',
+    'ского',
+    'ская',
+    'ние',
+    'ние',
+    'ение',
+    'ation',
+    'ing',
+    'ные',
+    'ных',
+    'ным',
+    'ость',
+    'енн',
+    'ова',
+    'ово',
+    'ovy',
+    'owy',
+    'ymi',
+    'ie',
+    'ym',
+    'em',
+    'mi',
+    'ej',
+    'ą',
+    'om',
+    'ów',
+    'aj',
+    'ay',
+    'ия',
+    'ой',
+    'ою',
+    'ые',
+    'ый',
+    'ая',
+    'ое',
+    'ev',
+    'ev',
+    'er',
+    'es',
+    'ed',
+    'a',
+    'e',
+    'i',
+    'o',
+    'u',
+    'y',
+  ]
+  if (t.length <= 4) return t
+  for (const suf of suffixes) {
+    if (t.length - suf.length >= 4 && t.endsWith(suf)) {
+      return t.slice(0, t.length - suf.length)
+    }
+  }
+  return t
+}
+
 /** Нормализация имени услуги для матча: lowercase, заменяем диакритику,
- * выкидываем не-буквенные символы и стоп-слова. */
+ * выкидываем не-буквенные символы и стоп-слова, потом стеммим. */
 function normalizeServiceName(s: string): string[] {
   const stripDiacritics = s
     .normalize('NFD')
@@ -1914,12 +1764,20 @@ function normalizeServiceName(s: string): string[] {
     'pl',
     'ru',
     'en',
+    'innej',
+    'inny',
+    'inn',
+    'stylistce',
+    'stylistki',
+    'stylist',
+    'mast',
   ])
   return stripDiacritics
     .toLowerCase()
     .replace(/[^a-zа-яёії\s+]/giu, ' ')
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !STOP.has(w))
+    .map(stemToken)
 }
 
 /** Jaccard-similarity по токенам [0..1]. */
@@ -1955,7 +1813,17 @@ type CompetitorMatch = {
 }
 
 type PriceMatchRow = {
-  ownService: { id: string; name: string; price_cents: number; duration_min: number }
+  ownService: {
+    id: string
+    name: string
+    /** Min цена среди нашего варианта (если у нас несколько услуг с тем же именем). */
+    price_cents: number
+    /** Max цена среди наших вариантов с тем же именем. */
+    price_max_cents: number
+    /** Сколько наших услуг с этим именем (1 если уникальное). */
+    own_variant_count: number
+    duration_min: number
+  }
   matches: CompetitorMatch[]
   competitorMin: number | null
   competitorMax: number | null
@@ -2129,13 +1997,33 @@ function PricesTable({
       }
     }
 
+    // Дедупим наши услуги по имени: если у юзера два «Laminacja brwi»
+    // (разные мастера / категории), сворачиваем в одну строку с диапазоном цен.
+    const byName = new Map<
+      string,
+      {
+        ids: string[]
+        prices: number[]
+        durations: number[]
+        firstId: string
+      }
+    >()
     for (const ownSvc of ownServices) {
       if (ownSvc.is_archived) continue
       if (watchedNames && !watchedNames.has(ownSvc.name)) continue
+      const key = ownSvc.name
+      const cur = byName.get(key) ?? { ids: [], prices: [], durations: [], firstId: ownSvc.id }
+      cur.ids.push(ownSvc.id)
+      cur.prices.push(ownSvc.default_price_cents)
+      if (ownSvc.default_duration_min) cur.durations.push(ownSvc.default_duration_min)
+      byName.set(key, cur)
+    }
+
+    for (const [name, group] of byName.entries()) {
       const matches: CompetitorMatch[] = []
 
       // Если есть AI-матчинг — используем его. Иначе fallback на fuzzy Jaccard.
-      const aiForThis = aiMatches?.find((m) => m.our_service === ownSvc.name)
+      const aiForThis = aiMatches?.find((m) => m.our_service === name)
       if (aiForThis) {
         for (const cm of aiForThis.competitors) {
           if (cm.confidence === 'low') continue
@@ -2147,21 +2035,18 @@ function PricesTable({
           matches.push(buildMatch(comp, svc, compServices))
         }
       } else {
-        const ownTokens = normalizeServiceName(ownSvc.name)
+        const ownTokens = normalizeServiceName(name)
         for (const c of competitors) {
           const list = competitorServices.get(c.id) ?? []
           let best: { score: number; svc: CompetitorService } | null = null
           for (const svc of list) {
             const sim = tokenSimilarity(ownTokens, normalizeServiceName(svc.name))
-            if (sim >= 0.4 && (!best || sim > best.score)) best = { score: sim, svc }
+            if (sim >= 0.3 && (!best || sim > best.score)) best = { score: sim, svc }
           }
           if (best) matches.push(buildMatch(c, best.svc, list))
         }
       }
 
-      // Для итоговых min/max/avg по строке берём ВСЕ цены (min..max каждого
-      // конкурента уплощены), а не только anchor.price_cents — так диапазон
-      // отражает реальную картину.
       const allPrices: number[] = []
       for (const m of matches) {
         allPrices.push(m.priceMin)
@@ -2171,14 +2056,19 @@ function PricesTable({
       const max = allPrices.length > 0 ? Math.max(...allPrices) : null
       const avg =
         allPrices.length > 0 ? allPrices.reduce((s, x) => s + x, 0) / allPrices.length : null
+      const ownMin = Math.min(...group.prices)
+      const ownMax = Math.max(...group.prices)
+      const ownAvgForDiff = (ownMin + ownMax) / 2
       const diffPct =
-        avg != null && avg > 0 ? Math.round(((ownSvc.default_price_cents - avg) / avg) * 100) : null
+        avg != null && avg > 0 ? Math.round(((ownAvgForDiff - avg) / avg) * 100) : null
       result.push({
         ownService: {
-          id: ownSvc.id,
-          name: ownSvc.name,
-          price_cents: ownSvc.default_price_cents,
-          duration_min: ownSvc.default_duration_min ?? 0,
+          id: group.firstId,
+          name,
+          price_cents: ownMin,
+          price_max_cents: ownMax,
+          own_variant_count: group.ids.length,
+          duration_min: group.durations[0] ?? 0,
         },
         matches,
         competitorMin: min,
@@ -2307,7 +2197,15 @@ function PricesTable({
                     ) : null}
                   </td>
                   <td className="num text-foreground px-3 py-3 text-right">
-                    {formatCurrency(r.ownService.price_cents, currency, locale)}
+                    {r.ownService.own_variant_count > 1
+                      ? `${formatCurrency(r.ownService.price_cents, currency, locale)} – ${formatCurrency(r.ownService.price_max_cents, currency, locale)}`
+                      : formatCurrency(r.ownService.price_cents, currency, locale)}
+                    {r.ownService.own_variant_count > 1 ? (
+                      <span className="text-muted-foreground/60 ml-1 text-[10px]">
+                        {' '}
+                        ×{r.ownService.own_variant_count}
+                      </span>
+                    ) : null}
                   </td>
                   {/* Цена у каждого конкурента + eye-link на страницу.
                       Если у конкурента >1 variant'а — показываем диапазон min-max.
