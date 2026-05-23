@@ -255,17 +255,25 @@ export type OwnSalonOccupancyService = {
   free_slots_7d: number
   days_covered: number
 }
-export function useOwnSalonOccupancy(salonId: string | undefined) {
+export function useOwnSalonOccupancy(
+  salonId: string | undefined,
+  dateFilter?: { startIso: string; endIso: string } | null,
+) {
   return useQuery<{
     services: OwnSalonOccupancyService[]
     total_staff: number
     snapshot_date: string
   } | null>({
-    queryKey: ['own-salon-occupancy', salonId],
+    queryKey: [
+      'own-salon-occupancy',
+      salonId,
+      dateFilter?.startIso ?? null,
+      dateFilter?.endIso ?? null,
+    ],
     enabled: !!salonId,
     queryFn: async () => {
       if (!salonId) return null
-      const { data } = await supabase
+      let q = supabase
         .from('own_salon_metrics')
         .select('data, snapshot_date')
         .eq('salon_id', salonId)
@@ -273,7 +281,10 @@ export function useOwnSalonOccupancy(salonId: string | undefined) {
         .eq('source', 'booksy')
         .order('snapshot_date', { ascending: false })
         .limit(1)
-        .maybeSingle()
+      if (dateFilter) {
+        q = q.gte('snapshot_date', dateFilter.startIso).lte('snapshot_date', dateFilter.endIso)
+      }
+      const { data } = await q.maybeSingle()
       const row = data as {
         data?: { services?: OwnSalonOccupancyService[]; total_staff?: number }
         snapshot_date?: string
@@ -315,9 +326,17 @@ export function useOwnSalonGoogleRating(salonId: string | undefined) {
   })
 }
 
-export function useOwnSalonContent(salonId: string | undefined) {
+export function useOwnSalonContent(
+  salonId: string | undefined,
+  dateFilter?: { startIso: string; endIso: string } | null,
+) {
   return useQuery<OwnSalonContent>({
-    queryKey: ['own-salon-content', salonId],
+    queryKey: [
+      'own-salon-content',
+      salonId,
+      dateFilter?.startIso ?? null,
+      dateFilter?.endIso ?? null,
+    ],
     queryFn: async () => {
       const empty: OwnSalonContent = {
         followers: null,
@@ -332,13 +351,17 @@ export function useOwnSalonContent(salonId: string | undefined) {
         has_data: false,
       }
       if (!salonId) return empty
-      const { data, error } = await supabase
+      let q = supabase
         .from('own_salon_metrics')
         .select('data, source, snapshot_date')
         .eq('salon_id', salonId)
         .eq('kind', 'content')
         .order('snapshot_date', { ascending: false })
         .limit(2) // оба источника (insta + fb), берём свежие
+      if (dateFilter) {
+        q = q.gte('snapshot_date', dateFilter.startIso).lte('snapshot_date', dateFilter.endIso)
+      }
+      const { data, error } = await q
       if (error) throw error
       const rows = (data ?? []) as Array<{
         data: Record<string, unknown>

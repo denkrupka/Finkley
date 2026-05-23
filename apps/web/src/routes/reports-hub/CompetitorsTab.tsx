@@ -179,7 +179,9 @@ function DataSection({
     dateFilter,
   )
   const { data: ownMetrics } = useOwnSalonMetrics(salonId)
-  const { data: ownContent } = useOwnSalonContent(salonId)
+  // ownContent/ownOccupancy фильтруются по периоду — чтобы при смене периода
+  // строка нашего салона не висела «застывшей» от другого месяца.
+  const { data: ownContent } = useOwnSalonContent(salonId, dateFilter)
   const { data: ownBooksyRating } = useOwnSalonBooksyRating(salonId)
   const { data: ownGoogleRating } = useOwnSalonGoogleRating(salonId)
 
@@ -206,8 +208,7 @@ function DataSection({
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-muted-foreground text-xs">{t('reports_hub.competitors.period_hint')}</p>
+      <div className="mb-3 flex items-center justify-end gap-2">
         <PeriodPickerPopover value={period} onChange={setPeriod} />
       </div>
       {showStatusBar ? <CompetitorsSyncStatusBar t={t} /> : null}
@@ -246,6 +247,7 @@ function DataSection({
           competitors={competitors}
           snapshots={snapshots}
           ownSalonName={salon?.name ?? t('reports_hub.competitors.own_label')}
+          dateFilter={dateFilter}
           t={t}
         />
       ) : (
@@ -466,8 +468,8 @@ function RatingCells({
 }
 
 /**
- * Content таб — таблица с 5 колонками: Posts, Reels Views, Frequency, Followers, Following.
- * «Просмотры рилсов» — недоступно через scrape (требует IG Business Graph API).
+ * Content таб — отдельные таблицы Instagram и Facebook. Данные тянутся из
+ * snapshots за выбранный период (если в периоде snapshot отсутствует — «—»).
  */
 function ContentTable({
   competitors,
@@ -482,7 +484,6 @@ function ContentTable({
   ownContent: OwnSalonContent | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
-  // У одного конкурента может быть 2 snapshot (insta + fb) — мержим.
   type ContentData = {
     posts?: number
     followers?: number
@@ -537,8 +538,6 @@ function ContentTable({
     return byCompetitor.get(c.id) ?? {}
   }
 
-  // Если у своего салона все content-поля null + ни у одного конкурента нет
-  // content-snapshot — показываем хинт что нужно подключить Instagram/Facebook.
   const ownEmpty =
     ownEffective.posts == null &&
     ownEffective.followers == null &&
@@ -547,98 +546,155 @@ function ContentTable({
   const noOwnSocial = !ownSalon?.instagram_url && !ownSalon?.facebook_url
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-6">
       {ownEmpty && noOwnSocial ? (
         <div className="border-brand-yellow-deep/40 bg-brand-yellow/30 rounded-lg border p-3 text-xs">
           {t('reports_hub.competitors.content_no_social_hint')}
         </div>
       ) : null}
-      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold">
-                {t('reports_hub.competitors.col_name')}
-              </th>
-              <th className="px-3 py-3 text-right font-semibold">
-                {t('reports_hub.competitors.col_followers')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_posts_hint')}
-              >
-                {t('reports_hub.competitors.col_posts')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_avg_likes_hint')}
-              >
-                {t('reports_hub.competitors.col_avg_likes')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_avg_comments_hint')}
-              >
-                {t('reports_hub.competitors.col_avg_comments')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_engagement_hint')}
-              >
-                {t('reports_hub.competitors.col_engagement')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_fb_likes_hint')}
-              >
-                FB
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-border divide-y">
-            {/* Own salon */}
-            <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
-              <td className="text-brand-sage-deep px-4 py-3 font-bold">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-3.5" strokeWidth={2} />
-                  {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
-                  <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
-                    {t('reports_hub.competitors.own_badge')}
-                  </span>
-                </div>
-              </td>
-              <td className="num px-3 py-3 text-right font-bold">
-                {fmtNum(ownEffective.followers)}
-              </td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_likes)}</td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_comments)}</td>
-              <td className="num px-3 py-3 text-right">{fmtPct(ownEffective.engagement_rate)}</td>
-              <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                {fmtNum(ownEffective.fb_likes)}
-              </td>
-            </tr>
-            {competitors.map((c) => {
-              const d = competitorEffective(c)
-              return (
-                <tr key={c.id}>
-                  <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                  <td className="num text-foreground px-3 py-3 text-right font-bold">
-                    {fmtNum(d.followers)}
-                  </td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.avg_likes)}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.avg_comments)}</td>
-                  <td className="num px-3 py-3 text-right">{fmtPct(d.engagement_rate)}</td>
-                  <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                    {fmtNum(d.fb_likes)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+
+      {/* ============ Instagram ============ */}
+      <section>
+        <h3 className="text-foreground mb-2 flex items-center gap-2 text-sm font-bold">
+          <span
+            className="inline-flex size-5 items-center justify-center rounded-md bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#515BD4] text-[10px] font-extrabold text-white"
+            aria-hidden
+          >
+            IG
+          </span>
+          Instagram
+        </h3>
+        <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.competitors.col_name')}
+                </th>
+                <th className="px-3 py-3 text-right font-semibold">
+                  {t('reports_hub.competitors.col_ig_followers')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_ig_posts_hint')}
+                >
+                  {t('reports_hub.competitors.col_ig_posts')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_ig_avg_likes_hint')}
+                >
+                  {t('reports_hub.competitors.col_ig_avg_likes')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_ig_avg_comments_hint')}
+                >
+                  {t('reports_hub.competitors.col_ig_avg_comments')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_ig_engagement_hint')}
+                >
+                  {t('reports_hub.competitors.col_ig_engagement')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+                <td className="text-brand-sage-deep px-4 py-3 font-bold">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-3.5" strokeWidth={2} />
+                    {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                    <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                      {t('reports_hub.competitors.own_badge')}
+                    </span>
+                  </div>
+                </td>
+                <td className="num px-3 py-3 text-right font-bold">
+                  {fmtNum(ownEffective.followers)}
+                </td>
+                <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
+                <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_likes)}</td>
+                <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_comments)}</td>
+                <td className="num px-3 py-3 text-right">{fmtPct(ownEffective.engagement_rate)}</td>
+              </tr>
+              {competitors.map((c) => {
+                const d = competitorEffective(c)
+                return (
+                  <tr key={c.id}>
+                    <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                    <td className="num text-foreground px-3 py-3 text-right font-bold">
+                      {fmtNum(d.followers)}
+                    </td>
+                    <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
+                    <td className="num px-3 py-3 text-right">{fmtNum(d.avg_likes)}</td>
+                    <td className="num px-3 py-3 text-right">{fmtNum(d.avg_comments)}</td>
+                    <td className="num px-3 py-3 text-right">{fmtPct(d.engagement_rate)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* ============ Facebook ============ */}
+      <section>
+        <h3 className="text-foreground mb-2 flex items-center gap-2 text-sm font-bold">
+          <span
+            className="inline-flex size-5 items-center justify-center rounded-md bg-[#1877F2] text-[10px] font-extrabold text-white"
+            aria-hidden
+          >
+            f
+          </span>
+          Facebook
+        </h3>
+        <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[440px] text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  {t('reports_hub.competitors.col_name')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_fb_page_likes_hint')}
+                >
+                  {t('reports_hub.competitors.col_fb_page_likes')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              <tr className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4">
+                <td className="text-brand-sage-deep px-4 py-3 font-bold">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-3.5" strokeWidth={2} />
+                    {ownSalon?.name ?? t('reports_hub.competitors.own_label')}
+                    <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                      {t('reports_hub.competitors.own_badge')}
+                    </span>
+                  </div>
+                </td>
+                <td className="num px-3 py-3 text-right font-bold">
+                  {fmtNum(ownEffective.fb_likes)}
+                </td>
+              </tr>
+              {competitors.map((c) => {
+                const d = competitorEffective(c)
+                return (
+                  <tr key={c.id}>
+                    <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
+                    <td className="num text-foreground px-3 py-3 text-right font-bold">
+                      {fmtNum(d.fb_likes)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
@@ -1341,19 +1397,21 @@ function OccupancyTable({
   competitors,
   snapshots,
   ownSalonName,
+  dateFilter,
   t,
 }: {
   salonId: string
   competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
   snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
   ownSalonName: string
+  dateFilter: { startIso: string; endIso: string } | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const refresh = useRefreshReportInsights(salonId)
   const [insights, setInsights] = useState<{ title: string; body: string }[] | null>(null)
   const syncCompetitors = useSyncCompetitors(salonId)
   const { data: settings } = useCompetitorSettings(salonId)
-  const { data: ownOccupancy } = useOwnSalonOccupancy(salonId)
+  const { data: ownOccupancy } = useOwnSalonOccupancy(salonId, dateFilter)
 
   // Загруженность приходит только от Booksy — если у конкурента нет
   // booksy_url, источника нет. Считаем чтобы отличить «нет Booksy-источника»
