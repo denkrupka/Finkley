@@ -1398,6 +1398,12 @@ function OccupancyTable({
     service: OccupancyService
     totalStaff: number
   }
+  // Пропускаем variants без availability (Booksy «Stały klient» / закрытые
+  // категории — бронируются вне публичного API, free_slots_7d=0, days_covered=0).
+  function isBookable(s: OccupancyService): boolean {
+    return s.free_slots_7d > 0 || s.days_covered > 0
+  }
+
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
     // Конкуренты
@@ -1408,6 +1414,7 @@ function OccupancyTable({
       const services = Array.isArray(data.services) ? data.services : []
       for (const svc of services) {
         if (!matchesWatched(svc.name)) continue
+        if (!isBookable(svc)) continue
         out.push({
           competitorId: c.id,
           competitorName: c.name,
@@ -1426,6 +1433,7 @@ function OccupancyTable({
     if (!ownOccupancy) return []
     return ownOccupancy.services
       .filter((s) => matchesWatched(s.name))
+      .filter((s) => isBookable(s as OccupancyService))
       .map((s) => ({
         competitorId: salonId,
         competitorName: ownSalonName,
