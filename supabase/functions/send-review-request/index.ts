@@ -31,7 +31,10 @@ import { sendSmsForSalon } from '../_shared/sms-billing.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
+// APP_URL может быть задан с/без trailing slash — нормализуем чтобы избежать
+// «склейки» вида `/app` + `review` = `/appreview` (баг 2026-05-24).
+const APP_URL_RAW = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
+const APP_URL = APP_URL_RAW.endsWith('/') ? APP_URL_RAW : APP_URL_RAW + '/'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
