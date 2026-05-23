@@ -1268,7 +1268,8 @@
       "script_body": "„Czy zapisać Panią na kolejny raz? Za 3 tygodnie — to będzie **{{date}}**. Wygodniej rano czy wieczorem?”",
       "hint_loss": "Alternatywne pytanie („kiedy wygodniej?”) zamiast otwartego („chcesz zarezerwować?”) obniża próg.",
       "ok_button": "OK, rozumiem",
-      "objections_button": "Praca z obiekcjami"
+      "objections_button": "Praca z obiekcjami",
+      "review_sent": "Prośba o opinię wysłana do klienta"
     },
     "script": {
       "title": "Skrypt: praca z obiekcjami",

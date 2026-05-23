@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'function_not_configured' }, 500)
   }
 
-  let body: { token?: string } = {}
+  let body: { token?: string; visit_id?: string } = {}
   try {
     body = await req.json()
   } catch {
@@ -178,13 +178,37 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  // Rendezvous token check (если задан в env — требуем match).
+  // ===========================================================================
+  // Single-visit mode — вызов из UI после клика «ОК, понял» в Next-Visit modal.
+  // Auth: user JWT через Authorization header → RLS проверит что юзер member
+  // салона визита. Никакого cron secret не требуется.
+  // ===========================================================================
+  if (body.visit_id) {
+    const authHeader = req.headers.get('authorization') ?? ''
+    if (!authHeader) return jsonResponse({ error: 'unauthorized' }, 401)
+    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    // RLS-проверка доступа: если юзер не member салона — visits вернёт пусто.
+    const { data: v } = await userClient
+      .from('visits')
+      .select('id, salon_id, client_id, visit_at')
+      .eq('id', body.visit_id)
+      .maybeSingle()
+    if (!v) return jsonResponse({ error: 'forbidden' }, 403)
+    const sent = await processOneVisit(admin, v as VisitRow)
+    return jsonResponse({ ok: true, sent: sent ? 1 : 0, mode: 'single' })
+  }
+
+  // ===========================================================================
+  // Cron mode (без visit_id) — сканируем paid визиты за 24h.
+  // ===========================================================================
   const expectedSecret = Deno.env.get('REVIEW_REQUEST_CRON_SECRET') ?? ''
   if (expectedSecret && body.token !== expectedSecret) {
     return jsonResponse({ error: 'unauthorized' }, 401)
   }
 
-  // Выбираем paid визиты за последние 24h без review_request.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { data: visits } = await admin
     .from('visits')

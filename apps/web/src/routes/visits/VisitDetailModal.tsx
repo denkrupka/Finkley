@@ -265,7 +265,23 @@ export function VisitDetailModal({
             visit={visit}
             services={services}
             staff={staff}
-            onDone={onClose}
+            onDone={() => {
+              // Триггерим review-request invoke сразу (single-visit mode).
+              // Edge function сама проверит broadcast_prefs и анти-дубль (1 раз
+              // на visit_id). Поэтому здесь не нужно ничего fetch'ить, fire-and-forget.
+              supabase.functions
+                .invoke('send-review-request', { body: { visit_id: visit.id } })
+                .then((res) => {
+                  if (res.data?.sent) {
+                    toast.success(t('visits.next_prompt.review_sent'))
+                  }
+                })
+                .catch((err) => {
+                  // Тихо — пользователь не должен видеть ошибку этого фонового действия.
+                  console.warn('send-review-request invoke failed:', err)
+                })
+              onClose()
+            }}
             t={t}
           />
         )}

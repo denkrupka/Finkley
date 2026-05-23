@@ -1268,7 +1268,8 @@
       "script_body": "\"Shall I book you for next time? In 3 weeks — that is **{{date}}**. Mornings or evenings work better for you?\"",
       "hint_loss": "Alternative question (\"when's better?\") instead of open (\"want to book?\") lowers the barrier.",
       "ok_button": "OK, got it",
-      "objections_button": "Handling objections"
+      "objections_button": "Handling objections",
+      "review_sent": "Review request sent to client"
     },
     "script": {
       "title": "Script: handling objections",
