@@ -493,24 +493,45 @@ function ContentTable({
     avg_likes?: number
     avg_comments?: number
     engagement_rate?: number
+    /** Постов добавлено за выбранный период (max-min posts по snapshots в range).
+     *  null = в периоде только 1 snapshot (недостаточно данных). */
+    posts_added_in_period?: number | null
   }
   const byCompetitor = new Map<string, ContentData>()
-  for (const s of snapshots ?? []) {
+  // Sort by date ascending — берём latest values, плюс tracking min/max posts.
+  const postsRange = new Map<string, { min: number; max: number; samples: number }>()
+  const sortedSnapshots = [...(snapshots ?? [])].sort((a, b) =>
+    a.snapshot_date.localeCompare(b.snapshot_date),
+  )
+  for (const s of sortedSnapshots) {
     if (s.kind !== 'content') continue
     const cur = byCompetitor.get(s.competitor_id) ?? {}
     const d = s.data as Record<string, unknown>
-    if (cur.posts == null && typeof d.posts === 'number') cur.posts = d.posts
-    if (cur.followers == null && typeof d.followers === 'number') cur.followers = d.followers
-    if (cur.following == null && typeof d.following === 'number') cur.following = d.following
-    if (cur.posts_per_month == null && typeof d.posts_per_month === 'number')
-      cur.posts_per_month = d.posts_per_month
-    if (cur.fb_likes == null && typeof d.fb_likes === 'number') cur.fb_likes = d.fb_likes
-    if (cur.avg_likes == null && typeof d.avg_likes === 'number') cur.avg_likes = d.avg_likes
-    if (cur.avg_comments == null && typeof d.avg_comments === 'number')
-      cur.avg_comments = d.avg_comments
-    if (cur.engagement_rate == null && typeof d.engagement_rate === 'number')
-      cur.engagement_rate = d.engagement_rate
+    // Latest values (последний snapshot перезаписывает предыдущие).
+    if (typeof d.posts === 'number') cur.posts = d.posts
+    if (typeof d.followers === 'number') cur.followers = d.followers
+    if (typeof d.following === 'number') cur.following = d.following
+    if (typeof d.posts_per_month === 'number') cur.posts_per_month = d.posts_per_month
+    if (typeof d.fb_likes === 'number') cur.fb_likes = d.fb_likes
+    if (typeof d.avg_likes === 'number') cur.avg_likes = d.avg_likes
+    if (typeof d.avg_comments === 'number') cur.avg_comments = d.avg_comments
+    if (typeof d.engagement_rate === 'number') cur.engagement_rate = d.engagement_rate
+    // Tracking min/max posts для «постов добавлено за период».
+    if (typeof d.posts === 'number') {
+      const r = postsRange.get(s.competitor_id) ?? { min: d.posts, max: d.posts, samples: 0 }
+      r.min = Math.min(r.min, d.posts)
+      r.max = Math.max(r.max, d.posts)
+      r.samples += 1
+      postsRange.set(s.competitor_id, r)
+    }
     byCompetitor.set(s.competitor_id, cur)
+  }
+  // Считаем posts_added_in_period: max - min среди snapshots в периоде.
+  // Нужно ≥2 sample'а — иначе показываем «—» (не успели накопить историю).
+  for (const [cid, r] of postsRange) {
+    const data = byCompetitor.get(cid)
+    if (!data) continue
+    data.posts_added_in_period = r.samples >= 2 ? r.max - r.min : null
   }
 
   function fmtNum(v: number | null | undefined): string {
@@ -524,7 +545,15 @@ function ContentTable({
     return v == null ? '—' : `${v.toFixed(2)}%`
   }
 
+  // «+ N постов за период» — для +/- маркера.
+  function fmtDelta(v: number | null | undefined): string {
+    if (v == null) return '—'
+    if (v === 0) return '0'
+    return v > 0 ? `+${v}` : String(v)
+  }
+
   const ownEffective: ContentData = {
+    posts_added_in_period: ownContent?.posts_added_in_period ?? undefined,
     followers: ownContent?.followers ?? undefined,
     posts: ownContent?.posts ?? undefined,
     following: ownContent?.following ?? undefined,
@@ -582,6 +611,12 @@ function ContentTable({
                 </th>
                 <th
                   className="px-3 py-3 text-right font-semibold"
+                  title={t('reports_hub.competitors.col_ig_posts_added_hint')}
+                >
+                  {t('reports_hub.competitors.col_ig_posts_added')}
+                </th>
+                <th
+                  className="px-3 py-3 text-right font-semibold"
                   title={t('reports_hub.competitors.col_ig_avg_likes_hint')}
                 >
                   {t('reports_hub.competitors.col_ig_avg_likes')}
@@ -615,6 +650,23 @@ function ContentTable({
                   {fmtNum(ownEffective.followers)}
                 </td>
                 <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
+                <td
+                  className={cn(
+                    'num px-3 py-3 text-right font-semibold',
+                    ownEffective.posts_added_in_period == null
+                      ? 'text-muted-foreground/60'
+                      : ownEffective.posts_added_in_period > 0
+                        ? 'text-emerald-700'
+                        : 'text-muted-foreground',
+                  )}
+                  title={
+                    ownEffective.posts_added_in_period == null
+                      ? t('reports_hub.competitors.col_ig_posts_added_no_history')
+                      : undefined
+                  }
+                >
+                  {fmtDelta(ownEffective.posts_added_in_period)}
+                </td>
                 <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_likes)}</td>
                 <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_comments)}</td>
                 <td className="num px-3 py-3 text-right">{fmtPct(ownEffective.engagement_rate)}</td>
@@ -628,6 +680,23 @@ function ContentTable({
                       {fmtNum(d.followers)}
                     </td>
                     <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
+                    <td
+                      className={cn(
+                        'num px-3 py-3 text-right font-semibold',
+                        d.posts_added_in_period == null
+                          ? 'text-muted-foreground/60'
+                          : d.posts_added_in_period > 0
+                            ? 'text-emerald-700'
+                            : 'text-muted-foreground',
+                      )}
+                      title={
+                        d.posts_added_in_period == null
+                          ? t('reports_hub.competitors.col_ig_posts_added_no_history')
+                          : undefined
+                      }
+                    >
+                      {fmtDelta(d.posts_added_in_period)}
+                    </td>
                     <td className="num px-3 py-3 text-right">{fmtNum(d.avg_likes)}</td>
                     <td className="num px-3 py-3 text-right">{fmtNum(d.avg_comments)}</td>
                     <td className="num px-3 py-3 text-right">{fmtPct(d.engagement_rate)}</td>

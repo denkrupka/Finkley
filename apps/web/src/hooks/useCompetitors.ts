@@ -217,6 +217,9 @@ export type OwnSalonContent = {
   avg_likes: number | null
   avg_comments: number | null
   engagement_rate: number | null
+  /** Постов добавлено за выбранный период (max-min среди snapshots в range).
+   *  null = в периоде ≤1 snapshot (нет истории для diff). */
+  posts_added_in_period: number | null
   snapshot_date: string | null
   has_data: boolean
 }
@@ -350,17 +353,20 @@ export function useOwnSalonContent(
         avg_likes: null,
         avg_comments: null,
         engagement_rate: null,
+        posts_added_in_period: null,
         snapshot_date: null,
         has_data: false,
       }
       if (!salonId) return empty
+      // Не ограничиваем limit(2) — нужны ВСЕ snapshots в периоде чтобы посчитать
+      // posts_added (max - min). Latest values берём из самого свежего.
       let q = supabase
         .from('own_salon_metrics')
         .select('data, source, snapshot_date')
         .eq('salon_id', salonId)
         .eq('kind', 'content')
         .order('snapshot_date', { ascending: false })
-        .limit(2) // оба источника (insta + fb), берём свежие
+        .limit(60) // 30 дней × 2 источника (insta + fb)
       if (dateFilter) {
         q = q.gte('snapshot_date', dateFilter.startIso).lte('snapshot_date', dateFilter.endIso)
       }
@@ -372,8 +378,12 @@ export function useOwnSalonContent(
         snapshot_date: string
       }>
       if (rows.length === 0) return empty
-      // Мерджим: одно поле может быть на одном источнике, другое — на другом.
+      // rows отсортированы desc (свежие первые) → берём первый Insta + первый FB
+      // как «latest по периоду». Параллельно tracking min/max posts.
       const merged: OwnSalonContent = { ...empty }
+      let postsMin: number | null = null
+      let postsMax: number | null = null
+      const uniqueDatesWithPosts = new Set<string>()
       for (const r of rows) {
         const d = r.data
         if (merged.followers == null && typeof d.followers === 'number')
@@ -391,6 +401,17 @@ export function useOwnSalonContent(
         if (merged.engagement_rate == null && typeof d.engagement_rate === 'number')
           merged.engagement_rate = d.engagement_rate
         if (!merged.snapshot_date) merged.snapshot_date = r.snapshot_date
+        if (typeof d.posts === 'number') {
+          uniqueDatesWithPosts.add(r.snapshot_date)
+          postsMin = postsMin == null ? d.posts : Math.min(postsMin, d.posts)
+          postsMax = postsMax == null ? d.posts : Math.max(postsMax, d.posts)
+        }
+      }
+      // posts_added — нужно ≥2 дня измерений (один и тот же день не даёт diff).
+      if (uniqueDatesWithPosts.size >= 2 && postsMin != null && postsMax != null) {
+        merged.posts_added_in_period = postsMax - postsMin
+      } else {
+        merged.posts_added_in_period = null
       }
       merged.has_data =
         merged.followers != null ||
