@@ -2953,6 +2953,8 @@
       "col_ig_engagement_hint": "Engagement rate: % of followers who react to posts (likes/comments). Higher = more active audience.",
       "col_fb_page_likes": "Page likes",
       "col_fb_page_likes_hint": "Number of people who liked the salon's Facebook page.",
+      "col_group_competitors": "Competitors",
+      "col_group_summary": "Summary",
       "ai_occupancy_hint": "Click «Generate AI insight» — AI will analyze competitor free slots and suggest where we beat them on availability and where we need to push.",
       "google_reviews_limit_hint": "Google API returns at most 5 latest reviews per place — so the «Reviews» column may show fewer than the actual count in Google Maps. Booksy returns the full history with no limit. If the number doesn't match your business — click the eye 👁 to verify Google links to your listing. If it's the wrong place — Settings → Profile → search your salon in Google Maps again.",
       "ai_panel_title": "AI insights on this report",

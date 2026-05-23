@@ -2954,6 +2954,8 @@
       "col_ig_engagement_hint": "Engagement-rate: % followersów reagujących na post. Im wyżej — tym aktywniejsza publika.",
       "col_fb_page_likes": "Polubień strony",
       "col_fb_page_likes_hint": "Ile osób polubiło stronę salonu na Facebook.",
+      "col_group_competitors": "Konkurenci",
+      "col_group_summary": "Podsumowanie konkurentów",
       "ai_occupancy_hint": "Naciśnij «Wygeneruj wniosek AI» — AI przeanalizuje wolne sloty konkurentów i powie gdzie wygrywamy dostępnością, a gdzie trzeba popracować.",
       "google_reviews_limit_hint": "Google API zwraca maks. 5 ostatnich opinii na miejsce — kolumna «Opinii» dla Google może pokazać mniej niż rzeczywista liczba w Google Maps. Booksy zwraca pełną historię bez limitu. Jeśli liczba zupełnie nie pasuje do Twojego salonu — kliknij 👁 i sprawdź czy Google wskazuje Twoją wizytówkę. Jeśli to nie ta — Settings → Profil → znajdź salon w Google Maps ponownie.",
       "ai_panel_title": "Wnioski AI z raportu",

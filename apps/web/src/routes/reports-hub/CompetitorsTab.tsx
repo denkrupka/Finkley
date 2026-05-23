@@ -2235,29 +2235,66 @@ function PricesTable({
         </Button>
       </div>
 
+      {/* Визуально таблица разбита на три «блока»:
+            1) НАШ САЛОН — sage-soft tint (наша услуга + цена)
+            2) КОНКУРЕНТЫ — каждая колонка с лёгким accent-tint + бордером слева
+            3) ИТОГ — диапазон / средний / разница, neutral muted
+          Это даёт глазу опору при горизонтальном чтении. */}
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold">
+          <colgroup>
+            <col />
+            <col className="bg-brand-sage-soft/15" />
+            {competitors.map((_, i) => (
+              <col key={i} className={i % 2 === 0 ? 'bg-sky-50/60' : 'bg-amber-50/60'} />
+            ))}
+            <col className="bg-muted/15" />
+            <col className="bg-muted/15" />
+            <col className="bg-muted/15" />
+          </colgroup>
+          <thead className="bg-muted/40 text-muted-foreground text-[11px] uppercase tracking-wider">
+            {/* Двух-уровневый header: верх группирует «Наш салон» / «Конкуренты» /
+                «Итог». Низ — отдельные колонки. */}
+            <tr className="border-b">
+              <th rowSpan={2} className="border-border/40 border-r px-4 py-2 text-left font-bold">
                 {t('reports_hub.competitors.col_service')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th
+                rowSpan={2}
+                className="border-border/40 bg-brand-sage-soft/30 text-brand-sage-deep border-r px-3 py-2 text-right font-bold"
+              >
                 {t('reports_hub.competitors.col_our_price')}
               </th>
-              {/* Динамическая колонка на каждого конкурента */}
-              {competitors.map((c) => (
-                <th key={c.id} className="px-3 py-3 text-right font-semibold" title={c.name}>
-                  <span className="inline-block max-w-[120px] truncate align-middle">{c.name}</span>
+              <th
+                colSpan={competitors.length}
+                className="border-border/40 text-foreground border-r px-3 py-2 text-center font-bold"
+              >
+                {t('reports_hub.competitors.col_group_competitors')}
+              </th>
+              <th colSpan={3} className="text-foreground px-3 py-2 text-center font-bold">
+                {t('reports_hub.competitors.col_group_summary')}
+              </th>
+            </tr>
+            <tr className="border-b">
+              {competitors.map((c, i) => (
+                <th
+                  key={c.id}
+                  className={cn(
+                    'border-border/40 border-l px-3 py-2 text-right font-semibold',
+                    i === competitors.length - 1 && 'border-r',
+                  )}
+                  title={c.name}
+                >
+                  <span className="inline-block max-w-[140px] truncate align-middle">{c.name}</span>
                 </th>
               ))}
-              <th className="px-3 py-3 text-right font-semibold">
+              <th className="px-3 py-2 text-right font-semibold">
                 {t('reports_hub.competitors.col_competitor_range')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th className="px-3 py-2 text-right font-semibold">
                 {t('reports_hub.competitors.col_competitor_avg')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th className="px-3 py-2 text-right font-semibold">
                 {t('reports_hub.competitors.col_diff_pct')}
               </th>
             </tr>
@@ -2275,7 +2312,7 @@ function PricesTable({
             ) : (
               rows.map((r) => (
                 <tr key={r.ownService.id}>
-                  <td className="text-foreground px-4 py-3 font-semibold">
+                  <td className="border-border/40 text-foreground border-r px-4 py-3 font-semibold">
                     {r.ownService.name}
                     {r.matches.length === 0 ? (
                       <span className="text-muted-foreground/60 ml-2 text-[10px] font-normal italic">
@@ -2283,7 +2320,7 @@ function PricesTable({
                       </span>
                     ) : null}
                   </td>
-                  <td className="num text-foreground px-3 py-3 text-right">
+                  <td className="num border-border/40 text-foreground border-r px-3 py-3 text-right font-bold">
                     {r.ownService.own_variant_count > 1
                       ? `${formatCurrency(r.ownService.price_cents, currency, locale)} – ${formatCurrency(r.ownService.price_max_cents, currency, locale)}`
                       : formatCurrency(r.ownService.price_cents, currency, locale)}
@@ -2294,15 +2331,15 @@ function PricesTable({
                       </span>
                     ) : null}
                   </td>
-                  {/* Цена у каждого конкурента + eye-link на страницу.
-                      Если у конкурента >1 variant'а — показываем диапазон min-max.
-                      Если активна promo-скидка на anchor variant'е — показываем
-                      зачёркнутую оригинальную цену сверху. */}
-                  {competitors.map((c) => {
+                  {competitors.map((c, idx) => {
                     const m = r.matches.find((x) => x.competitorId === c.id)
+                    const cellBorder = cn(
+                      'border-border/40 border-l px-3 py-3 text-right',
+                      idx === competitors.length - 1 && 'border-r',
+                    )
                     if (!m) {
                       return (
-                        <td key={c.id} className="text-muted-foreground/40 px-3 py-3 text-right">
+                        <td key={c.id} className={cn(cellBorder, 'text-muted-foreground/40')}>
                           —
                         </td>
                       )
@@ -2315,7 +2352,7 @@ function PricesTable({
                       typeof m.service.original_price_cents === 'number' &&
                       m.service.original_price_cents > m.service.price_cents
                     return (
-                      <td key={c.id} className="num text-foreground px-3 py-3 text-right">
+                      <td key={c.id} className={cn(cellBorder, 'num text-foreground')}>
                         <div className="flex flex-col items-end">
                           {hasDiscount && !hasRange ? (
                             <span className="text-muted-foreground/60 text-[10px] line-through">
@@ -2326,7 +2363,7 @@ function PricesTable({
                               )}
                             </span>
                           ) : null}
-                          <span className="inline-flex items-center justify-end gap-1.5">
+                          <span className="inline-flex items-center justify-end gap-1.5 font-semibold">
                             {hasRange
                               ? `${formatCurrency(m.priceMin, currency, locale)} – ${formatCurrency(m.priceMax, currency, locale)}`
                               : formatCurrency(m.service.price_cents, currency, locale)}
