@@ -27,12 +27,15 @@ export async function sendSms(
   text: string,
   /** Перебивает SMS_FROM env (используется sms-billing для активного sender салона). */
   senderOverride?: string,
+  /** ISO-2 country code салона — используется для подстановки dial-code когда
+   *  телефон у клиента без префикса страны (типичная ситуация в Польше: «692 ...»). */
+  countryCode?: string,
 ): Promise<SmsResult> {
   const provider = (Deno.env.get('SMS_PROVIDER') ?? 'none').toLowerCase()
   if (provider === 'none' || !provider) {
     return { ok: false, error: 'sms_provider_not_configured' }
   }
-  const phone = normalizePhone(to)
+  const phone = normalizePhone(to, countryCode)
   if (!phone) {
     return { ok: false, error: 'invalid_phone' }
   }
@@ -47,20 +50,42 @@ export async function sendSms(
   }
 }
 
-/** Нормализация телефона в E.164 формат. Принимает «+48 123 456 789» и подобное. */
-function normalizePhone(raw: string): string | null {
+/** Нормализация телефона в E.164. Если country code не указан в номере —
+ *  используем countryCode салона (ISO-2: PL → +48, UA → +380, ...). */
+const COUNTRY_TO_DIAL_CODE: Record<string, string> = {
+  PL: '48',
+  UA: '380',
+  RU: '7',
+  BY: '375',
+  KZ: '7',
+  DE: '49',
+  FR: '33',
+  ES: '34',
+  IT: '39',
+  CZ: '420',
+  LT: '370',
+  LV: '371',
+  EE: '372',
+  FI: '358',
+  NL: '31',
+  GB: '44',
+  US: '1',
+}
+
+export function normalizePhone(raw: string, countryCode?: string): string | null {
   if (!raw) return null
   const cleaned = raw.replace(/[^\d+]/g, '')
   if (!cleaned) return null
-  // Если нет «+», добавляем (FlySMS требует E.164).
-  if (!cleaned.startsWith('+')) {
-    // Если начинается с 48 / 380 / 7 — добавим plus. Иначе как есть.
-    if (/^(48|380|7|49|33|34|39|420|370|371|372|358|31)/.test(cleaned)) {
-      return `+${cleaned}`
-    }
-    return null
+  if (cleaned.startsWith('+')) return cleaned
+  // Если номер уже содержит международный префикс (4-3 цифры) — просто префикс +.
+  if (/^(48|380|7|49|33|34|39|420|370|371|372|358|31|44|375|1)/.test(cleaned)) {
+    return `+${cleaned}`
   }
-  return cleaned
+  // Иначе — добавляем dial-code из country_code салона.
+  const cc = countryCode?.toUpperCase()
+  const dial = cc ? COUNTRY_TO_DIAL_CODE[cc] : null
+  if (dial) return `+${dial}${cleaned}`
+  return null
 }
 
 /**

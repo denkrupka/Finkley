@@ -556,7 +556,9 @@ async function fetchBooksyAggregate(
   const parsed = parseBooksyUrl(booksyUrl)
   if (!parsed) return null
   try {
-    const u = `https://${parsed.region}.booksy.com/core/v2/customer_api/businesses/${parsed.businessId}/reviews/?reviews_page=1&reviews_per_page=1&ordering=-created`
+    // /businesses/{id} возвращает business.reviews_rank — точный float (4.94),
+    // в отличие от reviews_stars (округлённое целое 5). UI показывает 4.94.
+    const u = `https://${parsed.region}.booksy.com/core/v2/customer_api/businesses/${parsed.businessId}`
     const r = await fetch(u, {
       headers: {
         accept: 'application/json',
@@ -569,11 +571,18 @@ async function fetchBooksyAggregate(
     })
     if (!r.ok) return null
     const data = (await r.json()) as {
-      reviews?: Array<{ business?: { reviews_count?: number; reviews_stars?: number } }>
+      business?: { reviews_count?: number; reviews_stars?: number; reviews_rank?: number }
     }
-    const biz = data.reviews?.[0]?.business
+    const biz = data.business
     if (!biz) return null
-    const rating = typeof biz.reviews_stars === 'number' ? biz.reviews_stars : null
+    // Предпочитаем reviews_rank (фрактальный), fallback на reviews_stars.
+    const rawRating =
+      typeof biz.reviews_rank === 'number'
+        ? biz.reviews_rank
+        : typeof biz.reviews_stars === 'number'
+          ? biz.reviews_stars
+          : null
+    const rating = rawRating != null ? Math.round(rawRating * 10) / 10 : null
     const count = typeof biz.reviews_count === 'number' ? biz.reviews_count : null
     if (rating == null || count == null) return null
     return { rating, count }

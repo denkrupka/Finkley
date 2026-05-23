@@ -4321,11 +4321,11 @@
     "rate_subtitle": "{{salon}} — rate from 1 to 5 stars",
     "stars": "stars",
     "feedback_title": "Tell us what didn't work",
-    "feedback_subtitle": "Only the salon owner sees this. It helps us improve.",
+    "feedback_subtitle": "Your feedback helps us improve the service.",
     "your_name": "Your name (optional)",
     "feedback_placeholder": "Tell us in detail what could be improved…",
     "submit": "Submit",
     "done_title": "Thanks for your feedback!",
-    "done_subtitle": "The salon owner will read it."
+    "done_subtitle": "Your feedback helps us improve the service."
   }
 }

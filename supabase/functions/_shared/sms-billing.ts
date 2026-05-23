@@ -50,6 +50,7 @@ type SalonRow = {
   sms_active_sender_id: string | null
   sms_low_notified_at: string | null
   locale: string | null
+  country_code: string | null
 }
 
 type SenderRow = { sender_name: string; status: string }
@@ -61,7 +62,9 @@ export async function sendSmsForSalon(
 ): Promise<SendSmsForSalonResult> {
   const { data: salonData, error: salonErr } = await admin
     .from('salons')
-    .select('id, name, sms_balance, sms_paused, sms_active_sender_id, sms_low_notified_at, locale')
+    .select(
+      'id, name, sms_balance, sms_paused, sms_active_sender_id, sms_low_notified_at, locale, country_code',
+    )
     .eq('id', opts.salonId)
     .maybeSingle()
   if (salonErr || !salonData) {
@@ -98,7 +101,7 @@ export async function sendSmsForSalon(
   }
 
   // Реальная отправка.
-  const r = await sendSms(opts.to, opts.text, senderName)
+  const r = await sendSms(opts.to, opts.text, senderName, salon.country_code ?? undefined)
   if (!r.ok) {
     // Skipped_provider если провайдер не настроен; failed на остальных ошибках.
     const status: SendSmsForSalonResult['status'] =

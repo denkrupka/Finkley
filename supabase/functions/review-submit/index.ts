@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Если 5 ⭐ → НЕ сохраняем в reviews (клиент пойдёт в Google). Но помечаем
-  // submitted_at и возвращаем google_place_url.
+  // submitted_at и возвращаем URL прямого write-review.
   if (body.rating === 5) {
     await admin
       .from('review_requests')
@@ -125,13 +125,19 @@ Deno.serve(async (req: Request) => {
       .eq('id', rr.id)
     const { data: salon } = await admin
       .from('salons')
-      .select('google_place_url')
+      .select('google_place_url, google_place_id')
       .eq('id', rr.salon_id)
       .maybeSingle()
+    // Предпочитаем write-review URL который сразу открывает форму отзыва.
+    // Fallback на google_place_url (просто карта места) если place_id не задан.
+    const placeId = (salon as { google_place_id?: string | null } | null)?.google_place_id
+    const writeReviewUrl = placeId
+      ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`
+      : ((salon as { google_place_url?: string | null } | null)?.google_place_url ?? null)
     return jsonResponse({
       ok: true,
       action: 'redirect_google',
-      google_place_url: salon?.google_place_url ?? null,
+      google_place_url: writeReviewUrl,
     })
   }
 

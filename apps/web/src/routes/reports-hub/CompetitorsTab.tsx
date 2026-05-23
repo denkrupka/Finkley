@@ -611,12 +611,6 @@ function ContentTable({
                 </th>
                 <th
                   className="px-3 py-3 text-right font-semibold"
-                  title={t('reports_hub.competitors.col_ig_posts_added_hint')}
-                >
-                  {t('reports_hub.competitors.col_ig_posts_added')}
-                </th>
-                <th
-                  className="px-3 py-3 text-right font-semibold"
                   title={t('reports_hub.competitors.col_ig_avg_likes_hint')}
                 >
                   {t('reports_hub.competitors.col_ig_avg_likes')}
@@ -649,15 +643,10 @@ function ContentTable({
                 <td className="num px-3 py-3 text-right font-bold">
                   {fmtNum(ownEffective.followers)}
                 </td>
-                <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
                 <td
                   className={cn(
                     'num px-3 py-3 text-right font-semibold',
-                    ownEffective.posts_added_in_period == null
-                      ? 'text-muted-foreground/60'
-                      : ownEffective.posts_added_in_period > 0
-                        ? 'text-emerald-700'
-                        : 'text-muted-foreground',
+                    ownEffective.posts_added_in_period == null ? 'text-muted-foreground/60' : '',
                   )}
                   title={
                     ownEffective.posts_added_in_period == null
@@ -665,7 +654,9 @@ function ContentTable({
                       : undefined
                   }
                 >
-                  {fmtDelta(ownEffective.posts_added_in_period)}
+                  {ownEffective.posts_added_in_period == null
+                    ? '—'
+                    : ownEffective.posts_added_in_period}
                 </td>
                 <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_likes)}</td>
                 <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_comments)}</td>
@@ -2149,6 +2140,9 @@ function PricesTable({
     return `svc-match:${salonId}:${our}:${comp}`
   }, [salonId, ownServices, competitors, competitorServices, watchedNames])
 
+  // Авто-trigger AI-матчинга: если для текущего cacheKey ещё нет cached
+  // результата — запускаем матч в фоне один раз. Ранее пользователь жал
+  // кнопку «ИИ-матчинг» — теперь это происходит автоматически.
   useEffect(() => {
     if (!cacheKey) return
     try {
@@ -2161,14 +2155,30 @@ function PricesTable({
       /* ignore */
     }
     setAiMatches(null)
+    // Если есть конкуренты + наши услуги — старт автоматически.
+    if (competitors.length === 0) return
+    const our_services_count = ownServices.filter(
+      (s) => !s.is_archived && (!watchedNames || watchedNames.has(s.name)),
+    ).length
+    if (our_services_count === 0) return
+    // Не запускаем повторно — флаг inFlight по cacheKey.
+    const flightKey = `${cacheKey}:inflight`
+    try {
+      if (sessionStorage.getItem(flightKey)) return
+      sessionStorage.setItem(flightKey, '1')
+    } catch {
+      /* ignore */
+    }
+    runAiMatch(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey])
 
-  function runAiMatch() {
+  function runAiMatch(silent = false) {
     const our_services = ownServices
       .filter((s) => !s.is_archived && (!watchedNames || watchedNames.has(s.name)))
       .map((s) => s.name)
     if (our_services.length === 0) {
-      toast.error(t('reports_hub.competitors.no_services_to_match'))
+      if (!silent) toast.error(t('reports_hub.competitors.no_services_to_match'))
       return
     }
     const compsInput = competitors.map((c) => ({
@@ -2183,13 +2193,26 @@ function PricesTable({
           if (cacheKey) {
             try {
               localStorage.setItem(cacheKey, JSON.stringify(matches))
+              sessionStorage.removeItem(`${cacheKey}:inflight`)
             } catch {
               /* quota → пофиг */
             }
           }
-          toast.success(t('reports_hub.competitors.ai_match_done', { count: matches.length }))
+          if (!silent) {
+            toast.success(t('reports_hub.competitors.ai_match_done', { count: matches.length }))
+          }
         },
-        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+        onError: (e) => {
+          if (cacheKey) {
+            try {
+              sessionStorage.removeItem(`${cacheKey}:inflight`)
+            } catch {
+              /* ignore */
+            }
+          }
+          if (!silent) toast.error(e instanceof Error ? e.message : String(e))
+          else console.warn('auto AI-match failed:', e)
+        },
       },
     )
   }
@@ -2347,27 +2370,6 @@ function PricesTable({
         onShow={runAi}
         hint={t('reports_hub.competitors.ai_prices_hint')}
       />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-xs">
-          {aiMatches
-            ? t('reports_hub.competitors.ai_match_active', { count: aiMatches.length })
-            : t('reports_hub.competitors.ai_match_hint')}
-        </p>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={runAiMatch}
-          disabled={matchAi.isPending || competitors.length === 0}
-        >
-          <Sparkles className="mr-1.5 size-3.5" strokeWidth={2} />
-          {matchAi.isPending
-            ? t('common.loading')
-            : aiMatches
-              ? t('reports_hub.competitors.ai_match_refresh')
-              : t('reports_hub.competitors.ai_match_run')}
-        </Button>
-      </div>
 
       {/* Визуально таблица разбита на три «блока»:
             1) НАШ САЛОН — sage-soft tint (наша услуга + цена)

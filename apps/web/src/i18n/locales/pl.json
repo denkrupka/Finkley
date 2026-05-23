@@ -4322,11 +4322,11 @@
     "rate_subtitle": "{{salon}} — oceń od 1 do 5 gwiazdek",
     "stars": "gwiazdek",
     "feedback_title": "Powiedz, co poszło nie tak",
-    "feedback_subtitle": "Tylko właściciel salonu zobaczy. Pomoże nam się poprawić.",
+    "feedback_subtitle": "Twoja opinia pomoże nam ulepszyć serwis.",
     "your_name": "Twoje imię (opcjonalnie)",
     "feedback_placeholder": "Opisz dokładniej co można poprawić…",
     "submit": "Wyślij",
     "done_title": "Dzięki za opinię!",
-    "done_subtitle": "Właściciel salonu to przeczyta."
+    "done_subtitle": "Twoja opinia pomoże ulepszyć serwis."
   }
 }

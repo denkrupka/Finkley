@@ -1,5 +1,5 @@
 import { Star } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 
@@ -32,7 +32,16 @@ export function ReviewPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+  const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
   const FN_URL = `${SUPABASE_URL}/functions/v1/review-submit`
+  // Supabase Edge требует Bearer ANON для всех вызовов — публичная страница
+  // /review/:token без auth-сессии, но anon-ключ сам по себе ничего не открывает,
+  // RLS защищает данные через token-валидацию внутри функции.
+  // useMemo чтобы избежать react-hooks/exhaustive-deps warning в useEffect ниже.
+  const AUTH_HEADERS = useMemo(
+    () => ({ authorization: `Bearer ${SUPABASE_ANON}`, apikey: SUPABASE_ANON }),
+    [SUPABASE_ANON],
+  )
 
   useEffect(() => {
     if (!token) {
@@ -40,7 +49,7 @@ export function ReviewPage() {
       setError('missing_token')
       return
     }
-    void fetch(`${FN_URL}?token=${encodeURIComponent(token)}`)
+    void fetch(`${FN_URL}?token=${encodeURIComponent(token)}`, { headers: AUTH_HEADERS })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
@@ -60,7 +69,7 @@ export function ReviewPage() {
         setError('network')
         setPhase('error')
       })
-  }, [token, FN_URL, i18n])
+  }, [token, FN_URL, i18n, AUTH_HEADERS])
 
   async function submitRating(stars: number) {
     if (!token || submitting) return
@@ -68,7 +77,7 @@ export function ReviewPage() {
       setSubmitting(true)
       const res = await fetch(FN_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({ token, rating: 5 }),
       })
       const data = await res.json()
