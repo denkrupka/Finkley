@@ -495,36 +495,67 @@ async function fetchContent(
   instaUrl: string | null,
   fbUrl: string | null,
 ): Promise<Snapshot['data'] | null> {
+  // Meta (Instagram + Facebook) детектит datacenter IPs и серует им SPA-shell
+  // даже с crawler UA. Пробуем несколько UA по очереди — иногда удаётся пройти.
+  // Если ни один не выдал og:description — оставляем поля пустыми
+  // (UI покажет «—» и хинт «добавьте через настройки»).
+  const SCRAPER_UAS = [
+    'Twitterbot/1.0',
+    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+    'WhatsApp/2.0',
+    'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+    'Mozilla/5.0 (compatible; FinkleyBot/1.0; +https://finkley.app)',
+  ]
+  const SCRAPER_BASE_HEADERS = {
+    'accept-language': 'pl-PL,pl;q=0.9,en;q=0.5',
+    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9',
+  }
+  async function fetchWithFallbackUAs(url: string): Promise<{ html: string; status: number }> {
+    for (const ua of SCRAPER_UAS) {
+      try {
+        const r = await fetch(url, { headers: { ...SCRAPER_BASE_HEADERS, 'user-agent': ua } })
+        if (!r.ok) continue
+        const html = await r.text()
+        if (html.includes('og:description')) return { html, status: r.status }
+        // Без og:description пробуем следующий UA — текущий вернул SPA-shell.
+      } catch (e) {
+        console.warn(`fetch ${url} with UA="${ua.slice(0, 30)}" threw`, e)
+      }
+    }
+    // Все UA провалились — возвращаем пустую строку.
+    return { html: '', status: 0 }
+  }
   const out: Record<string, number | string> = {}
   if (instaUrl) {
     try {
-      const r = await fetch(instaUrl, {
-        headers: { 'user-agent': 'Mozilla/5.0 (compatible; FinkleyBot/1.0)' },
-      })
-      if (r.ok) {
-        const html = await r.text()
-        const counts = parseInstaOgDescription(html)
-        if (counts.followers != null) out.followers = counts.followers
+      const { html, status } = await fetchWithFallbackUAs(instaUrl)
+      const counts = html ? parseInstaOgDescription(html) : {}
+      console.log(
+        `instagram fetch ${instaUrl}: status=${status} len=${html.length} parsed=${JSON.stringify(counts)}`,
+      )
+      // Только если реально достали данные (followers — основной маркер) сохраняем
+      // snapshot. Иначе оставляем поля пустыми — UI прочтёт manual override из
+      // salons.content_* / competitors.content_*. Edge IP заблокирован Meta,
+      // эти UA-фолбеки лишь best-effort.
+      if (counts.followers != null) {
+        out.followers = counts.followers
         if (counts.posts != null) out.posts = counts.posts
         if (counts.following != null) out.following = counts.following
-        // Частота постов — best-effort на основе ISO/timestamp дат в HTML.
         const ppm = estimatePostsPerMonth(html, counts.posts)
         if (ppm != null) out.posts_per_month = ppm
         out.instagram_url = instaUrl
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn(`instagram fetch ${instaUrl} threw:`, e)
     }
   }
   if (fbUrl) {
     try {
-      const r = await fetch(fbUrl, {
-        headers: { 'user-agent': 'Mozilla/5.0 (compatible; FinkleyBot/1.0)' },
-      })
-      if (r.ok) {
-        const html = await r.text()
-        const likes = parseFbLikes(html)
-        if (likes != null) out.fb_likes = likes
+      const { html, status } = await fetchWithFallbackUAs(fbUrl)
+      const likes = html ? parseFbLikes(html) : null
+      console.log(`facebook fetch ${fbUrl}: status=${status} len=${html.length} likes=${likes}`)
+      if (likes != null) {
+        out.fb_likes = likes
         // На FB-странице публичные посты обычно имеют datetime атрибуты —
         // тоже попробуем оценить частоту, если ещё не получили от Insta.
         if (out.posts_per_month == null) {
@@ -590,6 +621,28 @@ async function syncOwnSalon(admin: SupabaseClient, s: OwnSalonRow): Promise<numb
         source: 'booksy',
         snapshot_date: TODAY,
       })
+    }
+
+    // Booksy catalog + occupancy для своего салона — чтобы Reports → Конкуренты/
+    // Загруженность могло показать нашу строку сверху для прямого сравнения.
+    const ownCatalog = await fetchBooksyCatalog(s.booksy_url)
+    const ownParsed = parseBooksyUrl(s.booksy_url)
+    if (ownCatalog && ownParsed) {
+      const topVariants = ownCatalog.services
+        .filter((v) => v.id && v.staffer_ids.length > 0)
+        .slice(0, 5)
+      if (topVariants.length > 0) {
+        const occ = await fetchBooksyOccupancy(ownParsed, topVariants)
+        if (occ.length > 0) {
+          inserts.push({
+            salon_id: s.id,
+            kind: 'occupancy',
+            data: { services: occ, total_staff: ownCatalog.staff.length },
+            source: 'booksy',
+            snapshot_date: TODAY,
+          })
+        }
+      }
     }
   }
 

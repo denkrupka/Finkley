@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
+  type Competitor,
   useCompetitors,
   useCompetitorSettings,
   useCompetitorSnapshots,
@@ -36,6 +37,7 @@ import {
   useOwnSalonBooksyRating,
   useOwnSalonContent,
   useOwnSalonGoogleRating,
+  useOwnSalonOccupancy,
   useOwnSalonMetrics,
   type OwnSalonContent,
   useSyncCompetitors,
@@ -46,6 +48,7 @@ import { AiReportPanel } from '@/components/domain/AiReportPanel'
 import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useRefreshReportInsights, useServiceMatchAi } from '@/hooks/useReportInsights'
 import { useSalon } from '@/hooks/useSalons'
+import { useUpdateSalon } from '@/hooks/useSalonMutations'
 import { useServices } from '@/hooks/useServices'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -224,6 +227,7 @@ function DataSection({
         />
       ) : kind === 'content' ? (
         <ContentTable
+          salonId={salonId}
           competitors={competitors}
           snapshots={snapshots}
           ownSalon={salon}
@@ -239,7 +243,13 @@ function DataSection({
           t={t}
         />
       ) : kind === 'occupancy' ? (
-        <OccupancyTable salonId={salonId} competitors={competitors} snapshots={snapshots} t={t} />
+        <OccupancyTable
+          salonId={salonId}
+          competitors={competitors}
+          snapshots={snapshots}
+          ownSalonName={salon?.name ?? t('reports_hub.competitors.own_label')}
+          t={t}
+        />
       ) : (
         <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
@@ -462,18 +472,23 @@ function RatingCells({
  * «Просмотры рилсов» — недоступно через scrape (требует IG Business Graph API).
  */
 function ContentTable({
+  salonId,
   competitors,
   snapshots,
   ownSalon,
   ownContent,
   t,
 }: {
+  salonId: string
   competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
   snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
   ownSalon: ReturnType<typeof useSalon>['data']
   ownContent: OwnSalonContent | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
+  const updateSalon = useUpdateSalon()
+  const updateCompetitor = useUpdateCompetitor(salonId)
+  const [editing, setEditing] = useState<{ kind: 'own' | 'competitor'; id: string } | null>(null)
   // У одного конкурента может быть 2 snapshot (insta + fb) — мержим.
   type ContentData = {
     posts?: number
@@ -501,18 +516,42 @@ function ContentTable({
     return v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
   }
 
+  // Применяем manual override: если salons.content_followers задан — он
+  // имеет приоритет над snapshot.followers. Auto-scrape Meta заблокирован
+  // datacenter IP, поэтому manual для большинства салонов = единственный
+  // источник правды.
+  const ownEffective: ContentData = {
+    followers: ownSalon?.content_followers ?? ownContent?.followers ?? undefined,
+    posts: ownSalon?.content_posts ?? ownContent?.posts ?? undefined,
+    following: ownContent?.following ?? undefined,
+    fb_likes: ownSalon?.content_fb_likes ?? ownContent?.fb_likes ?? undefined,
+    posts_per_month: ownSalon?.content_posts_per_month ?? ownContent?.posts_per_month ?? undefined,
+  }
+  function competitorEffective(c: Competitor): ContentData {
+    const auto = byCompetitor.get(c.id) ?? {}
+    return {
+      followers: c.content_followers ?? auto.followers,
+      posts: c.content_posts ?? auto.posts,
+      following: auto.following,
+      fb_likes: c.content_fb_likes ?? auto.fb_likes,
+      posts_per_month: c.content_posts_per_month ?? auto.posts_per_month,
+    }
+  }
+
   // Если у своего салона все content-поля null + ни у одного конкурента нет
   // content-snapshot — показываем хинт что нужно подключить Instagram/Facebook.
   const ownEmpty =
-    !ownContent ||
-    (ownContent.posts == null &&
-      ownContent.followers == null &&
-      ownContent.following == null &&
-      ownContent.posts_per_month == null)
+    ownEffective.posts == null &&
+    ownEffective.followers == null &&
+    ownEffective.following == null &&
+    ownEffective.posts_per_month == null
   const noOwnSocial = !ownSalon?.instagram_url && !ownSalon?.facebook_url
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="border-brand-sage-soft bg-brand-sage-soft/20 text-brand-sage-deep rounded-lg border p-3 text-xs">
+        💡 {t('reports_hub.competitors.content_manual_hint')}
+      </div>
       {ownEmpty && noOwnSocial ? (
         <div className="border-brand-yellow-deep/40 bg-brand-yellow/30 rounded-lg border p-3 text-xs">
           {t('reports_hub.competitors.content_no_social_hint')}
@@ -561,34 +600,258 @@ function ContentTable({
                   <span className="bg-brand-sage-soft text-brand-sage-deep ml-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
                     {t('reports_hub.competitors.own_badge')}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ kind: 'own', id: ownSalon?.id ?? '' })}
+                    className="text-brand-sage-deep hover:text-brand-sage-deep/70 ml-1"
+                    title={t('reports_hub.competitors.content_edit_btn')}
+                  >
+                    <Pencil className="size-3" strokeWidth={2} />
+                  </button>
                 </div>
               </td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.posts ?? null)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
               <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
               <td className="num px-3 py-3 text-right">
-                {ownContent?.posts_per_month != null ? `${ownContent.posts_per_month}/мес` : '—'}
+                {ownEffective.posts_per_month != null ? `${ownEffective.posts_per_month}/мес` : '—'}
               </td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.followers ?? null)}</td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownContent?.following ?? null)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.followers)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.following)}</td>
             </tr>
             {competitors.map((c) => {
-              const d = byCompetitor.get(c.id)
+              const d = competitorEffective(c)
               return (
                 <tr key={c.id}>
-                  <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d?.posts ?? null)}</td>
+                  <td className="text-foreground px-4 py-3 font-semibold">
+                    <div className="flex items-center gap-2">
+                      {c.name}
+                      <button
+                        type="button"
+                        onClick={() => setEditing({ kind: 'competitor', id: c.id })}
+                        className="text-muted-foreground hover:text-foreground"
+                        title={t('reports_hub.competitors.content_edit_btn')}
+                      >
+                        <Pencil className="size-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
                   <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
                   <td className="num px-3 py-3 text-right">
-                    {d?.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
+                    {d.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
                   </td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d?.followers ?? null)}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d?.following ?? null)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.followers)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.following)}</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+
+      {editing ? (
+        <ContentEditDialog
+          kind={editing.kind}
+          target={
+            editing.kind === 'own'
+              ? {
+                  name: ownSalon?.name ?? '',
+                  content_followers: ownSalon?.content_followers ?? null,
+                  content_posts: ownSalon?.content_posts ?? null,
+                  content_fb_likes: ownSalon?.content_fb_likes ?? null,
+                  content_posts_per_month: ownSalon?.content_posts_per_month ?? null,
+                }
+              : (() => {
+                  const c = competitors.find((x) => x.id === editing.id)
+                  return {
+                    name: c?.name ?? '',
+                    content_followers: c?.content_followers ?? null,
+                    content_posts: c?.content_posts ?? null,
+                    content_fb_likes: c?.content_fb_likes ?? null,
+                    content_posts_per_month: c?.content_posts_per_month ?? null,
+                  }
+                })()
+          }
+          onClose={() => setEditing(null)}
+          onSave={(patch) => {
+            const update = { ...patch, content_updated_at: new Date().toISOString() }
+            if (editing.kind === 'own') {
+              updateSalon.mutate(
+                { id: editing.id, ...update },
+                {
+                  onSuccess: () => {
+                    toast.success(t('reports_hub.competitors.content_saved'))
+                    setEditing(null)
+                  },
+                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                },
+              )
+            } else {
+              updateCompetitor.mutate(
+                { id: editing.id, ...update },
+                {
+                  onSuccess: () => {
+                    toast.success(t('reports_hub.competitors.content_saved'))
+                    setEditing(null)
+                  },
+                  onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                },
+              )
+            }
+          }}
+          saving={updateSalon.isPending || updateCompetitor.isPending}
+          t={t}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+type ContentEditFields = {
+  content_followers: number | null
+  content_posts: number | null
+  content_fb_likes: number | null
+  content_posts_per_month: number | null
+}
+
+function ContentEditDialog({
+  kind,
+  target,
+  onClose,
+  onSave,
+  saving,
+  t,
+}: {
+  kind: 'own' | 'competitor'
+  target: { name: string } & ContentEditFields
+  onClose: () => void
+  onSave: (patch: ContentEditFields) => void
+  saving: boolean
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [followers, setFollowers] = useState<string>(
+    target.content_followers != null ? String(target.content_followers) : '',
+  )
+  const [posts, setPosts] = useState<string>(
+    target.content_posts != null ? String(target.content_posts) : '',
+  )
+  const [fbLikes, setFbLikes] = useState<string>(
+    target.content_fb_likes != null ? String(target.content_fb_likes) : '',
+  )
+  const [ppm, setPpm] = useState<string>(
+    target.content_posts_per_month != null ? String(target.content_posts_per_month) : '',
+  )
+
+  function toIntOrNull(s: string): number | null {
+    const t = s.trim().replace(/[\s,]/g, '')
+    if (!t) return null
+    const n = parseInt(t, 10)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+  function toFloatOrNull(s: string): number | null {
+    const t = s.trim().replace(/,/g, '.').replace(/\s/g, '')
+    if (!t) return null
+    const n = parseFloat(t)
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-card border-border w-full max-w-md rounded-lg border p-5 shadow-xl">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-foreground text-base font-bold">
+            {kind === 'own'
+              ? t('reports_hub.competitors.content_edit_title_own', { name: target.name })
+              : t('reports_hub.competitors.content_edit_title_competitor', { name: target.name })}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-sm font-bold"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {t('reports_hub.competitors.content_edit_hint')}
+        </p>
+        <div className="mt-4 flex flex-col gap-3">
+          <FieldRow
+            label={t('reports_hub.competitors.col_followers')}
+            value={followers}
+            onChange={setFollowers}
+            placeholder="2173"
+          />
+          <FieldRow
+            label={t('reports_hub.competitors.col_posts')}
+            value={posts}
+            onChange={setPosts}
+            placeholder="272"
+          />
+          <FieldRow
+            label="Facebook likes"
+            value={fbLikes}
+            onChange={setFbLikes}
+            placeholder="459"
+          />
+          <FieldRow
+            label={t('reports_hub.competitors.col_freq')}
+            value={ppm}
+            onChange={setPpm}
+            placeholder="8.5"
+          />
+        </div>
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="border-border bg-card text-foreground hover:bg-muted/40 h-9 rounded-md border px-3 text-xs font-semibold"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() =>
+              onSave({
+                content_followers: toIntOrNull(followers),
+                content_posts: toIntOrNull(posts),
+                content_fb_likes: toIntOrNull(fbLikes),
+                content_posts_per_month: toFloatOrNull(ppm),
+              })
+            }
+            className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} /> : null}
+            {t('common.save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FieldRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Label className="text-foreground flex-1 text-xs font-semibold">{label}</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        inputMode="numeric"
+        className="num w-32 text-right"
+      />
     </div>
   )
 }
@@ -1290,21 +1553,42 @@ function OccupancyTable({
   salonId,
   competitors,
   snapshots,
+  ownSalonName,
   t,
 }: {
   salonId: string
   competitors: NonNullable<ReturnType<typeof useCompetitors>['data']>
   snapshots: ReturnType<typeof useCompetitorSnapshots>['data']
+  ownSalonName: string
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const refresh = useRefreshReportInsights(salonId)
   const [insights, setInsights] = useState<{ title: string; body: string }[] | null>(null)
   const syncCompetitors = useSyncCompetitors(salonId)
+  const { data: settings } = useCompetitorSettings(salonId)
+  const { data: ownOccupancy } = useOwnSalonOccupancy(salonId)
 
   // Загруженность приходит только от Booksy — если у конкурента нет
   // booksy_url, источника нет. Считаем чтобы отличить «нет Booksy-источника»
   // от «sync ещё не отработал».
   const booksyCompetitors = useMemo(() => competitors.filter((c) => c.booksy_url), [competitors])
+
+  // watched_services фильтр: если юзер выбрал что отслеживать — показываем
+  // ТОЛЬКО эти услуги (fuzzy-match по нормализованным токенам). Иначе все.
+  const watchedTokens = useMemo(() => {
+    const watched = settings?.watched_services ?? []
+    if (watched.length === 0) return null
+    return watched.map((s) => normalizeServiceName(s))
+  }, [settings?.watched_services])
+
+  function matchesWatched(svcName: string): boolean {
+    if (!watchedTokens) return true
+    const t = normalizeServiceName(svcName)
+    for (const ws of watchedTokens) {
+      if (tokenSimilarity(ws, t) >= 0.4) return true
+    }
+    return false
+  }
 
   // Собираем последний occupancy-snapshot на каждого конкурента.
   const latestByCompetitor = useMemo(() => {
@@ -1323,33 +1607,53 @@ function OccupancyTable({
   type Row = {
     competitorId: string
     competitorName: string
+    isOwn: boolean
     service: OccupancyService
     totalStaff: number
   }
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
+    // Конкуренты
     for (const c of competitors) {
       const snap = latestByCompetitor.get(c.id)
       if (!snap) continue
       const data = snap.data as { services?: OccupancyService[]; total_staff?: number }
       const services = Array.isArray(data.services) ? data.services : []
       for (const svc of services) {
+        if (!matchesWatched(svc.name)) continue
         out.push({
           competitorId: c.id,
           competitorName: c.name,
+          isOwn: false,
           service: svc,
           totalStaff: data.total_staff ?? 0,
         })
       }
     }
     return out
-  }, [competitors, latestByCompetitor])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [competitors, latestByCompetitor, watchedTokens])
 
-  // Среднее по всем — для % vs средний.
+  // Строки нашего салона (отдельно, чтобы рисовать сверху + не вмешиваться в фильтр).
+  const ownRows = useMemo<Row[]>(() => {
+    if (!ownOccupancy) return []
+    return ownOccupancy.services
+      .filter((s) => matchesWatched(s.name))
+      .map((s) => ({
+        competitorId: salonId,
+        competitorName: ownSalonName,
+        isOwn: true,
+        service: s as OccupancyService,
+        totalStaff: ownOccupancy.total_staff,
+      }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownOccupancy, salonId, ownSalonName, watchedTokens])
+
+  // Среднее по всем (наш + конкуренты) — для % vs средний.
   const avgSlotsByService = useMemo(() => {
     const map = new Map<string, number>()
     const buckets = new Map<string, number[]>()
-    for (const r of rows) {
+    for (const r of [...ownRows, ...rows]) {
       const list = buckets.get(r.service.name) ?? []
       list.push(r.service.free_slots_7d)
       buckets.set(r.service.name, list)
@@ -1359,7 +1663,7 @@ function OccupancyTable({
       map.set(name, avg)
     }
     return map
-  }, [rows])
+  }, [rows, ownRows])
 
   function runAi() {
     const payload = {
@@ -1401,22 +1705,87 @@ function OccupancyTable({
               <th className="px-4 py-3 text-left font-semibold">
                 {t('reports_hub.competitors.col_service')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_staff_count_hint')}
+              >
                 {t('reports_hub.competitors.col_staff_count')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_slots_7d_hint')}
+              >
                 {t('reports_hub.competitors.col_slots_7d')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_days_covered_hint')}
+              >
                 {t('reports_hub.competitors.col_days_covered')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_vs_avg_hint')}
+              >
                 {t('reports_hub.competitors.col_vs_avg')}
               </th>
             </tr>
           </thead>
           <tbody className="divide-border divide-y">
-            {rows.length === 0 ? (
+            {/* Own salon rows — выделены сверху, для прямого сравнения. */}
+            {ownRows.map((r, i) => {
+              const avg = avgSlotsByService.get(r.service.name) ?? 0
+              const diffPct =
+                avg > 0 ? Math.round(((r.service.free_slots_7d - avg) / avg) * 100) : null
+              return (
+                <tr
+                  key={`own_${i}`}
+                  className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4"
+                >
+                  <td className="text-brand-sage-deep px-4 py-3 font-bold">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-3.5" strokeWidth={2} />
+                      {r.competitorName}
+                      <span className="bg-brand-sage-soft text-brand-sage-deep rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
+                        {t('reports_hub.competitors.own_badge')}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="text-foreground px-4 py-3 text-xs">
+                    {r.service.name}
+                    {r.service.duration_min ? (
+                      <span className="text-muted-foreground ml-1">
+                        · {r.service.duration_min} {t('common.min')}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="num text-foreground px-3 py-3 text-right">
+                    {r.service.staff_count}
+                  </td>
+                  <td className="num text-foreground px-3 py-3 text-right font-bold">
+                    {r.service.free_slots_7d}
+                  </td>
+                  <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                    {r.service.days_covered} / 7
+                  </td>
+                  <td
+                    className={cn(
+                      'num px-3 py-3 text-right font-bold',
+                      diffPct == null
+                        ? 'text-muted-foreground/60'
+                        : diffPct > 10
+                          ? 'text-emerald-700'
+                          : diffPct < -10
+                            ? 'text-rose-600'
+                            : 'text-muted-foreground',
+                    )}
+                  >
+                    {diffPct == null ? '—' : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
+                  </td>
+                </tr>
+              )
+            })}
+            {rows.length === 0 && ownRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-muted-foreground px-5 py-12 text-center text-sm">
                   {booksyCompetitors.length === 0 ? (

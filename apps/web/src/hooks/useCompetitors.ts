@@ -11,6 +11,12 @@ export type Competitor = {
   google_place_id: string | null
   instagram_url: string | null
   facebook_url: string | null
+  /** Manual overrides — заменяют auto-scrape когда задано. */
+  content_followers: number | null
+  content_posts: number | null
+  content_fb_likes: number | null
+  content_posts_per_month: number | null
+  content_updated_at: string | null
   is_auto_picked: boolean
   is_archived: boolean
   created_at: string
@@ -231,6 +237,50 @@ export function useOwnSalonBooksyRating(salonId: string | undefined) {
       const d = (data as { data?: { rating?: number; count?: number } } | null)?.data
       if (!d || d.rating == null || d.count == null) return null
       return { rating: d.rating, count: d.count }
+    },
+    staleTime: 60_000,
+  })
+}
+
+/** Occupancy метрики своего салона из own_salon_metrics (kind='occupancy').
+ *  Структура: { services: OccupancyService[], total_staff } — та же что у конкурентов. */
+export type OwnSalonOccupancyService = {
+  name: string
+  variant_id?: number
+  duration_min: number
+  staff_count: number
+  free_slots_7d: number
+  days_covered: number
+}
+export function useOwnSalonOccupancy(salonId: string | undefined) {
+  return useQuery<{
+    services: OwnSalonOccupancyService[]
+    total_staff: number
+    snapshot_date: string
+  } | null>({
+    queryKey: ['own-salon-occupancy', salonId],
+    enabled: !!salonId,
+    queryFn: async () => {
+      if (!salonId) return null
+      const { data } = await supabase
+        .from('own_salon_metrics')
+        .select('data, snapshot_date')
+        .eq('salon_id', salonId)
+        .eq('kind', 'occupancy')
+        .eq('source', 'booksy')
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const row = data as {
+        data?: { services?: OwnSalonOccupancyService[]; total_staff?: number }
+        snapshot_date?: string
+      } | null
+      if (!row?.data?.services || row.data.services.length === 0) return null
+      return {
+        services: row.data.services,
+        total_staff: row.data.total_staff ?? 0,
+        snapshot_date: row.snapshot_date ?? '',
+      }
     },
     staleTime: 60_000,
   })

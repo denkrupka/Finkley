@@ -48,6 +48,14 @@ export type SalonRow = {
    *  для метрик контента в Reports → Конкуренты. */
   instagram_url?: string | null
   facebook_url?: string | null
+  /** Optional — миграция 20260523000002. Manual override Content-метрик
+   *  (auto-scrape Meta заблокирован datacenter-IP, эти поля заполняются
+   *  владельцем салона из настроек и из Reports → Конкуренты → Параметры). */
+  content_followers?: number | null
+  content_posts?: number | null
+  content_fb_likes?: number | null
+  content_posts_per_month?: number | null
+  content_updated_at?: string | null
 }
 
 /** Полный список типов уведомлений с человекочитаемыми i18n-ключами. */
@@ -79,7 +87,7 @@ export function useMySalons() {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url, content_followers, content_posts, content_fb_likes, content_posts_per_month, content_updated_at',
         )
         .order('created_at', { ascending: true })
       if (error) throw error
@@ -122,7 +130,7 @@ export function useSalon(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('salons')
         .select(
-          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url',
+          'id, name, country_code, currency, timezone, salon_type, locale, logo_url, weekly_digest_enabled, daily_digest_enabled, weekly_digest_channels, daily_digest_channels, benchmarks_opt_in, opening_cash_balance_cents, retention_window_days, churn_window_days, cash_discipline_enabled, created_at, blocked_at, blocked_reason, notification_prefs, address, city, lat, lng, google_place_id, google_place_url, booksy_url, instagram_url, facebook_url, content_followers, content_posts, content_fb_likes, content_posts_per_month, content_updated_at',
         )
         .eq('id', salonId)
         .maybeSingle()

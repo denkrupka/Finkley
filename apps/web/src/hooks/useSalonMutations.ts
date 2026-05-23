@@ -28,6 +28,13 @@ export type UpdateSalonInput = {
    *  контента в Reports → Конкуренты. */
   instagram_url?: string | null
   facebook_url?: string | null
+  /** Миграция 20260523000002. Manual overrides Content-метрик
+   *  (auto-scrape Meta заблокирован datacenter IP). */
+  content_followers?: number | null
+  content_posts?: number | null
+  content_fb_likes?: number | null
+  content_posts_per_month?: number | null
+  content_updated_at?: string | null
 }
 
 export function useUpdateSalon() {
