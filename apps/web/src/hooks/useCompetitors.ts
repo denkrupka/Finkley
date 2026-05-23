@@ -214,6 +214,9 @@ export type OwnSalonContent = {
   following: number | null
   posts_per_month: number | null
   fb_likes: number | null
+  avg_likes: number | null
+  avg_comments: number | null
+  engagement_rate: number | null
   snapshot_date: string | null
   has_data: boolean
 }
@@ -322,6 +325,9 @@ export function useOwnSalonContent(salonId: string | undefined) {
         following: null,
         posts_per_month: null,
         fb_likes: null,
+        avg_likes: null,
+        avg_comments: null,
+        engagement_rate: null,
         snapshot_date: null,
         has_data: false,
       }
@@ -352,13 +358,20 @@ export function useOwnSalonContent(salonId: string | undefined) {
         if (merged.posts_per_month == null && typeof d.posts_per_month === 'number')
           merged.posts_per_month = d.posts_per_month
         if (merged.fb_likes == null && typeof d.fb_likes === 'number') merged.fb_likes = d.fb_likes
+        if (merged.avg_likes == null && typeof d.avg_likes === 'number')
+          merged.avg_likes = d.avg_likes
+        if (merged.avg_comments == null && typeof d.avg_comments === 'number')
+          merged.avg_comments = d.avg_comments
+        if (merged.engagement_rate == null && typeof d.engagement_rate === 'number')
+          merged.engagement_rate = d.engagement_rate
         if (!merged.snapshot_date) merged.snapshot_date = r.snapshot_date
       }
       merged.has_data =
         merged.followers != null ||
         merged.posts != null ||
         merged.fb_likes != null ||
-        merged.posts_per_month != null
+        merged.posts_per_month != null ||
+        merged.avg_likes != null
       return merged
     },
     enabled: !!salonId,

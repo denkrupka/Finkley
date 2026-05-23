@@ -489,7 +489,9 @@ function ContentTable({
     following?: number
     posts_per_month?: number
     fb_likes?: number
-    reels_views?: number
+    avg_likes?: number
+    avg_comments?: number
+    engagement_rate?: number
   }
   const byCompetitor = new Map<string, ContentData>()
   for (const s of snapshots ?? []) {
@@ -502,33 +504,37 @@ function ContentTable({
     if (cur.posts_per_month == null && typeof d.posts_per_month === 'number')
       cur.posts_per_month = d.posts_per_month
     if (cur.fb_likes == null && typeof d.fb_likes === 'number') cur.fb_likes = d.fb_likes
+    if (cur.avg_likes == null && typeof d.avg_likes === 'number') cur.avg_likes = d.avg_likes
+    if (cur.avg_comments == null && typeof d.avg_comments === 'number')
+      cur.avg_comments = d.avg_comments
+    if (cur.engagement_rate == null && typeof d.engagement_rate === 'number')
+      cur.engagement_rate = d.engagement_rate
     byCompetitor.set(s.competitor_id, cur)
   }
 
   function fmtNum(v: number | null | undefined): string {
-    return v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
+    if (v == null) return '—'
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}k`
+    if (v < 10 && !Number.isInteger(v)) return v.toFixed(2)
+    if (v < 100 && !Number.isInteger(v)) return v.toFixed(1)
+    return String(v)
+  }
+  function fmtPct(v: number | null | undefined): string {
+    return v == null ? '—' : `${v.toFixed(2)}%`
   }
 
-  // Применяем manual override: если salons.content_followers задан — он
-  // имеет приоритет над snapshot.followers. Auto-scrape Meta заблокирован
-  // datacenter IP, поэтому manual для большинства салонов = единственный
-  // источник правды.
   const ownEffective: ContentData = {
-    followers: ownSalon?.content_followers ?? ownContent?.followers ?? undefined,
-    posts: ownSalon?.content_posts ?? ownContent?.posts ?? undefined,
+    followers: ownContent?.followers ?? undefined,
+    posts: ownContent?.posts ?? undefined,
     following: ownContent?.following ?? undefined,
-    fb_likes: ownSalon?.content_fb_likes ?? ownContent?.fb_likes ?? undefined,
-    posts_per_month: ownSalon?.content_posts_per_month ?? ownContent?.posts_per_month ?? undefined,
+    fb_likes: ownContent?.fb_likes ?? undefined,
+    posts_per_month: ownContent?.posts_per_month ?? undefined,
+    avg_likes: ownContent?.avg_likes ?? undefined,
+    avg_comments: ownContent?.avg_comments ?? undefined,
+    engagement_rate: ownContent?.engagement_rate ?? undefined,
   }
   function competitorEffective(c: Competitor): ContentData {
-    const auto = byCompetitor.get(c.id) ?? {}
-    return {
-      followers: c.content_followers ?? auto.followers,
-      posts: c.content_posts ?? auto.posts,
-      following: auto.following,
-      fb_likes: c.content_fb_likes ?? auto.fb_likes,
-      posts_per_month: c.content_posts_per_month ?? auto.posts_per_month,
-    }
+    return byCompetitor.get(c.id) ?? {}
   }
 
   // Если у своего салона все content-поля null + ни у одного конкурента нет
@@ -554,6 +560,9 @@ function ContentTable({
               <th className="px-4 py-3 text-left font-semibold">
                 {t('reports_hub.competitors.col_name')}
               </th>
+              <th className="px-3 py-3 text-right font-semibold">
+                {t('reports_hub.competitors.col_followers')}
+              </th>
               <th
                 className="px-3 py-3 text-right font-semibold"
                 title={t('reports_hub.competitors.col_posts_hint')}
@@ -562,21 +571,27 @@ function ContentTable({
               </th>
               <th
                 className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_reels_views_hint')}
+                title={t('reports_hub.competitors.col_avg_likes_hint')}
               >
-                {t('reports_hub.competitors.col_reels_views')}
+                {t('reports_hub.competitors.col_avg_likes')}
               </th>
               <th
                 className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_freq_hint')}
+                title={t('reports_hub.competitors.col_avg_comments_hint')}
               >
-                {t('reports_hub.competitors.col_freq')}
+                {t('reports_hub.competitors.col_avg_comments')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
-                {t('reports_hub.competitors.col_followers')}
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_engagement_hint')}
+              >
+                {t('reports_hub.competitors.col_engagement')}
               </th>
-              <th className="px-3 py-3 text-right font-semibold">
-                {t('reports_hub.competitors.col_following')}
+              <th
+                className="px-3 py-3 text-right font-semibold"
+                title={t('reports_hub.competitors.col_fb_likes_hint')}
+              >
+                FB
               </th>
             </tr>
           </thead>
@@ -592,26 +607,32 @@ function ContentTable({
                   </span>
                 </div>
               </td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
-              <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
-              <td className="num px-3 py-3 text-right">
-                {ownEffective.posts_per_month != null ? `${ownEffective.posts_per_month}/мес` : '—'}
+              <td className="num px-3 py-3 text-right font-bold">
+                {fmtNum(ownEffective.followers)}
               </td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.followers)}</td>
-              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.following)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.posts)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_likes)}</td>
+              <td className="num px-3 py-3 text-right">{fmtNum(ownEffective.avg_comments)}</td>
+              <td className="num px-3 py-3 text-right">{fmtPct(ownEffective.engagement_rate)}</td>
+              <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                {fmtNum(ownEffective.fb_likes)}
+              </td>
             </tr>
             {competitors.map((c) => {
               const d = competitorEffective(c)
               return (
                 <tr key={c.id}>
                   <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
-                  <td className="num text-muted-foreground/60 px-3 py-3 text-right text-xs">—</td>
-                  <td className="num px-3 py-3 text-right">
-                    {d.posts_per_month != null ? `${d.posts_per_month}/мес` : '—'}
+                  <td className="num text-foreground px-3 py-3 text-right font-bold">
+                    {fmtNum(d.followers)}
                   </td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.followers)}</td>
-                  <td className="num px-3 py-3 text-right">{fmtNum(d.following)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.posts)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.avg_likes)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtNum(d.avg_comments)}</td>
+                  <td className="num px-3 py-3 text-right">{fmtPct(d.engagement_rate)}</td>
+                  <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
+                    {fmtNum(d.fb_likes)}
+                  </td>
                 </tr>
               )
             })}

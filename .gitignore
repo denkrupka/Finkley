@@ -86,3 +86,4 @@ conversation-*.txt
 
 # diagnostic scripts (local-only, not part of app)
 apps/web/scripts/diag/
+apps/web/apps/

@@ -488,9 +488,86 @@ async function fetchBooksyAggregate(
 }
 
 // =============================================================================
-// Instagram / Facebook public — best-effort через og: meta тегов.
-// Полный Meta Graph требует app review; здесь scraping публичной страницы.
+// Instagram / Facebook content — собирает followers/posts/avg_likes/avg_comments
+// через Socialblade (proxied через ScraperAPI residential pool). Meta плотно
+// блокирует datacenter IPs — без residential proxy avg_likes/comments недоступны.
+// Fallback: direct og:description (только followers/posts).
 // =============================================================================
+
+const SCRAPERAPI_KEY = Deno.env.get('SCRAPERAPI_KEY') ?? ''
+
+/** Extract username из instagram_url. https://www.instagram.com/buro_spa/ → 'buro_spa'. */
+function instagramUsername(url: string): string | null {
+  const m = url.match(/instagram\.com\/([^\/?#]+)/i)
+  if (!m || !m[1]) return null
+  const u = m[1].replace(/^@/, '').trim()
+  return u && u !== 'p' && u !== 'explore' && u !== 'reel' ? u : null
+}
+
+/** Парсер Socialblade /instagram/user/{username} HTML.
+ *  Структура: `<p class="...">LABEL</p><p class="...">VALUE</p>` где
+ *  LABEL ∈ {followers, following, media count, engagement rate,
+ *           average likes, average comments}. */
+function parseSocialbladeInsta(html: string): {
+  followers?: number
+  following?: number
+  posts?: number
+  engagement_rate?: number
+  avg_likes?: number
+  avg_comments?: number
+} {
+  const out: Record<string, number> = {}
+  const labels: Array<[string, string]> = [
+    ['followers', 'followers'],
+    ['following', 'following'],
+    ['media count', 'posts'],
+    ['engagement rate', 'engagement_rate'],
+    ['average likes', 'avg_likes'],
+    ['average comments', 'avg_comments'],
+  ]
+  for (const [label, key] of labels) {
+    const re = new RegExp(label + '<\\/p>\\s*<p[^>]*>([^<]+)<', 'i')
+    const m = html.match(re)
+    if (m && m[1]) {
+      const raw = m[1].trim().replace(/,/g, '').replace(/[%\s]/g, '')
+      const n = parseFloat(raw)
+      if (Number.isFinite(n)) out[key] = n
+    }
+  }
+  return out
+}
+
+/** Возвращает stats Instagram через Socialblade. Тратит 1 ScraperAPI credit.
+ *  Если ScraperAPI ключ не задан или username некорректен — null. */
+async function fetchInstaViaSocialblade(instaUrl: string): Promise<Record<string, number> | null> {
+  if (!SCRAPERAPI_KEY) return null
+  const username = instagramUsername(instaUrl)
+  if (!username) return null
+  const target = `https://socialblade.com/instagram/user/${encodeURIComponent(username)}`
+  const proxied = `https://api.scraperapi.com/?api_key=${SCRAPERAPI_KEY}&url=${encodeURIComponent(target)}`
+  try {
+    const r = await fetch(proxied)
+    if (!r.ok) {
+      console.warn(`socialblade ${username}: HTTP ${r.status}`)
+      return null
+    }
+    const html = await r.text()
+    if (html.includes('We could not find that user') || html.includes('user could not be found')) {
+      console.warn(`socialblade ${username}: account not tracked`)
+      return null
+    }
+    const parsed = parseSocialbladeInsta(html)
+    if (parsed.followers == null) {
+      console.warn(`socialblade ${username}: no followers parsed (page format changed?)`)
+      return null
+    }
+    return parsed
+  } catch (e) {
+    console.warn(`socialblade ${username} threw:`, e)
+    return null
+  }
+}
+
 async function fetchContent(
   instaUrl: string | null,
   fbUrl: string | null,
@@ -527,37 +604,58 @@ async function fetchContent(
   }
   const out: Record<string, number | string> = {}
   if (instaUrl) {
-    try {
-      const { html, status } = await fetchWithFallbackUAs(instaUrl)
-      const counts = html ? parseInstaOgDescription(html) : {}
-      console.log(
-        `instagram fetch ${instaUrl}: status=${status} len=${html.length} parsed=${JSON.stringify(counts)}`,
-      )
-      // Только если реально достали данные (followers — основной маркер) сохраняем
-      // snapshot. Иначе оставляем поля пустыми — UI прочтёт manual override из
-      // salons.content_* / competitors.content_*. Edge IP заблокирован Meta,
-      // эти UA-фолбеки лишь best-effort.
-      if (counts.followers != null) {
-        out.followers = counts.followers
-        if (counts.posts != null) out.posts = counts.posts
-        if (counts.following != null) out.following = counts.following
-        const ppm = estimatePostsPerMonth(html, counts.posts)
-        if (ppm != null) out.posts_per_month = ppm
-        out.instagram_url = instaUrl
+    // Primary path: Socialblade через ScraperAPI (residential pool). Возвращает
+    // followers/posts + avg_likes/comments — недоступны через прямой og:description.
+    const sb = await fetchInstaViaSocialblade(instaUrl)
+    if (sb && sb.followers != null) {
+      out.followers = sb.followers
+      if (sb.following != null) out.following = sb.following
+      if (sb.posts != null) out.posts = sb.posts
+      if (sb.engagement_rate != null) out.engagement_rate = sb.engagement_rate
+      if (sb.avg_likes != null) out.avg_likes = sb.avg_likes
+      if (sb.avg_comments != null) out.avg_comments = sb.avg_comments
+      out.instagram_url = instaUrl
+      console.log(`instagram via socialblade ${instaUrl}: ${JSON.stringify(sb)}`)
+    } else {
+      // Fallback: direct fetch через UA-chain (только followers/posts если повезёт).
+      try {
+        const { html, status } = await fetchWithFallbackUAs(instaUrl)
+        const counts = html ? parseInstaOgDescription(html) : {}
+        console.log(
+          `instagram direct ${instaUrl}: status=${status} len=${html.length} parsed=${JSON.stringify(counts)}`,
+        )
+        if (counts.followers != null) {
+          out.followers = counts.followers
+          if (counts.posts != null) out.posts = counts.posts
+          if (counts.following != null) out.following = counts.following
+          const ppm = estimatePostsPerMonth(html, counts.posts)
+          if (ppm != null) out.posts_per_month = ppm
+          out.instagram_url = instaUrl
+        }
+      } catch (e) {
+        console.warn(`instagram fallback ${instaUrl} threw:`, e)
       }
-    } catch (e) {
-      console.warn(`instagram fetch ${instaUrl} threw:`, e)
     }
   }
   if (fbUrl) {
     try {
-      const { html, status } = await fetchWithFallbackUAs(fbUrl)
-      const likes = html ? parseFbLikes(html) : null
+      // Primary: direct fetch with bot UAs (FB иногда отдаёт og:description с PL формулировкой «X osób lubi to»).
+      let { html, status } = await fetchWithFallbackUAs(fbUrl)
+      let likes = html ? parseFbLikes(html) : null
+      // Fallback через ScraperAPI residential pool — если direct не достал og.
+      if (likes == null && SCRAPERAPI_KEY) {
+        const proxied = `https://api.scraperapi.com/?api_key=${SCRAPERAPI_KEY}&url=${encodeURIComponent(fbUrl)}`
+        const r = await fetch(proxied)
+        if (r.ok) {
+          html = await r.text()
+          status = r.status
+          likes = parseFbLikes(html)
+          console.log(`facebook via scraperapi ${fbUrl}: likes=${likes}`)
+        }
+      }
       console.log(`facebook fetch ${fbUrl}: status=${status} len=${html.length} likes=${likes}`)
       if (likes != null) {
         out.fb_likes = likes
-        // На FB-странице публичные посты обычно имеют datetime атрибуты —
-        // тоже попробуем оценить частоту, если ещё не получили от Insta.
         if (out.posts_per_month == null) {
           const ppm = estimatePostsPerMonth(html)
           if (ppm != null) out.posts_per_month = ppm
