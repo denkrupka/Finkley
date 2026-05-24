@@ -33,13 +33,16 @@ const APP_URL = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
 
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/fb-oauth-callback`
 
+// Только Page-scopes. Для Instagram используется отдельный flow через
+// `instagram-oauth-callback` (Instagram Login API) — новый путь, который
+// заменил deprecated `instagram_basic` + `instagram_manage_messages`.
+// Старые IG scopes удалены чтобы Meta App Review видел консистентный
+// список — без дубликатов «old IG via FB Page» + «new IG Login».
 const SCOPES = [
   'pages_show_list',
   'pages_messaging',
   'pages_manage_metadata',
   'pages_read_engagement',
-  'instagram_basic',
-  'instagram_manage_messages',
 ].join(',')
 
 function jsonResponse(body: unknown, status = 200) {
