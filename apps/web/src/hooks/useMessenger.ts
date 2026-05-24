@@ -213,9 +213,14 @@ export function useSendMessage(salonId: string | undefined) {
  */
 export function useStartOAuth(salonId: string | undefined) {
   return useMutation({
-    mutationFn: async (channel: 'facebook' | 'instagram') => {
+    mutationFn: async (channel: 'facebook' | 'instagram' | 'whatsapp') => {
       if (!salonId) throw new Error('no_salon')
-      const fnName = channel === 'facebook' ? 'fb-oauth-callback' : 'instagram-oauth-callback'
+      const fnName =
+        channel === 'facebook'
+          ? 'fb-oauth-callback'
+          : channel === 'instagram'
+            ? 'instagram-oauth-callback'
+            : 'whatsapp-oauth-callback'
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData.session?.access_token
       if (!accessToken) throw new Error('not_authenticated')

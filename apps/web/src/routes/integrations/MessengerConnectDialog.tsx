@@ -43,11 +43,11 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
   if (!channel) return null
   const meta = META[channel]
   const Icon = meta.icon
-  const isMetaOAuth = channel === 'facebook' || channel === 'instagram'
+  const isMetaOAuth = channel === 'facebook' || channel === 'instagram' || channel === 'whatsapp'
 
   function handleOAuth() {
     if (!isMetaOAuth) return
-    startOAuth.mutate(channel as 'facebook' | 'instagram', {
+    startOAuth.mutate(channel as 'facebook' | 'instagram' | 'whatsapp', {
       onSuccess: (authorizeUrl) => {
         window.location.href = authorizeUrl
       },
@@ -171,8 +171,10 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
               placeholder="123456789:ABC-DEF1234..."
               type="password"
             />
-          ) : channel === 'whatsapp' ? (
+          ) : channel === 'whatsapp' && showManual ? (
             <>
+              {/* Manual fallback — для случая «нет своего Meta Business».
+                  Primary path (OAuth) уже отрендерен выше в isMetaOAuth-блоке. */}
               <div className="border-brand-sage-soft bg-brand-sage-soft/15 rounded-md border p-3 text-xs">
                 <p className="text-brand-sage-deep mb-2 font-bold">
                   {t('integrations.messengers.whatsapp_steps_title')}
@@ -217,7 +219,6 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
                 placeholder="EAA..."
                 type="password"
               />
-              {/* verify_token больше не показываем — auto-generate на бэкенде. */}
             </>
           ) : showManual ? (
             <>
