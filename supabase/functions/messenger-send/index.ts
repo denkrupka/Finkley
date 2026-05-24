@@ -199,7 +199,9 @@ Deno.serve(async (req) => {
   } else if (integ && integ.status === 'connected' && convo.channel === 'whatsapp') {
     try {
       const creds = (integ.credentials ?? {}) as Record<string, unknown>
-      const waToken = await decryptSecret(creds.access_token_enc as string)
+      const waEnc = (creds.access_token_enc ?? creds.access_enc) as string | undefined
+      if (!waEnc) throw new Error('wa_token_missing')
+      const waToken = await decryptSecret(waEnc)
       const phoneId = (creds.phone_number_id as string) ?? integ.credentials?.phone_number_id
       if (!phoneId) throw new Error('phone_number_id_missing')
       const endpoint = `https://graph.facebook.com/v21.0/${phoneId}/messages`

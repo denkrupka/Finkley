@@ -155,32 +155,34 @@ Deno.serve(async (req) => {
         const v = ch.value as unknown as WaChangeValue
         const phoneId = v.metadata?.phone_number_id
         if (!phoneId) continue
-        const { data: integ } = await admin
+        const { data: integs } = await admin
           .from('messenger_integrations')
           .select('salon_id, status, credentials')
           .eq('channel', 'whatsapp')
           .eq('external_account_id', phoneId)
-          .maybeSingle()
-        if (!integ?.salon_id) {
+        if (!integs || integs.length === 0) {
           console.log(`[webhook] no WA integration for phone_id=${phoneId} — skip`)
           continue
         }
-        const creds = (integ.credentials ?? {}) as Record<string, unknown>
-        let waToken: string | null = null
-        if (creds.access_token_enc) {
-          try {
-            waToken = await decryptSecret(creds.access_token_enc as string)
-          } catch (e) {
-            console.warn('decrypt WA token failed:', (e as Error).message)
-          }
-        }
-        // Карта профилей (имя) — приходит в contacts[]
+        // Карта профилей (имя) — приходит в contacts[], одна на phone_id.
         const nameByWaId = new Map<string, string>()
         for (const c of v.contacts ?? []) {
           if (c.wa_id && c.profile?.name) nameByWaId.set(c.wa_id, c.profile.name)
         }
-        for (const m of v.messages ?? []) {
-          await ingestWaMessage(admin, integ.salon_id, m, nameByWaId, waToken)
+        for (const integ of integs) {
+          const creds = (integ.credentials ?? {}) as Record<string, unknown>
+          let waToken: string | null = null
+          const waEnc = (creds.access_token_enc ?? creds.access_enc) as string | undefined
+          if (waEnc) {
+            try {
+              waToken = await decryptSecret(waEnc)
+            } catch (e) {
+              console.warn('decrypt WA token failed:', (e as Error).message)
+            }
+          }
+          for (const m of v.messages ?? []) {
+            await ingestWaMessage(admin, integ.salon_id, m, nameByWaId, waToken)
+          }
         }
       }
     }
@@ -204,51 +206,50 @@ Deno.serve(async (req) => {
     }
     if (events.length === 0) continue
 
-    // Находим интеграцию салона по external_account_id = accountId
-    const { data: integ } = await admin
+    // Fan-out: одна Page/IG account может быть подключена к нескольким салонам
+    // (например, общий бизнес-аккаунт для прод + тест-салона).
+    const { data: integs } = await admin
       .from('messenger_integrations')
       .select('salon_id, channel, status, credentials')
       .eq('channel', channel)
       .eq('external_account_id', accountId)
-      .maybeSingle()
-    if (!integ?.salon_id) {
+    if (!integs || integs.length === 0) {
       console.log(`[webhook] no integration for ${channel}/${accountId} — skip`)
       continue
     }
 
-    // Расшифровка provider token'а — для подтягивания профиля.
-    // Flow A (page/IG-via-Page): credentials.page_access_enc → FB Page Token → graph.facebook.com
-    // Flow B (IG Login):         credentials.ig_access_enc   → IG User Token → graph.instagram.com
-    let providerToken: string | null = null
-    let providerKind: 'page' | 'ig' | null = null
-    const creds = (integ.credentials ?? {}) as Record<string, unknown>
-    if (creds.page_access_enc) {
-      try {
-        providerToken = await decryptSecret(creds.page_access_enc as string)
-        providerKind = 'page'
-      } catch (e) {
-        console.warn('decrypt page token failed:', (e as Error).message)
+    for (const integ of integs) {
+      let providerToken: string | null = null
+      let providerKind: 'page' | 'ig' | null = null
+      const creds = (integ.credentials ?? {}) as Record<string, unknown>
+      if (creds.page_access_enc) {
+        try {
+          providerToken = await decryptSecret(creds.page_access_enc as string)
+          providerKind = 'page'
+        } catch (e) {
+          console.warn('decrypt page token failed:', (e as Error).message)
+        }
+      } else if (creds.ig_access_enc) {
+        try {
+          providerToken = await decryptSecret(creds.ig_access_enc as string)
+          providerKind = 'ig'
+        } catch (e) {
+          console.warn('decrypt ig token failed:', (e as Error).message)
+        }
       }
-    } else if (creds.ig_access_enc) {
-      try {
-        providerToken = await decryptSecret(creds.ig_access_enc as string)
-        providerKind = 'ig'
-      } catch (e) {
-        console.warn('decrypt ig token failed:', (e as Error).message)
-      }
-    }
 
-    for (const ev of events) {
-      if (!ev.message) continue
-      await ingestMessage(
-        admin,
-        integ.salon_id,
-        channel,
-        ev,
-        accountId,
-        providerToken,
-        providerKind,
-      )
+      for (const ev of events) {
+        if (!ev.message) continue
+        await ingestMessage(
+          admin,
+          integ.salon_id,
+          channel,
+          ev,
+          accountId,
+          providerToken,
+          providerKind,
+        )
+      }
     }
   }
 
