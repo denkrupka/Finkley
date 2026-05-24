@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
@@ -71,10 +72,19 @@ const SUB_TABS: PageTab<CompetitorsSubTab>[] = [
  */
 export function CompetitorsTab({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
-  // Дефолт «Рейтинг» — там сразу видны данные (Booksy/Google ratings собираются
-  // автосинком сразу). Цены / Загруженность требуют AI-матчинга → пустые при
-  // первом открытии, что выглядит как «не работает».
-  const [sub, setSub] = useState<CompetitorsSubTab>('rating')
+  const [params, setParams] = useSearchParams()
+  // sub-tab синхронизирован с URL (?sub=prices|occupancy|rating|content|params).
+  // Дефолт «Рейтинг» — там сразу видны данные.
+  const subParam = params.get('sub') as CompetitorsSubTab | null
+  const sub: CompetitorsSubTab =
+    subParam && ['prices', 'occupancy', 'rating', 'content', 'params'].includes(subParam)
+      ? subParam
+      : 'rating'
+  function setSub(next: CompetitorsSubTab) {
+    const p = new URLSearchParams(params)
+    p.set('sub', next)
+    setParams(p, { replace: true })
+  }
   const { data: salon } = useSalon(salonId)
   const { data: competitors = [] } = useCompetitors(salonId)
   const currency = salon?.currency ?? 'PLN'
