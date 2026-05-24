@@ -89,14 +89,25 @@ export function useClients(
     queryKey: [...clientsKeys(salonId), 'list', { search, sort }],
     queryFn: async () => {
       if (!salonId) return []
-      let q = supabase
-        .from('clients')
-        .select('*')
-        .eq('salon_id', salonId)
-        .is('deleted_at', null)
-        .limit(5000)
+      // Серверный поиск через ilike: при наборе текста запросом тянем
+      // только релевантные строки (limit 300), не нагружая фронт фильтрацией
+      // 5000 строк на каждый keystroke. Без search — берём всё (до 5000),
+      // нужно для списков типа export/печать.
+      let q = supabase.from('clients').select('*').eq('salon_id', salonId).is('deleted_at', null)
+      if (search) {
+        const escaped = search.replace(/[%_]/g, (m) => `\\${m}`)
+        // Phone поиск — нормализуем pattern (digits only) и фильтруем через ilike.
+        const phonePattern = normalizeSearchPhone(search)
+        const orFilter =
+          phonePattern.length >= 2
+            ? `name.ilike.%${escaped}%,email.ilike.%${escaped}%,phone.ilike.%${phonePattern}%`
+            : `name.ilike.%${escaped}%,email.ilike.%${escaped}%`
+        q = q.or(orFilter).limit(300)
+      } else {
+        q = q.limit(5000)
+      }
 
-      // Сортировка применяется на сервере, чтобы LIMIT срабатывал по нужной оси
+      // Сортировка применяется на сервере, чтобы LIMIT срабатывал по нужной оси.
       if (sort === 'name') q = q.order('name', { ascending: true })
       else if (sort === 'revenue') q = q.order('total_revenue_cents', { ascending: false })
       else
@@ -106,23 +117,7 @@ export function useClients(
 
       const { data, error } = await q
       if (error) throw error
-      let rows = (data ?? []) as ClientRow[]
-
-      if (search) {
-        const lower = search.toLowerCase()
-        const phoneSearch = normalizeSearchPhone(search)
-        rows = rows.filter((c) => {
-          const nameMatch = c.name.toLowerCase().includes(lower)
-          const phoneMatch =
-            phoneSearch.length >= 2 &&
-            c.phone &&
-            normalizeSearchPhone(c.phone).includes(phoneSearch)
-          const emailMatch = c.email && c.email.toLowerCase().includes(lower)
-          return nameMatch || phoneMatch || emailMatch
-        })
-      }
-
-      return rows
+      return (data ?? []) as ClientRow[]
     },
     enabled: !!salonId,
     staleTime: 30_000,

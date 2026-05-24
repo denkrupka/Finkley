@@ -605,31 +605,29 @@ function ManualClientPickerDialog({
   onConfirm: (ids: string[]) => void
 }) {
   const { t } = useTranslation()
-  const { data: clients = [] } = useClients(salonId, { search: '', sort: 'name' })
-  const { data: ltvMap } = useClientLtvMetrics(salonId)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [picked, setPicked] = useState<Set<string>>(() => new Set(selected))
 
-  // Debounce поиска на 200ms — иначе фильтрация 5000 строк на каждый keystroke
-  // блокирует UI thread и поле «зависает».
+  // Debounce поиска 200ms — server-side ilike по name/email/phone, limit 300.
+  // Без search — full list (до 5000) для select-all сценария.
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 200)
     return () => clearTimeout(timer)
   }, [search])
 
-  // Лимит отображаемых строк — 300. При больших базах рендер всех 5000 строк
-  // (даже без скролла) ест 100ms+. 300 строк хватает чтобы найти кого надо
-  // через поиск; если нет — юзер уточнит запрос.
+  const { data: clients = [] } = useClients(salonId, { search: debouncedSearch, sort: 'name' })
+  const { data: ltvMap } = useClientLtvMetrics(salonId)
+
+  // Server возвращает уже лимитированный/отфильтрованный список — на клиенте
+  // только обрезаем под MAX_VISIBLE на случай 5000-row full-list.
   const MAX_VISIBLE = 300
   const { filtered, truncated } = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase()
-    const base = q ? clients.filter((c) => c.name?.toLowerCase().includes(q)) : clients
     return {
-      filtered: base.slice(0, MAX_VISIBLE),
-      truncated: base.length > MAX_VISIBLE ? base.length - MAX_VISIBLE : 0,
+      filtered: clients.slice(0, MAX_VISIBLE),
+      truncated: clients.length > MAX_VISIBLE ? clients.length - MAX_VISIBLE : 0,
     }
-  }, [clients, debouncedSearch])
+  }, [clients])
 
   function toggle(id: string) {
     setPicked((prev) => {
