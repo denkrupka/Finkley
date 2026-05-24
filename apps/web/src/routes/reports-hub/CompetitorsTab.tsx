@@ -1483,23 +1483,6 @@ function OccupancyTable({
   // от «sync ещё не отработал».
   const booksyCompetitors = useMemo(() => competitors.filter((c) => c.booksy_url), [competitors])
 
-  // watched_services фильтр: если юзер выбрал что отслеживать — показываем
-  // ТОЛЬКО эти услуги (fuzzy-match по нормализованным токенам). Иначе все.
-  const watchedTokens = useMemo(() => {
-    const watched = settings?.watched_services ?? []
-    if (watched.length === 0) return null
-    return watched.map((s) => normalizeServiceName(s))
-  }, [settings?.watched_services])
-
-  function matchesWatched(svcName: string): boolean {
-    if (!watchedTokens) return true
-    const t = normalizeServiceName(svcName)
-    for (const ws of watchedTokens) {
-      if (tokenSimilarity(ws, t) >= 0.4) return true
-    }
-    return false
-  }
-
   // Собираем последний occupancy-snapshot на каждого конкурента.
   const latestByCompetitor = useMemo(() => {
     const map = new Map<string, NonNullable<typeof snapshots>[number]>()
@@ -1550,60 +1533,169 @@ function OccupancyTable({
     return out
   }
 
-  const rows = useMemo<Row[]>(() => {
-    const out: Row[] = []
+  // ===========================================================================
+  // НОВАЯ структура: pivot rows = watched_services (или, если watched пуст, top
+  // имена услуг по объединённому каталогу). Колонки = (наш салон) + конкуренты.
+  // Внутри ячейки: free_slots_7d (max среди variants matching), days, staff.
+  // ===========================================================================
+
+  /** Все watched-имена (если есть) или union топ-имен из всех caталогов. */
+  const watchedList = useMemo(() => {
+    return settings?.watched_services ?? []
+  }, [settings?.watched_services])
+
+  /** Для каждого (party_id, watched_name) собираем агрегацию variants:
+   *  - free_slots_7d: MAX (избегаем задвоения — слоты разных variants ОДНОГО
+   *    мастера это его календарь, общий)
+   *  - staff_count: MAX (сколько мастеров делают наиболее популярный variant)
+   *  - days_covered: MAX
+   *  - variant_labels: список имён variants matching
+   *  - closed_to_public: TRUE если все variants закрыты
+   *  - matched: FALSE если ни один variant не совпадает с watched (показать «—»). */
+  type Cell = {
+    free_slots_7d: number
+    days_covered: number
+    staff_count: number
+    duration_min: number
+    variant_labels: string[]
+    closed_to_public: boolean
+    matched: boolean
+  }
+  const emptyCell: Cell = {
+    free_slots_7d: 0,
+    days_covered: 0,
+    staff_count: 0,
+    duration_min: 0,
+    variant_labels: [],
+    closed_to_public: false,
+    matched: false,
+  }
+  function aggCell(services: OccupancyService[], watchedTokensForName: string[]): Cell {
+    const matching = services.filter(
+      (s) => tokenSimilarity(watchedTokensForName, normalizeServiceName(s.name)) >= 0.3,
+    )
+    if (matching.length === 0) return emptyCell
+    const allClosed = matching.every((s) => s.closed_to_public || s.free_slots_7d === 0)
+    const max = matching.reduce((m, x) => (x.free_slots_7d > m.free_slots_7d ? x : m), matching[0]!)
+    return {
+      free_slots_7d: max.free_slots_7d,
+      days_covered: max.days_covered,
+      staff_count: Math.max(...matching.map((s) => s.staff_count)),
+      duration_min: max.duration_min,
+      variant_labels: matching.map((s) => s.name),
+      closed_to_public: allClosed,
+      matched: true,
+    }
+  }
+
+  /** Все доступные party-id и services (own + competitors) в одном списке. */
+  type Party = {
+    id: string
+    name: string
+    isOwn: boolean
+    services: OccupancyService[]
+    hasSnapshot: boolean
+  }
+  const parties = useMemo<Party[]>(() => {
+    const list: Party[] = []
+    list.push({
+      id: salonId,
+      name: ownSalonName,
+      isOwn: true,
+      services: ownOccupancy ? aggregateLegacy(ownOccupancy.services as OccupancyService[]) : [],
+      hasSnapshot: !!ownOccupancy,
+    })
     for (const c of competitors) {
       const snap = latestByCompetitor.get(c.id)
-      if (!snap) continue
-      const data = snap.data as { services?: OccupancyService[]; total_staff?: number }
-      const services = aggregateLegacy(Array.isArray(data.services) ? data.services : [])
-      for (const svc of services) {
-        if (!matchesWatched(svc.name)) continue
+      const data = snap?.data as { services?: OccupancyService[]; total_staff?: number } | undefined
+      list.push({
+        id: c.id,
+        name: c.name,
+        isOwn: false,
+        services: data ? aggregateLegacy(Array.isArray(data.services) ? data.services : []) : [],
+        hasSnapshot: !!snap,
+      })
+    }
+    return list
+  }, [competitors, latestByCompetitor, ownOccupancy, salonId, ownSalonName])
+
+  /** Имена для строк — watched services если заданы, иначе union имён из
+   *  всех каталогов (не более 10 уникальных). */
+  const rowServiceNames = useMemo<string[]>(() => {
+    if (watchedList.length > 0) return watchedList
+    const seen = new Set<string>()
+    for (const p of parties) {
+      for (const s of p.services) {
+        if (s.name) seen.add(s.name)
+        if (seen.size >= 10) break
+      }
+    }
+    return Array.from(seen)
+  }, [watchedList, parties])
+
+  /** Aggregate cells: для каждой watched-услуги × каждого party. */
+  const grid = useMemo(() => {
+    const out = new Map<string, Map<string, Cell>>()
+    for (const name of rowServiceNames) {
+      const tokens = normalizeServiceName(name)
+      const partyCells = new Map<string, Cell>()
+      for (const p of parties) {
+        partyCells.set(p.id, aggCell(p.services, tokens))
+      }
+      out.set(name, partyCells)
+    }
+    return out
+    // aggCell — pure function, не зависит от внешнего состояния.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowServiceNames, parties])
+
+  /** Среднее slots per service (для % vs средний). closed не учитываются. */
+  const avgSlotsByService = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const name of rowServiceNames) {
+      const cells = grid.get(name)
+      if (!cells) continue
+      const usable: number[] = []
+      for (const cell of cells.values()) {
+        if (!cell.matched || cell.closed_to_public) continue
+        usable.push(cell.free_slots_7d)
+      }
+      if (usable.length > 0) {
+        map.set(name, usable.reduce((s, x) => s + x, 0) / usable.length)
+      }
+    }
+    return map
+  }, [rowServiceNames, grid])
+
+  // Legacy rows для AI-выводов (не меняем shape payload).
+  const rows = useMemo(() => {
+    const out: Row[] = []
+    for (const name of rowServiceNames) {
+      const cells = grid.get(name)
+      if (!cells) continue
+      for (const p of parties) {
+        if (p.isOwn) continue
+        const cell = cells.get(p.id)
+        if (!cell?.matched) continue
         out.push({
-          competitorId: c.id,
-          competitorName: c.name,
+          competitorId: p.id,
+          competitorName: p.name,
           isOwn: false,
-          service: svc,
-          totalStaff: data.total_staff ?? 0,
+          service: {
+            name,
+            duration_min: cell.duration_min,
+            staff_count: cell.staff_count,
+            free_slots_7d: cell.free_slots_7d,
+            days_covered: cell.days_covered,
+            closed_to_public: cell.closed_to_public,
+            variant_labels: cell.variant_labels,
+          },
+          totalStaff: 0,
         })
       }
     }
     return out
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [competitors, latestByCompetitor, watchedTokens])
-
-  const ownRows = useMemo<Row[]>(() => {
-    if (!ownOccupancy) return []
-    const services = aggregateLegacy(ownOccupancy.services as OccupancyService[])
-    return services
-      .filter((s) => matchesWatched(s.name))
-      .map((s) => ({
-        competitorId: salonId,
-        competitorName: ownSalonName,
-        isOwn: true,
-        service: s,
-        totalStaff: ownOccupancy.total_staff,
-      }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownOccupancy, salonId, ownSalonName, watchedTokens])
-
-  // Среднее по всем (наш + конкуренты) — для % vs средний.
-  // closed_to_public rows исключаем (у них free_slots_7d=0, иначе среднее ушло вниз).
-  const avgSlotsByService = useMemo(() => {
-    const map = new Map<string, number>()
-    const buckets = new Map<string, number[]>()
-    for (const r of [...ownRows, ...rows]) {
-      if (r.service.closed_to_public) continue
-      const list = buckets.get(r.service.name) ?? []
-      list.push(r.service.free_slots_7d)
-      buckets.set(r.service.name, list)
-    }
-    for (const [name, list] of buckets.entries()) {
-      const avg = list.reduce((s, x) => s + x, 0) / list.length
-      map.set(name, avg)
-    }
-    return map
-  }, [rows, ownRows])
+  }, [rowServiceNames, grid, parties])
 
   function runAi() {
     const payload = {
@@ -1626,6 +1718,39 @@ function OccupancyTable({
     )
   }
 
+  function Slot({ cell }: { cell: Cell }) {
+    if (!cell.matched) {
+      return <span className="text-muted-foreground/40">—</span>
+    }
+    if (cell.closed_to_public) {
+      return (
+        <span
+          className="text-[11px] text-amber-700"
+          title={t('reports_hub.competitors.occupancy_closed_to_public')}
+        >
+          закрыто
+        </span>
+      )
+    }
+    return (
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="num text-foreground text-base font-bold">{cell.free_slots_7d}</span>
+        <span className="text-muted-foreground/80 text-[10px]">
+          {cell.days_covered}/7 дн · {cell.staff_count}{' '}
+          {t('reports_hub.competitors.col_staff_count').toLowerCase()}
+        </span>
+        {cell.variant_labels.length > 1 ? (
+          <span
+            className="text-muted-foreground/60 max-w-[180px] truncate text-[9.5px]"
+            title={cell.variant_labels.join(' · ')}
+          >
+            ×{cell.variant_labels.length} {t('reports_hub.competitors.occupancy_variants_short')}
+          </span>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <AiReportPanel
@@ -1635,228 +1760,115 @@ function OccupancyTable({
         hint={t('reports_hub.competitors.ai_occupancy_hint')}
       />
 
-      <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-muted/40 text-muted-foreground border-b text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold">
-                {t('reports_hub.competitors.col_competitor')}
-              </th>
-              <th className="px-4 py-3 text-left font-semibold">
-                {t('reports_hub.competitors.col_service')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_staff_count_hint')}
-              >
-                {t('reports_hub.competitors.col_staff_count')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_slots_7d_hint')}
-              >
-                {t('reports_hub.competitors.col_slots_7d')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_days_covered_hint')}
-              >
-                {t('reports_hub.competitors.col_days_covered')}
-              </th>
-              <th
-                className="px-3 py-3 text-right font-semibold"
-                title={t('reports_hub.competitors.col_vs_avg_hint')}
-              >
-                {t('reports_hub.competitors.col_vs_avg')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-border divide-y">
-            {/* Own salon rows — выделены сверху, для прямого сравнения. */}
-            {ownRows.map((r, i) => {
-              const avg = avgSlotsByService.get(r.service.name) ?? 0
-              const diffPct =
-                avg > 0 ? Math.round(((r.service.free_slots_7d - avg) / avg) * 100) : null
-              return (
-                <tr
-                  key={`own_${i}`}
-                  className="bg-brand-sage-soft/30 border-brand-sage-soft border-l-4"
-                >
-                  <td className="text-brand-sage-deep px-4 py-3 font-bold">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="size-3.5" strokeWidth={2} />
-                      {r.competitorName}
-                      <span className="bg-brand-sage-soft text-brand-sage-deep rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
-                        {t('reports_hub.competitors.own_badge')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="text-foreground px-4 py-3 text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span>
-                        {r.service.name}
-                        {r.service.duration_min ? (
-                          <span className="text-muted-foreground ml-1">
-                            · {r.service.duration_min} {t('common.min')}
-                          </span>
-                        ) : null}
-                      </span>
-                      {Array.isArray(r.service.variant_labels) &&
-                      r.service.variant_labels.filter(Boolean).length > 0 ? (
-                        <span className="text-muted-foreground/70 text-[10px]">
-                          {t('reports_hub.competitors.occupancy_includes', {
-                            list: r.service.variant_labels.filter(Boolean).join(' · '),
-                          })}
-                        </span>
-                      ) : null}
-                      {r.service.closed_to_public ? (
-                        <span className="text-[10px] text-amber-700">
-                          ⓘ {t('reports_hub.competitors.occupancy_closed_to_public')}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="num text-foreground px-3 py-3 text-right">
-                    {r.service.staff_count}
-                  </td>
-                  <td className="num text-foreground px-3 py-3 text-right font-bold">
-                    {r.service.closed_to_public ? '—' : r.service.free_slots_7d}
-                  </td>
-                  <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                    {r.service.closed_to_public ? '—' : `${r.service.days_covered} / 7`}
-                  </td>
-                  <td
+      {rowServiceNames.length === 0 ? (
+        <div className="border-border bg-card shadow-finsm rounded-lg border px-5 py-12 text-center">
+          <p className="text-muted-foreground text-sm">
+            {booksyCompetitors.length === 0
+              ? t('reports_hub.competitors.occupancy_no_booksy')
+              : t('reports_hub.competitors.occupancy_empty')}
+          </p>
+          <p className="text-muted-foreground/70 mt-1 text-xs">
+            {t('reports_hub.competitors.occupancy_pick_watched_hint')}
+          </p>
+        </div>
+      ) : (
+        <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[760px] text-sm">
+            <colgroup>
+              <col />
+              <col className="bg-brand-sage-soft/15" />
+              {parties.slice(1).map((_, i) => (
+                <col key={i} className={i % 2 === 0 ? 'bg-sky-50/60' : 'bg-amber-50/60'} />
+              ))}
+            </colgroup>
+            <thead className="bg-muted/40 text-muted-foreground text-[11px] uppercase tracking-wider">
+              <tr className="border-b">
+                <th className="border-border/40 border-r px-4 py-2 text-left font-bold">
+                  {t('reports_hub.competitors.col_service')}
+                </th>
+                {parties.map((p) => (
+                  <th
+                    key={p.id}
                     className={cn(
-                      'num px-3 py-3 text-right font-bold',
-                      diffPct == null
-                        ? 'text-muted-foreground/60'
-                        : diffPct > 10
-                          ? 'text-emerald-700'
-                          : diffPct < -10
-                            ? 'text-rose-600'
-                            : 'text-muted-foreground',
+                      'border-border/40 border-r px-3 py-2 text-right font-bold',
+                      p.isOwn && 'bg-brand-sage-soft/30 text-brand-sage-deep',
                     )}
                   >
-                    {diffPct == null || r.service.closed_to_public
-                      ? '—'
-                      : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
-                  </td>
-                </tr>
-              )
-            })}
-            {rows.length === 0 && ownRows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-muted-foreground px-5 py-12 text-center text-sm">
-                  {booksyCompetitors.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <p>{t('reports_hub.competitors.occupancy_no_booksy')}</p>
-                      <p className="text-muted-foreground/70 text-xs">
-                        {t('reports_hub.competitors.occupancy_no_booksy_hint')}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-3">
-                      <p>{t('reports_hub.competitors.occupancy_empty')}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Сбрасываем cooldown, чтобы DataSection effect не блокировал ручной запуск.
-                          try {
-                            localStorage.removeItem(`competitors-last-sync-${salonId}`)
-                          } catch {
-                            /* ignore */
-                          }
-                          syncCompetitors.mutate(undefined, {
-                            onSuccess: (res) =>
-                              toast.success(
-                                t('reports_hub.competitors.sync_done', {
-                                  count: res.snapshots,
-                                }),
-                              ),
-                            onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-                          })
-                        }}
-                        disabled={syncCompetitors.isPending}
-                        className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {syncCompetitors.isPending ? (
-                          <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
-                        ) : null}
-                        {syncCompetitors.isPending
-                          ? t('reports_hub.competitors.sync_running')
-                          : t('reports_hub.competitors.sync_now')}
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ) : (
-              rows.map((r, i) => {
-                const avg = avgSlotsByService.get(r.service.name) ?? 0
-                const diffPct =
-                  avg > 0 ? Math.round(((r.service.free_slots_7d - avg) / avg) * 100) : null
-                return (
-                  <tr key={`${r.competitorId}_${i}`}>
-                    <td className="text-foreground px-4 py-3 font-semibold">{r.competitorName}</td>
-                    <td className="text-foreground px-4 py-3 text-xs">
-                      <div className="flex flex-col gap-0.5">
-                        <span>
-                          {r.service.name}
-                          {r.service.duration_min ? (
-                            <span className="text-muted-foreground ml-1">
-                              · {r.service.duration_min} {t('common.min')}
-                            </span>
-                          ) : null}
+                    <div className="flex items-center justify-end gap-1.5">
+                      {p.isOwn ? <Sparkles className="size-3" strokeWidth={2.5} /> : null}
+                      <span className="max-w-[140px] truncate" title={p.name}>
+                        {p.name}
+                      </span>
+                      {p.isOwn ? (
+                        <span className="bg-brand-sage-soft text-brand-sage-deep rounded-full px-1 py-0.5 text-[8.5px] font-bold uppercase">
+                          {t('reports_hub.competitors.own_badge')}
                         </span>
-                        {Array.isArray(r.service.variant_labels) &&
-                        r.service.variant_labels.filter(Boolean).length > 0 ? (
-                          <span className="text-muted-foreground/70 text-[10px]">
-                            {t('reports_hub.competitors.occupancy_includes', {
-                              list: r.service.variant_labels.filter(Boolean).join(' · '),
-                            })}
-                          </span>
-                        ) : null}
-                        {r.service.closed_to_public ? (
-                          <span className="text-[10px] text-amber-700">
-                            ⓘ {t('reports_hub.competitors.occupancy_closed_to_public')}
-                          </span>
-                        ) : null}
-                      </div>
+                      ) : null}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              {rowServiceNames.map((name) => {
+                const cells = grid.get(name)
+                if (!cells) return null
+                return (
+                  <tr key={name}>
+                    <td className="text-foreground border-border/40 border-r px-4 py-3 align-top font-semibold">
+                      {name}
                     </td>
-                    <td className="num text-foreground px-3 py-3 text-right">
-                      {r.service.staff_count}
-                    </td>
-                    <td className="num text-foreground px-3 py-3 text-right font-bold">
-                      {r.service.closed_to_public ? '—' : r.service.free_slots_7d}
-                    </td>
-                    <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
-                      {r.service.closed_to_public ? '—' : `${r.service.days_covered} / 7`}
-                    </td>
-                    <td
-                      className={cn(
-                        'num px-3 py-3 text-right font-bold',
-                        diffPct == null
-                          ? 'text-muted-foreground/60'
-                          : diffPct > 10
-                            ? 'text-emerald-700'
-                            : diffPct < -10
-                              ? 'text-rose-600'
-                              : 'text-muted-foreground',
-                      )}
-                    >
-                      {diffPct == null || r.service.closed_to_public
-                        ? '—'
-                        : `${diffPct > 0 ? '+' : ''}${diffPct}%`}
-                    </td>
+                    {parties.map((p) => (
+                      <td key={p.id} className="border-border/40 border-r px-3 py-3 text-right">
+                        <Slot cell={cells.get(p.id) ?? emptyCell} />
+                      </td>
+                    ))}
                   </tr>
                 )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <div className="hidden">{/* prev AI block removed — moved to top */}</div>
+      {/* Кнопка Force-sync — показываем только когда ничего ещё не подтянулось. */}
+      {parties.every((p) => !p.hasSnapshot) && booksyCompetitors.length > 0 ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                localStorage.removeItem(`competitors-last-sync-${salonId}`)
+              } catch {
+                /* ignore */
+              }
+              syncCompetitors.mutate(undefined, {
+                onSuccess: (res) =>
+                  toast.success(t('reports_hub.competitors.sync_done', { count: res.snapshots })),
+                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+              })
+            }}
+            disabled={syncCompetitors.isPending}
+            className="bg-brand-navy hover:bg-brand-navy/90 inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {syncCompetitors.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+            ) : null}
+            {syncCompetitors.isPending
+              ? t('reports_hub.competitors.sync_running')
+              : t('reports_hub.competitors.sync_now')}
+          </button>
+        </div>
+      ) : null}
+
+      {/* Avg-by-service для AI payload (используется в runAi). */}
+      <div className="hidden">
+        {rows.map((r) => (
+          <span key={`${r.competitorId}-${r.service.name}`}>
+            {avgSlotsByService.get(r.service.name) ?? 0}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

@@ -2961,6 +2961,8 @@
       "col_group_summary": "Summary",
       "occupancy_includes": "incl.: {{list}}",
       "occupancy_closed_to_public": "booking closed (regular clients only)",
+      "occupancy_variants_short": "var.",
+      "occupancy_pick_watched_hint": "Pick up to 3 services in «Settings» — they will become rows of the table with competitors data.",
       "ai_occupancy_hint": "Click «Generate AI insight» — AI will analyze competitor free slots and suggest where we beat them on availability and where we need to push.",
       "google_reviews_limit_hint": "Google API returns at most 5 latest reviews per place — so the «Reviews» column may show fewer than the actual count in Google Maps. Booksy returns the full history with no limit. If the number doesn't match your business — click the eye 👁 to verify Google links to your listing. If it's the wrong place — Settings → Profile → search your salon in Google Maps again.",
       "ai_panel_title": "AI insights on this report",
