@@ -2481,7 +2481,10 @@
       "meta_pending_note": "WhatsApp / Instagram / Facebook wymagają Meta App Review dla dwukierunkowej komunikacji. Dane zostaną zapisane, prawdziwy odbiór wiadomości włączy się po zatwierdzeniu.",
       "generic_help": "Wprowadź dane dostępu kanału. Tokeny są zaszyfrowane na serwerze.",
       "telegram_help": "Utwórz bota przez @BotFather w Telegramie → /newbot → otrzymasz token jak 123456789:ABC-DEF1234… Wklej tutaj.",
-      "whatsapp_help": "W Meta for Developers utwórz aplikację WhatsApp Business → pobierz Phone Number ID i Permanent Access Token z ustawień API.",
+      "whatsapp_help": "Wpisz 2 wartości z Meta Business — Phone Number ID i Permanent Access Token. Gdzie je znaleźć — krok po kroku poniżej.",
+      "whatsapp_steps_title": "Gdzie wziąć dane:",
+      "whatsapp_step1": "Phone Number ID — otwórz",
+      "whatsapp_step2": "Permanent Access Token — utwórz System User token w",
       "instagram_help": "W Meta for Developers utwórz aplikację Instagram Graph → pobierz Page ID powiązanej strony FB i długoterminowy Page Access Token.",
       "facebook_help": "W Meta for Developers utwórz aplikację z dostępem do Stron → pobierz Page ID i Page Access Token z Graph API Explorer.",
       "field": {

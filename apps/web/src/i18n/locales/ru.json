@@ -3153,7 +3153,10 @@
       "meta_pending_note": "WhatsApp / Instagram / Facebook требуют прохождения Meta App Review для двусторонней связи. Данные сохранятся, реальный приём сообщений включится после одобрения.",
       "generic_help": "Введи данные доступа канала. Токены сохраняются в зашифрованном виде на сервере.",
       "telegram_help": "Создай бота через @BotFather в Telegram → /newbot → получишь токен вида 123456789:ABC-DEF1234… Вставь его сюда.",
-      "whatsapp_help": "В Meta for Developers создай приложение WhatsApp Business → возьми Phone Number ID и Permanent Access Token из настроек API.",
+      "whatsapp_help": "Введи 2 значения из Meta Business — Phone Number ID и Permanent Access Token. Где их взять — пошагово ниже.",
+      "whatsapp_steps_title": "Где взять данные:",
+      "whatsapp_step1": "Phone Number ID — открой",
+      "whatsapp_step2": "Permanent Access Token — создай System User token в",
       "instagram_help": "В Meta for Developers создай приложение Instagram Graph → возьми Page ID привязанной FB-страницы и долгоживущий Page Access Token.",
       "facebook_help": "В Meta for Developers создай приложение с Pages-доступом → возьми Page ID и Page Access Token из инструмента Graph API Explorer.",
       "field": {

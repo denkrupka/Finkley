@@ -68,7 +68,7 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
       credentials = {
         phone_number_id: (fields.phone_number_id ?? '').trim(),
         access_token: (fields.access_token ?? '').trim(),
-        verify_token: (fields.verify_token ?? '').trim(),
+        // verify_token не запрашиваем у юзера — backend генерирует случайный.
       }
     } else {
       credentials = {
@@ -173,6 +173,35 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
             />
           ) : channel === 'whatsapp' ? (
             <>
+              <div className="border-brand-sage-soft bg-brand-sage-soft/15 rounded-md border p-3 text-xs">
+                <p className="text-brand-sage-deep mb-2 font-bold">
+                  {t('integrations.messengers.whatsapp_steps_title')}
+                </p>
+                <ol className="text-foreground/80 list-inside list-decimal space-y-1 leading-relaxed">
+                  <li>
+                    {t('integrations.messengers.whatsapp_step1')}{' '}
+                    <a
+                      href="https://business.facebook.com/wa/manage/phone-numbers/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-navy font-semibold underline"
+                    >
+                      business.facebook.com → WhatsApp → Phone Numbers
+                    </a>
+                  </li>
+                  <li>
+                    {t('integrations.messengers.whatsapp_step2')}{' '}
+                    <a
+                      href="https://developers.facebook.com/apps/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-navy font-semibold underline"
+                    >
+                      developers.facebook.com → твоё App → WhatsApp → API Setup
+                    </a>
+                  </li>
+                </ol>
+              </div>
               <FieldInput
                 labelKey="integrations.messengers.field.phone_number_id"
                 hintKey="integrations.messengers.hint.phone_number_id"
@@ -188,13 +217,7 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
                 placeholder="EAA..."
                 type="password"
               />
-              <FieldInput
-                labelKey="integrations.messengers.field.verify_token"
-                hintKey="integrations.messengers.hint.verify_token"
-                value={fields.verify_token ?? ''}
-                onChange={(v) => set('verify_token', v)}
-                placeholder="random-string"
-              />
+              {/* verify_token больше не показываем — auto-generate на бэкенде. */}
             </>
           ) : showManual ? (
             <>

@@ -167,7 +167,10 @@ async function connectChannel(
   if (channel === 'whatsapp') {
     const phoneNumberId = String(credentials.phone_number_id ?? '').trim()
     const accessToken = String(credentials.access_token ?? '').trim()
-    const verifyToken = String(credentials.verify_token ?? '').trim()
+    // verify_token — webhook validation secret. Если юзер не задал, генерируем
+    // случайный (юзеру не нужно его помнить, кладём в webhook config в Meta).
+    const userVerifyToken = String(credentials.verify_token ?? '').trim()
+    const verifyToken = userVerifyToken || crypto.randomUUID().replace(/-/g, '')
     if (!phoneNumberId || !accessToken) {
       throw new Error('phone_number_id and access_token required')
     }
