@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 
+import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
+
 import { LinkTransactionDialog } from './LinkTransactionDialog'
 
 type Direction = 'debit' | 'credit'
@@ -45,6 +47,15 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
   const sync = useBankSyncNow(salonId)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
+  // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createPrefill, setCreatePrefill] = useState<{
+    bank_transaction_id: string
+    amount_cents: number
+    date: string
+    description: string
+    counterparty_hint: string | null
+  } | null>(null)
 
   const isLoading = inflowsQ.isLoading || outflowsQ.isLoading
   const rows: Array<BankInflowRow | BankOutflowRow> =
@@ -165,6 +176,37 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
           salonId={salonId}
           transaction={linkTx}
           direction={direction}
+          onCreateExpenseFromTx={
+            direction === 'debit'
+              ? () => {
+                  setCreatePrefill({
+                    bank_transaction_id: linkTx.id,
+                    amount_cents: linkTx.amount_cents,
+                    date: linkTx.executed_at.slice(0, 10),
+                    description: linkTx.description ?? '',
+                    counterparty_hint: linkTx.counterparty,
+                  })
+                  setLinkOpen(false)
+                  setCreateOpen(true)
+                }
+              : undefined
+          }
+        />
+      ) : null}
+
+      {createPrefill ? (
+        <ExpenseFormModal
+          open={createOpen}
+          onOpenChange={(v) => {
+            setCreateOpen(v)
+            if (!v) {
+              setCreatePrefill(null)
+              setLinkTx(null)
+            }
+          }}
+          salonId={salonId}
+          currency={currency}
+          prefillFromBankTx={createPrefill}
         />
       ) : null}
     </div>

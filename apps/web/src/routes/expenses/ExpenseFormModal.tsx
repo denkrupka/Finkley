@@ -256,6 +256,15 @@ type Props = {
   defaultDate?: string | null
   /** Существующий запланированный платёж — для mode='planned-paying'. */
   existingPayment?: ScheduledPaymentRow | null
+  /** Banking-flow: префилл из bank-транзакции. После create связываем
+   *  bank_transactions.expense_id и снимаем needs_review. */
+  prefillFromBankTx?: {
+    bank_transaction_id: string
+    amount_cents: number
+    date: string // YYYY-MM-DD
+    description: string
+    counterparty_hint: string | null
+  } | null
 }
 
 export function ExpenseFormModal({
@@ -267,6 +276,7 @@ export function ExpenseFormModal({
   expense,
   mode = 'expense',
   defaultDate,
+  prefillFromBankTx,
   existingPayment,
 }: Props) {
   const { t } = useTranslation()
@@ -448,6 +458,25 @@ export function ExpenseFormModal({
         is_partial_payment: false,
         paid_amount: '',
       })
+    } else if (prefillFromBankTx) {
+      form.reset({
+        expense_at: prefillFromBankTx.date,
+        description: prefillFromBankTx.counterparty_hint || prefillFromBankTx.description || '',
+        category_id: defaultCategoryId ?? '',
+        counterparty_id: '',
+        amount: (prefillFromBankTx.amount_cents / 100).toFixed(2),
+        payment_method: 'transfer',
+        cash_register_id: '',
+        document_number: '',
+        comment: prefillFromBankTx.description || '',
+        recurrence: 'none',
+        payroll_staff_id: '',
+        payroll_kind: '',
+        payroll_period_start: '',
+        payroll_period_end: '',
+        is_partial_payment: false,
+        paid_amount: '',
+      })
     } else {
       form.reset({
         expense_at: defaultDate || today,
@@ -469,7 +498,14 @@ export function ExpenseFormModal({
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
-  }, [open, expense?.id, existingPayment?.id, mode, defaultDate])
+  }, [
+    open,
+    expense?.id,
+    existingPayment?.id,
+    mode,
+    defaultDate,
+    prefillFromBankTx?.bank_transaction_id,
+  ])
 
   /**
    * Выводим payment_method из выбранной кассы (cash_register_id) если юзер
@@ -619,6 +655,21 @@ export function ExpenseFormModal({
       },
       {
         onSuccess: async (created) => {
+          // Banking-flow: если создавали из транзакции, линкуем сразу
+          // (bank_transactions.expense_id + expenses.bank_transaction_id,
+          // needs_review=false т.к. оператор сам ввёл данные).
+          if (prefillFromBankTx && created?.id) {
+            await supabase
+              .from('bank_transactions')
+              .update({ expense_id: created.id, needs_review: false })
+              .eq('id', prefillFromBankTx.bank_transaction_id)
+            await supabase
+              .from('expenses')
+              .update({ bank_transaction_id: prefillFromBankTx.bank_transaction_id })
+              .eq('id', created.id)
+            await qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+            await qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+          }
           // Связывание с scheduled_payments в зависимости от mode:
           //  - 'planned-paying': UPDATE существующего payment'а — status=paid,
           //    paid_expense_id=created.id, paid_at=now.

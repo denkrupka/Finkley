@@ -1,4 +1,4 @@
-import { Link2, Loader2, Search, Unlink2 } from 'lucide-react'
+import { Link2, Loader2, Plus, Search, Unlink2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -25,6 +25,9 @@ type Props = {
   salonId: string
   transaction: BankInflowRow | BankOutflowRow
   direction: 'debit' | 'credit'
+  /** Callback для кнопки «Создать новый расход» — родитель открывает
+   *  ExpenseFormModal с prefill из этой транзакции. Только для debit. */
+  onCreateExpenseFromTx?: () => void
 }
 
 /**
@@ -41,6 +44,7 @@ export function LinkTransactionDialog({
   salonId,
   transaction,
   direction,
+  onCreateExpenseFromTx,
 }: Props) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
@@ -195,9 +199,18 @@ export function LinkTransactionDialog({
             )}
           </div>
 
-          {/* TODO Этап 4: «Создать новый расход из этой транзакции» с
-              prefill (amount/date/counterparty) — требует расширения
-              ExpenseFormModal. */}
+          {direction === 'debit' && onCreateExpenseFromTx ? (
+            <button
+              type="button"
+              onClick={onCreateExpenseFromTx}
+              className="bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80 inline-flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-colors"
+            >
+              <Plus className="size-3.5" strokeWidth={2.4} />
+              {t('banking.link_dialog.create_new_expense', {
+                defaultValue: '+ Создать новый расход с этими данными',
+              })}
+            </button>
+          ) : null}
         </div>
 
         <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
