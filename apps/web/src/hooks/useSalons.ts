@@ -70,6 +70,7 @@ export type NotificationTypeKey =
   | 'low_inventory'
   | 'booksy_new_visits'
   | 'calendar_conflicts'
+  | 'messenger_new_message'
 
 /**
  * Возвращает список салонов текущего юзера через RLS-политику

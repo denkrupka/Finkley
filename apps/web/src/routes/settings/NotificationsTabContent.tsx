@@ -63,6 +63,12 @@ const TYPE_GROUPS: Array<{
       { key: 'calendar_conflicts', label: 'settings.notifications.type.calendar_conflicts' },
     ],
   },
+  {
+    group: 'settings.notifications.group.messaging',
+    items: [
+      { key: 'messenger_new_message', label: 'settings.notifications.type.messenger_new_message' },
+    ],
+  },
 ]
 
 export function NotificationsTabContent({
@@ -229,6 +235,8 @@ const DEFAULT_TYPE_LABELS: Record<NotificationTypeKey, string> = {
   low_inventory: 'Низкие остатки на складе',
   booksy_new_visits: 'Новые визиты импортированные из Booksy',
   calendar_conflicts: 'Конфликты в календаре (двойная бронь)',
+  messenger_new_message:
+    'Новое сообщение в мессенджере (WhatsApp / Instagram / Facebook / Telegram)',
 }
 
 function DigestSection({

@@ -474,6 +474,13 @@
     "record_voice": "Записать голосовое",
     "stop_recording": "Остановить запись и отправить",
     "search_in_chat": "Поиск в чате…",
+    "open": "Открыть",
+    "unknown_sender": "Неизвестный клиент",
+    "media_image": "📷 Фото",
+    "media_video": "🎥 Видео",
+    "media_audio": "🎙 Голосовое",
+    "media_file": "📎 Файл",
+    "media_sticker": "🎭 Стикер",
     "errors": {
       "file_too_large": "Файл слишком большой (макс. 50 МБ)",
       "no_mic": "Микрофон недоступен в этом браузере"
@@ -874,6 +881,7 @@
     "payouts": "Зарплаты",
     "reports": "Отчёты",
     "reports_unread_negative": "Новых негативных отзывов: {{count}}",
+    "messenger_unread": "Непрочитанных сообщений: {{count}}",
     "finance": "Финансы",
     "knowledge": "База знаний",
     "ai": "AI-помощник",
@@ -2565,7 +2573,8 @@
       "group": {
         "summary": "Сводки",
         "payments": "Платежи и фактуры",
-        "business": "События салона"
+        "business": "События салона",
+        "messaging": "Сообщения от клиентов"
       },
       "type": {
         "weekly_digest": "Еженедельный дайджест (понедельник утром)",
@@ -2577,7 +2586,8 @@
         "payment_overdue": "Просроченный платёж — каждый день пока не оплачен",
         "low_inventory": "Низкие остатки на складе",
         "booksy_new_visits": "Новые визиты импортированные из Booksy",
-        "calendar_conflicts": "Конфликты в календаре (двойная бронь)"
+        "calendar_conflicts": "Конфликты в календаре (двойная бронь)",
+        "messenger_new_message": "Новое сообщение в мессенджере (WhatsApp / Instagram / Facebook / Telegram)"
       }
     },
     "daily_digest": {

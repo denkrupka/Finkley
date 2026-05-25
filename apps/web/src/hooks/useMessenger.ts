@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -102,6 +105,167 @@ export type MessengerIntegration = {
   display_name: string | null
   last_synced_at: string | null
   last_error: string | null
+}
+
+/**
+ * Сумма unread_count по всем active conversations салона. Используется для
+ * badge на пункте «Мессенджер» в Sidebar.
+ *
+ * - Кеш-ключ намеренно отличается от useConversations: badge нужен в шапке
+ *   на всех страницах, а full list of conversations — только на странице
+ *   мессенджера. Раздельные ключи позволяют грузить только нужное.
+ * - Realtime подписка инвалидирует ключ при INSERT/UPDATE messenger_messages
+ *   и messenger_conversations.
+ */
+export function useUnreadMessengerCount(salonId: string | undefined) {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!salonId) return
+    const channel = supabase
+      .channel(`messenger-unread:${salonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messenger_conversations',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['messenger-unread', salonId] })
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [salonId, qc])
+
+  return useQuery<number>({
+    queryKey: ['messenger-unread', salonId],
+    queryFn: async () => {
+      if (!salonId) return 0
+      const { data, error } = await supabase
+        .from('messenger_conversations')
+        .select('unread_count')
+        .eq('salon_id', salonId)
+        .is('archived_at', null)
+      if (error) throw error
+      return (data ?? []).reduce((sum, c) => sum + (c.unread_count ?? 0), 0)
+    },
+    enabled: !!salonId,
+    staleTime: 5_000,
+  })
+}
+
+/**
+ * Глобальная подписка на новые ВХОДЯЩИЕ сообщения для salonId. Когда
+ * приходит direction='in' → показывает toast с CTA «Открыть», и (если
+ * разрешено в браузере) native Notification. Подключается из SalonLayout
+ * чтобы работало на любой странице портала, а не только в /messenger.
+ *
+ * Учитывает salon.notification_prefs.messenger_new_message:
+ *   - если значение === false → ничего не показываем
+ *   - отсутствие ключа = включено по умолчанию
+ *
+ * Чтобы не показать notification для сообщения, которое сам портал только
+ * что отправил, ловим только direction='in'.
+ * Чтобы не спамить когда пользователь УЖЕ на странице мессенджера → не
+ * показываем toast (но native Notification всё равно покажем — окно может
+ * быть в фоне). Простое правило: skip toast если location.pathname endsWith
+ * '/messenger'.
+ */
+export function useMessengerNotifications(
+  salonId: string | undefined,
+  options?: { enabled?: boolean; salonName?: string },
+) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const seenRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!salonId || options?.enabled === false) return
+    const channel = supabase
+      .channel(`messenger-notif:${salonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messenger_messages',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        async (payload) => {
+          const row = payload.new as {
+            id: string
+            direction: 'in' | 'out'
+            text: string | null
+            media_kind: string | null
+            conversation_id: string
+          }
+          if (row.direction !== 'in') return
+          if (seenRef.current.has(row.id)) return
+          seenRef.current.add(row.id)
+
+          // Достаём имя клиента из messenger_conversations — payload его не несёт.
+          const { data: convo } = await supabase
+            .from('messenger_conversations')
+            .select('display_name, channel')
+            .eq('id', row.conversation_id)
+            .maybeSingle()
+
+          const senderName = convo?.display_name ?? t('messenger.unknown_sender')
+          const preview =
+            row.text?.slice(0, 80) ??
+            (row.media_kind
+              ? t(`messenger.media_${row.media_kind}`, { defaultValue: '📎 Вложение' })
+              : '')
+
+          const onMessengerPage = location.pathname.endsWith('/messenger')
+
+          if (!onMessengerPage) {
+            toast(senderName, {
+              description: preview,
+              action: {
+                label: t('messenger.open'),
+                onClick: () => navigate(`/${salonId}/messenger?convo=${row.conversation_id}`),
+              },
+            })
+          }
+
+          if (
+            typeof window !== 'undefined' &&
+            'Notification' in window &&
+            Notification.permission === 'granted' &&
+            (document.hidden || !onMessengerPage)
+          ) {
+            try {
+              const n = new Notification(
+                options?.salonName ? `${options.salonName} · ${senderName}` : senderName,
+                {
+                  body: preview,
+                  tag: `msg-${row.conversation_id}`,
+                  icon: '/icon-192.png',
+                },
+              )
+              n.onclick = () => {
+                window.focus()
+                navigate(`/${salonId}/messenger?convo=${row.conversation_id}`)
+                n.close()
+              }
+            } catch {
+              // ignore — Safari иногда кидает на iOS
+            }
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [salonId, options?.enabled, options?.salonName, t, navigate, location.pathname])
 }
 
 export function useConversations(

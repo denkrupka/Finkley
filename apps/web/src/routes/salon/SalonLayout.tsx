@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
+import { useMessengerNotifications } from '@/hooks/useMessenger'
 import { useMySalons, useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -87,6 +88,16 @@ export function SalonLayout() {
   const { data: salonFull } = useSalon(salonId)
   const { data: staff = [] } = useStaff(salonId)
   const { hasOpenShift } = useRequireCashShift(salonId)
+
+  // Глобальная подписка на новые входящие сообщения — toast + native
+  // Notification (если разрешено). Учитываем notification_prefs:
+  // отсутствие ключа = включено, false = отключено.
+  const messengerNotifEnabled =
+    (salonFull?.notification_prefs ?? salon?.notification_prefs)?.messenger_new_message !== false
+  useMessengerNotifications(salonId, {
+    enabled: messengerNotifEnabled,
+    salonName: salon?.name,
+  })
 
   useEffect(() => {
     if (salonId && salon) rememberLastSalon(salonId)
