@@ -209,18 +209,24 @@ Deno.serve(async (req) => {
   }
 
   // --- Subscribe app to webhook for this user ---------------------------
+  // ВАЖНО: используем /me/subscribed_apps (не /{id}/subscribed_apps), т.к.
+  // scoped id из oauth/access_token отличается от того, что возвращает /me
+  // — обращение по сохранённому id даёт 404 и подписка фейлится молча.
   try {
-    const subUrl = `https://graph.instagram.com/v21.0/${igUserId}/subscribed_apps`
+    const subUrl = `https://graph.instagram.com/v21.0/me/subscribed_apps`
     const subBody = new URLSearchParams()
     subBody.set('subscribed_fields', 'messages,messaging_postbacks')
     subBody.set('access_token', longToken)
-    await fetch(subUrl, {
+    const subResp = await fetch(subUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: subBody.toString(),
     })
-  } catch {
-    // не блокирует подключение — подписку можно повторить позже
+    if (!subResp.ok) {
+      console.warn(`[ig-oauth] subscribed_apps failed: ${subResp.status} ${await subResp.text()}`)
+    }
+  } catch (e) {
+    console.warn('[ig-oauth] subscribe exception:', (e as Error).message)
   }
 
   // --- Encrypt & upsert messenger_integrations --------------------------
