@@ -251,32 +251,11 @@ Deno.serve(async (req) => {
     )
   }
 
-  // --- IG via Page (если привязан) ------------------------------------
-  let igConnected: string | null = null
-  if (page.instagram_business_account?.id) {
-    const ig = page.instagram_business_account
-    await admin.from('messenger_integrations').upsert(
-      {
-        salon_id: statePayload.salon_id,
-        channel: 'instagram',
-        external_account_id: ig.id,
-        display_name: ig.name || (ig.username ? `@${ig.username}` : `IG ${ig.id.slice(-6)}`),
-        status: 'connected',
-        credentials: { page_access_enc: pageTokenEnc, page_id: page.id, flow: 'page_messaging' },
-        last_synced_at: new Date().toISOString(),
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'salon_id,channel' },
-    )
-    igConnected = ig.username || ig.id
-  }
+  // NOTE: НЕ создаём автоматически IG-integration через Page Token. Старый
+  // flow=page_messaging не подписывает IG-аккаунт на webhook (Meta deprecated
+  // routing IG DMs через Page), поэтому DM от клиентов не приходили бы.
+  // IG подключается отдельной кнопкой → instagram-oauth-callback → правильно
+  // зовёт POST /{ig-user-id}/subscribed_apps и flow=instagram_login.
 
-  return redirect(
-    appUrl(statePayload.salon_id, {
-      fb: 'connected',
-      page: page.name,
-      ...(igConnected ? { ig_via_page: igConnected } : {}),
-    }),
-  )
+  return redirect(appUrl(statePayload.salon_id, { fb: 'connected', page: page.name }))
 })
