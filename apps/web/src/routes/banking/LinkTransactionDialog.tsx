@@ -14,8 +14,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useLinkBankTransaction, type BankInflowRow, type BankOutflowRow } from '@/hooks/useBanking'
+import { useClients } from '@/hooks/useClients'
 import { useExpenses, type ExpenseRow } from '@/hooks/useExpenses'
 import { useOtherIncomes, type OtherIncomeRow } from '@/hooks/useOtherIncomes'
+import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 
@@ -70,21 +72,35 @@ export function LinkTransactionDialog({
     [period],
   )
   const otherQ = useOtherIncomes(direction === 'credit' ? salonId : undefined, otherRange)
+  const visitsQ = useVisits(
+    direction === 'credit' ? salonId : undefined,
+    { start: `${period.start}T00:00:00`, end: `${period.end}T23:59:59` },
+    { paymentMethod: 'transfer' }, // банк-переводом → визиты с transfer-методом
+  )
+  const clientsQ = useClients(direction === 'credit' ? salonId : undefined)
+  const clientNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of clientsQ.data ?? []) {
+      if (c.id) map.set(c.id, c.name || c.phone || 'Без имени')
+    }
+    return map
+  }, [clientsQ.data])
 
-  // NOTE: Связь с визитами оставлена на Этап 4 — на VisitsPage есть join с
-  // клиентами, тут это лишний код. Для credit достаточно other_incomes;
-  // оплату визита банк-переводом маркетологи обычно проводят как other_income.
   const items: PickerItem[] = useMemo(() => {
     if (direction === 'debit') {
       return (expensesQ.data ?? [])
         .filter((e) => filterMatch(search, e.description, e.document_number, e.amount_cents))
         .map((e) => expenseToItem(e))
     }
-    return (otherQ.data ?? [])
+    const visits = (visitsQ.data ?? [])
+      .filter((v) => v.status !== 'cancelled')
+      .map((v) => visitToItem(v, clientNameById.get(v.client_id ?? '') ?? null))
+      .filter((it) => filterMatch(search, it.title, null, it.amount_cents))
+    const others = (otherQ.data ?? [])
       .filter((o) => filterMatch(search, o.comment ?? '', null, o.amount_cents))
       .map((o) => otherIncomeToItem(o))
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }, [direction, expensesQ.data, otherQ.data, search])
+    return [...visits, ...others].sort((a, b) => b.date.localeCompare(a.date))
+  }, [direction, expensesQ.data, otherQ.data, visitsQ.data, clientNameById, search])
 
   const txCurrency = transaction.currency || 'PLN'
 
@@ -94,6 +110,7 @@ export function LinkTransactionDialog({
       clearNeedsReview: true,
     }
     if (item.kind === 'expense') args.expenseId = item.id
+    else if (item.kind === 'visit') args.visitId = item.id
     else if (item.kind === 'other_income') args.otherIncomeId = item.id
     link.mutate(args, {
       onSuccess: () => {
@@ -247,6 +264,14 @@ type PickerItem =
       date: string
     }
   | {
+      kind: 'visit'
+      id: string
+      title: string
+      subtitle: string
+      amount_cents: number
+      date: string
+    }
+  | {
       kind: 'other_income'
       id: string
       title: string
@@ -263,6 +288,20 @@ function expenseToItem(e: ExpenseRow): PickerItem {
     subtitle: e.document_number ? `№ ${e.document_number}` : '',
     amount_cents: e.amount_cents,
     date: e.expense_at,
+  }
+}
+
+function visitToItem(v: VisitRow, clientName: string | null): PickerItem {
+  const total = v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0)
+  return {
+    kind: 'visit',
+    id: v.id,
+    title: clientName || v.service_name_snapshot || 'Визит',
+    subtitle:
+      (v.kind === 'retail' ? 'Продажа' : 'Визит') +
+      (v.service_name_snapshot && clientName ? ` · ${v.service_name_snapshot}` : ''),
+    amount_cents: total,
+    date: v.visit_at,
   }
 }
 
