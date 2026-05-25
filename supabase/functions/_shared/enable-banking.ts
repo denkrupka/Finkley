@@ -19,8 +19,11 @@
  * ENV в edge functions:
  *   ENABLE_BANKING_APP_ID       — UUID приложения
  *   ENABLE_BANKING_PRIVATE_KEY  — содержимое .pem (PKCS#8 или PKCS#1)
- *   ENABLE_BANKING_REDIRECT_URL — куда EB редиректит после bank-auth
- *                                  (https://finkley.app/banking/callback)
+ *   ENABLE_BANKING_REDIRECT_URL — куда EB редиректит после bank-auth.
+ *                                  SPA в подпапке /app/, поэтому правильный
+ *                                  URL — https://finkley.app/app/banking/callback
+ *                                  (должен совпадать с зарегистрированным в
+ *                                  Enable Banking dashboard).
  */
 
 const EB_API = 'https://api.enablebanking.com'
@@ -216,7 +219,7 @@ export async function createAuth(
   input: {
     aspspName: string // "Bank Millennium"
     aspspCountry: string // "PL"
-    redirectUrl: string // https://finkley.app/banking/callback
+    redirectUrl: string // https://finkley.app/app/banking/callback
     state?: string // CSRF-стейт; вернётся как ?state=… к нам
     psuType?: 'business' | 'personal'
     validUntil?: string // ISO datetime, до 180 дней

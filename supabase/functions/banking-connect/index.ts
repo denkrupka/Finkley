@@ -26,8 +26,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const APP_ID = Deno.env.get('ENABLE_BANKING_APP_ID') ?? ''
 const PRIVATE_KEY = Deno.env.get('ENABLE_BANKING_PRIVATE_KEY') ?? ''
+// SPA живёт в подпапке /app/ (см. apps/web/vite.config.ts → VITE_BASE).
+// URL должен совпадать с redirect_url'ом, зарегистрированным в Enable Banking
+// dashboard. Без /app/ редирект попадёт на лендинг и code потеряется.
 const REDIRECT_URL =
-  Deno.env.get('ENABLE_BANKING_REDIRECT_URL') ?? 'https://finkley.app/banking/callback'
+  Deno.env.get('ENABLE_BANKING_REDIRECT_URL') ?? 'https://finkley.app/app/banking/callback'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
