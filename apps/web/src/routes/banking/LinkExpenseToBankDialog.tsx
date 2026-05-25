@@ -98,9 +98,7 @@ export function LinkExpenseToBankDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Landmark className="text-brand-teal-deep size-4" strokeWidth={2} />
-            {t('banking.reverse_link.title', {
-              defaultValue: 'Привязать к банковской транзакции',
-            })}
+            {t('banking.reverse_link.title')}
           </DialogTitle>
           <DialogDescription>
             {expense.description || '—'}
@@ -123,9 +121,7 @@ export function LinkExpenseToBankDialog({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('banking.reverse_link.search_placeholder', {
-                defaultValue: 'Поиск по контрагенту, описанию или сумме…',
-              })}
+              placeholder={t('banking.reverse_link.search_placeholder')}
               className="pl-8"
               autoFocus
             />
@@ -138,10 +134,7 @@ export function LinkExpenseToBankDialog({
               </div>
             ) : items.length === 0 ? (
               <div className="text-muted-foreground flex h-full items-center justify-center px-4 text-center text-sm">
-                {t('banking.reverse_link.empty', {
-                  defaultValue:
-                    'Нет неpривязанных транзакций в ±90 дней. Либо все привязаны, либо нужно подтянуть свежие через «Синхронизировать».',
-                })}
+                {t('banking.reverse_link.empty')}
               </div>
             ) : (
               <ul>

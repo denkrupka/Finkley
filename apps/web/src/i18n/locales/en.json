@@ -4061,7 +4061,52 @@
       "error_title": "Something went wrong",
       "error_body": "Failed to complete connection. You can try again — no data was saved.",
       "back_to_integrations": "Back to integrations"
-    }
+    },
+    "transactions": {
+      "title": "Bank transactions",
+      "count_suffix": "for the period",
+      "sync_now": "Sync",
+      "sync_done": "Sync completed",
+      "no_connections": "No connected banks",
+      "no_connections_title": "No bank connected yet",
+      "no_connections_hint": "Connect your bank via Enable Banking — the transaction list will appear here automatically.",
+      "go_connect": "Connect bank",
+      "empty_period": "No transactions for this period.",
+      "col_date": "Date",
+      "col_counterparty": "Counterparty",
+      "col_amount": "Amount",
+      "col_purpose": "Purpose",
+      "col_linked": "Linked to",
+      "col_actions": "Action",
+      "no_counterparty": "—",
+      "linked": "Linked",
+      "not_linked": "Not linked",
+      "link_action": "Link",
+      "edit_link": "Edit",
+      "needs_review_tooltip": "Low-confidence auto-match — open and confirm manually"
+    },
+    "link_dialog": {
+      "title_debit": "Link to expense",
+      "title_credit": "Link to income",
+      "search_expense": "Search by description, number or amount…",
+      "search_income": "Search by client, service or amount…",
+      "empty": "Nothing found in ±90 days of this transaction. Try other filters or create a new entry.",
+      "exact_match": "Amount matches",
+      "close_match": "Amount close",
+      "linked_toast": "Linked",
+      "unlinked_toast": "Link removed",
+      "unlink": "Unlink"
+    },
+    "reverse_link": {
+      "title": "Link to bank transaction",
+      "search_placeholder": "Search by counterparty, description or amount…",
+      "empty": "No unlinked transactions in ±90 days. Either all linked, or pull fresh ones via 'Sync now'."
+    },
+    "linked_to_bank": "Confirmed by bank statement",
+    "not_linked_hint": "Not linked to bank statement",
+    "link_to_bank": "Link to bank",
+    "unlink": "Unlink",
+    "unlink_toast": "Bank link removed"
   },
   "tour": {
     "next": "Next",

@@ -4062,7 +4062,52 @@
       "error_title": "Coś poszło nie tak",
       "error_body": "Nie udało się zakończyć połączenia. Możesz spróbować ponownie — nic nie zostało zapisane.",
       "back_to_integrations": "Powrót do integracji"
-    }
+    },
+    "transactions": {
+      "title": "Transakcje bankowe",
+      "count_suffix": "w okresie",
+      "sync_now": "Synchronizuj",
+      "sync_done": "Synchronizacja zakończona",
+      "no_connections": "Brak podłączonych banków",
+      "no_connections_title": "Bank jeszcze niepodłączony",
+      "no_connections_hint": "Podłącz swój bank przez Enable Banking — lista transakcji pojawi się tutaj automatycznie.",
+      "go_connect": "Podłącz bank",
+      "empty_period": "Brak transakcji w tym okresie.",
+      "col_date": "Data",
+      "col_counterparty": "Kontrahent",
+      "col_amount": "Kwota",
+      "col_purpose": "Tytuł",
+      "col_linked": "Powiązane z",
+      "col_actions": "Akcja",
+      "no_counterparty": "—",
+      "linked": "Powiązane",
+      "not_linked": "Niepowiązane",
+      "link_action": "Powiąż",
+      "edit_link": "Zmień",
+      "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — otwórz i potwierdź ręcznie"
+    },
+    "link_dialog": {
+      "title_debit": "Powiąż z wydatkiem",
+      "title_credit": "Powiąż z przychodem",
+      "search_expense": "Szukaj po opisie, numerze lub kwocie…",
+      "search_income": "Szukaj po kliencie, usłudze lub kwocie…",
+      "empty": "Nic nie znaleziono w ±90 dni od daty transakcji. Spróbuj innych filtrów lub utwórz nowy wpis.",
+      "exact_match": "Kwota się zgadza",
+      "close_match": "Kwota podobna",
+      "linked_toast": "Powiązano",
+      "unlinked_toast": "Powiązanie usunięte",
+      "unlink": "Odłącz"
+    },
+    "reverse_link": {
+      "title": "Powiąż z transakcją bankową",
+      "search_placeholder": "Szukaj po kontrahencie, opisie lub kwocie…",
+      "empty": "Brak niepowiązanych transakcji w ±90 dni. Albo wszystkie powiązane, albo zsynchronizuj świeże przez „Synchronizuj”."
+    },
+    "linked_to_bank": "Potwierdzone wyciągiem bankowym",
+    "not_linked_hint": "Nie powiązane z wyciągiem bankowym",
+    "link_to_bank": "Powiąż z bankiem",
+    "unlink": "Odłącz",
+    "unlink_toast": "Powiązanie z bankiem usunięte"
   },
   "tour": {
     "next": "Dalej",

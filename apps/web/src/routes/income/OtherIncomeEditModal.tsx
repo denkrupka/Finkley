@@ -126,7 +126,7 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
         qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] }),
         qc.invalidateQueries({ queryKey: ['other-incomes', salonId] }),
       ])
-      toast.success(t('banking.unlink_toast', { defaultValue: 'Связь с банком снята' }))
+      toast.success(t('banking.unlink_toast'))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -270,11 +270,7 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
                   isBankLinked ? 'text-brand-teal-deep' : 'text-muted-foreground',
                 )}
               >
-                {isBankLinked
-                  ? t('banking.linked_to_bank', { defaultValue: 'Привязано к банковской выписке' })
-                  : t('banking.not_linked_hint', {
-                      defaultValue: 'Не привязано к банковской выписке',
-                    })}
+                {isBankLinked ? t('banking.linked_to_bank') : t('banking.not_linked_hint')}
               </span>
             </div>
             {isBankLinked ? (
@@ -287,7 +283,7 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
                 className="shrink-0"
               >
                 <Link2Off className="size-3.5" strokeWidth={2} />
-                {t('banking.unlink', { defaultValue: 'Снять связь' })}
+                {t('banking.unlink')}
               </Button>
             ) : (
               <Button
@@ -298,7 +294,7 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
                 className="shrink-0"
               >
                 <Link2 className="size-3.5" strokeWidth={2} />
-                {t('banking.link_to_bank', { defaultValue: 'Привязать к банку' })}
+                {t('banking.link_to_bank')}
               </Button>
             )}
           </div>
