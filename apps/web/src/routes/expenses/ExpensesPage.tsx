@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
+  effectivePaidCents,
   getReceiptSignedUrl,
   useDeleteExpense,
   useExpenseCategories,
@@ -224,14 +225,19 @@ export function ExpensesPage() {
   if (!salon || !salonId) return null
   const currency = salon.currency
 
-  // Сортируем категории как в прототипе (по sort_order), берём первые 4 для summary
+  // Сортируем категории как в прототипе (по sort_order), берём первые 4 для summary.
+  // Для частично оплаченных расходов учитываем только фактически оплаченную часть
+  // (см. effectivePaidCents) — остаток вернётся в total после доплаты.
   const categoryById = new Map(categories.map((c) => [c.id, c]))
   const totalsByCategory = new Map<string, number>()
   for (const e of expenses) {
     if (!e.category_id) continue
-    totalsByCategory.set(e.category_id, (totalsByCategory.get(e.category_id) ?? 0) + e.amount_cents)
+    totalsByCategory.set(
+      e.category_id,
+      (totalsByCategory.get(e.category_id) ?? 0) + effectivePaidCents(e),
+    )
   }
-  const total = expenses.reduce((acc, e) => acc + e.amount_cents, 0)
+  const total = expenses.reduce((acc, e) => acc + effectivePaidCents(e), 0)
 
   const totalPages = Math.max(1, Math.ceil(expenses.length / PAGE_SIZE))
   const pagedExpenses = expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)

@@ -59,9 +59,26 @@ export type ExpenseRow = {
   /** Частичная оплата: сколько фактически оплачено. NULL = полностью оплачено
    *  (legacy default). 0..amount_cents = частичная. См. миграцию 20260525150000. */
   paid_amount_cents: number | null
+  // ↑ для расчёта суммарных итогов (total за период, breakdown по категориям)
+  //   используем effectivePaidCents() — для частичных оплат берём paid_amount_cents.
   created_at: string
   updated_at: string
   deleted_at: string | null
+}
+
+/**
+ * Фактически потраченная сумма для расчётов total/breakdown.
+ * Частично оплаченный расход (paid_amount_cents < amount_cents) учитывается
+ * только в оплаченной части до момента, пока остаток не будет внесён.
+ * NULL paid_amount_cents = legacy «полностью оплачено» → берём amount_cents.
+ */
+export function effectivePaidCents(
+  e: Pick<ExpenseRow, 'amount_cents' | 'paid_amount_cents'>,
+): number {
+  if (e.paid_amount_cents != null && e.paid_amount_cents < e.amount_cents) {
+    return e.paid_amount_cents
+  }
+  return e.amount_cents
 }
 
 export type ExpenseCategoryRow = {

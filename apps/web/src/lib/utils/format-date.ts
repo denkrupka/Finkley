@@ -29,8 +29,12 @@ export function formatVisitDayHeading(iso: string): string {
  * YYYY-MM-DD → 12.05 для display в expenses
  */
 export function formatExpenseDate(date: string): string {
-  // 'YYYY-MM-DD' → парсим как date-only
-  const [, m, d] = date.split('-').map(Number)
+  // Принимает 'YYYY-MM-DD' (expenses.expense_at — date-only) ИЛИ ISO
+  // timestamp 'YYYY-MM-DDTHH:mm:ss.sssZ' (bank_transactions.executed_at —
+  // timestamptz). Без slice(0,10) split('-') на остатке "DDT..." даёт NaN
+  // в позиции [2] и в UI появляется «NaN.05».
+  const dateOnly = date.length > 10 ? date.slice(0, 10) : date
+  const [, m, d] = dateOnly.split('-').map(Number)
   return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
 }
 
