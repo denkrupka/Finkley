@@ -183,17 +183,27 @@ Deno.serve(async (req) => {
     )
   }
 
-  // --- Fetch user profile (username, name) -------------------------------
+  // --- Fetch user profile (username, name, LEGACY user_id) -------------
+  // КРИТИЧНО: /me?fields=user_id возвращает 17-значный legacy IG Business
+  // user_id (17841...), который Meta присылает в webhook entry.id. Scoped
+  // id (27260...) что приходит на oauth/access_token — другой, для него
+  // webhook'и НЕ ищутся. Храним legacy в external_account_id для матча.
   let username = ''
   let name = ''
+  let legacyUserId: string | null = null
   try {
     const u = new URL('https://graph.instagram.com/v21.0/me')
     u.searchParams.set('fields', 'user_id,username,name')
     u.searchParams.set('access_token', longToken)
     const r = await fetch(u.toString())
-    const j = (await r.json()) as { username?: string; name?: string }
+    const j = (await r.json()) as {
+      user_id?: string | number
+      username?: string
+      name?: string
+    }
     username = j.username ?? ''
     name = j.name ?? ''
+    if (j.user_id) legacyUserId = String(j.user_id)
   } catch {
     // не критично
   }
@@ -218,16 +228,28 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+  // Для external_account_id ОБЯЗАТЕЛЬНО используем legacy user_id (17841...)
+  // если он есть — это то, что Meta присылает в webhook entry.id. Если /me
+  // упал и legacy не получен, fallback на scoped id (но тогда webhook'и
+  // не будут матчиться — это видно в last_error).
+  const externalId = legacyUserId ?? igUserId
   const { error: upErr } = await admin.from('messenger_integrations').upsert(
     {
       salon_id: statePayload.salon_id,
       channel: 'instagram',
-      external_account_id: igUserId,
-      display_name: name || (username ? `@${username}` : `IG ${igUserId.slice(-6)}`),
+      external_account_id: externalId,
+      display_name: name || (username ? `@${username}` : `IG ${externalId.slice(-6)}`),
       status: 'connected',
-      credentials: { ig_access_enc: igAccessEnc, ig_user_id: igUserId, flow: 'instagram_login' },
+      credentials: {
+        ig_access_enc: igAccessEnc,
+        ig_user_id: legacyUserId ?? igUserId,
+        ig_user_id_scoped: igUserId,
+        flow: 'instagram_login',
+      },
       last_synced_at: new Date().toISOString(),
-      last_error: null,
+      last_error: legacyUserId
+        ? null
+        : 'legacy user_id not resolved — webhook events may not match',
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'salon_id,channel' },
