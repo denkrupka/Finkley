@@ -1307,6 +1307,7 @@ export type Database = {
           is_recurring: boolean
           metadata: Json
           next_occurrence_at: string | null
+          paid_amount_cents: number | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           payroll_kind: Database["public"]["Enums"]["payroll_kind"] | null
           payroll_period_end: string | null
@@ -1342,6 +1343,7 @@ export type Database = {
           is_recurring?: boolean
           metadata?: Json
           next_occurrence_at?: string | null
+          paid_amount_cents?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payroll_kind?: Database["public"]["Enums"]["payroll_kind"] | null
           payroll_period_end?: string | null
@@ -1377,6 +1379,7 @@ export type Database = {
           is_recurring?: boolean
           metadata?: Json
           next_occurrence_at?: string | null
+          paid_amount_cents?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payroll_kind?: Database["public"]["Enums"]["payroll_kind"] | null
           payroll_period_end?: string | null

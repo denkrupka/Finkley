@@ -164,6 +164,17 @@ export function ExpensesPage() {
     [allScheduled, range.start, range.end, categoryFilter],
   )
   const pendingTotal = pendingPayments.reduce((s, p) => s + p.amount_cents, 0)
+  // Частично-оплаченные расходы за период — показываются и в «Оплачено»
+  // (с пометкой "оплачено X"), и в «Не оплачено» (с суммой остатка).
+  const partiallyPaidExpenses = useMemo(
+    () =>
+      expenses.filter((e) => e.paid_amount_cents != null && e.paid_amount_cents < e.amount_cents),
+    [expenses],
+  )
+  const partialRemainingTotal = partiallyPaidExpenses.reduce(
+    (s, e) => s + (e.amount_cents - (e.paid_amount_cents ?? 0)),
+    0,
+  )
   const todayStr = new Date().toISOString().slice(0, 10)
   const [editingPayment, setEditingPayment] = useState<ScheduledPaymentRow | null>(null)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
@@ -415,7 +426,7 @@ export function ExpensesPage() {
                     <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
                   ))}
                 </div>
-              ) : pendingPayments.length === 0 ? (
+              ) : pendingPayments.length === 0 && partiallyPaidExpenses.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <p className="text-muted-foreground text-sm">
                     {t('expenses.tabs.empty_pending', {
@@ -424,110 +435,167 @@ export function ExpensesPage() {
                   </p>
                 </div>
               ) : (
-                <ul>
-                  {pendingPayments.map((p) => {
-                    const cat = p.category_id ? categoryById.get(p.category_id) : null
-                    const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
-                    const color =
-                      idx >= 0
-                        ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
-                        : '#9A9A9A'
-                    const overdue = p.due_date < todayStr
-                    const today = p.due_date === todayStr
-                    return (
-                      <li
-                        key={p.id}
-                        onClick={() => {
-                          if (!hasOpenShift) {
-                            setGateOpen(true)
-                            return
-                          }
-                          setEditingPayment(p)
-                        }}
-                        className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
-                        style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                      >
-                        <span className="num text-muted-foreground text-xs">
-                          {p.due_date.slice(5).replace('-', '.')}
+                <>
+                  {partiallyPaidExpenses.length > 0 ? (
+                    <div className="border-border border-b">
+                      <div className="bg-amber-50/60 px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                        {t('expenses.partial_section_title', {
+                          defaultValue: 'Частично оплаченные · осталось',
+                        })}{' '}
+                        <span className="num tabular-nums">
+                          {formatCurrency(partialRemainingTotal, currency)}
                         </span>
-                        <span className="min-w-0">
-                          <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-                            <span className="truncate">
-                              {p.vendor_name || cat?.name || t('expenses.no_category')}
-                            </span>
-                            <span
-                              className={cn(
-                                'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                                overdue
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : today
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-sky-100 text-sky-700',
-                              )}
+                      </div>
+                      <ul>
+                        {partiallyPaidExpenses.map((e) => {
+                          const remaining = e.amount_cents - (e.paid_amount_cents ?? 0)
+                          const cat = e.category_id ? categoryById.get(e.category_id) : null
+                          return (
+                            <li
+                              key={`partial-${e.id}`}
+                              onClick={() => {
+                                if (!hasOpenShift) {
+                                  setGateOpen(true)
+                                  return
+                                }
+                                setEditingExpense(e)
+                              }}
+                              className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto] items-center gap-3 border-b px-5 py-2.5 last:border-b-0"
                             >
-                              {overdue
-                                ? t('expenses.tabs.badge_overdue', { defaultValue: 'просрочен' })
-                                : today
-                                  ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
-                                  : t('expenses.tabs.badge_pending', {
-                                      defaultValue: 'запланирован',
-                                    })}
-                            </span>
-                          </span>
-                          <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                            {cat ? <span>{cat.name}</span> : null}
-                            {p.invoice_number ? (
-                              <>
-                                {cat ? <span aria-hidden>·</span> : null}
-                                <span className="num">№ {p.invoice_number}</span>
-                              </>
-                            ) : null}
-                            {p.comment ? (
-                              <>
-                                {cat || p.invoice_number ? <span aria-hidden>·</span> : null}
-                                <span className="truncate">{p.comment}</span>
-                              </>
-                            ) : null}
-                          </span>
-                        </span>
-                        <span className="num text-foreground text-right text-sm font-bold">
-                          −{formatCurrency(p.amount_cents, currency)}
-                        </span>
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
+                              <span className="num text-muted-foreground text-xs">
+                                {formatExpenseDate(e.expense_at)}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="text-foreground block truncate text-sm font-semibold">
+                                  {e.description || cat?.name || t('expenses.no_category')}
+                                </span>
+                                <span className="text-muted-foreground/80 text-[11px]">
+                                  {t('expenses.partial_subtitle', {
+                                    paid: formatCurrency(e.paid_amount_cents ?? 0, currency),
+                                    total: formatCurrency(e.amount_cents, currency),
+                                    defaultValue: 'Оплачено {{paid}} из {{total}}',
+                                  })}
+                                </span>
+                              </span>
+                              <span className="num text-right text-sm font-bold text-amber-700">
+                                {formatCurrency(remaining, currency)}
+                              </span>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {pendingPayments.length === 0 ? null : (
+                    <ul>
+                      {pendingPayments.map((p) => {
+                        const cat = p.category_id ? categoryById.get(p.category_id) : null
+                        const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
+                        const color =
+                          idx >= 0
+                            ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
+                            : '#9A9A9A'
+                        const overdue = p.due_date < todayStr
+                        const today = p.due_date === todayStr
+                        return (
+                          <li
+                            key={p.id}
+                            onClick={() => {
                               if (!hasOpenShift) {
                                 setGateOpen(true)
                                 return
                               }
                               setEditingPayment(p)
                             }}
-                            className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                            className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
+                            style={{ borderLeftWidth: 3, borderLeftColor: color }}
                           >
-                            <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                            {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (!confirm(t('finance.payments.confirm_delete'))) return
-                              deleteScheduled.mutate(p.id, {
-                                onSuccess: () => toast.success(t('finance.payments.toast_deleted')),
-                              })
-                            }}
-                            className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                            aria-label="delete"
-                          >
-                            <Trash2 className="size-4" strokeWidth={1.7} />
-                          </button>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
+                            <span className="num text-muted-foreground text-xs">
+                              {p.due_date.slice(5).replace('-', '.')}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                                <span className="truncate">
+                                  {p.vendor_name || cat?.name || t('expenses.no_category')}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                                    overdue
+                                      ? 'bg-rose-100 text-rose-700'
+                                      : today
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : 'bg-sky-100 text-sky-700',
+                                  )}
+                                >
+                                  {overdue
+                                    ? t('expenses.tabs.badge_overdue', {
+                                        defaultValue: 'просрочен',
+                                      })
+                                    : today
+                                      ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
+                                      : t('expenses.tabs.badge_pending', {
+                                          defaultValue: 'запланирован',
+                                        })}
+                                </span>
+                              </span>
+                              <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                {cat ? <span>{cat.name}</span> : null}
+                                {p.invoice_number ? (
+                                  <>
+                                    {cat ? <span aria-hidden>·</span> : null}
+                                    <span className="num">№ {p.invoice_number}</span>
+                                  </>
+                                ) : null}
+                                {p.comment ? (
+                                  <>
+                                    {cat || p.invoice_number ? <span aria-hidden>·</span> : null}
+                                    <span className="truncate">{p.comment}</span>
+                                  </>
+                                ) : null}
+                              </span>
+                            </span>
+                            <span className="num text-foreground text-right text-sm font-bold">
+                              −{formatCurrency(p.amount_cents, currency)}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!hasOpenShift) {
+                                    setGateOpen(true)
+                                    return
+                                  }
+                                  setEditingPayment(p)
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                              >
+                                <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                                {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!confirm(t('finance.payments.confirm_delete'))) return
+                                  deleteScheduled.mutate(p.id, {
+                                    onSuccess: () =>
+                                      toast.success(t('finance.payments.toast_deleted')),
+                                  })
+                                }}
+                                className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                                aria-label="delete"
+                              >
+                                <Trash2 className="size-4" strokeWidth={1.7} />
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </>
               )
             ) : isLoading ? (
               <div className="space-y-2 p-3">
@@ -652,8 +720,18 @@ export function ExpensesPage() {
                           ) : null}
                         </span>
                       </span>
-                      <span className="num text-destructive text-right text-sm font-bold">
-                        −{formatCurrency(e.amount_cents, currency)}
+                      <span className="text-right">
+                        <span className="num text-destructive block text-sm font-bold">
+                          −{formatCurrency(e.amount_cents, currency)}
+                        </span>
+                        {e.paid_amount_cents != null && e.paid_amount_cents < e.amount_cents ? (
+                          <span className="num text-muted-foreground/80 mt-0.5 block text-[10px]">
+                            {t('expenses.partial_paid', {
+                              paid: formatCurrency(e.paid_amount_cents, currency),
+                              defaultValue: 'Оплачено {{paid}}',
+                            })}
+                          </span>
+                        ) : null}
                       </span>
                       <div className="flex items-center gap-0.5">
                         {activeAccounting && e.source !== activeAccounting
