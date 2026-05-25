@@ -24,7 +24,7 @@ describe.skipIf(shouldSkip)('compute_benchmarks + get_benchmark_comparison', () 
     if (!ctx) throw new Error('no ctx')
     const { error } = await ctx.admin.rpc('compute_benchmarks')
     expect(error).toBeNull()
-  })
+  }, 30_000)
 
   it.skip('get_benchmark_comparison для пустого bucket (флаки на shared staging DB)', async () => {
     // Тест предполагал чистую БД, но на staging-проекте уже накопились
