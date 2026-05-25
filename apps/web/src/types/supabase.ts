@@ -4838,6 +4838,11 @@ export type Database = {
       }
       process_weekly_digests: { Args: never; Returns: number }
       process_weekly_insights: { Args: never; Returns: number }
+      recalc_expense_paid: {
+        Args: { p_expense_id: string }
+        Returns: undefined
+      }
+      recalc_expense_paid_from_bank: { Args: never; Returns: undefined }
       revenue_by_day: {
         Args: {
           p_period_end: string
