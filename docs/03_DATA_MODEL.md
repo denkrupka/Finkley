@@ -477,6 +477,89 @@ create policy "members can read sync logs" on integration_sync_logs
   for select using (salon_id in (select salon_id from salon_members where user_id = auth.uid()));
 ```
 
+### `bank_connections` / `bank_accounts` / `bank_transactions` — банкинг (Enable Banking PSD2)
+
+Импорт банковских транзакций через Enable Banking. Owner подключает свой
+банк, мы тащим debits/credits и линкуем с `expenses` / `visits` /
+`other_incomes`. Детали — ADR-024, формат миграций — `20260509000002*` и
+`20260525130000*` / `20260525191522*`.
+
+```sql
+create table public.bank_connections (
+  id uuid primary key default gen_random_uuid(),
+  salon_id uuid not null references salons(id) on delete cascade,
+  provider text not null default 'enable_banking',
+  bank_aspsp_name text not null,                -- "Bank Millennium", "mBank"
+  bank_country text not null,                   -- "PL", "DE", ...
+  status text not null,                         -- 'pending' | 'connected' | 'expired' | 'error' | 'revoked'
+  session_id text,                              -- Enable Banking session
+  valid_until timestamptz,                      -- PSD2 consent истекает 90-180 дней
+  last_synced_at timestamptz,
+  last_error text,
+  history_days int not null default 90,         -- глубина первого синка
+  sync_interval_minutes int not null default 360, -- 1h/3h/6h/12h/24h (range 60..1440)
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create table public.bank_accounts (
+  id uuid primary key default gen_random_uuid(),
+  connection_id uuid not null references bank_connections(id) on delete cascade,
+  external_id text not null,                    -- EB account id
+  iban text, name text, currency text,
+  is_active boolean not null default true
+);
+
+create table public.bank_transactions (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references bank_accounts(id) on delete cascade,
+  external_id text not null,                    -- EB transaction id (или hash)
+  type text not null check (type in ('debit', 'credit')),
+  amount_cents bigint not null check (amount_cents >= 0), -- знак в type
+  currency text not null,
+  description text,
+  counterparty text,
+  executed_at timestamptz not null,
+  -- Polymorphic FK — максимум одна из трёх связей одновременно:
+  expense_id uuid references expenses(id) on delete set null,
+  linked_visit_id uuid references visits(id) on delete set null,
+  linked_other_income_id uuid references other_incomes(id) on delete set null,
+  needs_review boolean not null default false,  -- low-confidence auto-match
+  raw jsonb,
+  created_at timestamptz not null default now(),
+  unique (account_id, external_id),
+  constraint chk_bank_tx_single_link check (
+    (case when expense_id is not null then 1 else 0 end) +
+    (case when linked_visit_id is not null then 1 else 0 end) +
+    (case when linked_other_income_id is not null then 1 else 0 end) <= 1
+  )
+);
+
+-- Зеркальная колонка на expenses (для unique FK на стороне расхода)
+alter table expenses
+  add column bank_transaction_id uuid references bank_transactions(id) on delete set null,
+  add column paid_amount_cents bigint;          -- частичные оплаты
+```
+
+RLS на всех трёх таблицах:
+
+- `bank_connections.select` — все members салона.
+- `bank_connections.for all` (insert/update/delete) — только `owner`/`admin`.
+- `bank_accounts.select` — JOIN через connection → salon → salon_members.
+- `bank_transactions.select` — JOIN через account → connection → salon.
+
+Триггер `bank_tx_paid_amount_trigger` — при INSERT/UPDATE bank_transactions
+с `expense_id` пересчитывает `expenses.paid_amount_cents` (сумма всех linked
+debit-tx). Расход считается полностью оплаченным когда `paid_amount_cents >=
+amount_cents`. Используется в UI для разделения «оплачено / не оплачено»
+и для прогресс-бара частичной оплаты в форме.
+
+Cron `cron_run_banking_syncs()` (pg_cron, `*/15 * * * *`) выбирает все
+connected connections где `last_synced_at + sync_interval_minutes` истёк и
+шлёт async POST на edge function `banking-sync` через pg_net.
+`banking-expiry-notify` (отдельный cron) шлёт email за 7 дней до истечения
+PSD2 consent — `BankingSection` показывает баннер «переподключи».
+
 ### `audit_log` — стадия 5
 
 ```sql

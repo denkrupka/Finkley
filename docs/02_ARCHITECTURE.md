@@ -106,17 +106,18 @@
 
 ### Внешние сервисы
 
-| Сервис        | Использование                        | Тариф старт                               |
-| ------------- | ------------------------------------ | ----------------------------------------- |
-| GitHub        | Репо + GitHub Pages + GitHub Actions | Free                                      |
-| Supabase      | БД + auth + storage + edge           | Free (500MB БД, 1GB Storage, 500k req/mo) |
-| Stripe        | Платежи + Stripe Tax                 | 1.5% + €0.25 на транзакцию                |
-| Postmark      | Транзакционный email                 | 100 email/мес free, $15/мес 10k           |
-| Anthropic API | OCR через Claude Haiku 4.5           | Pay-as-you-go, ~$0.001/чек                |
-| Groq          | OCR fallback                         | Free tier есть                            |
-| Sentry        | Мониторинг ошибок                    | Developer (free, 5k events/мес)           |
-| Plausible     | Веб-аналитика                        | $9/мес после free trial, или self-hosted  |
-| Cloudflare    | DNS + custom domain для GitHub Pages | Free                                      |
+| Сервис         | Использование                           | Тариф старт                               |
+| -------------- | --------------------------------------- | ----------------------------------------- |
+| GitHub         | Репо + GitHub Pages + GitHub Actions    | Free                                      |
+| Supabase       | БД + auth + storage + edge              | Free (500MB БД, 1GB Storage, 500k req/mo) |
+| Stripe         | Платежи + Stripe Tax                    | 1.5% + €0.25 на транзакцию                |
+| Postmark       | Транзакционный email                    | 100 email/мес free, $15/мес 10k           |
+| Anthropic API  | OCR через Claude Haiku 4.5              | Pay-as-you-go, ~$0.001/чек                |
+| Groq           | OCR fallback                            | Free tier есть                            |
+| Sentry         | Мониторинг ошибок                       | Developer (free, 5k events/мес)           |
+| Plausible      | Веб-аналитика                           | $9/мес после free trial, или self-hosted  |
+| Cloudflare     | DNS + custom domain для GitHub Pages    | Free                                      |
+| Enable Banking | PSD2 AIS — импорт банковских транзакций | ~€0.05 за tx (≈€10/мес на 200 tx/салон)   |
 
 **Совокупная стоимость инфраструктуры на старте: €0/мес** (всё на free tier до 100+ юзеров).
 
@@ -176,6 +177,38 @@ ADR: будет добавлен при необходимости (решени
 shadcn-компоненты используются «как есть», но shadcn-токены (`--primary`, `--background`, `--card`, …) **смаплены** на Finkley-палитру, чтобы дефолтные кнопки/инпуты сразу читались как фирменные.
 
 ADR: [`decisions/007-design-tokens.md`](../decisions/007-design-tokens.md)
+
+### 9. Банковская интеграция через Enable Banking PSD2
+
+Owner салона подключает свои банковские счета через Enable Banking
+(AIS-агрегатор, одобрен 2026-05-12). Цель — автоматизировать импорт
+транзакций и связать каждую с расходом/визитом/доходом, чтобы исключить
+«оплатил, но не внёс».
+
+Архитектура:
+
+- **Сырые транзакции** → таблица `bank_transactions` (debit/credit, дедуп по
+  `(account_id, external_id)`). Polymorphic FK на `expenses` /
+  `visits` / `other_incomes` — constraint `chk_bank_tx_single_link`
+  гарантирует не более одной связи на tx.
+- **Sync** — `banking-sync` edge function. `pg_cron` тикает каждые 15 минут,
+  выбирает due connections (где `last_synced_at + sync_interval_minutes`
+  истёк) и шлёт async POST через `pg_net`. Per-connection
+  `sync_interval_minutes` (range 60..1440, default 360 = 6h) — юзер выбирает
+  в UI BankingSection (1h / 3h / 6h / 12h / 24h).
+- **Auto-link скоринг** — для каждой свежей debit-tx ищем кандидата expense
+  в ±14 дней. Очки: amount exact (+3), document_number в description (+3),
+  NIP в description (+3), counterparty fuzzy (+2/+1). Score ≥5 → auto-link,
+  3-4 → link + `needs_review=true`, <3 → создаём новый expense. Для credit —
+  матч с `other_incomes` по сумме+комментарию.
+- **UI**: вкладки «Банкинг» в /expenses и /income; модалки
+  `LinkTransactionDialog` (с tx → пикаем сущность) и
+  `Link{Expense,Visit,OtherIncome}ToBankDialog` (обратно); маркеры «Банк»
+  (Landmark) и `AlertTriangle` (needs_review) в списках.
+- **Частичные оплаты**: `expenses.paid_amount_cents` + чекбокс в форме +
+  trigger авто-пересчёта при привязке tx.
+
+ADR: [`decisions/024-banking-enable-banking-psd2.md`](../decisions/024-banking-enable-banking-psd2.md)
 
 ## Слои безопасности
 
