@@ -481,6 +481,13 @@
     "media_audio": "🎙 Голосовое",
     "media_file": "📎 Файл",
     "media_sticker": "🎭 Стикер",
+    "channel": {
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "facebook": "Facebook Messenger",
+      "internal": "Внутренний чат"
+    },
     "errors": {
       "file_too_large": "Файл слишком большой (макс. 50 МБ)",
       "no_mic": "Микрофон недоступен в этом браузере"
@@ -2873,6 +2880,11 @@
     "budget": {
       "title": "Превышен бюджет «{{name}}»",
       "body": "В этом месяце уже {{pct}}% от лимита."
+    },
+    "messenger": {
+      "body_no_preview_one": "{{count}} непрочитанное в {{channel}}",
+      "body_no_preview_few": "{{count}} непрочитанных в {{channel}}",
+      "body_no_preview_many": "{{count}} непрочитанных в {{channel}}"
     }
   },
   "integrations": {

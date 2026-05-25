@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { AlertTriangle, Bell, Info, Sparkles, Zap } from 'lucide-react'
+import { AlertTriangle, Bell, Info, MessageCircle, Sparkles, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -78,13 +78,22 @@ function NotificationRow({
   notification: NotificationItem
   onClick: () => void
 }) {
-  const Icon = n.severity === 'critical' ? AlertTriangle : n.severity === 'warning' ? Zap : Info
+  const Icon =
+    n.kind === 'messenger_message'
+      ? MessageCircle
+      : n.severity === 'critical'
+        ? AlertTriangle
+        : n.severity === 'warning'
+          ? Zap
+          : Info
   const colorCls =
-    n.severity === 'critical'
-      ? 'text-destructive'
-      : n.severity === 'warning'
-        ? 'text-amber-600'
-        : 'text-brand-teal-deep'
+    n.kind === 'messenger_message'
+      ? 'text-brand-teal-deep'
+      : n.severity === 'critical'
+        ? 'text-destructive'
+        : n.severity === 'warning'
+          ? 'text-amber-600'
+          : 'text-brand-teal-deep'
 
   const content = (
     <>

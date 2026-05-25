@@ -1,20 +1,78 @@
-import { useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { supabase } from '@/lib/supabase/client'
 
 import { useBenchmarkComparison } from './useBenchmarks'
 import { useCategoryBudgets } from './useExpenseExtras'
 import { useInsights } from './useInsights'
+import { useSalon } from './useSalons'
 import { useUpcomingTemplates } from './useVisitTemplates'
 
 export type NotificationItem = {
   id: string
-  kind: 'insight' | 'overdue_template' | 'budget_exceeded'
+  kind: 'insight' | 'overdue_template' | 'budget_exceeded' | 'messenger_message'
   severity: 'info' | 'warning' | 'critical'
   title: string
   body: string
   link?: string
   /** ISO timestamp — для чтения с last-seen стейтом */
   ts: string
+}
+
+/** Непрочитанные диалоги мессенджера для feed уведомлений в TopBar. */
+function useMessengerUnreadConversations(salonId: string | undefined) {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!salonId) return
+    const channel = supabase
+      .channel(`notifs-messenger:${salonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messenger_conversations',
+          filter: `salon_id=eq.${salonId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['notifs-messenger-unread', salonId] })
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [salonId, qc])
+
+  return useQuery<
+    Array<{
+      id: string
+      display_name: string
+      last_message_preview: string | null
+      last_message_at: string
+      unread_count: number
+      channel: string
+    }>
+  >({
+    queryKey: ['notifs-messenger-unread', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('messenger_conversations')
+        .select('id, display_name, last_message_preview, last_message_at, unread_count, channel')
+        .eq('salon_id', salonId)
+        .gt('unread_count', 0)
+        .is('archived_at', null)
+        .order('last_message_at', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!salonId,
+    staleTime: 10_000,
+  })
 }
 
 const LAST_SEEN_KEY = (salonId: string) => `finkley:notif-last-seen:${salonId}`
@@ -33,11 +91,38 @@ export function useNotifications(salonId: string | undefined) {
   const { data: insights = [] } = useInsights(salonId)
   const { data: upcoming = [] } = useUpcomingTemplates(salonId, 0) // только overdue/today
   const { data: budgets = [] } = useCategoryBudgets(salonId)
+  const { data: unreadConvos = [] } = useMessengerUnreadConversations(salonId)
+  const { data: salon } = useSalon(salonId)
   // benchmark не показываем как нотификацию — это скорее интересный факт, не алерт
   useBenchmarkComparison(salonId) // подгружаем в кэш для consistency
 
+  // Тогл «Новое сообщение в мессенджере» из Настройки → Уведомления → Типы.
+  // Отсутствие ключа = включено по умолчанию.
+  const messengerNotifEnabled = (salon?.notification_prefs ?? {}).messenger_new_message !== false
+
   const items = useMemo<NotificationItem[]>(() => {
     const out: NotificationItem[] = []
+
+    if (messengerNotifEnabled) {
+      for (const c of unreadConvos) {
+        const channelLabel = t(`messenger.channel.${c.channel}`, { defaultValue: c.channel })
+        out.push({
+          id: `msg:${c.id}`,
+          kind: 'messenger_message',
+          severity: 'warning',
+          title: c.display_name || t('messenger.unknown_sender'),
+          body:
+            c.last_message_preview?.slice(0, 120) ||
+            t('notifications.messenger.body_no_preview', {
+              count: c.unread_count,
+              channel: channelLabel,
+              defaultValue: `${c.unread_count} непрочитанных в ${channelLabel}`,
+            }),
+          link: salonId ? `/${salonId}/messenger?convo=${c.id}` : undefined,
+          ts: c.last_message_at,
+        })
+      }
+    }
 
     for (const i of insights) {
       // Только warning/critical — info-инсайты живут на дашборде, не в уведомлениях
@@ -83,7 +168,7 @@ export function useNotifications(salonId: string | undefined) {
     }
 
     return out.sort((a, b) => b.ts.localeCompare(a.ts))
-  }, [insights, upcoming, budgets, salonId, t])
+  }, [insights, upcoming, budgets, unreadConvos, messengerNotifEnabled, salonId, t])
 
   const lastSeen =
     salonId && typeof window !== 'undefined'
