@@ -48,9 +48,17 @@ export type BankTransactionRow = {
   counterparty: string | null
   executed_at: string
   expense_id: string | null
+  linked_visit_id: string | null
+  linked_other_income_id: string | null
+  needs_review: boolean
 }
 
 export type BankInflowRow = BankTransactionRow & {
+  bank_name: string | null
+  account_iban: string | null
+}
+
+export type BankOutflowRow = BankTransactionRow & {
   bank_name: string | null
   account_iban: string | null
 }
@@ -165,6 +173,9 @@ export function useBankInflows(
           counterparty: r.counterparty,
           executed_at: r.executed_at,
           expense_id: r.expense_id,
+          linked_visit_id: r.linked_visit_id,
+          linked_other_income_id: r.linked_other_income_id,
+          needs_review: r.needs_review,
           bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
           account_iban: account?.iban ?? null,
         }
@@ -172,6 +183,110 @@ export function useBankInflows(
     },
     enabled: !!salonId,
     staleTime: 30_000,
+  })
+}
+
+/**
+ * Debit-транзакции (списания) для салона за период. Аналог useBankInflows
+ * но `type='debit'`. Используется на странице Расходы → таб Банкинг.
+ */
+export function useBankOutflows(
+  salonId: string | undefined,
+  period: { start: string; end: string },
+) {
+  return useQuery<BankOutflowRow[]>({
+    queryKey: ['bank-outflows', salonId, period],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('bank_transactions')
+        .select(
+          `id, account_id, external_id, type, amount_cents, currency, description,
+           counterparty, executed_at, expense_id, linked_visit_id, linked_other_income_id,
+           needs_review,
+           bank_accounts!inner (
+             iban,
+             bank_connections!inner (
+               salon_id, bank_name, bank_aspsp_name
+             )
+           )`,
+        )
+        .eq('type', 'debit')
+        .eq('bank_accounts.bank_connections.salon_id', salonId)
+        .gte('executed_at', period.start)
+        .lt('executed_at', period.end)
+        .order('executed_at', { ascending: false })
+        .limit(500)
+      if (error) throw error
+      type Joined = BankTransactionRow & {
+        bank_accounts?: Array<{
+          iban: string | null
+          bank_connections?: Array<{
+            bank_name: string | null
+            bank_aspsp_name: string | null
+          }> | null
+        }> | null
+      }
+      return ((data ?? []) as unknown as Joined[]).map((r): BankOutflowRow => {
+        const account = r.bank_accounts?.[0]
+        const conn = account?.bank_connections?.[0]
+        return {
+          id: r.id,
+          account_id: r.account_id,
+          external_id: r.external_id,
+          type: r.type,
+          amount_cents: r.amount_cents,
+          currency: r.currency,
+          description: r.description,
+          counterparty: r.counterparty,
+          executed_at: r.executed_at,
+          expense_id: r.expense_id,
+          linked_visit_id: r.linked_visit_id,
+          linked_other_income_id: r.linked_other_income_id,
+          needs_review: r.needs_review,
+          bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
+          account_iban: account?.iban ?? null,
+        }
+      })
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
+  })
+}
+
+/**
+ * Прикрепить транзакцию к расходу/визиту/прочему доходу. Передавайте только
+ * одну из ссылок — БД-constraint chk_bank_tx_single_link не пустит конфликт.
+ * Передача null'ов = отвязать.
+ */
+export function useLinkBankTransaction(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      transactionId: string
+      expenseId?: string | null
+      visitId?: string | null
+      otherIncomeId?: string | null
+      clearNeedsReview?: boolean
+    }) => {
+      const patch: Record<string, unknown> = {}
+      // Если передано — выставляем; если undefined — не трогаем (partial update).
+      if (args.expenseId !== undefined) patch.expense_id = args.expenseId
+      if (args.visitId !== undefined) patch.linked_visit_id = args.visitId
+      if (args.otherIncomeId !== undefined) patch.linked_other_income_id = args.otherIncomeId
+      if (args.clearNeedsReview) patch.needs_review = false
+      const { error } = await supabase
+        .from('bank_transactions')
+        .update(patch)
+        .eq('id', args.transactionId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
   })
 }
 

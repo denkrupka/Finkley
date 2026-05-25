@@ -2,6 +2,7 @@ import {
   CalendarClock,
   CheckCircle2,
   FileText,
+  Landmark,
   Loader2,
   Paperclip,
   Plus,
@@ -63,6 +64,7 @@ import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -89,12 +91,16 @@ export function ExpensesPage() {
   const [params, setParams] = useSearchParams()
   const categoryFilter = params.get('cat') || ''
   const payFilter = (params.get('pay') || '') as PaymentMethod | ''
-  // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments).
-  const tab = (params.get('tab') === 'pending' ? 'pending' : 'paid') as 'paid' | 'pending'
-  function setTab(value: 'paid' | 'pending') {
+  // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments)
+  // | banking (банковские транзакции для ручной/авто привязки к расходам).
+  type ExpenseTab = 'paid' | 'pending' | 'banking'
+  const tabParam = params.get('tab')
+  const tab: ExpenseTab =
+    tabParam === 'pending' ? 'pending' : tabParam === 'banking' ? 'banking' : 'paid'
+  function setTab(value: ExpenseTab) {
     const next = new URLSearchParams(params)
-    if (value === 'pending') next.set('tab', 'pending')
-    else next.delete('tab')
+    if (value === 'paid') next.delete('tab')
+    else next.set('tab', value)
     setParams(next, { replace: true })
   }
   // PeriodPickerPopover как в отчётах — выбор пресета/диапазона дат.
@@ -322,6 +328,19 @@ export function ExpensesPage() {
             {pendingPayments.length}
           </span>
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('banking')}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+            tab === 'banking'
+              ? 'bg-brand-teal-soft text-brand-teal-deep'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <Landmark className="size-4" strokeWidth={1.8} />
+          {t('expenses.tabs.banking', { defaultValue: 'Банкинг' })}
+        </button>
       </div>
 
       {/* Filters */}
@@ -365,127 +384,393 @@ export function ExpensesPage() {
           BudgetsCard перенесены в /finance → Бюджеты → Плановые расходы.
           На странице расходов остался только список + структура. */}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
-        {/* List */}
-        <div className="border-border bg-card shadow-finsm rounded-lg border">
-          <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
-            <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {tab === 'pending'
-                ? t('expenses.tabs.list_title_pending', { defaultValue: 'Запланированные платежи' })
-                : t('expenses.list_title')}
-            </h2>
-            <span className="text-muted-foreground text-xs">
-              {tab === 'pending' ? pendingPayments.length : expenses.length} {t('expenses.records')}
-            </span>
-          </div>
-          {tab === 'pending' ? (
-            scheduledLoading ? (
+      {tab === 'banking' ? (
+        <BankingTransactionsTable
+          salonId={salonId!}
+          direction="debit"
+          period={range}
+          currency={currency}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
+          {/* List */}
+          <div className="border-border bg-card shadow-finsm rounded-lg border">
+            <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
+              <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                {tab === 'pending'
+                  ? t('expenses.tabs.list_title_pending', {
+                      defaultValue: 'Запланированные платежи',
+                    })
+                  : t('expenses.list_title')}
+              </h2>
+              <span className="text-muted-foreground text-xs">
+                {tab === 'pending' ? pendingPayments.length : expenses.length}{' '}
+                {t('expenses.records')}
+              </span>
+            </div>
+            {tab === 'pending' ? (
+              scheduledLoading ? (
+                <div className="space-y-2 p-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
+                  ))}
+                </div>
+              ) : pendingPayments.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-muted-foreground text-sm">
+                    {t('expenses.tabs.empty_pending', {
+                      defaultValue: 'В этом периоде нет запланированных платежей',
+                    })}
+                  </p>
+                </div>
+              ) : (
+                <ul>
+                  {pendingPayments.map((p) => {
+                    const cat = p.category_id ? categoryById.get(p.category_id) : null
+                    const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
+                    const color =
+                      idx >= 0
+                        ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
+                        : '#9A9A9A'
+                    const overdue = p.due_date < todayStr
+                    const today = p.due_date === todayStr
+                    return (
+                      <li
+                        key={p.id}
+                        onClick={() => {
+                          if (!hasOpenShift) {
+                            setGateOpen(true)
+                            return
+                          }
+                          setEditingPayment(p)
+                        }}
+                        className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
+                        style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                      >
+                        <span className="num text-muted-foreground text-xs">
+                          {p.due_date.slice(5).replace('-', '.')}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                            <span className="truncate">
+                              {p.vendor_name || cat?.name || t('expenses.no_category')}
+                            </span>
+                            <span
+                              className={cn(
+                                'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                                overdue
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : today
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-sky-100 text-sky-700',
+                              )}
+                            >
+                              {overdue
+                                ? t('expenses.tabs.badge_overdue', { defaultValue: 'просрочен' })
+                                : today
+                                  ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
+                                  : t('expenses.tabs.badge_pending', {
+                                      defaultValue: 'запланирован',
+                                    })}
+                            </span>
+                          </span>
+                          <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                            {cat ? <span>{cat.name}</span> : null}
+                            {p.invoice_number ? (
+                              <>
+                                {cat ? <span aria-hidden>·</span> : null}
+                                <span className="num">№ {p.invoice_number}</span>
+                              </>
+                            ) : null}
+                            {p.comment ? (
+                              <>
+                                {cat || p.invoice_number ? <span aria-hidden>·</span> : null}
+                                <span className="truncate">{p.comment}</span>
+                              </>
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className="num text-foreground text-right text-sm font-bold">
+                          −{formatCurrency(p.amount_cents, currency)}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!hasOpenShift) {
+                                setGateOpen(true)
+                                return
+                              }
+                              setEditingPayment(p)
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                          >
+                            <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                            {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!confirm(t('finance.payments.confirm_delete'))) return
+                              deleteScheduled.mutate(p.id, {
+                                onSuccess: () => toast.success(t('finance.payments.toast_deleted')),
+                              })
+                            }}
+                            className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                            aria-label="delete"
+                          >
+                            <Trash2 className="size-4" strokeWidth={1.7} />
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )
+            ) : isLoading ? (
               <div className="space-y-2 p-3">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
                 ))}
               </div>
-            ) : pendingPayments.length === 0 ? (
+            ) : expenses.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <p className="text-muted-foreground text-sm">
-                  {t('expenses.tabs.empty_pending', {
-                    defaultValue: 'В этом периоде нет запланированных платежей',
-                  })}
-                </p>
+                <p className="text-muted-foreground text-sm">{t('expenses.empty')}</p>
               </div>
             ) : (
               <ul>
-                {pendingPayments.map((p) => {
-                  const cat = p.category_id ? categoryById.get(p.category_id) : null
+                {pagedExpenses.map((e: ExpenseRow) => {
+                  const cat = e.category_id ? categoryById.get(e.category_id) : null
                   const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
                   const color =
                     idx >= 0
                       ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
                       : '#9A9A9A'
-                  const overdue = p.due_date < todayStr
-                  const today = p.due_date === todayStr
                   return (
                     <li
-                      key={p.id}
+                      key={e.id}
                       onClick={() => {
                         if (!hasOpenShift) {
                           setGateOpen(true)
                           return
                         }
-                        setEditingPayment(p)
+                        setEditingExpense(e)
                       }}
                       className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
                       style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                      data-testid="expense-row"
                     >
                       <span className="num text-muted-foreground text-xs">
-                        {p.due_date.slice(5).replace('-', '.')}
+                        {formatExpenseDate(e.expense_at)}
                       </span>
                       <span className="min-w-0">
+                        {/* Описание (image #94) — приоритетно. Если не задано —
+                          fallback на comment, потом на имя категории. */}
                         <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
                           <span className="truncate">
-                            {p.vendor_name || cat?.name || t('expenses.no_category')}
+                            {e.description || e.comment || cat?.name || t('expenses.no_category')}
                           </span>
-                          <span
-                            className={cn(
-                              'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                              overdue
-                                ? 'bg-rose-100 text-rose-700'
-                                : today
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-sky-100 text-sky-700',
-                            )}
-                          >
-                            {overdue
-                              ? t('expenses.tabs.badge_overdue', { defaultValue: 'просрочен' })
-                              : today
-                                ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
-                                : t('expenses.tabs.badge_pending', {
-                                    defaultValue: 'запланирован',
-                                  })}
-                          </span>
+                          {e.recurrence && e.recurrence !== 'none' ? (
+                            <Repeat
+                              className="text-brand-teal size-3 shrink-0"
+                              strokeWidth={2}
+                              aria-label={t(`expenses.form.recurrence.${e.recurrence}`)}
+                            />
+                          ) : null}
+                          {e.receipt_url ? (
+                            <button
+                              type="button"
+                              onClick={() => openReceipt(e.receipt_url!)}
+                              className="text-brand-teal hover:bg-muted/40 grid size-5 shrink-0 place-items-center rounded-md"
+                              aria-label={t('expenses.receipt_open')}
+                              data-testid="expense-receipt"
+                            >
+                              <Paperclip className="size-3.5" strokeWidth={1.7} />
+                            </button>
+                          ) : null}
                         </span>
+                        {/* Sub-line: Категория · Контрагент · № документа · Касса · Кто внёс.
+                          Image #93/#59: категория/контрагент в строке списка.
+                          Image #110: + номер документа (фактуры/чека) и кто
+                          именно внёс расход (видно сразу, без открытия карточки). */}
                         <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                           {cat ? <span>{cat.name}</span> : null}
-                          {p.invoice_number ? (
+                          {e.counterparty_id ? (
                             <>
                               {cat ? <span aria-hidden>·</span> : null}
-                              <span className="num">№ {p.invoice_number}</span>
+                              <span>{counterpartyById.get(e.counterparty_id)?.name ?? '—'}</span>
                             </>
                           ) : null}
-                          {p.comment ? (
+                          {/* Image #110: номер документа — рядом с контрагентом. */}
+                          {e.document_number ? (
                             <>
-                              {cat || p.invoice_number ? <span aria-hidden>·</span> : null}
-                              <span className="truncate">{p.comment}</span>
+                              {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
+                              <span className="num">№ {e.document_number}</span>
+                            </>
+                          ) : null}
+                          {/* Image #82: касса вместо payment_method-пилюли.
+                            Fallback на старый payment_method если cash_register_id
+                            ещё не проставлен (исторические строки). */}
+                          {e.cash_register_id || e.payment_method ? (
+                            <>
+                              {cat || e.counterparty_id || e.document_number ? (
+                                <span aria-hidden>·</span>
+                              ) : null}
+                              <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
+                                {e.cash_register_id
+                                  ? (cashRegisterById.get(e.cash_register_id) ?? '—')
+                                  : t(`payment_methods.${e.payment_method}`, {
+                                      defaultValue: e.payment_method as string,
+                                    })}
+                              </span>
+                            </>
+                          ) : null}
+                          {/* Image #110: кто внёс расход. ФИО/email из salon_members. */}
+                          {e.created_by && userNameById.get(e.created_by) ? (
+                            <>
+                              <span aria-hidden>·</span>
+                              <span className="text-muted-foreground">
+                                {t('expenses.created_by_short', {
+                                  name: userNameById.get(e.created_by),
+                                  defaultValue: `внёс ${userNameById.get(e.created_by)}`,
+                                })}
+                              </span>
                             </>
                           ) : null}
                         </span>
                       </span>
-                      <span className="num text-foreground text-right text-sm font-bold">
-                        −{formatCurrency(p.amount_cents, currency)}
+                      <span className="num text-destructive text-right text-sm font-bold">
+                        −{formatCurrency(e.amount_cents, currency)}
                       </span>
                       <div className="flex items-center gap-0.5">
+                        {activeAccounting && e.source !== activeAccounting
+                          ? (() => {
+                              const meta = (e.metadata ?? {}) as Record<string, unknown>
+                              const idKey =
+                                activeAccounting === 'wfirma'
+                                  ? 'wfirma_expense_id'
+                                  : `${activeAccounting}_id`
+                              const pushedId =
+                                typeof meta[idKey] === 'string' ? (meta[idKey] as string) : null
+                              const portalLabel =
+                                PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
+                              const isPushing =
+                                activeAccounting === 'wfirma'
+                                  ? wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
+                                  : accountingPush.isPending &&
+                                    accountingPush.variables?.expenseId === e.id
+                              if (pushedId) {
+                                return (
+                                  <span
+                                    className="grid size-7 place-items-center rounded-md text-emerald-600"
+                                    title={t('expenses.portal.tooltip_pushed', {
+                                      portal: portalLabel,
+                                      id: pushedId,
+                                    })}
+                                  >
+                                    <CheckCircle2 className="size-4" strokeWidth={1.8} />
+                                  </span>
+                                )
+                              }
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const onCommonResult = (
+                                      kind: 'ok' | 'already_pushed' | 'error',
+                                      reason?: string,
+                                    ) => {
+                                      if (kind === 'ok') {
+                                        toast.success(
+                                          t('expenses.portal.toast_manual_pushed', {
+                                            portal: portalLabel,
+                                          }),
+                                        )
+                                      } else if (kind === 'already_pushed') {
+                                        toast.info(
+                                          t('expenses.portal.toast_already_pushed', {
+                                            portal: portalLabel,
+                                          }),
+                                        )
+                                      } else {
+                                        toast.error(
+                                          t('expenses.portal.toast_push_failed', {
+                                            portal: portalLabel,
+                                          }),
+                                          { description: reason },
+                                        )
+                                      }
+                                    }
+                                    const onErr = (err: unknown) =>
+                                      toast.error(
+                                        t('expenses.portal.toast_push_failed', {
+                                          portal: portalLabel,
+                                        }),
+                                        {
+                                          description:
+                                            err instanceof Error ? err.message : String(err),
+                                        },
+                                      )
+                                    if (activeAccounting === 'wfirma') {
+                                      wfirmaPush.mutate(
+                                        { expenseId: e.id, auto: false },
+                                        {
+                                          onSuccess: (res) =>
+                                            onCommonResult(
+                                              res.kind === 'ok'
+                                                ? 'ok'
+                                                : res.kind === 'already_pushed'
+                                                  ? 'already_pushed'
+                                                  : 'error',
+                                              'reason' in res ? res.reason : undefined,
+                                            ),
+                                          onError: onErr,
+                                        },
+                                      )
+                                    } else {
+                                      accountingPush.mutate(
+                                        { expenseId: e.id, auto: false },
+                                        {
+                                          onSuccess: (res) =>
+                                            onCommonResult(
+                                              res.kind === 'ok'
+                                                ? 'ok'
+                                                : res.kind === 'already_pushed'
+                                                  ? 'already_pushed'
+                                                  : 'error',
+                                              'reason' in res ? res.reason : undefined,
+                                            ),
+                                          onError: onErr,
+                                        },
+                                      )
+                                    }
+                                  }}
+                                  disabled={isPushing}
+                                  className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
+                                  aria-label={t('expenses.portal.push_button', {
+                                    portal: portalLabel,
+                                  })}
+                                  title={t('expenses.portal.push_button', {
+                                    portal: portalLabel,
+                                  })}
+                                >
+                                  {isPushing ? (
+                                    <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+                                  ) : (
+                                    <FileText className="size-4" strokeWidth={1.7} />
+                                  )}
+                                </button>
+                              )
+                            })()
+                          : null}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!hasOpenShift) {
-                              setGateOpen(true)
-                              return
-                            }
-                            setEditingPayment(p)
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                        >
-                          <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                          {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!confirm(t('finance.payments.confirm_delete'))) return
-                            deleteScheduled.mutate(p.id, {
-                              onSuccess: () => toast.success(t('finance.payments.toast_deleted')),
+                          onClick={() => {
+                            if (!confirm(t('expenses.confirm_delete'))) return
+                            deleteExpense.mutate(e.id, {
+                              onSuccess: () => toast.success(t('expenses.toast_deleted')),
                             })
                           }}
                           className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
@@ -498,341 +783,87 @@ export function ExpensesPage() {
                   )
                 })}
               </ul>
-            )
-          ) : isLoading ? (
-            <div className="space-y-2 p-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="bg-muted/60 h-12 animate-pulse rounded-md" />
-              ))}
-            </div>
-          ) : expenses.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-muted-foreground text-sm">{t('expenses.empty')}</p>
-            </div>
-          ) : (
-            <ul>
-              {pagedExpenses.map((e: ExpenseRow) => {
-                const cat = e.category_id ? categoryById.get(e.category_id) : null
-                const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
-                const color =
-                  idx >= 0
-                    ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
-                    : '#9A9A9A'
-                return (
-                  <li
-                    key={e.id}
-                    onClick={() => {
-                      if (!hasOpenShift) {
-                        setGateOpen(true)
-                        return
-                      }
-                      setEditingExpense(e)
-                    }}
-                    className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
-                    style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                    data-testid="expense-row"
-                  >
-                    <span className="num text-muted-foreground text-xs">
-                      {formatExpenseDate(e.expense_at)}
-                    </span>
-                    <span className="min-w-0">
-                      {/* Описание (image #94) — приоритетно. Если не задано —
-                          fallback на comment, потом на имя категории. */}
-                      <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-                        <span className="truncate">
-                          {e.description || e.comment || cat?.name || t('expenses.no_category')}
-                        </span>
-                        {e.recurrence && e.recurrence !== 'none' ? (
-                          <Repeat
-                            className="text-brand-teal size-3 shrink-0"
-                            strokeWidth={2}
-                            aria-label={t(`expenses.form.recurrence.${e.recurrence}`)}
-                          />
-                        ) : null}
-                        {e.receipt_url ? (
-                          <button
-                            type="button"
-                            onClick={() => openReceipt(e.receipt_url!)}
-                            className="text-brand-teal hover:bg-muted/40 grid size-5 shrink-0 place-items-center rounded-md"
-                            aria-label={t('expenses.receipt_open')}
-                            data-testid="expense-receipt"
-                          >
-                            <Paperclip className="size-3.5" strokeWidth={1.7} />
-                          </button>
-                        ) : null}
-                      </span>
-                      {/* Sub-line: Категория · Контрагент · № документа · Касса · Кто внёс.
-                          Image #93/#59: категория/контрагент в строке списка.
-                          Image #110: + номер документа (фактуры/чека) и кто
-                          именно внёс расход (видно сразу, без открытия карточки). */}
-                      <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        {cat ? <span>{cat.name}</span> : null}
-                        {e.counterparty_id ? (
-                          <>
-                            {cat ? <span aria-hidden>·</span> : null}
-                            <span>{counterpartyById.get(e.counterparty_id)?.name ?? '—'}</span>
-                          </>
-                        ) : null}
-                        {/* Image #110: номер документа — рядом с контрагентом. */}
-                        {e.document_number ? (
-                          <>
-                            {cat || e.counterparty_id ? <span aria-hidden>·</span> : null}
-                            <span className="num">№ {e.document_number}</span>
-                          </>
-                        ) : null}
-                        {/* Image #82: касса вместо payment_method-пилюли.
-                            Fallback на старый payment_method если cash_register_id
-                            ещё не проставлен (исторические строки). */}
-                        {e.cash_register_id || e.payment_method ? (
-                          <>
-                            {cat || e.counterparty_id || e.document_number ? (
-                              <span aria-hidden>·</span>
-                            ) : null}
-                            <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
-                              {e.cash_register_id
-                                ? (cashRegisterById.get(e.cash_register_id) ?? '—')
-                                : t(`payment_methods.${e.payment_method}`, {
-                                    defaultValue: e.payment_method as string,
-                                  })}
-                            </span>
-                          </>
-                        ) : null}
-                        {/* Image #110: кто внёс расход. ФИО/email из salon_members. */}
-                        {e.created_by && userNameById.get(e.created_by) ? (
-                          <>
-                            <span aria-hidden>·</span>
-                            <span className="text-muted-foreground">
-                              {t('expenses.created_by_short', {
-                                name: userNameById.get(e.created_by),
-                                defaultValue: `внёс ${userNameById.get(e.created_by)}`,
-                              })}
-                            </span>
-                          </>
-                        ) : null}
-                      </span>
-                    </span>
-                    <span className="num text-destructive text-right text-sm font-bold">
-                      −{formatCurrency(e.amount_cents, currency)}
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      {activeAccounting && e.source !== activeAccounting
-                        ? (() => {
-                            const meta = (e.metadata ?? {}) as Record<string, unknown>
-                            const idKey =
-                              activeAccounting === 'wfirma'
-                                ? 'wfirma_expense_id'
-                                : `${activeAccounting}_id`
-                            const pushedId =
-                              typeof meta[idKey] === 'string' ? (meta[idKey] as string) : null
-                            const portalLabel =
-                              PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
-                            const isPushing =
-                              activeAccounting === 'wfirma'
-                                ? wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
-                                : accountingPush.isPending &&
-                                  accountingPush.variables?.expenseId === e.id
-                            if (pushedId) {
-                              return (
-                                <span
-                                  className="grid size-7 place-items-center rounded-md text-emerald-600"
-                                  title={t('expenses.portal.tooltip_pushed', {
-                                    portal: portalLabel,
-                                    id: pushedId,
-                                  })}
-                                >
-                                  <CheckCircle2 className="size-4" strokeWidth={1.8} />
-                                </span>
-                              )
-                            }
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const onCommonResult = (
-                                    kind: 'ok' | 'already_pushed' | 'error',
-                                    reason?: string,
-                                  ) => {
-                                    if (kind === 'ok') {
-                                      toast.success(
-                                        t('expenses.portal.toast_manual_pushed', {
-                                          portal: portalLabel,
-                                        }),
-                                      )
-                                    } else if (kind === 'already_pushed') {
-                                      toast.info(
-                                        t('expenses.portal.toast_already_pushed', {
-                                          portal: portalLabel,
-                                        }),
-                                      )
-                                    } else {
-                                      toast.error(
-                                        t('expenses.portal.toast_push_failed', {
-                                          portal: portalLabel,
-                                        }),
-                                        { description: reason },
-                                      )
-                                    }
-                                  }
-                                  const onErr = (err: unknown) =>
-                                    toast.error(
-                                      t('expenses.portal.toast_push_failed', {
-                                        portal: portalLabel,
-                                      }),
-                                      {
-                                        description:
-                                          err instanceof Error ? err.message : String(err),
-                                      },
-                                    )
-                                  if (activeAccounting === 'wfirma') {
-                                    wfirmaPush.mutate(
-                                      { expenseId: e.id, auto: false },
-                                      {
-                                        onSuccess: (res) =>
-                                          onCommonResult(
-                                            res.kind === 'ok'
-                                              ? 'ok'
-                                              : res.kind === 'already_pushed'
-                                                ? 'already_pushed'
-                                                : 'error',
-                                            'reason' in res ? res.reason : undefined,
-                                          ),
-                                        onError: onErr,
-                                      },
-                                    )
-                                  } else {
-                                    accountingPush.mutate(
-                                      { expenseId: e.id, auto: false },
-                                      {
-                                        onSuccess: (res) =>
-                                          onCommonResult(
-                                            res.kind === 'ok'
-                                              ? 'ok'
-                                              : res.kind === 'already_pushed'
-                                                ? 'already_pushed'
-                                                : 'error',
-                                            'reason' in res ? res.reason : undefined,
-                                          ),
-                                        onError: onErr,
-                                      },
-                                    )
-                                  }
-                                }}
-                                disabled={isPushing}
-                                className="text-muted-foreground hover:text-secondary grid size-7 place-items-center rounded-md disabled:opacity-50"
-                                aria-label={t('expenses.portal.push_button', {
-                                  portal: portalLabel,
-                                })}
-                                title={t('expenses.portal.push_button', {
-                                  portal: portalLabel,
-                                })}
-                              >
-                                {isPushing ? (
-                                  <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
-                                ) : (
-                                  <FileText className="size-4" strokeWidth={1.7} />
-                                )}
-                              </button>
-                            )
-                          })()
-                        : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!confirm(t('expenses.confirm_delete'))) return
-                          deleteExpense.mutate(e.id, {
-                            onSuccess: () => toast.success(t('expenses.toast_deleted')),
-                          })
-                        }}
-                        className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                        aria-label="delete"
-                      >
-                        <Trash2 className="size-4" strokeWidth={1.7} />
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          {/* Пагинация по 25 (#9). Скрываем когда страница одна. */}
-          {tab === 'paid' && !isLoading && totalPages > 1 ? (
-            <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
-              <p className="text-muted-foreground text-xs">
-                {(page - 1) * PAGE_SIZE + 1}—{Math.min(page * PAGE_SIZE, expenses.length)}{' '}
-                {t('common.of')} {expenses.length}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ‹
-                </button>
-                <span className="text-muted-foreground px-2 text-xs">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {/* Structure — одинаковый блок для обоих табов, источник зависит от tab */}
-        <div className="flex flex-col gap-4">
-          <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-            <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-              {tab === 'pending'
-                ? t('expenses.tabs.structure_title_pending', {
-                    defaultValue: 'Структура запланированных',
-                  })
-                : t('expenses.structure_title')}
-            </h2>
-            {sideStructure.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {tab === 'pending'
-                  ? t('expenses.tabs.structure_empty_pending', {
-                      defaultValue: 'Нет запланированных платежей в этом периоде',
-                    })
-                  : t('expenses.structure_empty')}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3.5">
-                {sideStructure.map((c) => {
-                  const pct = sideTotal > 0 ? (c.total_cents / sideTotal) * 100 : 0
-                  return (
-                    <div key={c.id}>
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                        <span className="text-foreground text-sm font-medium">{c.name}</span>
-                        <span className="num text-brand-navy text-sm font-bold">
-                          {formatCurrency(c.total_cents, currency)}{' '}
-                          <span className="text-brand-text-faint font-medium">
-                            · {Math.round(pct)}%
-                          </span>
-                        </span>
-                      </div>
-                      <div className="bg-background h-2.5 overflow-hidden rounded-full">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${pct}%`, background: c.color }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
             )}
+            {/* Пагинация по 25 (#9). Скрываем когда страница одна. */}
+            {tab === 'paid' && !isLoading && totalPages > 1 ? (
+              <div className="border-border flex items-center justify-between gap-2 border-t px-5 py-3">
+                <p className="text-muted-foreground text-xs">
+                  {(page - 1) * PAGE_SIZE + 1}—{Math.min(page * PAGE_SIZE, expenses.length)}{' '}
+                  {t('common.of')} {expenses.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-muted-foreground px-2 text-xs">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page === totalPages}
+                    className="border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex h-8 items-center rounded-md border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Structure — одинаковый блок для обоих табов, источник зависит от tab */}
+          <div className="flex flex-col gap-4">
+            <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+              <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
+                {tab === 'pending'
+                  ? t('expenses.tabs.structure_title_pending', {
+                      defaultValue: 'Структура запланированных',
+                    })
+                  : t('expenses.structure_title')}
+              </h2>
+              {sideStructure.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  {tab === 'pending'
+                    ? t('expenses.tabs.structure_empty_pending', {
+                        defaultValue: 'Нет запланированных платежей в этом периоде',
+                      })
+                    : t('expenses.structure_empty')}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {sideStructure.map((c) => {
+                    const pct = sideTotal > 0 ? (c.total_cents / sideTotal) * 100 : 0
+                    return (
+                      <div key={c.id}>
+                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                          <span className="text-foreground text-sm font-medium">{c.name}</span>
+                          <span className="num text-brand-navy text-sm font-bold">
+                            {formatCurrency(c.total_cents, currency)}{' '}
+                            <span className="text-brand-text-faint font-medium">
+                              · {Math.round(pct)}%
+                            </span>
+                          </span>
+                        </div>
+                        <div className="bg-background h-2.5 overflow-hidden rounded-full">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${pct}%`, background: c.color }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <ExpenseFormModal
         open={formOpen}
