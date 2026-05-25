@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Landmark, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import {
   useOtherIncomeCategories,
@@ -100,6 +101,9 @@ export function SalesTab({ salonId }: { salonId: string }) {
     start: r.start,
     end: r.end,
   })
+  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  const linkedVisitIds = bankLinked?.visitIds ?? null
+  const linkedOtherIncomeIds = bankLinked?.otherIncomeIds ?? null
   const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
   const otherCategoriesById = useMemo(
     () => new Map(otherCategories.map((c) => [c.id, c.name])),
@@ -255,6 +259,15 @@ export function SalesTab({ salonId }: { salonId: string }) {
                     <span className="bg-brand-teal-soft text-brand-teal-deep ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase">
                       {t('income.sales.tag_other')}
                     </span>
+                    {linkedOtherIncomeIds?.has(o.id) ? (
+                      <span
+                        className="text-brand-teal-deep bg-brand-teal-soft ml-1.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                        title={t('income.linked_to_bank_tooltip')}
+                      >
+                        <Landmark className="size-2.5" strokeWidth={2.4} />
+                        {t('income.bank_badge')}
+                      </span>
+                    ) : null}
                     {o.comment ? (
                       <span className="text-muted-foreground ml-2 text-xs">· {o.comment}</span>
                     ) : null}
@@ -283,6 +296,15 @@ export function SalesTab({ salonId }: { salonId: string }) {
                     </td>
                     <td className="text-foreground px-4 py-2 font-semibold">
                       {s.service_name_snapshot ?? '—'}
+                      {linkedVisitIds?.has(s.id) ? (
+                        <span
+                          className="text-brand-teal-deep bg-brand-teal-soft ml-2 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                          title={t('income.linked_to_bank_tooltip')}
+                        >
+                          <Landmark className="size-2.5" strokeWidth={2.4} />
+                          {t('income.bank_badge')}
+                        </span>
+                      ) : null}
                       {s.comment ? (
                         <span className="text-muted-foreground ml-2 text-xs">· {s.comment}</span>
                       ) : null}

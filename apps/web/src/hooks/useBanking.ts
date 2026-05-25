@@ -286,7 +286,51 @@ export function useLinkBankTransaction(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
       qc.invalidateQueries({ queryKey: ['expenses', salonId] })
       qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
     },
+  })
+}
+
+/**
+ * Идентификаторы visits / other_incomes, которые привязаны к банковским
+ * транзакциям этого салона. Используется в IncomePage / SalesTab / VisitsPage
+ * чтобы рисовать маркер «Банк» рядом со строкой дохода — симметрично маркеру
+ * на расходах (см. ExpensesPage).
+ *
+ * Не фильтруем по периоду: связанных txs на салон обычно немного, а юзер
+ * может смотреть произвольный месяц. RLS уже ограничивает выборку салоном
+ * через bank_accounts → bank_connections.
+ */
+export function useBankLinkedIncomeIds(salonId: string | undefined) {
+  return useQuery<{ visitIds: Set<string>; otherIncomeIds: Set<string> }>({
+    queryKey: ['bank-linked-income-ids', salonId],
+    queryFn: async () => {
+      if (!salonId) return { visitIds: new Set(), otherIncomeIds: new Set() }
+      const { data, error } = await supabase
+        .from('bank_transactions')
+        .select(
+          `linked_visit_id, linked_other_income_id,
+           bank_accounts!inner (
+             bank_connections!inner ( salon_id )
+           )`,
+        )
+        .eq('bank_accounts.bank_connections.salon_id', salonId)
+        .or('linked_visit_id.not.is.null,linked_other_income_id.not.is.null')
+        .limit(2000)
+      if (error) throw error
+      const visitIds = new Set<string>()
+      const otherIncomeIds = new Set<string>()
+      for (const r of (data ?? []) as Array<{
+        linked_visit_id: string | null
+        linked_other_income_id: string | null
+      }>) {
+        if (r.linked_visit_id) visitIds.add(r.linked_visit_id)
+        if (r.linked_other_income_id) otherIncomeIds.add(r.linked_other_income_id)
+      }
+      return { visitIds, otherIncomeIds }
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
   })
 }
 
@@ -378,6 +422,10 @@ export function useBankSyncNow(salonId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bank-connections', salonId] })
       qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
     },
   })
 }

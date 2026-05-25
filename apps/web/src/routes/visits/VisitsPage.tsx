@@ -1,4 +1,4 @@
-import { Calculator, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronRight, Landmark, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import {
   useDeleteVisit,
@@ -96,6 +97,8 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
     serviceId: serviceFilter || null,
     kind: kindFilter,
   })
+  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  const linkedVisitIds = bankLinked?.visitIds ?? null
   const deleteVisit = useDeleteVisit(salonId)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -277,6 +280,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                               services={services}
                               clients={clients}
                               currency={currency}
+                              linkedVisitIds={linkedVisitIds}
                               t={t}
                             />
                           )
@@ -296,6 +300,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                             services={services}
                             clients={clients}
                             currency={currency}
+                            isBankLinked={linkedVisitIds?.has(row.id) ?? false}
                             t={t}
                           />
                         )
@@ -340,6 +345,7 @@ function SingleVisitRow({
   services,
   clients,
   currency,
+  isBankLinked,
   t,
 }: {
   visit: VisitRow
@@ -349,6 +355,7 @@ function SingleVisitRow({
   services: ServiceLite[]
   clients: ClientLite[]
   currency: string
+  isBankLinked: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const staffMember = staff.find((s) => s.id === v.staff_id)
@@ -389,6 +396,15 @@ function SingleVisitRow({
         {v.kind === 'retail' ? (
           <span className="bg-brand-yellow/40 text-brand-navy mr-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase">
             {t('visits.retail.badge')}
+          </span>
+        ) : null}
+        {isBankLinked ? (
+          <span
+            className="text-brand-teal-deep bg-brand-teal-soft mr-1.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+            title={t('income.linked_to_bank_tooltip')}
+          >
+            <Landmark className="size-2.5" strokeWidth={2.4} />
+            {t('income.bank_badge')}
           </span>
         ) : null}
         {svc?.name ?? v.service_name_snapshot ?? '—'}
@@ -464,6 +480,7 @@ function GroupRow({
   services,
   clients,
   currency,
+  linkedVisitIds,
   t,
 }: {
   group: { key: string; visits: VisitRow[] }
@@ -475,6 +492,7 @@ function GroupRow({
   services: ServiceLite[]
   clients: ClientLite[]
   currency: string
+  linkedVisitIds: Set<string> | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const visits = group.visits
@@ -483,6 +501,7 @@ function GroupRow({
   const totalAmount = visits.reduce((acc, v) => acc + v.amount_cents, 0)
   const client = clients.find((c) => c.id === primary.client_id)
   const allPaid = visits.every((v) => v.status === 'paid')
+  const groupBankLinked = linkedVisitIds ? visits.some((v) => linkedVisitIds.has(v.id)) : false
   // Если все одного метода — показываем; иначе "Смешано"
   const methods = new Set(visits.map((v) => v.payment_method))
   const sharedPay = methods.size === 1 ? PAY_LABEL[primary.payment_method] : null
@@ -533,6 +552,15 @@ function GroupRow({
           ))}
         </span>
         <span className="text-foreground hidden truncate text-sm sm:inline">
+          {groupBankLinked ? (
+            <span
+              className="text-brand-teal-deep bg-brand-teal-soft mr-1.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+              title={t('income.linked_to_bank_tooltip')}
+            >
+              <Landmark className="size-2.5" strokeWidth={2.4} />
+              {t('income.bank_badge')}
+            </span>
+          ) : null}
           {visits
             .map(
               (v) =>

@@ -2620,7 +2620,9 @@
     "other_edit": {
       "title": "Edit other income",
       "date": "Operation date"
-    }
+    },
+    "bank_badge": "Bank",
+    "linked_to_bank_tooltip": "Confirmed by bank statement"
   },
   "reports_hub": {
     "title": "Reports",

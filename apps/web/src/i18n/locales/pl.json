@@ -2620,7 +2620,9 @@
     "other_edit": {
       "title": "Edytuj inny przychód",
       "date": "Data operacji"
-    }
+    },
+    "bank_badge": "Bank",
+    "linked_to_bank_tooltip": "Potwierdzone wyciągiem bankowym"
   },
   "reports_hub": {
     "title": "Raporty",
