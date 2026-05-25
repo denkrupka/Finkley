@@ -81,6 +81,18 @@ jobs:
                 ;(function () {
                   var l = window.location
                   var APP = '/app/'
+                  // Bridge для Enable Banking OAuth: redirect_url зарегистрирован
+                  // без префикса /app/ (пока EB не одобрит замену — приложение в
+                  // подпапке /app/banking/callback не подключить напрямую).
+                  // Переписываем path на /app/banking/callback с сохранением
+                  // query (?code=...&state=...) и hash.
+                  if (l.pathname === '/banking/callback' || l.pathname.indexOf('/banking/callback/') === 0) {
+                    l.replace(
+                      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+                        APP + '?p=' + encodeURIComponent('banking/callback' + l.search) + l.hash
+                    )
+                    return
+                  }
                   if (l.pathname === APP || l.pathname.indexOf(APP) === 0) {
                     var rest = l.pathname.slice(APP.length)
                     l.replace(
