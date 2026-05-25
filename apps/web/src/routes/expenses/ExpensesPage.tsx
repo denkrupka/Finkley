@@ -590,6 +590,17 @@ export function ExpensesPage() {
                               <Paperclip className="size-3.5" strokeWidth={1.7} />
                             </button>
                           ) : null}
+                          {e.bank_transaction_id ? (
+                            <span
+                              className="text-brand-teal-deep bg-brand-teal-soft inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                              title={t('expenses.linked_to_bank_tooltip', {
+                                defaultValue: 'Привязан к банковской транзакции',
+                              })}
+                            >
+                              <Landmark className="size-2.5" strokeWidth={2.4} />
+                              {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+                            </span>
+                          ) : null}
                         </span>
                         {/* Sub-line: Категория · Контрагент · № документа · Касса · Кто внёс.
                           Image #93/#59: категория/контрагент в строке списка.

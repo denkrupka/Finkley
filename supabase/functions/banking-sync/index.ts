@@ -351,41 +351,173 @@ async function persistTransactions(
     return { newCount: 0, expCount: 0 }
   }
 
-  // Создать expenses для всех debit-транзакций
-  const debits = insertedTxs.filter((t) => t.type === 'debit')
-  if (debits.length === 0) return { newCount: insertedTxs.length, expCount: 0 }
+  // Достаём также counterparty + description новых транзакций для match-логики
+  const { data: insertedFull } = await admin
+    .from('bank_transactions')
+    .select('id, type, amount_cents, currency, description, counterparty, executed_at, external_id')
+    .in(
+      'id',
+      insertedTxs.map((t) => t.id as string),
+    )
 
-  const expenseRows = debits.map((t) => ({
-    salon_id: ctx.salonId,
-    category_id: ctx.bankCategoryId,
-    expense_at: (t.executed_at as string).slice(0, 10),
-    amount_cents: t.amount_cents,
-    payment_method: 'transfer' as const,
-    comment: (t.description as string | null) ?? null,
-    source: 'bank_import',
-    bank_transaction_id: t.id,
-    metadata: { bank_external_id: t.external_id, currency: t.currency },
-  }))
-
-  const { data: insertedExp, error: expErr } = await admin
-    .from('expenses')
-    .insert(expenseRows)
-    .select('id, bank_transaction_id')
-  if (expErr) {
-    console.error('insert expenses (bank import)', expErr)
-    return { newCount: insertedTxs.length, expCount: 0 }
-  }
-
-  // Опционально — записать обратную ссылку (не критично, FK на expense.id
-  // уже хранится; bank_transactions.expense_id мы держим для удобства query).
-  if (insertedExp) {
-    for (const e of insertedExp) {
-      await admin
-        .from('bank_transactions')
-        .update({ expense_id: e.id })
-        .eq('id', e.bank_transaction_id)
+  let expCount = 0
+  for (const t of insertedFull ?? []) {
+    if (t.type === 'debit') {
+      const matched = await tryAutoMatchExpense(admin, ctx.salonId, t)
+      if (!matched) {
+        // Ничего похожего не нашли — создаём авто-expense (старое поведение,
+        // но с пометкой needs_review чтобы оператор подтвердил категорию).
+        const { data: newExp, error: expErr } = await admin
+          .from('expenses')
+          .insert({
+            salon_id: ctx.salonId,
+            category_id: ctx.bankCategoryId,
+            expense_at: String(t.executed_at).slice(0, 10),
+            amount_cents: t.amount_cents,
+            payment_method: 'transfer',
+            description: (t.counterparty as string | null) ?? 'Банк',
+            comment: (t.description as string | null) ?? null,
+            source: 'bank_import',
+            bank_transaction_id: t.id,
+            metadata: { bank_external_id: t.external_id, currency: t.currency },
+          })
+          .select('id')
+          .single()
+        if (expErr) {
+          console.error('insert expense (bank import)', expErr)
+        } else if (newExp) {
+          await admin
+            .from('bank_transactions')
+            .update({ expense_id: newExp.id, needs_review: true })
+            .eq('id', t.id)
+          expCount += 1
+        }
+      }
+    } else if (t.type === 'credit') {
+      await tryAutoMatchOtherIncome(admin, ctx.salonId, t)
     }
   }
 
-  return { newCount: insertedTxs.length, expCount: insertedExp?.length ?? 0 }
+  return { newCount: insertedTxs.length, expCount }
+}
+
+type AutoMatchTx = {
+  id: string
+  type: 'debit' | 'credit'
+  amount_cents: number
+  description: string | null
+  counterparty: string | null
+  executed_at: string
+}
+
+/**
+ * Авто-матчинг debit-транзакции к существующему expense.
+ *
+ * Скоринг (нужно ≥ 3 — link, ≥ 5 — auto-link без needs_review):
+ *  - amount exact match: +3 (обязательно для полного матча; для частичных —
+ *    Этап 3 в следующих коммитах)
+ *  - document_number expense входит в description транзакции: +3
+ *  - counterparty.nip входит в description: +3 (NIP уникален)
+ *  - counterparty.name fuzzy совпадает (substring) с counterparty/description: +2
+ *
+ * Окно поиска: ±14 дней от executed_at. Уже привязанные через
+ * bank_transaction_id expenses пропускаем.
+ *
+ * Возвращает true если привязка выполнена.
+ */
+async function tryAutoMatchExpense(
+  admin: ReturnType<typeof createClient>,
+  salonId: string,
+  tx: AutoMatchTx,
+): Promise<boolean> {
+  const txDate = new Date(tx.executed_at)
+  const dayMs = 24 * 60 * 60 * 1000
+  const from = new Date(txDate.getTime() - 14 * dayMs).toISOString().slice(0, 10)
+  const to = new Date(txDate.getTime() + 14 * dayMs).toISOString().slice(0, 10)
+
+  const { data: candidates } = await admin
+    .from('expenses')
+    .select(
+      'id, amount_cents, description, document_number, expense_at, counterparty_id, counterparties:counterparty_id(name, nip)',
+    )
+    .eq('salon_id', salonId)
+    .gte('expense_at', from)
+    .lte('expense_at', to)
+    .is('bank_transaction_id', null)
+  if (!candidates || candidates.length === 0) return false
+
+  const desc = (tx.description ?? '').toLowerCase()
+  const cpName = (tx.counterparty ?? '').toLowerCase()
+  let best: { id: string; score: number } | null = null
+
+  for (const e of candidates) {
+    const cp = Array.isArray(e.counterparties)
+      ? (e.counterparties[0] as { name?: string; nip?: string } | undefined)
+      : (e.counterparties as { name?: string; nip?: string } | null)
+    let score = 0
+    if (e.amount_cents === tx.amount_cents) score += 3
+    if (e.document_number && desc.includes(String(e.document_number).toLowerCase())) score += 3
+    if (cp?.nip && desc.includes(String(cp.nip))) score += 3
+    if (cp?.name) {
+      const cpn = String(cp.name).toLowerCase()
+      if (cpName && (cpName.includes(cpn) || cpn.includes(cpName))) score += 2
+      else if (desc.includes(cpn)) score += 1
+    }
+    if (score > (best?.score ?? 0)) best = { id: e.id as string, score }
+  }
+
+  if (!best || best.score < 3) return false
+  const needsReview = best.score < 5
+  await admin
+    .from('bank_transactions')
+    .update({ expense_id: best.id, needs_review: needsReview })
+    .eq('id', tx.id)
+  await admin.from('expenses').update({ bank_transaction_id: tx.id }).eq('id', best.id)
+  return true
+}
+
+/**
+ * Авто-матчинг credit-транзакции к существующему other_incomes. Скоринг
+ * проще: только amount + comment (description) — у other_incomes мало полей.
+ */
+async function tryAutoMatchOtherIncome(
+  admin: ReturnType<typeof createClient>,
+  salonId: string,
+  tx: AutoMatchTx,
+): Promise<boolean> {
+  const txDate = new Date(tx.executed_at)
+  const dayMs = 24 * 60 * 60 * 1000
+  const from = new Date(txDate.getTime() - 14 * dayMs).toISOString().slice(0, 10)
+  const to = new Date(txDate.getTime() + 14 * dayMs).toISOString().slice(0, 10)
+
+  const { data: candidates } = await admin
+    .from('other_incomes')
+    .select('id, amount_cents, comment, income_at')
+    .eq('salon_id', salonId)
+    .gte('income_at', from)
+    .lte('income_at', to)
+  if (!candidates || candidates.length === 0) return false
+
+  const desc = (tx.description ?? '').toLowerCase()
+  const cpName = (tx.counterparty ?? '').toLowerCase()
+  let best: { id: string; score: number } | null = null
+
+  for (const inc of candidates) {
+    let score = 0
+    if (inc.amount_cents === tx.amount_cents) score += 3
+    const comm = String(inc.comment ?? '').toLowerCase()
+    if (comm) {
+      if (desc.includes(comm) || comm.includes(desc.slice(0, 30))) score += 2
+      if (cpName && comm.includes(cpName)) score += 1
+    }
+    if (score > (best?.score ?? 0)) best = { id: inc.id as string, score }
+  }
+
+  if (!best || best.score < 3) return false
+  const needsReview = best.score < 5
+  await admin
+    .from('bank_transactions')
+    .update({ linked_other_income_id: best.id, needs_review: needsReview })
+    .eq('id', tx.id)
+  return true
 }
