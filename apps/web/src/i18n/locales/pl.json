@@ -4110,7 +4110,31 @@
     "not_linked_hint": "Nie powiązane z wyciągiem bankowym",
     "link_to_bank": "Powiąż z bankiem",
     "unlink": "Odłącz",
-    "unlink_toast": "Powiązanie z bankiem usunięte"
+    "unlink_toast": "Powiązanie z bankiem usunięte",
+    "export": {
+      "title": "Eksport przelewów do banku",
+      "subtitle": "Wygenerujemy plik z wybranymi płatnościami — załadujesz go w banku, a przelewy utworzą się automatycznie.",
+      "source_label": "Konto źródłowe (z którego przelewać)",
+      "source_connected": "Z podłączonego banku",
+      "source_manual": "Podaj ręcznie",
+      "no_integration_hint": "Podłącz bank przez Enable Banking — konto wypełni się samo. Na razie wpisz IBAN ręcznie.",
+      "iban_invalid": "IBAN niepoprawny (mod-97 check nie przeszedł)",
+      "execution_date": "Data realizacji",
+      "format_label": "Format pliku",
+      "format": {
+        "sepa_xml": "SEPA XML (pain.001.001.03) — akceptowane przez wszystkie EU banki"
+      },
+      "summary_title": "Do eksportu: {{valid}} z {{total}}",
+      "missing_iban": "brak IBAN",
+      "invalid_skipped": "Pominięto płatności bez IBAN: {{count}}. Otwórz zaplanowaną płatność i wpisz IBAN odbiorcy (lub zapisz go w karcie kontrahenta).",
+      "no_valid_payments": "Żadna płatność nie ma wypełnionego IBAN odbiorcy. Plik nie zostanie wygenerowany.",
+      "download_button": "Pobierz plik",
+      "toast_downloaded": "Plik wygenerowany — przelewy: {{count}}. Załaduj w banku.",
+      "action_export": "Eksport ({{n}})",
+      "start_select": "Eksport do banku",
+      "cancel_select": "Anuluj",
+      "select_all": "Zaznacz wszystkie ({{n}})"
+    }
   },
   "tour": {
     "next": "Dalej",

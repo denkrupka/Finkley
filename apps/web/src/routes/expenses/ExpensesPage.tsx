@@ -68,6 +68,7 @@ import { formatExpenseDate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
+import { BankExportDialog } from './BankExportDialog'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -182,6 +183,27 @@ export function ExpensesPage() {
   )
   const todayStr = new Date().toISOString().slice(0, 10)
   const [editingPayment, setEditingPayment] = useState<ScheduledPaymentRow | null>(null)
+  // Bulk-export: режим выбора с чекбоксами и модалка экспорта.
+  const [exportMode, setExportMode] = useState(false)
+  const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set())
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const exportSelectedPayments = useMemo(
+    () => pendingPayments.filter((p) => exportSelectedIds.has(p.id)),
+    [pendingPayments, exportSelectedIds],
+  )
+  function toggleExportSelection(id: string) {
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  function toggleAllExport() {
+    setExportSelectedIds((prev) =>
+      prev.size === pendingPayments.length ? new Set() : new Set(pendingPayments.map((p) => p.id)),
+    )
+  }
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
   const wfirmaPush = useWfirmaPushExpense(salonId)
@@ -416,7 +438,7 @@ export function ExpensesPage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
           {/* List */}
           <div className="border-border bg-card shadow-finsm rounded-lg border">
-            <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
+            <div className="border-border flex items-baseline justify-between gap-2 border-b px-5 py-4">
               <h2 className="text-brand-navy text-base font-bold tracking-tight">
                 {tab === 'pending'
                   ? t('expenses.tabs.list_title_pending', {
@@ -424,10 +446,38 @@ export function ExpensesPage() {
                     })
                   : t('expenses.list_title')}
               </h2>
-              <span className="text-muted-foreground text-xs">
-                {tab === 'pending' ? pendingPayments.length : expenses.length}{' '}
-                {t('expenses.records')}
-              </span>
+              <div className="flex items-center gap-2">
+                {tab === 'pending' && pendingPayments.length > 0 ? (
+                  <>
+                    {exportMode && exportSelectedIds.size > 0 ? (
+                      <Button variant="primary" size="sm" onClick={() => setExportDialogOpen(true)}>
+                        <Landmark className="size-3.5" strokeWidth={2} />
+                        {t('banking.export.action_export', {
+                          defaultValue: 'Экспорт ({{n}})',
+                          n: exportSelectedIds.size,
+                        })}
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant={exportMode ? 'outline' : 'secondary'}
+                      size="sm"
+                      onClick={() => {
+                        setExportMode((v) => !v)
+                        setExportSelectedIds(new Set())
+                      }}
+                    >
+                      <Landmark className="size-3.5" strokeWidth={2} />
+                      {exportMode
+                        ? t('banking.export.cancel_select', { defaultValue: 'Отмена' })
+                        : t('banking.export.start_select', { defaultValue: 'Экспорт в банк' })}
+                    </Button>
+                  </>
+                ) : null}
+                <span className="text-muted-foreground text-xs">
+                  {tab === 'pending' ? pendingPayments.length : expenses.length}{' '}
+                  {t('expenses.records')}
+                </span>
+              </div>
             </div>
             {tab === 'pending' ? (
               scheduledLoading ? (
@@ -498,6 +548,25 @@ export function ExpensesPage() {
                   ) : null}
                   {pendingPayments.length === 0 ? null : (
                     <ul>
+                      {exportMode ? (
+                        <li className="border-border bg-muted/30 flex items-center gap-3 border-t px-5 py-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={
+                              exportSelectedIds.size === pendingPayments.length &&
+                              pendingPayments.length > 0
+                            }
+                            onChange={toggleAllExport}
+                            className="size-4 cursor-pointer"
+                          />
+                          <span className="text-muted-foreground font-semibold">
+                            {t('banking.export.select_all', {
+                              defaultValue: 'Выбрать все ({{n}})',
+                              n: pendingPayments.length,
+                            })}
+                          </span>
+                        </li>
+                      ) : null}
                       {pendingPayments.map((p) => {
                         const cat = p.category_id ? categoryById.get(p.category_id) : null
                         const idx = cat ? categories.findIndex((c) => c.id === cat.id) : -1
@@ -507,19 +576,38 @@ export function ExpensesPage() {
                             : '#9A9A9A'
                         const overdue = p.due_date < todayStr
                         const today = p.due_date === todayStr
+                        const isChecked = exportSelectedIds.has(p.id)
                         return (
                           <li
                             key={p.id}
                             onClick={() => {
+                              if (exportMode) {
+                                toggleExportSelection(p.id)
+                                return
+                              }
                               if (!hasOpenShift) {
                                 setGateOpen(true)
                                 return
                               }
                               setEditingPayment(p)
                             }}
-                            className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
+                            className={cn(
+                              'border-border hover:bg-muted/30 grid cursor-pointer items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0',
+                              exportMode
+                                ? 'grid-cols-[24px_60px_1fr_auto]'
+                                : 'grid-cols-[60px_1fr_auto_auto]',
+                            )}
                             style={{ borderLeftWidth: 3, borderLeftColor: color }}
                           >
+                            {exportMode ? (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleExportSelection(p.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="size-4 cursor-pointer"
+                              />
+                            ) : null}
                             <span className="num text-muted-foreground text-xs">
                               {p.due_date.slice(5).replace('-', '.')}
                             </span>
@@ -568,38 +656,40 @@ export function ExpensesPage() {
                             <span className="num text-foreground text-right text-sm font-bold">
                               −{formatCurrency(p.amount_cents, currency)}
                             </span>
-                            <div className="flex items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!hasOpenShift) {
-                                    setGateOpen(true)
-                                    return
-                                  }
-                                  setEditingPayment(p)
-                                }}
-                                className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                              >
-                                <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                                {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!confirm(t('finance.payments.confirm_delete'))) return
-                                  deleteScheduled.mutate(p.id, {
-                                    onSuccess: () =>
-                                      toast.success(t('finance.payments.toast_deleted')),
-                                  })
-                                }}
-                                className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                                aria-label="delete"
-                              >
-                                <Trash2 className="size-4" strokeWidth={1.7} />
-                              </button>
-                            </div>
+                            {exportMode ? null : (
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!hasOpenShift) {
+                                      setGateOpen(true)
+                                      return
+                                    }
+                                    setEditingPayment(p)
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                >
+                                  <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                                  {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!confirm(t('finance.payments.confirm_delete'))) return
+                                    deleteScheduled.mutate(p.id, {
+                                      onSuccess: () =>
+                                        toast.success(t('finance.payments.toast_deleted')),
+                                    })
+                                  }}
+                                  className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                                  aria-label="delete"
+                                >
+                                  <Trash2 className="size-4" strokeWidth={1.7} />
+                                </button>
+                              </div>
+                            )}
                           </li>
                         )
                       })}
@@ -1002,6 +1092,20 @@ export function ExpensesPage() {
         onClose={() => setGateOpen(false)}
         salonId={salonId}
         action="expense"
+      />
+
+      <BankExportDialog
+        open={exportDialogOpen}
+        onOpenChange={(v) => {
+          setExportDialogOpen(v)
+          if (!v) {
+            // После закрытия — сбросить выбор (любой исход: success/cancel)
+            setExportSelectedIds(new Set())
+            setExportMode(false)
+          }
+        }}
+        salonId={salonId}
+        payments={exportSelectedPayments}
       />
 
       {/* Просмотр чека */}

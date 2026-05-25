@@ -4109,7 +4109,31 @@
     "not_linked_hint": "Not linked to bank statement",
     "link_to_bank": "Link to bank",
     "unlink": "Unlink",
-    "unlink_toast": "Bank link removed"
+    "unlink_toast": "Bank link removed",
+    "export": {
+      "title": "Export transfers to bank",
+      "subtitle": "We'll generate a file from selected payments — upload it to your bank app and transfers will be created automatically.",
+      "source_label": "Source account (from which to transfer)",
+      "source_connected": "From connected bank",
+      "source_manual": "Enter manually",
+      "no_integration_hint": "Connect a bank via Enable Banking — account will fill itself. For now enter IBAN manually.",
+      "iban_invalid": "IBAN invalid (mod-97 check failed)",
+      "execution_date": "Execution date",
+      "format_label": "File format",
+      "format": {
+        "sepa_xml": "SEPA XML (pain.001.001.03) — accepted by all EU banks"
+      },
+      "summary_title": "To export: {{valid}} of {{total}}",
+      "missing_iban": "no IBAN",
+      "invalid_skipped": "Skipped payments without IBAN: {{count}}. Open the scheduled payment and fill recipient IBAN (or save it to the counterparty card).",
+      "no_valid_payments": "No payment has a recipient IBAN filled. File can't be generated.",
+      "download_button": "Download file",
+      "toast_downloaded": "File generated — transfers: {{count}}. Upload to bank app.",
+      "action_export": "Export ({{n}})",
+      "start_select": "Export to bank",
+      "cancel_select": "Cancel",
+      "select_all": "Select all ({{n}})"
+    }
   },
   "tour": {
     "next": "Next",
