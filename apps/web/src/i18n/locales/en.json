@@ -4076,6 +4076,7 @@
       "col_counterparty": "Counterparty",
       "col_amount": "Amount",
       "col_purpose": "Purpose",
+      "col_category": "Category",
       "col_linked": "Linked to",
       "col_actions": "Action",
       "no_counterparty": "—",

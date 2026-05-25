@@ -4077,6 +4077,7 @@
       "col_counterparty": "Kontrahent",
       "col_amount": "Kwota",
       "col_purpose": "Tytuł",
+      "col_category": "Kategoria",
       "col_linked": "Powiązane z",
       "col_actions": "Akcja",
       "no_counterparty": "—",

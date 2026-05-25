@@ -1,5 +1,5 @@
 import { AlertTriangle, Edit3, Landmark, Link2, Link2Off, Loader2, RefreshCcw } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 
+import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
+import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 
 import { LinkTransactionDialog } from './LinkTransactionDialog'
@@ -44,6 +46,75 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
   const { data: connections = [] } = useBankConnections(salonId)
   const inflowsQ = useBankInflows(direction === 'credit' ? salonId : undefined, period)
   const outflowsQ = useBankOutflows(direction === 'debit' ? salonId : undefined, period)
+  // Резолв категории для linked tx — без сервер-side join, на клиенте через
+  // уже кешируемые hooks. Период expenses/other_incomes расширяем ±90 дней
+  // (auto-match window) чтобы попасть в связь даже если tx и расход в разные
+  // месяцы. Период bank-tx уже у нас задан в `period`.
+  const expandedRange = useMemo(() => {
+    const start = new Date(period.start)
+    start.setDate(start.getDate() - 90)
+    const end = new Date(period.end)
+    end.setDate(end.getDate() + 90)
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    }
+  }, [period.start, period.end])
+  const { data: expenses = [] } = useExpenses(
+    direction === 'debit' ? salonId : undefined,
+    expandedRange,
+  )
+  const { data: expenseCategories = [] } = useExpenseCategories(
+    direction === 'debit' ? salonId : undefined,
+  )
+  const { data: otherIncomes = [] } = useOtherIncomes(
+    direction === 'credit' ? salonId : undefined,
+    { start: new Date(expandedRange.start), end: new Date(expandedRange.end) },
+  )
+  const { data: otherIncomeCategories = [] } = useOtherIncomeCategories(
+    direction === 'credit' ? salonId : undefined,
+  )
+  const categoryNameByTxId = useMemo(() => {
+    const m = new Map<string, string>()
+    if (direction === 'debit') {
+      const catNameById = new Map(expenseCategories.map((c) => [c.id, c.name]))
+      const expById = new Map(expenses.map((e) => [e.id, e]))
+      for (const tx of outflowsQ.data ?? []) {
+        if (!tx.expense_id) continue
+        const exp = expById.get(tx.expense_id)
+        if (!exp?.category_id) continue
+        const name = catNameById.get(exp.category_id)
+        if (name) m.set(tx.id, name)
+      }
+    } else {
+      const catNameById = new Map(otherIncomeCategories.map((c) => [c.id, c.name]))
+      const oiById = new Map(otherIncomes.map((o) => [o.id, o]))
+      for (const tx of inflowsQ.data ?? []) {
+        if (tx.linked_other_income_id) {
+          const oi = oiById.get(tx.linked_other_income_id)
+          if (oi?.category_id) {
+            const name = catNameById.get(oi.category_id)
+            if (name) m.set(tx.id, name)
+            continue
+          }
+        }
+        if (tx.linked_visit_id) {
+          // Визит — это услуга, у неё нет «категории», подписываем как тип.
+          m.set(tx.id, t('income.tabs.visits'))
+        }
+      }
+    }
+    return m
+  }, [
+    direction,
+    expenseCategories,
+    expenses,
+    outflowsQ.data,
+    otherIncomeCategories,
+    otherIncomes,
+    inflowsQ.data,
+    t,
+  ])
   const sync = useBankSyncNow(salonId)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
@@ -144,6 +215,7 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
                 </th>
                 <th className="px-4 py-2 text-right">{t('banking.transactions.col_amount')}</th>
                 <th className="px-4 py-2 text-left">{t('banking.transactions.col_purpose')}</th>
+                <th className="px-4 py-2 text-left">{t('banking.transactions.col_category')}</th>
                 <th className="px-4 py-2 text-left">{t('banking.transactions.col_linked')}</th>
                 <th className="px-4 py-2 text-right">{t('banking.transactions.col_actions')}</th>
               </tr>
@@ -155,6 +227,7 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
                   tx={tx}
                   direction={direction}
                   currency={currency}
+                  categoryName={categoryNameByTxId.get(tx.id) ?? null}
                   onLink={() => {
                     setLinkTx(tx)
                     setLinkOpen(true)
@@ -217,11 +290,13 @@ function TransactionRow({
   tx,
   direction,
   currency,
+  categoryName,
   onLink,
 }: {
   tx: BankInflowRow | BankOutflowRow
   direction: Direction
   currency: string
+  categoryName: string | null
   onLink: () => void
 }) {
   const { t } = useTranslation()
@@ -261,6 +336,15 @@ function TransactionRow({
       </td>
       <td className="text-muted-foreground max-w-[280px] truncate px-4 py-2.5 text-xs">
         {purpose}
+      </td>
+      <td className="px-4 py-2.5 text-xs">
+        {categoryName ? (
+          <span className="bg-muted text-foreground inline-flex max-w-[180px] truncate rounded px-2 py-0.5 font-semibold">
+            {categoryName}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/60">—</span>
+        )}
       </td>
       <td className="px-4 py-2.5">
         {linked ? (

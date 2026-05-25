@@ -897,6 +897,7 @@
       "col_counterparty": "Контрагент",
       "col_amount": "Сумма",
       "col_purpose": "Назначение",
+      "col_category": "Категория",
       "col_linked": "Связано с",
       "col_actions": "Действие",
       "no_counterparty": "—",

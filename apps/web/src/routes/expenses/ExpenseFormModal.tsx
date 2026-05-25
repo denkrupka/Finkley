@@ -57,6 +57,10 @@ import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useCounterparties } from '@/hooks/useCounterparties'
+import {
+  extractDocumentNumber,
+  findMatchingCounterpartyId,
+} from '@/lib/banking/extract-document-number'
 import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
@@ -460,16 +464,35 @@ export function ExpenseFormModal({
         paid_amount: '',
       })
     } else if (prefillFromBankTx) {
+      // Маппинг полей из bank-tx (см. owner-feedback 2026-05-26):
+      //   bank-tx.description → form.description (банковский tytuł — это и
+      //                          есть описание платежа: "Wezwanie...", "FV/...")
+      //   bank-tx.counterparty → form.counterparty_id если matchится в
+      //                          справочнике (fuzzy), иначе пусто — юзер сам
+      //                          добавит через «+» или впишет имя в descr.
+      //   document_number ← extract regex из description
+      const matchedCounterpartyId = findMatchingCounterpartyId(
+        prefillFromBankTx.counterparty_hint,
+        counterparties,
+      )
+      const extractedDocNumber = extractDocumentNumber(prefillFromBankTx.description)
+      // Если counterparty не нашли в справочнике — оставляем bank-имя в
+      // description чтобы юзер видел кто платил (потом сможет создать в
+      // справочнике через «+»). Если нашли — описание = banking-tytuł.
+      const descriptionFallback =
+        prefillFromBankTx.description || prefillFromBankTx.counterparty_hint || ''
       form.reset({
         expense_at: prefillFromBankTx.date,
-        description: prefillFromBankTx.counterparty_hint || prefillFromBankTx.description || '',
+        description: matchedCounterpartyId
+          ? prefillFromBankTx.description || ''
+          : descriptionFallback,
         category_id: defaultCategoryId ?? '',
-        counterparty_id: '',
+        counterparty_id: matchedCounterpartyId ?? '',
         amount: (prefillFromBankTx.amount_cents / 100).toFixed(2),
         payment_method: 'transfer',
         cash_register_id: '',
-        document_number: '',
-        comment: prefillFromBankTx.description || '',
+        document_number: extractedDocNumber ?? '',
+        comment: '',
         recurrence: 'none',
         payroll_staff_id: '',
         payroll_kind: '',
