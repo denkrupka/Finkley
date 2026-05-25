@@ -60,6 +60,7 @@ import { useCounterparties } from '@/hooks/useCounterparties'
 import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
+import { LinkExpenseToBankDialog } from '@/routes/banking/LinkExpenseToBankDialog'
 import { CounterpartyEditModal } from '@/routes/settings/counterparties/CounterpartyEditModal'
 
 type FormValues = {
@@ -1389,6 +1390,13 @@ export function ExpenseFormModal({
               `recurrence` остаётся в Zod-схеме с дефолтом 'none', чтобы
               существующие записи не сломались; новые расходы создаются
               как одноразовые. */}
+
+          {/* Banking-связь (только в edit-mode для existing expense).
+              Если уже привязан — show badge + кнопка «Снять связь».
+              Если нет — кнопка «Привязать к банковской транзакции». */}
+          {isEdit && expense ? (
+            <ExpenseBankLinkSection salonId={salonId} currency={currency} expense={expense} />
+          ) : null}
         </form>
 
         <DialogFooter>
@@ -1436,5 +1444,89 @@ export function ExpenseFormModal({
         onShiftOpened={() => void form.handleSubmit(onSubmit)()}
       />
     </Dialog>
+  )
+}
+
+function ExpenseBankLinkSection({
+  salonId,
+  currency,
+  expense,
+}: {
+  salonId: string
+  currency: string
+  expense: ExpenseRow
+}) {
+  const { t } = useTranslation()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const qc = useQueryClient()
+
+  async function handleUnlink() {
+    if (!expense.bank_transaction_id) return
+    const { error } = await supabase
+      .from('bank_transactions')
+      .update({ expense_id: null })
+      .eq('id', expense.bank_transaction_id)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    await supabase.from('expenses').update({ bank_transaction_id: null }).eq('id', expense.id)
+    await qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    await qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+    toast.success(t('banking.link_dialog.unlinked_toast'))
+  }
+
+  return (
+    <div className="border-border bg-muted/20 mt-2 rounded-md border p-3">
+      {expense.bank_transaction_id ? (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-foreground inline-flex items-center gap-1.5 text-sm font-semibold">
+            <span className="text-brand-teal-deep bg-brand-teal-soft inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">
+              {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+            </span>
+            {t('banking.reverse_link.linked_label', {
+              defaultValue: 'Привязан к банковской транзакции',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={handleUnlink}
+            className="text-destructive hover:bg-destructive/10 rounded-md px-2 py-1 text-xs font-semibold"
+          >
+            {t('banking.link_dialog.unlink')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground text-xs">
+            {t('banking.reverse_link.not_linked_hint', {
+              defaultValue: 'Расход не привязан к банковской транзакции.',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold"
+          >
+            {t('banking.reverse_link.button', {
+              defaultValue: 'Привязать к банку',
+            })}
+          </button>
+        </div>
+      )}
+      <LinkExpenseToBankDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        salonId={salonId}
+        currency={currency}
+        expense={{
+          id: expense.id,
+          amount_cents: expense.amount_cents,
+          expense_at: expense.expense_at,
+          description: expense.description ?? null,
+          document_number: expense.document_number,
+        }}
+      />
+    </div>
   )
 }
