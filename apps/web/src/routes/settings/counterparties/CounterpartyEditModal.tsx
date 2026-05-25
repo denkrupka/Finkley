@@ -28,6 +28,7 @@ import {
   useUpdateCounterparty,
   type CounterpartyRow,
 } from '@/hooks/useCounterparties'
+import { formatIbanForDisplay } from '@/lib/banking/iban'
 
 type Props = {
   open: boolean
@@ -67,6 +68,7 @@ export function CounterpartyEditModal({
   const [address, setAddress] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
   const [notes, setNotes] = useState('')
+  const [bankIban, setBankIban] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryDraft, setNewCategoryDraft] = useState('')
   const [lookupBusy, setLookupBusy] = useState(false)
@@ -79,12 +81,14 @@ export function CounterpartyEditModal({
       setAddress(counterparty.address ?? '')
       setCategoryId(counterparty.category_id ?? '')
       setNotes(counterparty.notes ?? '')
+      setBankIban(formatIbanForDisplay(counterparty.bank_account_iban))
     } else {
       setName(prefill?.name ?? '')
       setNip(prefill?.nip ?? '')
       setAddress(prefill?.address ?? '')
       setCategoryId('')
       setNotes('')
+      setBankIban('')
     }
     setAddingCategory(false)
     setNewCategoryDraft('')
@@ -137,6 +141,7 @@ export function CounterpartyEditModal({
       toast.error(t('counterparties.name_required'))
       return
     }
+    const cleanedIban = bankIban.replace(/\s+/g, '').trim() || null
     if (isEdit && counterparty) {
       updateCp.mutate(
         {
@@ -146,6 +151,7 @@ export function CounterpartyEditModal({
           address: address.trim() || null,
           category_id: categoryId || null,
           notes: notes.trim() || null,
+          bank_account_iban: cleanedIban,
         },
         {
           onSuccess: () => {
@@ -157,6 +163,7 @@ export function CounterpartyEditModal({
               address: address.trim() || null,
               category_id: categoryId || null,
               notes: notes.trim() || null,
+              bank_account_iban: cleanedIban,
             })
             onOpenChange(false)
           },
@@ -172,6 +179,7 @@ export function CounterpartyEditModal({
         address: address.trim() || null,
         category_id: categoryId || null,
         notes: notes.trim() || null,
+        bank_account_iban: cleanedIban,
       },
       {
         onSuccess: (cp) => {
@@ -314,6 +322,22 @@ export function CounterpartyEditModal({
                 </Button>
               </div>
             )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cp-iban">{t('counterparties.bank_iban_label')}</Label>
+            <Input
+              id="cp-iban"
+              value={bankIban}
+              onChange={(e) => setBankIban(e.target.value)}
+              onBlur={(e) => setBankIban(formatIbanForDisplay(e.target.value))}
+              placeholder="PL61 1090 1014 0000 0712 1981 2874"
+              inputMode="text"
+              className="num"
+            />
+            <p className="text-muted-foreground text-[10.5px]">
+              {t('counterparties.bank_iban_hint')}
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

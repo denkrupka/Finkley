@@ -61,6 +61,7 @@ import {
   extractDocumentNumber,
   findMatchingCounterpartyId,
 } from '@/lib/banking/extract-document-number'
+import { formatIbanForDisplay, normalizeIban } from '@/lib/banking/iban'
 import { useDictateExpense } from '@/hooks/useDictateExpense'
 import { useOcrReceipt } from '@/hooks/useOcrReceipt'
 import type { PaymentMethod } from '@/hooks/useVisits'
@@ -92,6 +93,10 @@ type FormValues = {
   is_partial_payment: boolean
   /** Сумма уже оплаченного (только если is_partial_payment=true). */
   paid_amount: string
+  /** IBAN получателя — опционально. Cross-fill из counterparty при выборе.
+   *  При новом значении + наличии counterparty (без IBAN) — confirm-prompt
+   *  «записать счёт контрагенту». */
+  bank_account_iban: string
 }
 
 const schema = z.object({
@@ -120,6 +125,7 @@ const schema = z.object({
   payroll_period_end: z.string().optional().default(''),
   is_partial_payment: z.boolean().default(false),
   paid_amount: z.string().optional().default(''),
+  bank_account_iban: z.string().optional().default(''),
 })
 
 /** Считает дату следующего повторения от исходной даты расхода. */
@@ -403,6 +409,7 @@ export function ExpenseFormModal({
       payroll_period_end: '',
       is_partial_payment: false,
       paid_amount: '',
+      bank_account_iban: '',
     },
   })
 
@@ -410,6 +417,22 @@ export function ExpenseFormModal({
   const watchedCategoryId = form.watch('category_id')
   const watchedCategory = categories.find((c) => c.id === watchedCategoryId)
   const isPayrollCategory = !!watchedCategory?.is_payroll
+
+  // Cross-fill: при выборе counterparty с сохранённым IBAN — авто-заполнить
+  // поле IBAN в форме, если оно пустое. Если у юзера уже что-то введено
+  // вручную — не перезатираем. Также пользователь сам можем перепечатать.
+  const watchedCounterpartyId = form.watch('counterparty_id')
+  useEffect(() => {
+    if (!watchedCounterpartyId) return
+    const cp = counterparties.find((c) => c.id === watchedCounterpartyId)
+    if (!cp?.bank_account_iban) return
+    const current = normalizeIban(form.getValues('bank_account_iban'))
+    if (current) return
+    form.setValue('bank_account_iban', formatIbanForDisplay(cp.bank_account_iban), {
+      shouldDirty: true,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form stable
+  }, [watchedCounterpartyId, counterparties])
 
   // При открытии в edit-mode — префиллим форму данными существующего расхода.
   // Для mode='planned-paying' — префиллим из existingPayment (vendor → description,
@@ -441,6 +464,7 @@ export function ExpenseFormModal({
         payroll_period_end: expense.payroll_period_end ?? '',
         is_partial_payment: isPartial,
         paid_amount: isPartial ? ((expense.paid_amount_cents ?? 0) / 100).toFixed(2) : '',
+        bank_account_iban: formatIbanForDisplay(expense.bank_account_iban ?? ''),
       })
     } else if (existingPayment) {
       // mode='planned-paying' — оплата существующего pending. vendor_name свободный
@@ -449,7 +473,7 @@ export function ExpenseFormModal({
         expense_at: today,
         description: existingPayment.vendor_name ?? '',
         category_id: existingPayment.category_id ?? defaultCategoryId ?? '',
-        counterparty_id: '',
+        counterparty_id: existingPayment.counterparty_id ?? '',
         amount: (existingPayment.amount_cents / 100).toFixed(2),
         payment_method: '',
         cash_register_id: '',
@@ -462,6 +486,7 @@ export function ExpenseFormModal({
         payroll_period_end: '',
         is_partial_payment: false,
         paid_amount: '',
+        bank_account_iban: formatIbanForDisplay(existingPayment.bank_account_iban ?? ''),
       })
     } else if (prefillFromBankTx) {
       // Маппинг полей из bank-tx (см. owner-feedback 2026-05-26):
@@ -500,6 +525,7 @@ export function ExpenseFormModal({
         payroll_period_end: '',
         is_partial_payment: false,
         paid_amount: '',
+        bank_account_iban: '',
       })
     } else {
       form.reset({
@@ -519,6 +545,7 @@ export function ExpenseFormModal({
         payroll_period_end: '',
         is_partial_payment: false,
         paid_amount: '',
+        bank_account_iban: '',
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
@@ -559,6 +586,34 @@ export function ExpenseFormModal({
         : null
     const partialPaid =
       paidAmountCents != null && paidAmountCents < amountCents ? paidAmountCents : null
+    const formIban = normalizeIban(values.bank_account_iban)
+    const cpId = values.counterparty_id || null
+
+    // Confirm-prompt: если в форме есть IBAN, выбран контрагент, и его IBAN
+    // отличается от введённого (или пустой) — предлагаем сохранить в карточке
+    // контрагента. При следующих платежах IBAN auto-fill через cross-fill
+    // useEffect. window.confirm() для MVP — без полной модалки.
+    if (formIban && cpId) {
+      const cp = counterparties.find((c) => c.id === cpId)
+      const cpIban = normalizeIban(cp?.bank_account_iban ?? '')
+      if (cp && formIban !== cpIban) {
+        const msg = t('counterparties.save_iban_to_counterparty_body', {
+          name: cp.name,
+          iban: formatIbanForDisplay(formIban),
+        })
+        if (window.confirm(msg)) {
+          const { error: cpErr } = await supabase
+            .from('counterparties')
+            .update({ bank_account_iban: formIban })
+            .eq('id', cpId)
+          if (cpErr) {
+            console.warn('Failed to save IBAN to counterparty:', cpErr)
+          } else {
+            await qc.invalidateQueries({ queryKey: ['counterparties', salonId] })
+          }
+        }
+      }
+    }
 
     // Ветка 1: запланированный платёж (paid=false) — пишем только в
     // scheduled_payments(status=pending). Может прийти как из календаря
@@ -573,6 +628,8 @@ export function ExpenseFormModal({
         vendor_name: values.description.trim() || null,
         invoice_number: values.document_number.trim() || null,
         category_id: values.category_id || null,
+        counterparty_id: cpId,
+        bank_account_iban: formIban || null,
         comment: values.comment || null,
         source: 'manual',
       })
@@ -626,6 +683,7 @@ export function ExpenseFormModal({
           document_number: values.document_number.trim() || null,
           comment: values.comment || null,
           recurrence: values.recurrence,
+          bank_account_iban: formIban || null,
           ...payrollFields,
         },
         {
@@ -675,6 +733,7 @@ export function ExpenseFormModal({
         recurrence: values.recurrence,
         next_occurrence_at: nextOccurrence(values.expense_at, values.recurrence),
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        bank_account_iban: formIban || null,
         ...payrollFields,
       },
       {
@@ -1405,6 +1464,31 @@ export function ExpenseFormModal({
                   maxLength={60}
                 />
               </div>
+            </div>
+          )}
+
+          {/* IBAN получателя — для bulk-экспорта переводов в банк. Auto-fill
+              из counterparty.bank_account_iban при выборе. Скрыт для payroll. */}
+          {isPayrollCategory ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="exp-iban">{t('expenses.form.bank_iban_label')}</Label>
+              <Controller
+                name="bank_account_iban"
+                control={form.control}
+                render={({ field }) => (
+                  <Input
+                    id="exp-iban"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={(e) => field.onChange(formatIbanForDisplay(e.target.value))}
+                    placeholder="PL61 1090 1014 0000 0712 1981 2874"
+                    className="num"
+                  />
+                )}
+              />
+              <p className="text-muted-foreground text-[10.5px]">
+                {t('expenses.form.bank_iban_hint')}
+              </p>
             </div>
           )}
 

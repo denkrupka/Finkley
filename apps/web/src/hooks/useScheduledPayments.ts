@@ -16,6 +16,10 @@ export type ScheduledPaymentRow = {
   paid_expense_id: string | null
   source: string
   external_id: string | null
+  /** IBAN получателя для bulk-экспорта в банк. Auto-fill из контрагента. */
+  bank_account_iban: string | null
+  /** FK на counterparty — для cross-fill IBAN. NULL для legacy записей. */
+  counterparty_id: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null

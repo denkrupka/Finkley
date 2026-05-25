@@ -18,6 +18,8 @@ export type CounterpartyRow = {
   address: string | null
   category_id: string | null
   notes: string | null
+  /** IBAN счёта контрагента — для bulk-экспорта переводов в банк. */
+  bank_account_iban: string | null
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -103,6 +105,7 @@ export type CreateCounterpartyInput = {
   address?: string | null
   category_id?: string | null
   notes?: string | null
+  bank_account_iban?: string | null
 }
 
 export function useCreateCounterparty(salonId: string | undefined) {
@@ -117,6 +120,7 @@ export function useCreateCounterparty(salonId: string | undefined) {
         address: input.address?.trim() || null,
         category_id: input.category_id ?? null,
         notes: input.notes?.trim() || null,
+        bank_account_iban: input.bank_account_iban?.replace(/\s+/g, '') || null,
       }
       const { data, error } = await supabase
         .from('counterparties')
@@ -138,6 +142,11 @@ export function useUpdateCounterparty(salonId: string | undefined) {
       const patch: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(rest)) {
         if (v === undefined) continue
+        if (k === 'bank_account_iban' && typeof v === 'string') {
+          // IBAN — убираем все пробелы (UI вводит "PL61 1090 ..." формат).
+          patch[k] = v.replace(/\s+/g, '') || null
+          continue
+        }
         patch[k] = typeof v === 'string' ? v.trim() || null : v
       }
       if (typeof rest.name === 'string') patch.name = rest.name.trim()
