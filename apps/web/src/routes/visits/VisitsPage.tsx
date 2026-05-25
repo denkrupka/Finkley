@@ -1,4 +1,12 @@
-import { Calculator, ChevronDown, ChevronRight, Landmark, Pencil, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Calculator,
+  ChevronDown,
+  ChevronRight,
+  Landmark,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -99,6 +107,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
   })
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
   const linkedVisitIds = bankLinked?.visitIds ?? null
+  const needsReviewVisitIds = bankLinked?.needsReviewVisitIds ?? null
   const deleteVisit = useDeleteVisit(salonId)
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -281,6 +290,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                               clients={clients}
                               currency={currency}
                               linkedVisitIds={linkedVisitIds}
+                              needsReviewVisitIds={needsReviewVisitIds}
                               t={t}
                             />
                           )
@@ -301,6 +311,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                             clients={clients}
                             currency={currency}
                             isBankLinked={linkedVisitIds?.has(row.id) ?? false}
+                            needsReview={needsReviewVisitIds?.has(row.id) ?? false}
                             t={t}
                           />
                         )
@@ -346,6 +357,7 @@ function SingleVisitRow({
   clients,
   currency,
   isBankLinked,
+  needsReview,
   t,
 }: {
   visit: VisitRow
@@ -356,6 +368,7 @@ function SingleVisitRow({
   clients: ClientLite[]
   currency: string
   isBankLinked: boolean
+  needsReview: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const staffMember = staff.find((s) => s.id === v.staff_id)
@@ -405,6 +418,11 @@ function SingleVisitRow({
           >
             <Landmark className="size-2.5" strokeWidth={2.4} />
             {t('income.bank_badge')}
+          </span>
+        ) : null}
+        {needsReview ? (
+          <span title={t('income.needs_review_tooltip')} className="mr-1.5 inline-flex">
+            <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />
           </span>
         ) : null}
         {svc?.name ?? v.service_name_snapshot ?? '—'}
@@ -481,6 +499,7 @@ function GroupRow({
   clients,
   currency,
   linkedVisitIds,
+  needsReviewVisitIds,
   t,
 }: {
   group: { key: string; visits: VisitRow[] }
@@ -493,6 +512,7 @@ function GroupRow({
   clients: ClientLite[]
   currency: string
   linkedVisitIds: Set<string> | null
+  needsReviewVisitIds: Set<string> | null
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const visits = group.visits
@@ -502,6 +522,9 @@ function GroupRow({
   const client = clients.find((c) => c.id === primary.client_id)
   const allPaid = visits.every((v) => v.status === 'paid')
   const groupBankLinked = linkedVisitIds ? visits.some((v) => linkedVisitIds.has(v.id)) : false
+  const groupNeedsReview = needsReviewVisitIds
+    ? visits.some((v) => needsReviewVisitIds.has(v.id))
+    : false
   // Если все одного метода — показываем; иначе "Смешано"
   const methods = new Set(visits.map((v) => v.payment_method))
   const sharedPay = methods.size === 1 ? PAY_LABEL[primary.payment_method] : null
@@ -559,6 +582,11 @@ function GroupRow({
             >
               <Landmark className="size-2.5" strokeWidth={2.4} />
               {t('income.bank_badge')}
+            </span>
+          ) : null}
+          {groupNeedsReview ? (
+            <span title={t('income.needs_review_tooltip')} className="mr-1.5 inline-flex">
+              <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />
             </span>
           ) : null}
           {visits

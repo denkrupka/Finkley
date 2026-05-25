@@ -4,6 +4,9 @@ import {
   Clock,
   Edit2,
   FileText,
+  Landmark,
+  Link2,
+  Link2Off,
   Loader2,
   Plus,
   Receipt,
@@ -22,6 +25,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
@@ -40,6 +44,7 @@ import {
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { LinkVisitToBankDialog } from '@/routes/banking/LinkVisitToBankDialog'
 
 /**
  * Booksy-style карточка визита.
@@ -151,6 +156,7 @@ export function VisitDetailModal({
         {view === 'detail' ? (
           <DetailView
             visit={visit}
+            salonId={salonId}
             client={client}
             groupLines={groupLines}
             services={services}
@@ -303,6 +309,7 @@ export function VisitDetailModal({
 
 type DetailViewProps = {
   visit: VisitRow
+  salonId: string
   client: { id: string; name: string } | null
   groupLines: VisitRow[]
   services: Array<{
@@ -331,6 +338,7 @@ type DetailViewProps = {
 
 function DetailView({
   visit,
+  salonId,
   client,
   groupLines,
   services,
@@ -352,6 +360,36 @@ function DetailView({
 }: DetailViewProps) {
   const [addingService, setAddingService] = useState(false)
   const [addingValue, setAddingValue] = useState('')
+  const [bankPickerOpen, setBankPickerOpen] = useState(false)
+  const [bankUnlinking, setBankUnlinking] = useState(false)
+  const qc = useQueryClient()
+  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  // Bank-секция — только для одиночного оплаченного визита. Группы (retail-
+  // wizard'ы из 2+ позиций) оставляем как есть: одна общая оплата может быть
+  // привязана к любому из них, и UI с per-line кнопками был бы шумным.
+  const showBankSection = allPaid && groupLines.length === 1
+  const isBankLinked = bankLinked?.visitIds.has(visit.id) ?? false
+
+  async function handleUnlinkBank() {
+    setBankUnlinking(true)
+    try {
+      const { error } = await supabase
+        .from('bank_transactions')
+        .update({ linked_visit_id: null })
+        .eq('linked_visit_id', visit.id)
+      if (error) throw error
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] }),
+        qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] }),
+        qc.invalidateQueries({ queryKey: ['visits', salonId] }),
+      ])
+      toast.success(t('banking.unlink_toast', { defaultValue: 'Связь с банком снята' }))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBankUnlinking(false)
+    }
+  }
   const headerLabel = allPaid ? t('visits.detail.status_paid') : t('visits.detail.status_confirmed')
   const dateLabel = format(new Date(visit.visit_at), 'EEEE, d MMMM', { locale: getDateLocale() })
 
@@ -566,6 +604,56 @@ function DetailView({
         )}
       </div>
 
+      {showBankSection ? (
+        <div className="border-border bg-muted/30 flex items-center justify-between gap-2 border-t px-5 py-2.5">
+          <div className="flex min-w-0 items-center gap-2 text-xs">
+            <Landmark
+              className={cn(
+                'size-4 shrink-0',
+                isBankLinked ? 'text-brand-teal-deep' : 'text-muted-foreground',
+              )}
+              strokeWidth={1.8}
+            />
+            <span
+              className={cn(
+                'truncate font-semibold',
+                isBankLinked ? 'text-brand-teal-deep' : 'text-muted-foreground',
+              )}
+            >
+              {isBankLinked
+                ? t('banking.linked_to_bank', { defaultValue: 'Привязано к банковской выписке' })
+                : t('banking.not_linked_hint', {
+                    defaultValue: 'Не привязано к банковской выписке',
+                  })}
+            </span>
+          </div>
+          {isBankLinked ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUnlinkBank}
+              disabled={bankUnlinking}
+              className="shrink-0"
+            >
+              <Link2Off className="size-3.5" strokeWidth={2} />
+              {t('banking.unlink', { defaultValue: 'Снять связь' })}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBankPickerOpen(true)}
+              className="shrink-0"
+            >
+              <Link2 className="size-3.5" strokeWidth={2} />
+              {t('banking.link_to_bank', { defaultValue: 'Привязать к банку' })}
+            </Button>
+          )}
+        </div>
+      ) : null}
+
       {/* Footer */}
       <footer className="border-border flex items-center justify-between gap-3 border-t px-5 py-3">
         <div>
@@ -583,6 +671,19 @@ function DetailView({
           </Button>
         )}
       </footer>
+
+      <LinkVisitToBankDialog
+        open={bankPickerOpen}
+        onOpenChange={setBankPickerOpen}
+        salonId={salonId}
+        currency={currency}
+        visit={{
+          id: visit.id,
+          amount_cents: total,
+          visit_at: visit.visit_at,
+          title: client?.name ?? services.find((s) => s.id === visit.service_id)?.name ?? '—',
+        }}
+      />
     </div>
   )
 }

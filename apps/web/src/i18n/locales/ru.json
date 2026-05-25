@@ -3451,7 +3451,8 @@
       }
     },
     "bank_badge": "Банк",
-    "linked_to_bank_tooltip": "Подтверждено банковской выпиской"
+    "linked_to_bank_tooltip": "Подтверждено банковской выпиской",
+    "needs_review_tooltip": "Авто-привязка низкой уверенности — проверь, тот ли это банковский платёж"
   },
   "reports_insights": {
     "title": "AI-выводы по отчёту",
@@ -4241,6 +4242,9 @@
     "structure_empty": "Нет расходов в этом периоде",
     "records": "записей",
     "created_by_short": "внёс {{name}}",
+    "bank_badge": "Банк",
+    "linked_to_bank_tooltip": "Подтверждено банковской выпиской",
+    "needs_review_tooltip": "Авто-привязка низкой уверенности — проверь, тот ли это банковский платёж",
     "tabs": {
       "expenses": "Расходы",
       "inflows": "Поступления"

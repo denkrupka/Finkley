@@ -1,4 +1,4 @@
-import { Landmark, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Landmark, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -104,6 +104,8 @@ export function SalesTab({ salonId }: { salonId: string }) {
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
   const linkedVisitIds = bankLinked?.visitIds ?? null
   const linkedOtherIncomeIds = bankLinked?.otherIncomeIds ?? null
+  const needsReviewVisitIds = bankLinked?.needsReviewVisitIds ?? null
+  const needsReviewOtherIncomeIds = bankLinked?.needsReviewOtherIncomeIds ?? null
   const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
   const otherCategoriesById = useMemo(
     () => new Map(otherCategories.map((c) => [c.id, c.name])),
@@ -268,6 +270,14 @@ export function SalesTab({ salonId }: { salonId: string }) {
                         {t('income.bank_badge')}
                       </span>
                     ) : null}
+                    {needsReviewOtherIncomeIds?.has(o.id) ? (
+                      <span title={t('income.needs_review_tooltip')} className="ml-1.5 inline-flex">
+                        <AlertTriangle
+                          className="size-3.5 shrink-0 text-amber-600"
+                          strokeWidth={2}
+                        />
+                      </span>
+                    ) : null}
                     {o.comment ? (
                       <span className="text-muted-foreground ml-2 text-xs">· {o.comment}</span>
                     ) : null}
@@ -303,6 +313,17 @@ export function SalesTab({ salonId }: { salonId: string }) {
                         >
                           <Landmark className="size-2.5" strokeWidth={2.4} />
                           {t('income.bank_badge')}
+                        </span>
+                      ) : null}
+                      {needsReviewVisitIds?.has(s.id) ? (
+                        <span
+                          title={t('income.needs_review_tooltip')}
+                          className="ml-1.5 inline-flex"
+                        >
+                          <AlertTriangle
+                            className="size-3.5 shrink-0 text-amber-600"
+                            strokeWidth={2}
+                          />
                         </span>
                       ) : null}
                       {s.comment ? (

@@ -2622,7 +2622,8 @@
       "date": "Operation date"
     },
     "bank_badge": "Bank",
-    "linked_to_bank_tooltip": "Confirmed by bank statement"
+    "linked_to_bank_tooltip": "Confirmed by bank statement",
+    "needs_review_tooltip": "Low-confidence auto-match — check this is the right bank payment"
   },
   "reports_hub": {
     "title": "Reports",
@@ -3329,6 +3330,9 @@
     "structure_title": "Expense breakdown",
     "structure_empty": "No expenses in this period",
     "records": "records",
+    "bank_badge": "Bank",
+    "linked_to_bank_tooltip": "Confirmed by bank statement",
+    "needs_review_tooltip": "Low-confidence auto-match — check this is the right bank payment",
     "budgets": {
       "title": "Budgets by category",
       "no_limit": "No limit set",

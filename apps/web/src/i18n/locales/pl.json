@@ -2622,7 +2622,8 @@
       "date": "Data operacji"
     },
     "bank_badge": "Bank",
-    "linked_to_bank_tooltip": "Potwierdzone wyciągiem bankowym"
+    "linked_to_bank_tooltip": "Potwierdzone wyciągiem bankowym",
+    "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — sprawdź, czy to właściwa płatność"
   },
   "reports_hub": {
     "title": "Raporty",
@@ -3330,6 +3331,9 @@
     "structure_title": "Struktura wydatków",
     "structure_empty": "Brak wydatków w tym okresie",
     "records": "rekordów",
+    "bank_badge": "Bank",
+    "linked_to_bank_tooltip": "Potwierdzone wyciągiem bankowym",
+    "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — sprawdź, czy to właściwa płatność",
     "budgets": {
       "title": "Budżety wg kategorii",
       "no_limit": "Limit nieustawiony",

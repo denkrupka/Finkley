@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CalendarClock,
   CheckCircle2,
   FileText,
@@ -64,6 +65,7 @@ import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
@@ -150,6 +152,8 @@ export function ExpensesPage() {
     categoryId: categoryFilter || null,
     paymentMethod: payFilter || null,
   })
+  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  const needsReviewExpenseIds = bankLinked?.needsReviewExpenseIds ?? null
   // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
   // категории — на клиенте, чтобы не плодить варианты хука.
   const { data: allScheduled = [], isLoading: scheduledLoading } = useScheduledPayments(salonId)
@@ -667,6 +671,14 @@ export function ExpensesPage() {
                             >
                               <Landmark className="size-2.5" strokeWidth={2.4} />
                               {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+                            </span>
+                          ) : null}
+                          {needsReviewExpenseIds?.has(e.id) ? (
+                            <span title={t('expenses.needs_review_tooltip')}>
+                              <AlertTriangle
+                                className="size-3.5 shrink-0 text-amber-600"
+                                strokeWidth={2}
+                              />
                             </span>
                           ) : null}
                         </span>

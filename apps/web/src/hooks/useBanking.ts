@@ -292,42 +292,77 @@ export function useLinkBankTransaction(salonId: string | undefined) {
 }
 
 /**
- * Идентификаторы visits / other_incomes, которые привязаны к банковским
- * транзакциям этого салона. Используется в IncomePage / SalesTab / VisitsPage
- * чтобы рисовать маркер «Банк» рядом со строкой дохода — симметрично маркеру
- * на расходах (см. ExpensesPage).
+ * Идентификаторы расходов/визитов/other_incomes этого салона, которые
+ * привязаны к банковским транзакциям + те же id, у которых linked tx
+ * стоит в needs_review (требует ручной проверки оператора).
+ *
+ * Используется в ExpensesPage / VisitsPage / SalesTab для двух маркеров:
+ *   1) «Банк» — оплата подтверждена выпиской
+ *   2) AlertTriangle — авто-матч низкой уверенности, надо подтвердить
  *
  * Не фильтруем по периоду: связанных txs на салон обычно немного, а юзер
  * может смотреть произвольный месяц. RLS уже ограничивает выборку салоном
  * через bank_accounts → bank_connections.
  */
+export type BankLinkedIncomeIds = {
+  visitIds: Set<string>
+  otherIncomeIds: Set<string>
+  expenseIds: Set<string>
+  needsReviewVisitIds: Set<string>
+  needsReviewOtherIncomeIds: Set<string>
+  needsReviewExpenseIds: Set<string>
+}
+
 export function useBankLinkedIncomeIds(salonId: string | undefined) {
-  return useQuery<{ visitIds: Set<string>; otherIncomeIds: Set<string> }>({
+  return useQuery<BankLinkedIncomeIds>({
     queryKey: ['bank-linked-income-ids', salonId],
     queryFn: async () => {
-      if (!salonId) return { visitIds: new Set(), otherIncomeIds: new Set() }
+      const empty: BankLinkedIncomeIds = {
+        visitIds: new Set(),
+        otherIncomeIds: new Set(),
+        expenseIds: new Set(),
+        needsReviewVisitIds: new Set(),
+        needsReviewOtherIncomeIds: new Set(),
+        needsReviewExpenseIds: new Set(),
+      }
+      if (!salonId) return empty
       const { data, error } = await supabase
         .from('bank_transactions')
         .select(
-          `linked_visit_id, linked_other_income_id,
+          `expense_id, linked_visit_id, linked_other_income_id, needs_review,
            bank_accounts!inner (
              bank_connections!inner ( salon_id )
            )`,
         )
         .eq('bank_accounts.bank_connections.salon_id', salonId)
-        .or('linked_visit_id.not.is.null,linked_other_income_id.not.is.null')
+        .or('expense_id.not.is.null,linked_visit_id.not.is.null,linked_other_income_id.not.is.null')
         .limit(2000)
       if (error) throw error
-      const visitIds = new Set<string>()
-      const otherIncomeIds = new Set<string>()
+      const result: BankLinkedIncomeIds = {
+        visitIds: new Set(),
+        otherIncomeIds: new Set(),
+        expenseIds: new Set(),
+        needsReviewVisitIds: new Set(),
+        needsReviewOtherIncomeIds: new Set(),
+        needsReviewExpenseIds: new Set(),
+      }
       for (const r of (data ?? []) as Array<{
+        expense_id: string | null
         linked_visit_id: string | null
         linked_other_income_id: string | null
+        needs_review: boolean | null
       }>) {
-        if (r.linked_visit_id) visitIds.add(r.linked_visit_id)
-        if (r.linked_other_income_id) otherIncomeIds.add(r.linked_other_income_id)
+        if (r.expense_id) result.expenseIds.add(r.expense_id)
+        if (r.linked_visit_id) result.visitIds.add(r.linked_visit_id)
+        if (r.linked_other_income_id) result.otherIncomeIds.add(r.linked_other_income_id)
+        if (r.needs_review) {
+          if (r.expense_id) result.needsReviewExpenseIds.add(r.expense_id)
+          if (r.linked_visit_id) result.needsReviewVisitIds.add(r.linked_visit_id)
+          if (r.linked_other_income_id)
+            result.needsReviewOtherIncomeIds.add(r.linked_other_income_id)
+        }
       }
-      return { visitIds, otherIncomeIds }
+      return result
     },
     enabled: !!salonId,
     staleTime: 30_000,
