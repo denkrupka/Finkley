@@ -82,6 +82,11 @@ type FormValues = {
   payroll_kind: PayrollKind | ''
   payroll_period_start: string
   payroll_period_end: string
+  /** Чекбокс «частичная оплата» — если true, в paid_amount храним то что
+   *  юзер ввёл (а в amount — полная сумма по документу). False = full paid. */
+  is_partial_payment: boolean
+  /** Сумма уже оплаченного (только если is_partial_payment=true). */
+  paid_amount: string
 }
 
 const schema = z.object({
@@ -108,6 +113,8 @@ const schema = z.object({
   payroll_kind: z.enum(['advance', 'final', '']).optional().default(''),
   payroll_period_start: z.string().optional().default(''),
   payroll_period_end: z.string().optional().default(''),
+  is_partial_payment: z.boolean().default(false),
+  paid_amount: z.string().optional().default(''),
 })
 
 /** Считает дату следующего повторения от исходной даты расхода. */
@@ -379,6 +386,8 @@ export function ExpenseFormModal({
       payroll_kind: '',
       payroll_period_start: '',
       payroll_period_end: '',
+      is_partial_payment: false,
+      paid_amount: '',
     },
   })
 
@@ -398,6 +407,8 @@ export function ExpenseFormModal({
     setPaid(true)
 
     if (expense) {
+      const isPartial =
+        expense.paid_amount_cents != null && expense.paid_amount_cents < expense.amount_cents
       form.reset({
         expense_at: expense.expense_at.slice(0, 10),
         description: expense.description ?? '',
@@ -413,6 +424,8 @@ export function ExpenseFormModal({
         payroll_kind: (expense.payroll_kind as PayrollKind) ?? '',
         payroll_period_start: expense.payroll_period_start ?? '',
         payroll_period_end: expense.payroll_period_end ?? '',
+        is_partial_payment: isPartial,
+        paid_amount: isPartial ? ((expense.paid_amount_cents ?? 0) / 100).toFixed(2) : '',
       })
     } else if (existingPayment) {
       // mode='planned-paying' — оплата существующего pending. vendor_name свободный
@@ -432,6 +445,8 @@ export function ExpenseFormModal({
         payroll_kind: '',
         payroll_period_start: '',
         payroll_period_end: '',
+        is_partial_payment: false,
+        paid_amount: '',
       })
     } else {
       form.reset({
@@ -449,6 +464,8 @@ export function ExpenseFormModal({
         payroll_kind: '',
         payroll_period_start: '',
         payroll_period_end: '',
+        is_partial_payment: false,
+        paid_amount: '',
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет
@@ -474,6 +491,14 @@ export function ExpenseFormModal({
 
   async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+    // Частичная оплата: paid_amount_cents = введённое значение; null если
+    // checkbox выключен ИЛИ paid==amount (полная оплата).
+    const paidAmountCents =
+      values.is_partial_payment && values.paid_amount.trim() !== ''
+        ? Math.min(Math.round(Number(values.paid_amount.replace(',', '.')) * 100), amountCents)
+        : null
+    const partialPaid =
+      paidAmountCents != null && paidAmountCents < amountCents ? paidAmountCents : null
 
     // Ветка 1: запланированный платёж (paid=false) — пишем только в
     // scheduled_payments(status=pending). Может прийти как из календаря
@@ -535,6 +560,7 @@ export function ExpenseFormModal({
           category_id: values.category_id || null,
           counterparty_id: values.counterparty_id || null,
           amount_cents: amountCents,
+          paid_amount_cents: partialPaid,
           payment_method: derivedPaymentMethod,
           cash_register_id: values.cash_register_id || null,
           document_number: values.document_number.trim() || null,
@@ -581,6 +607,7 @@ export function ExpenseFormModal({
         category_id: values.category_id || null,
         counterparty_id: values.counterparty_id || null,
         amount_cents: amountCents,
+        paid_amount_cents: partialPaid,
         payment_method: values.payment_method || null,
         document_number: values.document_number.trim() || null,
         comment: values.comment || null,
@@ -1130,6 +1157,63 @@ export function ExpenseFormModal({
               </p>
             ) : null}
           </div>
+
+          {/* Чекбокс «частичная оплата». amount = сумма по документу,
+              paid_amount = сколько уже оплатили. UI блок появляется только
+              если paid=true (для plan-mode нет смысла). */}
+          {paid ? (
+            <Controller
+              name="is_partial_payment"
+              control={form.control}
+              render={({ field: partialField }) => (
+                <div className="border-border bg-muted/30 flex flex-col gap-2 rounded-md border p-3">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!partialField.value}
+                      onChange={(e) => partialField.onChange(e.target.checked)}
+                      className="border-brand-border accent-brand-navy size-4 cursor-pointer rounded"
+                    />
+                    <span className="text-foreground text-sm font-semibold">
+                      {t('expenses.form.partial_payment_label', {
+                        defaultValue: 'Частичная оплата',
+                      })}
+                    </span>
+                  </label>
+                  {partialField.value ? (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="exp-paid-amount" className="text-xs">
+                        {t('expenses.form.paid_amount_label', {
+                          defaultValue: 'Оплачено сейчас',
+                        })}
+                      </Label>
+                      <div className="border-border bg-card flex h-10 items-center gap-2 rounded-md border px-3">
+                        <span className="num text-muted-foreground text-base font-bold">
+                          {currencySymbol}
+                        </span>
+                        <input
+                          id="exp-paid-amount"
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          placeholder="0"
+                          {...form.register('paid_amount')}
+                          className="num text-foreground placeholder:text-muted-foreground/40 h-full flex-1 bg-transparent text-base font-bold tracking-tight outline-none"
+                        />
+                      </div>
+                      <p className="text-muted-foreground text-[11px]">
+                        {t('expenses.form.partial_payment_hint', {
+                          defaultValue:
+                            'Сумма выше — полная сумма по документу. Оставшаяся часть появится во вкладке «Не оплачено» как остаток.',
+                        })}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            />
+          ) : null}
 
           {/* Image #82: кассы (вместо payment_methods). Pills рендерятся из
               financial_settings.cash_registers.items[] — конкретные кассы

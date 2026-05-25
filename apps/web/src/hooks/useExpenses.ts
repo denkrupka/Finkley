@@ -179,6 +179,8 @@ export type CreateExpenseInput = {
   category_id?: string | null
   expense_at: string
   amount_cents: number
+  /** Частичная оплата: NULL = full paid (default), 0..amount = partial. */
+  paid_amount_cents?: number | null
   payment_method?: PaymentMethod | null
   description?: string
   document_number?: string | null
