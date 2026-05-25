@@ -304,6 +304,7 @@ async function syncKsefToFinkley(
         sellerName: inv.sellerName,
         buyerNip: inv.buyerNip,
         description: null as string | null,
+        sellerIban: null as string | null,
       }
       let xmlPath: string | null = null
       const xmlRes = await getInvoiceXml(accessToken, inv.ksefReferenceNumber)
@@ -318,6 +319,7 @@ async function syncKsefToFinkley(
             sellerName: parsed.sellerName ?? detail.sellerName,
             buyerNip: parsed.buyerNip ?? detail.buyerNip,
             description: parsed.description,
+            sellerIban: parsed.sellerIban,
           }
         }
         xmlPath = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
@@ -357,6 +359,7 @@ async function syncKsefToFinkley(
         source: 'ksef',
         external_id: inv.ksefReferenceNumber,
         receipt_url: xmlPath,
+        bank_account_iban: detail.sellerIban,
         metadata: {
           ksef_id: inv.ksefReferenceNumber,
           vendor_nip: detail.sellerNip,

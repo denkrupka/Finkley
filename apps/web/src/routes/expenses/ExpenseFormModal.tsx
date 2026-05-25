@@ -313,6 +313,7 @@ export function ExpenseFormModal({
     name?: string
     nip?: string
     address?: string
+    iban?: string
   } | null>(null)
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
@@ -1048,6 +1049,16 @@ export function ExpenseFormModal({
                           shouldDirty: true,
                         })
                       }
+                      // OCR auto-fill IBAN получателя (Раунд 4).
+                      // На paragon обычно нет IBAN — vendor_iban будет null.
+                      // На фактуре — заполняется автоматически, юзер может править.
+                      if (parsed.vendor_iban && !form.getValues('bank_account_iban')) {
+                        form.setValue(
+                          'bank_account_iban',
+                          formatIbanForDisplay(parsed.vendor_iban),
+                          { shouldDirty: true },
+                        )
+                      }
                       // Image #93: контрагент. Сначала пытаемся match по NIP
                       // (надёжный ключ), потом по имени. Если не нашли —
                       // открываем CounterpartyEditModal с префилом для
@@ -1071,11 +1082,12 @@ export function ExpenseFormModal({
                         } else {
                           setDictationPrefillForNewCp({
                             name: parsed.vendor,
-                            // CounterpartyEditModal принимает prefill { name, nip, address }
+                            // CounterpartyEditModal принимает prefill { name, nip, address, iban }
                             // — дополняем доступными полями из OCR.
                             ...(parsed.vendor_nip ? { nip: parsed.vendor_nip } : {}),
                             ...(parsed.vendor_address ? { address: parsed.vendor_address } : {}),
-                          } as { name: string; nip?: string; address?: string })
+                            ...(parsed.vendor_iban ? { iban: parsed.vendor_iban } : {}),
+                          } as { name: string; nip?: string; address?: string; iban?: string })
                           setCounterpartyModalOpen(true)
                         }
                       }

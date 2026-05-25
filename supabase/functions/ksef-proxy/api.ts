@@ -547,6 +547,8 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   sellerName: string | null
   buyerNip: string | null
   description: string | null
+  /** IBAN счёта продавца (NrRBPL/NrRB в FA(2)/FA(1)). Для bulk-перевода. */
+  sellerIban: string | null
 } | null {
   const xml = new TextDecoder('utf-8').decode(xmlBytes)
   if (!xml.includes('<Faktura') && !xml.includes(':Faktura')) return null
@@ -565,6 +567,15 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   const buyerNip = buyer.match(/<NIP[^>]*>([^<]+)<\/NIP>/)?.[1] ?? null
   const description = grab(/<P_7[^>]*>([^<]+)<\/P_7>/)
 
+  // KSeF FA(2): счета продавца в <Platnosc><RachunekBankowy><NrRB>...</NrRB>
+  // или для PL — <NrRBPL>. Берём первый встретившийся. Если фактура содержит
+  // несколько счетов (например, EUR + PLN) — первый обычно главный.
+  const ibanMatch =
+    xml.match(/<NrRBPL[^>]*>([^<]+)<\/NrRBPL>/)?.[1] ??
+    xml.match(/<NrRB[^>]*>([^<]+)<\/NrRB>/)?.[1] ??
+    null
+  const sellerIban = ibanMatch ? ibanMatch.trim().replace(/\s+/g, '') : null
+
   const gross = grossStr ? parseFloat(grossStr) : null
 
   return {
@@ -575,5 +586,6 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     sellerName,
     buyerNip,
     description,
+    sellerIban,
   }
 }

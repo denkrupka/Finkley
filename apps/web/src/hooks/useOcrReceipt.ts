@@ -14,6 +14,8 @@ export type OcrParsedReceipt = {
   category_guess: string | null
   /** Номер документа (FV/.../..., paragon №...) — для expenses.document_number. */
   document_number: string | null
+  /** IBAN счёта продавца — для bulk-перевода. Null для paragon-чеков без счёта. */
+  vendor_iban: string | null
   raw_text: string | null
 }
 

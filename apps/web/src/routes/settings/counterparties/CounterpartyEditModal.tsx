@@ -39,7 +39,7 @@ type Props = {
   /** Колбэк после создания/обновления; получает финальную строку. */
   onSaved?: (cp: CounterpartyRow) => void
   /** Префилл для нового контрагента (после OCR/dictation). */
-  prefill?: { name?: string; nip?: string; address?: string } | null
+  prefill?: { name?: string; nip?: string; address?: string; iban?: string } | null
 }
 
 /**
@@ -88,12 +88,12 @@ export function CounterpartyEditModal({
       setAddress(prefill?.address ?? '')
       setCategoryId('')
       setNotes('')
-      setBankIban('')
+      setBankIban(prefill?.iban ? formatIbanForDisplay(prefill.iban) : '')
     }
     setAddingCategory(false)
     setNewCategoryDraft('')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- одноразовый ресет при open/counterparty.id
-  }, [open, counterparty?.id, prefill?.name, prefill?.nip, prefill?.address])
+  }, [open, counterparty?.id, prefill?.name, prefill?.nip, prefill?.address, prefill?.iban])
 
   async function handleNipLookup() {
     const cleaned = nip.replace(/[^0-9]/g, '')
