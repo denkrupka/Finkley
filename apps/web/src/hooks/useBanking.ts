@@ -16,6 +16,8 @@ export type BankConnectionRow = {
   last_synced_at: string | null
   last_error: string | null
   history_days: number
+  /** Период авто-синка в минутах. Range 60..1440, default 360 (6h). */
+  sync_interval_minutes: number
   created_at: string
 }
 
@@ -461,6 +463,27 @@ export function useBankSyncNow(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
       qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
       qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+    },
+  })
+}
+
+/**
+ * Изменить per-connection частоту авто-синка. Записывает напрямую в
+ * bank_connections через anon-key (RLS пропускает owner'а салона). После
+ * успеха next cron-tick (каждые 15 минут) увидит обновлённый interval.
+ */
+export function useUpdateBankSyncInterval(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { connectionId: string; intervalMinutes: number }) => {
+      const { error } = await supabase
+        .from('bank_connections')
+        .update({ sync_interval_minutes: args.intervalMinutes })
+        .eq('id', args.connectionId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bank-connections', salonId] })
     },
   })
 }

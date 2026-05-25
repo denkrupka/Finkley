@@ -13,16 +13,35 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { getDateLocale } from '@/lib/utils/format-date'
 import {
   useBankAccountsForConnections,
   useBankConnections,
   useBankDisconnect,
   useBankSyncNow,
+  useUpdateBankSyncInterval,
   type BankConnectionRow,
 } from '@/hooks/useBanking'
 
 import { BankingConnectDialog } from './BankingConnectDialog'
+
+// Варианты частоты авто-синка. Range constraint в БД: 60..1440 минут.
+// Выбор небольшой — owner не должен думать что значит «42 минуты», а
+// чаще часа просто упрётся в Enable Banking rate-limit.
+const SYNC_INTERVAL_OPTIONS: ReadonlyArray<{ value: number; labelKey: string }> = [
+  { value: 60, labelKey: 'banking.sync_interval.1h' },
+  { value: 180, labelKey: 'banking.sync_interval.3h' },
+  { value: 360, labelKey: 'banking.sync_interval.6h' },
+  { value: 720, labelKey: 'banking.sync_interval.12h' },
+  { value: 1440, labelKey: 'banking.sync_interval.24h' },
+]
 
 type Props = { salonId: string }
 
@@ -42,6 +61,7 @@ export function BankingSection({ salonId }: Props) {
   const { data: accounts = [] } = useBankAccountsForConnections(connectionIds)
   const sync = useBankSyncNow(salonId)
   const disconnect = useBankDisconnect(salonId)
+  const updateInterval = useUpdateBankSyncInterval(salonId)
   const [connectOpen, setConnectOpen] = useState(false)
   const [reconnectFor, setReconnectFor] = useState<BankConnectionRow | null>(null)
   const autoSyncedRef = useRef<Set<string>>(new Set())
@@ -87,6 +107,21 @@ export function BankingSection({ salonId }: Props) {
         })
       },
     })
+  }
+
+  function handleIntervalChange(connectionId: string, value: string) {
+    const minutes = Number(value)
+    if (!Number.isFinite(minutes) || minutes < 60 || minutes > 1440) return
+    updateInterval.mutate(
+      { connectionId, intervalMinutes: minutes },
+      {
+        onSuccess: () => toast.success(t('banking.toast_interval_saved')),
+        onError: (err) =>
+          toast.error(t('banking.toast_interval_failed'), {
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    )
   }
 
   function handleDisconnect(connection: BankConnectionRow) {
@@ -207,6 +242,30 @@ export function BankingSection({ salonId }: Props) {
                       </span>
                     ) : null}
                   </div>
+
+                  {c.status === 'connected' ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">
+                        {t('banking.sync_interval.label')}
+                      </span>
+                      <Select
+                        value={String(c.sync_interval_minutes)}
+                        onValueChange={(v) => handleIntervalChange(c.id, v)}
+                        disabled={updateInterval.isPending}
+                      >
+                        <SelectTrigger className="h-7 w-[120px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SYNC_INTERVAL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={String(opt.value)}>
+                              {t(opt.labelKey)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">

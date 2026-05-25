@@ -4019,6 +4019,16 @@
     "toast_sync_failed": "Failed to sync",
     "toast_disconnected": "Bank disconnected",
     "toast_disconnect_failed": "Failed to disconnect",
+    "toast_interval_saved": "Sync frequency updated",
+    "toast_interval_failed": "Failed to save frequency",
+    "sync_interval": {
+      "label": "Auto-sync:",
+      "1h": "Every hour",
+      "3h": "Every 3 hours",
+      "6h": "Every 6 hours",
+      "12h": "Every 12 hours",
+      "24h": "Once a day"
+    },
     "errors": {
       "no_bank": "Pick a bank",
       "connect_failed": "Failed to start connection"

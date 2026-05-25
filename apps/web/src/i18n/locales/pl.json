@@ -4020,6 +4020,16 @@
     "toast_sync_failed": "Nie udało się zsynchronizować",
     "toast_disconnected": "Bank odłączony",
     "toast_disconnect_failed": "Nie udało się odłączyć",
+    "toast_interval_saved": "Częstotliwość synchronizacji zapisana",
+    "toast_interval_failed": "Nie udało się zapisać częstotliwości",
+    "sync_interval": {
+      "label": "Auto-sync:",
+      "1h": "Co godzinę",
+      "3h": "Co 3 godziny",
+      "6h": "Co 6 godzin",
+      "12h": "Co 12 godzin",
+      "24h": "Raz dziennie"
+    },
     "errors": {
       "no_bank": "Wybierz bank",
       "connect_failed": "Nie udało się rozpocząć połączenia"
