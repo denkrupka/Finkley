@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import {
+  detectMultiLinkConflicts,
+  type ExistingLegacyFk,
+  type ExistingSplit,
+} from '@/lib/banking/detect-link-conflicts'
 import { supabase } from '@/lib/supabase/client'
 
 export type BankConnectionStatus = 'pending' | 'connected' | 'expired' | 'revoked' | 'error'
@@ -450,21 +455,20 @@ export function useMultiLinkBankTransaction(salonId: string | undefined) {
        *  кидаем ошибку с conflict_entities, чтобы UI показал диалог. */
       allowRebind?: boolean
     }) => {
-      // Шаг 0: conflict-check. Собираем все entity-id и проверяем что они
-      // не привязаны к другим tx через splits или legacy FK.
+      // Шаг 0: conflict-check. Собираем existing splits/FK и проверяем
+      // через pure-helper detectMultiLinkConflicts (тестируем без БД).
       if (args.splits.length > 0) {
         const entityIds = args.splits.map((s) => s.entityId)
-        // (a) splits на других tx
-        const { data: conflictSplits } = await supabase
-          .from('bank_tx_splits')
-          .select('bank_transaction_id, kind, entity_id')
-          .in('entity_id', entityIds)
-          .neq('bank_transaction_id', args.transactionId)
-        // (b) legacy FK на других tx (expense_id / linked_visit_id / linked_other_income_id)
         const expenseIds = args.splits.filter((s) => s.kind === 'expense').map((s) => s.entityId)
         const visitIds = args.splits.filter((s) => s.kind === 'visit').map((s) => s.entityId)
         const otherIds = args.splits.filter((s) => s.kind === 'other_income').map((s) => s.entityId)
-        const fkChecks = await Promise.all([
+
+        const [{ data: conflictSplits }, fkExpenses, fkVisits, fkOthers] = await Promise.all([
+          supabase
+            .from('bank_tx_splits')
+            .select('bank_transaction_id, kind, entity_id')
+            .in('entity_id', entityIds)
+            .neq('bank_transaction_id', args.transactionId),
           expenseIds.length
             ? supabase
                 .from('bank_transactions')
@@ -489,34 +493,45 @@ export function useMultiLinkBankTransaction(salonId: string | undefined) {
                 data: [] as Array<{ id: string; linked_other_income_id: string }>,
               }),
         ])
-        const hasSplitConflict = (conflictSplits ?? []).length > 0
-        const hasLegacyConflict =
-          (fkChecks[0].data ?? []).length > 0 ||
-          (fkChecks[1].data ?? []).length > 0 ||
-          (fkChecks[2].data ?? []).length > 0
 
-        if ((hasSplitConflict || hasLegacyConflict) && !args.allowRebind) {
-          // Кидаем структурированную ошибку — UI распарсит и покажет диалог.
-          const conflictIds = new Set<string>()
-          for (const r of conflictSplits ?? []) conflictIds.add(r.entity_id)
-          for (const r of fkChecks[0].data ?? []) conflictIds.add(r.expense_id)
-          for (const r of fkChecks[1].data ?? []) conflictIds.add(r.linked_visit_id)
-          for (const r of fkChecks[2].data ?? []) conflictIds.add(r.linked_other_income_id)
+        const existingLegacyFks: ExistingLegacyFk[] = [
+          ...(fkExpenses.data ?? []).map((r) => ({
+            bank_transaction_id: r.id,
+            kind: 'expense' as const,
+            entity_id: r.expense_id,
+          })),
+          ...(fkVisits.data ?? []).map((r) => ({
+            bank_transaction_id: r.id,
+            kind: 'visit' as const,
+            entity_id: r.linked_visit_id,
+          })),
+          ...(fkOthers.data ?? []).map((r) => ({
+            bank_transaction_id: r.id,
+            kind: 'other_income' as const,
+            entity_id: r.linked_other_income_id,
+          })),
+        ]
+
+        const { hasConflict, conflictEntityIds } = detectMultiLinkConflicts(
+          (conflictSplits ?? []) as ExistingSplit[],
+          existingLegacyFks,
+          args.splits,
+          args.transactionId,
+        )
+
+        if (hasConflict && !args.allowRebind) {
           const err = new Error('multi_link_conflict')
-          ;(err as Error & { conflictEntityIds?: string[] }).conflictEntityIds =
-            Array.from(conflictIds)
+          ;(err as Error & { conflictEntityIds?: string[] }).conflictEntityIds = conflictEntityIds
           throw err
         }
 
-        if (args.allowRebind && (hasSplitConflict || hasLegacyConflict)) {
-          // Отвязываем выбранные сущности от старых tx
-          if (hasSplitConflict) {
-            await supabase
-              .from('bank_tx_splits')
-              .delete()
-              .in('entity_id', entityIds)
-              .neq('bank_transaction_id', args.transactionId)
-          }
+        if (args.allowRebind && hasConflict) {
+          // Отвязываем выбранные сущности от старых tx (splits + legacy FK)
+          await supabase
+            .from('bank_tx_splits')
+            .delete()
+            .in('entity_id', entityIds)
+            .neq('bank_transaction_id', args.transactionId)
           if (expenseIds.length) {
             await supabase
               .from('bank_transactions')
