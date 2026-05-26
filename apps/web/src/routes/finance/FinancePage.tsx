@@ -5,7 +5,6 @@ import {
   FileBarChart,
   LineChart,
   Target,
-  Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -15,17 +14,18 @@ import { useSalon } from '@/hooks/useSalons'
 import { ReportsPage } from '@/routes/reports/ReportsPage'
 
 import { BudgetsTab } from './BudgetsTab'
-import { CashFlowTab } from './CashFlowTab'
 import { CashTab } from './CashTab'
 import { FinancialReportTab } from './FinancialReportTab'
 import { PaymentsTab } from './PaymentsTab'
 import { TransfersTab } from './TransfersTab'
 
-type FinanceTab = 'pnl' | 'cashflow' | 'report' | 'payments' | 'budgets' | 'cash' | 'transfers'
+// bug 1c77b56e — sub-tab 'cashflow' (ДДС) удалён. График динамики потоков
+// теперь живёт внутри FinancialReportTab (Отчёт по прибыли). Legacy URL
+// с ?tab=cashflow редиректит на report.
+type FinanceTab = 'pnl' | 'report' | 'payments' | 'budgets' | 'cash' | 'transfers'
 
 const ALL_TABS: PageTab<FinanceTab>[] = [
   { id: 'pnl', labelKey: 'finance.tabs.pnl', icon: LineChart },
-  { id: 'cashflow', labelKey: 'finance.tabs.cashflow', icon: Wallet },
   { id: 'report', labelKey: 'finance.tabs.report', icon: FileBarChart },
   { id: 'payments', labelKey: 'finance.tabs.payments', icon: CalendarClock },
   { id: 'budgets', labelKey: 'finance.tabs.budgets', icon: Target },
@@ -36,7 +36,6 @@ const ALL_TABS: PageTab<FinanceTab>[] = [
 function isFinanceTab(v: string | null): v is FinanceTab {
   return (
     v === 'pnl' ||
-    v === 'cashflow' ||
     v === 'report' ||
     v === 'payments' ||
     v === 'budgets' ||
@@ -67,7 +66,9 @@ export function FinancePage() {
     : ALL_TABS.filter((tab) => tab.id !== 'cash')
 
   const tabParam = params.get('tab')
-  const requested: FinanceTab = isFinanceTab(tabParam) ? tabParam : 'pnl'
+  // bug 1c77b56e — legacy URL с ?tab=cashflow редиректим на 'report'
+  const requested: FinanceTab =
+    tabParam === 'cashflow' ? 'report' : isFinanceTab(tabParam) ? tabParam : 'pnl'
   // Защита от ситуации «приходим по ссылке ?tab=cash, а флаг выключен».
   const active: FinanceTab =
     requested === 'cash' && !salon?.cash_discipline_enabled ? 'pnl' : requested
@@ -88,8 +89,6 @@ export function FinancePage() {
 
       {active === 'pnl' ? (
         <ReportsPage />
-      ) : active === 'cashflow' ? (
-        <CashFlowTab salonId={salonId} />
       ) : active === 'report' ? (
         <FinancialReportTab salonId={salonId} />
       ) : active === 'payments' ? (
