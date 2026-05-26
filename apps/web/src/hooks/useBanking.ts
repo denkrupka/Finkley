@@ -345,10 +345,11 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         needsReviewExpenseIds: new Set(),
       }
       if (!salonId) return empty
-      const { data, error } = await supabase
+      // (1) Legacy single-link: FK на bank_transactions.
+      const { data: txData, error: txErr } = await supabase
         .from('bank_transactions')
         .select(
-          `expense_id, linked_visit_id, linked_other_income_id, needs_review,
+          `id, expense_id, linked_visit_id, linked_other_income_id, needs_review,
            bank_accounts!inner (
              bank_connections!inner ( salon_id )
            )`,
@@ -356,7 +357,8 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         .eq('bank_accounts.bank_connections.salon_id', salonId)
         .or('expense_id.not.is.null,linked_visit_id.not.is.null,linked_other_income_id.not.is.null')
         .limit(2000)
-      if (error) throw error
+      if (txErr) throw new Error(txErr.message)
+
       const result: BankLinkedIncomeIds = {
         visitIds: new Set(),
         otherIncomeIds: new Set(),
@@ -365,12 +367,16 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         needsReviewOtherIncomeIds: new Set(),
         needsReviewExpenseIds: new Set(),
       }
-      for (const r of (data ?? []) as Array<{
+      // Параллельно собираем txId → needs_review для использования с splits ниже
+      const needsReviewByTxId = new Map<string, boolean>()
+      for (const r of (txData ?? []) as Array<{
+        id: string
         expense_id: string | null
         linked_visit_id: string | null
         linked_other_income_id: string | null
         needs_review: boolean | null
       }>) {
+        needsReviewByTxId.set(r.id, !!r.needs_review)
         if (r.expense_id) result.expenseIds.add(r.expense_id)
         if (r.linked_visit_id) result.visitIds.add(r.linked_visit_id)
         if (r.linked_other_income_id) result.otherIncomeIds.add(r.linked_other_income_id)
@@ -381,10 +387,94 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
             result.needsReviewOtherIncomeIds.add(r.linked_other_income_id)
         }
       }
+
+      // (2) Multi-link через bank_tx_splits (миграция 20260526120616).
+      // RLS уже режет по salon через bank_transactions → account → connection.
+      const { data: splitsData, error: splitsErr } = await supabase
+        .from('bank_tx_splits')
+        .select('bank_transaction_id, kind, entity_id')
+        .limit(5000)
+      if (splitsErr) throw new Error(splitsErr.message)
+      for (const s of (splitsData ?? []) as Array<{
+        bank_transaction_id: string
+        kind: 'expense' | 'visit' | 'other_income'
+        entity_id: string
+      }>) {
+        const isReview = needsReviewByTxId.get(s.bank_transaction_id) ?? false
+        if (s.kind === 'expense') {
+          result.expenseIds.add(s.entity_id)
+          if (isReview) result.needsReviewExpenseIds.add(s.entity_id)
+        } else if (s.kind === 'visit') {
+          result.visitIds.add(s.entity_id)
+          if (isReview) result.needsReviewVisitIds.add(s.entity_id)
+        } else {
+          result.otherIncomeIds.add(s.entity_id)
+          if (isReview) result.needsReviewOtherIncomeIds.add(s.entity_id)
+        }
+      }
       return result
     },
     enabled: !!salonId,
     staleTime: 30_000,
+  })
+}
+
+/**
+ * Связать tx с несколькими сущностями (multi-link). Очищает legacy FK,
+ * создаёт N записей в bank_tx_splits. Если splits пусто — это просто
+ * unlink всех связей. Должна вызываться только когда выбрано >1 сущности;
+ * для single-link предпочтительнее useLinkBankTransaction (legacy FK
+ * быстрее для UI-резолва primary linked entity).
+ */
+export function useMultiLinkBankTransaction(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      transactionId: string
+      splits: Array<{
+        kind: 'expense' | 'visit' | 'other_income'
+        entityId: string
+        amountCents: number
+      }>
+      clearNeedsReview?: boolean
+    }) => {
+      // Шаг 1: очищаем legacy FK + needs_review.
+      const txPatch: Record<string, unknown> = {
+        expense_id: null,
+        linked_visit_id: null,
+        linked_other_income_id: null,
+      }
+      if (args.clearNeedsReview) txPatch.needs_review = false
+      const { error: txErr } = await supabase
+        .from('bank_transactions')
+        .update(txPatch)
+        .eq('id', args.transactionId)
+      if (txErr) throw new Error(txErr.message)
+      // Шаг 2: удаляем существующие splits этой tx (если переписываем).
+      const { error: delErr } = await supabase
+        .from('bank_tx_splits')
+        .delete()
+        .eq('bank_transaction_id', args.transactionId)
+      if (delErr) throw new Error(delErr.message)
+      // Шаг 3: вставляем новые splits.
+      if (args.splits.length > 0) {
+        const rows = args.splits.map((s) => ({
+          bank_transaction_id: args.transactionId,
+          kind: s.kind,
+          entity_id: s.entityId,
+          amount_cents: s.amountCents,
+        }))
+        const { error: insErr } = await supabase.from('bank_tx_splits').insert(rows)
+        if (insErr) throw new Error(insErr.message)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+    },
   })
 }
 
