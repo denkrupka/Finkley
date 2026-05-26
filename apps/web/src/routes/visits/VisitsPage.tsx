@@ -479,16 +479,25 @@ function SingleVisitRow({
             {t('income.bank_badge')}
           </span>
         ) : null}
-        {v.paid_amount_cents != null ? (
-          <span
-            className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
-            title={t('income.partial_tooltip', {
-              defaultValue: 'Частично получено',
-            })}
-          >
-            {t('income.partial_badge', { defaultValue: 'Частично' })}
-          </span>
-        ) : null}
+        {v.paid_amount_cents != null
+          ? (() => {
+              const net = v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0)
+              const remaining = Math.max(0, net - v.paid_amount_cents)
+              return (
+                <span
+                  className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
+                  title={t('income.partial_tooltip_with_remaining', {
+                    paid: formatCurrency(v.paid_amount_cents, currency),
+                    total: formatCurrency(net, currency),
+                    remaining: formatCurrency(remaining, currency),
+                    defaultValue: 'Получено {{paid}} из {{total}} · осталось {{remaining}}',
+                  })}
+                >
+                  {t('income.partial_badge', { defaultValue: 'Частично' })}
+                </span>
+              )
+            })()
+          : null}
         {needsReview ? (
           <span title={t('income.needs_review_tooltip')} className="mr-1.5 inline-flex">
             <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />

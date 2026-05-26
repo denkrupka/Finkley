@@ -9,6 +9,7 @@ export type IncomePaymentInstallmentRow = {
   paid_at: string
   amount_cents: number
   payment_method: string | null
+  /** ID кассы из salons.financial_settings.cash_registers.items[] (text, не FK). */
   cash_register_id: string | null
   bank_transaction_id: string | null
   comment: string | null

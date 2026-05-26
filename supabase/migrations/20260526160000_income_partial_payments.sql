@@ -30,7 +30,9 @@ create table if not exists income_payment_installments (
   paid_at timestamptz not null default now(),
   amount_cents bigint not null check (amount_cents > 0),
   payment_method text,
-  cash_register_id uuid references cash_registers(id) on delete set null,
+  -- cash_register_id хранится в salons.financial_settings.cash_registers.items[]
+  -- как JSONB-id (не отдельная таблица — см. ADR-014). Поэтому text + без FK.
+  cash_register_id text,
   bank_transaction_id uuid references bank_transactions(id) on delete set null,
   comment text,
   created_by uuid references auth.users(id) on delete set null,

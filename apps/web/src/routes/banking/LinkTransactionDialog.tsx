@@ -142,19 +142,48 @@ export function LinkTransactionDialog({
       })
       if (!window.confirm(msg)) return
     }
+    runMultiLink(splits, 'credit')
+  }
+  function runMultiLink(
+    splits: Array<{
+      kind: 'expense' | 'visit' | 'other_income'
+      entityId: string
+      amountCents: number
+    }>,
+    side: 'debit' | 'credit',
+    allowRebind = false,
+  ) {
     multiLink.mutate(
-      { transactionId: transaction.id, splits, clearNeedsReview: true },
+      { transactionId: transaction.id, splits, clearNeedsReview: true, allowRebind },
       {
         onSuccess: () => {
           toast.success(
-            t('banking.link_dialog.multi_linked_toast_credit', {
-              defaultValue: 'Связано с {{count}} доходами',
-              count: splits.length,
-            }),
+            side === 'credit'
+              ? t('banking.link_dialog.multi_linked_toast_credit', {
+                  defaultValue: 'Связано с {{count}} доходами',
+                  count: splits.length,
+                })
+              : t('banking.link_dialog.multi_linked_toast', {
+                  defaultValue: 'Связано с {{count}} расходами',
+                  count: splits.length,
+                }),
           )
           onOpenChange(false)
         },
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+        onError: (err) => {
+          if (err instanceof Error && err.message === 'multi_link_conflict') {
+            const msg = t('banking.link_dialog.multi_conflict_confirm', {
+              defaultValue:
+                'Одна или несколько выбранных сущностей уже связаны с другой транзакцией. Отвязать их и привязать к этой?',
+            })
+            if (window.confirm(msg)) {
+              runMultiLink(splits, side, true)
+              return
+            }
+            return
+          }
+          toast.error(err instanceof Error ? err.message : String(err))
+        },
       },
     )
   }
@@ -196,21 +225,7 @@ export function LinkTransactionDialog({
       })
       if (!window.confirm(msg)) return
     }
-    multiLink.mutate(
-      { transactionId: transaction.id, splits, clearNeedsReview: true },
-      {
-        onSuccess: () => {
-          toast.success(
-            t('banking.link_dialog.multi_linked_toast', {
-              defaultValue: 'Связано с {{count}} расходами',
-              count: splits.length,
-            }),
-          )
-          onOpenChange(false)
-        },
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-      },
-    )
+    runMultiLink(splits, 'debit')
   }
 
   const txCurrency = transaction.currency || 'PLN'

@@ -445,7 +445,101 @@ export function useMultiLinkBankTransaction(salonId: string | undefined) {
         amountCents: number
       }>
       clearNeedsReview?: boolean
+      /** allowRebind: если выбранные сущности уже связаны с другой tx —
+       *  отвязать их (обнуляем splits/FK на старой стороне). Default false:
+       *  кидаем ошибку с conflict_entities, чтобы UI показал диалог. */
+      allowRebind?: boolean
     }) => {
+      // Шаг 0: conflict-check. Собираем все entity-id и проверяем что они
+      // не привязаны к другим tx через splits или legacy FK.
+      if (args.splits.length > 0) {
+        const entityIds = args.splits.map((s) => s.entityId)
+        // (a) splits на других tx
+        const { data: conflictSplits } = await supabase
+          .from('bank_tx_splits')
+          .select('bank_transaction_id, kind, entity_id')
+          .in('entity_id', entityIds)
+          .neq('bank_transaction_id', args.transactionId)
+        // (b) legacy FK на других tx (expense_id / linked_visit_id / linked_other_income_id)
+        const expenseIds = args.splits.filter((s) => s.kind === 'expense').map((s) => s.entityId)
+        const visitIds = args.splits.filter((s) => s.kind === 'visit').map((s) => s.entityId)
+        const otherIds = args.splits.filter((s) => s.kind === 'other_income').map((s) => s.entityId)
+        const fkChecks = await Promise.all([
+          expenseIds.length
+            ? supabase
+                .from('bank_transactions')
+                .select('id, expense_id')
+                .in('expense_id', expenseIds)
+                .neq('id', args.transactionId)
+            : Promise.resolve({ data: [] as Array<{ id: string; expense_id: string }> }),
+          visitIds.length
+            ? supabase
+                .from('bank_transactions')
+                .select('id, linked_visit_id')
+                .in('linked_visit_id', visitIds)
+                .neq('id', args.transactionId)
+            : Promise.resolve({ data: [] as Array<{ id: string; linked_visit_id: string }> }),
+          otherIds.length
+            ? supabase
+                .from('bank_transactions')
+                .select('id, linked_other_income_id')
+                .in('linked_other_income_id', otherIds)
+                .neq('id', args.transactionId)
+            : Promise.resolve({
+                data: [] as Array<{ id: string; linked_other_income_id: string }>,
+              }),
+        ])
+        const hasSplitConflict = (conflictSplits ?? []).length > 0
+        const hasLegacyConflict =
+          (fkChecks[0].data ?? []).length > 0 ||
+          (fkChecks[1].data ?? []).length > 0 ||
+          (fkChecks[2].data ?? []).length > 0
+
+        if ((hasSplitConflict || hasLegacyConflict) && !args.allowRebind) {
+          // Кидаем структурированную ошибку — UI распарсит и покажет диалог.
+          const conflictIds = new Set<string>()
+          for (const r of conflictSplits ?? []) conflictIds.add(r.entity_id)
+          for (const r of fkChecks[0].data ?? []) conflictIds.add(r.expense_id)
+          for (const r of fkChecks[1].data ?? []) conflictIds.add(r.linked_visit_id)
+          for (const r of fkChecks[2].data ?? []) conflictIds.add(r.linked_other_income_id)
+          const err = new Error('multi_link_conflict')
+          ;(err as Error & { conflictEntityIds?: string[] }).conflictEntityIds =
+            Array.from(conflictIds)
+          throw err
+        }
+
+        if (args.allowRebind && (hasSplitConflict || hasLegacyConflict)) {
+          // Отвязываем выбранные сущности от старых tx
+          if (hasSplitConflict) {
+            await supabase
+              .from('bank_tx_splits')
+              .delete()
+              .in('entity_id', entityIds)
+              .neq('bank_transaction_id', args.transactionId)
+          }
+          if (expenseIds.length) {
+            await supabase
+              .from('bank_transactions')
+              .update({ expense_id: null })
+              .in('expense_id', expenseIds)
+              .neq('id', args.transactionId)
+          }
+          if (visitIds.length) {
+            await supabase
+              .from('bank_transactions')
+              .update({ linked_visit_id: null })
+              .in('linked_visit_id', visitIds)
+              .neq('id', args.transactionId)
+          }
+          if (otherIds.length) {
+            await supabase
+              .from('bank_transactions')
+              .update({ linked_other_income_id: null })
+              .in('linked_other_income_id', otherIds)
+              .neq('id', args.transactionId)
+          }
+        }
+      }
       // Шаг 1: очищаем legacy FK + needs_review.
       const txPatch: Record<string, unknown> = {
         expense_id: null,

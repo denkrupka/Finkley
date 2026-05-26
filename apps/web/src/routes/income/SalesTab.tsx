@@ -324,8 +324,14 @@ export function SalesTab({
                     {o.paid_amount_cents != null ? (
                       <span
                         className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
-                        title={t('income.partial_tooltip', {
-                          defaultValue: 'Частично получено',
+                        title={t('income.partial_tooltip_with_remaining', {
+                          paid: formatCurrency(o.paid_amount_cents, currency),
+                          total: formatCurrency(o.amount_cents, currency),
+                          remaining: formatCurrency(
+                            Math.max(0, o.amount_cents - o.paid_amount_cents),
+                            currency,
+                          ),
+                          defaultValue: 'Получено {{paid}} из {{total}} · осталось {{remaining}}',
                         })}
                       >
                         {t('income.partial_badge', { defaultValue: 'Частично' })}
@@ -399,16 +405,27 @@ export function SalesTab({
                           {t('income.bank_badge')}
                         </span>
                       ) : null}
-                      {s.paid_amount_cents != null ? (
-                        <span
-                          className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
-                          title={t('income.partial_tooltip', {
-                            defaultValue: 'Частично получено',
-                          })}
-                        >
-                          {t('income.partial_badge', { defaultValue: 'Частично' })}
-                        </span>
-                      ) : null}
+                      {s.paid_amount_cents != null
+                        ? (() => {
+                            const net =
+                              s.amount_cents - (s.discount_cents ?? 0) + (s.tip_cents ?? 0)
+                            const remaining = Math.max(0, net - s.paid_amount_cents)
+                            return (
+                              <span
+                                className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
+                                title={t('income.partial_tooltip_with_remaining', {
+                                  paid: formatCurrency(s.paid_amount_cents, currency),
+                                  total: formatCurrency(net, currency),
+                                  remaining: formatCurrency(remaining, currency),
+                                  defaultValue:
+                                    'Получено {{paid}} из {{total}} · осталось {{remaining}}',
+                                })}
+                              >
+                                {t('income.partial_badge', { defaultValue: 'Частично' })}
+                              </span>
+                            )
+                          })()
+                        : null}
                       {needsReviewVisitIds?.has(s.id) ? (
                         <span
                           title={t('income.needs_review_tooltip')}
