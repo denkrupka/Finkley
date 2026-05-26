@@ -40,6 +40,42 @@ const INTERNAL_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
 
 const BANK_CATEGORY_NAME = 'Банк (без категории)'
 
+/**
+ * Эвристика для извлечения имени продавца из bank-tx description.
+ * POS-операции PL банков часто содержат имя магазина в верхнем регистре,
+ * за которым следуют место/код/дата:
+ *   "ROSSMANN 21 POZNAN POL 2026-05-22"        → "ROSSMANN 21"
+ *   "LIDL OSTROWSKA Poznan POL 2026-05-22"     → "LIDL OSTROWSKA"
+ *   "PL KFC POZNAN STATOIL POZNAN POL 2026-..." → "PL KFC POZNAN STATOIL"
+ *   "Revolut**3322* Dublin IRL"                 → "Revolut"
+ *   "APPLE.COM/BILL APPLE.COM/BIL IRL"          → "APPLE.COM"
+ * Возвращает null если эвристика не нашла осмысленного имени.
+ */
+function extractCounterpartyFromDescription(description: string): string | null {
+  const text = description.trim()
+  if (!text) return null
+  // Pattern 1: leading UPPERCASE-words (минимум 2 буквы) — PL POS-формат
+  const upper = text.match(/^([A-Z][A-Z0-9.\-]*(?:\s+[A-Z][A-Z0-9.\-]*){0,3})\b/)
+  if (upper && upper[1].length >= 3) {
+    // Cut at common geo-noise tokens (POZNAN, WARSZAWA, POL, IRL, DE, etc.)
+    const cleaned = upper[1]
+      .replace(
+        /\b(POZNAN|POZNA|WARSZAWA|KRAKOW|GDANSK|WROCLAW|LODZ|POL|PL|IRL|DE|US|UK|GB)\b.*$/,
+        '',
+      )
+      .trim()
+    return cleaned.length >= 3 ? cleaned.slice(0, 200) : upper[1].slice(0, 200)
+  }
+  // Pattern 2: домен-like (APPLE.COM, GOOGLE.COM)
+  const domain = text.match(/^([A-Z][A-Z0-9]*\.(?:COM|PL|EU|NET|ORG))/i)
+  if (domain) return domain[1].slice(0, 200)
+  // Pattern 3: первое слово с большой буквы (Revolut, Enea, Spotify) — берём
+  // если длина >= 4 символов, чтобы не цеплять предлоги.
+  const word = text.match(/^([A-ZА-Я][a-zа-я]{3,}(?:\*+[A-Za-z0-9]+)?)/)
+  if (word) return word[1].slice(0, 200)
+  return null
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -314,14 +350,21 @@ async function persistTransactions(
   // Сначала — INSERT bank_transactions с onConflict ignore (через upsert)
   const txRows = booked.map((t) => {
     const { amountCents, type } = parseAmount(t)
+    const description = transactionDescription(t)
+    // Если EB не вернул counterparty явно — пытаемся извлечь имя продавца
+    // из description regex'ом. POS-транзакции PL (ROSSMANN, LIDL OSTROWSKA,
+    // KFC POZNAN STATOIL) обычно начинаются с имени магазина в верхнем
+    // регистре, дальше место/код/дата.
+    const explicit = counterpartyName(t)?.slice(0, 200) ?? null
+    const fromDescription = explicit ? null : extractCounterpartyFromDescription(description)
     return {
       account_id: ctx.accountId,
       external_id: transactionExternalId(t),
       type,
       amount_cents: amountCents,
       currency: t.transaction_amount.currency || ctx.currency,
-      description: transactionDescription(t).slice(0, 500) || null,
-      counterparty: counterpartyName(t)?.slice(0, 200) ?? null,
+      description: description.slice(0, 500) || null,
+      counterparty: explicit ?? fromDescription,
       executed_at: new Date(transactionDate(t)).toISOString(),
       raw: t as unknown as Record<string, unknown>,
     }
