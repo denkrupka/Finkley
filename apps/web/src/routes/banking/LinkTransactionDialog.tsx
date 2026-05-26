@@ -32,6 +32,7 @@ import { IncomePage } from '@/routes/income/IncomePage'
 import { AmountMismatchDialog, type MismatchAction } from './AmountMismatchDialog'
 import { LinkConflictDialog, type ConflictAction } from './LinkConflictDialog'
 import { PartiallyPaidExpenseDialog } from './PartiallyPaidExpenseDialog'
+import { PartiallyPaidIncomeDialog } from './PartiallyPaidIncomeDialog'
 
 type Props = {
   open: boolean
@@ -67,9 +68,12 @@ export function LinkTransactionDialog({
   // Используем для conflict-check (image #45): сущность уже связана с другой tx?
   const { data: bankLinkedAll } = useBankLinkedIncomeIds(salonId)
   const [conflictCtx, setConflictCtx] = useState<{ item: PickerItem } | null>(null)
-  // PartiallyPaid-flow (image #47/#48) — отдельная модалка для частично-оплаченных
-  // расходов с журналом installments + 2/3 опциями привязки.
+  // PartiallyPaid-flow (image #47/#48 + #51) — отдельная модалка для частично-оплаченных
+  // расходов/доходов с журналом installments + 2/3 опциями привязки.
   const [partialCtx, setPartialCtx] = useState<{ expense: ExpenseRow } | null>(null)
+  const [partialIncomeCtx, setPartialIncomeCtx] = useState<
+    { kind: 'visit'; row: VisitRow } | { kind: 'other_income'; row: OtherIncomeRow } | null
+  >(null)
   // Mismatch state — храним выбранную сущность для модалки подтверждения,
   // если сумма tx не совпадает с (остаток к доплате) сущности.
   const [mismatchCtx, setMismatchCtx] = useState<{
@@ -419,16 +423,29 @@ export function LinkTransactionDialog({
     })
   }
   function handlePickVisit(v: VisitRow) {
+    const total = v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0)
+    if (v.paid_amount_cents != null && v.paid_amount_cents > 0 && v.paid_amount_cents < total) {
+      setPartialIncomeCtx({ kind: 'visit', row: v })
+      return
+    }
     handlePick({
       kind: 'visit',
       id: v.id,
       title: v.service_name_snapshot ?? '',
       subtitle: '',
-      amount_cents: v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0),
+      amount_cents: total,
       date: v.visit_at,
     })
   }
   function handlePickOtherIncome(o: OtherIncomeRow) {
+    if (
+      o.paid_amount_cents != null &&
+      o.paid_amount_cents > 0 &&
+      o.paid_amount_cents < o.amount_cents
+    ) {
+      setPartialIncomeCtx({ kind: 'other_income', row: o })
+      return
+    }
     handlePick({
       kind: 'other_income',
       id: o.id,
@@ -487,6 +504,29 @@ export function LinkTransactionDialog({
     />
   ) : null
 
+  const partialIncomeDialog = partialIncomeCtx ? (
+    <PartiallyPaidIncomeDialog
+      open={!!partialIncomeCtx}
+      onOpenChange={(v) => !v && setPartialIncomeCtx(null)}
+      salonId={salonId}
+      entity={partialIncomeCtx}
+      txAmount={transaction.amount_cents}
+      txCurrency={txCurrency}
+      txId={transaction.id}
+      txExecutedAt={transaction.executed_at}
+      onLinked={() => {
+        setPartialIncomeCtx(null)
+        void qc.invalidateQueries({ queryKey: ['visits', salonId] })
+        void qc.invalidateQueries({ queryKey: ['other-incomes', salonId] })
+        void qc.invalidateQueries({ queryKey: ['income-installments'] })
+        void qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+        void qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+        void qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+        onOpenChange(false)
+      }}
+    />
+  ) : null
+
   // Debit: embedded full ExpensesPage в широкой модалке (см. owner-feedback
   // 2026-05-26 — image #10/#11). Юзер видит вкладки Оплачено/Не оплачено,
   // структуру, фильтры — выбирает расход кликом и связывается с tx.
@@ -496,6 +536,7 @@ export function LinkTransactionDialog({
         {mismatchDialog}
         {conflictDialog}
         {partialDialog}
+        {partialIncomeDialog}
         <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
           <DialogHeader>
             <div className="border-border border-b px-5 py-3">

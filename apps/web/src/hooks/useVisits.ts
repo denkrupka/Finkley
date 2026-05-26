@@ -33,6 +33,9 @@ export type VisitRow = {
   cash_register_id: string | null
   /** Для retail-визитов — товар со склада (для финотчёта по категориям). */
   inventory_item_id: string | null
+  /** Image #51: сумма уже полученного по визиту (для частичных поступлений).
+   *  NULL = полностью получено. См. income_payment_installments + trigger. */
+  paid_amount_cents: number | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -151,6 +154,7 @@ export function useCreateVisit(salonId: string | undefined) {
         duration_min: input.duration_min ?? null,
         cash_register_id: input.cash_register_id ?? null,
         inventory_item_id: input.inventory_item_id ?? null,
+        paid_amount_cents: null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

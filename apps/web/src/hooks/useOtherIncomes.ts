@@ -20,6 +20,9 @@ export type OtherIncomeRow = {
   payer_name: string | null
   /** Под-статья (иерархическая детализация). */
   sub_article: string | null
+  /** Image #51: сумма уже полученного (для частичных поступлений).
+   *  NULL = полностью получено. См. income_payment_installments. */
+  paid_amount_cents: number | null
   created_at: string
   updated_at: string
   deleted_at: string | null
