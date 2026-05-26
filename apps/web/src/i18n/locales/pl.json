@@ -2992,7 +2992,7 @@
     "title": "Finanse",
     "subtitle": "P&L, przepływy pieniężne (DDS), faktury do zapłaty.",
     "tabs": {
-      "pnl": "P&L",
+      "pnl": "Raport finansowy",
       "cashflow": "Przepływy",
       "payments": "Do zapłaty",
       "report": "Raport zysku",

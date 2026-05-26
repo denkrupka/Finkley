@@ -2991,7 +2991,7 @@
     "title": "Finance",
     "subtitle": "P&L, cash flow (DDS), upcoming payments.",
     "tabs": {
-      "pnl": "P&L",
+      "pnl": "Financial report",
       "cashflow": "Cash flow",
       "payments": "Payments",
       "report": "Profit report",
