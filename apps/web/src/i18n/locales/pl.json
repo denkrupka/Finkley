@@ -2995,7 +2995,7 @@
       "pnl": "P&L",
       "cashflow": "Przepływy",
       "payments": "Do zapłaty",
-      "report": "Raport finansowy",
+      "report": "Raport zysku",
       "budgets": "Budżety",
       "cash": "Kasy",
       "transfers": "Przelewy"
@@ -3205,8 +3205,8 @@
       "confirm_archive": "Usunąć pozycję z planowanych przychodów? Historia pozostanie w raportach, ale nie pojawi się już w formularzu."
     },
     "report": {
-      "title": "Raport finansowy",
-      "subtitle": "Cash-flow miesięcznie: działalność operacyjna, inwestycyjna, finansowa. Faktyczne z wizyt/wydatków; plan z 'Ustawień'.",
+      "title": "Raport zysku",
+      "subtitle": "P&L miesięcznie: wizyty, sprzedaż, pozostałe przychody i wydatki. Faktyczne z rejestrów; plan z Budżetów w Ustawieniach.",
       "current_balance": "Dostępne środki (obecnie)",
       "col_row": "Parametr",
       "col_total": "Razem rok",
@@ -3234,6 +3234,8 @@
       "end_balance_by_register": "Saldo na koniec miesiąca — według kas",
       "export_csv": "Excel / CSV",
       "print": "Drukuj / PDF",
+      "fullscreen": "Pełny ekran",
+      "exit_fullscreen": "Zwiń",
       "expenses_other": "Pozostałe kategorie"
     }
   },

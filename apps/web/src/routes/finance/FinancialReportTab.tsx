@@ -4,7 +4,8 @@ import {
   ChevronDown,
   ChevronRight,
   FileSpreadsheet,
-  Landmark,
+  Maximize2,
+  Minimize2,
   Printer,
   Wallet,
 } from 'lucide-react'
@@ -223,6 +224,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     }
     return map
   }, [otherIncomes, year])
+
+  // bug 3a000612 — fullscreen toggle для отчёта (юзеру удобнее смотреть
+  // широкую таблицу на весь viewport, без sidebar/header).
+  const [fullscreen, setFullscreen] = useState(false)
 
   // Все группы свёрнуты по умолчанию — пользователь раскрывает только то, что
   // его интересует. Балансовые корневые группы тоже здесь.
@@ -520,12 +525,15 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const visibleMainRows = rows.filter(
     (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
   )
-  const visibleBalanceRows = balanceRows.filter(
-    (row) => !(row.parentGroupKey && collapsed.has(row.parentGroupKey)),
-  )
+  // bug fec22f39 — visibleBalanceRows был для удалённого блока «Баланс».
+  // balanceRows pop'нут в exportCsv ниже, поэтому helper переменную не пишем.
 
   return (
-    <div className="space-y-5">
+    <div
+      className={
+        fullscreen ? 'bg-background fixed inset-0 z-50 space-y-3 overflow-auto p-5' : 'space-y-5'
+      }
+    >
       {/* ===== TOP TOOLBAR ===== */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -535,6 +543,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           <p className="mt-1 text-sm text-slate-500">{t('finance.report.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <Button variant="outline" size="md" onClick={() => setFullscreen((v) => !v)}>
+            {fullscreen ? (
+              <Minimize2 className="size-4" strokeWidth={1.8} />
+            ) : (
+              <Maximize2 className="size-4" strokeWidth={1.8} />
+            )}
+            {fullscreen
+              ? t('finance.report.exit_fullscreen', { defaultValue: 'Свернуть' })
+              : t('finance.report.fullscreen', { defaultValue: 'На весь экран' })}
+          </Button>
           <Button variant="outline" size="md" onClick={exportCsv}>
             <FileSpreadsheet className="size-4" strokeWidth={1.8} />
             {t('finance.report.export_csv')}
@@ -585,21 +603,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             />
           </BlockSection>
 
-          <BlockSection
-            title={t('finance.report.section_balance')}
-            icon={<Landmark className="size-4" strokeWidth={1.8} />}
-          >
-            <ReportTable
-              year={year}
-              months={months}
-              currentMonthIdx={currentMonthIdx}
-              rows={visibleBalanceRows}
-              currency={currency}
-              collapsed={collapsed}
-              onToggle={toggleGroup}
-              t={t}
-            />
-          </BlockSection>
+          {/* bug fec22f39 — блок «Баланс» удалён из «Отчёта по прибыли».
+              Балансы и Cash-flow остаются в отдельном табе ДДС. */}
         </div>
       </div>
     </div>

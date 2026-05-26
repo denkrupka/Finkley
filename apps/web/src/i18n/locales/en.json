@@ -2994,7 +2994,7 @@
       "pnl": "P&L",
       "cashflow": "Cash flow",
       "payments": "Payments",
-      "report": "Financial report",
+      "report": "Profit report",
       "budgets": "Budgets",
       "cash": "Cash",
       "transfers": "Transfers"
@@ -3204,8 +3204,8 @@
       "confirm_archive": "Delete item from planned incomes? History will remain in reports, but it won't appear in the form anymore."
     },
     "report": {
-      "title": "Financial report",
-      "subtitle": "Cash-flow by month: operating, investing, financing activities. Actual taken from visits/expenses; plan from 'Settings'.",
+      "title": "Profit report",
+      "subtitle": "P&L by month: visits, sales, other income and expenses. Actual taken from registries; plan from Budgets in Settings.",
       "current_balance": "Available funds (current)",
       "col_row": "Parameter",
       "col_total": "YTD total",
@@ -3233,6 +3233,8 @@
       "end_balance_by_register": "End-of-month balance — by register",
       "export_csv": "Excel / CSV",
       "print": "Print / PDF",
+      "fullscreen": "Fullscreen",
+      "exit_fullscreen": "Exit fullscreen",
       "expenses_other": "Other categories"
     }
   },
