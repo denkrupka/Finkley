@@ -1,7 +1,8 @@
-import { AlertTriangle, Landmark, Loader2 } from 'lucide-react'
+import { AlertTriangle, Landmark, Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -12,7 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useIncomePaymentInstallments } from '@/hooks/useIncomePaymentInstallments'
+import {
+  incomeInstallmentsKey,
+  useIncomePaymentInstallments,
+} from '@/hooks/useIncomePaymentInstallments'
 import type { OtherIncomeRow } from '@/hooks/useOtherIncomes'
 import type { VisitRow } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
@@ -41,6 +45,7 @@ type Props = {
 export function PartiallyPaidIncomeDialog({
   open,
   onOpenChange,
+  salonId,
   entity,
   txAmount,
   txCurrency,
@@ -56,6 +61,63 @@ export function PartiallyPaidIncomeDialog({
     other_income_id: otherIncomeId,
   })
   const [busy, setBusy] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const qcInstallments = useQueryClient()
+
+  async function deleteInstallment(id: string, bankTxId: string | null) {
+    if (
+      !window.confirm(
+        t('banking.partial_paid.confirm_delete_income', {
+          defaultValue:
+            'Удалить это поступление? Если оно было привязано к банковской транзакции, связь тоже будет снята.',
+        }),
+      )
+    ) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      const { error: delErr } = await supabase
+        .from('income_payment_installments')
+        .delete()
+        .eq('id', id)
+      if (delErr) throw new Error(delErr.message)
+      // Снимаем связь с tx если она была единственной installment от этой tx
+      if (bankTxId) {
+        const remaining = installments.filter(
+          (i) => i.id !== id && i.bank_transaction_id === bankTxId,
+        )
+        if (remaining.length === 0) {
+          const col = visitId ? 'linked_visit_id' : 'linked_other_income_id'
+          const eid = visitId ?? otherIncomeId
+          if (eid) {
+            await supabase
+              .from('bank_transactions')
+              .update({ [col]: null })
+              .eq('id', bankTxId)
+              .eq(col, eid)
+          }
+        }
+      }
+      toast.success(
+        t('banking.partial_paid.deleted_toast_income', {
+          defaultValue: 'Поступление удалено',
+        }),
+      )
+      await qcInstallments.invalidateQueries({
+        queryKey: incomeInstallmentsKey({ visit_id: visitId, other_income_id: otherIncomeId }),
+      })
+      await qcInstallments.invalidateQueries({ queryKey: ['visits', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['other-incomes', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const total =
     entity.kind === 'visit'
@@ -198,7 +260,7 @@ export function PartiallyPaidIncomeDialog({
                 {installments.map((it) => (
                   <li
                     key={it.id}
-                    className="border-border/60 grid grid-cols-[80px_1fr_auto] items-center gap-3 border-t px-3 py-2 text-sm first:border-t-0"
+                    className="border-border/60 grid grid-cols-[80px_1fr_auto_28px] items-center gap-3 border-t px-3 py-2 text-sm first:border-t-0"
                   >
                     <span className="num text-muted-foreground text-xs">
                       {formatExpenseDate(it.paid_at)}
@@ -219,6 +281,21 @@ export function PartiallyPaidIncomeDialog({
                     <span className="num text-foreground text-right text-xs font-bold">
                       {formatCurrency(it.amount_cents, txCurrency)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => deleteInstallment(it.id, it.bank_transaction_id)}
+                      disabled={!!deletingId || !!busy}
+                      className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md disabled:opacity-30"
+                      aria-label={t('banking.partial_paid.delete_aria_income', {
+                        defaultValue: 'Удалить поступление',
+                      })}
+                    >
+                      {deletingId === it.id ? (
+                        <Loader2 className="size-3 animate-spin" strokeWidth={2} />
+                      ) : (
+                        <Trash2 className="size-3.5" strokeWidth={1.7} />
+                      )}
+                    </button>
                   </li>
                 ))}
               </ul>

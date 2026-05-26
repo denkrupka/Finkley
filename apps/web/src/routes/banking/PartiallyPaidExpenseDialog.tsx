@@ -1,7 +1,8 @@
-import { AlertTriangle, Landmark, Loader2 } from 'lucide-react'
+import { AlertTriangle, Landmark, Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -13,7 +14,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { ExpenseRow } from '@/hooks/useExpenses'
-import { useExpensePaymentInstallments } from '@/hooks/useExpensePaymentInstallments'
+import {
+  expenseInstallmentsKey,
+  useExpensePaymentInstallments,
+} from '@/hooks/useExpensePaymentInstallments'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
@@ -50,6 +54,7 @@ type Props = {
 export function PartiallyPaidExpenseDialog({
   open,
   onOpenChange,
+  salonId,
   expense,
   txAmount,
   txCurrency,
@@ -58,8 +63,61 @@ export function PartiallyPaidExpenseDialog({
   onLinked,
 }: Props) {
   const { t } = useTranslation()
+  const qcInstallments = useQueryClient()
   const { data: installments = [] } = useExpensePaymentInstallments(expense.id)
   const [busy, setBusy] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  async function deleteInstallment(id: string, bankTxId: string | null) {
+    if (
+      !window.confirm(
+        t('banking.partial_paid.confirm_delete', {
+          defaultValue:
+            'Удалить эту оплату? Если она была привязана к банковской транзакции, связь тоже будет снята.',
+        }),
+      )
+    ) {
+      return
+    }
+    setDeletingId(id)
+    try {
+      // 1) Удалить installment — trigger пересчитает paid_amount_cents
+      const { error: delErr } = await supabase
+        .from('expense_payment_installments')
+        .delete()
+        .eq('id', id)
+      if (delErr) throw new Error(delErr.message)
+      // 2) Если installment был привязан к bank_tx — снять связь tx → expense.
+      // Делаем только если эта tx больше не упоминается в других installments
+      // этого расхода (т.е. это была единственная installment с этого банка).
+      if (bankTxId) {
+        const remaining = installments.filter(
+          (i) => i.id !== id && i.bank_transaction_id === bankTxId,
+        )
+        if (remaining.length === 0) {
+          await supabase
+            .from('bank_transactions')
+            .update({ expense_id: null })
+            .eq('id', bankTxId)
+            .eq('expense_id', expense.id)
+        }
+      }
+      toast.success(
+        t('banking.partial_paid.deleted_toast', {
+          defaultValue: 'Оплата удалена',
+        }),
+      )
+      await qcInstallments.invalidateQueries({ queryKey: expenseInstallmentsKey(expense.id) })
+      await qcInstallments.invalidateQueries({ queryKey: ['expenses', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+      await qcInstallments.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const alreadyPaid = expense.paid_amount_cents ?? 0
   const remaining = Math.max(0, expense.amount_cents - alreadyPaid)
@@ -187,7 +245,7 @@ export function PartiallyPaidExpenseDialog({
                 {installments.map((it) => (
                   <li
                     key={it.id}
-                    className="border-border/60 grid grid-cols-[80px_1fr_auto] items-center gap-3 border-t px-3 py-2 text-sm first:border-t-0"
+                    className="border-border/60 grid grid-cols-[80px_1fr_auto_28px] items-center gap-3 border-t px-3 py-2 text-sm first:border-t-0"
                   >
                     <span className="num text-muted-foreground text-xs">
                       {formatExpenseDate(it.paid_at)}
@@ -208,6 +266,21 @@ export function PartiallyPaidExpenseDialog({
                     <span className="num text-foreground text-right text-xs font-bold">
                       {formatCurrency(it.amount_cents, txCurrency)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => deleteInstallment(it.id, it.bank_transaction_id)}
+                      disabled={!!deletingId || !!busy}
+                      className="text-muted-foreground hover:text-destructive grid size-7 place-items-center rounded-md disabled:opacity-30"
+                      aria-label={t('banking.partial_paid.delete_aria', {
+                        defaultValue: 'Удалить оплату',
+                      })}
+                    >
+                      {deletingId === it.id ? (
+                        <Loader2 className="size-3 animate-spin" strokeWidth={2} />
+                      ) : (
+                        <Trash2 className="size-3.5" strokeWidth={1.7} />
+                      )}
+                    </button>
                   </li>
                 ))}
               </ul>
