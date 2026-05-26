@@ -58,6 +58,10 @@ import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useCounterparties } from '@/hooks/useCounterparties'
 import {
+  useDeleteExpenseInstallment,
+  useExpensePaymentInstallments,
+} from '@/hooks/useExpensePaymentInstallments'
+import {
   extractDocumentNumber,
   findMatchingCounterpartyId,
 } from '@/lib/banking/extract-document-number'
@@ -1304,6 +1308,21 @@ export function ExpenseFormModal({
             ) : null}
           </div>
 
+          {/* Журнал частичных оплат (edit-mode, расход уже существует и
+              имеет installments). Показываем список «Дата · Сумма · Касса» +
+              кнопку удалить. Создаются автоматом из mismatch-модалки или
+              через чекбокс «Частичная оплата» ниже. owner-feedback 2026-05-26. */}
+          {paid && isEdit && expense ? (
+            <InstallmentsList
+              salonId={salonId}
+              expenseId={expense.id}
+              totalCents={Math.round(Number(form.watch('amount').replace(',', '.')) * 100) || 0}
+              currency={currency}
+              currencySymbol={currencySymbol}
+              t={t}
+            />
+          ) : null}
+
           {/* Чекбокс «частичная оплата». amount = сумма по документу,
               paid_amount = сколько уже оплатили. UI блок появляется только
               если paid=true (для plan-mode нет смысла). */}
@@ -1646,6 +1665,96 @@ function ExpenseBankLinkSection({
           document_number: expense.document_number,
         }}
       />
+    </div>
+  )
+}
+
+/**
+ * Список installments расхода — owner-feedback 2026-05-26: при следующем
+ * открытии частично-оплаченного расхода юзер хочет видеть список «Дата,
+ * Сумма, Чем оплатили» с возможностью удалить запись (откатить оплату) и
+ * добавить следующую частичную оплату.
+ *
+ * Создание новой installment в этом списке-минимум не делаем — юзер
+ * вводит сумму в чекбоксе «Частичная оплата» ниже и сохраняет расход
+ * (старый flow). Из mismatch-модалки installments создаются автоматом.
+ * Когда понадобится UI «доплатить из этой формы» — добавим отдельной
+ * inline-формой здесь.
+ */
+function InstallmentsList({
+  salonId,
+  expenseId,
+  totalCents,
+  currency,
+  currencySymbol,
+  t,
+}: {
+  salonId: string
+  expenseId: string
+  totalCents: number
+  currency: string
+  currencySymbol: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const { data: installments = [] } = useExpensePaymentInstallments(expenseId)
+  const remove = useDeleteExpenseInstallment(salonId)
+  if (installments.length === 0) return null
+  const paidSum = installments.reduce((s, i) => s + i.amount_cents, 0)
+  const remaining = Math.max(0, totalCents - paidSum)
+  return (
+    <div className="border-border flex flex-col gap-2 rounded-md border bg-amber-50/40 p-3">
+      <p className="text-foreground text-xs font-bold uppercase tracking-wider">
+        {t('expenses.form.installments_title', {
+          defaultValue: 'История оплат · оплачено {{paid}} {{symbol}}, осталось {{remaining}}',
+          paid: (paidSum / 100).toFixed(2),
+          symbol: currencySymbol,
+          remaining: (remaining / 100).toFixed(2),
+        })}
+      </p>
+      <ul className="flex flex-col gap-1.5 text-xs">
+        {installments.map((it) => (
+          <li
+            key={it.id}
+            className="border-border/60 bg-card flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+          >
+            <span className="num text-muted-foreground text-[11px]">
+              {new Date(it.paid_at).toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+              })}
+            </span>
+            <span className="num text-foreground flex-1 text-right font-bold">
+              {(it.amount_cents / 100).toFixed(2)} {currency}
+            </span>
+            <span className="text-muted-foreground/80 truncate text-[11px]">
+              {it.bank_transaction_id
+                ? t('expenses.form.installment_via_bank', { defaultValue: 'Банк' })
+                : (it.payment_method ??
+                  it.comment ??
+                  t('expenses.form.installment_unknown', { defaultValue: '—' }))}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  !confirm(
+                    t('expenses.form.installment_confirm_delete', {
+                      defaultValue: 'Удалить эту запись об оплате? Сумма откатится в «остаток».',
+                    }),
+                  )
+                )
+                  return
+                remove.mutate({ id: it.id, expense_id: expenseId })
+              }}
+              className="text-muted-foreground hover:text-destructive text-xs"
+              aria-label="delete-installment"
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -97,7 +97,7 @@ export function LinkTransactionDialog({
     }
     setMismatchBusy(true)
     try {
-      const { item, entityAmount, alreadyPaid } = mismatchCtx
+      const { item, alreadyPaid } = mismatchCtx
       const txAmt = transaction.amount_cents
 
       if (action === 'partial') {
@@ -105,11 +105,16 @@ export function LinkTransactionDialog({
         // Для visit/other_income частичная оплата как концепт не моделируется
         // (см. ADR-024 — partial paid live only on expense). Линкуем как есть.
         if (item.kind === 'expense') {
-          const newPaid = Math.min(entityAmount, alreadyPaid + txAmt)
-          const { error } = await supabase
-            .from('expenses')
-            .update({ paid_amount_cents: newPaid })
-            .eq('id', item.id)
+          // Создаём installment-запись (триггер сам пересчитает
+          // expenses.paid_amount_cents через recalc_expense_paid_amount).
+          const { error } = await supabase.from('expense_payment_installments').insert({
+            expense_id: item.id,
+            paid_at: transaction.executed_at,
+            amount_cents: txAmt,
+            bank_transaction_id: transaction.id,
+            payment_method: 'transfer',
+            comment: transaction.description ?? null,
+          })
           if (error) throw new Error(error.message)
         }
       } else if (action === 'adjust_amount') {
