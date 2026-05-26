@@ -178,20 +178,64 @@ export function BankingTransactionsTable({
   async function handleExtractCounterparties() {
     setExtracting(true)
     try {
+      // Шаг 1: regex-эвристика (быстро, дёшево)
       const { data, error } = await supabase.rpc('extract_bank_tx_counterparty', {
         p_salon_id: salonId,
       })
       if (error) throw new Error(error.message)
       const row = Array.isArray(data) ? data[0] : data
-      const updated = (row as { updated_count?: number })?.updated_count ?? 0
-      const total = (row as { total_with_null?: number })?.total_with_null ?? 0
+      const regexUpdated = (row as { updated_count?: number })?.updated_count ?? 0
+      const totalWithNull = (row as { total_with_null?: number })?.total_with_null ?? 0
+
+      // Шаг 2: Groq AI fallback для оставшихся (где regex не нашёл)
+      // вызывается итеративно по 50 tx пока есть что обрабатывать или
+      // пока не упрётся в 5 итераций (защита от бесконечного цикла).
+      let aiUpdated = 0
+      let aiProcessed = 0
+      try {
+        const { data: sessData } = await supabase.auth.getSession()
+        const token = sessData.session?.access_token
+        if (token) {
+          const fnUrl =
+            (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '') +
+            '/functions/v1/extract-counterparty-ai'
+          for (let i = 0; i < 5; i++) {
+            const res = await fetch(fnUrl, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ salon_id: salonId }),
+            })
+            if (!res.ok) break
+            const json = (await res.json()) as {
+              processed?: number
+              updated?: number
+              total_remaining?: number
+            }
+            aiProcessed += json.processed ?? 0
+            aiUpdated += json.updated ?? 0
+            // Если ничего не осталось или ничего не обновили — стоп
+            if (!json.processed || json.processed === 0) break
+            if ((json.total_remaining ?? 0) === 0) break
+          }
+        }
+      } catch {
+        // AI-шаг опционален, если упадёт — показываем только regex-результат
+      }
+
+      const updated = regexUpdated + aiUpdated
       toast.success(
-        t('banking.transactions.extract_done', {
-          defaultValue: 'Извлечено {{updated}} из {{total}} контрагентов',
+        t('banking.transactions.extract_done_with_ai', {
+          defaultValue: 'Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})',
           updated,
-          total,
+          total: totalWithNull,
+          regex: regexUpdated,
+          ai: aiUpdated,
         }),
       )
+      void aiProcessed
       await qcRoot.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
       await qcRoot.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
     } catch (e) {

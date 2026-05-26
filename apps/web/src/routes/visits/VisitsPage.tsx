@@ -302,7 +302,14 @@ export function VisitsPage({
                               group={row}
                               isExpanded={expandedGroups.has(row.key)}
                               onToggle={() => toggleGroup(row.key)}
-                              onEdit={(v) => (isPickerMode ? onPickVisit?.(v) : setEditingVisit(v))}
+                              onEdit={(v) => {
+                                if (multiSelectMode) {
+                                  onToggleVisitSelection?.(v)
+                                  return
+                                }
+                                if (isPickerMode) onPickVisit?.(v)
+                                else setEditingVisit(v)
+                              }}
                               onDelete={(id) => {
                                 if (!confirm(t('visits.confirm_delete'))) return
                                 deleteVisit.mutate(id, {
@@ -315,6 +322,9 @@ export function VisitsPage({
                               currency={currency}
                               linkedVisitIds={linkedVisitIds}
                               needsReviewVisitIds={needsReviewVisitIds}
+                              multiSelectMode={multiSelectMode}
+                              selectedVisitIds={selectedVisitIds}
+                              onToggleVisitSelection={onToggleVisitSelection}
                               t={t}
                             />
                           )
@@ -582,6 +592,9 @@ function GroupRow({
   currency,
   linkedVisitIds,
   needsReviewVisitIds,
+  multiSelectMode = false,
+  selectedVisitIds,
+  onToggleVisitSelection,
   t,
 }: {
   group: { key: string; visits: VisitRow[] }
@@ -595,6 +608,9 @@ function GroupRow({
   currency: string
   linkedVisitIds: Set<string> | null
   needsReviewVisitIds: Set<string> | null
+  multiSelectMode?: boolean
+  selectedVisitIds?: Set<string>
+  onToggleVisitSelection?: (v: VisitRow) => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const visits = group.visits
@@ -622,18 +638,52 @@ function GroupRow({
     uniqueStaff.push({ id: v.staff_id, name: member?.full_name ?? t('visits.no_staff') })
   }
 
+  // Multi-select: чекбокс показывает aggregate-состояние выбора группы.
+  const allSelected =
+    multiSelectMode && selectedVisitIds != null && visits.every((v) => selectedVisitIds.has(v.id))
+  const someSelected =
+    multiSelectMode &&
+    selectedVisitIds != null &&
+    !allSelected &&
+    visits.some((v) => selectedVisitIds.has(v.id))
+  function toggleGroupSelection() {
+    if (!onToggleVisitSelection) return
+    if (allSelected) {
+      // Снять выбор со всех (toggle для каждой)
+      for (const v of visits) onToggleVisitSelection(v)
+    } else {
+      // Выбрать всё что ещё не выбрано
+      for (const v of visits) {
+        if (!selectedVisitIds?.has(v.id)) onToggleVisitSelection(v)
+      }
+    }
+  }
+
   return (
     <>
       <li
         className={cn(
           'border-border hover:bg-muted/30 cursor-pointer border-t first:border-t-0',
           ROW_GRID,
+          allSelected ? 'bg-brand-teal-soft/30' : someSelected ? 'bg-brand-teal-soft/15' : '',
         )}
-        onClick={onToggle}
+        onClick={multiSelectMode ? toggleGroupSelection : onToggle}
         data-testid="visit-group-row"
       >
         <span className="num text-muted-foreground flex items-center gap-1 text-xs">
-          {isExpanded ? (
+          {multiSelectMode ? (
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected
+              }}
+              onChange={toggleGroupSelection}
+              onClick={(e) => e.stopPropagation()}
+              className="size-3.5 cursor-pointer"
+              aria-label="select-group"
+            />
+          ) : isExpanded ? (
             <ChevronDown className="size-3.5" strokeWidth={2} />
           ) : (
             <ChevronRight className="size-3.5" strokeWidth={2} />
