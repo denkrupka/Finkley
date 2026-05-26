@@ -23,10 +23,14 @@ import {
 } from '@/hooks/useFinancialSettings'
 import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
 import { useInventoryItems } from '@/hooks/useInventory'
-import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
+import {
+  effectiveReceivedFromOtherIncome,
+  useOtherIncomeCategories,
+  useOtherIncomes,
+} from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
 import { useScheduledPayments } from '@/hooks/useScheduledPayments'
-import { useVisits } from '@/hooks/useVisits'
+import { effectiveReceivedFromVisit, useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 type RowColor = 'navy' | 'sage' | 'destructive' | 'muted' | 'teal'
@@ -87,23 +91,25 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       const d = new Date(v.visit_at)
       if (d.getFullYear() !== year) continue
       const m = d.getMonth()
-      const amt = v.amount_cents - v.discount_cents + v.tip_cents
-      plan[m]!.visitsRevenue += amt
-      if (v.status === 'paid') fact[m]!.visitsRevenue += amt
+      // Plan = полная сумма (что должно прийти), Fact = effective (учёт
+      // частичных поступлений через paid_amount_cents).
+      const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
+      plan[m]!.visitsRevenue += planAmt
+      if (v.status === 'paid') fact[m]!.visitsRevenue += effectiveReceivedFromVisit(v)
     }
     for (const v of retailSales) {
       const d = new Date(v.visit_at)
       if (d.getFullYear() !== year) continue
       const m = d.getMonth()
-      const amt = v.amount_cents - v.discount_cents + v.tip_cents
-      plan[m]!.retailRevenue += amt
-      if (v.status === 'paid') fact[m]!.retailRevenue += amt
+      const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
+      plan[m]!.retailRevenue += planAmt
+      if (v.status === 'paid') fact[m]!.retailRevenue += effectiveReceivedFromVisit(v)
     }
     for (const oi of otherIncomes) {
       const d = new Date(oi.income_at)
       if (d.getFullYear() !== year) continue
       plan[d.getMonth()]!.otherIncome += oi.amount_cents
-      fact[d.getMonth()]!.otherIncome += oi.amount_cents
+      fact[d.getMonth()]!.otherIncome += effectiveReceivedFromOtherIncome(oi)
     }
     for (const e of expenses) {
       const d = new Date(e.expense_at)
@@ -188,7 +194,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       }
       const key = cat.trim() || t('finance.report.uncategorized')
       const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
-      arr[d.getMonth()]! += v.amount_cents - v.discount_cents + v.tip_cents
+      arr[d.getMonth()]! += effectiveReceivedFromVisit(v)
       map.set(key, arr)
     }
     return map
@@ -201,7 +207,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       if (d.getFullYear() !== year) continue
       const key = oi.category_id ?? '__none__'
       const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
-      arr[d.getMonth()]! += oi.amount_cents
+      arr[d.getMonth()]! += effectiveReceivedFromOtherIncome(oi)
       map.set(key, arr)
     }
     return map

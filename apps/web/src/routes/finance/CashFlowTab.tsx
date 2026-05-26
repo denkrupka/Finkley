@@ -25,10 +25,14 @@ import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { useCashFlowDaily } from '@/hooks/useCashFlow'
 import { useClients } from '@/hooks/useClients'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
-import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
+import {
+  effectiveReceivedFromOtherIncome,
+  useOtherIncomeCategories,
+  useOtherIncomes,
+} from '@/hooks/useOtherIncomes'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
-import { useVisits, type VisitRow } from '@/hooks/useVisits'
+import { effectiveReceivedFromVisit, useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
@@ -122,7 +126,9 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
       // рассчитаны) не учитываются — попадут когда юзер их «Рассчитает».
       if (v.status !== 'paid') continue
       const day = v.visit_at.slice(0, 10)
-      const amt = v.amount_cents - v.discount_cents + v.tip_cents
+      // effectiveReceivedFromVisit учитывает частичные поступления
+      // (paid_amount_cents) — миграция 20260526160000 (image #51).
+      const amt = effectiveReceivedFromVisit(v)
       if (amt === 0) continue
       const staffName = staff.find((s) => s.id === v.staff_id)?.full_name ?? null
       const client = clients.find((c) => c.id === v.client_id)
@@ -151,7 +157,7 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         day,
         kind: 'inflow',
         source: 'other_income',
-        amountCents: oi.amount_cents,
+        amountCents: effectiveReceivedFromOtherIncome(oi),
         article: `Прочий доход · ${cat}${sub}`,
         counterparty: oi.payer_name ?? null,
         paymentMethod: (oi.payment_method as PaymentMethod) ?? null,
