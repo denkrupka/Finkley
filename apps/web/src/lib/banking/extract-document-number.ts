@@ -54,14 +54,20 @@ export function extractDocumentNumber(description: string | null | undefined): s
  * → match.
  */
 export function normalizeCounterpartyName(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/\bsp(ó|o)łka\b/gi, '')
-    .replace(/\bs\.?\s*p\.?\s*z\.?\s*o\.?\s*o\.?\b/gi, '')
-    .replace(/\bsp\s*z\s*o\.?o\.?/gi, '')
-    .replace(/\bsa\b|\bs\.a\.\b/gi, '')
-    .replace(/[\s.,]+/g, '')
-    .trim()
+  return (
+    raw
+      .toLowerCase()
+      .replace(/\bsp(ó|o)łka\b/gi, '')
+      // "sp. z o.o." / "sp z oo" — полная форма
+      .replace(/\bs\.?\s*p\.?\s*z\.?\s*o\.?\s*o\.?/gi, '')
+      .replace(/\bsp\s*z\s*o\.?o\.?/gi, '')
+      // Остаток «z o.o.» после удаления spółka — тоже выкидываем
+      .replace(/\bz\s*o\.?\s*o\.?/gi, '')
+      // S.A. / SA — польская spółka akcyjna
+      .replace(/\bs\.?\s*a\.?(?=\s|$|\W)/gi, '')
+      .replace(/[\s.,]+/g, '')
+      .trim()
+  )
 }
 
 export function findMatchingCounterpartyId(
