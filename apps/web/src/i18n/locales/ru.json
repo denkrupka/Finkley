@@ -910,7 +910,14 @@
       "extract_counterparties": "Извлечь контрагентов",
       "extract_hint": "Извлечь контрагентов из назначений для транзакций где колонка пустая (regex + AI)",
       "extract_done": "Извлечено {{updated}} из {{total}} контрагентов",
-      "extract_done_with_ai": "Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})"
+      "extract_done_with_ai": "Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})",
+      "extract_progress_regex": "regex…",
+      "extract_progress_regex_done": "regex {{n}}/{{total}} · AI…",
+      "extract_progress_ai": "regex {{r}} · AI {{ai}} · осталось {{left}}",
+      "extract_ai_failed": "{{reason}}. {{n}} транзакций остались без контрагента.",
+      "extract_ai_not_configured": "AI не подключён (GROQ_API_KEY не задан в secrets)",
+      "extract_ai_network": "AI недоступен (сетевая ошибка)",
+      "extract_ai_http": "AI вернул ошибку"
     },
     "link_dialog": {
       "title_debit": "Связать с расходом",

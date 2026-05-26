@@ -4105,7 +4105,14 @@
       "extract_counterparties": "Wyodrębnij kontrahentów",
       "extract_hint": "Wyodrębnij nazwy kontrahentów z opisów dla transakcji bez wpisu (regex + AI)",
       "extract_done": "Wyodrębniono {{updated}} z {{total}} kontrahentów",
-      "extract_done_with_ai": "Wyodrębniono {{updated}} z {{total}} (regex: {{regex}}, AI: {{ai}})"
+      "extract_done_with_ai": "Wyodrębniono {{updated}} z {{total}} (regex: {{regex}}, AI: {{ai}})",
+      "extract_progress_regex": "regex…",
+      "extract_progress_regex_done": "regex {{n}}/{{total}} · AI…",
+      "extract_progress_ai": "regex {{r}} · AI {{ai}} · pozostało {{left}}",
+      "extract_ai_failed": "{{reason}}. {{n}} transakcji bez kontrahenta.",
+      "extract_ai_not_configured": "AI nie włączony (brak GROQ_API_KEY w secrets)",
+      "extract_ai_network": "AI niedostępny (błąd sieci)",
+      "extract_ai_http": "AI zwrócił błąd"
     },
     "link_dialog": {
       "title_debit": "Powiąż z wydatkiem",

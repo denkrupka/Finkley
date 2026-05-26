@@ -4104,7 +4104,14 @@
       "extract_counterparties": "Extract counterparties",
       "extract_hint": "Extract counterparty names from descriptions for transactions where the column is empty (regex + AI)",
       "extract_done": "Extracted {{updated}} of {{total}} counterparties",
-      "extract_done_with_ai": "Extracted {{updated}} of {{total}} (regex: {{regex}}, AI: {{ai}})"
+      "extract_done_with_ai": "Extracted {{updated}} of {{total}} (regex: {{regex}}, AI: {{ai}})",
+      "extract_progress_regex": "regex…",
+      "extract_progress_regex_done": "regex {{n}}/{{total}} · AI…",
+      "extract_progress_ai": "regex {{r}} · AI {{ai}} · {{left}} left",
+      "extract_ai_failed": "{{reason}}. {{n}} transactions still without counterparty.",
+      "extract_ai_not_configured": "AI not enabled (GROQ_API_KEY missing in secrets)",
+      "extract_ai_network": "AI unavailable (network error)",
+      "extract_ai_http": "AI returned an error"
     },
     "link_dialog": {
       "title_debit": "Link to expense",
