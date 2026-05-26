@@ -539,6 +539,15 @@ create table public.bank_transactions (
 alter table expenses
   add column bank_transaction_id uuid references bank_transactions(id) on delete set null,
   add column paid_amount_cents bigint;          -- частичные оплаты
+
+-- IBAN для bulk-экспорта переводов (миграция 20260526002416, см. ADR-025)
+alter table counterparties
+  add column bank_account_iban text;            -- единый счёт контрагента
+alter table scheduled_payments
+  add column bank_account_iban text,            -- IBAN получателя для bulk
+  add column counterparty_id uuid references counterparties(id) on delete set null;
+alter table expenses
+  add column bank_account_iban text;            -- OCR/KSeF auto-fill
 ```
 
 RLS на всех трёх таблицах:

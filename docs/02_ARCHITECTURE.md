@@ -207,8 +207,26 @@ Owner салона подключает свои банковские счета
   (Landmark) и `AlertTriangle` (needs_review) в списках.
 - **Частичные оплаты**: `expenses.paid_amount_cents` + чекбокс в форме +
   trigger авто-пересчёта при привязке tx.
+- **Bulk-export переводов** (см. ADR-025): на /expenses → «Не оплачено»
+  юзер выделяет чекбоксами scheduled_payments → модалка `BankExportDialog`
+  → файл SEPA XML (pain.001.001.03) или Elixir-O для PL банков →
+  загружается в банк-клиент. IBAN получателя берётся из
+  `scheduled_payments.bank_account_iban` (auto-fill из counterparty
+  при выборе) либо вручную в форме платежа.
+- **IBAN на сущностях** (см. ADR-025): `counterparties.bank_account_iban`
+  единый для контрагента; `scheduled_payments.bank_account_iban` +
+  `counterparty_id` (FK); `expenses.bank_account_iban` для случая
+  оплаченных переводом. Auto-fill из OCR (Claude Haiku 4.5 vision) и
+  KSeF (`<NrRBPL>`/`<NrRB>` из FA(2) XML). Cross-fill: при выборе
+  counterparty → подставка IBAN; confirm-prompt при новом значении →
+  сохранение в карточке контрагента.
+- **Embed-страницы в Link-модалки**: связывание tx ↔ сущность открывает
+  полноценную ExpensesPage / IncomePage / BankingTransactionsTable в
+  широкой модалке (1100px) с привычными вкладками/фильтрами/структурой
+  — а не мини-пикер.
 
-ADR: [`decisions/024-banking-enable-banking-psd2.md`](../decisions/024-banking-enable-banking-psd2.md)
+ADR: [`decisions/024-banking-enable-banking-psd2.md`](../decisions/024-banking-enable-banking-psd2.md),
+[`decisions/025-banking-bulk-export-and-iban-flow.md`](../decisions/025-banking-bulk-export-and-iban-flow.md)
 
 ## Слои безопасности
 
