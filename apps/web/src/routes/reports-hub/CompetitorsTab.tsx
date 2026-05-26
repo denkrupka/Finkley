@@ -1,5 +1,4 @@
 import {
-  BarChart2,
   Check,
   DollarSign,
   Eye,
@@ -53,11 +52,13 @@ import { useServices } from '@/hooks/useServices'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
-type CompetitorsSubTab = 'prices' | 'occupancy' | 'rating' | 'content' | 'params'
+// bug 20106e42 — sub-tab «Загруженность» (occupancy) удалён по решению
+// владельца (данные/кроны не нужны). Тип/массив SUB_TABS оставили без
+// 'occupancy'; legacy URL с ?sub=occupancy редиректит на 'rating'.
+type CompetitorsSubTab = 'prices' | 'rating' | 'content' | 'params'
 
 const SUB_TABS: PageTab<CompetitorsSubTab>[] = [
   { id: 'prices', labelKey: 'reports_hub.competitors.tabs.prices', icon: DollarSign },
-  { id: 'occupancy', labelKey: 'reports_hub.competitors.tabs.occupancy', icon: BarChart2 },
   { id: 'rating', labelKey: 'reports_hub.competitors.tabs.rating', icon: Star },
   { id: 'content', labelKey: 'reports_hub.competitors.tabs.content', icon: ImageIcon },
   { id: 'params', labelKey: 'reports_hub.competitors.tabs.params', icon: SettingsIcon },
@@ -77,9 +78,7 @@ export function CompetitorsTab({ salonId }: { salonId: string }) {
   // Дефолт «Рейтинг» — там сразу видны данные.
   const subParam = params.get('sub') as CompetitorsSubTab | null
   const sub: CompetitorsSubTab =
-    subParam && ['prices', 'occupancy', 'rating', 'content', 'params'].includes(subParam)
-      ? subParam
-      : 'rating'
+    subParam && ['prices', 'rating', 'content', 'params'].includes(subParam) ? subParam : 'rating'
   function setSub(next: CompetitorsSubTab) {
     const p = new URLSearchParams(params)
     p.set('sub', next)

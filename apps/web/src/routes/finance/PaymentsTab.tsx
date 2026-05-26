@@ -27,6 +27,12 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { getDateLocale } from '@/lib/utils/format-date'
 import {
   useDeleteScheduledPayment,
@@ -148,12 +154,19 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
     | null
   >(null)
 
+  // bug 486d7295 — выбор периода в шапке. По умолчанию — текущий месяц
+  // (поведение совпадает с предыдущей версией где «этот месяц» был хардкодом).
+  const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
+  const periodRange = useMemo(() => periodToRange(period), [period])
+
   const now = useMemo(() => new Date(), [])
   const todayStr = useMemo(() => format(now, 'yyyy-MM-dd'), [now])
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now])
   const weekEnd = useMemo(() => endOfWeek(now, { weekStartsOn: 1 }), [now])
-  const monthStartNow = useMemo(() => startOfMonth(now), [now])
-  const monthEndNow = useMemo(() => endOfMonth(now), [now])
+  // Период «этого месяца» больше не равен реальному текущему месяцу — берём
+  // из выбранного period в PeriodPickerPopover (для статистики/карточек).
+  const monthStartNow = periodRange.start
+  const monthEndNow = periodRange.end
 
   // Курсор месяца календаря (Date — первое число месяца).
   const [monthCursor, setMonthCursor] = useState<Date>(() => startOfMonth(now))
@@ -246,14 +259,18 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">{t('finance.payments.subtitle')}</p>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setModal({ mode: 'planned-new', date: todayStr })}
-        >
-          <Plus className="size-4" strokeWidth={2.4} />
-          {t('finance.payments.add_button')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* bug 486d7295 — period picker для статистических карточек */}
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setModal({ mode: 'planned-new', date: todayStr })}
+          >
+            <Plus className="size-4" strokeWidth={2.4} />
+            {t('finance.payments.add_button')}
+          </Button>
+        </div>
       </div>
 
       {/* Metric cards: Просрочено / На этой неделе / Этот месяц / Оплачено */}
