@@ -114,7 +114,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     for (const e of expenses) {
       const d = new Date(e.expense_at)
       if (d.getFullYear() !== year) continue
-      plan[d.getMonth()]!.expensesTotal += e.amount_cents
+      // bug e007ea97/7a84bd6f — fact-колонка считается из реестра расходов
+      // (e.amount_cents). Plan на этой строке НЕ инкрементируем: для plan
+      // используются scheduled_payments (запланированные) + items из
+      // settings.fixed/variable/taxes (см. ниже buildFixedRows и т.д.).
       fact[d.getMonth()]!.expensesTotal += e.amount_cents
     }
     for (const sp of scheduledPayments) {
@@ -123,8 +126,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       if (d.getFullYear() !== year) continue
       plan[d.getMonth()]!.expensesTotal += sp.amount_cents
     }
+    // bug c19e8ab6 — план должен также включать постоянные статьи бюджета
+    // (settings.fixed/variable/taxes) — это «ожидаемые ежемесячные расходы».
+    const monthlyBudgetCents = sumFixedCents(settings) + sumTaxesCents(settings)
+    if (monthlyBudgetCents > 0) {
+      for (let m = 0; m < 12; m++) {
+        plan[m]!.expensesTotal += monthlyBudgetCents
+      }
+    }
     return { plan, fact }
-  }, [visits, retailSales, otherIncomes, expenses, scheduledPayments, year])
+  }, [visits, retailSales, otherIncomes, expenses, scheduledPayments, year, settings])
 
   const factByLabel = useMemo<Map<string, number[]>>(() => {
     const catNameById = new Map<string, string>()
@@ -403,13 +414,16 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     })),
 
     // «Прочие категории» — expense_categories из БД, которых нет в
-    // settings.fixed/variable/taxes. Без них custom-категории были не
-    // видны в раскрытии расходов (фикс по запросу image #57).
+    // settings.fixed/variable/taxes. Bug e007ea97: эти строки рисовались
+    // в plan-колонке, fact-колонка оставалась пустой → юзер видел расход
+    // на аренду в реестре, но не видел его в «Факт» отчёта. Теперь:
+    // values (план) = нули, factValues = реальные расходы.
     ...(otherExpenseCategories.length > 0
       ? [
           {
             label: t('finance.report.expenses_other'),
-            values: otherExpenseCategories.reduce(
+            values: Array.from({ length: 12 }, () => 0),
+            factValues: otherExpenseCategories.reduce(
               (acc: number[], cat) => acc.map((v, i) => v - (cat.values[i] ?? 0)),
               Array.from({ length: 12 }, () => 0),
             ),
@@ -421,7 +435,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           },
           ...otherExpenseCategories.map((cat) => ({
             label: cat.label,
-            values: cat.values.map((v) => -v),
+            values: Array.from({ length: 12 }, () => 0),
+            factValues: cat.values.map((v) => -v),
             indent: 2,
             parentGroupKey: 'expenses_other',
           })),
