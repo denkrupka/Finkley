@@ -13,7 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useLinkBankTransaction, type BankInflowRow, type BankOutflowRow } from '@/hooks/useBanking'
+import {
+  useLinkBankTransaction,
+  useMultiLinkBankTransaction,
+  type BankInflowRow,
+  type BankOutflowRow,
+} from '@/hooks/useBanking'
 import { type ExpenseRow } from '@/hooks/useExpenses'
 import { type OtherIncomeRow } from '@/hooks/useOtherIncomes'
 import { type VisitRow } from '@/hooks/useVisits'
@@ -55,6 +60,7 @@ export function LinkTransactionDialog({
   const { t } = useTranslation()
   const qc = useQueryClient()
   const link = useLinkBankTransaction(salonId)
+  const multiLink = useMultiLinkBankTransaction(salonId)
   // Mismatch state — храним выбранную сущность для модалки подтверждения,
   // если сумма tx не совпадает с (остаток к доплате) сущности.
   const [mismatchCtx, setMismatchCtx] = useState<{
@@ -63,6 +69,47 @@ export function LinkTransactionDialog({
     alreadyPaid: number
   } | null>(null)
   const [mismatchBusy, setMismatchBusy] = useState(false)
+
+  // Multi-select state — для multi-link (одна tx → N expense).
+  // Toggle включается кнопкой «Выбрать несколько»; чекбоксы появляются в
+  // ExpensesPage. Submit делает useMultiLinkBankTransaction.
+  const [multiMode, setMultiMode] = useState(false)
+  const [selectedExpenses, setSelectedExpenses] = useState<Map<string, ExpenseRow>>(new Map())
+  const selectedSum = Array.from(selectedExpenses.values()).reduce(
+    (s, e) => s + (e.amount_cents - (e.paid_amount_cents ?? 0)),
+    0,
+  )
+  function toggleExpense(e: ExpenseRow) {
+    setSelectedExpenses((prev) => {
+      const next = new Map(prev)
+      if (next.has(e.id)) next.delete(e.id)
+      else next.set(e.id, e)
+      return next
+    })
+  }
+  function handleMultiSubmit() {
+    if (selectedExpenses.size === 0) return
+    const splits = Array.from(selectedExpenses.values()).map((e) => ({
+      kind: 'expense' as const,
+      entityId: e.id,
+      amountCents: e.amount_cents - (e.paid_amount_cents ?? 0),
+    }))
+    multiLink.mutate(
+      { transactionId: transaction.id, splits, clearNeedsReview: true },
+      {
+        onSuccess: () => {
+          toast.success(
+            t('banking.link_dialog.multi_linked_toast', {
+              defaultValue: 'Связано с {{count}} расходами',
+              count: splits.length,
+            }),
+          )
+          onOpenChange(false)
+        },
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+  }
 
   const txCurrency = transaction.currency || 'PLN'
 
@@ -279,9 +326,38 @@ export function LinkTransactionDialog({
               pickerSalonId={salonId}
               hideBankingTab
               highlightExpenseId={transaction.expense_id ?? null}
-              onPickExpense={handlePickExpense}
+              onPickExpense={multiMode ? undefined : handlePickExpense}
+              multiSelectMode={multiMode}
+              selectedExpenseIds={new Set(selectedExpenses.keys())}
+              onToggleExpenseSelection={toggleExpense}
             />
           </div>
+
+          {multiMode && selectedExpenses.size > 0 ? (
+            <div className="border-border bg-muted/40 flex items-center justify-between gap-3 border-t px-5 py-2 text-xs">
+              <span className="text-foreground font-semibold">
+                {t('banking.link_dialog.multi_selected', {
+                  defaultValue: 'Выбрано {{n}} · сумма {{sum}} → tx {{tx}}',
+                  n: selectedExpenses.size,
+                  sum: formatCurrency(selectedSum, txCurrency),
+                  tx: formatCurrency(transaction.amount_cents, txCurrency),
+                })}
+              </span>
+              {selectedSum !== transaction.amount_cents ? (
+                <span className="text-[11px] text-amber-700">
+                  {selectedSum < transaction.amount_cents
+                    ? t('banking.link_dialog.multi_under', {
+                        defaultValue: 'не хватает {{d}}',
+                        d: formatCurrency(transaction.amount_cents - selectedSum, txCurrency),
+                      })
+                    : t('banking.link_dialog.multi_over', {
+                        defaultValue: 'превышает на {{d}}',
+                        d: formatCurrency(selectedSum - transaction.amount_cents, txCurrency),
+                      })}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           <DialogFooter className="border-border flex items-center justify-between gap-2 border-t px-5 py-3 sm:justify-between">
             {hasExistingLink ? (
@@ -299,7 +375,33 @@ export function LinkTransactionDialog({
               <span />
             )}
             <div className="flex items-center gap-2">
-              {onCreateExpenseFromTx ? (
+              <Button
+                variant={multiMode ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setMultiMode((v) => !v)
+                  setSelectedExpenses(new Map())
+                }}
+              >
+                {multiMode
+                  ? t('banking.link_dialog.multi_cancel', { defaultValue: 'Одиночный выбор' })
+                  : t('banking.link_dialog.multi_start', { defaultValue: 'Выбрать несколько' })}
+              </Button>
+              {multiMode && selectedExpenses.size > 0 ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleMultiSubmit}
+                  disabled={multiLink.isPending}
+                >
+                  <Link2 className="size-3.5" strokeWidth={2} />
+                  {t('banking.link_dialog.multi_submit', {
+                    defaultValue: 'Связать ({{n}})',
+                    n: selectedExpenses.size,
+                  })}
+                </Button>
+              ) : null}
+              {onCreateExpenseFromTx && !multiMode ? (
                 <Button variant="secondary" size="sm" onClick={onCreateExpenseFromTx}>
                   <Plus className="size-3.5" strokeWidth={2.4} />
                   {t('banking.link_dialog.create_new_expense', {

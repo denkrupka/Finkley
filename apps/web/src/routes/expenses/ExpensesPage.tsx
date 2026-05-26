@@ -104,6 +104,10 @@ type ExpensesPageProps = {
   /** ID расхода с которым уже связана транзакция — подсвечиваем зелёным
    *  в picker-режиме, чтобы юзер видел текущую связь. */
   highlightExpenseId?: string | null
+  /** Multi-select для multi-link: чекбокс в строке + tracking выбранных. */
+  multiSelectMode?: boolean
+  selectedExpenseIds?: Set<string>
+  onToggleExpenseSelection?: (e: ExpenseRow) => void
 }
 
 export function ExpensesPage({
@@ -112,6 +116,9 @@ export function ExpensesPage({
   onPickExpense,
   hideBankingTab = false,
   highlightExpenseId = null,
+  multiSelectMode = false,
+  selectedExpenseIds,
+  onToggleExpenseSelection,
 }: ExpensesPageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
@@ -777,10 +784,15 @@ export function ExpensesPage({
                     idx >= 0
                       ? (CATEGORY_COLORS[idx % CATEGORY_COLORS.length] ?? '#9A9A9A')
                       : '#9A9A9A'
+                  const isChecked = selectedExpenseIds?.has(e.id) ?? false
                   return (
                     <li
                       key={e.id}
                       onClick={() => {
+                        if (multiSelectMode) {
+                          onToggleExpenseSelection?.(e)
+                          return
+                        }
                         if (isPickerMode) {
                           onPickExpense?.(e)
                           return
@@ -792,14 +804,28 @@ export function ExpensesPage({
                         setEditingExpense(e)
                       }}
                       className={cn(
-                        'border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0',
+                        'border-border hover:bg-muted/30 grid cursor-pointer items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0',
+                        multiSelectMode
+                          ? 'grid-cols-[24px_60px_1fr_auto_auto]'
+                          : 'grid-cols-[60px_1fr_auto_auto]',
                         highlightExpenseId === e.id
                           ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
                           : '',
+                        isChecked ? 'bg-brand-teal-soft/30' : '',
                       )}
                       style={{ borderLeftWidth: 3, borderLeftColor: color }}
                       data-testid="expense-row"
                     >
+                      {multiSelectMode ? (
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => onToggleExpenseSelection?.(e)}
+                          onClick={(ev) => ev.stopPropagation()}
+                          className="size-4 cursor-pointer"
+                          aria-label="select-expense"
+                        />
+                      ) : null}
                       <span className="num text-muted-foreground text-xs">
                         {formatExpenseDate(e.expense_at)}
                       </span>
