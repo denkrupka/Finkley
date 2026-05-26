@@ -15,12 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { bootstrap, shouldSkip, teardown, type Ctx } from './_helpers'
 
-// FIXME(2026-05-26): миграция 20260526160000 ещё не применена на staging —
-// тесты упадут с «table not in schema cache». После прохождения
-// deploy-supabase.yml снять .skip.
-describe.skip('income_payment_installments + trigger', () => {
-  // dummy reference чтобы TS не ругался на unused
-  void shouldSkip
+describe.skipIf(shouldSkip)('income_payment_installments + trigger', () => {
   let owner: Ctx
   let intruder: Ctx
   let staffId: string

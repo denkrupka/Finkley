@@ -4099,7 +4099,11 @@
       "link_action": "Powiąż",
       "edit_link": "Zmień",
       "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — otwórz i potwierdź ręcznie",
-      "show_linked": "Pokaż powiązane"
+      "show_linked": "Pokaż powiązane",
+      "extract_counterparties": "Wyodrębnij kontrahentów",
+      "extract_hint": "Wyodrębnij nazwy kontrahentów z opisów dla transakcji bez wpisu (regex + AI)",
+      "extract_done": "Wyodrębniono {{updated}} z {{total}} kontrahentów",
+      "extract_done_with_ai": "Wyodrębniono {{updated}} z {{total}} (regex: {{regex}}, AI: {{ai}})"
     },
     "link_dialog": {
       "title_debit": "Powiąż z wydatkiem",

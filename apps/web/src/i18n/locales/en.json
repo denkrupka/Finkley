@@ -4098,7 +4098,11 @@
       "link_action": "Link",
       "edit_link": "Edit",
       "needs_review_tooltip": "Low-confidence auto-match — open and confirm manually",
-      "show_linked": "Show linked"
+      "show_linked": "Show linked",
+      "extract_counterparties": "Extract counterparties",
+      "extract_hint": "Extract counterparty names from descriptions for transactions where the column is empty (regex + AI)",
+      "extract_done": "Extracted {{updated}} of {{total}} counterparties",
+      "extract_done_with_ai": "Extracted {{updated}} of {{total}} (regex: {{regex}}, AI: {{ai}})"
     },
     "link_dialog": {
       "title_debit": "Link to expense",

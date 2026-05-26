@@ -39,6 +39,20 @@ export type OtherIncomeCategoryRow = {
   parent_id: string | null
 }
 
+/**
+ * Фактически полученная сумма прочего дохода (учёт частичных поступлений).
+ * Если paid_amount_cents != null и меньше amount_cents — берём её. NULL =
+ * полностью получено (legacy default).
+ */
+export function effectiveReceivedFromOtherIncome(
+  o: Pick<OtherIncomeRow, 'amount_cents' | 'paid_amount_cents'>,
+): number {
+  if (o.paid_amount_cents != null && o.paid_amount_cents < o.amount_cents) {
+    return o.paid_amount_cents
+  }
+  return o.amount_cents
+}
+
 export function useOtherIncomeCategories(
   salonId: string | undefined,
   opts: { includeArchived?: boolean } = {},

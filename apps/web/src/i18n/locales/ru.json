@@ -906,7 +906,11 @@
       "link_action": "Связать",
       "edit_link": "Изменить",
       "needs_review_tooltip": "Авто-привязка с низкой уверенностью — открой и подтверди вручную",
-      "show_linked": "Показать связанные"
+      "show_linked": "Показать связанные",
+      "extract_counterparties": "Извлечь контрагентов",
+      "extract_hint": "Извлечь контрагентов из назначений для транзакций где колонка пустая (regex + AI)",
+      "extract_done": "Извлечено {{updated}} из {{total}} контрагентов",
+      "extract_done_with_ai": "Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})"
     },
     "link_dialog": {
       "title_debit": "Связать с расходом",
