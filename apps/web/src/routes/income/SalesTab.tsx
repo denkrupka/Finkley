@@ -29,6 +29,7 @@ import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import {
+  effectiveReceivedFromOtherIncome,
   useOtherIncomeCategories,
   useOtherIncomes,
   type OtherIncomeRow,
@@ -38,6 +39,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import {
+  effectiveReceivedFromVisit,
   useDeleteVisit,
   useVisits,
   visitsKeys,
@@ -153,11 +155,13 @@ export function SalesTab({
 
   const deleteVisit = useDeleteVisit(salonId)
 
-  const salesTotal = sales.reduce(
-    (acc, s) => acc + s.amount_cents - s.discount_cents + s.tip_cents,
+  // Total = effective (учёт частичных поступлений). Если хочешь видеть
+  // «должно было быть» — это будет план/factual divergence в отчётах.
+  const salesTotal = sales.reduce((acc, s) => acc + effectiveReceivedFromVisit(s), 0)
+  const otherTotal = filteredOtherIncomes.reduce(
+    (acc, o) => acc + effectiveReceivedFromOtherIncome(o),
     0,
   )
-  const otherTotal = filteredOtherIncomes.reduce((acc, o) => acc + o.amount_cents, 0)
   const total = salesTotal + otherTotal
   const totalCount = sales.length + filteredOtherIncomes.length
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))

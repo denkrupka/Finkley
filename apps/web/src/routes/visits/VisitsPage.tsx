@@ -27,6 +27,7 @@ import {
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import {
+  effectiveReceivedFromVisit,
   useDeleteVisit,
   useVisits,
   type PaymentMethod,
@@ -155,7 +156,9 @@ export function VisitsPage({
   if (!salon || !salonId) return null
   const currency = salon.currency
 
-  const totalRevenue = visits.reduce((acc, v) => acc + v.amount_cents, 0)
+  // effective (учёт частичных поступлений, image #51). Если paid_amount_cents
+  // != null и меньше net — берём её, иначе net = amount - discount + tip.
+  const totalRevenue = visits.reduce((acc, v) => acc + effectiveReceivedFromVisit(v), 0)
   const grouped = groupByDay(visits)
 
   // Когда VisitsPage встроен в IncomePage (forcedKind задан) — обёрточные
@@ -616,7 +619,7 @@ function GroupRow({
   const visits = group.visits
   const primary = visits[0]
   if (!primary) return null
-  const totalAmount = visits.reduce((acc, v) => acc + v.amount_cents, 0)
+  const totalAmount = visits.reduce((acc, v) => acc + effectiveReceivedFromVisit(v), 0)
   const client = clients.find((c) => c.id === primary.client_id)
   const allPaid = visits.every((v) => v.status === 'paid')
   const groupBankLinked = linkedVisitIds ? visits.some((v) => linkedVisitIds.has(v.id)) : false
