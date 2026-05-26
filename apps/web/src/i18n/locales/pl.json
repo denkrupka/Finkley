@@ -4087,7 +4087,8 @@
       "not_linked": "Niepowiązane",
       "link_action": "Powiąż",
       "edit_link": "Zmień",
-      "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — otwórz i potwierdź ręcznie"
+      "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — otwórz i potwierdź ręcznie",
+      "show_linked": "Pokaż powiązane"
     },
     "link_dialog": {
       "title_debit": "Powiąż z wydatkiem",
@@ -4135,6 +4136,22 @@
       "start_select": "Eksport do banku",
       "cancel_select": "Anuluj",
       "select_all": "Zaznacz wszystkie ({{n}})"
+    },
+    "mismatch": {
+      "title": "Kwoty się nie zgadzają",
+      "kind_expense": "wydatek",
+      "kind_visit": "wizytę",
+      "kind_other_income": "przychód",
+      "tx_less": "Transakcja {{tx}} jest mniejsza niż {{kind}} {{entity}} (do dopłaty {{remaining}}).",
+      "tx_more": "Transakcja {{tx}} jest większa niż pozostała kwota {{kind}} ({{remaining}}).",
+      "tx_label": "Transakcja",
+      "entity_label": "Kwota {{kind}}",
+      "entity_remaining_label": "Pozostało",
+      "already_paid_hint": "z {{total}} (opłacono {{paid}})",
+      "action_partial": "Zapisz jako częściową płatność (reszta w «Nieopłacone»)",
+      "action_adjust_down": "Zmień kwotę {{kind}} na {{tx}} (w pełni opłacone)",
+      "action_adjust_up": "Zwiększ kwotę {{kind}} do {{tx}}",
+      "toast_partial": "Powiązane jako częściowa płatność"
     }
   },
   "tour": {

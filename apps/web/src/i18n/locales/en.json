@@ -4086,7 +4086,8 @@
       "not_linked": "Not linked",
       "link_action": "Link",
       "edit_link": "Edit",
-      "needs_review_tooltip": "Low-confidence auto-match — open and confirm manually"
+      "needs_review_tooltip": "Low-confidence auto-match — open and confirm manually",
+      "show_linked": "Show linked"
     },
     "link_dialog": {
       "title_debit": "Link to expense",
@@ -4134,6 +4135,22 @@
       "start_select": "Export to bank",
       "cancel_select": "Cancel",
       "select_all": "Select all ({{n}})"
+    },
+    "mismatch": {
+      "title": "Amounts don't match",
+      "kind_expense": "expense",
+      "kind_visit": "visit",
+      "kind_other_income": "income",
+      "tx_less": "Transaction {{tx}} is less than {{kind}} {{entity}} (remaining to pay {{remaining}}).",
+      "tx_more": "Transaction {{tx}} is more than remaining to pay on {{kind}} ({{remaining}}).",
+      "tx_label": "Transaction",
+      "entity_label": "{{kind}} amount",
+      "entity_remaining_label": "Remaining",
+      "already_paid_hint": "of {{total}} (paid {{paid}})",
+      "action_partial": "Record as partial payment (remainder goes to «Unpaid»)",
+      "action_adjust_down": "Change {{kind}} amount to {{tx}} (fully paid)",
+      "action_adjust_up": "Increase {{kind}} amount to {{tx}}",
+      "toast_partial": "Linked as partial payment"
     }
   },
   "tour": {
