@@ -7,6 +7,8 @@ import { getDateLocale } from '@/lib/utils/format-date'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 
+import { trackUserAction } from '@/lib/analytics/track-user-action'
+
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import {
   DialogContent as DialogContentUi,
@@ -64,6 +66,11 @@ export function SalonLayout() {
   // P&L/ДДС/налогов, а не для записи. Также скрываем на /reports (аналитика —
   // отдельный flow) и /settings (конфигурация — там FAB только мешает).
   const path = location.pathname
+  // bug a75ebedf — page-view tracking (fire-and-forget, debounce 5s).
+  useEffect(() => {
+    if (!salonId) return
+    trackUserAction({ kind: 'page_view', target: path, salonId })
+  }, [path, salonId])
   const hideFab =
     path.endsWith('/messenger') ||
     path.endsWith('/finance') ||

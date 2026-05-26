@@ -13,6 +13,7 @@ import { usePayoutsPreview } from '@/hooks/usePayouts'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useStaffPerformanceAdvanced } from '@/hooks/useStaffPerformance'
+import { useVisits } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { StaffPerformanceSection } from '@/routes/staff/StaffPerformanceSection'
@@ -69,6 +70,75 @@ function PerformanceSubTab({
 }) {
   const setPeriod = onPeriodChange
   const { data: rows = [], isLoading } = useStaffPerformanceAdvanced(salonId, startIso, endIso)
+  // bug 64d0bbf8 — Отток + Скоринг: client-side computation из visits.
+  // Берём полный год (с начала текущего года) чтобы понять кто отвалился.
+  const churnRange = useMemo(() => {
+    const yearStart = new Date(new Date().getFullYear(), 0, 1)
+    const now = new Date()
+    return { start: yearStart.toISOString(), end: now.toISOString() }
+  }, [])
+  const { data: allVisits = [] } = useVisits(salonId, churnRange, { kind: 'visit' })
+  // Для каждого мастера считаем: clients_total = unique client_id у мастера,
+  // churned = клиенты для которых последний визит у этого мастера = их
+  // последний визит в салон вообще. Скоринг = (rebook × retention) / churn.
+  const churnByStaff = useMemo(() => {
+    const result = new Map<
+      string,
+      { churnPct: number; scoring: number; clientsTotal: number; churnedCount: number }
+    >()
+    if (allVisits.length === 0) return result
+    // Карта: client_id → последний визит в салон (любой staff).
+    const lastVisitOfClient = new Map<string, number>()
+    for (const v of allVisits) {
+      if (!v.client_id) continue
+      const ts = new Date(v.visit_at).getTime()
+      const prev = lastVisitOfClient.get(v.client_id) ?? 0
+      if (ts > prev) lastVisitOfClient.set(v.client_id, ts)
+    }
+    // Для каждого мастера: clients + последний визит к нему
+    const lastVisitOfClientAtStaff = new Map<string, Map<string, number>>()
+    for (const v of allVisits) {
+      if (!v.client_id || !v.staff_id) continue
+      const ts = new Date(v.visit_at).getTime()
+      const inner = lastVisitOfClientAtStaff.get(v.staff_id) ?? new Map<string, number>()
+      const prev = inner.get(v.client_id) ?? 0
+      if (ts > prev) inner.set(v.client_id, ts)
+      lastVisitOfClientAtStaff.set(v.staff_id, inner)
+    }
+    for (const r of rows) {
+      const inner = lastVisitOfClientAtStaff.get(r.staff_id)
+      if (!inner || inner.size === 0) {
+        result.set(r.staff_id, { churnPct: 0, scoring: 0, clientsTotal: 0, churnedCount: 0 })
+        continue
+      }
+      let churned = 0
+      // 60 days threshold — если клиент не возвращался в салон > 60 дней
+      // после визита у мастера, считаем «отвалился». Безусловный «больше
+      // никогда» был бы слишком строгим для активных клиентов.
+      const churnThresholdMs = 60 * 24 * 3600 * 1000
+      const nowMs = Date.now()
+      for (const [clientId, lastAtStaff] of inner) {
+        const lastAtSalon = lastVisitOfClient.get(clientId) ?? lastAtStaff
+        // Если последний визит у мастера = последний визит в салон, и с
+        // тех пор прошло > 60 дней — клиент отвалился после этого мастера.
+        if (lastAtSalon === lastAtStaff && nowMs - lastAtSalon > churnThresholdMs) {
+          churned++
+        }
+      }
+      const clientsTotal = inner.size
+      const churnPct = clientsTotal > 0 ? (churned / clientsTotal) * 100 : 0
+      const retentionPct =
+        r.unique_clients_count > 0 ? (r.returned_clients_count / r.unique_clients_count) * 100 : 0
+      const scoring = churnPct > 0 ? (r.rebook_pct * retentionPct) / churnPct : retentionPct * 10
+      result.set(r.staff_id, {
+        churnPct: Number(churnPct.toFixed(1)),
+        scoring: Number(scoring.toFixed(1)),
+        clientsTotal,
+        churnedCount: churned,
+      })
+    }
+    return result
+  }, [allVisits, rows])
   const { data: staffList = [] } = useStaff(salonId, { activeOnly: false })
   // Заработок мастера за период: usePayoutsPreview считает по тому же
   // RPC, что и страница /payouts (схема commission + revenue × процент).
@@ -166,6 +236,24 @@ function PerformanceSubTab({
                   </th>
                   <th className="px-3 py-3 text-right font-semibold">
                     {t('reports_hub.staff.col_utilization')}
+                  </th>
+                  {/* bug 64d0bbf8 — Отток + Скоринг */}
+                  <th
+                    className="px-3 py-3 text-right font-semibold"
+                    title={t('reports_hub.staff.col_churn_tooltip', {
+                      defaultValue: '% клиентов мастера которые не вернулись в салон более 60 дней',
+                    })}
+                  >
+                    {t('reports_hub.staff.col_churn', { defaultValue: 'Отток' })}
+                  </th>
+                  <th
+                    className="px-3 py-3 text-right font-semibold"
+                    title={t('reports_hub.staff.col_scoring_tooltip', {
+                      defaultValue:
+                        'Скоринг = (Rebook% × Retention%) / Churn%. Чем выше — тем лучше.',
+                    })}
+                  >
+                    {t('reports_hub.staff.col_scoring', { defaultValue: 'Скоринг' })}
                   </th>
                   <th className="px-3 py-3 text-right font-semibold">
                     {t('reports_hub.staff.col_earnings')}
@@ -290,6 +378,52 @@ function PerformanceSubTab({
                           </span>
                         </div>
                       </td>
+                      {/* bug 64d0bbf8 — Отток и Скоринг */}
+                      {(() => {
+                        const cs = churnByStaff.get(r.staff_id) ?? {
+                          churnPct: 0,
+                          scoring: 0,
+                          clientsTotal: 0,
+                          churnedCount: 0,
+                        }
+                        return (
+                          <>
+                            <td className="px-3 py-3 text-right">
+                              <span
+                                className={cn(
+                                  'num text-sm font-bold',
+                                  cs.churnPct <= 20
+                                    ? 'text-brand-sage-deep'
+                                    : cs.churnPct <= 50
+                                      ? 'text-amber-700'
+                                      : 'text-destructive',
+                                )}
+                                title={t('reports_hub.staff.churn_breakdown', {
+                                  defaultValue: '{{churned}} из {{total}} клиентов',
+                                  churned: cs.churnedCount,
+                                  total: cs.clientsTotal,
+                                })}
+                              >
+                                {cs.churnPct}%
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <span
+                                className={cn(
+                                  'num text-sm font-bold',
+                                  cs.scoring >= 200
+                                    ? 'text-brand-sage-deep'
+                                    : cs.scoring >= 100
+                                      ? 'text-amber-700'
+                                      : 'text-destructive',
+                                )}
+                              >
+                                {cs.scoring}
+                              </span>
+                            </td>
+                          </>
+                        )
+                      })()}
                       {/* Заработок мастера за период (commission по схеме). */}
                       <td className="px-3 py-3 text-right">
                         <div className="inline-flex items-center gap-1">
@@ -316,7 +450,8 @@ function PerformanceSubTab({
                     <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
                       {formatCurrency(totalRevenue, currency)}
                     </td>
-                    <td colSpan={4} />
+                    {/* +2 колонки (Отток+Скоринг) — увеличиваем colSpan на 2 */}
+                    <td colSpan={6} />
                     <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
                       {formatCurrency(
                         payouts.reduce((s, p) => s + p.payout_cents, 0),

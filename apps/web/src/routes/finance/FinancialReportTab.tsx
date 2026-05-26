@@ -228,6 +228,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   // bug 3a000612 — fullscreen toggle для отчёта (юзеру удобнее смотреть
   // широкую таблицу на весь viewport, без sidebar/header).
   const [fullscreen, setFullscreen] = useState(false)
+  // bug c2a57e1b — drill-down модалка с детализацией клика по «итого»
+  const [drillDownRow, setDrillDownRow] = useState<CellRow | null>(null)
 
   // Все группы свёрнуты по умолчанию — пользователь раскрывает только то, что
   // его интересует. Балансовые корневые группы тоже здесь.
@@ -584,6 +586,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
               currency={currency}
               collapsed={collapsed}
               onToggle={toggleGroup}
+              onDrillDown={setDrillDownRow}
               t={t}
             />
           </BlockSection>
@@ -606,6 +609,134 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           {/* bug fec22f39 — блок «Баланс» удалён из «Отчёта по прибыли».
               Балансы и Cash-flow остаются в отдельном табе ДДС. */}
         </div>
+      </div>
+
+      {/* bug c2a57e1b — drill-down модалка для итогов */}
+      <DrillDownDialog
+        row={drillDownRow}
+        currency={currency}
+        onClose={() => setDrillDownRow(null)}
+        t={t}
+      />
+    </div>
+  )
+}
+
+// ============================ DrillDownDialog ============================
+
+function DrillDownDialog({
+  row,
+  currency,
+  onClose,
+  t,
+}: {
+  row: CellRow | null
+  currency: string
+  onClose: () => void
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  if (!row) return null
+  const planTotal = row.values.reduce((s, v) => s + v, 0)
+  const factTotal = (row.factValues ?? []).reduce((s, v) => s + v, 0)
+  const monthNames = [
+    'Янв',
+    'Фев',
+    'Мар',
+    'Апр',
+    'Май',
+    'Июн',
+    'Июл',
+    'Авг',
+    'Сен',
+    'Окт',
+    'Ноя',
+    'Дек',
+  ]
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card shadow-finmd w-full max-w-2xl rounded-xl p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-brand-navy text-lg font-bold">{row.label}</h3>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t('finance.report.drill_subtitle', {
+                defaultValue: 'Разбивка по месяцам — план vs факт',
+              })}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground rounded-md p-1 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="bg-muted/30 mb-4 grid grid-cols-2 gap-3 rounded-md p-3 text-sm">
+          <div>
+            <p className="text-muted-foreground text-[10.5px] uppercase tracking-wider">
+              {t('finance.report.drill_plan_total', { defaultValue: 'Итого план' })}
+            </p>
+            <p className="num text-foreground text-lg font-bold">
+              {formatCurrency(Math.abs(planTotal), currency)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-[10.5px] uppercase tracking-wider">
+              {t('finance.report.drill_fact_total', { defaultValue: 'Итого факт' })}
+            </p>
+            <p className="num text-foreground text-lg font-bold">
+              {formatCurrency(Math.abs(factTotal), currency)}
+            </p>
+          </div>
+        </div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-muted-foreground border-border border-b text-left">
+              <th className="py-2">{t('finance.report.drill_month', { defaultValue: 'Месяц' })}</th>
+              <th className="num py-2 text-right">
+                {t('finance.report.drill_plan', { defaultValue: 'План' })}
+              </th>
+              <th className="num py-2 text-right">
+                {t('finance.report.drill_fact', { defaultValue: 'Факт' })}
+              </th>
+              <th className="num py-2 text-right">
+                {t('finance.report.drill_diff', { defaultValue: 'Δ' })}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {row.values.map((plan, i) => {
+              const fact = row.factValues?.[i] ?? 0
+              const diff = fact - plan
+              return (
+                <tr key={i} className="border-border/40 border-b last:border-b-0">
+                  <td className="py-1.5">{monthNames[i]}</td>
+                  <td className="num py-1.5 text-right">
+                    {formatCurrency(Math.abs(plan), currency)}
+                  </td>
+                  <td className="num py-1.5 text-right">
+                    {formatCurrency(Math.abs(fact), currency)}
+                  </td>
+                  <td
+                    className={`num py-1.5 text-right font-semibold ${
+                      diff > 0 ? 'text-brand-sage-deep' : diff < 0 ? 'text-destructive' : ''
+                    }`}
+                  >
+                    {diff > 0 ? '+' : ''}
+                    {formatCurrency(diff, currency)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -772,6 +903,7 @@ function ReportTable({
   currency,
   collapsed,
   onToggle,
+  onDrillDown,
   t,
 }: {
   year: number
@@ -781,6 +913,8 @@ function ReportTable({
   currency: string
   collapsed: Set<string>
   onToggle: (key: string) => void
+  /** bug c2a57e1b — клик по «итого» открывает детализацию. */
+  onDrillDown?: (row: CellRow) => void
   t: (k: string) => string
 }) {
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
@@ -888,18 +1022,27 @@ function ReportTable({
                   </span>
                 </span>
               </td>
-              {/* Итого План | Факт */}
+              {/* Итого План | Факт. bug c2a57e1b — клик по ячейкам открывает
+                  drill-down модалку (если row.bold — это группа/parent row). */}
               <td
                 className={`num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
-                } ${colorClass(row.color)}`}
+                } ${colorClass(row.color)} ${
+                  onDrillDown ? 'cursor-pointer hover:bg-slate-200' : ''
+                }`}
+                onClick={onDrillDown ? () => onDrillDown(row) : undefined}
+                title={onDrillDown ? t('finance.report.click_for_details') : undefined}
               >
                 {formatPF(yearTotal(row.values), currency)}
               </td>
               <td
                 className={`num bg-slate-50 px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
-                } ${colorClass(row.color)}`}
+                } ${colorClass(row.color)} ${
+                  onDrillDown ? 'cursor-pointer hover:bg-slate-200' : ''
+                }`}
+                onClick={onDrillDown ? () => onDrillDown(row) : undefined}
+                title={onDrillDown ? t('finance.report.click_for_details') : undefined}
               >
                 {formatPF(yearTotal(row.factValues ?? []), currency)}
               </td>

@@ -3235,6 +3235,14 @@
       "print": "Print / PDF",
       "fullscreen": "Fullscreen",
       "exit_fullscreen": "Exit fullscreen",
+      "click_for_details": "Click for monthly breakdown",
+      "drill_subtitle": "Monthly breakdown — plan vs actual",
+      "drill_plan_total": "Plan total",
+      "drill_fact_total": "Actual total",
+      "drill_month": "Month",
+      "drill_plan": "Plan",
+      "drill_fact": "Actual",
+      "drill_diff": "Δ",
       "expenses_other": "Other categories"
     }
   },

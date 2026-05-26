@@ -133,8 +133,8 @@ Respond STRICTLY as JSON (no markdown, no preface):
     "offer": "<what to offer: free re-do, discount, gift, personal master, etc.>",
     "key_hook": "<the psychological hook for THIS exact person — based on the profile>"
   },
-  "suggested_public_reply": "<ready-to-paste public reply on Booksy/Google — short, warm, respectful, owns the issue without excuses, mentions the offer or invites to DM>",
-  "suggested_private_message": "<ready-to-send private DM/SMS/email to the client — personal, addresses the hook, asks them to consider editing the review after the issue is fixed>"
+  "suggested_public_reply": "<ready-to-paste public reply on Booksy/Google — short, warm, respectful, professional. STRICT RULES (bug 147921fb, owner-feedback): (a) hold the salon's professional boundaries — do NOT publicly admit guilt where evidence is ambiguous, do NOT promise refunds/free re-do/discounts in the PUBLIC reply (that breeds 'consumer terrorism' where future complainers expect the same). (b) Acknowledge the client's feeling without surrendering the position. (c) Invite to a private channel ('напишите нам в личные сообщения / DM' / 'давайте обсудим лично') where the specific resolution will be discussed individually. (d) Stay respectful, no defensiveness, no excuses. PUBLIC reply = brand voice, not negotiation>",
+  "suggested_private_message": "<ready-to-send private DM/SMS/email to the client — personal, addresses the hook. HERE you CAN propose concrete resolution if the situation warrants it (free re-do, discount, gift, personal master, etc.) — private channel is the place for individual deals. Asks them to consider editing the review after the issue is fixed>"
 }`
 }
 

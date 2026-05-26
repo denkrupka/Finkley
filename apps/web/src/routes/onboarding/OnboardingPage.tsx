@@ -88,7 +88,11 @@ const INITIAL: OnboardingState = {
   expense_categories: [...DEFAULT_EXPENSE_CATEGORIES],
   benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
   selected_integrations: [],
-  subscribe_after_submit: true, // paywall opt-out: можно снять и зайти в trial без card
+  // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
+  // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
+  // без редиректа в Stripe Checkout. Активация подписки переехала в
+  // /settings/billing где юзер увидит CTA «Активировать».
+  subscribe_after_submit: false,
 }
 
 export function OnboardingPage() {

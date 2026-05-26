@@ -3236,6 +3236,14 @@
       "print": "Drukuj / PDF",
       "fullscreen": "Pełny ekran",
       "exit_fullscreen": "Zwiń",
+      "click_for_details": "Kliknij — szczegóły miesięczne",
+      "drill_subtitle": "Rozbicie miesięczne — plan vs fakt",
+      "drill_plan_total": "Plan razem",
+      "drill_fact_total": "Fakt razem",
+      "drill_month": "Miesiąc",
+      "drill_plan": "Plan",
+      "drill_fact": "Fakt",
+      "drill_diff": "Δ",
       "expenses_other": "Pozostałe kategorie"
     }
   },
