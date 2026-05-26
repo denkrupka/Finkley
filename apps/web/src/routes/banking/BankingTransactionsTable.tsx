@@ -21,6 +21,9 @@ import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
 import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 
+import { supabase } from '@/lib/supabase/client'
+import { useQueryClient } from '@tanstack/react-query'
+
 import { LinkTransactionDialog } from './LinkTransactionDialog'
 
 type Direction = 'debit' | 'credit'
@@ -138,6 +141,8 @@ export function BankingTransactionsTable({
     t,
   ])
   const sync = useBankSyncNow(salonId)
+  const qcRoot = useQueryClient()
+  const [extracting, setExtracting] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
   // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
@@ -169,6 +174,32 @@ export function BankingTransactionsTable({
       : allRows
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')
+
+  async function handleExtractCounterparties() {
+    setExtracting(true)
+    try {
+      const { data, error } = await supabase.rpc('extract_bank_tx_counterparty', {
+        p_salon_id: salonId,
+      })
+      if (error) throw new Error(error.message)
+      const row = Array.isArray(data) ? data[0] : data
+      const updated = (row as { updated_count?: number })?.updated_count ?? 0
+      const total = (row as { total_with_null?: number })?.total_with_null ?? 0
+      toast.success(
+        t('banking.transactions.extract_done', {
+          defaultValue: 'Извлечено {{updated}} из {{total}} контрагентов',
+          updated,
+          total,
+        }),
+      )
+      await qcRoot.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+      await qcRoot.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExtracting(false)
+    }
+  }
 
   function handleSyncAll() {
     const active = connections.filter((c) => c.status === 'connected')
@@ -229,6 +260,24 @@ export function BankingTransactionsTable({
               {t('banking.transactions.show_linked', { defaultValue: 'Показать связанные' })}
             </label>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExtractCounterparties}
+            disabled={extracting}
+            title={t('banking.transactions.extract_hint', {
+              defaultValue: 'Извлечь контрагентов из назначений для tx где колонка пустая',
+            })}
+          >
+            {extracting ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <AlertTriangle className="size-3.5" strokeWidth={1.8} />
+            )}
+            {t('banking.transactions.extract_counterparties', {
+              defaultValue: 'Извлечь контрагентов',
+            })}
+          </Button>
           <Button
             variant="outline"
             size="sm"

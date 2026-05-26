@@ -31,6 +31,7 @@ import { IncomePage } from '@/routes/income/IncomePage'
 
 import { AmountMismatchDialog, type MismatchAction } from './AmountMismatchDialog'
 import { LinkConflictDialog, type ConflictAction } from './LinkConflictDialog'
+import { PartiallyPaidExpenseDialog } from './PartiallyPaidExpenseDialog'
 
 type Props = {
   open: boolean
@@ -66,6 +67,9 @@ export function LinkTransactionDialog({
   // Используем для conflict-check (image #45): сущность уже связана с другой tx?
   const { data: bankLinkedAll } = useBankLinkedIncomeIds(salonId)
   const [conflictCtx, setConflictCtx] = useState<{ item: PickerItem } | null>(null)
+  // PartiallyPaid-flow (image #47/#48) — отдельная модалка для частично-оплаченных
+  // расходов с журналом installments + 2/3 опциями привязки.
+  const [partialCtx, setPartialCtx] = useState<{ expense: ExpenseRow } | null>(null)
   // Mismatch state — храним выбранную сущность для модалки подтверждения,
   // если сумма tx не совпадает с (остаток к доплате) сущности.
   const [mismatchCtx, setMismatchCtx] = useState<{
@@ -393,6 +397,17 @@ export function LinkTransactionDialog({
       : !!(transaction.linked_visit_id || transaction.linked_other_income_id)
 
   function handlePickExpense(expense: ExpenseRow) {
+    // Image #47/#48: если расход уже частично оплачен — отдельная модалка
+    // с журналом installments + опциями (частичная / изменить / отмена).
+    // Не используем общий handlePick для таких — там mismatch без истории.
+    if (
+      expense.paid_amount_cents != null &&
+      expense.paid_amount_cents > 0 &&
+      expense.paid_amount_cents < expense.amount_cents
+    ) {
+      setPartialCtx({ expense })
+      return
+    }
     handlePick({
       kind: 'expense',
       id: expense.id,
@@ -449,6 +464,29 @@ export function LinkTransactionDialog({
     />
   ) : null
 
+  const partialDialog = partialCtx ? (
+    <PartiallyPaidExpenseDialog
+      open={!!partialCtx}
+      onOpenChange={(v) => !v && setPartialCtx(null)}
+      salonId={salonId}
+      expense={partialCtx.expense}
+      txAmount={transaction.amount_cents}
+      txCurrency={txCurrency}
+      txId={transaction.id}
+      txExecutedAt={transaction.executed_at}
+      onLinked={() => {
+        setPartialCtx(null)
+        // Инвалидация и закрытие парента — как при обычном link.mutate
+        void qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+        void qc.invalidateQueries({ queryKey: ['expense-installments', partialCtx.expense.id] })
+        void qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+        void qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+        void qc.invalidateQueries({ queryKey: ['bank-linked-income-ids', salonId] })
+        onOpenChange(false)
+      }}
+    />
+  ) : null
+
   // Debit: embedded full ExpensesPage в широкой модалке (см. owner-feedback
   // 2026-05-26 — image #10/#11). Юзер видит вкладки Оплачено/Не оплачено,
   // структуру, фильтры — выбирает расход кликом и связывается с tx.
@@ -457,6 +495,7 @@ export function LinkTransactionDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         {mismatchDialog}
         {conflictDialog}
+        {partialDialog}
         <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
           <DialogHeader>
             <div className="border-border border-b px-5 py-3">
