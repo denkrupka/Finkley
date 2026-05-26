@@ -53,14 +53,25 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const currency = salon?.currency ?? 'PLN'
   const { data: settings = DEFAULT_FINANCIAL_SETTINGS } = useFinancialSettings(salonId)
 
-  const year = new Date().getFullYear()
-  const yearStart = startOfYear(new Date(year, 0, 1))
-  const yearEnd = endOfMonth(new Date(year, 11, 31))
-  const visitsRange = { start: yearStart.toISOString(), end: yearEnd.toISOString() }
-  const expensesRange = {
-    start: format(yearStart, 'yyyy-MM-dd'),
-    end: format(yearEnd, 'yyyy-MM-dd'),
-  }
+  // bug 2783fa9e — выбор года в шапке. Полный period-picker с динамической
+  // разбивкой (день/неделя/месяц) — большой рефакторинг (вся таблица
+  // hardcoded под 12 месяцев). Сейчас отдаём year-selector — основной
+  // кейс «посмотреть прошлый год vs текущий».
+  const currentYear = new Date().getFullYear()
+  const [year, setYear] = useState<number>(currentYear)
+  const yearStart = useMemo(() => startOfYear(new Date(year, 0, 1)), [year])
+  const yearEnd = useMemo(() => endOfMonth(new Date(year, 11, 31)), [year])
+  const visitsRange = useMemo(
+    () => ({ start: yearStart.toISOString(), end: yearEnd.toISOString() }),
+    [yearStart, yearEnd],
+  )
+  const expensesRange = useMemo(
+    () => ({
+      start: format(yearStart, 'yyyy-MM-dd'),
+      end: format(yearEnd, 'yyyy-MM-dd'),
+    }),
+    [yearStart, yearEnd],
+  )
 
   const { data: visits = [] } = useVisits(salonId, visitsRange, { kind: 'visit' })
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
@@ -545,6 +556,18 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           <p className="mt-1 text-sm text-slate-500">{t('finance.report.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
+          {/* bug 2783fa9e — выбор года */}
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="border-border bg-card text-foreground h-10 rounded-md border px-3 text-sm font-medium"
+          >
+            {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
           <Button variant="outline" size="md" onClick={() => setFullscreen((v) => !v)}>
             {fullscreen ? (
               <Minimize2 className="size-4" strokeWidth={1.8} />

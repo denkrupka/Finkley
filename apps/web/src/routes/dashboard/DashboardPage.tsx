@@ -17,6 +17,7 @@ import { CashBalanceWidget } from './CashBalanceWidget'
 import { ForecastWidget } from './ForecastWidget'
 import { InsightsWidget } from './InsightsWidget'
 import { MiniCalendarWidget } from './MiniCalendarWidget'
+import { OccupancyHeatmapWidget } from './OccupancyHeatmapWidget'
 import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
@@ -134,6 +135,12 @@ export function DashboardPage() {
         <ForecastWidget salonId={salonId} currency={currency} />
         <UpcomingVisitsWidget salonId={salonId} />
         <MiniCalendarWidget salonId={salonId} currency={currency} />
+      </div>
+
+      {/* bug d861eca4/db77effc + 4fc86f35 — Загрузка по дням/часам перенесена
+          с P&L на главный дашборд (запрос владельца). */}
+      <div className="mb-5">
+        <OccupancyHeatmapWidget salonId={salonId} />
       </div>
 
       {/* KPI row */}

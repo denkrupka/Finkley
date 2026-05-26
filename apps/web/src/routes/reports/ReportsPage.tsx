@@ -26,6 +26,7 @@ import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 import { useSalon } from '@/hooks/useSalons'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { downloadAsXls, type XlsTable } from './export-xls'
+import { PnlChartsSection } from './PnlChartsSection'
 
 const PAYMENT_METHOD_KEY: Record<PaymentMethodRow['payment_method'], string> = {
   cash: 'reports.payment.cash',
@@ -186,6 +187,11 @@ export function ReportsPage() {
           delta={delta(kpis.data?.profit_cents, prevKpis.data?.profit_cents)}
           positive
         />
+      </section>
+
+      {/* bug 4fc86f35 — 3 графика в середине P&L */}
+      <section className="mt-5">
+        <PnlChartsSection salonId={salonId} currency={currency} />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
