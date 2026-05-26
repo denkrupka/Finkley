@@ -30,6 +30,13 @@ type Props = {
   direction: Direction
   period: { start: string; end: string }
   currency: string
+  /** Picker-mode для обратных модалок (LinkExpense/Visit/OtherIncomeToBankDialog).
+   *  Если задан onPickTransaction — клик по строке вызывает callback вместо
+   *  открытия LinkTransactionDialog. Также скрывается колонка действий. */
+  onPickTransaction?: (tx: BankInflowRow | BankOutflowRow) => void
+  /** Опц фильтр: показывать только неpривязанные tx (для picker-режима — там
+   *  нет смысла предлагать связать уже-привязанную). */
+  unlinkedOnly?: boolean
 }
 
 /**
@@ -41,7 +48,15 @@ type Props = {
  * предупреждения «требует перепроверки» (needs_review). Связывание открывает
  * LinkTransactionDialog — модалка с поиском по расходам или по доходам.
  */
-export function BankingTransactionsTable({ salonId, direction, period, currency }: Props) {
+export function BankingTransactionsTable({
+  salonId,
+  direction,
+  period,
+  currency,
+  onPickTransaction,
+  unlinkedOnly = false,
+}: Props) {
+  const isPickerMode = !!onPickTransaction
   const { t } = useTranslation()
   const { data: connections = [] } = useBankConnections(salonId)
   const inflowsQ = useBankInflows(direction === 'credit' ? salonId : undefined, period)
@@ -129,8 +144,11 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
   } | null>(null)
 
   const isLoading = inflowsQ.isLoading || outflowsQ.isLoading
-  const rows: Array<BankInflowRow | BankOutflowRow> =
+  const allRows: Array<BankInflowRow | BankOutflowRow> =
     direction === 'debit' ? (outflowsQ.data ?? []) : (inflowsQ.data ?? [])
+  const rows = unlinkedOnly
+    ? allRows.filter((tx) => !tx.expense_id && !tx.linked_visit_id && !tx.linked_other_income_id)
+    : allRows
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')
 
@@ -228,7 +246,12 @@ export function BankingTransactionsTable({ salonId, direction, period, currency 
                   direction={direction}
                   currency={currency}
                   categoryName={categoryNameByTxId.get(tx.id) ?? null}
+                  isPickerMode={isPickerMode}
                   onLink={() => {
+                    if (isPickerMode) {
+                      onPickTransaction?.(tx)
+                      return
+                    }
                     setLinkTx(tx)
                     setLinkOpen(true)
                   }}
@@ -291,12 +314,14 @@ function TransactionRow({
   direction,
   currency,
   categoryName,
+  isPickerMode,
   onLink,
 }: {
   tx: BankInflowRow | BankOutflowRow
   direction: Direction
   currency: string
   categoryName: string | null
+  isPickerMode: boolean
   onLink: () => void
 }) {
   const { t } = useTranslation()
@@ -307,9 +332,11 @@ function TransactionRow({
 
   return (
     <tr
+      onClick={isPickerMode ? onLink : undefined}
       className={cn(
         'border-border hover:bg-muted/30 border-b last:border-b-0',
         tx.needs_review && 'bg-amber-50/40',
+        isPickerMode && 'cursor-pointer',
       )}
     >
       <td className="text-foreground whitespace-nowrap px-4 py-2.5 text-xs">
@@ -360,23 +387,30 @@ function TransactionRow({
         )}
       </td>
       <td className="px-4 py-2.5 text-right">
-        <button
-          type="button"
-          onClick={onLink}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors',
-            linked
-              ? 'text-foreground hover:bg-muted/60'
-              : 'bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80',
-          )}
-        >
-          {linked ? (
-            <Edit3 className="size-3" strokeWidth={2} />
-          ) : (
+        {isPickerMode ? (
+          <span className="text-brand-teal-deep inline-flex items-center gap-1 text-xs font-semibold">
             <Link2 className="size-3" strokeWidth={2} />
-          )}
-          {linked ? t('banking.transactions.edit_link') : t('banking.transactions.link_action')}
-        </button>
+            {t('banking.transactions.link_action')}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onLink}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors',
+              linked
+                ? 'text-foreground hover:bg-muted/60'
+                : 'bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80',
+            )}
+          >
+            {linked ? (
+              <Edit3 className="size-3" strokeWidth={2} />
+            ) : (
+              <Link2 className="size-3" strokeWidth={2} />
+            )}
+            {linked ? t('banking.transactions.edit_link') : t('banking.transactions.link_action')}
+          </button>
+        )}
       </td>
     </tr>
   )

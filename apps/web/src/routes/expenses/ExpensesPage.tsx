@@ -89,24 +89,56 @@ const CATEGORY_COLORS = [
   '#C0392B',
 ]
 
-export function ExpensesPage() {
+type ExpensesPageProps = {
+  /** Embedded режим — без header'a, picker callbacks вместо edit modal.
+   *  Используется в LinkTransactionDialog для выбора расхода (см. Раунд 5). */
+  embedded?: boolean
+  /** Override salonId если не из URL (нужен в embed-моде). */
+  pickerSalonId?: string
+  /** Callback при клике на строку расхода в picker-mode. Если задан —
+   *  открытие edit-modal отключено, юзер выбирает расход для связи. */
+  onPickExpense?: (expense: ExpenseRow) => void
+  /** Скрыть таб «Банкинг» — нужно когда страница embedded в LinkTransactionDialog
+   *  (показывать банкинг внутри банкинга = recursive UX). */
+  hideBankingTab?: boolean
+}
+
+export function ExpensesPage({
+  embedded = false,
+  pickerSalonId,
+  onPickExpense,
+  hideBankingTab = false,
+}: ExpensesPageProps = {}) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const params_ = useParams<{ salonId: string }>()
+  const salonId = pickerSalonId ?? params_.salonId
   const [params, setParams] = useSearchParams()
-  const categoryFilter = params.get('cat') || ''
-  const payFilter = (params.get('pay') || '') as PaymentMethod | ''
+  // Embedded: используем локальный state вместо URL params чтобы не дёргать
+  // history родительской страницы. Фильтры/таб живут только пока открыта модалка.
+  const [localTab, setLocalTab] = useState<'paid' | 'pending'>('paid')
+  const [localCatFilter, setLocalCatFilter] = useState<string>('')
+  const [localPayFilter, setLocalPayFilter] = useState<PaymentMethod | ''>('')
+  const categoryFilter = embedded ? localCatFilter : params.get('cat') || ''
+  const payFilter = embedded ? localPayFilter : ((params.get('pay') || '') as PaymentMethod | '')
   // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments)
   // | banking (банковские транзакции для ручной/авто привязки к расходам).
   type ExpenseTab = 'paid' | 'pending' | 'banking'
   const tabParam = params.get('tab')
-  const tab: ExpenseTab =
+  const urlTab: ExpenseTab =
     tabParam === 'pending' ? 'pending' : tabParam === 'banking' ? 'banking' : 'paid'
+  const tab: ExpenseTab = embedded ? localTab : urlTab
   function setTab(value: ExpenseTab) {
+    if (embedded) {
+      if (value === 'banking') return // в embed нет банкинга
+      setLocalTab(value)
+      return
+    }
     const next = new URLSearchParams(params)
     if (value === 'paid') next.delete('tab')
     else next.set('tab', value)
     setParams(next, { replace: true })
   }
+  const isPickerMode = !!onPickExpense
   // PeriodPickerPopover как в отчётах — выбор пресета/диапазона дат.
   // useExpenses ждёт диапазон дат в формате 'YYYY-MM-DD' (без времени),
   // потому что у expenses.expense_at колонка типа date, не timestamp.
@@ -118,6 +150,12 @@ export function ExpensesPage() {
   }
 
   function setFilter(key: string, value: string | null) {
+    if (embedded) {
+      const v = value && value !== 'all' ? value : ''
+      if (key === 'cat') setLocalCatFilter(v)
+      if (key === 'pay') setLocalPayFilter(v as PaymentMethod | '')
+      return
+    }
     const next = new URLSearchParams(params)
     if (value && value !== 'all') next.set(key, value)
     else next.delete(key)
@@ -296,46 +334,59 @@ export function ExpensesPage() {
   const sideTotal = tab === 'pending' ? pendingTotal : total
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
-      {/* Header */}
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div>
-          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-            {t('expenses.title')}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {tab === 'pending'
-              ? t('expenses.tabs.subtitle_pending', { defaultValue: 'Запланировано к оплате:' })
-              : t('expenses.subtitle_total')}{' '}
-            <span
-              className={cn(
-                'num font-bold',
-                tab === 'pending' ? 'text-sky-700' : 'text-destructive',
-              )}
-            >
-              {formatCurrency(tab === 'pending' ? pendingTotal : total, currency)}
-            </span>
+    <div className={cn('flex flex-1 flex-col', embedded ? 'p-0' : 'px-5 py-7 sm:px-8 lg:pb-12')}>
+      {/* Header — скрыт в embedded (его место занимает DialogTitle родителя). */}
+      {embedded ? (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-xs">
+            {isPickerMode
+              ? t('expenses.picker_hint', {
+                  defaultValue: 'Кликни по расходу чтобы связать с банковской транзакцией',
+                })
+              : null}
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
           <PeriodPickerPopover value={period} onChange={setPeriod} />
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => {
-              if (!hasOpenShift) {
-                setGateOpen(true)
-                return
-              }
-              setFormOpen(true)
-            }}
-            data-testid="add-expense"
-          >
-            <Plus className="size-4" strokeWidth={2.4} />
-            {t('expenses.add')}
-          </Button>
         </div>
-      </div>
+      ) : (
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+          <div>
+            <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+              {t('expenses.title')}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {tab === 'pending'
+                ? t('expenses.tabs.subtitle_pending', { defaultValue: 'Запланировано к оплате:' })
+                : t('expenses.subtitle_total')}{' '}
+              <span
+                className={cn(
+                  'num font-bold',
+                  tab === 'pending' ? 'text-sky-700' : 'text-destructive',
+                )}
+              >
+                {formatCurrency(tab === 'pending' ? pendingTotal : total, currency)}
+              </span>
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PeriodPickerPopover value={period} onChange={setPeriod} />
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => {
+                if (!hasOpenShift) {
+                  setGateOpen(true)
+                  return
+                }
+                setFormOpen(true)
+              }}
+              data-testid="add-expense"
+            >
+              <Plus className="size-4" strokeWidth={2.4} />
+              {t('expenses.add')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Табы Оплачено / Не оплачено */}
       <div className="border-border bg-card shadow-finsm mb-4 inline-flex rounded-lg border p-1">
@@ -371,19 +422,21 @@ export function ExpensesPage() {
             {pendingPayments.length}
           </span>
         </button>
-        <button
-          type="button"
-          onClick={() => setTab('banking')}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-            tab === 'banking'
-              ? 'bg-brand-teal-soft text-brand-teal-deep'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <Landmark className="size-4" strokeWidth={1.8} />
-          {t('expenses.tabs.banking', { defaultValue: 'Банкинг' })}
-        </button>
+        {hideBankingTab ? null : (
+          <button
+            type="button"
+            onClick={() => setTab('banking')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+              tab === 'banking'
+                ? 'bg-brand-teal-soft text-brand-teal-deep'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Landmark className="size-4" strokeWidth={1.8} />
+            {t('expenses.tabs.banking', { defaultValue: 'Банкинг' })}
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -514,6 +567,10 @@ export function ExpensesPage() {
                             <li
                               key={`partial-${e.id}`}
                               onClick={() => {
+                                if (isPickerMode) {
+                                  onPickExpense?.(e)
+                                  return
+                                }
                                 if (!hasOpenShift) {
                                   setGateOpen(true)
                                   return
@@ -720,6 +777,10 @@ export function ExpensesPage() {
                     <li
                       key={e.id}
                       onClick={() => {
+                        if (isPickerMode) {
+                          onPickExpense?.(e)
+                          return
+                        }
                         if (!hasOpenShift) {
                           setGateOpen(true)
                           return

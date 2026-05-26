@@ -20,6 +20,7 @@ import { useOtherIncomes, type OtherIncomeRow } from '@/hooks/useOtherIncomes'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
+import { ExpensesPage } from '@/routes/expenses/ExpensesPage'
 
 type Props = {
   open: boolean
@@ -144,23 +145,106 @@ export function LinkTransactionDialog({
       ? !!transaction.expense_id
       : !!(transaction.linked_visit_id || transaction.linked_other_income_id)
 
+  function handlePickExpense(expense: ExpenseRow) {
+    handlePick({
+      kind: 'expense',
+      id: expense.id,
+      title: expense.description || '',
+      subtitle: '',
+      amount_cents: expense.amount_cents,
+      date: expense.expense_at,
+    })
+  }
+
+  // Debit: embedded full ExpensesPage в широкой модалке (см. owner-feedback
+  // 2026-05-26 — image #10/#11). Юзер видит вкладки Оплачено/Не оплачено,
+  // структуру, фильтры — выбирает расход кликом и связывается с tx.
+  if (direction === 'debit') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
+          <DialogHeader>
+            <div className="border-border border-b px-5 py-3">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Link2 className="text-brand-teal-deep size-4" strokeWidth={2} />
+                {t('banking.link_dialog.title_debit')}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                <span className="block">
+                  {transaction.counterparty || t('banking.transactions.no_counterparty')}
+                  {' · '}
+                  <span className="text-destructive">
+                    −{formatCurrency(transaction.amount_cents, txCurrency)}
+                  </span>
+                  {' · '}
+                  {formatExpenseDate(transaction.executed_at)}
+                </span>
+                {transaction.description ? (
+                  <span className="text-muted-foreground/80 mt-0.5 block truncate text-[11px]">
+                    {transaction.description}
+                  </span>
+                ) : null}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <div className="overflow-y-auto px-5 py-3">
+            <ExpensesPage
+              embedded
+              pickerSalonId={salonId}
+              hideBankingTab
+              onPickExpense={handlePickExpense}
+            />
+          </div>
+
+          <DialogFooter className="border-border flex items-center justify-between gap-2 border-t px-5 py-3 sm:justify-between">
+            {hasExistingLink ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUnlink}
+                disabled={link.isPending}
+                className="text-destructive border-destructive/40"
+              >
+                <Unlink2 className="size-3.5" strokeWidth={2} />
+                {t('banking.link_dialog.unlink')}
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              {onCreateExpenseFromTx ? (
+                <Button variant="secondary" size="sm" onClick={onCreateExpenseFromTx}>
+                  <Plus className="size-3.5" strokeWidth={2.4} />
+                  {t('banking.link_dialog.create_new_expense', {
+                    defaultValue: '+ Создать новый расход с этими данными',
+                  })}
+                </Button>
+              ) : null}
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="text-brand-teal-deep size-4" strokeWidth={2} />
-            {direction === 'debit'
-              ? t('banking.link_dialog.title_debit')
-              : t('banking.link_dialog.title_credit')}
+            {t('banking.link_dialog.title_credit')}
           </DialogTitle>
           <DialogDescription>
             <span className="block">
               {transaction.counterparty || t('banking.transactions.no_counterparty')}
               {' · '}
-              <span className={direction === 'debit' ? 'text-destructive' : 'text-emerald-700'}>
-                {direction === 'debit' ? '−' : '+'}
-                {formatCurrency(transaction.amount_cents, txCurrency)}
+              <span className="text-emerald-700">
+                +{formatCurrency(transaction.amount_cents, txCurrency)}
               </span>
               {' · '}
               {formatExpenseDate(transaction.executed_at)}
@@ -182,11 +266,7 @@ export function LinkTransactionDialog({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                direction === 'debit'
-                  ? t('banking.link_dialog.search_expense')
-                  : t('banking.link_dialog.search_income')
-              }
+              placeholder={t('banking.link_dialog.search_income')}
               className="pl-8"
               autoFocus
             />
@@ -215,19 +295,6 @@ export function LinkTransactionDialog({
               </ul>
             )}
           </div>
-
-          {direction === 'debit' && onCreateExpenseFromTx ? (
-            <button
-              type="button"
-              onClick={onCreateExpenseFromTx}
-              className="bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80 inline-flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-colors"
-            >
-              <Plus className="size-3.5" strokeWidth={2.4} />
-              {t('banking.link_dialog.create_new_expense', {
-                defaultValue: '+ Создать новый расход с этими данными',
-              })}
-            </button>
-          ) : null}
         </div>
 
         <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
