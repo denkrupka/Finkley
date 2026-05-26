@@ -33,6 +33,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { formatCurrency } from '@/lib/utils/format-currency'
 import { LinkOtherIncomeToBankDialog } from '@/routes/banking/LinkOtherIncomeToBankDialog'
 
 type Props = {
@@ -185,6 +186,19 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
+            {/* Image #51: если доход частично получен — разбивка под полем. */}
+            {income?.paid_amount_cents != null ? (
+              <p className="num text-[11px] font-semibold text-amber-700">
+                {t('income.other_form.partial_received', {
+                  paid: formatCurrency(income.paid_amount_cents, currency),
+                  remaining: formatCurrency(
+                    Math.max(0, income.amount_cents - income.paid_amount_cents),
+                    currency,
+                  ),
+                  defaultValue: 'Получено {{paid}} · осталось {{remaining}}',
+                })}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">

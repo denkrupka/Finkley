@@ -657,6 +657,20 @@ function DetailView({
             {t('visits.detail.total')}
           </p>
           <p className="num text-foreground text-xl font-bold">{formatCurrency(total, currency)}</p>
+          {/* Image #51: partial-info — если визит частично получен,
+              показываем разбивку получено/осталось. */}
+          {groupLines.length === 1 && groupLines[0]?.paid_amount_cents != null ? (
+            <p className="num mt-0.5 text-[11px] font-semibold text-amber-700">
+              {t('visits.detail.partial_received', {
+                paid: formatCurrency(groupLines[0].paid_amount_cents, currency),
+                remaining: formatCurrency(
+                  Math.max(0, total - groupLines[0].paid_amount_cents),
+                  currency,
+                ),
+                defaultValue: 'Получено {{paid}} · осталось {{remaining}}',
+              })}
+            </p>
+          ) : null}
         </div>
         {allPaid ? (
           <Button onClick={onClose}>{t('common.close')}</Button>

@@ -25,5 +25,8 @@ export default defineConfig({
     // за один и тот же staging Supabase — bank_tx_splits ловит timeout
     // и RLS-тесты видят чужие seeds. Чуть медленнее, но стабильнее.
     fileParallelism: false,
+    // Default 5s слишком короткий для PostgREST RPC через сеть. UNIQUE-тест
+    // bank_tx_splits надёжно занимает 14-15s (insert + дубль). Поднимаем.
+    testTimeout: 20_000,
   },
 })
