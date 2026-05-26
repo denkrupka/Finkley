@@ -42,13 +42,24 @@ export function LogoWordmark({ height = 28, className }: { height?: number; clas
  * Композит: монограмма + текст «Finkley» рядом.
  * Используется в sidebar/onboarding header.
  */
-export function LogoLockup({ size = 30, className }: { size?: number; className?: string }) {
+export function LogoLockup({
+  size = 30,
+  className,
+  hideText = false,
+}: {
+  size?: number
+  className?: string
+  /** bug 94dd5f53 — collapsed sidebar: показать только монограмму без текста. */
+  hideText?: boolean
+}) {
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
       <LogoMonogram size={size} />
-      <span className="font-display text-brand-navy text-base font-bold tracking-tight">
-        Finkley
-      </span>
+      {hideText ? null : (
+        <span className="font-display text-brand-navy text-base font-bold tracking-tight">
+          Finkley
+        </span>
+      )}
     </div>
   )
 }

@@ -72,6 +72,23 @@ export function SalonLayout() {
   const { user } = useAuth()
   const { data: salons, isLoading } = useMySalons()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // bug 94dd5f53 — collapse sidebar (только иконки). Состояние в
+  // localStorage чтобы переживало рефреш.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('finkley:sidebar:collapsed') === '1'
+  })
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem('finkley:sidebar:collapsed', next ? '1' : '0')
+      } catch {
+        /* localStorage may be disabled — ignore */
+      }
+      return next
+    })
+  }
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
   const [quickEntryPrefill, setQuickEntryPrefill] = useState<{
     staffId: string
@@ -166,7 +183,11 @@ export function SalonLayout() {
     <div className="bg-background min-h-screen">
       {/* Sidebar desktop — fixed, всегда видна при прокрутке (любой высоты страницы). */}
       <div className="fixed inset-y-0 left-0 z-30 hidden lg:block">
-        <Sidebar salonId={salon.id} />
+        <Sidebar
+          salonId={salon.id}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebarCollapsed}
+        />
       </div>
 
       {/* Sidebar mobile в Drawer */}
@@ -188,7 +209,11 @@ export function SalonLayout() {
           h-screen на десктопе делает колонку строго равной viewport — TopBar
           всегда виден, скролл живёт внутри <main>. Это нужно для страниц
           вроде /messenger где нельзя позволить body-скроллу выпихнуть UI. */}
-      <div className="flex min-h-screen min-w-0 flex-col lg:h-screen lg:pl-[232px]">
+      <div
+        className={`flex min-h-screen min-w-0 flex-col lg:h-screen ${
+          sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[232px]'
+        }`}
+      >
         <TopBar
           salonId={salon.id}
           salonName={salon.name}

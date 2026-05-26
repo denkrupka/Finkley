@@ -1,4 +1,4 @@
-import { Bug, HelpCircle } from 'lucide-react'
+import { Bug, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink } from 'react-router-dom'
@@ -20,23 +20,32 @@ type Props = {
   salonId: string
   /** Для mobile-drawer — закрыть после клика по пункту */
   onNavigate?: () => void
+  /** bug 94dd5f53 — collapsed mode: только иконки, ширина 64px. */
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }
 
 /**
- * Sidebar 232×fullheight. Sticky на десктопе — всегда видна при прокрутке.
- * Сверху лого, по центру навигация, в подвале — Help / Реферал / Тема.
+ * Sidebar 232×fullheight (или 64×fullheight в collapsed). Sticky на
+ * десктопе — всегда видна при прокрутке. Сверху лого, по центру навигация,
+ * в подвале — Help / Реферал / Тема + кнопка collapse (bug 94dd5f53).
  */
-export function Sidebar({ salonId, onNavigate }: Props) {
+export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollapsed }: Props) {
   const { t } = useTranslation()
   const [bugOpen, setBugOpen] = useState(false)
   const { data: unreadNegative = 0 } = useUnreadNegativeReviewsCount(salonId)
   const { data: unreadMessenger = 0 } = useUnreadMessengerCount(salonId)
 
   return (
-    <aside className="border-border bg-card flex h-screen w-[232px] flex-shrink-0 flex-col border-r px-3.5 pb-4 pt-5">
+    <aside
+      className={cn(
+        'border-border bg-card flex h-screen flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
+        collapsed ? 'w-[64px] px-2' : 'w-[232px] px-3.5',
+      )}
+    >
       {/* Logo */}
-      <div className="mb-5 px-2">
-        <LogoLockup size={28} />
+      <div className={cn('mb-5', collapsed ? 'flex justify-center' : 'px-2')}>
+        {collapsed ? <LogoLockup size={28} hideText /> : <LogoLockup size={28} />}
       </div>
 
       {/* Nav */}
@@ -48,9 +57,11 @@ export function Sidebar({ salonId, onNavigate }: Props) {
               key={item.id}
               to={`/${salonId}/${item.id}`}
               onClick={onNavigate}
+              title={collapsed ? t(item.i18nKey) : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
+                  'flex items-center rounded-md text-sm transition-colors',
+                  collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                   isActive
                     ? 'bg-primary text-primary-foreground font-semibold'
                     : 'text-foreground hover:bg-accent/50 font-medium',
@@ -66,32 +77,48 @@ export function Sidebar({ salonId, onNavigate }: Props) {
                     )}
                     strokeWidth={1.7}
                   />
-                  <span className="flex-1">{t(item.i18nKey)}</span>
+                  {collapsed ? null : <span className="flex-1">{t(item.i18nKey)}</span>}
+                  {/* В collapsed badge показываем как маленькую red-dot
+                      в углу иконки (через absolute, требует relative parent) */}
                   {item.id === 'reports' && unreadNegative > 0 ? (
-                    <span
-                      className={cn(
-                        'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none',
-                        isActive
-                          ? 'bg-primary-foreground text-primary'
-                          : 'bg-destructive text-destructive-foreground',
-                      )}
-                      title={t('nav.reports_unread_negative', { count: unreadNegative })}
-                    >
-                      {unreadNegative > 99 ? '99+' : unreadNegative}
-                    </span>
+                    collapsed ? (
+                      <span
+                        className="bg-destructive absolute -mr-3 -mt-3 size-2 rounded-full"
+                        title={t('nav.reports_unread_negative', { count: unreadNegative })}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none',
+                          isActive
+                            ? 'bg-primary-foreground text-primary'
+                            : 'bg-destructive text-destructive-foreground',
+                        )}
+                        title={t('nav.reports_unread_negative', { count: unreadNegative })}
+                      >
+                        {unreadNegative > 99 ? '99+' : unreadNegative}
+                      </span>
+                    )
                   ) : null}
                   {item.id === 'messenger' && unreadMessenger > 0 ? (
-                    <span
-                      className={cn(
-                        'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none',
-                        isActive
-                          ? 'bg-primary-foreground text-primary'
-                          : 'bg-destructive text-destructive-foreground',
-                      )}
-                      title={t('nav.messenger_unread', { count: unreadMessenger })}
-                    >
-                      {unreadMessenger > 99 ? '99+' : unreadMessenger}
-                    </span>
+                    collapsed ? (
+                      <span
+                        className="bg-destructive absolute -mr-3 -mt-3 size-2 rounded-full"
+                        title={t('nav.messenger_unread', { count: unreadMessenger })}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none',
+                          isActive
+                            ? 'bg-primary-foreground text-primary'
+                            : 'bg-destructive text-destructive-foreground',
+                        )}
+                        title={t('nav.messenger_unread', { count: unreadMessenger })}
+                      >
+                        {unreadMessenger > 99 ? '99+' : unreadMessenger}
+                      </span>
+                    )
                   ) : null}
                 </>
               )}
@@ -105,26 +132,51 @@ export function Sidebar({ salonId, onNavigate }: Props) {
           жёлтой ленте Tester'а (TesterBanner) и была доступна только
           тестерам; теперь — всем юзерам по запросу владельца. */}
       <div className="border-border mt-3 flex flex-col gap-2 border-t pt-3">
-        <ReferralButton variant="sidebar" />
+        {collapsed ? null : <ReferralButton variant="sidebar" />}
         <button
           type="button"
           onClick={() => setBugOpen(true)}
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-amber-500/15 px-2 text-[12px] font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
+          title={collapsed ? t('nav.report_bug') : undefined}
+          className={cn(
+            'inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-amber-500/15 text-[12px] font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200',
+            collapsed ? 'w-9 px-0' : 'px-2',
+          )}
         >
           <Bug className="size-3.5" strokeWidth={2} />
-          {t('nav.report_bug')}
+          {collapsed ? null : t('nav.report_bug')}
         </button>
-        <div className="flex items-center gap-2">
+        <div className={cn('flex items-center', collapsed ? 'flex-col gap-1.5' : 'gap-2')}>
           <ThemeToggleButton variant="sidebar" />
-          <Link
-            to={`/${salonId}/help`}
-            onClick={onNavigate}
-            className="text-muted-foreground hover:text-foreground inline-flex flex-1 items-center gap-1.5 px-1.5 text-[11px] font-medium"
-          >
-            <HelpCircle className="size-3.5" strokeWidth={1.7} />
-            {t('nav.help')}
-          </Link>
+          {collapsed ? null : (
+            <Link
+              to={`/${salonId}/help`}
+              onClick={onNavigate}
+              className="text-muted-foreground hover:text-foreground inline-flex flex-1 items-center gap-1.5 px-1.5 text-[11px] font-medium"
+            >
+              <HelpCircle className="size-3.5" strokeWidth={1.7} />
+              {t('nav.help')}
+            </Link>
+          )}
         </div>
+        {/* bug 94dd5f53 — toggle collapse в самом низу */}
+        {onToggleCollapsed ? (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            title={
+              collapsed
+                ? t('nav.expand_sidebar', { defaultValue: 'Развернуть меню' })
+                : t('nav.collapse_sidebar', { defaultValue: 'Свернуть меню' })
+            }
+            className="text-muted-foreground hover:text-foreground hover:bg-accent/40 mt-1 inline-flex h-7 items-center justify-center rounded-md"
+          >
+            {collapsed ? (
+              <ChevronRight className="size-4" strokeWidth={1.8} />
+            ) : (
+              <ChevronLeft className="size-4" strokeWidth={1.8} />
+            )}
+          </button>
+        ) : null}
       </div>
 
       {bugOpen ? (

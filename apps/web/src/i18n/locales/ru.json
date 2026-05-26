@@ -1013,7 +1013,9 @@
     "more": "Ещё",
     "help": "Помощь и FAQ",
     "report_bug": "Сообщить о баге",
-    "drawer_title": "Меню навигации"
+    "drawer_title": "Меню навигации",
+    "collapse_sidebar": "Свернуть меню",
+    "expand_sidebar": "Развернуть меню"
   },
   "services_page": {
     "title": "Услуги салона",

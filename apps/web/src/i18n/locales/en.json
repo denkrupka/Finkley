@@ -289,7 +289,9 @@
     "help": "Help & FAQ",
     "drawer_title": "Navigation menu",
     "messenger": "Messenger",
-    "report_bug": "Report a bug"
+    "report_bug": "Report a bug",
+    "collapse_sidebar": "Collapse menu",
+    "expand_sidebar": "Expand menu"
   },
   "services_page": {
     "title": "Salon services",

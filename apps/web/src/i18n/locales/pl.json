@@ -289,7 +289,9 @@
     "help": "Pomoc i FAQ",
     "drawer_title": "Menu nawigacji",
     "messenger": "Komunikator",
-    "report_bug": "Zgłoś bug"
+    "report_bug": "Zgłoś bug",
+    "collapse_sidebar": "Zwiń menu",
+    "expand_sidebar": "Rozwiń menu"
   },
   "services_page": {
     "title": "Usługi salonu",
