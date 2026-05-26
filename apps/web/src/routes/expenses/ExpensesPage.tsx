@@ -129,6 +129,9 @@ export function ExpensesPage({
   const [localTab, setLocalTab] = useState<'paid' | 'pending'>('paid')
   const [localCatFilter, setLocalCatFilter] = useState<string>('')
   const [localPayFilter, setLocalPayFilter] = useState<PaymentMethod | ''>('')
+  // Image #44: в embedded picker по умолчанию прячем расходы уже связанные
+  // с какой-то банк-tx. Юзер toggle'ает «Показать связанные» чтобы вернуть их.
+  const [showLinked, setShowLinked] = useState(false)
   const categoryFilter = embedded ? localCatFilter : params.get('cat') || ''
   const payFilter = embedded ? localPayFilter : ((params.get('pay') || '') as PaymentMethod | '')
   // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments)
@@ -199,12 +202,35 @@ export function ExpensesPage({
     return map
   }, [teamMembers])
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
-  const { data: expenses = [], isLoading } = useExpenses(salonId, range, {
+  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  const needsReviewExpenseIds = bankLinked?.needsReviewExpenseIds ?? null
+  const linkedExpenseIds = useMemo(() => bankLinked?.expenseIds ?? new Set<string>(), [bankLinked])
+  const isLinked = useMemo(
+    () =>
+      (e: ExpenseRow): boolean =>
+        !!e.bank_transaction_id || linkedExpenseIds.has(e.id),
+    [linkedExpenseIds],
+  )
+  // Если в embed picker мы открыли tx с уже связанным расходом — не прячем его,
+  // чтобы юзер видел текущую связь и мог переподтвердить (highlight зелёным).
+  const passesLinkedFilter = useMemo(
+    () =>
+      (e: ExpenseRow): boolean => {
+        if (!embedded) return true
+        if (showLinked) return true
+        if (highlightExpenseId === e.id) return true
+        return !isLinked(e)
+      },
+    [embedded, showLinked, highlightExpenseId, isLinked],
+  )
+  const { data: rawExpenses = [], isLoading } = useExpenses(salonId, range, {
     categoryId: categoryFilter || null,
     paymentMethod: payFilter || null,
   })
-  const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
-  const needsReviewExpenseIds = bankLinked?.needsReviewExpenseIds ?? null
+  const expenses = useMemo(
+    () => rawExpenses.filter((e) => passesLinkedFilter(e)),
+    [rawExpenses, passesLinkedFilter],
+  )
   // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
   // категории — на клиенте, чтобы не плодить варианты хука.
   const { data: allScheduled = [], isLoading: scheduledLoading } = useScheduledPayments(salonId)
@@ -218,7 +244,7 @@ export function ExpensesPage({
         .sort((a, b) => a.due_date.localeCompare(b.due_date)),
     [allScheduled, range.start, range.end, categoryFilter],
   )
-  const pendingTotal = pendingPayments.reduce((s, p) => s + p.amount_cents, 0)
+  const scheduledPendingTotal = pendingPayments.reduce((s, p) => s + p.amount_cents, 0)
   // Частично-оплаченные расходы за период — показываются и в «Оплачено»
   // (с пометкой "оплачено X"), и в «Не оплачено» (с суммой остатка).
   const partiallyPaidExpenses = useMemo(
@@ -230,6 +256,10 @@ export function ExpensesPage({
     (s, e) => s + (e.amount_cents - (e.paid_amount_cents ?? 0)),
     0,
   )
+  // Объединённый total «Не оплачено» — запланированные + остаток по частично-оплаченным.
+  // Счётчик во вкладке считаем по той же формуле (image #46).
+  const pendingTotal = scheduledPendingTotal + partialRemainingTotal
+  const pendingCount = pendingPayments.length + partiallyPaidExpenses.length
   const todayStr = new Date().toISOString().slice(0, 10)
   const [editingPayment, setEditingPayment] = useState<ScheduledPaymentRow | null>(null)
   // Bulk-export: режим выбора с чекбоксами и модалка экспорта.
@@ -348,7 +378,7 @@ export function ExpensesPage({
     <div className={cn('flex flex-1 flex-col', embedded ? 'p-0' : 'px-5 py-7 sm:px-8 lg:pb-12')}>
       {/* Header — скрыт в embedded (его место занимает DialogTitle родителя). */}
       {embedded ? (
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
             {isPickerMode
               ? t('expenses.picker_hint', {
@@ -356,7 +386,18 @@ export function ExpensesPage({
                 })
               : null}
           </p>
-          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <div className="flex items-center gap-2">
+            <label className="text-muted-foreground inline-flex cursor-pointer select-none items-center gap-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={showLinked}
+                onChange={(e) => setShowLinked(e.target.checked)}
+                className="size-3.5 cursor-pointer"
+              />
+              {t('expenses.picker_show_linked', { defaultValue: 'Показать связанные' })}
+            </label>
+            <PeriodPickerPopover value={period} onChange={setPeriod} />
+          </div>
         </div>
       ) : (
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -430,7 +471,7 @@ export function ExpensesPage({
           <CalendarClock className="size-4" strokeWidth={1.8} />
           {t('expenses.tabs.pending', { defaultValue: 'Не оплачено' })}
           <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
-            {pendingPayments.length}
+            {pendingCount}
           </span>
         </button>
         {hideBankingTab ? null : (
@@ -499,7 +540,7 @@ export function ExpensesPage({
           currency={currency}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
+        <div className={cn('grid grid-cols-1 gap-5', embedded ? '' : 'lg:grid-cols-[2fr_1fr]')}>
           {/* List */}
           <div className="border-border bg-card shadow-finsm rounded-lg border">
             <div className="border-border flex items-baseline justify-between gap-2 border-b px-5 py-4">
@@ -594,8 +635,21 @@ export function ExpensesPage({
                                 {formatExpenseDate(e.expense_at)}
                               </span>
                               <span className="min-w-0">
-                                <span className="text-foreground block truncate text-sm font-semibold">
-                                  {e.description || cat?.name || t('expenses.no_category')}
+                                <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                                  <span className="truncate">
+                                    {e.description || cat?.name || t('expenses.no_category')}
+                                  </span>
+                                  {isLinked(e) ? (
+                                    <span
+                                      className="text-brand-teal-deep bg-brand-teal-soft inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                                      title={t('expenses.linked_to_bank_tooltip', {
+                                        defaultValue: 'Привязан к банковской транзакции',
+                                      })}
+                                    >
+                                      <Landmark className="size-2.5" strokeWidth={2.4} />
+                                      {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="text-muted-foreground/80 text-[11px]">
                                   {t('expenses.partial_subtitle', {
@@ -854,7 +908,7 @@ export function ExpensesPage({
                               <Paperclip className="size-3.5" strokeWidth={1.7} />
                             </button>
                           ) : null}
-                          {e.bank_transaction_id ? (
+                          {isLinked(e) ? (
                             <span
                               className="text-brand-teal-deep bg-brand-teal-soft inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
                               title={t('expenses.linked_to_bank_tooltip', {
@@ -1118,52 +1172,56 @@ export function ExpensesPage({
             ) : null}
           </div>
 
-          {/* Structure — одинаковый блок для обоих табов, источник зависит от tab */}
-          <div className="flex flex-col gap-4">
-            <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
-              <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-                {tab === 'pending'
-                  ? t('expenses.tabs.structure_title_pending', {
-                      defaultValue: 'Структура запланированных',
-                    })
-                  : t('expenses.structure_title')}
-              </h2>
-              {sideStructure.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
+          {/* Structure — одинаковый блок для обоих табов, источник зависит от tab.
+              В embedded режиме (picker из LinkTransactionDialog) скрываем —
+              юзеру не нужна аналитика при выборе расхода для связи (owner-feedback). */}
+          {embedded ? null : (
+            <div className="flex flex-col gap-4">
+              <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
+                <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
                   {tab === 'pending'
-                    ? t('expenses.tabs.structure_empty_pending', {
-                        defaultValue: 'Нет запланированных платежей в этом периоде',
+                    ? t('expenses.tabs.structure_title_pending', {
+                        defaultValue: 'Структура запланированных',
                       })
-                    : t('expenses.structure_empty')}
-                </p>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {sideStructure.map((c) => {
-                    const pct = sideTotal > 0 ? (c.total_cents / sideTotal) * 100 : 0
-                    return (
-                      <div key={c.id}>
-                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                          <span className="text-foreground text-sm font-medium">{c.name}</span>
-                          <span className="num text-brand-navy text-sm font-bold">
-                            {formatCurrency(c.total_cents, currency)}{' '}
-                            <span className="text-brand-text-faint font-medium">
-                              · {Math.round(pct)}%
+                    : t('expenses.structure_title')}
+                </h2>
+                {sideStructure.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    {tab === 'pending'
+                      ? t('expenses.tabs.structure_empty_pending', {
+                          defaultValue: 'Нет запланированных платежей в этом периоде',
+                        })
+                      : t('expenses.structure_empty')}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-3.5">
+                    {sideStructure.map((c) => {
+                      const pct = sideTotal > 0 ? (c.total_cents / sideTotal) * 100 : 0
+                      return (
+                        <div key={c.id}>
+                          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                            <span className="text-foreground text-sm font-medium">{c.name}</span>
+                            <span className="num text-brand-navy text-sm font-bold">
+                              {formatCurrency(c.total_cents, currency)}{' '}
+                              <span className="text-brand-text-faint font-medium">
+                                · {Math.round(pct)}%
+                              </span>
                             </span>
-                          </span>
+                          </div>
+                          <div className="bg-background h-2.5 overflow-hidden rounded-full">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: c.color }}
+                            />
+                          </div>
                         </div>
-                        <div className="bg-background h-2.5 overflow-hidden rounded-full">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, background: c.color }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

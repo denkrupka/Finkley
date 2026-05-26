@@ -330,6 +330,10 @@ export type BankLinkedIncomeIds = {
   needsReviewVisitIds: Set<string>
   needsReviewOtherIncomeIds: Set<string>
   needsReviewExpenseIds: Set<string>
+  /** IDs транзакций которые имеют хотя бы одну связь (legacy FK или split).
+   *  Используется в BankingTransactionsTable для toggle «Показать связанные»
+   *  — split-tx без legacy FK выглядели как unlinked. */
+  linkedTxIds: Set<string>
 }
 
 export function useBankLinkedIncomeIds(salonId: string | undefined) {
@@ -343,6 +347,7 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         needsReviewVisitIds: new Set(),
         needsReviewOtherIncomeIds: new Set(),
         needsReviewExpenseIds: new Set(),
+        linkedTxIds: new Set(),
       }
       if (!salonId) return empty
       // (1) Legacy single-link: FK на bank_transactions.
@@ -366,6 +371,7 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         needsReviewVisitIds: new Set(),
         needsReviewOtherIncomeIds: new Set(),
         needsReviewExpenseIds: new Set(),
+        linkedTxIds: new Set(),
       }
       // Параллельно собираем txId → needs_review для использования с splits ниже
       const needsReviewByTxId = new Map<string, boolean>()
@@ -377,6 +383,7 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         needs_review: boolean | null
       }>) {
         needsReviewByTxId.set(r.id, !!r.needs_review)
+        result.linkedTxIds.add(r.id)
         if (r.expense_id) result.expenseIds.add(r.expense_id)
         if (r.linked_visit_id) result.visitIds.add(r.linked_visit_id)
         if (r.linked_other_income_id) result.otherIncomeIds.add(r.linked_other_income_id)
@@ -401,6 +408,7 @@ export function useBankLinkedIncomeIds(salonId: string | undefined) {
         entity_id: string
       }>) {
         const isReview = needsReviewByTxId.get(s.bank_transaction_id) ?? false
+        result.linkedTxIds.add(s.bank_transaction_id)
         if (s.kind === 'expense') {
           result.expenseIds.add(s.entity_id)
           if (isReview) result.needsReviewExpenseIds.add(s.entity_id)

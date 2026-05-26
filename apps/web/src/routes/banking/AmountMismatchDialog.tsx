@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
-export type MismatchAction = 'partial' | 'adjust_amount' | 'cancel'
+export type MismatchAction = 'partial' | 'adjust_amount' | 'cancel' | 'pick_multiple'
 
 type Props = {
   open: boolean
@@ -31,6 +31,9 @@ type Props = {
   onChoose: (action: MismatchAction) => void
   /** Spinner на кнопках во время mutation. */
   busy?: boolean
+  /** Показывать ли опцию «Выбрать несколько» (image #43) — для debit-режима
+   *  имеет смысл предложить multi-link если одна сущность не закрывает tx. */
+  allowPickMultiple?: boolean
 }
 
 /**
@@ -57,6 +60,7 @@ export function AmountMismatchDialog({
   entityKind,
   onChoose,
   busy = false,
+  allowPickMultiple = false,
 }: Props) {
   const { t } = useTranslation()
   const [pending, setPending] = useState<MismatchAction | null>(null)
@@ -86,7 +90,7 @@ export function AmountMismatchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="size-5 text-amber-600" strokeWidth={2} />
@@ -147,42 +151,61 @@ export function AmountMismatchDialog({
               variant="primary"
               onClick={() => pick('partial')}
               disabled={busy}
-              className="w-full justify-start"
+              className="h-auto w-full justify-start whitespace-normal py-2.5 text-left leading-snug"
             >
               {pending === 'partial' && busy ? (
-                <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                <Loader2 className="size-4 shrink-0 animate-spin" strokeWidth={2} />
               ) : null}
-              {t('banking.mismatch.action_partial', {
-                defaultValue: 'Записать как частичную оплату (остаток в «Не оплачено»)',
-              })}
+              <span className="block">
+                {t('banking.mismatch.action_partial', {
+                  defaultValue: 'Записать как частичную оплату (остаток в «Не оплачено»)',
+                })}
+              </span>
             </Button>
           ) : null}
           <Button
             variant="outline"
             onClick={() => pick('adjust_amount')}
             disabled={busy}
-            className="w-full justify-start"
+            className="h-auto w-full justify-start whitespace-normal py-2.5 text-left leading-snug"
           >
             {pending === 'adjust_amount' && busy ? (
-              <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+              <Loader2 className="size-4 shrink-0 animate-spin" strokeWidth={2} />
             ) : null}
-            {txLessThanRemaining
-              ? t('banking.mismatch.action_adjust_down', {
-                  defaultValue: 'Изменить сумму {{kind}} на {{tx}} (полностью оплачено)',
-                  tx: formatCurrency(txAmount, currency),
-                  kind: kindLabel,
-                })
-              : t('banking.mismatch.action_adjust_up', {
-                  defaultValue: 'Увеличить сумму {{kind}} до {{tx}}',
-                  tx: formatCurrency(txAmount, currency),
+            <span className="block">
+              {txLessThanRemaining
+                ? t('banking.mismatch.action_adjust_down', {
+                    defaultValue: 'Изменить сумму {{kind}} на {{tx}} (полностью оплачено)',
+                    tx: formatCurrency(txAmount, currency),
+                    kind: kindLabel,
+                  })
+                : t('banking.mismatch.action_adjust_up', {
+                    defaultValue: 'Увеличить сумму {{kind}} до {{tx}}',
+                    tx: formatCurrency(txAmount, currency),
+                    kind: kindLabel,
+                  })}
+            </span>
+          </Button>
+          {allowPickMultiple ? (
+            <Button
+              variant="outline"
+              onClick={() => pick('pick_multiple')}
+              disabled={busy}
+              className="h-auto w-full justify-start whitespace-normal py-2.5 text-left leading-snug"
+            >
+              <span className="block">
+                {t('banking.mismatch.action_pick_multiple', {
+                  defaultValue: 'Выбрать несколько {{kind}}ов для этой транзакции',
                   kind: kindLabel,
                 })}
-          </Button>
+              </span>
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             onClick={() => pick('cancel')}
             disabled={busy}
-            className="w-full justify-start"
+            className="h-auto w-full justify-start whitespace-normal py-2 text-left"
           >
             {t('common.cancel')}
           </Button>

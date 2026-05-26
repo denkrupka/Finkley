@@ -65,6 +65,11 @@ export function SalesTab({
   onPickOtherIncome,
   highlightVisitId = null,
   highlightOtherIncomeId = null,
+  multiSelectMode = false,
+  selectedVisitIds,
+  selectedOtherIncomeIds,
+  onToggleVisitSelection,
+  onToggleOtherIncomeSelection,
 }: {
   salonId: string
   /** Picker-mode: клик по retail-row → callback вместо VisitDetailModal. */
@@ -74,6 +79,12 @@ export function SalesTab({
   /** ID связанной с открытой tx сущности — подсветка зелёным. */
   highlightVisitId?: string | null
   highlightOtherIncomeId?: string | null
+  /** Multi-select для multi-link одной tx → N доходов. */
+  multiSelectMode?: boolean
+  selectedVisitIds?: Set<string>
+  selectedOtherIncomeIds?: Set<string>
+  onToggleVisitSelection?: (v: VisitRow) => void
+  onToggleOtherIncomeSelection?: (o: OtherIncomeRow) => void
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -270,10 +281,28 @@ export function SalesTab({
                     highlightOtherIncomeId === o.id
                       ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
                       : '',
+                    selectedOtherIncomeIds?.has(o.id) ? 'bg-brand-teal-soft/30' : '',
                   )}
-                  onClick={() => (isPickerMode ? onPickOtherIncome?.(o) : setEditingOther(o))}
+                  onClick={() => {
+                    if (multiSelectMode) {
+                      onToggleOtherIncomeSelection?.(o)
+                      return
+                    }
+                    if (isPickerMode) onPickOtherIncome?.(o)
+                    else setEditingOther(o)
+                  }}
                 >
-                  <td className="num text-muted-foreground px-4 py-2 text-xs">
+                  <td className="num text-muted-foreground flex items-center gap-1.5 px-4 py-2 text-xs">
+                    {multiSelectMode ? (
+                      <input
+                        type="checkbox"
+                        checked={selectedOtherIncomeIds?.has(o.id) ?? false}
+                        onChange={() => onToggleOtherIncomeSelection?.(o)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="size-3.5 cursor-pointer"
+                        aria-label="select-other-income"
+                      />
+                    ) : null}
                     {formatVisitDate(o.income_at)}
                   </td>
                   <td className="text-foreground px-4 py-2">
@@ -325,10 +354,28 @@ export function SalesTab({
                       highlightVisitId === s.id
                         ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
                         : '',
+                      selectedVisitIds?.has(s.id) ? 'bg-brand-teal-soft/30' : '',
                     )}
-                    onClick={() => (isPickerMode ? onPickVisit?.(s) : setEditingSale(s))}
+                    onClick={() => {
+                      if (multiSelectMode) {
+                        onToggleVisitSelection?.(s)
+                        return
+                      }
+                      if (isPickerMode) onPickVisit?.(s)
+                      else setEditingSale(s)
+                    }}
                   >
-                    <td className="num text-muted-foreground px-4 py-2 text-xs">
+                    <td className="num text-muted-foreground flex items-center gap-1.5 px-4 py-2 text-xs">
+                      {multiSelectMode ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedVisitIds?.has(s.id) ?? false}
+                          onChange={() => onToggleVisitSelection?.(s)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="size-3.5 cursor-pointer"
+                          aria-label="select-visit"
+                        />
+                      ) : null}
                       {formatVisitDate(s.visit_at)}
                     </td>
                     <td className="text-foreground px-4 py-2 font-semibold">

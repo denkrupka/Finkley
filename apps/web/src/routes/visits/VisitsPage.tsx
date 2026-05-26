@@ -77,6 +77,10 @@ type VisitsPageProps = {
   pickerSalonId?: string
   /** ID визита уже связанного с открытой tx — подсветить зелёным. */
   highlightVisitId?: string | null
+  /** Multi-select для multi-link: чекбокс в строке + tracking выбранных. */
+  multiSelectMode?: boolean
+  selectedVisitIds?: Set<string>
+  onToggleVisitSelection?: (v: VisitRow) => void
 }
 
 export function VisitsPage({
@@ -84,6 +88,9 @@ export function VisitsPage({
   onPickVisit,
   pickerSalonId,
   highlightVisitId = null,
+  multiSelectMode = false,
+  selectedVisitIds,
+  onToggleVisitSelection,
 }: VisitsPageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
@@ -316,9 +323,14 @@ export function VisitsPage({
                           <SingleVisitRow
                             key={row.id}
                             visit={row}
-                            onEdit={() =>
-                              isPickerMode ? onPickVisit?.(row) : setEditingVisit(row)
-                            }
+                            onEdit={() => {
+                              if (multiSelectMode) {
+                                onToggleVisitSelection?.(row)
+                                return
+                              }
+                              if (isPickerMode) onPickVisit?.(row)
+                              else setEditingVisit(row)
+                            }}
                             onDelete={() => {
                               if (!confirm(t('visits.confirm_delete'))) return
                               deleteVisit.mutate(row.id, {
@@ -333,6 +345,8 @@ export function VisitsPage({
                             needsReview={needsReviewVisitIds?.has(row.id) ?? false}
                             hideActions={isPickerMode}
                             highlight={highlightVisitId === row.id}
+                            multiSelectMode={multiSelectMode}
+                            isMultiSelected={selectedVisitIds?.has(row.id) ?? false}
                             t={t}
                           />
                         )
@@ -381,6 +395,8 @@ function SingleVisitRow({
   needsReview,
   hideActions = false,
   highlight = false,
+  multiSelectMode = false,
+  isMultiSelected = false,
   t,
 }: {
   visit: VisitRow
@@ -396,6 +412,8 @@ function SingleVisitRow({
   hideActions?: boolean
   /** Подсветить строку зелёным (visit уже привязан к текущей tx). */
   highlight?: boolean
+  multiSelectMode?: boolean
+  isMultiSelected?: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const staffMember = staff.find((s) => s.id === v.staff_id)
@@ -409,6 +427,7 @@ function SingleVisitRow({
         'border-border hover:bg-muted/40 cursor-pointer border-t transition-colors first:border-t-0',
         ROW_GRID,
         highlight ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60' : '',
+        isMultiSelected ? 'bg-brand-teal-soft/30' : '',
       )}
       data-testid="visit-row"
       onClick={onEdit}
@@ -421,7 +440,19 @@ function SingleVisitRow({
       role="button"
       tabIndex={0}
     >
-      <span className="num text-muted-foreground text-xs">{visitTimeStr(v.visit_at)}</span>
+      <span className="num text-muted-foreground flex items-center gap-1.5 text-xs">
+        {multiSelectMode ? (
+          <input
+            type="checkbox"
+            checked={isMultiSelected}
+            onChange={() => onEdit()}
+            onClick={(e) => e.stopPropagation()}
+            className="size-3.5 cursor-pointer"
+            aria-label="select-visit"
+          />
+        ) : null}
+        {visitTimeStr(v.visit_at)}
+      </span>
       <span className="flex items-center gap-2.5">
         <span
           className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"

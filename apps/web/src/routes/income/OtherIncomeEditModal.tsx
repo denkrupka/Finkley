@@ -151,12 +151,14 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('income.other_edit.title')}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col p-0">
+        <div className="border-border shrink-0 border-b px-5 py-3">
+          <DialogHeader>
+            <DialogTitle>{t('income.other_edit.title')}</DialogTitle>
+          </DialogHeader>
+        </div>
 
-        <div className="flex flex-col gap-3 px-5 pb-2">
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="oi-edit-category">{t('income.other_form.category')}</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
@@ -315,7 +317,7 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
           }}
         />
 
-        <DialogFooter className="justify-between sm:justify-between">
+        <DialogFooter className="border-border shrink-0 justify-between border-t px-5 py-3 sm:justify-between">
           <Button
             variant="ghost"
             onClick={handleDelete}

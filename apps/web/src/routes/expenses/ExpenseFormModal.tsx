@@ -1312,7 +1312,7 @@ export function ExpenseFormModal({
               имеет installments). Показываем список «Дата · Сумма · Касса» +
               кнопку удалить. Создаются автоматом из mismatch-модалки или
               через чекбокс «Частичная оплата» ниже. owner-feedback 2026-05-26. */}
-          {paid && isEdit && expense ? (
+          {paid && isEdit && expense && !isPayrollCategory ? (
             <InstallmentsList
               salonId={salonId}
               expenseId={expense.id}
@@ -1326,7 +1326,7 @@ export function ExpenseFormModal({
           {/* Чекбокс «частичная оплата». amount = сумма по документу,
               paid_amount = сколько уже оплатили. UI блок появляется только
               если paid=true (для plan-mode нет смысла). */}
-          {paid ? (
+          {paid && !isPayrollCategory ? (
             <Controller
               name="is_partial_payment"
               control={form.control}

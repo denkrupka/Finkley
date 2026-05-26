@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import {
   useBankConnections,
   useBankInflows,
+  useBankLinkedIncomeIds,
   useBankOutflows,
   useBankSyncNow,
   type BankInflowRow,
@@ -64,6 +65,9 @@ export function BankingTransactionsTable({
   const { data: connections = [] } = useBankConnections(salonId)
   const inflowsQ = useBankInflows(direction === 'credit' ? salonId : undefined, period)
   const outflowsQ = useBankOutflows(direction === 'debit' ? salonId : undefined, period)
+  // linkedTxIds — для фильтра «Показать связанные» (учитываем splits, не
+  // только legacy FK). См. image #55 — без этого split-tx считались unlinked.
+  const { data: bankLinkedAll } = useBankLinkedIncomeIds(salonId)
   // Резолв категории для linked tx — без сервер-side join, на клиенте через
   // уже кешируемые hooks. Период expenses/other_incomes расширяем ±90 дней
   // (auto-match window) чтобы попасть в связь даже если tx и расход в разные
@@ -151,9 +155,17 @@ export function BankingTransactionsTable({
     direction === 'debit' ? (outflowsQ.data ?? []) : (inflowsQ.data ?? [])
   // unlinkedOnly (picker-mode) — жёсткий фильтр. Иначе — soft toggle
   // showLinked (default false: только unlinked, юзеру важнее необработанные).
+  // Учитываем и legacy FK, и splits (bank_tx_splits — multi-link). Без splits
+  // tx считалась бы unlinked даже если она связана через splits.
   const rows =
     unlinkedOnly || !showLinked
-      ? allRows.filter((tx) => !tx.expense_id && !tx.linked_visit_id && !tx.linked_other_income_id)
+      ? allRows.filter(
+          (tx) =>
+            !tx.expense_id &&
+            !tx.linked_visit_id &&
+            !tx.linked_other_income_id &&
+            !bankLinkedAll?.linkedTxIds.has(tx.id),
+        )
       : allRows
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')

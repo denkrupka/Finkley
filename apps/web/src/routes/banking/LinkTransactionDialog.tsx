@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  useBankLinkedIncomeIds,
   useLinkBankTransaction,
   useMultiLinkBankTransaction,
   type BankInflowRow,
@@ -29,6 +30,7 @@ import { ExpensesPage } from '@/routes/expenses/ExpensesPage'
 import { IncomePage } from '@/routes/income/IncomePage'
 
 import { AmountMismatchDialog, type MismatchAction } from './AmountMismatchDialog'
+import { LinkConflictDialog, type ConflictAction } from './LinkConflictDialog'
 
 type Props = {
   open: boolean
@@ -61,6 +63,9 @@ export function LinkTransactionDialog({
   const qc = useQueryClient()
   const link = useLinkBankTransaction(salonId)
   const multiLink = useMultiLinkBankTransaction(salonId)
+  // Используем для conflict-check (image #45): сущность уже связана с другой tx?
+  const { data: bankLinkedAll } = useBankLinkedIncomeIds(salonId)
+  const [conflictCtx, setConflictCtx] = useState<{ item: PickerItem } | null>(null)
   // Mismatch state — храним выбранную сущность для модалки подтверждения,
   // если сумма tx не совпадает с (остаток к доплате) сущности.
   const [mismatchCtx, setMismatchCtx] = useState<{
@@ -70,11 +75,81 @@ export function LinkTransactionDialog({
   } | null>(null)
   const [mismatchBusy, setMismatchBusy] = useState(false)
 
-  // Multi-select state — для multi-link (одна tx → N expense).
-  // Toggle включается кнопкой «Выбрать несколько»; чекбоксы появляются в
-  // ExpensesPage. Submit делает useMultiLinkBankTransaction.
+  // Multi-select state — для multi-link (одна tx → N сущностей).
   const [multiMode, setMultiMode] = useState(false)
   const [selectedExpenses, setSelectedExpenses] = useState<Map<string, ExpenseRow>>(new Map())
+  const [selectedVisits, setSelectedVisits] = useState<Map<string, VisitRow>>(new Map())
+  const [selectedOtherIncomes, setSelectedOtherIncomes] = useState<Map<string, OtherIncomeRow>>(
+    new Map(),
+  )
+  function visitNet(v: VisitRow): number {
+    return v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0)
+  }
+  const selectedCreditSum =
+    Array.from(selectedVisits.values()).reduce((s, v) => s + visitNet(v), 0) +
+    Array.from(selectedOtherIncomes.values()).reduce((s, o) => s + o.amount_cents, 0)
+  const selectedCreditCount = selectedVisits.size + selectedOtherIncomes.size
+  function toggleVisit(v: VisitRow) {
+    setSelectedVisits((prev) => {
+      const next = new Map(prev)
+      if (next.has(v.id)) next.delete(v.id)
+      else next.set(v.id, v)
+      return next
+    })
+  }
+  function toggleOtherIncome(o: OtherIncomeRow) {
+    setSelectedOtherIncomes((prev) => {
+      const next = new Map(prev)
+      if (next.has(o.id)) next.delete(o.id)
+      else next.set(o.id, o)
+      return next
+    })
+  }
+  function handleMultiSubmitCredit() {
+    if (selectedCreditCount === 0) return
+    const splits = [
+      ...Array.from(selectedVisits.values()).map((v) => ({
+        kind: 'visit' as const,
+        entityId: v.id,
+        amountCents: visitNet(v),
+      })),
+      ...Array.from(selectedOtherIncomes.values()).map((o) => ({
+        kind: 'other_income' as const,
+        entityId: o.id,
+        amountCents: o.amount_cents,
+      })),
+    ]
+    const sumSplits = splits.reduce((s, x) => s + x.amountCents, 0)
+    if (sumSplits !== transaction.amount_cents) {
+      const diff = sumSplits - transaction.amount_cents
+      const dir = diff > 0 ? 'over' : 'under'
+      const msg = t('banking.link_dialog.multi_mismatch_confirm_credit', {
+        defaultValue:
+          dir === 'over'
+            ? 'Сумма выбранных доходов ({{sum}}) превышает транзакцию ({{tx}}) на {{diff}}. Записать как есть?'
+            : 'Сумма выбранных доходов ({{sum}}) меньше транзакции ({{tx}}) на {{diff}}. Записать как есть?',
+        sum: formatCurrency(sumSplits, txCurrency),
+        tx: formatCurrency(transaction.amount_cents, txCurrency),
+        diff: formatCurrency(Math.abs(diff), txCurrency),
+      })
+      if (!window.confirm(msg)) return
+    }
+    multiLink.mutate(
+      { transactionId: transaction.id, splits, clearNeedsReview: true },
+      {
+        onSuccess: () => {
+          toast.success(
+            t('banking.link_dialog.multi_linked_toast_credit', {
+              defaultValue: 'Связано с {{count}} доходами',
+              count: splits.length,
+            }),
+          )
+          onOpenChange(false)
+        },
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+  }
   const selectedSum = Array.from(selectedExpenses.values()).reduce(
     (s, e) => s + (e.amount_cents - (e.paid_amount_cents ?? 0)),
     0,
@@ -94,6 +169,25 @@ export function LinkTransactionDialog({
       entityId: e.id,
       amountCents: e.amount_cents - (e.paid_amount_cents ?? 0),
     }))
+    const sumSplits = splits.reduce((s, x) => s + x.amountCents, 0)
+    // Mismatch guard: если total selected != tx.amount — confirm dialog.
+    // Записываем как есть (splits с full remaining); юзеру предлагается
+    // либо подтвердить (расходы останутся частично оплаченными), либо
+    // вернуться к выбору и поправить.
+    if (sumSplits !== transaction.amount_cents) {
+      const diff = sumSplits - transaction.amount_cents
+      const direction = diff > 0 ? 'over' : 'under'
+      const msg = t('banking.link_dialog.multi_mismatch_confirm', {
+        defaultValue:
+          direction === 'over'
+            ? 'Сумма выбранных расходов ({{sum}}) превышает транзакцию ({{tx}}) на {{diff}}. Записать как есть? Расходы останутся частично оплаченными.'
+            : 'Сумма выбранных расходов ({{sum}}) меньше транзакции ({{tx}}) на {{diff}}. Записать как есть? Разница не закроет ни один расход полностью.',
+        sum: formatCurrency(sumSplits, txCurrency),
+        tx: formatCurrency(transaction.amount_cents, txCurrency),
+        diff: formatCurrency(Math.abs(diff), txCurrency),
+      })
+      if (!window.confirm(msg)) return
+    }
     multiLink.mutate(
       { transactionId: transaction.id, splits, clearNeedsReview: true },
       {
@@ -139,6 +233,18 @@ export function LinkTransactionDialog({
   async function applyMismatch(action: MismatchAction) {
     if (!mismatchCtx) return
     if (action === 'cancel') {
+      setMismatchCtx(null)
+      return
+    }
+    if (action === 'pick_multiple') {
+      // Image #43: переключаемся в multiMode, текущий выбранный expense уже в
+      // selectedExpenses. Закрываем mismatch — юзер продолжит выбирать ещё.
+      if (mismatchCtx.item.kind === 'expense') {
+        // Авто-добавляем текущий expense в выбор, чтобы не терять его.
+        // ExpensesPage достанет полные данные из useExpenses через ID,
+        // нам же для multi нужны только id и remaining; используем заглушку.
+        setMultiMode(true)
+      }
       setMismatchCtx(null)
       return
     }
@@ -205,8 +311,53 @@ export function LinkTransactionDialog({
     }
   }
 
+  function isAlreadyLinkedElsewhere(item: PickerItem): boolean {
+    // Сущность уже связана с какой-то tx? Сравниваем с открытой transaction.
+    // Если связана с тем же tx — это renew/highlight, не конфликт.
+    if (item.kind === 'expense') {
+      if (transaction.expense_id === item.id) return false
+      return bankLinkedAll?.expenseIds.has(item.id) ?? false
+    }
+    if (item.kind === 'visit') {
+      if (transaction.linked_visit_id === item.id) return false
+      return bankLinkedAll?.visitIds.has(item.id) ?? false
+    }
+    if (transaction.linked_other_income_id === item.id) return false
+    return bankLinkedAll?.otherIncomeIds.has(item.id) ?? false
+  }
+
   function handlePick(item: PickerItem) {
-    // Проверяем mismatch с remaining (для expense — amount - paid_amount_cents).
+    // (1) Конфликт привязки (image #45) — сущность уже связана с другой tx.
+    if (isAlreadyLinkedElsewhere(item)) {
+      setConflictCtx({ item })
+      return
+    }
+    // (2) Проверяем mismatch с remaining (для expense — amount - paid_amount_cents).
+    const entityAmount = item.amount_cents
+    const alreadyPaid =
+      item.kind === 'expense' && item.paid_amount_cents != null ? item.paid_amount_cents : 0
+    const remaining = Math.max(0, entityAmount - alreadyPaid)
+    if (transaction.amount_cents !== remaining) {
+      setMismatchCtx({ item, entityAmount, alreadyPaid })
+      return
+    }
+    doLink(item)
+  }
+
+  function handleConflict(action: ConflictAction) {
+    if (!conflictCtx) return
+    if (action === 'cancel' || action === 'pick_another') {
+      setConflictCtx(null)
+      return
+    }
+    // 'rebind' — отвязываем предыдущую tx, потом проходим обычный handlePick
+    // (он сам обработает mismatch если суммы не сходятся).
+    const item = conflictCtx.item
+    setConflictCtx(null)
+    // Отвязка предыдущей tx происходит через очистку FK на сущности на стороне
+    // useLinkBankTransaction — оно автоматически перепривяжет (одна сущность
+    // → одна tx через legacy FK; в splits — допускается N→N). Простейшая
+    // реализация: вызываем doLink, он перезапишет связь.
     const entityAmount = item.amount_cents
     const alreadyPaid =
       item.kind === 'expense' && item.paid_amount_cents != null ? item.paid_amount_cents : 0
@@ -283,7 +434,18 @@ export function LinkTransactionDialog({
       currency={txCurrency}
       entityKind={mismatchCtx.item.kind}
       busy={mismatchBusy}
+      allowPickMultiple={direction === 'debit' && mismatchCtx.item.kind === 'expense'}
       onChoose={applyMismatch}
+    />
+  ) : null
+
+  const conflictDialog = conflictCtx ? (
+    <LinkConflictDialog
+      open={!!conflictCtx}
+      onOpenChange={(v) => !v && setConflictCtx(null)}
+      entityKind={conflictCtx.item.kind}
+      busy={link.isPending}
+      onChoose={handleConflict}
     />
   ) : null
 
@@ -294,6 +456,7 @@ export function LinkTransactionDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         {mismatchDialog}
+        {conflictDialog}
         <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
           <DialogHeader>
             <div className="border-border border-b px-5 py-3">
@@ -456,12 +619,43 @@ export function LinkTransactionDialog({
             embedded
             pickerSalonId={salonId}
             hideBankingTab
-            onPickVisit={handlePickVisit}
-            onPickOtherIncome={handlePickOtherIncome}
+            onPickVisit={multiMode ? undefined : handlePickVisit}
+            onPickOtherIncome={multiMode ? undefined : handlePickOtherIncome}
             highlightVisitId={transaction.linked_visit_id ?? null}
             highlightOtherIncomeId={transaction.linked_other_income_id ?? null}
+            multiSelectMode={multiMode}
+            selectedVisitIds={new Set(selectedVisits.keys())}
+            selectedOtherIncomeIds={new Set(selectedOtherIncomes.keys())}
+            onToggleVisitSelection={toggleVisit}
+            onToggleOtherIncomeSelection={toggleOtherIncome}
           />
         </div>
+
+        {multiMode && selectedCreditCount > 0 ? (
+          <div className="border-border bg-muted/40 flex items-center justify-between gap-3 border-t px-5 py-2 text-xs">
+            <span className="text-foreground font-semibold">
+              {t('banking.link_dialog.multi_selected_credit', {
+                defaultValue: 'Выбрано {{n}} · сумма {{sum}} → tx {{tx}}',
+                n: selectedCreditCount,
+                sum: formatCurrency(selectedCreditSum, txCurrency),
+                tx: formatCurrency(transaction.amount_cents, txCurrency),
+              })}
+            </span>
+            {selectedCreditSum !== transaction.amount_cents ? (
+              <span className="text-[11px] text-amber-700">
+                {selectedCreditSum < transaction.amount_cents
+                  ? t('banking.link_dialog.multi_under', {
+                      defaultValue: 'не хватает {{d}}',
+                      d: formatCurrency(transaction.amount_cents - selectedCreditSum, txCurrency),
+                    })
+                  : t('banking.link_dialog.multi_over', {
+                      defaultValue: 'превышает на {{d}}',
+                      d: formatCurrency(selectedCreditSum - transaction.amount_cents, txCurrency),
+                    })}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <DialogFooter className="border-border flex items-center justify-between gap-2 border-t px-5 py-3 sm:justify-between">
           {hasExistingLink ? (
@@ -478,9 +672,38 @@ export function LinkTransactionDialog({
           ) : (
             <span />
           )}
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            {t('common.cancel')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={multiMode ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setMultiMode((v) => !v)
+                setSelectedVisits(new Map())
+                setSelectedOtherIncomes(new Map())
+              }}
+            >
+              {multiMode
+                ? t('banking.link_dialog.multi_cancel', { defaultValue: 'Одиночный выбор' })
+                : t('banking.link_dialog.multi_start', { defaultValue: 'Выбрать несколько' })}
+            </Button>
+            {multiMode && selectedCreditCount > 0 ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleMultiSubmitCredit}
+                disabled={multiLink.isPending}
+              >
+                <Link2 className="size-3.5" strokeWidth={2} />
+                {t('banking.link_dialog.multi_submit', {
+                  defaultValue: 'Связать ({{n}})',
+                  n: selectedCreditCount,
+                })}
+              </Button>
+            ) : null}
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

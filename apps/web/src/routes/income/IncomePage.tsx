@@ -48,6 +48,12 @@ type IncomePageProps = {
   /** ID визита/прочего дохода уже связанного с открытой tx — подсветка. */
   highlightVisitId?: string | null
   highlightOtherIncomeId?: string | null
+  /** Multi-select для multi-link (одна tx → N доходов). */
+  multiSelectMode?: boolean
+  selectedVisitIds?: Set<string>
+  selectedOtherIncomeIds?: Set<string>
+  onToggleVisitSelection?: (v: VisitRow) => void
+  onToggleOtherIncomeSelection?: (o: OtherIncomeRow) => void
 }
 
 /**
@@ -64,6 +70,11 @@ export function IncomePage({
   hideBankingTab = false,
   highlightVisitId = null,
   highlightOtherIncomeId = null,
+  multiSelectMode = false,
+  selectedVisitIds,
+  selectedOtherIncomeIds,
+  onToggleVisitSelection,
+  onToggleOtherIncomeSelection,
 }: IncomePageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
@@ -126,6 +137,9 @@ export function IncomePage({
           pickerSalonId={embedded ? salonId : undefined}
           onPickVisit={onPickVisit}
           highlightVisitId={highlightVisitId}
+          multiSelectMode={multiSelectMode}
+          selectedVisitIds={selectedVisitIds}
+          onToggleVisitSelection={onToggleVisitSelection}
         />
       ) : active === 'sales' ? (
         <SalesTab
@@ -134,6 +148,11 @@ export function IncomePage({
           onPickOtherIncome={onPickOtherIncome}
           highlightVisitId={highlightVisitId}
           highlightOtherIncomeId={highlightOtherIncomeId}
+          multiSelectMode={multiSelectMode}
+          selectedVisitIds={selectedVisitIds}
+          selectedOtherIncomeIds={selectedOtherIncomeIds}
+          onToggleVisitSelection={onToggleVisitSelection}
+          onToggleOtherIncomeSelection={onToggleOtherIncomeSelection}
         />
       ) : (
         <BankingTransactionsTable
