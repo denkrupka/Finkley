@@ -138,6 +138,7 @@ export function LinkTransactionDialog({
               embedded
               pickerSalonId={salonId}
               hideBankingTab
+              highlightExpenseId={transaction.expense_id ?? null}
               onPickExpense={handlePickExpense}
             />
           </div>
@@ -162,7 +163,7 @@ export function LinkTransactionDialog({
                 <Button variant="secondary" size="sm" onClick={onCreateExpenseFromTx}>
                   <Plus className="size-3.5" strokeWidth={2.4} />
                   {t('banking.link_dialog.create_new_expense', {
-                    defaultValue: '+ Создать новый расход с этими данными',
+                    defaultValue: 'Создать новый расход с этими данными',
                   })}
                 </Button>
               ) : null}

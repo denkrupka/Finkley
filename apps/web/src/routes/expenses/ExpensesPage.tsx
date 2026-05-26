@@ -101,6 +101,9 @@ type ExpensesPageProps = {
   /** Скрыть таб «Банкинг» — нужно когда страница embedded в LinkTransactionDialog
    *  (показывать банкинг внутри банкинга = recursive UX). */
   hideBankingTab?: boolean
+  /** ID расхода с которым уже связана транзакция — подсвечиваем зелёным
+   *  в picker-режиме, чтобы юзер видел текущую связь. */
+  highlightExpenseId?: string | null
 }
 
 export function ExpensesPage({
@@ -108,6 +111,7 @@ export function ExpensesPage({
   pickerSalonId,
   onPickExpense,
   hideBankingTab = false,
+  highlightExpenseId = null,
 }: ExpensesPageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
@@ -713,7 +717,7 @@ export function ExpensesPage({
                             <span className="num text-foreground text-right text-sm font-bold">
                               −{formatCurrency(p.amount_cents, currency)}
                             </span>
-                            {exportMode ? null : (
+                            {exportMode || isPickerMode ? null : (
                               <div className="flex items-center gap-0.5">
                                 <button
                                   type="button"
@@ -787,7 +791,12 @@ export function ExpensesPage({
                         }
                         setEditingExpense(e)
                       }}
-                      className="border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0"
+                      className={cn(
+                        'border-border hover:bg-muted/30 grid cursor-pointer grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 transition-colors first:border-t-0',
+                        highlightExpenseId === e.id
+                          ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
+                          : '',
+                      )}
                       style={{ borderLeftWidth: 3, borderLeftColor: color }}
                       data-testid="expense-row"
                     >
@@ -890,14 +899,21 @@ export function ExpensesPage({
                         </span>
                       </span>
                       <span className="text-right">
+                        {/* Большая красная сумма — то, что РЕАЛЬНО учтено как
+                            оплачено (для частичной — paid_amount_cents, для
+                            полной — amount_cents). Маленькое снизу — остаток
+                            к доплате (не учитывается в учёте, just FYI). */}
                         <span className="num text-destructive block text-sm font-bold">
-                          −{formatCurrency(e.amount_cents, currency)}
+                          −{formatCurrency(effectivePaidCents(e), currency)}
                         </span>
                         {e.paid_amount_cents != null && e.paid_amount_cents < e.amount_cents ? (
                           <span className="num text-muted-foreground/80 mt-0.5 block text-[10px]">
-                            {t('expenses.partial_paid', {
-                              paid: formatCurrency(e.paid_amount_cents, currency),
-                              defaultValue: 'Оплачено {{paid}}',
+                            {t('expenses.partial_remaining', {
+                              remaining: formatCurrency(
+                                e.amount_cents - (e.paid_amount_cents ?? 0),
+                                currency,
+                              ),
+                              defaultValue: 'Осталось {{remaining}}',
                             })}
                           </span>
                         ) : null}
@@ -1023,19 +1039,21 @@ export function ExpensesPage({
                               )
                             })()
                           : null}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!confirm(t('expenses.confirm_delete'))) return
-                            deleteExpense.mutate(e.id, {
-                              onSuccess: () => toast.success(t('expenses.toast_deleted')),
-                            })
-                          }}
-                          className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                          aria-label="delete"
-                        >
-                          <Trash2 className="size-4" strokeWidth={1.7} />
-                        </button>
+                        {isPickerMode ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!confirm(t('expenses.confirm_delete'))) return
+                              deleteExpense.mutate(e.id, {
+                                onSuccess: () => toast.success(t('expenses.toast_deleted')),
+                              })
+                            }}
+                            className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                            aria-label="delete"
+                          >
+                            <Trash2 className="size-4" strokeWidth={1.7} />
+                          </button>
+                        )}
                       </div>
                     </li>
                   )

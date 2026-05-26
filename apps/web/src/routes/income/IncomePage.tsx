@@ -45,6 +45,9 @@ type IncomePageProps = {
   onPickOtherIncome?: (o: OtherIncomeRow) => void
   /** Скрыть таб «Банкинг» (когда embed внутри LinkTransactionDialog credit). */
   hideBankingTab?: boolean
+  /** ID визита/прочего дохода уже связанного с открытой tx — подсветка. */
+  highlightVisitId?: string | null
+  highlightOtherIncomeId?: string | null
 }
 
 /**
@@ -59,6 +62,8 @@ export function IncomePage({
   onPickVisit,
   onPickOtherIncome,
   hideBankingTab = false,
+  highlightVisitId = null,
+  highlightOtherIncomeId = null,
 }: IncomePageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
@@ -120,12 +125,15 @@ export function IncomePage({
           forcedKind="visit"
           pickerSalonId={embedded ? salonId : undefined}
           onPickVisit={onPickVisit}
+          highlightVisitId={highlightVisitId}
         />
       ) : active === 'sales' ? (
         <SalesTab
           salonId={salonId}
           onPickVisit={onPickVisit}
           onPickOtherIncome={onPickOtherIncome}
+          highlightVisitId={highlightVisitId}
+          highlightOtherIncomeId={highlightOtherIncomeId}
         />
       ) : (
         <BankingTransactionsTable

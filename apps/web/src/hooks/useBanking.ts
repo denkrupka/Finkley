@@ -272,16 +272,33 @@ export function useLinkBankTransaction(salonId: string | undefined) {
       clearNeedsReview?: boolean
     }) => {
       const patch: Record<string, unknown> = {}
-      // Если передано — выставляем; если undefined — не трогаем (partial update).
-      if (args.expenseId !== undefined) patch.expense_id = args.expenseId
-      if (args.visitId !== undefined) patch.linked_visit_id = args.visitId
-      if (args.otherIncomeId !== undefined) patch.linked_other_income_id = args.otherIncomeId
+      // Если задана связь любого типа — автоматически сбрасываем остальные два
+      // FK. Иначе chk_bank_tx_single_link constraint падает на переключении
+      // (например visit → other_income: visit_id остаётся со старой связью).
+      // Юзер передаёт только новую связь — мы дополняем patch nullами для
+      // остальных, кроме случая «отвязка вообще» (всё передано как null).
+      const anyLinkSet =
+        (args.expenseId !== undefined && args.expenseId !== null) ||
+        (args.visitId !== undefined && args.visitId !== null) ||
+        (args.otherIncomeId !== undefined && args.otherIncomeId !== null)
+      if (anyLinkSet) {
+        patch.expense_id = args.expenseId ?? null
+        patch.linked_visit_id = args.visitId ?? null
+        patch.linked_other_income_id = args.otherIncomeId ?? null
+      } else {
+        // explicit unlink — все три ключа сбрасываются
+        if (args.expenseId !== undefined) patch.expense_id = null
+        if (args.visitId !== undefined) patch.linked_visit_id = null
+        if (args.otherIncomeId !== undefined) patch.linked_other_income_id = null
+      }
       if (args.clearNeedsReview) patch.needs_review = false
       const { error } = await supabase
         .from('bank_transactions')
         .update(patch)
         .eq('id', args.transactionId)
-      if (error) throw error
+      // PostgrestError — не Error-instance; оборачиваем чтобы получить
+      // нормальный .message (без [object Object] в toast.error).
+      if (error) throw new Error(error.message || 'Failed to link transaction')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })

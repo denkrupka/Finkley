@@ -75,9 +75,16 @@ type VisitsPageProps = {
   onPickVisit?: (v: VisitRow) => void
   /** Override salonId если не из URL (нужен в embed-моде). */
   pickerSalonId?: string
+  /** ID визита уже связанного с открытой tx — подсветить зелёным. */
+  highlightVisitId?: string | null
 }
 
-export function VisitsPage({ forcedKind, onPickVisit, pickerSalonId }: VisitsPageProps = {}) {
+export function VisitsPage({
+  forcedKind,
+  onPickVisit,
+  pickerSalonId,
+  highlightVisitId = null,
+}: VisitsPageProps = {}) {
   const { t } = useTranslation()
   const params_ = useParams<{ salonId: string }>()
   const salonId = pickerSalonId ?? params_.salonId
@@ -240,7 +247,7 @@ export function VisitsPage({ forcedKind, onPickVisit, pickerSalonId }: VisitsPag
           </div>
 
           {/* Свободные окна — раскрывающаяся панель над списком визитов */}
-          <FreeSlotsPanel salonId={salonId} />
+          {isPickerMode ? null : <FreeSlotsPanel salonId={salonId} />}
 
           {/* Body */}
           {isLoading ? (
@@ -324,6 +331,8 @@ export function VisitsPage({ forcedKind, onPickVisit, pickerSalonId }: VisitsPag
                             currency={currency}
                             isBankLinked={linkedVisitIds?.has(row.id) ?? false}
                             needsReview={needsReviewVisitIds?.has(row.id) ?? false}
+                            hideActions={isPickerMode}
+                            highlight={highlightVisitId === row.id}
                             t={t}
                           />
                         )
@@ -370,6 +379,8 @@ function SingleVisitRow({
   currency,
   isBankLinked,
   needsReview,
+  hideActions = false,
+  highlight = false,
   t,
 }: {
   visit: VisitRow
@@ -381,6 +392,10 @@ function SingleVisitRow({
   currency: string
   isBankLinked: boolean
   needsReview: boolean
+  /** Скрыть Calc/Pencil/Trash — для picker-режима из LinkTransactionDialog. */
+  hideActions?: boolean
+  /** Подсветить строку зелёным (visit уже привязан к текущей tx). */
+  highlight?: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const staffMember = staff.find((s) => s.id === v.staff_id)
@@ -393,6 +408,7 @@ function SingleVisitRow({
       className={cn(
         'border-border hover:bg-muted/40 cursor-pointer border-t transition-colors first:border-t-0',
         ROW_GRID,
+        highlight ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60' : '',
       )}
       data-testid="visit-row"
       onClick={onEdit}
@@ -463,38 +479,42 @@ function SingleVisitRow({
         </span>
       )}
       <span className="flex items-center justify-end gap-0.5">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit()
-          }}
-          className={cn(
-            'grid size-8 place-items-center rounded-md',
-            v.status === 'pending'
-              ? 'text-secondary hover:bg-secondary/10'
-              : 'text-muted-foreground hover:text-secondary',
-          )}
-          aria-label={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
-          title={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
-        >
-          {v.status === 'pending' ? (
-            <Calculator className="size-4" strokeWidth={1.9} />
-          ) : (
-            <Pencil className="size-4" strokeWidth={1.7} />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-          aria-label="delete"
-        >
-          <Trash2 className="size-4" strokeWidth={1.7} />
-        </button>
+        {hideActions ? null : (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+              className={cn(
+                'grid size-8 place-items-center rounded-md',
+                v.status === 'pending'
+                  ? 'text-secondary hover:bg-secondary/10'
+                  : 'text-muted-foreground hover:text-secondary',
+              )}
+              aria-label={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
+              title={v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')}
+            >
+              {v.status === 'pending' ? (
+                <Calculator className="size-4" strokeWidth={1.9} />
+              ) : (
+                <Pencil className="size-4" strokeWidth={1.7} />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+              className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+              aria-label="delete"
+            >
+              <Trash2 className="size-4" strokeWidth={1.7} />
+            </button>
+          </>
+        )}
       </span>
     </li>
   )

@@ -44,6 +44,7 @@ import {
   type PaymentMethod,
   type VisitRow,
 } from '@/hooks/useVisits'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDate } from '@/lib/utils/format-date'
 import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
@@ -62,12 +63,17 @@ export function SalesTab({
   salonId,
   onPickVisit,
   onPickOtherIncome,
+  highlightVisitId = null,
+  highlightOtherIncomeId = null,
 }: {
   salonId: string
   /** Picker-mode: клик по retail-row → callback вместо VisitDetailModal. */
   onPickVisit?: (v: VisitRow) => void
   /** Picker-mode: клик по other-income-row → callback вместо edit-modal. */
   onPickOtherIncome?: (o: OtherIncomeRow) => void
+  /** ID связанной с открытой tx сущности — подсветка зелёным. */
+  highlightVisitId?: string | null
+  highlightOtherIncomeId?: string | null
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -259,7 +265,12 @@ export function SalesTab({
               {pagedOther.map((o) => (
                 <tr
                   key={`oi-${o.id}`}
-                  className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
+                  className={cn(
+                    'border-border/60 hover:bg-muted/30 cursor-pointer border-t',
+                    highlightOtherIncomeId === o.id
+                      ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
+                      : '',
+                  )}
                   onClick={() => (isPickerMode ? onPickOtherIncome?.(o) : setEditingOther(o))}
                 >
                   <td className="num text-muted-foreground px-4 py-2 text-xs">
@@ -309,7 +320,12 @@ export function SalesTab({
                 return (
                   <tr
                     key={s.id}
-                    className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
+                    className={cn(
+                      'border-border/60 hover:bg-muted/30 cursor-pointer border-t',
+                      highlightVisitId === s.id
+                        ? 'bg-emerald-50/70 ring-2 ring-inset ring-emerald-300/60'
+                        : '',
+                    )}
                     onClick={() => (isPickerMode ? onPickVisit?.(s) : setEditingSale(s))}
                   >
                     <td className="num text-muted-foreground px-4 py-2 text-xs">

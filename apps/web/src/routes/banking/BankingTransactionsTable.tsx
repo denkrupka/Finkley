@@ -34,8 +34,8 @@ type Props = {
    *  Если задан onPickTransaction — клик по строке вызывает callback вместо
    *  открытия LinkTransactionDialog. Также скрывается колонка действий. */
   onPickTransaction?: (tx: BankInflowRow | BankOutflowRow) => void
-  /** Опц фильтр: показывать только неpривязанные tx (для picker-режима — там
-   *  нет смысла предлагать связать уже-привязанную). */
+  /** Жёсткий фильтр: показывать ТОЛЬКО неpривязанные tx (без переключателя).
+   *  Используется в picker-модалках — связывать уже-привязанные не имеет смысла. */
   unlinkedOnly?: boolean
 }
 
@@ -170,6 +170,11 @@ export function BankingTransactionsTable({
     }
   }
 
+  // Сумма по строкам периода — для шапки (см. owner-feedback 2026-05-26):
+  // на debit-табе показываем «общая сумма списаний», на credit-табе —
+  // «общая сумма поступлений». Считаем по rows (с учётом unlinkedOnly).
+  const periodSum = rows.reduce((s, r) => s + r.amount_cents, 0)
+
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border">
       {/* Header */}
@@ -182,6 +187,17 @@ export function BankingTransactionsTable({
           <span className="text-muted-foreground/80 text-xs">
             {rows.length} {t('banking.transactions.count_suffix')}
           </span>
+          {rows.length > 0 ? (
+            <span
+              className={cn(
+                'num ml-2 text-xs font-bold tabular-nums',
+                direction === 'debit' ? 'text-destructive' : 'text-emerald-700',
+              )}
+            >
+              {direction === 'debit' ? '−' : '+'}
+              {formatCurrency(periodSum, currency)}
+            </span>
+          ) : null}
         </div>
         <Button
           variant="outline"
