@@ -905,7 +905,8 @@
       "not_linked": "Не связано",
       "link_action": "Связать",
       "edit_link": "Изменить",
-      "needs_review_tooltip": "Авто-привязка с низкой уверенностью — открой и подтверди вручную"
+      "needs_review_tooltip": "Авто-привязка с низкой уверенностью — открой и подтверди вручную",
+      "show_linked": "Показать связанные"
     },
     "link_dialog": {
       "title_debit": "Связать с расходом",
@@ -953,6 +954,22 @@
       "start_select": "Экспорт в банк",
       "cancel_select": "Отмена",
       "select_all": "Выбрать все ({{n}})"
+    },
+    "mismatch": {
+      "title": "Суммы не совпадают",
+      "kind_expense": "расход",
+      "kind_visit": "визит",
+      "kind_other_income": "доход",
+      "tx_less": "Транзакция {{tx}} меньше чем {{kind}} {{entity}} (остаток к доплате {{remaining}}).",
+      "tx_more": "Транзакция {{tx}} больше чем остаток к доплате по {{kind}} ({{remaining}}).",
+      "tx_label": "Транзакция",
+      "entity_label": "Сумма {{kind}}",
+      "entity_remaining_label": "Остаток",
+      "already_paid_hint": "из {{total}} (оплачено {{paid}})",
+      "action_partial": "Записать как частичную оплату (остаток в «Не оплачено»)",
+      "action_adjust_down": "Изменить сумму {{kind}} на {{tx}} (полностью оплачено)",
+      "action_adjust_up": "Увеличить сумму {{kind}} до {{tx}}",
+      "toast_partial": "Привязано как частичная оплата"
     }
   },
   "nav": {

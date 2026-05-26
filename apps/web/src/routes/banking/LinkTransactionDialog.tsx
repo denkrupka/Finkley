@@ -1,6 +1,8 @@
 import { Link2, Plus, Unlink2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -13,10 +15,15 @@ import {
 } from '@/components/ui/dialog'
 import { useLinkBankTransaction, type BankInflowRow, type BankOutflowRow } from '@/hooks/useBanking'
 import { type ExpenseRow } from '@/hooks/useExpenses'
+import { type OtherIncomeRow } from '@/hooks/useOtherIncomes'
+import { type VisitRow } from '@/hooks/useVisits'
+import { supabase } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { ExpensesPage } from '@/routes/expenses/ExpensesPage'
 import { IncomePage } from '@/routes/income/IncomePage'
+
+import { AmountMismatchDialog, type MismatchAction } from './AmountMismatchDialog'
 
 type Props = {
   open: boolean
@@ -46,11 +53,20 @@ export function LinkTransactionDialog({
   onCreateExpenseFromTx,
 }: Props) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const link = useLinkBankTransaction(salonId)
+  // Mismatch state — храним выбранную сущность для модалки подтверждения,
+  // если сумма tx не совпадает с (остаток к доплате) сущности.
+  const [mismatchCtx, setMismatchCtx] = useState<{
+    item: PickerItem
+    entityAmount: number
+    alreadyPaid: number
+  } | null>(null)
+  const [mismatchBusy, setMismatchBusy] = useState(false)
 
   const txCurrency = transaction.currency || 'PLN'
 
-  function handlePick(item: PickerItem) {
+  function doLink(item: PickerItem, opts: { partial?: boolean } = {}) {
     const args: Parameters<typeof link.mutate>[0] = {
       transactionId: transaction.id,
       clearNeedsReview: true,
@@ -60,11 +76,94 @@ export function LinkTransactionDialog({
     else if (item.kind === 'other_income') args.otherIncomeId = item.id
     link.mutate(args, {
       onSuccess: () => {
-        toast.success(t('banking.link_dialog.linked_toast'))
+        toast.success(
+          opts.partial
+            ? t('banking.mismatch.toast_partial', {
+                defaultValue: 'Привязано как частичная оплата',
+              })
+            : t('banking.link_dialog.linked_toast'),
+        )
         onOpenChange(false)
       },
       onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
     })
+  }
+
+  async function applyMismatch(action: MismatchAction) {
+    if (!mismatchCtx) return
+    if (action === 'cancel') {
+      setMismatchCtx(null)
+      return
+    }
+    setMismatchBusy(true)
+    try {
+      const { item, entityAmount, alreadyPaid } = mismatchCtx
+      const txAmt = transaction.amount_cents
+
+      if (action === 'partial') {
+        // Только для expense — paid_amount_cents хранится только на expenses.
+        // Для visit/other_income частичная оплата как концепт не моделируется
+        // (см. ADR-024 — partial paid live only on expense). Линкуем как есть.
+        if (item.kind === 'expense') {
+          const newPaid = Math.min(entityAmount, alreadyPaid + txAmt)
+          const { error } = await supabase
+            .from('expenses')
+            .update({ paid_amount_cents: newPaid })
+            .eq('id', item.id)
+          if (error) throw new Error(error.message)
+        }
+      } else if (action === 'adjust_amount') {
+        // Меняем сумму сущности так чтобы tx закрывал её полностью.
+        // Для expense: amount = (alreadyPaid + txAmt), paid_amount_cents = null
+        // (полностью оплачено).
+        if (item.kind === 'expense') {
+          const newAmount = alreadyPaid + txAmt
+          const { error } = await supabase
+            .from('expenses')
+            .update({ amount_cents: newAmount, paid_amount_cents: null })
+            .eq('id', item.id)
+          if (error) throw new Error(error.message)
+        } else if (item.kind === 'visit') {
+          // На visits нет paid_amount_cents — просто меняем amount_cents.
+          const { error } = await supabase
+            .from('visits')
+            .update({ amount_cents: txAmt })
+            .eq('id', item.id)
+          if (error) throw new Error(error.message)
+        } else {
+          const { error } = await supabase
+            .from('other_incomes')
+            .update({ amount_cents: txAmt })
+            .eq('id', item.id)
+          if (error) throw new Error(error.message)
+        }
+      }
+
+      await qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      await qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      await qc.invalidateQueries({ queryKey: ['other-incomes', salonId] })
+
+      // Делаем link после изменения сущности.
+      doLink(item, { partial: action === 'partial' })
+      setMismatchCtx(null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setMismatchBusy(false)
+    }
+  }
+
+  function handlePick(item: PickerItem) {
+    // Проверяем mismatch с remaining (для expense — amount - paid_amount_cents).
+    const entityAmount = item.amount_cents
+    const alreadyPaid =
+      item.kind === 'expense' && item.paid_amount_cents != null ? item.paid_amount_cents : 0
+    const remaining = Math.max(0, entityAmount - alreadyPaid)
+    if (transaction.amount_cents !== remaining) {
+      setMismatchCtx({ item, entityAmount, alreadyPaid })
+      return
+    }
+    doLink(item)
   }
 
   function handleUnlink() {
@@ -97,9 +196,44 @@ export function LinkTransactionDialog({
       title: expense.description || '',
       subtitle: '',
       amount_cents: expense.amount_cents,
+      paid_amount_cents: expense.paid_amount_cents,
       date: expense.expense_at,
     })
   }
+  function handlePickVisit(v: VisitRow) {
+    handlePick({
+      kind: 'visit',
+      id: v.id,
+      title: v.service_name_snapshot ?? '',
+      subtitle: '',
+      amount_cents: v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0),
+      date: v.visit_at,
+    })
+  }
+  function handlePickOtherIncome(o: OtherIncomeRow) {
+    handlePick({
+      kind: 'other_income',
+      id: o.id,
+      title: o.comment ?? 'Прочий доход',
+      subtitle: '',
+      amount_cents: o.amount_cents,
+      date: o.income_at,
+    })
+  }
+
+  const mismatchDialog = mismatchCtx ? (
+    <AmountMismatchDialog
+      open={!!mismatchCtx}
+      onOpenChange={(v) => !v && setMismatchCtx(null)}
+      txAmount={transaction.amount_cents}
+      entityAmount={mismatchCtx.entityAmount}
+      alreadyPaid={mismatchCtx.alreadyPaid}
+      currency={txCurrency}
+      entityKind={mismatchCtx.item.kind}
+      busy={mismatchBusy}
+      onChoose={applyMismatch}
+    />
+  ) : null
 
   // Debit: embedded full ExpensesPage в широкой модалке (см. owner-feedback
   // 2026-05-26 — image #10/#11). Юзер видит вкладки Оплачено/Не оплачено,
@@ -107,6 +241,7 @@ export function LinkTransactionDialog({
   if (direction === 'debit') {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
+        {mismatchDialog}
         <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
           <DialogHeader>
             <div className="border-border border-b px-5 py-3">
@@ -182,6 +317,7 @@ export function LinkTransactionDialog({
   // прочий доход кликом, и tx линкуется с этой сущностью.
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {mismatchDialog}
       <DialogContent className="!max-h-[92vh] !w-[min(96vw,1100px)] !max-w-[1100px] gap-0 overflow-hidden p-0">
         <DialogHeader>
           <div className="border-border border-b px-5 py-3">
@@ -213,26 +349,10 @@ export function LinkTransactionDialog({
             embedded
             pickerSalonId={salonId}
             hideBankingTab
-            onPickVisit={(v) => {
-              handlePick({
-                kind: 'visit',
-                id: v.id,
-                title: v.service_name_snapshot ?? '',
-                subtitle: '',
-                amount_cents: v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0),
-                date: v.visit_at,
-              })
-            }}
-            onPickOtherIncome={(o) => {
-              handlePick({
-                kind: 'other_income',
-                id: o.id,
-                title: o.comment ?? 'Прочий доход',
-                subtitle: '',
-                amount_cents: o.amount_cents,
-                date: o.income_at,
-              })
-            }}
+            onPickVisit={handlePickVisit}
+            onPickOtherIncome={handlePickOtherIncome}
+            highlightVisitId={transaction.linked_visit_id ?? null}
+            highlightOtherIncomeId={transaction.linked_other_income_id ?? null}
           />
         </div>
 
@@ -267,6 +387,9 @@ type PickerItem =
       title: string
       subtitle: string
       amount_cents: number
+      /** Уже оплаченная часть (NULL = full paid). Нужно для mismatch-логики
+       *  — сравниваем tx с remaining = amount - paid, а не с total. */
+      paid_amount_cents: number | null
       date: string
     }
   | {

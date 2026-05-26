@@ -57,6 +57,9 @@ export function BankingTransactionsTable({
   unlinkedOnly = false,
 }: Props) {
   const isPickerMode = !!onPickTransaction
+  // Toggle «Показать связанные»: default false (юзеру важнее видеть
+  // необработанные). В picker-режиме toggle скрыт (там жёсткий unlinkedOnly).
+  const [showLinked, setShowLinked] = useState<boolean>(false)
   const { t } = useTranslation()
   const { data: connections = [] } = useBankConnections(salonId)
   const inflowsQ = useBankInflows(direction === 'credit' ? salonId : undefined, period)
@@ -146,9 +149,12 @@ export function BankingTransactionsTable({
   const isLoading = inflowsQ.isLoading || outflowsQ.isLoading
   const allRows: Array<BankInflowRow | BankOutflowRow> =
     direction === 'debit' ? (outflowsQ.data ?? []) : (inflowsQ.data ?? [])
-  const rows = unlinkedOnly
-    ? allRows.filter((tx) => !tx.expense_id && !tx.linked_visit_id && !tx.linked_other_income_id)
-    : allRows
+  // unlinkedOnly (picker-mode) — жёсткий фильтр. Иначе — soft toggle
+  // showLinked (default false: только unlinked, юзеру важнее необработанные).
+  const rows =
+    unlinkedOnly || !showLinked
+      ? allRows.filter((tx) => !tx.expense_id && !tx.linked_visit_id && !tx.linked_other_income_id)
+      : allRows
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')
 
@@ -199,19 +205,32 @@ export function BankingTransactionsTable({
             </span>
           ) : null}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSyncAll}
-          disabled={!hasActiveConnection || sync.isPending}
-        >
-          {sync.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-          ) : (
-            <RefreshCcw className="size-3.5" strokeWidth={1.8} />
+        <div className="flex items-center gap-2">
+          {unlinkedOnly ? null : (
+            <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={showLinked}
+                onChange={(e) => setShowLinked(e.target.checked)}
+                className="size-3.5 cursor-pointer"
+              />
+              {t('banking.transactions.show_linked', { defaultValue: 'Показать связанные' })}
+            </label>
           )}
-          {t('banking.transactions.sync_now')}
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncAll}
+            disabled={!hasActiveConnection || sync.isPending}
+          >
+            {sync.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <RefreshCcw className="size-3.5" strokeWidth={1.8} />
+            )}
+            {t('banking.transactions.sync_now')}
+          </Button>
+        </div>
       </div>
 
       {/* Empty / no connections */}
