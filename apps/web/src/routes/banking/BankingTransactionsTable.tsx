@@ -202,6 +202,7 @@ export function BankingTransactionsTable({
       // пока не упрётся в 5 итераций (защита от бесконечного цикла).
       let aiUpdated = 0
       let aiProcessed = 0
+      let aiError: string | null = null // 'not_configured' | 'http_xxx' | 'network'
       try {
         const { data: sessData } = await supabase.auth.getSession()
         const token = sessData.session?.access_token
@@ -218,7 +219,15 @@ export function BankingTransactionsTable({
               },
               body: JSON.stringify({ salon_id: salonId }),
             })
-            if (!res.ok) break
+            if (!res.ok) {
+              // 500 + function_not_configured = нет GROQ_API_KEY в secrets
+              const errJson = await res.json().catch(() => ({}))
+              aiError =
+                (errJson as { error?: string }).error === 'function_not_configured'
+                  ? 'not_configured'
+                  : `http_${res.status}`
+              break
+            }
             const json = (await res.json()) as {
               processed?: number
               updated?: number
@@ -240,7 +249,7 @@ export function BankingTransactionsTable({
           }
         }
       } catch {
-        // AI-шаг опционален, если упадёт — показываем только regex-результат
+        aiError = 'network'
       }
 
       const updated = regexUpdated + aiUpdated
@@ -253,6 +262,31 @@ export function BankingTransactionsTable({
           ai: aiUpdated,
         }),
       )
+      // Subtle warning если AI-фаза не отработала, а regex остался с
+      // непокрытыми tx (totalWithNull - regexUpdated > 0). Юзер должен знать
+      // что часть tx осталась без counterparty.
+      const stillEmpty = totalWithNull - regexUpdated
+      if (aiError && stillEmpty > 0) {
+        const reason =
+          aiError === 'not_configured'
+            ? t('banking.transactions.extract_ai_not_configured', {
+                defaultValue: 'AI не подключён (GROQ_API_KEY не задан в secrets)',
+              })
+            : aiError === 'network'
+              ? t('banking.transactions.extract_ai_network', {
+                  defaultValue: 'AI недоступен (сетевая ошибка)',
+                })
+              : t('banking.transactions.extract_ai_http', {
+                  defaultValue: 'AI вернул ошибку',
+                })
+        toast.warning(
+          t('banking.transactions.extract_ai_failed', {
+            defaultValue: '{{reason}}. {{n}} транзакций остались без контрагента.',
+            reason,
+            n: stillEmpty,
+          }),
+        )
+      }
       void aiProcessed
       await qcRoot.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
       await qcRoot.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
