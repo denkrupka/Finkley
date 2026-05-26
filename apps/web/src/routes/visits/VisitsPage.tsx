@@ -69,19 +69,29 @@ type VisitsPageProps = {
    * «Продажи» (`forcedKind='retail'`).
    */
   forcedKind?: VisitKind
+  /** Picker-mode: клик по визиту вызывает callback вместо VisitDetailModal.
+   *  Используется в LinkTransactionDialog (direction='credit') — embed
+   *  IncomePage для выбора визита для связи с банк-tx. */
+  onPickVisit?: (v: VisitRow) => void
+  /** Override salonId если не из URL (нужен в embed-моде). */
+  pickerSalonId?: string
 }
 
-export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
+export function VisitsPage({ forcedKind, onPickVisit, pickerSalonId }: VisitsPageProps = {}) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const params_ = useParams<{ salonId: string }>()
+  const salonId = pickerSalonId ?? params_.salonId
   const [params, setParams] = useSearchParams()
+  const isPickerMode = !!onPickVisit
   const period = (params.get('period') ?? 'month') as PeriodKey
   const staffFilter = params.get('staff') || ''
   const paymentFilter = (params.get('pay') || '') as PaymentMethod | ''
   const serviceFilter = params.get('service') || ''
   /** Toggle list/calendar. По дефолту calendar (так удобнее, owner 2026-05-12).
    *  ?view=list переключает на список (как было раньше). */
-  const view = params.get('view') === 'list' ? 'list' : 'calendar'
+  // В picker-режиме форсируем list — в календаре пикать визит неудобно
+  // (нет фильтров/поиска по сумме, нужны вокруг для матча с банк-tx).
+  const view = isPickerMode ? 'list' : params.get('view') === 'list' ? 'list' : 'calendar'
   // `?kind=retail` фильтрует список до товарных продаж. Может быть задан
   // через URL (старые роуты) или пропсом `forcedKind` (из IncomePage).
   const kindParam = params.get('kind')
@@ -278,7 +288,7 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                               group={row}
                               isExpanded={expandedGroups.has(row.key)}
                               onToggle={() => toggleGroup(row.key)}
-                              onEdit={(v) => setEditingVisit(v)}
+                              onEdit={(v) => (isPickerMode ? onPickVisit?.(v) : setEditingVisit(v))}
                               onDelete={(id) => {
                                 if (!confirm(t('visits.confirm_delete'))) return
                                 deleteVisit.mutate(id, {
@@ -299,7 +309,9 @@ export function VisitsPage({ forcedKind }: VisitsPageProps = {}) {
                           <SingleVisitRow
                             key={row.id}
                             visit={row}
-                            onEdit={() => setEditingVisit(row)}
+                            onEdit={() =>
+                              isPickerMode ? onPickVisit?.(row) : setEditingVisit(row)
+                            }
                             onDelete={() => {
                               if (!confirm(t('visits.confirm_delete'))) return
                               deleteVisit.mutate(row.id, {

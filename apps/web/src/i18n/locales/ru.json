@@ -940,7 +940,8 @@
       "execution_date": "Дата исполнения",
       "format_label": "Формат файла",
       "format": {
-        "sepa_xml": "SEPA XML (pain.001.001.03) — принимают все EU банки"
+        "sepa_xml": "SEPA XML (pain.001.001.03) — принимают все EU банки",
+        "elixir_o": "Elixir-O (.txt) — для польских банков, только PLN→PLN"
       },
       "summary_title": "К экспорту: {{valid}} из {{total}}",
       "missing_iban": "нет IBAN",

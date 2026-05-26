@@ -4122,7 +4122,8 @@
       "execution_date": "Data realizacji",
       "format_label": "Format pliku",
       "format": {
-        "sepa_xml": "SEPA XML (pain.001.001.03) — akceptowane przez wszystkie EU banki"
+        "sepa_xml": "SEPA XML (pain.001.001.03) — akceptowane przez wszystkie EU banki",
+        "elixir_o": "Elixir-O (.txt) — dla polskich banków, tylko PLN→PLN"
       },
       "summary_title": "Do eksportu: {{valid}} z {{total}}",
       "missing_iban": "brak IBAN",

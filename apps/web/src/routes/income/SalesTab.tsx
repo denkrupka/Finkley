@@ -58,11 +58,22 @@ import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
  * MVP: только текущий месяц + фильтры мастер/способ оплаты. Период-toggle —
  * следующая итерация если будет спрос.
  */
-export function SalesTab({ salonId }: { salonId: string }) {
+export function SalesTab({
+  salonId,
+  onPickVisit,
+  onPickOtherIncome,
+}: {
+  salonId: string
+  /** Picker-mode: клик по retail-row → callback вместо VisitDetailModal. */
+  onPickVisit?: (v: VisitRow) => void
+  /** Picker-mode: клик по other-income-row → callback вместо edit-modal. */
+  onPickOtherIncome?: (o: OtherIncomeRow) => void
+}) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
+  const isPickerMode = !!(onPickVisit || onPickOtherIncome)
 
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const r = periodToRange(period)
@@ -249,7 +260,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
                 <tr
                   key={`oi-${o.id}`}
                   className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
-                  onClick={() => setEditingOther(o)}
+                  onClick={() => (isPickerMode ? onPickOtherIncome?.(o) : setEditingOther(o))}
                 >
                   <td className="num text-muted-foreground px-4 py-2 text-xs">
                     {formatVisitDate(o.income_at)}
@@ -299,7 +310,7 @@ export function SalesTab({ salonId }: { salonId: string }) {
                   <tr
                     key={s.id}
                     className="border-border/60 hover:bg-muted/30 cursor-pointer border-t"
-                    onClick={() => setEditingSale(s)}
+                    onClick={() => (isPickerMode ? onPickVisit?.(s) : setEditingSale(s))}
                   >
                     <td className="num text-muted-foreground px-4 py-2 text-xs">
                       {formatVisitDate(s.visit_at)}

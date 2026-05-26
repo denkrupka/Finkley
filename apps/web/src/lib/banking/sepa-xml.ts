@@ -154,22 +154,31 @@ export function downloadFile(filename: string, content: string, mime = 'applicat
 }
 
 /**
- * Список поддерживаемых форматов экспорта. Сейчас один — SEPA XML, который
- * принимают все EU банки. В будущем сюда добавятся PL-специфичные форматы
- * (Elixir-O для PKO/Santander, MT940 для устаревших, банк-CSV для retail).
+ * Список поддерживаемых форматов экспорта.
+ *  - sepa-xml: pain.001.001.03 — принимают все EU банки (PLN+EUR+другие)
+ *  - elixir-o: текстовый формат для PL bulk-przelewów (только PLN→PLN)
  */
-export type ExportFormat = 'sepa-xml'
+export type ExportFormat = 'sepa-xml' | 'elixir-o'
 
 export const EXPORT_FORMATS: Array<{
   id: ExportFormat
   labelKey: string
   extension: string
   mime: string
+  /** Только PLN-only? (для UI-warning'a при mixed валютах). */
+  plnOnly?: boolean
 }> = [
   {
     id: 'sepa-xml',
     labelKey: 'banking.export.format.sepa_xml',
     extension: 'xml',
     mime: 'application/xml',
+  },
+  {
+    id: 'elixir-o',
+    labelKey: 'banking.export.format.elixir_o',
+    extension: 'txt',
+    mime: 'text/plain',
+    plnOnly: true,
   },
 ]

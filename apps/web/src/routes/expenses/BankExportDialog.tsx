@@ -26,6 +26,7 @@ import { useCounterparties } from '@/hooks/useCounterparties'
 import { useSalon } from '@/hooks/useSalons'
 import { type ScheduledPaymentRow } from '@/hooks/useScheduledPayments'
 import { formatIbanForDisplay, isIbanValid, normalizeIban } from '@/lib/banking/iban'
+import { buildElixirO } from '@/lib/banking/elixir-o'
 import {
   buildSepaXml,
   downloadFile,
@@ -130,16 +131,24 @@ export function BankExportDialog({ open, onOpenChange, salonId, payments }: Prop
             `Payment ${p.row.id.slice(0, 8)}`,
         }))
 
-      const xml = buildSepaXml({
-        debtorName: salon?.name ?? 'Finkley Salon',
-        debtorIban: sourceIban,
-        executionDate,
-        payments: sepaPayments,
-      })
-
       const fmt = EXPORT_FORMATS.find((f) => f.id === format)!
+      const fileContent =
+        format === 'elixir-o'
+          ? buildElixirO({
+              debtorName: salon?.name ?? 'Finkley Salon',
+              debtorIban: sourceIban,
+              executionDate,
+              payments: sepaPayments,
+            })
+          : buildSepaXml({
+              debtorName: salon?.name ?? 'Finkley Salon',
+              debtorIban: sourceIban,
+              executionDate,
+              payments: sepaPayments,
+            })
+
       const filename = `finkley-transfers-${new Date().toISOString().slice(0, 10)}.${fmt.extension}`
-      downloadFile(filename, xml, fmt.mime)
+      downloadFile(filename, fileContent, fmt.mime)
       toast.success(t('banking.export.toast_downloaded', { count: sepaPayments.length }))
       onOpenChange(false)
     } catch (e) {
