@@ -479,6 +479,16 @@ function SingleVisitRow({
             {t('income.bank_badge')}
           </span>
         ) : null}
+        {v.paid_amount_cents != null ? (
+          <span
+            className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
+            title={t('income.partial_tooltip', {
+              defaultValue: 'Частично получено',
+            })}
+          >
+            {t('income.partial_badge', { defaultValue: 'Частично' })}
+          </span>
+        ) : null}
         {needsReview ? (
           <span title={t('income.needs_review_tooltip')} className="mr-1.5 inline-flex">
             <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />

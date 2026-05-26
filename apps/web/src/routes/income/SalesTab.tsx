@@ -321,6 +321,16 @@ export function SalesTab({
                         {t('income.bank_badge')}
                       </span>
                     ) : null}
+                    {o.paid_amount_cents != null ? (
+                      <span
+                        className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
+                        title={t('income.partial_tooltip', {
+                          defaultValue: 'Частично получено',
+                        })}
+                      >
+                        {t('income.partial_badge', { defaultValue: 'Частично' })}
+                      </span>
+                    ) : null}
                     {needsReviewOtherIncomeIds?.has(o.id) ? (
                       <span title={t('income.needs_review_tooltip')} className="ml-1.5 inline-flex">
                         <AlertTriangle
@@ -387,6 +397,16 @@ export function SalesTab({
                         >
                           <Landmark className="size-2.5" strokeWidth={2.4} />
                           {t('income.bank_badge')}
+                        </span>
+                      ) : null}
+                      {s.paid_amount_cents != null ? (
+                        <span
+                          className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800"
+                          title={t('income.partial_tooltip', {
+                            defaultValue: 'Частично получено',
+                          })}
+                        >
+                          {t('income.partial_badge', { defaultValue: 'Частично' })}
                         </span>
                       ) : null}
                       {needsReviewVisitIds?.has(s.id) ? (

@@ -2623,7 +2623,9 @@
     },
     "bank_badge": "Bank",
     "linked_to_bank_tooltip": "Confirmed by bank statement",
-    "needs_review_tooltip": "Low-confidence auto-match — check this is the right bank payment"
+    "needs_review_tooltip": "Low-confidence auto-match — check this is the right bank payment",
+    "partial_badge": "Partial",
+    "partial_tooltip": "Partially received"
   },
   "reports_hub": {
     "title": "Reports",

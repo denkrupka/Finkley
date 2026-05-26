@@ -2623,7 +2623,9 @@
     },
     "bank_badge": "Bank",
     "linked_to_bank_tooltip": "Potwierdzone wyciągiem bankowym",
-    "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — sprawdź, czy to właściwa płatność"
+    "needs_review_tooltip": "Auto-dopasowanie niskiej pewności — sprawdź, czy to właściwa płatność",
+    "partial_badge": "Częściowo",
+    "partial_tooltip": "Częściowo otrzymane"
   },
   "reports_hub": {
     "title": "Raporty",
