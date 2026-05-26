@@ -143,6 +143,8 @@ export function BankingTransactionsTable({
   const sync = useBankSyncNow(salonId)
   const qcRoot = useQueryClient()
   const [extracting, setExtracting] = useState(false)
+  /** Progress для кнопки «Извлечь контрагентов»: "regex 12/137 · AI 50/85". */
+  const [extractProgress, setExtractProgress] = useState<string | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
   // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
@@ -177,6 +179,7 @@ export function BankingTransactionsTable({
 
   async function handleExtractCounterparties() {
     setExtracting(true)
+    setExtractProgress(t('banking.transactions.extract_progress_regex', { defaultValue: 'regex…' }))
     try {
       // Шаг 1: regex-эвристика (быстро, дёшево)
       const { data, error } = await supabase.rpc('extract_bank_tx_counterparty', {
@@ -186,6 +189,13 @@ export function BankingTransactionsTable({
       const row = Array.isArray(data) ? data[0] : data
       const regexUpdated = (row as { updated_count?: number })?.updated_count ?? 0
       const totalWithNull = (row as { total_with_null?: number })?.total_with_null ?? 0
+      setExtractProgress(
+        t('banking.transactions.extract_progress_regex_done', {
+          defaultValue: 'regex {{n}}/{{total}} · AI…',
+          n: regexUpdated,
+          total: totalWithNull,
+        }),
+      )
 
       // Шаг 2: Groq AI fallback для оставшихся (где regex не нашёл)
       // вызывается итеративно по 50 tx пока есть что обрабатывать или
@@ -216,6 +226,14 @@ export function BankingTransactionsTable({
             }
             aiProcessed += json.processed ?? 0
             aiUpdated += json.updated ?? 0
+            setExtractProgress(
+              t('banking.transactions.extract_progress_ai', {
+                defaultValue: 'regex {{r}} · AI {{ai}} · осталось {{left}}',
+                r: regexUpdated,
+                ai: aiUpdated,
+                left: json.total_remaining ?? 0,
+              }),
+            )
             // Если ничего не осталось или ничего не обновили — стоп
             if (!json.processed || json.processed === 0) break
             if ((json.total_remaining ?? 0) === 0) break
@@ -242,6 +260,7 @@ export function BankingTransactionsTable({
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
       setExtracting(false)
+      setExtractProgress(null)
     }
   }
 
@@ -318,9 +337,11 @@ export function BankingTransactionsTable({
             ) : (
               <AlertTriangle className="size-3.5" strokeWidth={1.8} />
             )}
-            {t('banking.transactions.extract_counterparties', {
-              defaultValue: 'Извлечь контрагентов',
-            })}
+            {extractProgress
+              ? extractProgress
+              : t('banking.transactions.extract_counterparties', {
+                  defaultValue: 'Извлечь контрагентов',
+                })}
           </Button>
           <Button
             variant="outline"
