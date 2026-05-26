@@ -20,7 +20,7 @@ import { MiniCalendarWidget } from './MiniCalendarWidget'
 import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
 import { useStaff } from '@/hooks/useStaff'
 import { useAuth } from '@/hooks/useAuth'
-import { useVisits, type PaymentMethod } from '@/hooks/useVisits'
+import { effectiveReceivedFromVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -63,10 +63,12 @@ export function DashboardPage() {
   // Топ-5 последних визитов для нижней таблицы
   const recentVisits = visits.slice(0, 5)
 
-  // Donut: распределение по payment method (% от revenue)
+  // Donut: распределение по payment method (% от revenue). Используем
+  // effectiveReceivedFromVisit чтобы частичные поступления (paid_amount_cents
+  // < net) учитывались как реально пришедшие деньги, не как «должно прийти».
   const paymentTotals = visits.reduce(
     (acc, v) => {
-      acc[v.payment_method] = (acc[v.payment_method] ?? 0) + v.amount_cents
+      acc[v.payment_method] = (acc[v.payment_method] ?? 0) + effectiveReceivedFromVisit(v)
       return acc
     },
     {} as Record<PaymentMethod, number>,
