@@ -1742,6 +1742,7 @@
       "save_hint": "Zmiany zostaną zastosowane do wszystkich przyszłych raportów",
       "show_archived": "Pokaż archiwum",
       "add_item": "Dodaj pozycję",
+      "add_group": "Dodaj grupę",
       "add_subcategory": "Dodaj podkategorię",
       "archive": "Archiwizuj",
       "restore": "Przywróć",
@@ -3421,7 +3422,8 @@
       "amount_required": "Podaj kwotę",
       "amount_positive": "Kwota musi być większa od zera",
       "description_required": "Opisz krótko wydatek",
-      "description_too_long": "Opis za długi (max 200 znaków)"
+      "description_too_long": "Opis za długi (max 200 znaków)",
+      "payment_required": "Podaj czym zapłacono — kasa lub forma płatności jest wymagana"
     },
     "toast_added": "Wydatek dodany",
     "toast_deleted": "Wydatek usunięty",

@@ -1742,6 +1742,7 @@
       "save_hint": "Changes will apply to all future reports",
       "show_archived": "Show archive",
       "add_item": "Add item",
+      "add_group": "Add group",
       "add_subcategory": "Add subcategory",
       "archive": "Archive",
       "restore": "Restore",
@@ -3420,7 +3421,8 @@
       "amount_required": "Enter an amount",
       "amount_positive": "Amount must be greater than zero",
       "description_required": "Briefly describe the expense",
-      "description_too_long": "Description too long (max 200 chars)"
+      "description_too_long": "Description too long (max 200 chars)",
+      "payment_required": "Specify how it was paid — cash register or payment method is required"
     },
     "toast_added": "Expense added",
     "toast_deleted": "Expense deleted",

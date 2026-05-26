@@ -519,7 +519,10 @@ export function ExpenseFormModal({
         category_id: defaultCategoryId ?? '',
         counterparty_id: matchedCounterpartyId ?? '',
         amount: (prefillFromBankTx.amount_cents / 100).toFixed(2),
-        payment_method: 'transfer',
+        // bug b95d1619 — НЕ префилим payment_method=transfer чтобы строка
+        // расхода не получала тег «ПЕРЕВОД» когда юзер не имеет такой кассы.
+        // Юзер обязан выбрать конкретную кассу из своих financial_settings.
+        payment_method: '',
         cash_register_id: '',
         document_number: extractedDocNumber ?? '',
         comment: '',
@@ -583,6 +586,21 @@ export function ExpenseFormModal({
 
   async function onSubmit(values: FormValues) {
     const amountCents = Math.round(Number(values.amount.replace(',', '.')) * 100)
+    // bug b95d1619 — для paid-расхода обязательно требуем «чем оплатили»
+    // (cash_register_id ИЛИ payment_method). Раньше форма пропускала пустыми
+    // — потом в списке расходов было непонятно с какой кассы списали.
+    if (paid && !values.cash_register_id && !values.payment_method) {
+      form.setError('cash_register_id', {
+        type: 'manual',
+        message: 'expenses.errors.payment_required',
+      })
+      toast.error(
+        t('expenses.errors.payment_required', {
+          defaultValue: 'Укажи чем оплачено — касса или способ оплаты обязателен',
+        }),
+      )
+      return
+    }
     // Частичная оплата: paid_amount_cents = введённое значение; null если
     // checkbox выключен ИЛИ paid==amount (полная оплата).
     const paidAmountCents =

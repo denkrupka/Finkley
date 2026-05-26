@@ -1172,7 +1172,13 @@ function NextVisitPromptView({
         <p className="text-muted-foreground text-xs">{t('visits.next_prompt.hint_loss')}</p>
       </div>
       <div className="border-border bg-muted/10 flex gap-2 border-t px-5 py-4">
-        <Button variant="outline" onClick={() => setShowScript(true)} className="flex-1">
+        {/* bug 23afc33e — кнопка «Работа с возражениями» теперь зелёная
+            (заметнее для администратора, owner-feedback). */}
+        <Button
+          variant="outline"
+          onClick={() => setShowScript(true)}
+          className="bg-brand-sage-soft text-brand-sage-deep hover:bg-brand-sage-soft/80 border-brand-sage/40 flex-1"
+        >
           {t('visits.next_prompt.objections_button')}
         </Button>
         <Button onClick={onDone} className="flex-1">

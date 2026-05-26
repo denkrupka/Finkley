@@ -392,7 +392,11 @@ function SectionTable({
           </label>
           <Button type="button" variant="outline" size="sm" onClick={addRoot}>
             <Plus className="size-3.5" strokeWidth={2} />
-            {t('settings.parameters.add_item')}
+            {/* bug 006b95f9 — для investments юзер хочет «+ Добавить группу»
+                вместо общего «+ Добавить позицию» (там реально группы статей). */}
+            {def.key === 'investments'
+              ? t('settings.parameters.add_group')
+              : t('settings.parameters.add_item')}
           </Button>
         </div>
       </header>
