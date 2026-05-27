@@ -14,7 +14,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     css: false,
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/unit/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'tests/unit/**/*.{test,spec}.{ts,tsx}',
+      // T49 — pure-логика Edge Function shared-helpers (без Deno API).
+      '../../supabase/functions/_shared/**/*.{test,spec}.ts',
+    ],
     exclude: ['node_modules', 'dist', 'tests/e2e/**'],
     // RPC/edge-function тесты ходят в реальный Supabase staging — иногда
     // флапают на rate-limit или конкуренции (admin-stats особенно). Даём
