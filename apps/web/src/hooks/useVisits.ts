@@ -45,20 +45,11 @@ export type VisitRow = {
 export type VisitsPeriod = { start: string; end: string }
 
 /**
- * Фактически полученная сумма по визиту (net + учёт частичных поступлений).
- * net = amount - discount + tip. Если есть paid_amount_cents и она меньше
- * net — берём paid_amount_cents (остаток не считаем в доход пока не пришла
- * следующая транзакция). NULL paid_amount_cents = полностью получено.
+ * Re-export pure-helper (см. lib/income/effective-received.ts) — старый
+ * импорт `from '@/hooks/useVisits'` остаётся валидным для всех мест где
+ * helper уже используется (CashFlowTab, FinancialReportTab, SalesTab, etc).
  */
-export function effectiveReceivedFromVisit(
-  v: Pick<VisitRow, 'amount_cents' | 'discount_cents' | 'tip_cents' | 'paid_amount_cents'>,
-): number {
-  const net = v.amount_cents - (v.discount_cents ?? 0) + (v.tip_cents ?? 0)
-  if (v.paid_amount_cents != null && v.paid_amount_cents < net) {
-    return v.paid_amount_cents
-  }
-  return net
-}
+export { effectiveReceivedFromVisit } from '@/lib/income/effective-received'
 
 export function visitsKeys(salonId: string | undefined) {
   return ['visits', salonId] as const

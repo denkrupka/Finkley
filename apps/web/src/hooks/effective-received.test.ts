@@ -9,8 +9,12 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { effectiveReceivedFromVisit } from './useVisits'
-import { effectiveReceivedFromOtherIncome } from './useOtherIncomes'
+// Импорт из pure-модуля чтобы не подтягивать supabase-client (на CI
+// нет VITE_SUPABASE_URL и hooks/useVisits.ts падает при импорте).
+import {
+  effectiveReceivedFromOtherIncome,
+  effectiveReceivedFromVisit,
+} from '@/lib/income/effective-received'
 
 describe('effectiveReceivedFromVisit', () => {
   it('paid_amount_cents == null → возвращает net (amount - discount + tip)', () => {

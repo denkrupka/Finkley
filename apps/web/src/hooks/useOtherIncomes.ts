@@ -40,18 +40,12 @@ export type OtherIncomeCategoryRow = {
 }
 
 /**
- * Фактически полученная сумма прочего дохода (учёт частичных поступлений).
- * Если paid_amount_cents != null и меньше amount_cents — берём её. NULL =
- * полностью получено (legacy default).
+ * Re-export pure-helper. См. lib/income/effective-received.ts — extract
+ * сделан чтобы юнит-тесты могли импортировать helper'ы без supabase-client
+ * (на CI нет VITE_SUPABASE_URL). Старые импорты `from '@/hooks/useOtherIncomes'`
+ * остаются валидными.
  */
-export function effectiveReceivedFromOtherIncome(
-  o: Pick<OtherIncomeRow, 'amount_cents' | 'paid_amount_cents'>,
-): number {
-  if (o.paid_amount_cents != null && o.paid_amount_cents < o.amount_cents) {
-    return o.paid_amount_cents
-  }
-  return o.amount_cents
-}
+export { effectiveReceivedFromOtherIncome } from '@/lib/income/effective-received'
 
 export function useOtherIncomeCategories(
   salonId: string | undefined,
