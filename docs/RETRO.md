@@ -5,6 +5,149 @@
 
 ---
 
+## Batch 7 — Финансы / Уведомления / Permissions / UI Tours · 27-28 мая 2026
+
+**Релиз:** один большой merge в `main`, успешно задеплоен в прод
+(коммиты `330c95f` → `1b6bff0` → `6c6d253` → `b712ccf`). 51 задача (T1–T51)
+за ~36 часов работы в несколько сессий. Тесты: 386 → 425 (+39).
+
+### Что сделано
+
+**Финансы / P&L (T1–T7):**
+
+- Кнопка fullscreen в P&L — только иконка + растягивается на весь viewport.
+- Year-selector → универсальный PeriodPickerPopover с динамическими колонками
+  месяцев (buildMonthCols + useRegisterBalancesAtMonthEnds).
+- Системная касса «Корректировки» (preset_key='adjustments'), скрытая везде
+  кроме CashTransferModal / TransfersTab. Строка «Корректировки» над
+  «Сальдо за период» с балансом.
+
+**Дашборд (T8):**
+
+- Полный rewrite по образцу `finsalon_dashboard.html`: 5 KPI карточек +
+  секции Клиенты/Мастера / Расходы/Финансы / Операции / Маркетинг RFM.
+- LowStock и Insights обёрнуты в CollapsibleSection с localStorage.
+
+**Методы оплаты + авто-комиссии (T9–T15, T34):**
+
+- SQL миграции: `payment_methods.cash_register_id` + `commission_pct`,
+  системная категория «Комиссии», DB-triggers auto-commission на
+  visits/other_incomes (paid → auto-expense).
+- UI вкладка «Методы оплаты», CommissionsPin + CommissionsModal с
+  in-place модалками источников (T31).
+- Метод оплаты вместо «Касса» в модалках визита и прочего дохода.
+
+**Permissions matrix (T26, T30, T35, T36):**
+
+- SQL: `salon_members.permissions jsonb` + `accept_salon_invitation` копирует
+  из invitation. PermissionsBlock с роль-пресетами.
+- `usePermissions` hook + защита роутов через RequirePermission, Sidebar
+  фильтрует пункты nav по can(category, 'view').
+
+**Уведомления / multi-channel (T22–T23, T37–T44, T48):**
+
+- Edge Function `send-notification` + `dispatchNotification()` helper.
+- 11 типов × 3 канала (email/Telegram/SMS) × 3 языка (ru/pl/en) в
+  `notify-templates.ts`. Twilio для SMS, Resend для email.
+- Per-channel prefs `notification_prefs[type.channel]` + UI матрица в
+  /settings/notifications → Типы.
+- In-app realtime через postgres_changes + sonner-toast (T42).
+- Bell с unread badge + drawer + mark-as-read (T43).
+- Полная страница `/notifications` с фильтрами + пагинацией (T44).
+- Подключено в cron: daily-notifications, payment-reminders,
+  generate-insights, booksy-proxy, messenger-{meta,telegram}-webhook.
+
+**UI Tours (T45–T48):**
+
+- OnboardingTour: spotlight overlay (4 div'а + ring) вокруг `data-tour`
+  элементов, per-role фильтр (staff видит 5 шагов, owner — 9).
+- PageTour универсальный + 3 per-page тура (/expenses, /finance, /inventory).
+- Секция «Гиды и обучение» в /help со всеми 4 турами.
+- Auto-tour для приглашённого мастера после `InviteSignupForm.onComplete`.
+
+**Профиль и онбординг (T25, T27, T33):**
+
+- UserProfileCard в /settings/profile (имя, фамилия, телефон, email
+  read-only, аватар, пароль). Все блоки в profile-tab сворачиваемые с
+  localStorage (default свёрнуты).
+- InviteSignupForm — форма регистрации приглашённого мастера.
+- Из инвайт-модалки удалены поля Фото/Имя/Фамилия/Телефон (заполняет сам).
+
+**Banking + display фиксы (T20, T21, T29, T32):**
+
+- Убрана кнопка «Извлечь контрагентов» — автозапуск после sync (silent).
+- Счётчик несвязанных tx на табе «Банкинг».
+- `formatExpenseDate` конвертирует UTC timestamp в локальную дату (фикс
+  «30.04 → 1.05» в Bank Millennium листинге).
+- banking-sync: детальное логирование + минимум 30-дневное окно (фикс
+  Bank Millennium quirk с lazy-booked tx).
+
+**UI / общие (T18, T19, T24, T28, T33):**
+
+- Список визитов открывает QuickEntryModal (как Календарь).
+- Календарь визитов: `minmax(COL_WIDTH, 1fr)` — колонки растягиваются на
+  всю ширину при скрытых мастерах.
+- Sidebar: кнопка сворачивания наверх возле логотипа (ChevronsLeft/Right).
+- `common.back_home` i18n ключ ru/en/pl.
+
+**Тесты (T49, T51):**
+
+- 19 unit-тестов для `permissions-logic.ts` (выделена pure-логика из
+  `usePermissions.ts`).
+- 20 unit-тестов для `notify-templates.ts` (шаблоны email/TG/SMS во всех 3
+  локалях + HTML-escape от инъекций).
+- vitest include расширен на `supabase/functions/_shared/**/*.test.ts`.
+
+**Observability (T41, T50):**
+
+- `withSentry` обвязка для send-notification, daily-notifications,
+  payment-reminders, generate-insights — все 4 cron'а ловят unhandled
+  exceptions с тегом `fn=<name>`.
+
+### Что хорошо
+
+- **Большой batch один-commit-один-changelog** оказался лучше чем серия
+  мелких commit'ов: меньше шансов рассинхронить промежуточные состояния,
+  всё или ничего на проде.
+- **Pure-логика отдельно от хука** (permissions-logic vs usePermissions)
+  — тестировать стало тривиально, и unit-тесты ловят регрессии не
+  трогая React-render.
+- **Spotlight overlay без зависимостей** (4 div'а вместо react-joyride)
+  — экономия ~50 KB bundle + полный контроль над z-index/styling.
+- **Pre-commit hook (prettier+lint) автокоммитит форматирование** —
+  никаких отдельных `style:` commit'ов после merge.
+
+### Что плохо / уроки
+
+- **Польские типографские кавычки `„text"` ломают JSON** — закрывающая
+  `"` парсилась как конец строки. Регэксп `„([^„"\n]+)"` → `„$1”`
+  починил. Урок: для не-ASCII кавычек в JSON всегда использовать `”`
+  (U+201D) явно или escape `\"`.
+- **3 deploy подряд = 3×(staging+prod) очередь** — каждый push занимает
+  ~15-25 минут на Edge Functions × 50. На большие пакеты лучше один commit.
+- **i18n notif.\* defaultValue inline в TSX** — пришлось дублировать
+  словарь в `useNotifications` (toast), `NotificationsBell` (popover),
+  `NotificationsPage` (полный список). При локализации en/pl всё
+  нашлось через grep, но в идеале — общая утилита `describeNotification(type, payload, t)`.
+
+### Известные хвосты (не критичные)
+
+- В Sidebar/TopBar данные derive (insights/budgets/messenger) считают
+  unread по `lastSeen` localStorage; in_app считает по `read_at` jsonb.
+  Можно унифицировать в одну таблицу.
+- Тесты для `useRealtimeNotifications` хук + `tour-internals` хелперы.
+- Локализация email-шаблонов welcome/trial_ending — `send-email`
+  использует свой `templates.ts`, не интегрирован с `notify-templates.ts`.
+
+### Новые ADR
+
+— (ни одного: все изменения укладывались в существующие архитектурные
+решения. Расширение `payment_methods` колонками `cash_register_id` +
+`commission_pct` — пограничный случай, но решение симметрично уже
+существующему `cash_registers.payment_method_mapping` legacy-полю.)
+
+---
+
 ## Стадия 3 — Messenger Phase 3 · 19 мая 2026
 
 **Релиз:** прод-патч поверх ADR-015 (TG userbot).
