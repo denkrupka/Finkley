@@ -23,6 +23,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { makeT, normalizeNotifLocale, type NotifLocale } from '../_shared/notifications-i18n.ts'
 import { dispatchNotification, sendTelegramToUser } from '../_shared/notify.ts'
+import { withSentry } from '../_shared/sentry.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -291,54 +292,56 @@ async function processOneSalon(
   return stats
 }
 
-Deno.serve(async (req: Request) => {
-  const pf = preflight(req)
-  if (pf) return pf
-  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
-  if (!SUPABASE_URL || !SERVICE_KEY)
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+Deno.serve(
+  withSentry('payment-reminders', async (req: Request) => {
+    const pf = preflight(req)
+    if (pf) return pf
+    if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
+    if (!SUPABASE_URL || !SERVICE_KEY)
+      return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
 
-  let body: { token?: string; cron?: boolean } = {}
-  try {
-    body = await req.json()
-  } catch {
-    // ignore
-  }
-  if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 401)
-
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY)
-
-  // Валидируем rendezvous токен (одноразовый, не expired)
-  const { data: trig, error: trigErr } = await admin
-    .from('payment_reminder_triggers')
-    .update({ used_at: new Date().toISOString() })
-    .eq('token', body.token)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .select('token')
-    .maybeSingle()
-  if (trigErr || !trig) return jsonResponse({ ok: false, error: 'invalid_or_expired_token' }, 401)
-
-  const today = new Date().toISOString().slice(0, 10)
-
-  // Берём все салоны (не блокированные)
-  const { data: salons } = await admin
-    .from('salons')
-    .select('id, name, currency, notification_prefs')
-    .is('deleted_at', null)
-    .is('blocked_at', null)
-
-  let totalSent = 0
-  let totalSkipped = 0
-  for (const s of salons ?? []) {
+    let body: { token?: string; cron?: boolean } = {}
     try {
-      const r = await processOneSalon(admin, s as SalonRow, today)
-      totalSent += r.sent
-      totalSkipped += r.skipped
-    } catch (e) {
-      console.warn(`salon ${s.id} failed: ${e instanceof Error ? e.message : String(e)}`)
+      body = await req.json()
+    } catch {
+      // ignore
     }
-  }
+    if (!body.token) return jsonResponse({ ok: false, error: 'token_required' }, 401)
 
-  return jsonResponse({ ok: true, sent: totalSent, skipped: totalSkipped })
-})
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+
+    // Валидируем rendezvous токен (одноразовый, не expired)
+    const { data: trig, error: trigErr } = await admin
+      .from('payment_reminder_triggers')
+      .update({ used_at: new Date().toISOString() })
+      .eq('token', body.token)
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .select('token')
+      .maybeSingle()
+    if (trigErr || !trig) return jsonResponse({ ok: false, error: 'invalid_or_expired_token' }, 401)
+
+    const today = new Date().toISOString().slice(0, 10)
+
+    // Берём все салоны (не блокированные)
+    const { data: salons } = await admin
+      .from('salons')
+      .select('id, name, currency, notification_prefs')
+      .is('deleted_at', null)
+      .is('blocked_at', null)
+
+    let totalSent = 0
+    let totalSkipped = 0
+    for (const s of salons ?? []) {
+      try {
+        const r = await processOneSalon(admin, s as SalonRow, today)
+        totalSent += r.sent
+        totalSkipped += r.skipped
+      } catch (e) {
+        console.warn(`salon ${s.id} failed: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+
+    return jsonResponse({ ok: true, sent: totalSent, skipped: totalSkipped })
+  }),
+)
