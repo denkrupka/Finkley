@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { QuickEntryModal } from './QuickEntryModal'
 import { VisitDetailModal } from './VisitDetailModal'
 import { FreeSlotsPanel } from './FreeSlotsPanel'
 import { VisitsActionsBar } from './VisitsActionsBar'
@@ -134,7 +135,12 @@ export function VisitsPage({
   const linkedVisitIds = bankLinked?.visitIds ?? null
   const needsReviewVisitIds = bankLinked?.needsReviewVisitIds ?? null
   const deleteVisit = useDeleteVisit(salonId)
+  // T18 — в режиме «Список» открываем полноценную модалку «Редактировать
+  // визит» (QuickEntryModal в edit-mode), как в Календаре. VisitDetailModal
+  // (короткая карточка с табами «Визит/Информация») остаётся только для
+  // ChargeView — флоу «Рассчитать визит» после редактирования.
   const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
+  const [chargeVisit, setChargeVisit] = useState<VisitRow | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   function toggleGroup(key: string) {
@@ -195,9 +201,26 @@ export function VisitsPage({
           {/* Перенесённый ниже list-content внутри fragment чтобы Calendar
             бранч не рендерил его */}
 
+          {/* T18 — QuickEntryModal в edit-mode: полная форма «Редактировать визит»
+              (Image #84/85). При нажатии «Рассчитать» — закрывается и открывается
+              VisitDetailModal (ChargeView) для расчёта оплаты. */}
+          <QuickEntryModal
+            open={!!editingVisit}
+            onOpenChange={(o) => {
+              if (!o) setEditingVisit(null)
+            }}
+            salonId={salonId}
+            currency={currency}
+            editVisit={editingVisit}
+            onChargeRequest={(visitId) => {
+              const v = visits.find((x) => x.id === visitId)
+              setEditingVisit(null)
+              if (v) setChargeVisit(v)
+            }}
+          />
           <VisitDetailModal
-            visit={editingVisit}
-            onClose={() => setEditingVisit(null)}
+            visit={chargeVisit}
+            onClose={() => setChargeVisit(null)}
             salonId={salonId}
             currency={currency}
           />

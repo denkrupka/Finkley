@@ -64,7 +64,7 @@ jobs:
             echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
             echo "VITE_SUPABASE_URL_TEST=$VITE_SUPABASE_URL_TEST"
           } > apps/web/.env.local
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth telegram-link telegram-bug-collector tester-bug-report ai-seo-helper team-update-member send-email process-recurring-expenses send-weekly-digest generate-insights banking-sync banking-expiry-notify messenger-telegram-webhook messenger-meta-webhook instagram-oauth-callback instagram-deauthorize instagram-data-deletion fb-oauth-callback fb-deauthorize fb-data-deletion"
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth telegram-link telegram-bug-collector tester-bug-report ai-seo-helper team-update-member send-email send-notification process-recurring-expenses send-weekly-digest send-daily-digest daily-notifications payment-reminders generate-insights banking-sync banking-expiry-notify messenger-telegram-webhook messenger-meta-webhook instagram-oauth-callback instagram-deauthorize instagram-data-deletion fb-oauth-callback fb-deauthorize fb-data-deletion"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi
@@ -122,7 +122,7 @@ jobs:
             echo "SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN"
             echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
           } > apps/web/.env.local
-          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth telegram-link telegram-bug-collector tester-bug-report ai-seo-helper team-update-member send-email process-recurring-expenses send-weekly-digest generate-insights banking-sync banking-expiry-notify messenger-telegram-webhook messenger-meta-webhook instagram-oauth-callback instagram-deauthorize instagram-data-deletion fb-oauth-callback fb-deauthorize fb-data-deletion"
+          NO_JWT_FUNCTIONS="stripe-webhook telegram-auth telegram-link telegram-bug-collector tester-bug-report ai-seo-helper team-update-member send-email send-notification process-recurring-expenses send-weekly-digest send-daily-digest daily-notifications payment-reminders generate-insights banking-sync banking-expiry-notify messenger-telegram-webhook messenger-meta-webhook instagram-oauth-callback instagram-deauthorize instagram-data-deletion fb-oauth-callback fb-deauthorize fb-data-deletion"
           for fn in supabase/functions/*/; do
             name=$(basename "$fn")
             if [ "$name" = "_shared" ]; then continue; fi

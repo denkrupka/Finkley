@@ -51,6 +51,7 @@ export function FAB({
           type="button"
           aria-label={t('fab.add')}
           data-testid="fab-add"
+          data-tour="fab-add"
           className={[
             'bg-primary text-primary-foreground shadow-finlg fixed z-20',
             // Mobile: круглая 56px над bottom-nav

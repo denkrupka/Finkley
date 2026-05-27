@@ -22,7 +22,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { makeT, normalizeNotifLocale, type NotifLocale } from '../_shared/notifications-i18n.ts'
-import { sendTelegramToUser } from '../_shared/notify.ts'
+import { dispatchNotification, sendTelegramToUser } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -258,18 +258,34 @@ async function processOneSalon(
       console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
     }
 
-    // Telegram (silent fail)
-    if (ownerData.telegram_id) {
-      const ok = await sendTelegramToUser(ownerData.telegram_id, text)
-      if (ok) stats.sent += 1
+    // T38 — единый dispatcher: per-channel prefs + единый шаблон.
+    // Для каждого платежа в bucket генерируем отдельное уведомление
+    // (точечная инфа: контрагент, документ, сумма). Telegram/SMS будут
+    // компактными, email — детальным.
+    for (const p of list) {
+      const dispatched = await dispatchNotification({
+        salonId: salon.id,
+        userId: ownerData.user_id,
+        type: bucketKey,
+        payload: {
+          counterparty: p.vendor_name ?? '—',
+          document_number: p.invoice_number ?? '',
+          amount_formatted: new Intl.NumberFormat('ru-RU', {
+            style: 'currency',
+            currency,
+          }).format(p.amount_cents / 100),
+        },
+      })
+      if (dispatched) stats.sent += 1
     }
-
-    // Email
-    if (ownerData.email) {
-      const r = await sendEmailReminder(ownerData.email, subject, html)
-      if (r.ok) stats.sent += 1
-      else console.warn(`email failed for ${ownerData.email}: ${r.error}`)
-    }
+    // Mute legacy: text/html/subject/sendTelegramToUser/sendEmailReminder
+    // оставлены для backward-compat; push выше работает независимо от
+    // dispatcher'а (push не в матрице prefs).
+    void text
+    void html
+    void subject
+    void sendTelegramToUser
+    void sendEmailReminder
   }
 
   return stats

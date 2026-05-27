@@ -23,7 +23,7 @@ import {
   normalizeNotifLocale,
   type NotifLocale,
 } from '../_shared/notifications-i18n.ts'
-import { sendTelegramToUser } from '../_shared/notify.ts'
+import { dispatchNotification, sendTelegramToUser } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -145,13 +145,28 @@ async function processLowInventory(
   } catch (e) {
     console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
   }
-  if (owner.telegram_id) {
-    if (await sendTelegramToUser(owner.telegram_id, text)) sent++
-  }
-  if (owner.email) {
-    const r = await sendEmail(owner.email, pushTitle, html)
-    if (r.ok) sent++
-  }
+  // T38 — единый dispatcher: проверит prefs.low_inventory.{email,telegram,sms}
+  // и отправит по нужным каналам с готовыми шаблонами. Push выше — отдельная
+  // ветка (он не управляется тем же prefs-флагом, см. PushNotificationsCard).
+  const dispatched = await dispatchNotification({
+    salonId: salon.id,
+    userId: owner.user_id,
+    type: 'low_inventory',
+    payload: {
+      items: lowList.map((it) => ({
+        name: it.name,
+        current: it.current_stock,
+        min: it.min_stock,
+        unit: it.unit ?? '',
+      })),
+    },
+  })
+  if (dispatched) sent++
+  // Mute неиспользуемые legacy-переменные: оставляем text/html для fallback
+  // если в будущем dispatchNotification вернётся к direct-send.
+  void text
+  void html
+  void pushTitle
   return sent
 }
 
@@ -259,13 +274,22 @@ async function processCalendarConflicts(
   } catch (e) {
     console.warn(`push failed: ${e instanceof Error ? e.message : String(e)}`)
   }
-  if (owner.telegram_id) {
-    if (await sendTelegramToUser(owner.telegram_id, text)) sent++
-  }
-  if (owner.email) {
-    const r = await sendEmail(owner.email, t('conflict.push_title', { salonName }), html)
-    if (r.ok) sent++
-  }
+  // T38 — единый dispatcher с per-channel prefs.
+  const dispatched = await dispatchNotification({
+    salonId: salon.id,
+    userId: owner.user_id,
+    type: 'calendar_conflicts',
+    payload: {
+      conflicts: conflicts.slice(0, 20).map((c) => ({
+        staff: staffName.get(c.a.staff_id!) ?? dash,
+        time: fmt(c.a.visit_at),
+        clients: `${c.a.service_name_snapshot ?? dash} ↔ ${c.b.service_name_snapshot ?? dash}`,
+      })),
+    },
+  })
+  if (dispatched) sent++
+  void text
+  void html
   return sent
 }
 

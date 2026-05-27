@@ -1,4 +1,13 @@
-import { ExternalLink, MessageCircle, PlayCircle, Sparkles } from 'lucide-react'
+import {
+  ExternalLink,
+  MessageCircle,
+  PiggyBank,
+  PlayCircle,
+  Package,
+  Receipt,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -6,20 +15,66 @@ import { LogoLockup } from '@/components/ui/logo'
 
 import { HelpFAQ } from './HelpFAQ'
 
+type TourCard = {
+  id: 'onboarding' | 'expenses' | 'finance' | 'inventory'
+  icon: LucideIcon
+  storageKey: string
+  /** Куда вести при клике (без leading /salonId). */
+  pathBuilder: (salonId: string) => string
+  titleKey: string
+  bodyKey: string
+}
+
+const TOURS: TourCard[] = [
+  {
+    id: 'onboarding',
+    icon: Sparkles,
+    storageKey: 'finkley:tour:dismissed',
+    pathBuilder: (s) => `/${s}/dashboard?showTour=1`,
+    titleKey: 'help.tours.onboarding.title',
+    bodyKey: 'help.tours.onboarding.body',
+  },
+  {
+    id: 'expenses',
+    icon: Receipt,
+    storageKey: 'finkley:tour:page:expenses',
+    pathBuilder: (s) => `/${s}/expenses?tour=1`,
+    titleKey: 'help.tours.expenses.title',
+    bodyKey: 'help.tours.expenses.body',
+  },
+  {
+    id: 'finance',
+    icon: PiggyBank,
+    storageKey: 'finkley:tour:page:finance',
+    pathBuilder: (s) => `/${s}/finance?tour=1`,
+    titleKey: 'help.tours.finance.title',
+    bodyKey: 'help.tours.finance.body',
+  },
+  {
+    id: 'inventory',
+    icon: Package,
+    storageKey: 'finkley:tour:page:inventory',
+    pathBuilder: (s) => `/${s}/inventory?tour=1`,
+    titleKey: 'help.tours.inventory.title',
+    bodyKey: 'help.tours.inventory.body',
+  },
+]
+
 export function HelpPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const navigate = useNavigate()
-  function relaunchTour() {
+
+  function relaunchTour(tour: TourCard) {
     if (!salonId) return
-    // Сбрасываем dismissed-флаг чтобы тур не отказался показываться, и
-    // одновременно прокидываем showTour=1 (force) для надёжности.
+    // Сбрасываем dismissed-флаг + прокидываем query (force=true) для надёжности
+    // — query сработает даже если localStorage недоступен.
     try {
-      localStorage.removeItem('finkley:tour:dismissed')
+      localStorage.removeItem(tour.storageKey)
     } catch {
-      // localStorage недоступен — query параметр всё равно сработает
+      // ignore
     }
-    navigate(`/${salonId}/dashboard?showTour=1`)
+    navigate(tour.pathBuilder(salonId))
   }
 
   return (
@@ -55,27 +110,47 @@ export function HelpPage() {
         </div>
 
         {salonId ? (
-          <div className="border-border bg-card shadow-finsm mb-6 flex items-center gap-3 rounded-lg border p-4">
-            <span
-              className="bg-brand-yellow/30 text-brand-navy grid size-10 place-items-center rounded-full"
-              aria-hidden
-            >
-              <PlayCircle className="size-5" strokeWidth={1.8} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-brand-navy text-sm font-bold">{t('help.relaunch_tour.title')}</p>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                {t('help.relaunch_tour.subtitle')}
-              </p>
+          <section className="mb-8">
+            <h2 className="text-brand-navy mb-3 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider">
+              <PlayCircle className="text-secondary size-4" strokeWidth={1.8} />
+              {t('help.tours.section_title', { defaultValue: 'Гиды и обучение' })}
+            </h2>
+            <p className="text-muted-foreground mb-4 text-sm">
+              {t('help.tours.section_subtitle', {
+                defaultValue:
+                  'Короткие туры по ключевым разделам. Можно запустить заново когда нужно — снова покажет подсветку и пояснения.',
+              })}
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {TOURS.map((tour) => {
+                const Icon = tour.icon
+                return (
+                  <button
+                    key={tour.id}
+                    type="button"
+                    onClick={() => relaunchTour(tour)}
+                    className="border-border bg-card hover:border-secondary/40 hover:bg-muted/20 group flex items-start gap-3 rounded-lg border p-4 text-left transition-colors"
+                  >
+                    <span
+                      className="bg-brand-teal-soft text-brand-teal-deep grid size-10 shrink-0 place-items-center rounded-lg"
+                      aria-hidden
+                    >
+                      <Icon className="size-5" strokeWidth={1.8} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-brand-navy text-sm font-bold">{t(tour.titleKey)}</p>
+                      <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                        {t(tour.bodyKey)}
+                      </p>
+                      <span className="text-secondary mt-2 inline-flex items-center gap-1 text-xs font-semibold group-hover:underline">
+                        {t('help.tours.relaunch', { defaultValue: 'Показать ещё раз →' })}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
-            <button
-              type="button"
-              onClick={relaunchTour}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors"
-            >
-              {t('help.relaunch_tour.button')}
-            </button>
-          </div>
+          </section>
         ) : null}
 
         <HelpFAQ />

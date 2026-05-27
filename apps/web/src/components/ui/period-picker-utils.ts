@@ -50,6 +50,52 @@ export function currentMonthPeriod(): PeriodValue {
   return { kind: 'month', year: now.getFullYear(), month: now.getMonth() + 1 }
 }
 
+export type MonthCol = { year: number; monthIdx: number; key: string }
+
+/**
+ * Список колонок-месяцев для табличных отчётов (P&L), покрывающих
+ * указанный диапазон. Каждая колонка — один календарный месяц.
+ *
+ * Гарантирует минимум одну колонку (если start > end или диапазон в пределах
+ * одного месяца — возвращает один месяц от start). Безопасно ограничивает
+ * максимум на 60 месяцев — для «За все время» с from='2000-01-01' иначе
+ * вернулись бы сотни колонок и таблица ушла бы в OOM.
+ */
+export function buildMonthCols(start: Date, end: Date): MonthCol[] {
+  const MAX_COLS = 60
+  const a = new Date(start.getFullYear(), start.getMonth(), 1)
+  const b = new Date(end.getFullYear(), end.getMonth(), 1)
+  const cols: MonthCol[] = []
+  const cur = new Date(a)
+  while (cur.getTime() <= b.getTime() && cols.length < MAX_COLS) {
+    const year = cur.getFullYear()
+    const monthIdx = cur.getMonth()
+    cols.push({ year, monthIdx, key: `${year}-${String(monthIdx + 1).padStart(2, '0')}` })
+    cur.setMonth(cur.getMonth() + 1)
+  }
+  if (cols.length === 0) {
+    const year = a.getFullYear()
+    const monthIdx = a.getMonth()
+    cols.push({ year, monthIdx, key: `${year}-${String(monthIdx + 1).padStart(2, '0')}` })
+  }
+  // Если упёрлись в MAX_COLS, обрежем «справа» — последние 60 месяцев перед end.
+  if (cur.getTime() <= b.getTime()) {
+    const toCut = cols.length
+    cols.length = 0
+    const start2 = new Date(b)
+    start2.setMonth(start2.getMonth() - (MAX_COLS - 1))
+    const cur2 = new Date(start2)
+    while (cur2.getTime() <= b.getTime() && cols.length < MAX_COLS) {
+      const year = cur2.getFullYear()
+      const monthIdx = cur2.getMonth()
+      cols.push({ year, monthIdx, key: `${year}-${String(monthIdx + 1).padStart(2, '0')}` })
+      cur2.setMonth(cur2.getMonth() + 1)
+    }
+    void toCut
+  }
+  return cols
+}
+
 export function shiftPeriod(value: PeriodValue, direction: 1 | -1): PeriodValue {
   if (value.kind === 'month') {
     const anchor = addYears(new Date(value.year, value.month - 1, 1), 0)

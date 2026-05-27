@@ -24,6 +24,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { dispatchNotification } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -298,11 +299,22 @@ async function processSalon(admin: SupabaseClient, salonId: string): Promise<num
         .maybeSingle()
       if (ownerRow) {
         const userId = (ownerRow as { user_id: string }).user_id
+        // Push owner'у (отдельная ветка, не в матрице prefs).
         await sendPushToUser(admin, userId, {
           title: `🧠 ${top3[0].title}`,
           body: top3[0].body.slice(0, 200),
           url: `/app/${salonId}/dashboard`,
           tag: `insights-${salonId}`,
+        })
+        // T39 — email/Telegram/SMS через единый dispatcher с per-channel prefs.
+        await dispatchNotification({
+          salonId,
+          userId,
+          type: 'ai_insights',
+          payload: {
+            headline: top3[0].title,
+            body: top3[0].body,
+          },
         })
       }
     }

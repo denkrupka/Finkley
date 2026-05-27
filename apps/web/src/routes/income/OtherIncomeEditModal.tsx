@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
-import { useCashRegisters } from '@/hooks/useCashRegisters'
 import {
   useDeleteOtherIncome,
   useOtherIncomeCategories,
@@ -57,7 +56,6 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
   const remove = useDeleteOtherIncome(salonId)
   const { data: categories = [] } = useOtherIncomeCategories(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
-  const { data: cashRegisters = [] } = useCashRegisters(salonId)
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
   const isBankLinked = income ? (bankLinked?.otherIncomeIds.has(income.id) ?? false) : false
 
@@ -201,6 +199,10 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
             ) : null}
           </div>
 
+          {/* T16 — «Метод оплаты» (раньше «Способ оплаты»). Кассу выбирать
+              не нужно — она определяется автоматически из mapping выбранного
+              метода (payment_methods.cash_register_id), задаваемого в
+              справочнике /settings/finance → Методы оплаты. */}
           <div className="flex flex-col gap-1.5">
             <Label>{t('income.other_form.payment_method')}</Label>
             <div className="flex flex-wrap gap-1.5">
@@ -210,7 +212,16 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setPaymentMethod(active ? '' : m.code)}
+                    onClick={() => {
+                      if (active) {
+                        setPaymentMethod('')
+                        setCashRegisterId('')
+                      } else {
+                        setPaymentMethod(m.code)
+                        // Авто-привязка кассы из справочника метода.
+                        setCashRegisterId(m.cash_register_id ?? '')
+                      }
+                    }}
                     className={cn(
                       'border-border h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
                       active
@@ -224,32 +235,6 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
               })}
             </div>
           </div>
-
-          {cashRegisters.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              <Label>{t('income.other_form.cash_register')}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {cashRegisters.map((r) => {
-                  const active = cashRegisterId === r.id
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setCashRegisterId(active ? '' : r.id)}
-                      className={cn(
-                        'border-border h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
-                        active
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'bg-card hover:bg-muted/40',
-                      )}
-                    >
-                      {r.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="oi-edit-date">{t('income.other_edit.date')}</Label>

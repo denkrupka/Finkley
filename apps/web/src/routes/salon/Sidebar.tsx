@@ -1,4 +1,4 @@
-import { Bug, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react'
+import { Bug, ChevronsLeft, ChevronsRight, HelpCircle } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { LogoLockup } from '@/components/ui/logo'
 import { ReferralButton } from '@/components/ui/ReferralButton'
 import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
 import { useUnreadMessengerCount } from '@/hooks/useMessenger'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useUnreadNegativeReviewsCount } from '@/hooks/useReviews'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
@@ -35,22 +36,60 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
   const [bugOpen, setBugOpen] = useState(false)
   const { data: unreadNegative = 0 } = useUnreadNegativeReviewsCount(salonId)
   const { data: unreadMessenger = 0 } = useUnreadMessengerCount(salonId)
+  // T35 — фильтр nav-пунктов по permissions матрице. Главная и Настройки
+  // всегда видны (минимально нужны юзеру даже с самыми ограниченными правами).
+  const { can } = usePermissions(salonId)
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.id === 'dashboard' || item.id === 'settings') return true
+    return can(item.id, 'view')
+  })
 
   return (
     <aside
+      data-tour="sidebar"
       className={cn(
         'border-border bg-card flex h-screen flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
         collapsed ? 'w-[64px] px-2' : 'w-[232px] px-3.5',
       )}
     >
-      {/* Logo */}
-      <div className={cn('mb-5', collapsed ? 'flex justify-center' : 'px-2')}>
+      {/* Logo + кнопка сворачивания. T28 — кнопка перенесена снизу наверх к
+          логотипу, чтобы не занимать место в подвале. Использует ChevronsLeft/
+          ChevronsRight (двойную стрелку) как компактный визуальный маркер. */}
+      <div
+        className={cn(
+          'mb-5 flex items-center',
+          collapsed ? 'flex-col gap-2' : 'justify-between px-2',
+        )}
+      >
         {collapsed ? <LogoLockup size={28} hideText /> : <LogoLockup size={28} />}
+        {onToggleCollapsed ? (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            title={
+              collapsed
+                ? t('nav.expand_sidebar', { defaultValue: 'Развернуть меню' })
+                : t('nav.collapse_sidebar', { defaultValue: 'Свернуть меню' })
+            }
+            aria-label={
+              collapsed
+                ? t('nav.expand_sidebar', { defaultValue: 'Развернуть меню' })
+                : t('nav.collapse_sidebar', { defaultValue: 'Свернуть меню' })
+            }
+            className="text-muted-foreground hover:text-foreground hover:bg-accent/40 grid size-7 shrink-0 place-items-center rounded-md"
+          >
+            {collapsed ? (
+              <ChevronsRight className="size-4" strokeWidth={1.8} />
+            ) : (
+              <ChevronsLeft className="size-4" strokeWidth={1.8} />
+            )}
+          </button>
+        ) : null}
       </div>
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon
           return (
             <NavLink
@@ -158,25 +197,6 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
             </Link>
           )}
         </div>
-        {/* bug 94dd5f53 — toggle collapse в самом низу */}
-        {onToggleCollapsed ? (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            title={
-              collapsed
-                ? t('nav.expand_sidebar', { defaultValue: 'Развернуть меню' })
-                : t('nav.collapse_sidebar', { defaultValue: 'Свернуть меню' })
-            }
-            className="text-muted-foreground hover:text-foreground hover:bg-accent/40 mt-1 inline-flex h-7 items-center justify-center rounded-md"
-          >
-            {collapsed ? (
-              <ChevronRight className="size-4" strokeWidth={1.8} />
-            ) : (
-              <ChevronLeft className="size-4" strokeWidth={1.8} />
-            )}
-          </button>
-        ) : null}
       </div>
 
       {bugOpen ? (

@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { RouteErrorBoundary } from '@/components/error-boundary/ErrorBoundary'
 import { useI18nSync } from '@/i18n/useI18nSync'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -55,6 +56,11 @@ const OnboardingPage = lazyWithRetry(() =>
 
 const DashboardPage = lazyWithRetry(() =>
   import('@/routes/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+)
+const NotificationsPage = lazyWithRetry(() =>
+  import('@/routes/notifications/NotificationsPage').then((m) => ({
+    default: m.NotificationsPage,
+  })),
 )
 const VisitsPage = lazyWithRetry(() =>
   import('@/routes/visits/VisitsPage').then((m) => ({ default: m.VisitsPage })),
@@ -253,6 +259,7 @@ function App() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={lazyRoute(<DashboardPage />)} />
+        <Route path="notifications" element={lazyRoute(<NotificationsPage />)} />
         <Route path="visits" element={lazyRoute(<VisitsPage />)} />
         {/* /clients жил отдельной страницей в Settings → Справочники.
             После TASK-42 справочник клиентов merged в Reports → Клиенты →
@@ -267,18 +274,67 @@ function App() {
             старые закладки. Это просто заглушка на уровне ClientsAnalyticsTab:
             если в URL пришло client=top, компонент сам отрисует list (fallback
             в isClientsSubTab). Дополнительная редирект-маршрут не нужна. */}
-        <Route path="expenses" element={lazyRoute(<ExpensesPage />)} />
+        {/* T36 — защита роутов через permissions матрицу. RequirePermission
+            проверяет can(category, 'view'); owner/admin всегда проходят. При
+            запрете — redirect на /dashboard + toast. */}
+        <Route
+          path="expenses"
+          element={
+            <RequirePermission category="expenses">{lazyRoute(<ExpensesPage />)}</RequirePermission>
+          }
+        />
         <Route path="staff" element={lazyRoute(<StaffPage />)} />
         <Route path="services" element={lazyRoute(<ServicesPage />)} />
-        <Route path="inventory" element={lazyRoute(<InventoryPage />)} />
-        <Route path="marketing" element={lazyRoute(<MarketingPage />)} />
-        <Route path="messenger" element={lazyRoute(<MessengerPage />)} />
+        <Route
+          path="inventory"
+          element={
+            <RequirePermission category="inventory">
+              {lazyRoute(<InventoryPage />)}
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="marketing"
+          element={
+            <RequirePermission category="marketing">
+              {lazyRoute(<MarketingPage />)}
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="messenger"
+          element={
+            <RequirePermission category="messenger">
+              {lazyRoute(<MessengerPage />)}
+            </RequirePermission>
+          }
+        />
         <Route path="knowledge" element={lazyRoute(<KnowledgePage />)} />
         <Route path="payouts" element={lazyRoute(<PayoutsPage />)} />
-        <Route path="reports" element={lazyRoute(<ReportsHubPage />)} />
-        <Route path="income" element={lazyRoute(<IncomePage />)} />
-        <Route path="finance" element={lazyRoute(<FinancePage />)} />
-        <Route path="ai" element={lazyRoute(<AIPage />)} />
+        <Route
+          path="reports"
+          element={
+            <RequirePermission category="reports">
+              {lazyRoute(<ReportsHubPage />)}
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="income"
+          element={
+            <RequirePermission category="income">{lazyRoute(<IncomePage />)}</RequirePermission>
+          }
+        />
+        <Route
+          path="finance"
+          element={
+            <RequirePermission category="finance">{lazyRoute(<FinancePage />)}</RequirePermission>
+          }
+        />
+        <Route
+          path="ai"
+          element={<RequirePermission category="ai">{lazyRoute(<AIPage />)}</RequirePermission>}
+        />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />
         {/* /settings/integrations рендерит SettingsPage (sub-tab integrations).

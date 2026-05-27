@@ -13,6 +13,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { dispatchNotification } from '../_shared/notify.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -105,6 +106,32 @@ Deno.serve(async (req) => {
     external_message_id: `${chatId}:${msg.message_id}`,
     created_at: msg.date ? new Date(msg.date * 1000).toISOString() : new Date().toISOString(),
   })
+
+  // T40 — уведомление владельца о входящем Telegram-сообщении.
+  try {
+    const { data: ownerRow } = await admin
+      .from('salon_members')
+      .select('user_id')
+      .eq('salon_id', salonId)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle()
+    if (ownerRow) {
+      const senderName =
+        [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') ||
+        msg.from?.username ||
+        'Клиент'
+      const preview = msg.text || (mediaKind ? `[${mediaKind}]` : '')
+      await dispatchNotification({
+        salonId,
+        userId: (ownerRow as { user_id: string }).user_id,
+        type: 'messenger_new_message',
+        payload: { sender: senderName, channel: 'telegram', preview: preview.slice(0, 280) },
+      })
+    }
+  } catch (e) {
+    console.warn(`messenger-telegram notify failed: ${e instanceof Error ? e.message : String(e)}`)
+  }
 
   return jsonResponse({ ok: true })
 })

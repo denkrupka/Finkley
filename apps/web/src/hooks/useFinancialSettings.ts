@@ -46,14 +46,22 @@ export type ParameterItem = {
    */
   cash_kind?: 'cash' | 'non_cash'
   /**
-   * Только для cash_registers: маппинг payment_method → касса. Когда
-   * visit/expense приходит с этим payment_method (включая импорт из
-   * Booksy) — деньги зачисляются на эту кассу автоматически. На каждый
-   * тип оплаты может быть прицеплена только одна касса (уникальность
-   * проверяется на клиенте в UI). Пример: «Конверт» = cash → все визиты
-   * оплаченные наличными попадают на баланс «Конверт».
+   * @deprecated Заменено секцией financial_settings.payment_methods —
+   * mapping теперь идёт с обратной стороны (метод → касса). Поле сохранено
+   * только для backward-миграции и не должно использоваться в новом коде.
    */
   payment_method_mapping?: 'cash' | 'card' | 'transfer' | 'online' | null
+  /**
+   * Только для payment_methods: ID кассы (cash_registers.items[].id) куда
+   * зачисляются средства при оплате этим методом.
+   */
+  cash_register_id?: string | null
+  /**
+   * Только для payment_methods: % комиссии от каждой транзакции. При оплате
+   * автоматически создаётся расход в категории «Комиссии» = paid * commission_pct / 100.
+   * 0 или undefined → комиссия не списывается.
+   */
+  commission_pct?: number
   /**
    * Маркер preset-позиции (системной). Только для миграции — не показывается
    * юзеру и не влияет на UI. После рефакторинга все позиции редактируются
@@ -97,6 +105,13 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
       preset('gotowka', 'Gotówka', { amount_cents: 0, cash_kind: 'cash' }),
       preset('bank_karta', 'Bank/Karta', { amount_cents: 0, cash_kind: 'non_cash' }),
       preset('karta_terminal', 'Karta / Terminal', { amount_cents: 0, cash_kind: 'non_cash' }),
+      // Системная касса «Корректировки»: служит для выравнивания баланса
+      // при несхождении плана с фактом (округление сдачи, мелочь и т.п.).
+      // Скрыта во всех UI кроме модалки «Перестановка средств». Деньги
+      // поступают/убывают ТОЛЬКО через cash_transfer (не привязана ни к
+      // одному payment_method, не появляется в селекторах формы визита/
+      // расхода). См. isSystemAdjustmentsRegister().
+      preset('adjustments', 'Корректировки', { amount_cents: 0, cash_kind: 'cash' }),
     ],
   },
   fixed: {
@@ -337,15 +352,39 @@ function migrateLegacySection(defaults: ParameterItem[], stored: unknown): Param
   return result
 }
 
+/**
+ * Гарантирует что в списке items[] присутствуют все обязательные preset'ы из
+ * defaults[] — добавляет недостающие в конец. Нужно для пост-миграционного
+ * добавления новых системных preset'ов (например 'adjustments', который
+ * появился позже первоначальной миграции).
+ */
+function ensureRequiredPresets(
+  items: ParameterItem[],
+  defaults: ParameterItem[],
+  requiredPresetKeys: string[],
+): ParameterItem[] {
+  const have = new Set(items.map((i) => i.preset_key).filter(Boolean))
+  const additions = defaults.filter(
+    (d) => d.preset_key && requiredPresetKeys.includes(d.preset_key) && !have.has(d.preset_key),
+  )
+  if (additions.length === 0) return items
+  return [...items, ...additions.map((d) => ({ ...d }))]
+}
+
+/** Системная касса для выравнивания баланса (cash_transfers only). */
+export function isSystemAdjustmentsRegister(item: { preset_key?: string }): boolean {
+  return item.preset_key === 'adjustments'
+}
+
 function mergeWithDefaults(stored: unknown): FinancialSettings {
   const s = (stored ?? {}) as Partial<Record<keyof FinancialSettings, unknown>>
+  const cashRegisters = ensureRequiredPresets(
+    migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.cash_registers.items, s.cash_registers),
+    DEFAULT_FINANCIAL_SETTINGS.cash_registers.items,
+    ['adjustments'],
+  )
   return {
-    cash_registers: {
-      items: migrateLegacySection(
-        DEFAULT_FINANCIAL_SETTINGS.cash_registers.items,
-        s.cash_registers,
-      ),
-    },
+    cash_registers: { items: cashRegisters },
     fixed: {
       items: migrateLegacySection(DEFAULT_FINANCIAL_SETTINGS.fixed.items, s.fixed),
     },

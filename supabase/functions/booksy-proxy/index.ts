@@ -37,6 +37,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { recordSyncResult } from '../_shared/notify.ts'
 import { withSentry } from '../_shared/sentry.ts'
+import { dispatchNotification } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -960,25 +961,42 @@ async function syncClients(
   const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
 
   // Маппинг payment_method → cash_register_id для historic backfill.
-  const { data: salonForMapping } = await admin
-    .from('salons')
-    .select('financial_settings')
-    .eq('id', salonId)
-    .maybeSingle()
-  type FinCashItem = {
-    id?: string
-    archived?: boolean
-    payment_method_mapping?: string | null
-  }
+  // Primary источник — таблица payment_methods (T12). Fallback — legacy
+  // financial_settings.cash_registers[].payment_method_mapping для старых
+  // салонов где новый справочник ещё не настроен.
   const cashRegisterByMethod: Record<string, string> = {}
-  const finSettings =
-    (salonForMapping?.financial_settings as {
-      cash_registers?: { items?: FinCashItem[] }
-    } | null) ?? null
-  for (const item of finSettings?.cash_registers?.items ?? []) {
-    if (item.archived) continue
-    if (item.payment_method_mapping && item.id) {
-      cashRegisterByMethod[item.payment_method_mapping] = item.id
+  const { data: pmRows } = await admin
+    .from('payment_methods')
+    .select('code, cash_register_id, is_archived')
+    .eq('salon_id', salonId)
+  for (const r of (pmRows ?? []) as Array<{
+    code?: string
+    cash_register_id?: string | null
+    is_archived?: boolean
+  }>) {
+    if (r.is_archived) continue
+    if (r.code && r.cash_register_id) cashRegisterByMethod[r.code] = r.cash_register_id
+  }
+  if (Object.keys(cashRegisterByMethod).length === 0) {
+    const { data: salonForMapping } = await admin
+      .from('salons')
+      .select('financial_settings')
+      .eq('id', salonId)
+      .maybeSingle()
+    type FinCashItem = {
+      id?: string
+      archived?: boolean
+      payment_method_mapping?: string | null
+    }
+    const finSettings =
+      (salonForMapping?.financial_settings as {
+        cash_registers?: { items?: FinCashItem[] }
+      } | null) ?? null
+    for (const item of finSettings?.cash_registers?.items ?? []) {
+      if (item.archived) continue
+      if (item.payment_method_mapping && item.id) {
+        cashRegisterByMethod[item.payment_method_mapping] = item.id
+      }
     }
   }
 
@@ -1486,28 +1504,44 @@ async function syncVisits(
   const existingExt = new Set(existingByExt.keys())
   stats.visits_synced = stats.visits_synced ?? 0
 
-  // Маппинг payment_method → cash_register_id из financial_settings.cash_registers.
-  // Юзер настраивает в Settings → Кассы → колонка «Маппинг оплаты». Если
-  // визит из Booksy оплачен наличными — пишем в кассу с маппингом cash.
-  const { data: salonForMapping } = await admin
-    .from('salons')
-    .select('financial_settings')
-    .eq('id', salonId)
-    .maybeSingle()
+  // Маппинг payment_method → cash_register_id. T12 — primary берётся из
+  // справочника payment_methods (поле cash_register_id), которое юзер
+  // настраивает в /settings/finance → Методы оплаты. Если справочник пуст
+  // или старый салон ещё не мигрировал — fallback на legacy поле
+  // financial_settings.cash_registers[].payment_method_mapping.
   const cashRegisterByMethod: Record<string, string> = {}
-  type FinCashItem = {
-    id?: string
-    archived?: boolean
-    payment_method_mapping?: string | null
+  const { data: pmRows } = await admin
+    .from('payment_methods')
+    .select('code, cash_register_id, is_archived')
+    .eq('salon_id', salonId)
+  for (const r of (pmRows ?? []) as Array<{
+    code?: string
+    cash_register_id?: string | null
+    is_archived?: boolean
+  }>) {
+    if (r.is_archived) continue
+    if (r.code && r.cash_register_id) cashRegisterByMethod[r.code] = r.cash_register_id
   }
-  const finSettings =
-    (salonForMapping?.financial_settings as {
-      cash_registers?: { items?: FinCashItem[] }
-    } | null) ?? null
-  for (const item of finSettings?.cash_registers?.items ?? []) {
-    if (item.archived) continue
-    if (item.payment_method_mapping && item.id) {
-      cashRegisterByMethod[item.payment_method_mapping] = item.id
+  if (Object.keys(cashRegisterByMethod).length === 0) {
+    const { data: salonForMapping } = await admin
+      .from('salons')
+      .select('financial_settings')
+      .eq('id', salonId)
+      .maybeSingle()
+    type FinCashItem = {
+      id?: string
+      archived?: boolean
+      payment_method_mapping?: string | null
+    }
+    const finSettings =
+      (salonForMapping?.financial_settings as {
+        cash_registers?: { items?: FinCashItem[] }
+      } | null) ?? null
+    for (const item of finSettings?.cash_registers?.items ?? []) {
+      if (item.archived) continue
+      if (item.payment_method_mapping && item.id) {
+        cashRegisterByMethod[item.payment_method_mapping] = item.id
+      }
     }
   }
   const cashRegisterFor = (method: string | null | undefined): string | null =>
@@ -1934,12 +1968,26 @@ async function notifyBooksyNewVisits(
       })
       .join('\n')
     const more = newVisits.length > 5 ? `\n…ещё ${newVisits.length - 5}` : ''
-    await sendPushToUser(admin, (ownerRow as { user_id: string }).user_id, {
+    const ownerId = (ownerRow as { user_id: string }).user_id
+    // Push (отдельная ветка от per-channel prefs).
+    await sendPushToUser(admin, ownerId, {
       title: `Новые визиты из Booksy (${newVisits.length})`,
       body: `${lines}${more}`,
       url: `/app/${salonId}/visits`,
       tag: 'booksy-new-visits',
     })
+    // T39 — email/Telegram/SMS через единый dispatcher.
+    await dispatchNotification({
+      salonId,
+      userId: ownerId,
+      type: 'booksy_new_visits',
+      payload: {
+        count: newVisits.length,
+        // sum_formatted можно посчитать когда у visits будет агрегат, пока
+        // только count — шаблон корректно отрендерит без суммы.
+      },
+    })
+    void more
   } catch (e) {
     console.warn(`notifyBooksyNewVisits failed: ${e instanceof Error ? e.message : String(e)}`)
   }

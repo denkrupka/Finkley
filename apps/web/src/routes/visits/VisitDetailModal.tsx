@@ -27,7 +27,6 @@ import { Label } from '@/components/ui/label'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
-import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { useServices } from '@/hooks/useServices'
@@ -132,7 +131,6 @@ export function VisitDetailModal({
   const { data: staff = [] } = useStaff(salonId)
   const { data: clients = [] } = useClients(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
-  const { data: cashRegisters = [] } = useCashRegisters(salonId)
   // Per-user касса: гейт на «Рассчитать». Проверяем ДО открытия ChargeView,
   // чтобы юзер сразу видел сообщение, а не вбивал суммы зря.
   const { hasOpenShift: hasOpenShiftTop } = useRequireCashShift(salonId)
@@ -241,7 +239,6 @@ export function VisitDetailModal({
           <ChargeView
             salonId={salonId}
             groupLines={groupLines}
-            cashRegisters={cashRegisters}
             currency={currency}
             onBack={() => {
               if (onBackFromCharge && visit) {
@@ -778,7 +775,6 @@ const TIP_PRESETS = [
 function ChargeView({
   salonId,
   groupLines,
-  cashRegisters,
   currency,
   onBack,
   onCharged,
@@ -786,10 +782,6 @@ function ChargeView({
 }: {
   salonId: string
   groupLines: VisitRow[]
-  /** Image #82: вместо paymentMethods — список касс. ID кассы пишется
-   *  в visits.cash_register_id, payment_method остаётся 'card' для
-   *  обратной совместимости (старая аналитика). */
-  cashRegisters: Array<{ id: string; label: string }>
   currency: string
   onBack: () => void
   onCharged: () => void
@@ -797,13 +789,22 @@ function ChargeView({
 }) {
   const qc = useQueryClient()
   const { hasOpenShift } = useRequireCashShift(salonId)
+  // T17 — селектор «Касса» заменён на «Метод оплаты». Список берётся из
+  // payment_methods directory; при выборе метода visits.payment_method
+  // обновляется (для аналитики), а visits.cash_register_id — из mapping
+  // выбранного метода (payment_methods.cash_register_id).
+  const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   // grossTotalCents — сумма amount_cents всех линий (до скидки), на ней считаем
   // процентную скидку. discount применяется ко всему чеку.
   const grossTotalCents = groupLines.reduce((acc, v) => acc + v.amount_cents, 0)
   const [tipPreset, setTipPreset] = useState<string>('none')
   const [customTipStr, setCustomTipStr] = useState('')
   const [chargeGateOpen, setChargeGateOpen] = useState(false)
-  const [cashRegisterId, setCashRegisterId] = useState<string>(cashRegisters[0]?.id ?? '')
+  const [paymentMethodCode, setPaymentMethodCode] = useState<string>(paymentMethods[0]?.code ?? '')
+  const cashRegisterId = useMemo(() => {
+    const m = paymentMethods.find((x) => x.code === paymentMethodCode)
+    return m?.cash_register_id ?? ''
+  }, [paymentMethods, paymentMethodCode])
   const [busy, setBusy] = useState(false)
 
   // ---- Скидка ----
@@ -857,6 +858,7 @@ function ChargeView({
           .from('visits')
           .update({
             cash_register_id: cashRegisterId || null,
+            payment_method: (paymentMethodCode || null) as PaymentMethod | null,
             tip_cents: lineTip,
             discount_cents: lineDiscount,
             discount_reason: discountCents > 0 ? discountReason.trim() : null,
@@ -1033,21 +1035,23 @@ function ChargeView({
         ) : null}
 
         <Label className="text-muted-foreground mt-5 block text-[11px] font-bold uppercase tracking-wider">
-          {t('visits.charge.cash_register')}
+          {t('visits.charge.payment_method', { defaultValue: 'Метод оплаты' })}
         </Label>
         <div className="mt-2 flex flex-wrap gap-2">
-          {cashRegisters.length === 0 ? (
+          {paymentMethods.length === 0 ? (
             <p className="text-muted-foreground text-xs">
-              {t('visits.charge.cash_register_empty')}
+              {t('visits.charge.payment_method_empty', {
+                defaultValue: 'Нет настроенных методов оплаты',
+              })}
             </p>
           ) : (
-            cashRegisters.map((r) => {
-              const active = cashRegisterId === r.id
+            paymentMethods.map((m) => {
+              const active = paymentMethodCode === m.code
               return (
                 <button
-                  key={r.id}
+                  key={m.id}
                   type="button"
-                  onClick={() => setCashRegisterId(r.id)}
+                  onClick={() => setPaymentMethodCode(m.code)}
                   className={cn(
                     'h-10 rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors',
                     active
@@ -1055,7 +1059,7 @@ function ChargeView({
                       : 'border-border bg-card hover:bg-muted/40',
                   )}
                 >
-                  {r.label}
+                  {m.label}
                 </button>
               )
             })

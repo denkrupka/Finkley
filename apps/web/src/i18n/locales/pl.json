@@ -60,7 +60,8 @@
     "search": "Szukaj",
     "add": "Dodaj",
     "archive": "Archiwum",
-    "restore": "Przywróć"
+    "restore": "Przywróć",
+    "back_home": "Powrót do strony głównej"
   },
   "auth": {
     "or": "lub",
@@ -928,6 +929,27 @@
       "title": "Uruchom tour ponownie",
       "subtitle": "Przejdź startowy tour jeszcze raz — 5 kroków o kluczowych funkcjach.",
       "button": "Pokaż tour"
+    },
+    "tours": {
+      "section_title": "Przewodniki i nauka",
+      "section_subtitle": "Krótkie tour'y po kluczowych sekcjach. Możesz je uruchomić ponownie kiedy potrzebujesz — pokażą podświetlenia i wyjaśnienia.",
+      "relaunch": "Pokaż ponownie →",
+      "onboarding": {
+        "title": "Tour startowy",
+        "body": "Główne funkcje portalu: nawigacja, dodawanie wizyty, magazyn, powiadomienia, integracje. Podświetla kluczowe przyciski wprost na ekranie."
+      },
+      "expenses": {
+        "title": "Tour po Wydatkach",
+        "body": "Zakładki Opłacone / Nieopłacone / Bankowość, OCR paragonów, auto-import z banku, auto-prowizje od opłat."
+      },
+      "finance": {
+        "title": "Tour po Finansach",
+        "body": "Raport P&L z plan/wykonanie, kalendarz płatności, kasy i zmiany, przeniesienia środków między kasami."
+      },
+      "inventory": {
+        "title": "Tour po Magazynie",
+        "body": "Katalog materiałów, próg powiadomień „kończy się\", zakupy/spisania, inwentaryzacja."
+      }
     }
   },
   "ai": {
@@ -2180,9 +2202,21 @@
   },
   "notifications": {
     "title": "Powiadomienia",
+    "page_title": "Powiadomienia",
+    "page_subtitle": "Pełna historia powiadomień w aplikacji.",
     "aria_label": "Powiadomienia",
     "count": "{{count}} w kanale",
     "empty": "Spokojnie — brak nowych zdarzeń",
+    "see_all": "Pokaż wszystkie",
+    "mark_all_read": "Oznacz wszystkie jako przeczytane",
+    "mark_all_read_short": "Wszystkie",
+    "records": "{{n}} rekordów",
+    "filter": {
+      "all_types": "Wszystkie typy",
+      "all_status": "Wszystkie",
+      "unread": "Nieprzeczytane",
+      "read": "Przeczytane"
+    },
     "overdue": {
       "title": "{{name}} — pora napisać",
       "body_today": "Dziś zaplanowana wizyta. Przypomnij klientce.",
@@ -2193,6 +2227,34 @@
     "budget": {
       "title": "Przekroczony budżet „{{name}}”",
       "body": "W tym miesiącu już {{pct}}% limitu."
+    }
+  },
+  "notif": {
+    "generic": "🔔 Powiadomienie",
+    "low_inv_title": "⚠️ Kończą się materiały",
+    "low_inv_desc": "{{n}} pozycji poniżej minimum",
+    "payment_overdue": "🔴 Płatność po terminie",
+    "payment_due_today": "⏰ Płatność dziś",
+    "payment_due_1d": "⏰ Płatność jutro",
+    "payment_due_2d": "🗓 Płatność za 2 dni",
+    "booksy_title": "📅 Import Booksy: +{{n}} wizyt",
+    "conflict_title": "⚠️ Konflikt w kalendarzu",
+    "conflict_desc": "{{n}} podwójnych rezerwacji",
+    "messenger_title": "💬 Wiadomość od {{sender}}",
+    "weekly_digest": "📊 Tygodniowe podsumowanie gotowe",
+    "daily_digest": "📊 Dzienne podsumowanie gotowe",
+    "type": {
+      "ai_insights": "Inspiracje AI",
+      "low_inventory": "Niski stan",
+      "payment_due_2d": "Płatność za 2 dni",
+      "payment_due_1d": "Płatność jutro",
+      "payment_due_today": "Płatność dziś",
+      "payment_overdue": "Płatność po terminie",
+      "booksy_new_visits": "Nowe wizyty Booksy",
+      "calendar_conflicts": "Konflikty w kalendarzu",
+      "messenger_new_message": "Wiadomości",
+      "weekly_digest": "Tygodniowy digest",
+      "daily_digest": "Dzienne podsumowanie"
     }
   },
   "integrations": {
@@ -4211,6 +4273,10 @@
         "title": "Witaj w Finkley 👋",
         "body": "To krótki tour po głównych funkcjach — zajmie 1 minutę.\n\nPokażę, gdzie co jest i jak szybko dodać pierwsze dane."
       },
+      "nav": {
+        "title": "Lewy panel — nawigacja",
+        "body": "Wszystkie sekcje portalu: Główna, Przychody, Wydatki, Raporty, Finanse, Magazyn, Marketing, Komunikator, AI i Ustawienia.\n\nPrzycisk zwijania obok logo — zostawia tylko ikony i zwalnia miejsce."
+      },
       "visit": {
         "title": "Zapisz wizytę",
         "body": "Kliknij niebieski przycisk '+' w prawym dolnym rogu, aby otworzyć formularz nowej wizyty.\n\nWybierz datę, mistrza, usługę i kwotę — wizyta natychmiast trafi do przychodów i sekcji 'Wizyty'.",
@@ -4229,10 +4295,83 @@
         "title": "Kalendarz i wolne okienka",
         "body": "Na dashboardzie w prawym górnym rogu — mini-kalendarz z kolorowymi kropkami: dni z wizytami. Kliknij dzień → szczegóły.\n\nNa stronie 'Wizyty' na górze rozwija się panel 'Wolne okienka' — widzisz, kiedy każdy mistrz jest wolny na 7 dni naprzód."
       },
+      "notifications": {
+        "title": "Dzwonek — powiadomienia",
+        "body": "Plakietka pokazuje nieprzeczytane. Kliknij, aby zobaczyć ostatnie zdarzenia: niskie zapasy, zaległe płatności, AI insights, wiadomości komunikatora.\n\nKanały (Email / Telegram / SMS) konfigurujesz w Ustawienia → Powiadomienia → Typy."
+      },
       "integrations": {
         "title": "Integracje",
         "body": "W Ustawienia → Integracje możesz podłączyć:\n- Booksy (import wizyt)\n- wFirma (eksport faktur)\n- Bank (auto-import wydatków przez PSD2)\n\nKażdy import z banku automatycznie tworzy wiersz w Wydatkach.",
         "cta": "Otwórz Integracje"
+      },
+      "team": {
+        "title": "Zespół i dostępy",
+        "body": "Zapraszaj mistrzynie, administratorów i księgowych po e-mail. Dla każdego konfigurujesz macierz uprawnień: co widzi, co może edytować.\n\nMistrzyni widzi tylko swoje wizyty i swój profil — inne dane salonu są ukryte.",
+        "cta": "Otwórz zespół"
+      }
+    },
+    "page": {
+      "expenses": {
+        "tabs": {
+          "title": "Trzy zakładki wydatków",
+          "body": "„Opłacone” — faktycznie wydane pieniądze.\n„Nieopłacone” — planowane płatności z faktur z przypomnieniami.\n„Bankowość” — wszystkie transakcje bankowe; licznik pokazuje niepowiązane."
+        },
+        "add": {
+          "title": "Dodaj wydatek",
+          "body": "Przycisk „+ Wydatek” w prawym górnym rogu. Obsługuje zdjęcie paragonu (OCR rozpoznaje kwotę, datę, kontrahenta), powiązanie z fakturą wFirma/KSeF i transakcją bankową."
+        },
+        "banking": {
+          "title": "Auto-import z banku",
+          "body": "Podłącz bank przez PSD2 w Ustawienia → Integracje. Transakcje przychodzą automatycznie, kontrahent wydobywany przez AI, duplikaty odfiltrowywane.\n\nKlik „Powiąż” przy transakcji = szybkie utworzenie wydatku."
+        },
+        "ocr": {
+          "title": "OCR paragonów",
+          "body": "Załącz zdjęcie paragonu do wydatku — Finkley rozpoznaje: kwotę, datę, kontrahenta, NIP, rozbicie VAT. Działa z polskimi i ukraińskimi paragonami."
+        },
+        "commissions": {
+          "title": "Auto-prowizje",
+          "body": "Jeśli w Ustawienia → Metody płatności podano % prowizji — przy opłacie wizyty tworzony jest auto-wydatek w kategorii „Prowizje”. Przypięty jako pierwszy wiersz; klik otwiera szczegóły."
+        }
+      },
+      "finance": {
+        "tabs": {
+          "title": "5 zakładek Finansów",
+          "body": "P&L — przychody, wydatki, zysk za okres.\nRaport zysku — plan/wykonanie miesięcznie.\nPłatności — kalendarz nadchodzących i zaległych.\nKasa — rozliczenie zmian (jeśli włączone).\nPrzeniesienia środków — między kasami."
+        },
+        "pnl": {
+          "title": "Raport P&L",
+          "body": "Raport finansowy z dynamicznymi kolumnami miesięcy zgodnie z wybranym okresem. Klik na „razem” otwiera drill-down po dniach.\n\nPrzycisk fullscreen — rozciąga tabelę na cały ekran."
+        },
+        "payments": {
+          "title": "Kalendarz płatności",
+          "body": "Wszystkie nadchodzące płatności: faktury, czynsz, podatki, ZUS. Kolorowe wskaźniki: żółty — za 2 dni, pomarańczowy — jutro, czerwony — po terminie.\n\nPowiadomienia — Email/Telegram/SMS według macierzy kanałów."
+        },
+        "cash": {
+          "title": "Kasy i zmiany",
+          "body": "Jeśli włączysz „Kasę” w Ustawienia → codziennie otwierasz i zamykasz zmianę, fiksujesz saldo początkowe i końcowe.\n\nKasy w Finanse → Kasy (Kasa szefa / Gotówka / Konto / Korekty)."
+        },
+        "transfers": {
+          "title": "Przeniesienia środków",
+          "body": "Przeniesienia między kasami nie wpływają na przychody/wydatki. Historia z filtrami + osobny flow modalny.\n\nKasa „Korekty” — wyrównuje saldo przy niezgodnościach planu z faktem (drobne reszty, niedobory)."
+        }
+      },
+      "inventory": {
+        "list": {
+          "title": "Katalog materiałów",
+          "body": "Wszystkie pozycje magazynu z wyszukiwaniem, filtrami po kategorii i dostawcy. Kolorowy wskaźnik: zielony → norma, żółty → poniżej minimum, czerwony → 0."
+        },
+        "threshold": {
+          "title": "Próg powiadomień",
+          "body": "W karcie materiału pole „Powiadom gdy stan ≤” — przy spadku do tej liczby materiał pojawi się na głównej w bloku „Kończą się materiały” + powiadomienie po wybranych kanałach."
+        },
+        "purchase": {
+          "title": "Zakup / Spisanie",
+          "body": "Przyciski w karcie materiału: „Zakup” (plus do stanu), „Korekta” (dokładna kwota), „Spisz” (minus). Każdy ruch zapisany w historii."
+        },
+        "stocktake": {
+          "title": "Inwentaryzacja",
+          "body": "Raz w miesiącu możesz zrobić pełną inwentaryzację — Finkley porówna faktyczne stany z systemowymi i podświetli rozbieżności."
+        }
       }
     }
   },

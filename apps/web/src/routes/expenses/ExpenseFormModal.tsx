@@ -1162,11 +1162,15 @@ export function ExpenseFormModal({
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((c: ExpenseCategoryRow) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
+                      {/* T34 — системная категория «Комиссии» скрыта (заполняется
+                          автоматически триггером для расходов с commission_pct). */}
+                      {categories
+                        .filter((c: ExpenseCategoryRow) => !(c.is_system && c.name === 'Комиссии'))
+                        .map((c: ExpenseCategoryRow) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {categories.length === 0 ? (

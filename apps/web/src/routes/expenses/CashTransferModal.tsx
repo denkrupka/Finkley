@@ -1,4 +1,4 @@
-import { ArrowRight, Loader2, Wallet } from 'lucide-react'
+import { ArrowRight, Info, Loader2, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -49,7 +49,9 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
-  const { data: registers = [] } = useCashRegisters(salonId)
+  // includeSystem: true — для модалки перестановки показываем системную кассу
+  // «Корректировки» (preset_key='adjustments'), которая в других местах скрыта.
+  const { data: registers = [] } = useCashRegisters(salonId, { includeSystem: true })
   const { data: balances = [], isLoading: loadingBalances } = useRegisterBalances(salonId)
   const balanceById = useMemo(
     () => new Map(balances.map((b) => [b.register_id, b.balance_cents])),
@@ -190,6 +192,26 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
                 })}
               </div>
             )}
+          </div>
+
+          {/* T7 — пояснение про системную кассу «Корректировки» */}
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/60 p-3">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 size-4 shrink-0 text-amber-700" strokeWidth={2} />
+              <div className="text-xs leading-relaxed text-amber-900">
+                <p className="mb-1 font-bold uppercase tracking-wider">
+                  {t('cash_transfer.adjustments_info_title', {
+                    defaultValue: 'Касса «Корректировки»',
+                  })}
+                </p>
+                <p>
+                  {t('cash_transfer.adjustments_info_body', {
+                    defaultValue:
+                      'Служит для выравнивания баланса при несхождении плана с фактом. Например: клиент дал деньги, а сдачу-мелочь не забрал — переведите излишек в «Корректировки». Или наоборот: не было мелочи на сдачу и дали чуть больше клиенту — компенсируйте перемещением из «Корректировок». На эту кассу деньги поступают и убывают только перемещением средств.',
+                  })}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Block 2 — Форма / Confirm */}

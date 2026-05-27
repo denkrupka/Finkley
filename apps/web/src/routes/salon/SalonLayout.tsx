@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMessengerNotifications } from '@/hooks/useMessenger'
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { useMySalons, useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -122,6 +123,11 @@ export function SalonLayout() {
     enabled: messengerNotifEnabled,
     salonName: salon?.name,
   })
+
+  // T42 — единый realtime-канал in_app_notifications: подписан пока юзер в
+  // портале, показывает toast при любом новом уведомлении (low_inventory,
+  // payment_due_*, ai_insights и т.д.). Не зависит от prefs (in-app всегда on).
+  useRealtimeNotifications(salonId)
 
   useEffect(() => {
     if (salonId && salon) rememberLastSalon(salonId)

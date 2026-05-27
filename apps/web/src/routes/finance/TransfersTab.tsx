@@ -94,7 +94,7 @@ function TransfersHistoryBlock({ salonId, currency }: { salonId: string; currenc
   const [page, setPage] = useState(1)
   const [drawer, setDrawer] = useState<CashTransfer | null>(null)
 
-  const { data: registers = [] } = useCashRegisters(salonId)
+  const { data: registers = [] } = useCashRegisters(salonId, { includeSystem: true })
   const { data: teamMembers = [] } = useTeamMembers(salonId)
   const labelById = useMemo(() => new Map(registers.map((r) => [r.id, r.label])), [registers])
   const userNameById = useMemo(() => {
@@ -426,7 +426,7 @@ function TransferDetailDrawer({
   currency: string
 }) {
   const { t } = useTranslation()
-  const { data: registers = [] } = useCashRegisters(salonId)
+  const { data: registers = [] } = useCashRegisters(salonId, { includeSystem: true })
   const { data: membership } = useSalonMembership(salonId)
   const canEdit = membership?.role === 'owner' || membership?.role === 'admin'
 

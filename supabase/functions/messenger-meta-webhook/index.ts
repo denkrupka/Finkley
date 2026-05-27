@@ -22,7 +22,55 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { dispatchNotification } from '../_shared/notify.ts'
 import { decryptSecret } from './crypto.ts'
+
+/**
+ * T40 — уведомление владельца салона о входящем сообщении от клиента.
+ * Вызывается ПОСЛЕ insert в messenger_messages для direction='in'.
+ * Все ошибки тихо логируем — webhook не должен падать из-за нотификации.
+ */
+async function notifyOwnerOfIncomingMessage(
+  admin: SupabaseClient,
+  salonId: string,
+  conversationId: string,
+  channel: 'whatsapp' | 'facebook' | 'instagram',
+  preview: string,
+): Promise<void> {
+  try {
+    // Имя клиента — display_name из conversation; fallback на «Клиент».
+    const { data: convo } = await admin
+      .from('messenger_conversations')
+      .select('display_name')
+      .eq('id', conversationId)
+      .maybeSingle()
+    const sender = (convo as { display_name?: string | null } | null)?.display_name || 'Клиент'
+
+    const { data: ownerRow } = await admin
+      .from('salon_members')
+      .select('user_id')
+      .eq('salon_id', salonId)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle()
+    if (!ownerRow) return
+
+    await dispatchNotification({
+      salonId,
+      userId: (ownerRow as { user_id: string }).user_id,
+      type: 'messenger_new_message',
+      payload: {
+        sender,
+        channel,
+        preview: preview.slice(0, 280),
+      },
+    })
+  } catch (e) {
+    console.warn(
+      `notifyOwnerOfIncomingMessage failed: ${e instanceof Error ? e.message : String(e)}`,
+    )
+  }
+}
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -454,6 +502,17 @@ async function ingestMessage(
     created_at: createdAt,
   }
   await admin.from('messenger_messages').insert(insertPayload)
+
+  // T40 — уведомить владельца о входящем сообщении от клиента.
+  if (direction === 'in') {
+    await notifyOwnerOfIncomingMessage(
+      admin,
+      salonId,
+      convo.id,
+      channel,
+      text || (mediaKind ? `[${mediaKind}]` : ''),
+    )
+  }
 }
 
 /**
@@ -605,4 +664,13 @@ async function ingestWaMessage(
     external_message_id: m.id,
     created_at: createdAt,
   })
+
+  // T40 — уведомление владельца о входящем WhatsApp-сообщении.
+  await notifyOwnerOfIncomingMessage(
+    admin,
+    salonId,
+    convoId,
+    'whatsapp',
+    text || (mediaKind ? `[${mediaKind}]` : ''),
+  )
 }

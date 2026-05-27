@@ -199,7 +199,9 @@ export function ReportsPage() {
         <RevenueByPaymentCard
           rows={byPayment.data ?? []}
           currency={currency}
-          cashRegisters={financialSettings?.cash_registers.items ?? []}
+          cashRegisters={(financialSettings?.cash_registers.items ?? []).filter(
+            (r) => r.preset_key !== 'adjustments',
+          )}
         />
       </section>
 

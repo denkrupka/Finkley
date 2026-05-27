@@ -453,7 +453,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <div
               className="relative grid h-full"
               style={{
-                gridTemplateColumns: `${TIME_AXIS_WIDTH_PX}px repeat(${staff.length}, ${COL_WIDTH_PX}px)`,
+                // minmax(COL_WIDTH_PX, 1fr) — когда мастеров мало, колонки
+                // растягиваются на всю доступную ширину; когда много —
+                // удерживают минимальную и появляется горизонтальный скролл.
+                gridTemplateColumns: `${TIME_AXIS_WIDTH_PX}px repeat(${staff.length}, minmax(${COL_WIDTH_PX}px, 1fr))`,
               }}
             >
               {/* Sticky header row с аватарами мастеров */}

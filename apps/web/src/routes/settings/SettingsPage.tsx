@@ -62,6 +62,8 @@ import { SalonHolidaysCard } from './SalonHolidaysCard'
 import { MFACard } from './MFACard'
 import { NotificationsTabContent } from './NotificationsTabContent'
 // ReferralCard убран из Settings — раньше жил на отдельной вкладке /team.
+import { CollapsibleSection } from '@/routes/dashboard/CollapsibleSection'
+import { UserProfileCard } from './UserProfileCard'
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
 import {
@@ -333,157 +335,179 @@ export function SettingsPage() {
 
       {activeTab === 'profile' && (
         <>
-          {/* Профиль */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
-              {t('settings.profile.title')}
-            </h2>
+          {/* T27 — блок «Профиль пользователя» (новый). Свёрнут по умолчанию
+              как и остальные блоки. Юзер может изменить имя, телефон, аватар
+              и пароль. Email — read-only. */}
+          <CollapsibleSection
+            id="settings.user_profile"
+            title={t('settings.user_profile.title', { defaultValue: 'Профиль пользователя' })}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <div className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+              <UserProfileCard />
+            </div>
+          </CollapsibleSection>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <Label htmlFor="set-name">{t('settings.profile.name_label')}</Label>
-                <Input id="set-name" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
+          {/* T27 — блок «Профиль салона». Свёрнут по умолчанию. */}
+          <CollapsibleSection
+            id="settings.salon_profile"
+            title={t('settings.profile.title')}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+              <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
+                {t('settings.profile.title')}
+              </h2>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-country">{t('settings.profile.country_label')}</Label>
-                <Select value={country} onValueChange={(v) => setCountry(v as CountryCode)}>
-                  <SelectTrigger id="set-country">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRY_OPTIONS.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {t(`onboarding.country.${c.code}`, { defaultValue: c.name })} · {c.currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.country_hint')}
-                </p>
-              </div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label htmlFor="set-name">{t('settings.profile.name_label')}</Label>
+                  <Input id="set-name" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
 
-              {/* Тип салона (image #80). Если значение совпадает с одним из
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="set-country">{t('settings.profile.country_label')}</Label>
+                  <Select value={country} onValueChange={(v) => setCountry(v as CountryCode)}>
+                    <SelectTrigger id="set-country">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRY_OPTIONS.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {t(`onboarding.country.${c.code}`, { defaultValue: c.name })} ·{' '}
+                          {c.currency}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.country_hint')}
+                  </p>
+                </div>
+
+                {/* Тип салона (image #80). Если значение совпадает с одним из
                   предустановленных id — селект показывает его. Иначе считаем
                   это кастомным значением — выбираем "__custom__" и рядом
                   открываем Input для ручного редактирования. */}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-type">{t('settings.profile.type_label')}</Label>
-                {(() => {
-                  const isPreset = SALON_TYPES.some((s) => s.id === salonType)
-                  const selectValue = isPreset ? salonType : '__custom__'
-                  return (
-                    <>
-                      <Select
-                        value={selectValue}
-                        onValueChange={(v) => {
-                          if (v === '__custom__') {
-                            // Переключение в режим custom — оставляем текущее
-                            // значение если оно уже custom, иначе пусто чтобы
-                            // юзер увидел свободный input.
-                            setSalonType(isPreset ? '' : salonType)
-                          } else {
-                            setSalonType(v)
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="set-type">{t('settings.profile.type_label')}</Label>
+                  {(() => {
+                    const isPreset = SALON_TYPES.some((s) => s.id === salonType)
+                    const selectValue = isPreset ? salonType : '__custom__'
+                    return (
+                      <>
+                        <Select
+                          value={selectValue}
+                          onValueChange={(v) => {
+                            if (v === '__custom__') {
+                              // Переключение в режим custom — оставляем текущее
+                              // значение если оно уже custom, иначе пусто чтобы
+                              // юзер увидел свободный input.
+                              setSalonType(isPreset ? '' : salonType)
+                            } else {
+                              setSalonType(v)
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="set-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SALON_TYPES.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {t(`onboarding.salon_type.${s.id}`, { defaultValue: s.name })}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__custom__">
+                              {t('settings.profile.type_custom')}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {!isPreset ? (
+                          <Input
+                            autoFocus
+                            value={salonType}
+                            onChange={(e) => setSalonType(e.target.value)}
+                            placeholder={t('settings.profile.type_custom_placeholder')}
+                            maxLength={60}
+                          />
+                        ) : null}
+                      </>
+                    )
+                  })()}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label htmlFor="set-logo">{t('settings.profile.logo_label')}</Label>
+                  <div className="flex items-center gap-4">
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt="logo"
+                        className="border-border bg-muted size-16 rounded-md border object-contain"
+                      />
+                    ) : (
+                      <div className="border-border bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-md border text-xs">
+                        —
+                      </div>
+                    )}
+                    <div className="flex flex-1 flex-col gap-1.5">
+                      <input
+                        id="set-logo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        className="text-muted-foreground file:border-border file:bg-muted file:text-foreground hover:file:bg-muted/80 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
+                        disabled={logoUploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file || !salon) return
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast.error(t('settings.profile.logo_too_large'))
+                            e.target.value = ''
+                            return
+                          }
+                          try {
+                            setLogoUploading(true)
+                            const url = await uploadSalonLogo(salon.id, file)
+                            setLogoUrl(url)
+                            toast.success(t('settings.profile.logo_uploaded'))
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : String(err))
+                          } finally {
+                            setLogoUploading(false)
+                            e.target.value = ''
                           }
                         }}
-                      >
-                        <SelectTrigger id="set-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SALON_TYPES.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {t(`onboarding.salon_type.${s.id}`, { defaultValue: s.name })}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__custom__">
-                            {t('settings.profile.type_custom')}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {!isPreset ? (
-                        <Input
-                          autoFocus
-                          value={salonType}
-                          onChange={(e) => setSalonType(e.target.value)}
-                          placeholder={t('settings.profile.type_custom_placeholder')}
-                          maxLength={60}
-                        />
+                      />
+                      {logoUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setLogoUrl('')}
+                          className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-2 hover:underline"
+                        >
+                          {t('settings.profile.logo_remove')}
+                        </button>
                       ) : null}
-                    </>
-                  )
-                })()}
-              </div>
-
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="set-logo">{t('settings.profile.logo_label')}</Label>
-                <div className="flex items-center gap-4">
-                  {logoUrl ? (
-                    <img
-                      src={logoUrl}
-                      alt="logo"
-                      className="border-border bg-muted size-16 rounded-md border object-contain"
-                    />
-                  ) : (
-                    <div className="border-border bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-md border text-xs">
-                      —
                     </div>
-                  )}
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    <input
-                      id="set-logo"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                      className="text-muted-foreground file:border-border file:bg-muted file:text-foreground hover:file:bg-muted/80 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
-                      disabled={logoUploading}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file || !salon) return
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast.error(t('settings.profile.logo_too_large'))
-                          e.target.value = ''
-                          return
-                        }
-                        try {
-                          setLogoUploading(true)
-                          const url = await uploadSalonLogo(salon.id, file)
-                          setLogoUrl(url)
-                          toast.success(t('settings.profile.logo_uploaded'))
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : String(err))
-                        } finally {
-                          setLogoUploading(false)
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                    {logoUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => setLogoUrl('')}
-                        className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-2 hover:underline"
-                      >
-                        {t('settings.profile.logo_remove')}
-                      </button>
-                    ) : null}
                   </div>
+                  <p className="text-muted-foreground text-xs">{t('settings.profile.logo_hint')}</p>
                 </div>
-                <p className="text-muted-foreground text-xs">{t('settings.profile.logo_hint')}</p>
-              </div>
 
-              <div className="sm:col-span-2">
-                <Button
-                  size="lg"
-                  onClick={save}
-                  disabled={!dirty || update.isPending}
-                  data-testid="settings-save"
-                >
-                  {update.isPending ? t('common.loading') : t('common.save')}
-                </Button>
+                <div className="sm:col-span-2">
+                  <Button
+                    size="lg"
+                    onClick={save}
+                    disabled={!dirty || update.isPending}
+                    data-testid="settings-save"
+                  >
+                    {update.isPending ? t('common.loading') : t('common.save')}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </CollapsibleSection>
 
           {/* График работы и праздники переехали в Settings → «График работы»
               (image #71) — две подвкладки: SalonHoursCard и SalonHolidaysCard. */}
@@ -497,195 +521,240 @@ export function SettingsPage() {
               авто-заполняет address/city/lat/lng/google_place_url/google_place_id
               в один шаг. Остальные инпуты редактируемые на случай если
               юзер хочет уточнить (например адрес другим языком). */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <h2 className="text-brand-navy mb-1 text-base font-bold tracking-tight">
-              {t('settings.profile.public_title')}
-            </h2>
-            <p className="text-muted-foreground mb-4 text-sm">
-              {t('settings.profile.public_subtitle')}
-            </p>
+          <CollapsibleSection
+            id="settings.salon_address"
+            title={t('settings.profile.public_title')}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+              <h2 className="text-brand-navy mb-1 text-base font-bold tracking-tight">
+                {t('settings.profile.public_title')}
+              </h2>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {t('settings.profile.public_subtitle')}
+              </p>
 
-            <div className="mb-4">
-              <Label className="mb-1.5 block">{t('settings.profile.place_search.label')}</Label>
-              <GooglePlaceSearchInput
-                initialName={salon.name}
-                initialPlaceId={googlePlaceId || null}
-                onPick={(p) => {
-                  setGooglePlaceId(p.google_place_id)
-                  setGooglePlaceUrl(p.google_maps_uri ?? '')
-                  if (p.address) setAddress(p.address)
-                  if (p.lat != null) setLat(String(p.lat))
-                  if (p.lng != null) setLng(String(p.lng))
-                  // Город попытаемся вытащить из адреса (последний компонент
-                  // обычно страна, предпоследний — город. Это эвристика).
-                  if (p.address) {
-                    const parts = p.address.split(',').map((s) => s.trim())
-                    if (parts.length >= 2) setCity(parts[parts.length - 2] ?? '')
-                  }
-                }}
-                onClear={() => {
-                  setGooglePlaceId('')
-                  setGooglePlaceUrl('')
-                }}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <Label htmlFor="set-address">{t('settings.profile.address_label')}</Label>
-                <Input
-                  id="set-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder={t('settings.profile.address_placeholder')}
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.address_hint')}
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-city">{t('settings.profile.city_label')}</Label>
-                <Input
-                  id="set-city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder={t('settings.profile.city_placeholder')}
+              <div className="mb-4">
+                <Label className="mb-1.5 block">{t('settings.profile.place_search.label')}</Label>
+                <GooglePlaceSearchInput
+                  initialName={salon.name}
+                  initialPlaceId={googlePlaceId || null}
+                  onPick={(p) => {
+                    setGooglePlaceId(p.google_place_id)
+                    setGooglePlaceUrl(p.google_maps_uri ?? '')
+                    if (p.address) setAddress(p.address)
+                    if (p.lat != null) setLat(String(p.lat))
+                    if (p.lng != null) setLng(String(p.lng))
+                    // Город попытаемся вытащить из адреса (последний компонент
+                    // обычно страна, предпоследний — город. Это эвристика).
+                    if (p.address) {
+                      const parts = p.address.split(',').map((s) => s.trim())
+                      if (parts.length >= 2) setCity(parts[parts.length - 2] ?? '')
+                    }
+                  }}
+                  onClear={() => {
+                    setGooglePlaceId('')
+                    setGooglePlaceUrl('')
+                  }}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>{t('settings.profile.coords_label')}</Label>
-                <div className="flex gap-2">
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label htmlFor="set-address">{t('settings.profile.address_label')}</Label>
                   <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    placeholder="52.2297"
-                    className="num"
+                    id="set-address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder={t('settings.profile.address_placeholder')}
                   />
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.address_hint')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="set-city">{t('settings.profile.city_label')}</Label>
                   <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                    placeholder="21.0122"
-                    className="num"
+                    id="set-city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder={t('settings.profile.city_placeholder')}
                   />
                 </div>
-                <p className="text-muted-foreground text-xs">{t('settings.profile.coords_hint')}</p>
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t('settings.profile.coords_label')}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={lat}
+                      onChange={(e) => setLat(e.target.value)}
+                      placeholder="52.2297"
+                      className="num"
+                    />
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={lng}
+                      onChange={(e) => setLng(e.target.value)}
+                      placeholder="21.0122"
+                      className="num"
+                    />
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.coords_hint')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label htmlFor="set-booksy-url">Booksy URL</Label>
+                  <Input
+                    id="set-booksy-url"
+                    value={booksyUrl}
+                    onChange={(e) => setBooksyUrl(e.target.value)}
+                    placeholder="https://booksy.com/..."
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.booksy_url_hint')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="set-instagram-url">Instagram</Label>
+                  <Input
+                    id="set-instagram-url"
+                    value={instagramUrl}
+                    onChange={(e) => setInstagramUrl(e.target.value)}
+                    placeholder="https://instagram.com/yoursalon"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.instagram_url_hint')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="set-facebook-url">Facebook</Label>
+                  <Input
+                    id="set-facebook-url"
+                    value={facebookUrl}
+                    onChange={(e) => setFacebookUrl(e.target.value)}
+                    placeholder="https://facebook.com/yoursalon"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    {t('settings.profile.facebook_url_hint')}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <Button
+                    size="lg"
+                    onClick={save}
+                    disabled={!dirty || update.isPending}
+                    data-testid="settings-save-public"
+                  >
+                    {update.isPending ? t('common.loading') : t('common.save')}
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <Label htmlFor="set-booksy-url">Booksy URL</Label>
-                <Input
-                  id="set-booksy-url"
-                  value={booksyUrl}
-                  onChange={(e) => setBooksyUrl(e.target.value)}
-                  placeholder="https://booksy.com/..."
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.booksy_url_hint')}
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-instagram-url">Instagram</Label>
-                <Input
-                  id="set-instagram-url"
-                  value={instagramUrl}
-                  onChange={(e) => setInstagramUrl(e.target.value)}
-                  placeholder="https://instagram.com/yoursalon"
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.instagram_url_hint')}
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="set-facebook-url">Facebook</Label>
-                <Input
-                  id="set-facebook-url"
-                  value={facebookUrl}
-                  onChange={(e) => setFacebookUrl(e.target.value)}
-                  placeholder="https://facebook.com/yoursalon"
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('settings.profile.facebook_url_hint')}
-                </p>
-              </div>
-              <div className="sm:col-span-2">
-                <Button
-                  size="lg"
-                  onClick={save}
-                  disabled={!dirty || update.isPending}
-                  data-testid="settings-save-public"
-                >
-                  {update.isPending ? t('common.loading') : t('common.save')}
-                </Button>
-              </div>
-            </div>
-          </section>
+            </section>
+          </CollapsibleSection>
 
           {/* Бухгалтерия (image #122): юр. данные компании, налоговая
               схема, доставка документов бухгалтеру. */}
-          {salonId ? <AccountingSettingsCard salonId={salonId} /> : null}
+          <CollapsibleSection
+            id="settings.accounting"
+            title={t('settings.accounting.title', { defaultValue: 'Бухгалтерия' })}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            {salonId ? <AccountingSettingsCard salonId={salonId} /> : null}
+          </CollapsibleSection>
 
           {/* Касса (опц.) — включатель кассового дня. */}
-          {salonId ? <CashDisciplineCard salonId={salonId} /> : null}
+          <CollapsibleSection
+            id="settings.cash_discipline"
+            title={t('settings.cash_discipline.title', { defaultValue: 'Кассовая дисциплина' })}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            {salonId ? <CashDisciplineCard salonId={salonId} /> : null}
+          </CollapsibleSection>
 
           {/* Telegram-привязка для отправки багов в @finklay_dev_bot */}
-          <TelegramLinkCard />
+          <CollapsibleSection
+            id="settings.telegram_link"
+            title={t('settings.telegram.title', { defaultValue: 'Telegram' })}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <TelegramLinkCard />
+          </CollapsibleSection>
 
           {/* Сегментация клиентов перенесена в /staff (Справочник → Мастера) */}
 
           {/* Сравнение с рынком (benchmarks opt-in) */}
-          <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <h2 className="text-brand-navy text-base font-bold tracking-tight">
-              {t('settings.benchmarks.title')}
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {t('settings.benchmarks.subtitle')}
-            </p>
-            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={salon.benchmarks_opt_in}
-                onChange={(e) =>
-                  toggleBenchmarks.mutate(e.target.checked, {
-                    onSuccess: () =>
-                      toast.success(
-                        e.target.checked
-                          ? t('settings.benchmarks.toast_enabled')
-                          : t('settings.benchmarks.toast_disabled'),
-                      ),
-                    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-                  })
-                }
-                className="size-4 cursor-pointer"
-              />
-              <span className="text-foreground">
-                {salon.benchmarks_opt_in
-                  ? t('settings.benchmarks.enabled')
-                  : t('settings.benchmarks.disabled')}
-              </span>
-            </label>
-          </section>
+          <CollapsibleSection
+            id="settings.benchmarks"
+            title={t('settings.benchmarks.title')}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+              <h2 className="text-brand-navy text-base font-bold tracking-tight">
+                {t('settings.benchmarks.title')}
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {t('settings.benchmarks.subtitle')}
+              </p>
+              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={salon.benchmarks_opt_in}
+                  onChange={(e) =>
+                    toggleBenchmarks.mutate(e.target.checked, {
+                      onSuccess: () =>
+                        toast.success(
+                          e.target.checked
+                            ? t('settings.benchmarks.toast_enabled')
+                            : t('settings.benchmarks.toast_disabled'),
+                        ),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }
+                  className="size-4 cursor-pointer"
+                />
+                <span className="text-foreground">
+                  {salon.benchmarks_opt_in
+                    ? t('settings.benchmarks.enabled')
+                    : t('settings.benchmarks.disabled')}
+                </span>
+              </label>
+            </section>
+          </CollapsibleSection>
 
           {/* Опасная зона — удаление салона */}
-          <section className="border-destructive/30 bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <h2 className="text-destructive mb-1 text-base font-bold tracking-tight">
-              {t('settings.delete.title')}
-            </h2>
-            <p className="text-muted-foreground mb-4 text-sm">{t('settings.delete.subtitle')}</p>
-            <Button
-              variant="destructive"
-              size="md"
-              onClick={() => {
-                setConfirmName('')
-                setDeleteOpen(true)
-              }}
-              data-testid="settings-delete"
-            >
-              {t('settings.delete.button')}
-            </Button>
-          </section>
+          <CollapsibleSection
+            id="settings.delete_salon"
+            title={t('settings.delete.title')}
+            defaultOpen={false}
+            className="mb-6"
+          >
+            <section className="border-destructive/30 bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+              <h2 className="text-destructive mb-1 text-base font-bold tracking-tight">
+                {t('settings.delete.title')}
+              </h2>
+              <p className="text-muted-foreground mb-4 text-sm">{t('settings.delete.subtitle')}</p>
+              <Button
+                variant="destructive"
+                size="md"
+                onClick={() => {
+                  setConfirmName('')
+                  setDeleteOpen(true)
+                }}
+                data-testid="settings-delete"
+              >
+                {t('settings.delete.button')}
+              </Button>
+            </section>
+          </CollapsibleSection>
         </>
       )}
 

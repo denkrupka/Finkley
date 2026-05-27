@@ -78,6 +78,55 @@ export function useMonthlyRegisterBalances(
 }
 
 /**
+ * То же что useMonthlyRegisterBalances, но для произвольного списка месяцев
+ * (используется в P&L отчёте с динамическим period — диапазон может покрывать
+ * не один год). Принимает массив { year, monthIdx }, возвращает
+ * Map<register_id, number[]> где индекс совпадает с индексом во входном списке.
+ */
+export function useRegisterBalancesAtMonthEnds(
+  salonId: string | undefined,
+  monthCols: Array<{ year: number; monthIdx: number }>,
+): { data: Map<string, number[]>; isLoading: boolean } {
+  const monthsKey = useMemo(
+    () => monthCols.map((c) => `${c.year}-${c.monthIdx}`).join(','),
+    [monthCols],
+  )
+  const isoDates = useMemo(() => {
+    return monthCols.map((c) =>
+      new Date(Date.UTC(c.year, c.monthIdx + 1, 0, 23, 59, 59, 999)).toISOString(),
+    )
+  }, [monthCols])
+
+  const queries = useQuery<Map<string, number[]>>({
+    queryKey: ['register-balances', salonId, 'monthCols', monthsKey],
+    queryFn: async () => {
+      if (!salonId) return new Map()
+      const results = await Promise.all(
+        isoDates.map((iso) =>
+          supabase.rpc('compute_all_register_balances', { p_salon_id: salonId, p_at: iso }),
+        ),
+      )
+      const map = new Map<string, number[]>()
+      const len = isoDates.length
+      results.forEach((res, idx) => {
+        if (res.error) return
+        const rows = (res.data ?? []) as RegisterBalance[]
+        for (const r of rows) {
+          const arr = map.get(r.register_id) ?? Array.from({ length: len }, () => 0)
+          arr[idx] = r.balance_cents
+          map.set(r.register_id, arr)
+        }
+      })
+      return map
+    },
+    enabled: !!salonId && monthCols.length > 0,
+    staleTime: 60_000,
+  })
+
+  return { data: queries.data ?? new Map(), isLoading: queries.isLoading }
+}
+
+/**
  * Все балансы активных касс салона одним вызовом (RPC
  * compute_all_register_balances). Используется в карточках касс наверху
  * модалки трансфера и в табе /finance → Касса.

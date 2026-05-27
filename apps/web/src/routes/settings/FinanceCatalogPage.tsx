@@ -1,4 +1,13 @@
-import { ArrowLeft, ArrowRightLeft, Coins, CreditCard, Scale, Sprout, Wallet } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  Banknote,
+  Coins,
+  CreditCard,
+  Scale,
+  Sprout,
+  Wallet,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
@@ -6,8 +15,16 @@ import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 
 import { CategoriesSection } from './IncomeCategoriesPage'
 import { ParametersCard } from './ParametersCard'
+import { PaymentMethodsCard } from './PaymentMethodsCard'
 
-type FinanceCatalogTab = 'expenses' | 'incomes' | 'investments' | 'financing' | 'cash' | 'balance'
+type FinanceCatalogTab =
+  | 'expenses'
+  | 'incomes'
+  | 'investments'
+  | 'financing'
+  | 'cash'
+  | 'payment_methods'
+  | 'balance'
 
 const TABS: PageTab<FinanceCatalogTab>[] = [
   { id: 'expenses', labelKey: 'settings.finance_catalog.tabs.expenses', icon: Wallet },
@@ -15,6 +32,11 @@ const TABS: PageTab<FinanceCatalogTab>[] = [
   { id: 'investments', labelKey: 'settings.finance_catalog.tabs.investments', icon: Sprout },
   { id: 'financing', labelKey: 'settings.finance_catalog.tabs.financing', icon: ArrowRightLeft },
   { id: 'cash', labelKey: 'settings.finance_catalog.tabs.cash', icon: CreditCard },
+  {
+    id: 'payment_methods',
+    labelKey: 'settings.finance_catalog.tabs.payment_methods',
+    icon: Banknote,
+  },
   { id: 'balance', labelKey: 'settings.finance_catalog.tabs.balance', icon: Scale },
 ]
 
@@ -25,6 +47,7 @@ function isTab(v: string | null): v is FinanceCatalogTab {
     v === 'investments' ||
     v === 'financing' ||
     v === 'cash' ||
+    v === 'payment_methods' ||
     v === 'balance'
   )
 }
@@ -94,6 +117,8 @@ export function FinanceCatalogPage() {
         <ParametersCard sectionKeys={['flows']} urlKey="fin" />
       ) : active === 'cash' ? (
         <ParametersCard sectionKeys={['cash_registers']} urlKey="cash" />
+      ) : active === 'payment_methods' ? (
+        <PaymentMethodsCard salonId={salonId} />
       ) : (
         <ParametersCard sectionKeys={['balance']} urlKey="bal" />
       )}

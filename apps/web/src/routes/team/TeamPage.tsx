@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Loader2, Mail, Trash2, UserPlus, X } from 'lucide-react'
+import { ArrowLeft, Loader2, Mail, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useStaff, useUnlinkedStaff } from '@/hooks/useStaff'
-import { uploadStaffAvatar } from '@/lib/storage/upload-avatar'
 import {
   useCancelInvitation,
   useInvitations,
@@ -36,6 +35,8 @@ import {
   type SalonRole,
   type TeamMember,
 } from '@/hooks/useTeam'
+
+import { PermissionsBlock, type PermissionsMap } from './PermissionsBlock'
 
 const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
   { value: 'admin', key: 'team.role.admin' },
@@ -69,11 +70,10 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
   // плюс staff_id заранее задан или auto_create_staff=true.
   const [selectedRoles, setSelectedRoles] = useState<Set<SalonRole>>(new Set(['staff']))
   const [staffLinkChoice, setStaffLinkChoice] = useState<string>('new')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [avatarUploading, setAvatarUploading] = useState(false)
+  // T30 — матрица прав. При смене роли PermissionsBlock сам пересчитает preset
+  // через onChange callback (см. useEffect внутри). null = «использовать preset
+  // роли на сервере» (отправляем undefined в invite).
+  const [permissions, setPermissions] = useState<PermissionsMap | null>(null)
 
   const { data: unlinkedStaff = [] } = useUnlinkedStaff(salonId)
   const isMasterChecked = selectedRoles.has('staff')
@@ -113,16 +113,23 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
     // Для role='staff' без существующего staff_id — RPC уже создаст staff
     // (legacy behavior). auto_create_staff не нужен дополнительно.
 
+    // Преобразуем PermissionsMap → отправляемый формат: оставляем только
+    // явные 'view'/'edit', 'none' пропускаем (= отсутствие ключа = нет доступа).
+    const permsToSend = permissions
+      ? (Object.fromEntries(
+          Object.entries(permissions).filter(([, v]) => v === 'view' || v === 'edit'),
+        ) as Record<string, 'view' | 'edit'>)
+      : undefined
+
     invite.mutate(
       {
         email: email.trim(),
         role,
         staffId: linkExistingStaffId,
         autoCreateStaff,
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        avatar_url: avatarUrl ?? undefined,
+        // T26 — first_name/last_name/phone/avatar заполняет приглашённый
+        // самостоятельно в InviteSignupForm после accept-invite.
+        permissions: permsToSend,
       },
       {
         onSuccess: () => {
@@ -131,10 +138,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
           setEmail('')
           setSelectedRoles(new Set(['staff']))
           setStaffLinkChoice('new')
-          setFirstName('')
-          setLastName('')
-          setPhone('')
-          setAvatarUrl(null)
+          setPermissions(null)
         },
         onError: (err) => {
           const msg = err instanceof Error ? err.message : String(err)
@@ -361,69 +365,9 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               submitInvite()
             }}
           >
-            {/* Аватар (опционально) — загружается в Storage сразу при выборе */}
-            <div className="flex flex-col items-center gap-2">
-              <Label className="self-start">{t('team.invite_avatar')}</Label>
-              <div className="flex items-center gap-3">
-                <div className="border-border bg-muted/30 relative grid size-16 place-items-center overflow-hidden rounded-full border">
-                  {avatarUrl ? (
-                    <>
-                      <img
-                        src={avatarUrl}
-                        alt=""
-                        className="size-full object-cover"
-                        onError={() => setAvatarUrl(null)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setAvatarUrl(null)}
-                        className="absolute right-0 top-0 rounded-bl-md bg-black/60 p-0.5 text-white"
-                        aria-label="remove"
-                      >
-                        <X className="size-3" strokeWidth={2.5} />
-                      </button>
-                    </>
-                  ) : avatarUploading ? (
-                    <Loader2 className="text-muted-foreground size-5 animate-spin" />
-                  ) : (
-                    <Camera className="text-muted-foreground size-5" strokeWidth={1.5} />
-                  )}
-                </div>
-                <label
-                  htmlFor="inv-avatar"
-                  className="border-border hover:bg-muted/40 cursor-pointer rounded-md border px-3 py-1.5 text-xs font-semibold"
-                >
-                  {avatarUploading
-                    ? t('team.invite_avatar_uploading')
-                    : t('team.invite_avatar_pick')}
-                  <input
-                    id="inv-avatar"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={avatarUploading || !salonId}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0]
-                      if (!file || !salonId) return
-                      setAvatarUploading(true)
-                      try {
-                        const url = await uploadStaffAvatar(salonId, file)
-                        setAvatarUrl(url)
-                      } catch (err) {
-                        const code = err instanceof Error ? err.message : String(err)
-                        toast.error(t(`team.errors.${code}`, t('team.errors.avatar_failed')))
-                      } finally {
-                        setAvatarUploading(false)
-                        e.target.value = ''
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-              <p className="text-muted-foreground text-center text-xs">
-                {t('team.invite_avatar_hint')}
-              </p>
-            </div>
+            {/* T26 — блоки Фото/Имя/Фамилия/Телефон удалены: юзер сам заполнит
+                эти данные в форме регистрации после клика по invite-ссылке
+                (см. InviteSignupForm). */}
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
@@ -436,40 +380,10 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
                 autoComplete="email"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inv-first-name">{t('team.invite_first_name')}</Label>
-                <Input
-                  id="inv-first-name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder={t('team.invite_first_name_placeholder')}
-                  autoComplete="given-name"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inv-last-name">{t('team.invite_last_name')}</Label>
-                <Input
-                  id="inv-last-name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder={t('team.invite_last_name_placeholder')}
-                  autoComplete="family-name"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="inv-phone">{t('team.invite_phone')}</Label>
-              <Input
-                id="inv-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+48 ..."
-                autoComplete="tel"
-              />
-              <p className="text-muted-foreground text-xs">{t('team.invite_phone_hint')}</p>
-            </div>
+            {/* T26 — Имя / Фамилия / Телефон заполняются пользователем при
+                регистрации по invite-ссылке (см. InviteSignupForm). Здесь поля
+                сохраняются в state, но не рендерятся в UI — backend всё ещё
+                принимает их как опциональные при invite.create. */}
             <div className="flex flex-col gap-1.5">
               <Label>{t('team.invite_role')}</Label>
               <p className="text-muted-foreground -mt-1 text-xs">
@@ -503,7 +417,10 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               </div>
             </div>
 
-            {isMasterChecked ? (
+            {/* T26 — «Связать с мастером» скрываем если все мастера уже
+                привязаны к user_id (unlinkedStaff пуст) — тогда автоматически
+                staffLinkChoice='new', блок не нужен. */}
+            {isMasterChecked && unlinkedStaff.length > 0 ? (
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="inv-staff-link">{t('team.invite_staff_link')}</Label>
                 <Select value={staffLinkChoice} onValueChange={setStaffLinkChoice}>
@@ -531,6 +448,18 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
                 </p>
               </div>
             ) : null}
+
+            {/* T26 — блок «Доступы». Свёрнут по умолчанию; роль пресетит
+                разрешения (Мастер: видит свои визиты + свой профиль;
+                Администратор: полные права на доходы/расходы/отчёты/склад/
+                маркетинг/мессенджер/AI). Сохранение прав в БД появится в
+                следующей миграции (salon_members.permissions jsonb), сейчас
+                UI отображает преднастройку для подтверждения. */}
+            <PermissionsBlock
+              role={highestRole()}
+              value={permissions ?? undefined}
+              onChange={setPermissions}
+            />
           </form>
           <DialogFooter className="border-border shrink-0 border-t bg-white px-5 py-3">
             <Button

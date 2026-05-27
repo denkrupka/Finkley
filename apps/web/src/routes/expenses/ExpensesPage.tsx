@@ -16,6 +16,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,10 @@ import {
 } from '@/hooks/useScheduledPayments'
 import { cn } from '@/lib/utils/cn'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
-import type { PaymentMethod } from '@/hooks/useVisits'
+import type { PaymentMethod, VisitRow } from '@/hooks/useVisits'
+import type { OtherIncomeRow } from '@/hooks/useOtherIncomes'
+import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+import { OtherIncomeEditModal } from '@/routes/income/OtherIncomeEditModal'
 import {
   pickActiveAccountingProvider,
   useAccountingPushExpense,
@@ -66,9 +70,12 @@ import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
-import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
+import { useBankLinkedIncomeIds, useBankOutflows } from '@/hooks/useBanking'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
 import { BankExportDialog } from './BankExportDialog'
+import { CommissionsPin } from './CommissionsPin'
+import { PageTour } from '@/components/onboarding-tour/PageTour'
+import { EXPENSES_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -203,6 +210,27 @@ export function ExpensesPage({
   }, [teamMembers])
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  // T21 — счётчик несвязанных bank-tx в кнопке «Банкинг». Считаем по
+  // outflows (debit) в текущем периоде, у которых нет ни expense_id, ни
+  // linked_visit_id, ни linked_other_income_id, ни записей в bank_tx_splits.
+  const bankRange = useMemo(
+    () => ({
+      start: r.start.toISOString(),
+      end: r.end.toISOString(),
+    }),
+    [r.start, r.end],
+  )
+  const { data: bankOutflows = [] } = useBankOutflows(salonId, bankRange)
+  const linkedTxIds = bankLinked?.linkedTxIds ?? null
+  const unlinkedBankCount = useMemo(() => {
+    return bankOutflows.filter(
+      (tx) =>
+        !tx.expense_id &&
+        !tx.linked_visit_id &&
+        !tx.linked_other_income_id &&
+        !(linkedTxIds && linkedTxIds.has(tx.id)),
+    ).length
+  }, [bankOutflows, linkedTxIds])
   const needsReviewExpenseIds = bankLinked?.needsReviewExpenseIds ?? null
   const linkedExpenseIds = useMemo(() => bankLinked?.expenseIds ?? new Set<string>(), [bankLinked])
   const isLinked = useMemo(
@@ -228,7 +256,9 @@ export function ExpensesPage({
     paymentMethod: payFilter || null,
   })
   const expenses = useMemo(
-    () => rawExpenses.filter((e) => passesLinkedFilter(e)),
+    // T15 — auto_commission расходы скрываются из общего реестра, они показаны
+    // отдельной pin'ной строкой над списком (CommissionsPin → CommissionsModal).
+    () => rawExpenses.filter((e) => e.source !== 'auto_commission' && passesLinkedFilter(e)),
     [rawExpenses, passesLinkedFilter],
   )
   // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
@@ -309,6 +339,12 @@ export function ExpensesPage({
   // Edit-режим: клик по строке расхода → ExpenseFormModal в edit mode
   // (Image #49). null = создание нового. ExpenseFormModal сам различает.
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null)
+  // T31 — открыть источник комиссии (visit или other_income) in-place вместо
+  // навигации через window.location.href. Подгружаем row из БД по id и
+  // показываем соответствующую модалку.
+  const [commissionVisit, setCommissionVisit] = useState<VisitRow | null>(null)
+  const [commissionIncome, setCommissionIncome] = useState<OtherIncomeRow | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [receiptError, setReceiptError] = useState<string | null>(null)
 
@@ -376,6 +412,12 @@ export function ExpensesPage({
 
   return (
     <div className={cn('flex flex-1 flex-col', embedded ? 'p-0' : 'px-5 py-7 sm:px-8 lg:pb-12')}>
+      {/* T46 — per-page mini-tour. Запускается раз через localStorage; повторно
+          через ?tour=1 в URL. Не показывается в embedded-режиме (picker внутри
+          LinkTransactionDialog). */}
+      {!embedded ? (
+        <PageTour name="expenses" steps={EXPENSES_TOUR_STEPS} force={params.get('tour') === '1'} />
+      ) : null}
       {/* Header — скрыт в embedded (его место занимает DialogTitle родителя). */}
       {embedded ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -487,6 +529,11 @@ export function ExpensesPage({
           >
             <Landmark className="size-4" strokeWidth={1.8} />
             {t('expenses.tabs.banking', { defaultValue: 'Банкинг' })}
+            {unlinkedBankCount > 0 ? (
+              <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
+                {unlinkedBankCount}
+              </span>
+            ) : null}
           </button>
         )}
       </div>
@@ -502,11 +549,15 @@ export function ExpensesPage({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('expenses.filters.all_categories')}</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {/* T34 — системная категория «Комиссии» скрыта: она автозаполняется
+                триггером для авто-комиссий, юзер не должен класть туда руками. */}
+            {categories
+              .filter((c) => !(c.is_system && c.name === 'Комиссии'))
+              .map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
 
@@ -584,6 +635,42 @@ export function ExpensesPage({
                 </span>
               </div>
             </div>
+            {/* T15 — pin'ная позиция «Комиссии» над списком расходов в режиме
+                «Оплачено». Открывает модалку с детализацией транзакций. */}
+            {tab === 'paid' ? (
+              <CommissionsPin
+                salonId={salonId!}
+                currency={currency}
+                expenses={rawExpenses}
+                onOpenSource={async (table, id) => {
+                  setCommissionLoading(true)
+                  try {
+                    if (table === 'visits') {
+                      const { data, error } = await supabase
+                        .from('visits')
+                        .select('*')
+                        .eq('id', id)
+                        .single()
+                      if (error) throw error
+                      setCommissionVisit(data as VisitRow)
+                    } else {
+                      const { data, error } = await supabase
+                        .from('other_incomes')
+                        .select('*')
+                        .eq('id', id)
+                        .single()
+                      if (error) throw error
+                      setCommissionIncome(data as OtherIncomeRow)
+                    }
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : String(err))
+                  } finally {
+                    setCommissionLoading(false)
+                  }
+                }}
+              />
+            ) : null}
+            {commissionLoading ? null : null}
             {tab === 'pending' ? (
               scheduledLoading ? (
                 <div className="space-y-2 p-3">
@@ -1248,6 +1335,21 @@ export function ExpensesPage({
         currency={currency}
         mode="planned-paying"
         existingPayment={editingPayment}
+      />
+
+      {/* T31 — модалки источника комиссии: визит или прочий доход. */}
+      <VisitDetailModal
+        visit={commissionVisit}
+        onClose={() => setCommissionVisit(null)}
+        salonId={salonId!}
+        currency={currency}
+      />
+      <OtherIncomeEditModal
+        open={!!commissionIncome}
+        onClose={() => setCommissionIncome(null)}
+        salonId={salonId!}
+        currency={currency}
+        income={commissionIncome}
       />
 
       <CashGateRequiredDialog

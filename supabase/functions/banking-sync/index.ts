@@ -258,16 +258,28 @@ async function syncConnection(
     const overlap = 7 * 24 * 60 * 60 * 1000
     dateFrom = new Date(new Date(conn.last_synced_at).getTime() - overlap)
   }
-  const rangeFrom = dateFrom.toISOString().slice(0, 10)
   const rangeTo = dateTo.toISOString().slice(0, 10)
+
+  // T32 — fix incorrectly-narrow sync window. Bank Millennium часто отдаёт
+  // только последние ~3 дня если dateFrom близок к now (вторичный quirk
+  // некоторых aspsp). Гарантируем минимум 30 дней истории при каждом sync
+  // (не только initial), чтобы поймать lazy-booked tx через 1–7 дней.
+  const MIN_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+  if (dateTo.getTime() - dateFrom.getTime() < MIN_WINDOW_MS) {
+    dateFrom = new Date(dateTo.getTime() - MIN_WINDOW_MS)
+  }
+  const effectiveFrom = dateFrom.toISOString().slice(0, 10)
 
   for (const acc of accounts ?? []) {
     let txs: EbTransaction[] = []
     try {
       txs = await listTransactions(cfg, acc.external_id as string, {
-        dateFrom: rangeFrom,
+        dateFrom: effectiveFrom,
         dateTo: rangeTo,
       })
+      console.log(
+        `[banking-sync] listTransactions account=${acc.external_id} from=${effectiveFrom} to=${rangeTo} got=${txs.length}`,
+      )
     } catch (e) {
       console.error('listTransactions failed', acc.external_id, e)
       await admin
@@ -342,10 +354,28 @@ async function persistTransactions(
     txs: EbTransaction[]
   },
 ): Promise<{ newCount: number; expCount: number }> {
-  if (ctx.txs.length === 0) return { newCount: 0, expCount: 0 }
+  // T32 — детальное логирование чтобы диагностировать почему провайдер
+  // возвращает «зелёную галочку» но новых tx нет. Видно в логе:
+  //   - сколько всего пришло из API
+  //   - сколько booked vs pending
+  //   - сколько отфильтровано как дубль (existingIds)
+  //   - сколько в итоге записано
+  console.log(
+    `[banking-sync] salon=${ctx.salonId} account=${ctx.accountId} provider_total=${ctx.txs.length}`,
+  )
+  if (ctx.txs.length === 0) {
+    console.log(`[banking-sync] salon=${ctx.salonId} provider returned 0 transactions`)
+    return { newCount: 0, expCount: 0 }
+  }
 
   // Только booked транзакции пишем (PDNG/pending часто меняют сумму/исчезают).
   const booked = ctx.txs.filter((t) => !t.status || t.status === 'BOOK' || t.status === 'BOOKED')
+  const pendingCount = ctx.txs.length - booked.length
+  if (pendingCount > 0) {
+    console.log(
+      `[banking-sync] salon=${ctx.salonId} skipped_pending=${pendingCount} (status != BOOK/BOOKED)`,
+    )
+  }
 
   // Сначала — INSERT bank_transactions с onConflict ignore (через upsert)
   const txRows = booked.map((t) => {
@@ -383,6 +413,9 @@ async function persistTransactions(
     )
   const existingIds = new Set((existingRows ?? []).map((r) => r.external_id))
   const newRows = txRows.filter((r) => !existingIds.has(r.external_id))
+  console.log(
+    `[banking-sync] salon=${ctx.salonId} booked=${booked.length} duplicates=${existingIds.size} to_insert=${newRows.length}`,
+  )
   if (newRows.length === 0) return { newCount: 0, expCount: 0 }
 
   const { data: insertedTxs, error: txErr } = await admin

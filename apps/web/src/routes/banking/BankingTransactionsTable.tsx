@@ -142,9 +142,6 @@ export function BankingTransactionsTable({
   ])
   const sync = useBankSyncNow(salonId)
   const qcRoot = useQueryClient()
-  const [extracting, setExtracting] = useState(false)
-  /** Progress для кнопки «Извлечь контрагентов»: "regex 12/137 · AI 50/85". */
-  const [extractProgress, setExtractProgress] = useState<string | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
   // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
@@ -177,9 +174,8 @@ export function BankingTransactionsTable({
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')
 
-  async function handleExtractCounterparties() {
-    setExtracting(true)
-    setExtractProgress(t('banking.transactions.extract_progress_regex', { defaultValue: 'regex…' }))
+  async function handleExtractCounterparties(opts: { silent?: boolean } = {}) {
+    const silent = !!opts.silent
     try {
       // Шаг 1: regex-эвристика (быстро, дёшево)
       const { data, error } = await supabase.rpc('extract_bank_tx_counterparty', {
@@ -189,14 +185,6 @@ export function BankingTransactionsTable({
       const row = Array.isArray(data) ? data[0] : data
       const regexUpdated = (row as { updated_count?: number })?.updated_count ?? 0
       const totalWithNull = (row as { total_with_null?: number })?.total_with_null ?? 0
-      setExtractProgress(
-        t('banking.transactions.extract_progress_regex_done', {
-          defaultValue: 'regex {{n}}/{{total}} · AI…',
-          n: regexUpdated,
-          total: totalWithNull,
-        }),
-      )
-
       // Шаг 2: Groq AI fallback для оставшихся (где regex не нашёл)
       // вызывается итеративно по 50 tx пока есть что обрабатывать или
       // пока не упрётся в 5 итераций (защита от бесконечного цикла).
@@ -235,14 +223,6 @@ export function BankingTransactionsTable({
             }
             aiProcessed += json.processed ?? 0
             aiUpdated += json.updated ?? 0
-            setExtractProgress(
-              t('banking.transactions.extract_progress_ai', {
-                defaultValue: 'regex {{r}} · AI {{ai}} · осталось {{left}}',
-                r: regexUpdated,
-                ai: aiUpdated,
-                left: json.total_remaining ?? 0,
-              }),
-            )
             // Если ничего не осталось или ничего не обновили — стоп
             if (!json.processed || json.processed === 0) break
             if ((json.total_remaining ?? 0) === 0) break
@@ -253,20 +233,22 @@ export function BankingTransactionsTable({
       }
 
       const updated = regexUpdated + aiUpdated
-      toast.success(
-        t('banking.transactions.extract_done_with_ai', {
-          defaultValue: 'Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})',
-          updated,
-          total: totalWithNull,
-          regex: regexUpdated,
-          ai: aiUpdated,
-        }),
-      )
+      if (!silent && updated > 0) {
+        toast.success(
+          t('banking.transactions.extract_done_with_ai', {
+            defaultValue: 'Извлечено {{updated}} из {{total}} (regex: {{regex}}, AI: {{ai}})',
+            updated,
+            total: totalWithNull,
+            regex: regexUpdated,
+            ai: aiUpdated,
+          }),
+        )
+      }
       // Subtle warning если AI-фаза не отработала, а regex остался с
       // непокрытыми tx (totalWithNull - regexUpdated > 0). Юзер должен знать
       // что часть tx осталась без counterparty.
       const stillEmpty = totalWithNull - regexUpdated
-      if (aiError && stillEmpty > 0) {
+      if (!silent && aiError && stillEmpty > 0) {
         const reason =
           aiError === 'not_configured'
             ? t('banking.transactions.extract_ai_not_configured', {
@@ -291,10 +273,7 @@ export function BankingTransactionsTable({
       await qcRoot.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
       await qcRoot.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
-    } finally {
-      setExtracting(false)
-      setExtractProgress(null)
+      if (!silent) toast.error(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -309,7 +288,13 @@ export function BankingTransactionsTable({
       sync.mutate(c.id, {
         onSuccess: () => {
           done += 1
-          if (done === active.length) toast.success(t('banking.transactions.sync_done'))
+          if (done === active.length) {
+            toast.success(t('banking.transactions.sync_done'))
+            // T20 — извлекаем контрагентов из новых транзакций автоматически
+            // после успешной синхронизации. Без UI-кнопки: запускается тихо в
+            // фоне; ошибки логируются, но юзеру не мешают.
+            void handleExtractCounterparties({ silent: true }).catch(() => {})
+          }
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
       })
@@ -357,26 +342,9 @@ export function BankingTransactionsTable({
               {t('banking.transactions.show_linked', { defaultValue: 'Показать связанные' })}
             </label>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExtractCounterparties}
-            disabled={extracting}
-            title={t('banking.transactions.extract_hint', {
-              defaultValue: 'Извлечь контрагентов из назначений для tx где колонка пустая',
-            })}
-          >
-            {extracting ? (
-              <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-            ) : (
-              <AlertTriangle className="size-3.5" strokeWidth={1.8} />
-            )}
-            {extractProgress
-              ? extractProgress
-              : t('banking.transactions.extract_counterparties', {
-                  defaultValue: 'Извлечь контрагентов',
-                })}
-          </Button>
+          {/* T20 — кнопка «Извлечь контрагентов» удалена; извлечение
+              запускается автоматически после успешной синхронизации
+              (handleSyncAll → handleExtractCounterparties({ silent: true })). */}
           <Button
             variant="outline"
             size="sm"

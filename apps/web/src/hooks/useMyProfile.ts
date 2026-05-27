@@ -41,6 +41,41 @@ export function useMyProfile() {
 }
 
 /**
+ * Обновить редактируемые поля профиля текущего юзера: имя, телефон, аватар.
+ * Email хранится в auth.users и меняется отдельной операцией supabase.auth
+ * (через email change flow), здесь не редактируется.
+ */
+export function useUpdateMyProfile() {
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (patch: {
+      full_name?: string | null
+      phone?: string | null
+      avatar_url?: string | null
+    }) => {
+      if (!user) throw new Error('not_authenticated')
+      const { error } = await supabase.from('profiles').update(patch).eq('id', user.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-profile'] })
+    },
+  })
+}
+
+/** Изменить пароль текущего юзера через Supabase Auth. */
+export function useChangeMyPassword() {
+  return useMutation({
+    mutationFn: async (newPassword: string) => {
+      if (newPassword.length < 8) throw new Error('Пароль должен быть не менее 8 символов')
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+    },
+  })
+}
+
+/**
  * Отвязать Telegram — обнуляем telegram_id/telegram_username. Серверная
  * проверка не нужна, RLS-политика "users can update own profile" разрешает
  * юзеру изменять свой profile.

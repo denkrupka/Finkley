@@ -116,6 +116,89 @@ export async function notifyOwnerTelegram(
 }
 
 /**
+ * T38 — единый dispatcher для уведомлений. Вызывает send-notification
+ * Edge Function которая сама разрулит каналы по notification_prefs и
+ * отправит через email/Telegram/SMS с готовыми шаблонами.
+ *
+ * Используется из cron-функций вместо прямых sendEmail/sendTelegramToUser —
+ * чтобы матрица prefs.{type}.{channel} работала единообразно повсюду.
+ */
+export async function dispatchNotification(input: {
+  salonId: string
+  userId: string
+  type: string
+  payload: Record<string, unknown>
+}): Promise<boolean> {
+  if (!SUPABASE_URL || !FUNCTION_SECRET) {
+    console.warn('dispatchNotification: not configured (SUPABASE_URL or FUNCTION_INTERNAL_SECRET)')
+    return false
+  }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Finkley-Secret': FUNCTION_SECRET,
+      },
+      body: JSON.stringify({
+        salon_id: input.salonId,
+        user_id: input.userId,
+        type: input.type,
+        payload: input.payload,
+      }),
+    })
+    if (!res.ok) {
+      console.warn(`dispatchNotification[${input.type}] failed:`, res.status)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn(
+      `dispatchNotification[${input.type}] exception:`,
+      e instanceof Error ? e.message : e,
+    )
+    return false
+  }
+}
+
+/**
+ * T37 — шлёт SMS через Twilio API. Требует env:
+ *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER (E.164).
+ * Если не настроено или провайдер вернул ошибку — false; основной flow
+ * этим не блокируется (consumer должен сам решать что делать).
+ */
+export async function sendSMS(toPhone: string, text: string): Promise<boolean> {
+  const sid = Deno.env.get('TWILIO_ACCOUNT_SID')
+  const token = Deno.env.get('TWILIO_AUTH_TOKEN')
+  const from = Deno.env.get('TWILIO_FROM_NUMBER')
+  if (!sid || !token || !from) {
+    console.warn('sendSMS: TWILIO_* not configured')
+    return false
+  }
+  if (!toPhone) return false
+  const phone = toPhone.startsWith('+') ? toPhone : `+${toPhone.replace(/[^\d]/g, '')}`
+  try {
+    const auth = btoa(`${sid}:${token}`)
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ From: from, To: phone, Body: text }).toString(),
+    })
+    if (!res.ok) {
+      console.warn(`sendSMS failed (to=${phone}):`, res.status, await res.text().catch(() => ''))
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn(`sendSMS exception (to=${toPhone}):`, e instanceof Error ? e.message : e)
+    return false
+  }
+}
+
+/**
  * Записывает результат sync-а интеграции и при 3+ fail подряд шлёт
  * telegram-алерт владельцу. Не чаще 1 раза в 24 часа на пару (salon, provider).
  */

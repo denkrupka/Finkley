@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
+import { PageTour } from '@/components/onboarding-tour/PageTour'
+import { INVENTORY_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -85,6 +87,8 @@ export function InventoryPage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+      {/* T46 — per-page mini-tour: материалы, порог уведомлений, закупка, инвентаризация. */}
+      <PageTour name="inventory" steps={INVENTORY_TOUR_STEPS} force={params.get('tour') === '1'} />
       {/* Header */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>

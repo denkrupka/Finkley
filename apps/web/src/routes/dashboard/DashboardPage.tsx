@@ -1,565 +1,312 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, TrendingUp } from 'lucide-react'
+import { startOfMonth, subMonths } from 'date-fns'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase/client'
 
-import { useTopServices, useTopStaff, useDashboardKpis } from '@/hooks/useDashboard'
-import { useSalon } from '@/hooks/useSalons'
 import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
-
-import { BenchmarksWidget } from './BenchmarksWidget'
-import { LowStockWidget } from './LowStockWidget'
-import { CashBalanceWidget } from './CashBalanceWidget'
-import { ForecastWidget } from './ForecastWidget'
-import { InsightsWidget } from './InsightsWidget'
-import { MiniCalendarWidget } from './MiniCalendarWidget'
-import { OccupancyHeatmapWidget } from './OccupancyHeatmapWidget'
-import { UpcomingVisitsWidget } from './UpcomingVisitsWidget'
-import { useStaff } from '@/hooks/useStaff'
+import { useDashboardKpis, useTopStaff } from '@/hooks/useDashboard'
+import { useRegisterBalances } from '@/hooks/useCashTransfers'
 import { useAuth } from '@/hooks/useAuth'
-import { effectiveReceivedFromVisit, useVisits, type PaymentMethod } from '@/hooks/useVisits'
+import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
+import { useFinancialSettings } from '@/hooks/useFinancialSettings'
+import { useSalon } from '@/hooks/useSalons'
+import { useStaff } from '@/hooks/useStaff'
+import { useVisits } from '@/hooks/useVisits'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
-import { cn } from '@/lib/utils/cn'
-import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatVisitDate } from '@/lib/utils/format-date'
+import { effectiveReceivedFromVisit } from '@/hooks/useVisits'
 
-const STAFF_PALETTE = ['#F4D7C5', '#D7E4C5', '#C5DAE4', '#E4C5DC', '#E8C4B8', '#FBE5C0']
+import { CollapsibleSection } from './CollapsibleSection'
+import { InsightsWidget } from './InsightsWidget'
+import { LowStockWidget } from './LowStockWidget'
+import {
+  ClientsSection,
+  ExpensesSection,
+  FinancesSection,
+  KpiCardsRow,
+  MarketingSection,
+  MastersSection,
+  OperationsSection,
+} from './sections'
+import { aggregateDailyRevenue } from './sections-utils'
 
-const PAY_PILL: Record<PaymentMethod, { bg: string; fg: string }> = {
-  cash: { bg: '#EFEEF5', fg: 'hsl(var(--brand-navy))' },
-  card: { bg: 'hsl(var(--brand-teal-soft))', fg: 'hsl(var(--brand-teal-deep))' },
-  transfer: { bg: 'hsl(var(--brand-sage-soft))', fg: 'hsl(var(--brand-sage))' },
-  online: { bg: '#E5F0F4', fg: 'hsl(var(--brand-teal))' },
-  mixed: { bg: '#EEE', fg: 'hsl(var(--brand-navy))' },
-}
-
+/**
+ * Главный дашборд (Image #71-72 — новая структура). Заменяет старый дашборд,
+ * который состоял из множества разнородных виджетов. Новая структура:
+ *   1. Заголовок (привет + период)
+ *   2. Сворачиваемые блоки «Заканчиваются материалы» + «AI-помощник видит»
+ *      — единственное, что осталось с предыдущей версии.
+ *   3. 5 KPI карточек (Выручка / Прибыль / Заполненность / Возврат / Деньги)
+ *   4. Клиенты + Мастера (2 колонки)
+ *   5. Расходы + Финансы (2 колонки)
+ *   6. Запись и операции (4 metric'а)
+ *   7. Маркетинг (источники + RFM)
+ *
+ * Где есть готовые хуки (DashboardKpis, TopStaff, Expenses, Visits,
+ * RegisterBalances) — показываем реальные данные. Где данных нет
+ * (Заполненность, Retention, RFM, источники, CAC) — секция получает
+ * `null`/`undefined` и показывает «—». Это позволяет наполнять секции
+ * постепенно, без переписывания UI.
+ */
 export function DashboardPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
   const period = (params.get('period') ?? 'month') as PeriodKey
-  const range = getPeriodRange(period, new Date(), readCustomFromParams(params))
+  const now = new Date()
+  const range = getPeriodRange(period, now, readCustomFromParams(params))
+
+  // Предыдущий месяц — для MoM (Month over Month) сравнения KPI.
+  const prevMonthAnchor = subMonths(startOfMonth(now), 1)
+  const prevRange = getPeriodRange('month', prevMonthAnchor)
 
   const { user } = useAuth()
   const { data: salon } = useSalon(salonId)
-  const { data: kpis, isLoading: kpisLoading } = useDashboardKpis(salonId, range)
-  const { data: topStaff = [] } = useTopStaff(salonId, range, 4)
-  const { data: topServices = [], isLoading: servicesLoading } = useTopServices(salonId, range, 5)
-  const { data: visits = [] } = useVisits(salonId, range)
+  const { data: kpis } = useDashboardKpis(salonId, range)
+  const { data: prevKpis } = useDashboardKpis(salonId, prevRange)
+  const { data: topStaff = [] } = useTopStaff(salonId, range, 5)
   const { data: staff = [] } = useStaff(salonId)
+  const { data: visits = [] } = useVisits(salonId, range)
+  const { data: expenses = [] } = useExpenses(salonId, {
+    start: range.start.slice(0, 10),
+    end: range.end.slice(0, 10),
+  })
+  const { data: expenseCategories = [] } = useExpenseCategories(salonId)
+  const { data: registerBalances = [] } = useRegisterBalances(salonId)
+  const { data: financialSettings } = useFinancialSettings(salonId)
 
   if (!salon || !salonId) return null
   const currency = salon.currency
 
   const firstName = (user?.user_metadata?.full_name ?? '').split(' ')[0]
 
-  // Empty state — нет ни визитов, ни расходов
-  const isEmpty =
-    !kpisLoading && (kpis?.visits_count ?? 0) === 0 && (kpis?.expense_cents ?? 0) === 0
+  // ─── Деривативные значения ────────────────────────────────────────────────
+  const revenueCents = kpis?.revenue_cents ?? 0
+  const expenseCents = kpis?.expense_cents ?? 0
+  const profitCents = kpis?.profit_cents ?? 0
+  const visitsCount = kpis?.visits_count ?? 0
 
-  // Топ-5 последних визитов для нижней таблицы
-  const recentVisits = visits.slice(0, 5)
+  // План: фиксированные + налоги (для безубыточности) — берём из настроек.
+  const fixedPlanCents =
+    financialSettings?.fixed.items
+      .filter((i) => !i.archived)
+      .reduce((acc, i) => acc + (i.amount_cents ?? 0), 0) ?? null
+  const taxesPlanCents =
+    financialSettings?.taxes.items
+      .filter((i) => !i.archived)
+      .reduce((acc, i) => acc + (i.amount_cents ?? 0), 0) ?? null
+  const breakEvenCents =
+    fixedPlanCents != null && taxesPlanCents != null ? fixedPlanCents + taxesPlanCents : null
 
-  // Donut: распределение по payment method (% от revenue). Используем
-  // effectiveReceivedFromVisit чтобы частичные поступления (paid_amount_cents
-  // < net) учитывались как реально пришедшие деньги, не как «должно прийти».
-  const paymentTotals = visits.reduce(
-    (acc, v) => {
-      acc[v.payment_method] = (acc[v.payment_method] ?? 0) + effectiveReceivedFromVisit(v)
-      return acc
-    },
-    {} as Record<PaymentMethod, number>,
-  )
-  const donutTotal = Object.values(paymentTotals).reduce((a, b) => a + b, 0)
-  const donutData: { name: string; pct: number; value: number; color: string }[] = (
-    ['cash', 'card', 'transfer'] as const
-  )
-    .filter((p) => (paymentTotals[p] ?? 0) > 0)
-    .map((p) => ({
-      name: t(`payment_methods.${p}`),
-      value: paymentTotals[p] ?? 0,
-      pct: donutTotal > 0 ? ((paymentTotals[p] ?? 0) / donutTotal) * 100 : 0,
-      color:
-        p === 'cash'
-          ? 'hsl(var(--brand-navy))'
-          : p === 'card'
-            ? 'hsl(var(--brand-teal))'
-            : 'hsl(var(--brand-sage))',
+  // Прогноз прибыли = текущий факт * (дней в месяце / дней прошло).
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const daysPassed = Math.max(1, now.getDate())
+  const profitForecastCents =
+    period === 'month' ? Math.round((profitCents * daysInMonth) / daysPassed) : null
+
+  // Сумма всех касс «сейчас».
+  const cashBalanceCents = registerBalances.reduce((acc, b) => acc + b.balance_cents, 0)
+
+  // MoM% выручки / прибыли.
+  const prevRevenueCents = prevKpis?.revenue_cents ?? null
+  const prevProfitCents = prevKpis?.profit_cents ?? null
+
+  // Средний чек = выручка / число оплаченных визитов.
+  const paidVisits = visits.filter((v) => v.status === 'paid')
+  const avgCheckCents =
+    paidVisits.length > 0
+      ? Math.round(
+          paidVisits.reduce((acc, v) => acc + effectiveReceivedFromVisit(v), 0) / paidVisits.length,
+        )
+      : null
+
+  // Отменённые записи % — visits.status='cancelled' / total.
+  const cancelledCount = visits.filter((v) => v.status === 'cancelled').length
+  const cancelledPct = visits.length > 0 ? (cancelledCount / visits.length) * 100 : null
+
+  // Расходы по категориям (group by category_id) — top 6.
+  const categoryById = new Map(expenseCategories.map((c) => [c.id, c.name]))
+  const expBucket = new Map<string, number>()
+  for (const e of expenses) {
+    const name = e.category_id ? (categoryById.get(e.category_id) ?? '—') : '—'
+    expBucket.set(name, (expBucket.get(name) ?? 0) + e.amount_cents)
+  }
+  const expenseRowColors = [
+    'hsl(var(--brand-navy))',
+    'hsl(var(--brand-teal))',
+    'hsl(var(--brand-sage))',
+    'hsl(var(--brand-gold))',
+    'hsl(var(--destructive))',
+    'hsl(var(--muted-foreground))',
+  ]
+  const expenseCats = Array.from(expBucket.entries())
+    .map(([name, amountCents], i) => ({
+      name,
+      amountCents,
+      color: expenseRowColors[i % expenseRowColors.length]!,
     }))
+    .sort((a, b) => b.amountCents - a.amountCents)
+    .slice(0, 6)
 
-  // top-services с margin-цветом (sage/gold/red). Если в services задана
-  // cost_cents — используем реальную маржу из RPC. Иначе fallback на share
-  // от лидера как proxy «крупности».
-  const maxServiceRev = Math.max(1, ...topServices.map((s) => s.revenue_cents))
+  // Daily revenue для sparkline.
+  const dailyRevenue = aggregateDailyRevenue(visits)
+
+  // Активные мастера.
+  const activeStaffCount = staff.filter((s) => s.is_active).length
+
+  // Топ мастеров (id+full_name из useStaff, revenue из top_staff).
+  const topStaffRows = topStaff.map((s) => ({
+    id: s.staff_id,
+    full_name: s.full_name,
+    revenueCents: s.revenue_cents,
+  }))
+
+  // Маржа.
+  const marginPct = revenueCents > 0 ? (profitCents / revenueCents) * 100 : null
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+    <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
       {/* Greeting */}
-      <header className="mb-5">
-        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('dashboard.greeting', { name: firstName || 'там' })} 👋
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {t(`dashboard.greeting_subtitle_${period}`, {
-            defaultValue: t('dashboard.greeting_subtitle_month'),
-          })}
-        </p>
+      <header className="mb-2 flex items-baseline justify-between gap-3">
+        <div>
+          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+            {t('dashboard.greeting', { name: firstName || 'там' })} 👋
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t(`dashboard.greeting_subtitle_${period}`, {
+              defaultValue: t('dashboard.greeting_subtitle_month'),
+            })}
+          </p>
+        </div>
       </header>
 
-      {isEmpty ? <DashboardEmpty /> : null}
+      {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
 
-      {/* Стартовый тур по приложению — показывается раз при первом
-          входе на дашборд. Юзер может перезапустить через /help → «Показать тур»,
-          который добавляет ?showTour=1 — этот query триггерит force=true. */}
+      {/* Стартовый тур */}
       <OnboardingTour salonId={salonId} force={params.get('showTour') === '1'} />
 
-      {/* Виджет «Заканчивается» — выше всех инсайтов, чтобы владелица сразу
-          видела нужно ли что-то закупить. Не показывается если всё ОК. */}
-      <LowStockWidget salonId={salonId} />
+      {/* Сворачиваемые блоки — единственное что осталось с прошлой версии */}
+      <CollapsibleSection
+        id="lowStock"
+        title={t('dashboard.collapsible.low_stock', { defaultValue: 'Заканчиваются материалы' })}
+        defaultOpen
+      >
+        <LowStockWidget salonId={salonId} />
+      </CollapsibleSection>
 
-      {/* AI-инсайты — до 3-х актуальных, генерируются weekly cron'ом */}
-      <InsightsWidget salonId={salonId} />
+      <CollapsibleSection
+        id="insights"
+        title={t('dashboard.collapsible.insights', { defaultValue: 'AI-помощник видит' })}
+        defaultOpen
+      >
+        <InsightsWidget salonId={salonId} />
+      </CollapsibleSection>
 
-      {/* Бенчмарки — сравнение с рынком, daily cron, k-anonymity ≥10 */}
-      <BenchmarksWidget salonId={salonId} currency={currency} />
+      {/* Блок 1 — 5 KPI */}
+      <KpiCardsRow
+        currency={currency}
+        revenueCents={revenueCents}
+        profitCents={profitCents}
+        expenseCents={expenseCents}
+        revenuePlanCents={null}
+        profitPlanCents={null}
+        breakEvenCents={breakEvenCents}
+        prevRevenueCents={prevRevenueCents}
+        prevProfitCents={prevProfitCents}
+        prevCashCents={null}
+        profitForecastCents={profitForecastCents}
+        occupancyPct={null}
+        prevOccupancyPct={null}
+        retentionPct={null}
+        prevRetentionPct={null}
+        newClients={null}
+        churnedClients={null}
+        cashBalanceCents={cashBalanceCents}
+        cashPlanCents={null}
+      />
 
-      {/* Cash on hand + прогноз + предстоящие визиты + мини-календарь
-          (по запросу e34d725d/1d40c533: календарь в правом верхнем углу с
-          popover'ом визитов на день при клике). */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_minmax(220px,1.1fr)]">
-        <CashBalanceWidget salonId={salonId} currency={currency} />
-        <ForecastWidget salonId={salonId} currency={currency} />
-        <UpcomingVisitsWidget salonId={salonId} />
-        <MiniCalendarWidget salonId={salonId} currency={currency} />
-      </div>
-
-      {/* bug d861eca4/db77effc + 4fc86f35 — Загрузка по дням/часам перенесена
-          с P&L на главный дашборд (запрос владельца). */}
-      <div className="mb-5">
-        <OccupancyHeatmapWidget salonId={salonId} />
-      </div>
-
-      {/* KPI row */}
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {kpisLoading ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard tall />
-          </>
-        ) : (
-          <>
-            <KpiCard
-              label={t('dashboard.kpi.revenue_label')}
-              valueCents={kpis?.revenue_cents ?? 0}
-              currency={currency}
-              variant="revenue"
-            />
-            <KpiCard
-              label={t('dashboard.kpi.expense_label')}
-              valueCents={kpis?.expense_cents ?? 0}
-              currency={currency}
-              variant="expense"
-            />
-            <KpiCard
-              label={t('dashboard.kpi.profit_label')}
-              valueCents={kpis?.profit_cents ?? 0}
-              currency={currency}
-              variant="profit"
-              sublabel={t('dashboard.kpi.profit_sublabel')}
-            />
-          </>
-        )}
-      </div>
-
-      {/* 2-col: master bars + donut */}
-      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Card>
-          <CardHeader
-            title={t('dashboard.master_bars.title')}
-            action={
-              <span className="text-muted-foreground text-xs">
-                {t('dashboard.master_bars.active_count', {
-                  count: staff.filter((s) => s.is_active).length,
-                })}
-              </span>
-            }
-          />
-          {topStaff.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t('dashboard.master_bars.empty')}</p>
-          ) : (
-            <div className="flex flex-col gap-3.5">
-              {topStaff.map((s, i) => {
-                const max = Math.max(1, ...topStaff.map((x) => x.revenue_cents))
-                const pct = (s.revenue_cents / max) * 100
-                const color = STAFF_PALETTE[i % STAFF_PALETTE.length]!
-                const avatarUrl = staff.find((st) => st.id === s.staff_id)?.avatar_url ?? null
-                return (
-                  <div key={s.staff_id}>
-                    <div className="mb-1.5 flex items-baseline justify-between">
-                      <span className="flex items-center gap-2.5">
-                        {avatarUrl ? (
-                          <img
-                            src={avatarUrl}
-                            alt=""
-                            loading="lazy"
-                            className="size-7 shrink-0 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span
-                            className="text-brand-navy grid size-7 place-items-center rounded-full text-xs font-bold"
-                            style={{ background: color }}
-                          >
-                            {s.full_name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                        <span className="text-foreground text-sm font-semibold">{s.full_name}</span>
-                      </span>
-                      <span className="num text-brand-navy text-[15px] font-bold">
-                        {formatCurrency(s.revenue_cents, currency)}
-                      </span>
-                    </div>
-                    <div className="bg-background h-2 overflow-hidden rounded-full">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background:
-                            'linear-gradient(90deg, hsl(var(--brand-teal)) 0%, hsl(var(--brand-teal-deep)) 100%)',
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader title={t('dashboard.payment_donut.title')} />
-          <PaymentDonut data={donutData} total={donutTotal} currency={currency} />
-        </Card>
-      </div>
-
-      {/* Top services row */}
-      <div className="mb-5">
-        <Card>
-          <CardHeader
-            title={t('dashboard.top_services.title')}
-            action={
-              <Link
-                to={`/${salonId}/reports`}
-                className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-              >
-                {t('dashboard.top_services.see_all')} <ArrowRight className="size-3.5" />
-              </Link>
-            }
-          />
-          {servicesLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-muted/60 h-24 animate-pulse rounded-md" />
-              ))}
-            </div>
-          ) : topServices.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t('dashboard.top_services.empty')}</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {topServices.map((s, i) => {
-                const share = (s.revenue_cents / maxServiceRev) * 100
-                // Реальная маржа когда задана cost_cents у услуги.
-                // sage ≥50% / gold 35–50% / red <35% (брендовая шкала).
-                // Fallback (cost не задан) — псевдо-маржа по share от лидера.
-                const dot =
-                  s.margin_pct != null
-                    ? s.margin_pct >= 50
-                      ? 'sage'
-                      : s.margin_pct >= 35
-                        ? 'gold'
-                        : 'red'
-                    : share > 70
-                      ? 'sage'
-                      : share > 40
-                        ? 'gold'
-                        : 'red'
-                const dotClass =
-                  dot === 'sage'
-                    ? 'bg-brand-sage'
-                    : dot === 'gold'
-                      ? 'bg-brand-gold'
-                      : 'bg-destructive'
-                return (
-                  <div
-                    key={s.service_id || i}
-                    className="border-border bg-card hover:border-secondary flex flex-col gap-1.5 rounded-md border p-3.5 transition-colors"
-                  >
-                    <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-semibold">
-                      <span className={cn('size-1.5 rounded-full', dotClass)} />
-                      {s.margin_pct != null
-                        ? t('dashboard.top_services.margin', { pct: Math.round(s.margin_pct) })
-                        : t('dashboard.top_services.share', { pct: Math.round(share) })}
-                    </div>
-                    <div className="text-foreground line-clamp-2 text-[14px] font-semibold">
-                      {s.service_name}
-                    </div>
-                    <div className="mt-auto flex items-baseline justify-between">
-                      <span className="num text-brand-navy text-base font-bold">
-                        {formatCurrency(s.revenue_cents, currency)}
-                      </span>
-                      <span className="text-brand-text-faint text-[11px]">
-                        {t('dashboard.top_services.visits', { count: s.visits_count })}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Recent visits */}
-      <Card noPadding>
-        <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
-          <h2 className="text-brand-navy text-base font-bold tracking-tight">
-            {t('dashboard.recent_visits.title')}
-          </h2>
-          <Link
-            to={`/${salonId}/visits`}
-            className="text-secondary text-sm font-semibold hover:underline"
-          >
-            {t('dashboard.recent_visits.show_all')} →
-          </Link>
-        </div>
-        {recentVisits.length === 0 ? (
-          <p className="text-muted-foreground px-5 py-12 text-center text-sm">
-            {t('dashboard.recent_visits.empty')}
-          </p>
-        ) : (
-          <ul>
-            {recentVisits.map((v) => {
-              const stf = staff.find((s) => s.id === v.staff_id)
-              const idx = staff.findIndex((s) => s.id === v.staff_id)
-              const color = idx >= 0 ? STAFF_PALETTE[idx % STAFF_PALETTE.length]! : '#E8E5DF'
-              const pay = PAY_PILL[v.payment_method]
-              return (
-                <li
-                  key={v.id}
-                  className="border-border grid grid-cols-[60px_1fr_auto_auto] items-center gap-3 border-t px-5 py-3 first:border-t-0 sm:grid-cols-[80px_1.4fr_2fr_120px_120px]"
-                >
-                  <span className="num text-muted-foreground text-xs">
-                    {formatVisitDate(v.visit_at)}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="text-brand-navy grid size-6 place-items-center rounded-full text-[10px] font-bold"
-                      style={{ background: color }}
-                    >
-                      {(stf?.full_name ?? '?').charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-foreground truncate text-sm">
-                      {stf?.full_name ?? '—'}
-                    </span>
-                  </span>
-                  <span className="text-foreground hidden truncate text-sm sm:inline">
-                    {v.service_name_snapshot ?? '—'}
-                  </span>
-                  <span className="num text-brand-sage justify-self-end text-sm font-bold">
-                    +{formatCurrency(v.amount_cents, currency)}
-                  </span>
-                  <span
-                    className="hidden rounded-full px-2.5 py-0.5 text-[11px] font-semibold sm:inline"
-                    style={{ background: pay.bg, color: pay.fg }}
-                  >
-                    {t(`payment_methods.${v.payment_method}`)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Card>
-    </div>
-  )
-}
-
-/* ------------ helpers ------------ */
-
-function Card({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
-  return (
-    <div
-      className={cn('border-border bg-card shadow-finsm rounded-lg border', noPadding ? '' : 'p-5')}
-    >
-      {children}
-    </div>
-  )
-}
-
-function CardHeader({ title, action }: { title: string; action?: React.ReactNode }) {
-  return (
-    <div className="mb-3 flex items-baseline justify-between gap-3">
-      <h2 className="text-brand-navy text-base font-bold tracking-tight">{title}</h2>
-      {action ?? null}
-    </div>
-  )
-}
-
-function SkeletonCard({ tall }: { tall?: boolean }) {
-  return (
-    <div
-      className={cn(
-        'border-border bg-card animate-pulse rounded-lg border',
-        tall ? 'h-[140px]' : 'h-[110px]',
-      )}
-    />
-  )
-}
-
-function KpiCard({
-  label,
-  valueCents,
-  currency,
-  variant,
-  sublabel,
-}: {
-  label: string
-  valueCents: number
-  currency: string
-  variant: 'revenue' | 'expense' | 'profit'
-  sublabel?: string
-}) {
-  const isProfit = variant === 'profit'
-  const isExpense = variant === 'expense'
-  const sign = isExpense ? '−' : ''
-  return (
-    <div
-      className={cn(
-        'shadow-finsm relative overflow-hidden rounded-lg p-5',
-        isProfit ? 'bg-primary text-primary-foreground' : 'border-border bg-card border',
-      )}
-    >
-      {isProfit ? (
-        <div
-          className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full"
-          style={{
-            background: 'radial-gradient(circle, rgba(46,158,107,0.18) 0%, transparent 70%)',
-          }}
-          aria-hidden
+      {/* Блок 2 — Клиенты + Мастера */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <ClientsSection
+          currency={currency}
+          visitsCount={visitsCount}
+          visitsMomPct={
+            prevKpis?.visits_count
+              ? ((visitsCount - prevKpis.visits_count) / prevKpis.visits_count) * 100
+              : null
+          }
+          newClientsCount={null}
+          newClientsMomPct={null}
+          regularClientsCount={null}
+          avgCheckCents={avgCheckCents}
+          onlineBookingsPct={null}
+          cancelledPct={cancelledPct}
+          sources={[]}
         />
-      ) : null}
-      <div
-        className={cn(
-          'text-xs font-semibold',
-          isProfit ? 'uppercase tracking-wider text-white/65' : 'text-muted-foreground',
-        )}
-      >
-        {label}
+        <MastersSection
+          activeCount={activeStaffCount}
+          totalCount={staff.length}
+          avgLoadPct={null}
+          loadPlanPct={null}
+          top={topStaffRows}
+          currency={currency}
+          avgRating={null}
+          reviewsCount={null}
+          noShowsCount={null}
+        />
       </div>
-      <div
-        className={cn(
-          'num mt-2 font-bold tracking-tight',
-          isProfit ? 'text-[44px] leading-none' : 'text-[34px] leading-none',
-          !isProfit && (isExpense ? 'text-destructive' : 'text-brand-sage'),
-        )}
-      >
-        {sign}
-        {formatCurrency(Math.abs(valueCents), currency)}
+
+      {/* Блок 3 — Расходы + Финансы */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <ExpensesSection
+          currency={currency}
+          totalCents={expenseCents}
+          planCents={fixedPlanCents != null ? fixedPlanCents + (taxesPlanCents ?? 0) : null}
+          categories={expenseCats}
+        />
+        <FinancesSection
+          currency={currency}
+          revenueCents={revenueCents}
+          profitCents={profitCents}
+          marginPct={marginPct}
+          revenueMomPct={
+            prevRevenueCents != null && prevRevenueCents !== 0
+              ? ((revenueCents - prevRevenueCents) / Math.abs(prevRevenueCents)) * 100
+              : null
+          }
+          dailyRevenue={dailyRevenue}
+          revenueByCategory={[]}
+        />
       </div>
-      {sublabel ? (
-        <div
-          className={cn(
-            'mt-3 flex items-center gap-2 text-xs',
-            isProfit ? 'text-white/70' : 'text-muted-foreground',
-          )}
-        >
-          <span>{sublabel}</span>
-          {isProfit && valueCents > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(46,158,107,0.22)] px-2 py-0.5 text-[10px] font-bold text-[#7ED9A8]">
-              <TrendingUp className="size-3" strokeWidth={2.5} />+
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+
+      {/* Блок 4 — Запись и операции */}
+      <OperationsSection
+        todayAppointments={null}
+        waitlistCount={null}
+        materialsStockPct={null}
+        freeSlotsCount={null}
+        totalSlotsCount={null}
+      />
+
+      {/* Блок 5 — Маркетинг */}
+      <MarketingSection
+        currency={currency}
+        sources={[]}
+        cacByChannel={[]}
+        avgCacCents={null}
+        rfm={[]}
+        totalClients={null}
+        activeClients={null}
+        needsReactivation={null}
+      />
     </div>
   )
 }
 
-function PaymentDonut({
-  data,
-  total,
-  currency,
-}: {
-  data: { name: string; pct: number; value: number; color: string }[]
-  total: number
-  currency: string
-}) {
-  const { t } = useTranslation()
-  if (data.length === 0) {
-    return <p className="text-muted-foreground text-sm">{t('dashboard.payment_donut.empty')}</p>
-  }
-  const R = 70
-  const C = 2 * Math.PI * R
-  let offset = 0
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative">
-        <svg width="180" height="180" viewBox="0 0 180 180" style={{ transform: 'rotate(-90deg)' }}>
-          <circle
-            cx="90"
-            cy="90"
-            r={R}
-            fill="none"
-            stroke="hsl(var(--background))"
-            strokeWidth={20}
-          />
-          {data.map((d) => {
-            const len = (d.pct / 100) * C
-            const dash = `${len} ${C - len}`
-            const seg = (
-              <circle
-                key={d.name}
-                cx={90}
-                cy={90}
-                r={R}
-                fill="none"
-                stroke={d.color}
-                strokeWidth={20}
-                strokeDasharray={dash}
-                strokeDashoffset={-offset}
-              />
-            )
-            offset += len
-            return seg
-          })}
-        </svg>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-muted-foreground text-[11px] font-semibold">
-            {t('dashboard.payment_donut.total')}
-          </div>
-          <div className="num text-brand-navy text-xl font-bold tracking-tight">
-            {formatCurrency(total, currency)}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex w-full flex-col gap-2">
-        {data.map((d) => (
-          <div key={d.name} className="flex items-center gap-2.5 text-sm">
-            <span className="size-2.5 rounded-sm" style={{ background: d.color }} />
-            <span className="text-foreground flex-1">{d.name}</span>
-            <span className="num text-brand-navy font-bold">{Math.round(d.pct)}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+// ─── Empty state ───────────────────────────────────────────────────────────
 
 function DashboardEmpty() {
   const { t } = useTranslation()
@@ -601,7 +348,7 @@ function DashboardEmpty() {
   }
 
   return (
-    <div className="border-border bg-card mb-5 rounded-lg border border-dashed px-6 py-10 text-center">
+    <div className="border-border bg-card mb-3 rounded-lg border border-dashed px-6 py-10 text-center">
       <h2 className="text-brand-navy text-xl font-bold tracking-tight">
         {t('dashboard.empty.title')}
       </h2>

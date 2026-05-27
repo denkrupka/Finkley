@@ -101,19 +101,28 @@ export function useMySalons() {
 /**
  * Роль текущего юзера в салоне (owner/admin/staff). Используется для
  * условного рендера UI редактирования (только owner/admin).
+ *
+ * T30/T35 — также возвращает permissions матрицу из salon_members.permissions.
+ * Структура: { "income.visits": "edit", "settings.*": "view", ... }
+ * NULL = preset по роли (см. PermissionsBlock.presetForRole).
  */
 export function useSalonMembership(salonId: string | undefined) {
-  return useQuery<{ role: string } | null>({
+  return useQuery<{ role: string; permissions: Record<string, 'view' | 'edit'> | null } | null>({
     queryKey: ['salon-membership', salonId],
     queryFn: async () => {
       if (!salonId) return null
       const { data, error } = await supabase
         .from('salon_members')
-        .select('role')
+        .select('role, permissions')
         .eq('salon_id', salonId)
         .maybeSingle()
       if (error) throw error
-      return (data as { role: string } | null) ?? null
+      return (
+        (data as {
+          role: string
+          permissions: Record<string, 'view' | 'edit'> | null
+        } | null) ?? null
+      )
     },
     enabled: !!salonId,
     staleTime: 5 * 60_000,

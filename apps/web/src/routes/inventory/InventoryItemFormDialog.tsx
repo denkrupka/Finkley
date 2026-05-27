@@ -150,7 +150,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="w-[min(820px,96vw)] max-w-none">
+      <DialogContent className="w-[min(960px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? t('inventory.form.title_edit') : t('inventory.form.title_new')}
@@ -331,6 +331,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 value={minStock}
                 onChange={(e) => setMinStock(e.target.value)}
               />
+              <p className="text-muted-foreground text-xs">{t('inventory.form.min_hint')}</p>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inv-cost">

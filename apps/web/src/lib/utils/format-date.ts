@@ -26,15 +26,26 @@ export function formatVisitDayHeading(iso: string): string {
 }
 
 /**
- * YYYY-MM-DD → 12.05 для display в expenses
+ * YYYY-MM-DD → 12.05 для display в expenses.
+ *
+ * Принимает:
+ *  • 'YYYY-MM-DD' (date-only) — берётся как есть (expenses.expense_at).
+ *  • ISO timestamp 'YYYY-MM-DDTHH:mm:ss.sssZ' — конвертируется в локальную
+ *    дату через new Date(). Это важно для bank_transactions.executed_at: UTC-
+ *    timestamp '2026-04-30T22:00:00Z' в Europe/Warsaw = 1 мая 00:00, и должен
+ *    показаться как 01.05, а не 30.04 (bug: при slice(0,10) терялся TZ-сдвиг,
+ *    из-за чего апрельские в UTC транзакции отображались под маем).
  */
 export function formatExpenseDate(date: string): string {
-  // Принимает 'YYYY-MM-DD' (expenses.expense_at — date-only) ИЛИ ISO
-  // timestamp 'YYYY-MM-DDTHH:mm:ss.sssZ' (bank_transactions.executed_at —
-  // timestamptz). Без slice(0,10) split('-') на остатке "DDT..." даёт NaN
-  // в позиции [2] и в UI появляется «NaN.05».
-  const dateOnly = date.length > 10 ? date.slice(0, 10) : date
-  const [, m, d] = dateOnly.split('-').map(Number)
+  if (date.length === 10) {
+    // date-only, без TZ
+    const [, m, d] = date.split('-').map(Number)
+    return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
+  }
+  const dt = new Date(date)
+  if (Number.isNaN(dt.getTime())) return ''
+  const m = dt.getMonth() + 1
+  const d = dt.getDate()
   return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
 }
 

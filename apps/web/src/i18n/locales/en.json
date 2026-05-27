@@ -60,7 +60,8 @@
     "search": "Search",
     "add": "Add",
     "archive": "Archive",
-    "restore": "Restore"
+    "restore": "Restore",
+    "back_home": "Back to home"
   },
   "auth": {
     "or": "or",
@@ -928,6 +929,27 @@
       "title": "Relaunch the tour",
       "subtitle": "Walk through the intro tour again — 5 steps on key features.",
       "button": "Show tour"
+    },
+    "tours": {
+      "section_title": "Guides and learning",
+      "section_subtitle": "Short tours through key sections. You can relaunch them anytime — they'll show highlights and explanations again.",
+      "relaunch": "Show again →",
+      "onboarding": {
+        "title": "Intro tour",
+        "body": "Main portal features: navigation, adding a visit, inventory, notifications, integrations. Highlights key buttons right on the screen."
+      },
+      "expenses": {
+        "title": "Expenses tour",
+        "body": "Paid / Unpaid / Banking tabs, receipt OCR, bank auto-import, auto-commissions for payments."
+      },
+      "finance": {
+        "title": "Finance tour",
+        "body": "P&L report with plan/actual, payment calendar, cash registers and shifts, fund transfers between registers."
+      },
+      "inventory": {
+        "title": "Inventory tour",
+        "body": "Materials catalog, 'running low' notification threshold, purchases/write-offs, stocktake."
+      }
     }
   },
   "ai": {
@@ -2180,9 +2202,21 @@
   },
   "notifications": {
     "title": "Notifications",
+    "page_title": "Notifications",
+    "page_subtitle": "Full history of in-app notifications.",
     "aria_label": "Notifications",
     "count": "{{count}} in feed",
     "empty": "All quiet — no new events",
+    "see_all": "See all",
+    "mark_all_read": "Mark all read",
+    "mark_all_read_short": "All",
+    "records": "{{n}} records",
+    "filter": {
+      "all_types": "All types",
+      "all_status": "All",
+      "unread": "Unread",
+      "read": "Read"
+    },
     "overdue": {
       "title": "{{name}} — time to reach out",
       "body_today": "A visit is scheduled today. Remind the client.",
@@ -2193,6 +2227,34 @@
     "budget": {
       "title": "Budget exceeded for \"{{name}}\"",
       "body": "Already at {{pct}}% of the limit this month."
+    }
+  },
+  "notif": {
+    "generic": "🔔 Notification",
+    "low_inv_title": "⚠️ Running low on supplies",
+    "low_inv_desc": "{{n}} items below minimum",
+    "payment_overdue": "🔴 Payment overdue",
+    "payment_due_today": "⏰ Payment due today",
+    "payment_due_1d": "⏰ Payment due tomorrow",
+    "payment_due_2d": "🗓 Payment in 2 days",
+    "booksy_title": "📅 Booksy import: +{{n}} visits",
+    "conflict_title": "⚠️ Calendar conflict",
+    "conflict_desc": "{{n}} double bookings",
+    "messenger_title": "💬 Message from {{sender}}",
+    "weekly_digest": "📊 Weekly digest ready",
+    "daily_digest": "📊 Daily summary ready",
+    "type": {
+      "ai_insights": "AI insights",
+      "low_inventory": "Low stock",
+      "payment_due_2d": "Payment in 2 days",
+      "payment_due_1d": "Payment tomorrow",
+      "payment_due_today": "Payment today",
+      "payment_overdue": "Overdue payment",
+      "booksy_new_visits": "New Booksy visits",
+      "calendar_conflicts": "Calendar conflicts",
+      "messenger_new_message": "Messenger messages",
+      "weekly_digest": "Weekly digest",
+      "daily_digest": "Daily summary"
     }
   },
   "integrations": {
@@ -4210,6 +4272,10 @@
         "title": "Welcome to Finkley 👋",
         "body": "This is a short tour of the main features — it'll take 1 minute.\n\nI'll show where everything is and how to quickly add first data."
       },
+      "nav": {
+        "title": "Left panel — navigation",
+        "body": "All portal sections: Dashboard, Income, Expenses, Reports, Finance, Inventory, Marketing, Messenger, AI and Settings.\n\nCollapse button near the logo — leaves only icons and frees up space."
+      },
       "visit": {
         "title": "Record a visit",
         "body": "Hit the blue '+' button bottom-right to open new visit form.\n\nPick date, master, service and amount — visit will instantly fall into revenue and 'Visits' section.",
@@ -4228,10 +4294,83 @@
         "title": "Calendar and free slots",
         "body": "On dashboard top-right — mini-calendar with colored dots: days with visits. Click on day → details.\n\nOn 'Visits' page on top the 'Free slots' panel expands — see when each master is free for next 7 days."
       },
+      "notifications": {
+        "title": "Bell — notifications",
+        "body": "Badge shows unread. Click to see latest events: low inventory, overdue payments, AI insights, messenger messages.\n\nChannels (Email / Telegram / SMS) configured in Settings → Notifications → Types."
+      },
       "integrations": {
         "title": "Integrations",
         "body": "In Settings → Integrations you can connect:\n- Booksy (visits import)\n- wFirma (invoice export)\n- Bank (auto-import expenses via PSD2)\n\nEvery bank import automatically creates a row in Expenses.",
         "cta": "Open Integrations"
+      },
+      "team": {
+        "title": "Team and access",
+        "body": "Invite masters, admins and accountant by email. Each gets a permissions matrix: what they see, what they can edit.\n\nMaster sees only own visits and own profile — other salon data is hidden.",
+        "cta": "Open team"
+      }
+    },
+    "page": {
+      "expenses": {
+        "tabs": {
+          "title": "Three expense tabs",
+          "body": "'Paid' — money actually spent.\n'Unpaid' — scheduled payments by invoices with reminders.\n'Banking' — all bank transactions; counter shows unlinked."
+        },
+        "add": {
+          "title": "Add expense",
+          "body": "'+ Expense' button top-right. Supports receipt photo (OCR auto-recognizes amount, date, counterparty), linking to wFirma/KSeF invoice and linking to bank transaction."
+        },
+        "banking": {
+          "title": "Bank auto-import",
+          "body": "Connect bank via PSD2 in Settings → Integrations. Transactions arrive automatically, counterparty extracted by AI, duplicates filtered out.\n\n'Link' click on a transaction = quick expense creation."
+        },
+        "ocr": {
+          "title": "Receipt OCR",
+          "body": "Attach a receipt photo to expense — Finkley recognizes: amount, date, counterparty, NIP, VAT breakdown. Works with Polish and Ukrainian receipts."
+        },
+        "commissions": {
+          "title": "Auto-commissions",
+          "body": "If Settings → Payment Methods specifies a commission % — when a visit is paid, an auto-expense in 'Commissions' category is created. Pinned as first row; click opens breakdown."
+        }
+      },
+      "finance": {
+        "tabs": {
+          "title": "5 Finance tabs",
+          "body": "P&L — revenue, expenses, profit for period.\nProfit report — plan/actual by month.\nPayments — calendar of upcoming and overdue.\nCash — shift accounting (if enabled).\nFund transfers — between cash registers."
+        },
+        "pnl": {
+          "title": "P&L report",
+          "body": "Financial report with dynamic month columns based on selected period. Clicking 'total' opens drill-down by days.\n\nFullscreen button — stretches table to full screen."
+        },
+        "payments": {
+          "title": "Payment calendar",
+          "body": "All upcoming payments: invoices, rent, taxes, ZUS. Colored indicators: yellow — in 2 days, orange — tomorrow, red — overdue.\n\nNotifications — Email/Telegram/SMS via channel matrix."
+        },
+        "cash": {
+          "title": "Cash registers and shifts",
+          "body": "If 'Cash' enabled in Settings → each day open and close a shift, fix opening and closing balance.\n\nRegisters stored in Finance → Cash (Director's till / Cash / Account / Adjustments)."
+        },
+        "transfers": {
+          "title": "Fund transfers",
+          "body": "Transfers between registers don't affect income/expenses. History with filters + separate modal flow.\n\n'Adjustments' register — balances plan vs actual mismatches (change rounding, shortages)."
+        }
+      },
+      "inventory": {
+        "list": {
+          "title": "Materials catalog",
+          "body": "All inventory items with search, filters by category and supplier. Color indicator: green → normal, yellow → below minimum, red → 0."
+        },
+        "threshold": {
+          "title": "Notification threshold",
+          "body": "In material card field 'Notify when stock ≤' — when stock drops to this number, item appears on home page in 'Running low' block + notification sent via selected channels."
+        },
+        "purchase": {
+          "title": "Purchase / Write-off",
+          "body": "Buttons in material card: 'Purchase' (plus to stock), 'Adjustment' (exact amount), 'Write-off' (minus). Each movement saved in history."
+        },
+        "stocktake": {
+          "title": "Stocktake",
+          "body": "Once a month you can do full stocktake — Finkley compares actual vs system balances and highlights discrepancies."
+        }
       }
     }
   },

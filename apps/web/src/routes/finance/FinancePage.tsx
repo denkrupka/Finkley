@@ -9,6 +9,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
+import { PageTour } from '@/components/onboarding-tour/PageTour'
+import { FINANCE_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { useSalon } from '@/hooks/useSalons'
 import { ReportsPage } from '@/routes/reports/ReportsPage'
@@ -83,6 +85,8 @@ export function FinancePage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+      {/* T46 — per-page mini-tour: P&L / Платежи / Касса / Перестановка средств. */}
+      <PageTour name="finance" steps={FINANCE_TOUR_STEPS} force={params.get('tour') === '1'} />
       {/* Image #62: header «P&L, ДДС, счета на оплату» убран — он дублировал
           навигацию sidebar'а и съедал место когда у Финансов 5 табов. */}
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />

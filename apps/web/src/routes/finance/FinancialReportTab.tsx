@@ -1,4 +1,4 @@
-import { endOfMonth, format, startOfMonth, startOfYear } from 'date-fns'
+import { format, startOfMonth } from 'date-fns'
 import {
   BarChart3,
   ChevronDown,
@@ -13,6 +13,13 @@ import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import {
+  buildMonthCols,
+  periodToRange,
+  type MonthCol,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { getDateLocale } from '@/lib/utils/format-date'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import {
@@ -22,7 +29,7 @@ import {
   type FinancialSettings,
   type ParameterItem,
 } from '@/hooks/useFinancialSettings'
-import { useMonthlyRegisterBalances } from '@/hooks/useCashTransfers'
+import { useRegisterBalancesAtMonthEnds } from '@/hooks/useCashTransfers'
 import { useInventoryItems } from '@/hooks/useInventory'
 import {
   effectiveReceivedFromOtherIncome,
@@ -53,29 +60,41 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const currency = salon?.currency ?? 'PLN'
   const { data: settings = DEFAULT_FINANCIAL_SETTINGS } = useFinancialSettings(salonId)
 
-  // bug 2783fa9e — выбор года в шапке. Полный period-picker с динамической
-  // разбивкой (день/неделя/месяц) — большой рефакторинг (вся таблица
-  // hardcoded под 12 месяцев). Сейчас отдаём year-selector — основной
-  // кейс «посмотреть прошлый год vs текущий».
+  // bug 2783fa9e — выбор периода (универсальный PeriodPickerPopover вместо
+  // year-select). Таблица адаптируется под набор месяцев в диапазоне: 1 месяц
+  // → 1 колонка + Итого; year → 12 колонок; range на 2 года → все месяцы.
   const currentYear = new Date().getFullYear()
-  const [year, setYear] = useState<number>(currentYear)
-  const yearStart = useMemo(() => startOfYear(new Date(year, 0, 1)), [year])
-  const yearEnd = useMemo(() => endOfMonth(new Date(year, 11, 31)), [year])
+  const [period, setPeriod] = useState<PeriodValue>(() => ({ kind: 'year', year: currentYear }))
+  const range = useMemo(() => periodToRange(period), [period])
+  const monthCols = useMemo(() => buildMonthCols(range.start, range.end), [range.start, range.end])
+  const colCount = monthCols.length
+
+  // Индекс в monthCols по (year, monthIdx). Используется для bucket-агрегации
+  // визитов/расходов/доходов в колонки таблицы.
+  const monthColIndex = useMemo(() => {
+    const m = new Map<string, number>()
+    monthCols.forEach((c, i) => m.set(`${c.year}-${c.monthIdx}`, i))
+    return m
+  }, [monthCols])
+
   const visitsRange = useMemo(
-    () => ({ start: yearStart.toISOString(), end: yearEnd.toISOString() }),
-    [yearStart, yearEnd],
+    () => ({ start: range.start.toISOString(), end: range.end.toISOString() }),
+    [range.start, range.end],
   )
   const expensesRange = useMemo(
     () => ({
-      start: format(yearStart, 'yyyy-MM-dd'),
-      end: format(yearEnd, 'yyyy-MM-dd'),
+      start: format(range.start, 'yyyy-MM-dd'),
+      end: format(range.end, 'yyyy-MM-dd'),
     }),
-    [yearStart, yearEnd],
+    [range.start, range.end],
   )
 
   const { data: visits = [] } = useVisits(salonId, visitsRange, { kind: 'visit' })
   const { data: retailSales = [] } = useVisits(salonId, visitsRange, { kind: 'retail' })
-  const { data: otherIncomes = [] } = useOtherIncomes(salonId, { start: yearStart, end: yearEnd })
+  const { data: otherIncomes = [] } = useOtherIncomes(salonId, {
+    start: range.start,
+    end: range.end,
+  })
   const { data: expenses = [] } = useExpenses(salonId, expensesRange)
   const { data: scheduledPayments = [] } = useScheduledPayments(salonId)
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
@@ -83,7 +102,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: otherIncomeCats = [] } = useOtherIncomeCategories(salonId, {
     includeArchived: true,
   })
-  const { data: monthlyRegBalances } = useMonthlyRegisterBalances(salonId, year)
+  const { data: monthlyRegBalances } = useRegisterBalancesAtMonthEnds(salonId, monthCols)
 
   // Семантика двух колонок (запрос юзера 21.05):
   //   План = ВСЕ записи периода (paid + pending визиты, expenses + scheduled).
@@ -91,7 +110,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   //          — таблица содержит только paid, scheduled НЕ учитываем).
   const monthly = useMemo(() => {
     const make = () =>
-      Array.from({ length: 12 }, () => ({
+      Array.from({ length: colCount }, () => ({
         visitsRevenue: 0,
         retailRevenue: 0,
         otherIncome: 0,
@@ -99,10 +118,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       }))
     const plan = make()
     const fact = make()
+    const getIdx = (d: Date): number =>
+      monthColIndex.get(`${d.getFullYear()}-${d.getMonth()}`) ?? -1
     for (const v of visits) {
-      const d = new Date(v.visit_at)
-      if (d.getFullYear() !== year) continue
-      const m = d.getMonth()
+      const m = getIdx(new Date(v.visit_at))
+      if (m < 0) continue
       // Plan = полная сумма (что должно прийти), Fact = effective (учёт
       // частичных поступлений через paid_amount_cents).
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
@@ -110,44 +130,52 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       if (v.status === 'paid') fact[m]!.visitsRevenue += effectiveReceivedFromVisit(v)
     }
     for (const v of retailSales) {
-      const d = new Date(v.visit_at)
-      if (d.getFullYear() !== year) continue
-      const m = d.getMonth()
+      const m = getIdx(new Date(v.visit_at))
+      if (m < 0) continue
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
       plan[m]!.retailRevenue += planAmt
       if (v.status === 'paid') fact[m]!.retailRevenue += effectiveReceivedFromVisit(v)
     }
     for (const oi of otherIncomes) {
-      const d = new Date(oi.income_at)
-      if (d.getFullYear() !== year) continue
-      plan[d.getMonth()]!.otherIncome += oi.amount_cents
-      fact[d.getMonth()]!.otherIncome += effectiveReceivedFromOtherIncome(oi)
+      const m = getIdx(new Date(oi.income_at))
+      if (m < 0) continue
+      plan[m]!.otherIncome += oi.amount_cents
+      fact[m]!.otherIncome += effectiveReceivedFromOtherIncome(oi)
     }
     for (const e of expenses) {
-      const d = new Date(e.expense_at)
-      if (d.getFullYear() !== year) continue
+      const m = getIdx(new Date(e.expense_at))
+      if (m < 0) continue
       // bug e007ea97/7a84bd6f — fact-колонка считается из реестра расходов
       // (e.amount_cents). Plan на этой строке НЕ инкрементируем: для plan
       // используются scheduled_payments (запланированные) + items из
       // settings.fixed/variable/taxes (см. ниже buildFixedRows и т.д.).
-      fact[d.getMonth()]!.expensesTotal += e.amount_cents
+      fact[m]!.expensesTotal += e.amount_cents
     }
     for (const sp of scheduledPayments) {
       if (sp.status === 'paid') continue // уже учтено через paid_expense_id
-      const d = new Date(sp.due_date)
-      if (d.getFullYear() !== year) continue
-      plan[d.getMonth()]!.expensesTotal += sp.amount_cents
+      const m = getIdx(new Date(sp.due_date))
+      if (m < 0) continue
+      plan[m]!.expensesTotal += sp.amount_cents
     }
     // bug c19e8ab6 — план должен также включать постоянные статьи бюджета
     // (settings.fixed/variable/taxes) — это «ожидаемые ежемесячные расходы».
     const monthlyBudgetCents = sumFixedCents(settings) + sumTaxesCents(settings)
     if (monthlyBudgetCents > 0) {
-      for (let m = 0; m < 12; m++) {
+      for (let m = 0; m < colCount; m++) {
         plan[m]!.expensesTotal += monthlyBudgetCents
       }
     }
     return { plan, fact }
-  }, [visits, retailSales, otherIncomes, expenses, scheduledPayments, year, settings])
+  }, [
+    visits,
+    retailSales,
+    otherIncomes,
+    expenses,
+    scheduledPayments,
+    settings,
+    colCount,
+    monthColIndex,
+  ])
 
   const factByLabel = useMemo<Map<string, number[]>>(() => {
     const catNameById = new Map<string, string>()
@@ -158,16 +186,17 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       const name = catNameById.get(e.category_id)
       if (!name) continue
       const d = new Date(e.expense_at)
-      if (d.getFullYear() !== year) continue
-      const arr = map.get(name) ?? Array.from({ length: 12 }, () => 0)
-      arr[d.getMonth()]! += e.amount_cents
+      const idx = monthColIndex.get(`${d.getFullYear()}-${d.getMonth()}`)
+      if (idx == null) continue
+      const arr = map.get(name) ?? Array.from({ length: colCount }, () => 0)
+      arr[idx]! += e.amount_cents
       map.set(name, arr)
     }
     return map
-  }, [expenses, expenseCategories, year])
+  }, [expenses, expenseCategories, colCount, monthColIndex])
 
   function factsForLabel(label: string): number[] {
-    return factByLabel.get(normName(label)) ?? Array.from({ length: 12 }, () => 0)
+    return factByLabel.get(normName(label)) ?? Array.from({ length: colCount }, () => 0)
   }
 
   // Категории расходов которые НЕ matched в settings.fixed/variable/taxes —
@@ -202,7 +231,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     const map = new Map<string, number[]>()
     for (const v of retailSales) {
       const d = new Date(v.visit_at)
-      if (d.getFullYear() !== year) continue
+      const idx = monthColIndex.get(`${d.getFullYear()}-${d.getMonth()}`)
+      if (idx == null) continue
       // 1. Сначала по inventory_item_id (новые продажи после миграции).
       // 2. Fallback — по service_name_snapshot (старые продажи или «ручные
       //    позиции», где пользователь ввёл название вручную, не выбирая со
@@ -216,25 +246,26 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         cat = invCatByName.get(normName(base)) ?? ''
       }
       const key = cat.trim() || t('finance.report.uncategorized')
-      const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
-      arr[d.getMonth()]! += effectiveReceivedFromVisit(v)
+      const arr = map.get(key) ?? Array.from({ length: colCount }, () => 0)
+      arr[idx]! += effectiveReceivedFromVisit(v)
       map.set(key, arr)
     }
     return map
-  }, [retailSales, inventory, year, t])
+  }, [retailSales, inventory, colCount, monthColIndex, t])
 
   const otherIncomesByCategory = useMemo<Map<string, number[]>>(() => {
     const map = new Map<string, number[]>()
     for (const oi of otherIncomes) {
       const d = new Date(oi.income_at)
-      if (d.getFullYear() !== year) continue
+      const idx = monthColIndex.get(`${d.getFullYear()}-${d.getMonth()}`)
+      if (idx == null) continue
       const key = oi.category_id ?? '__none__'
-      const arr = map.get(key) ?? Array.from({ length: 12 }, () => 0)
-      arr[d.getMonth()]! += effectiveReceivedFromOtherIncome(oi)
+      const arr = map.get(key) ?? Array.from({ length: colCount }, () => 0)
+      arr[idx]! += effectiveReceivedFromOtherIncome(oi)
       map.set(key, arr)
     }
     return map
-  }, [otherIncomes, year])
+  }, [otherIncomes, colCount, monthColIndex])
 
   // bug 3a000612 — fullscreen toggle для отчёта (юзеру удобнее смотреть
   // широкую таблицу на весь viewport, без sidebar/header).
@@ -277,11 +308,12 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const investmentsTotal = sumInvestmentsCents(settings)
   const flowsTotalMonthly = sumFlowsCents(settings)
 
-  const months = Array.from({ length: 12 }, (_, i) => i)
-  const currentMonthIdx = new Date().getMonth()
+  // Индекс текущего календарного месяца в monthCols (-1 если не входит в период).
+  const now = new Date()
+  const currentMonthIdx = monthColIndex.get(`${now.getFullYear()}-${now.getMonth()}`) ?? -1
 
   function constant(value: number) {
-    return months.map(() => value)
+    return Array.from({ length: colCount }, () => value)
   }
   function variablePctOfRevenue(pct: number) {
     // % от выручки считаем от ПЛАНОВОЙ (все визиты), а fact = от реальной paid.
@@ -313,11 +345,14 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
   const fixedByMonth = constant(fixedTotalMonthly)
   const taxesByMonth = constant(taxesTotalMonthly)
-  const expensesTotalByMonth = months.map(
-    (i) => (variableByMonth[i] ?? 0) + (fixedByMonth[i] ?? 0) + (taxesByMonth[i] ?? 0),
+  const expensesTotalByMonth = Array.from(
+    { length: colCount },
+    (_, i) => (variableByMonth[i] ?? 0) + (fixedByMonth[i] ?? 0) + (taxesByMonth[i] ?? 0),
   )
 
-  const investmentsByMonth = months.map((m) => (m === currentMonthIdx ? investmentsTotal : 0))
+  const investmentsByMonth = Array.from({ length: colCount }, (_, i) =>
+    i === currentMonthIdx ? investmentsTotal : 0,
+  )
   const flowsByMonth = constant(flowsTotalMonthly)
 
   const periodSaldoByMonth = revenueByMonth.map(
@@ -485,6 +520,24 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'financing',
     })),
 
+    // T6 — строка «Корректировки» (баланс системной кассы Корректировки
+    // на конец каждого месяца). Не складывается с Сальдо за период —
+    // информационная: показывает текущее накопление расхождений.
+    ...(() => {
+      const adj = settings.cash_registers.items.find((i) => i.preset_key === 'adjustments')
+      if (!adj) return []
+      const balances = monthlyRegBalances.get(adj.id) ?? Array.from({ length: colCount }, () => 0)
+      return [
+        {
+          label: t('finance.report.adjustments', { defaultValue: 'Корректировки' }) as string,
+          values: balances,
+          factValues: balances,
+          bold: true,
+          color: 'navy' as RowColor,
+        },
+      ]
+    })(),
+
     {
       label: t('finance.report.period_saldo'),
       values: periodSaldoByMonth,
@@ -506,6 +559,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     runningEndOfMonth,
     periodSaldoByMonth,
     inventory,
+    colCount,
   )
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
@@ -514,8 +568,8 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     const headers = [
       t('finance.report.col_row'),
       t('finance.report.col_total'),
-      ...months.map((m) =>
-        format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() }),
+      ...monthCols.map((c) =>
+        format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', { locale: getDateLocale() }),
       ),
     ]
     const lines = [headers.join(';')]
@@ -530,7 +584,13 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `financial-report-${year}.csv`
+    const firstCol = monthCols[0]
+    const lastCol = monthCols[monthCols.length - 1]
+    const fname =
+      firstCol && lastCol
+        ? `financial-report-${firstCol.key}_${lastCol.key}.csv`
+        : `financial-report.csv`
+    a.download = fname
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -556,27 +616,31 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           <p className="mt-1 text-sm text-slate-500">{t('finance.report.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
-          {/* bug 2783fa9e — выбор года */}
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="border-border bg-card text-foreground h-10 rounded-md border px-3 text-sm font-medium"
+          {/* bug 2783fa9e — универсальный PeriodPickerPopover (как везде).
+              Таблица адаптируется под выбранный период автоматически: 1 месяц
+              = 1 колонка + Итого, год = 12 колонок, range = столько колонок,
+              сколько месяцев в диапазоне. */}
+          <PeriodPickerPopover value={period} onChange={setPeriod} />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setFullscreen((v) => !v)}
+            aria-label={
+              fullscreen
+                ? t('finance.report.exit_fullscreen', { defaultValue: 'Свернуть' })
+                : t('finance.report.fullscreen', { defaultValue: 'На весь экран' })
+            }
+            title={
+              fullscreen
+                ? t('finance.report.exit_fullscreen', { defaultValue: 'Свернуть' })
+                : t('finance.report.fullscreen', { defaultValue: 'На весь экран' })
+            }
           >
-            {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <Button variant="outline" size="md" onClick={() => setFullscreen((v) => !v)}>
             {fullscreen ? (
               <Minimize2 className="size-4" strokeWidth={1.8} />
             ) : (
               <Maximize2 className="size-4" strokeWidth={1.8} />
             )}
-            {fullscreen
-              ? t('finance.report.exit_fullscreen', { defaultValue: 'Свернуть' })
-              : t('finance.report.fullscreen', { defaultValue: 'На весь экран' })}
           </Button>
           <Button variant="outline" size="md" onClick={exportCsv}>
             <FileSpreadsheet className="size-4" strokeWidth={1.8} />
@@ -596,14 +660,17 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           внутри карточки, а не страницы (иначе sticky не работал бы как
           надо). При печати ограничения снимаются. */}
       <div className="shadow-finmd overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="max-h-[calc(100vh-220px)] overflow-auto print:max-h-none print:overflow-visible">
+        <div
+          className={`overflow-auto print:max-h-none print:overflow-visible ${
+            fullscreen ? 'max-h-[calc(100vh-130px)]' : 'max-h-[calc(100vh-220px)]'
+          }`}
+        >
           <BlockSection
             title={t('finance.report.title')}
             icon={<BarChart3 className="size-4" strokeWidth={1.8} />}
           >
             <ReportTable
-              year={year}
-              months={months}
+              monthCols={monthCols}
               currentMonthIdx={currentMonthIdx}
               rows={visibleMainRows}
               currency={currency}
@@ -619,10 +686,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             icon={<Wallet className="size-4" strokeWidth={1.8} />}
           >
             <CashRegistersTable
-              year={year}
-              months={months}
+              monthCols={monthCols}
               currentMonthIdx={currentMonthIdx}
-              registers={settings.cash_registers.items.filter((i) => !i.archived)}
+              registers={settings.cash_registers.items.filter(
+                (i) => !i.archived && i.preset_key !== 'adjustments',
+              )}
               monthlyRegBalances={monthlyRegBalances}
               currency={currency}
               t={t}
@@ -638,6 +706,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       <DrillDownDialog
         row={drillDownRow}
         currency={currency}
+        monthCols={monthCols}
         onClose={() => setDrillDownRow(null)}
         t={t}
       />
@@ -650,31 +719,22 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 function DrillDownDialog({
   row,
   currency,
+  monthCols,
   onClose,
   t,
 }: {
   row: CellRow | null
   currency: string
+  monthCols: MonthCol[]
   onClose: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   if (!row) return null
   const planTotal = row.values.reduce((s, v) => s + v, 0)
   const factTotal = (row.factValues ?? []).reduce((s, v) => s + v, 0)
-  const monthNames = [
-    'Янв',
-    'Фев',
-    'Мар',
-    'Апр',
-    'Май',
-    'Июн',
-    'Июл',
-    'Авг',
-    'Сен',
-    'Окт',
-    'Ноя',
-    'Дек',
-  ]
+  const monthNames = monthCols.map((c) =>
+    format(new Date(c.year, c.monthIdx, 1), 'LLL yy', { locale: getDateLocale() }),
+  )
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -816,16 +876,18 @@ function BlockSection({
  */
 const COL_LABEL_W = 220
 const COL_SUB_W = 130
-const TABLE_MIN_W = COL_LABEL_W + COL_SUB_W * 2 + COL_SUB_W * 2 * 12 // = 3600
+function tableMinW(colCount: number) {
+  return COL_LABEL_W + COL_SUB_W * 2 + COL_SUB_W * 2 * colCount
+}
 
-function SharedColGroup({ months }: { months: number[] }) {
+function SharedColGroup({ monthCols }: { monthCols: MonthCol[] }) {
   return (
     <colgroup>
       <col style={{ width: COL_LABEL_W }} />
       <col style={{ width: COL_SUB_W }} />
       <col style={{ width: COL_SUB_W }} />
-      {months.map((m) => (
-        <Fragment key={m}>
+      {monthCols.map((c) => (
+        <Fragment key={c.key}>
           <col style={{ width: COL_SUB_W }} />
           <col style={{ width: COL_SUB_W }} />
         </Fragment>
@@ -837,16 +899,14 @@ function SharedColGroup({ months }: { months: number[] }) {
 // ============================ CashRegistersTable ============================
 
 function CashRegistersTable({
-  year,
-  months,
+  monthCols,
   currentMonthIdx,
   registers,
   monthlyRegBalances,
   currency,
   t,
 }: {
-  year: number
-  months: number[]
+  monthCols: MonthCol[]
   currentMonthIdx: number
   registers: { id: string; label?: string | null; amount_cents?: number | null }[]
   monthlyRegBalances: Map<string, number[]>
@@ -854,8 +914,11 @@ function CashRegistersTable({
   t: (k: string) => string
 }) {
   return (
-    <table className="border-collapse text-xs" style={{ tableLayout: 'fixed', width: TABLE_MIN_W }}>
-      <SharedColGroup months={months} />
+    <table
+      className="border-collapse text-xs"
+      style={{ tableLayout: 'fixed', width: tableMinW(monthCols.length) }}
+    >
+      <SharedColGroup monthCols={monthCols} />
       <thead>
         <tr className="bg-slate-100 text-slate-600">
           <th className="sticky left-0 top-[44px] z-40 border-b border-r border-slate-200 bg-slate-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
@@ -867,15 +930,17 @@ function CashRegistersTable({
           >
             {t('finance.report.col_start')}
           </th>
-          {months.map((m) => (
+          {monthCols.map((c, idx) => (
             <th
-              key={m}
+              key={c.key}
               colSpan={2}
               className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
+                idx === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
-              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() })}
+              {format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', {
+                locale: getDateLocale(),
+              })}
             </th>
           ))}
         </tr>
@@ -897,15 +962,15 @@ function CashRegistersTable({
               >
                 {formatNumberSafe(reg.amount_cents ?? 0, currency)}
               </td>
-              {months.map((m) => (
+              {monthCols.map((c, mi) => (
                 <td
-                  key={m}
+                  key={c.key}
                   colSpan={2}
                   className={`num border-l border-slate-100 px-2 py-2 text-right text-slate-700 ${
-                    m === currentMonthIdx ? 'bg-amber-50' : ''
+                    mi === currentMonthIdx ? 'bg-amber-50' : ''
                   }`}
                 >
-                  {formatNumberSafe(monthlyBalances[m] ?? 0, currency)}
+                  {formatNumberSafe(monthlyBalances[mi] ?? 0, currency)}
                 </td>
               ))}
             </tr>
@@ -919,8 +984,7 @@ function CashRegistersTable({
 // ============================ ReportTable ============================
 
 function ReportTable({
-  year,
-  months,
+  monthCols,
   currentMonthIdx,
   rows,
   currency,
@@ -929,8 +993,7 @@ function ReportTable({
   onDrillDown,
   t,
 }: {
-  year: number
-  months: number[]
+  monthCols: MonthCol[]
   currentMonthIdx: number
   rows: CellRow[]
   currency: string
@@ -942,8 +1005,11 @@ function ReportTable({
 }) {
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
   return (
-    <table className="border-collapse text-xs" style={{ tableLayout: 'fixed', width: TABLE_MIN_W }}>
-      <SharedColGroup months={months} />
+    <table
+      className="border-collapse text-xs"
+      style={{ tableLayout: 'fixed', width: tableMinW(monthCols.length) }}
+    >
+      <SharedColGroup monthCols={monthCols} />
       <thead>
         {/* Row 1 — Параметр (rowSpan=2) + месяцы (colSpan=2). Sticky top=44px
             (под title bar блока). Все sticky-ячейки имеют непрозрачный bg,
@@ -961,15 +1027,17 @@ function ReportTable({
           >
             {t('finance.report.col_total')}
           </th>
-          {months.map((m) => (
+          {monthCols.map((c, mi) => (
             <th
-              key={m}
+              key={c.key}
               colSpan={2}
               className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                m === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
+                mi === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
               }`}
             >
-              {format(startOfMonth(new Date(year, m, 1)), 'MM/yy', { locale: getDateLocale() })}
+              {format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', {
+                locale: getDateLocale(),
+              })}
             </th>
           ))}
         </tr>
@@ -981,18 +1049,18 @@ function ReportTable({
           <th className="sticky top-[72px] z-30 border-b border-slate-200 bg-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_fact')}
           </th>
-          {months.map((m) => (
-            <Fragment key={m}>
+          {monthCols.map((c, mi) => (
+            <Fragment key={c.key}>
               <th
                 className={`sticky top-[72px] z-30 border-b border-l border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
+                  mi === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
                 {t('finance.report.col_plan')}
               </th>
               <th
                 className={`sticky top-[72px] z-30 border-b border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  m === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
+                  mi === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
                 }`}
               >
                 {t('finance.report.col_fact')}
@@ -1305,9 +1373,10 @@ function buildBalanceRows(
   _runningEndOfMonth: number[],
   periodSaldoByMonth: number[],
   inventory: Array<{ current_stock?: number; cost_per_unit_cents?: number | null }>,
+  colCount: number,
 ): CellRow[] {
-  const months = Array.from({ length: 12 }, (_, i) => i)
-  const moneyByMonth = months.map((m) => {
+  const indices = Array.from({ length: colCount }, (_, i) => i)
+  const moneyByMonth = indices.map((m) => {
     let sum = 0
     for (const arr of monthlyRegBalances.values()) sum += arr[m] ?? 0
     return sum
@@ -1325,7 +1394,7 @@ function buildBalanceRows(
   const computedByKey = new Map<string, number[]>([
     ['balance_assets_money', moneyByMonth],
     ['balance_liabilities_profit', accumulatedProfit],
-    ['balance_assets_stock', months.map(() => stockCents)],
+    ['balance_assets_stock', indices.map(() => stockCents)],
   ])
   const byParent = new Map<string | null, ParameterItem[]>()
   for (const it of items) {
@@ -1334,13 +1403,13 @@ function buildBalanceRows(
     arr.push(it)
     byParent.set(k, arr)
   }
-  const zeros = Array.from({ length: 12 }, () => 0)
+  const zeros = Array.from({ length: colCount }, () => 0)
   const rows: CellRow[] = []
   function pushNode(node: ParameterItem, indent: number, rootKey: string | null) {
     const isRoot = indent === 0
     const myKey = isRoot ? `balance_root_${node.preset_key || node.id}` : rootKey
     const planConst = node.amount_cents ?? 0
-    const planArr = months.map(() => planConst)
+    const planArr = indices.map(() => planConst)
     const computed = node.preset_key ? computedByKey.get(node.preset_key) : undefined
     const baseLabel = node.label || '—'
     const factArr = computed ?? zeros.slice()

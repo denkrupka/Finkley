@@ -62,6 +62,8 @@ async function handleCreate(
     invited_last_name?: string
     invited_phone?: string
     invited_avatar_url?: string
+    /** T30 — матрица прав { "<cat>.<sub>": "view"|"edit" }. NULL = preset по роли. */
+    permissions?: Record<string, 'view' | 'edit'> | null
   },
 ): Promise<Response> {
   if (!body.salon_id || !body.email || !body.role) {
@@ -127,6 +129,10 @@ async function handleCreate(
       invited_avatar_url:
         typeof body.invited_avatar_url === 'string' && body.invited_avatar_url
           ? body.invited_avatar_url
+          : null,
+      permissions:
+        body.permissions && typeof body.permissions === 'object' && !Array.isArray(body.permissions)
+          ? body.permissions
           : null,
     })
     .select('id, expires_at')

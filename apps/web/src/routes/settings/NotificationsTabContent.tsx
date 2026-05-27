@@ -1,10 +1,12 @@
-import { Bell, Mail, ToggleLeft } from 'lucide-react'
+import { Bell, ChevronDown, ChevronRight, Mail, ToggleLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { useMyProfile } from '@/hooks/useMyProfile'
+import { usePersistedCollapse } from '@/routes/dashboard/useCollapsedState'
 import {
   useUpdateNotificationPref,
   type DigestChannel,
@@ -59,9 +61,13 @@ const TYPE_GROUPS: Array<{
     group: 'settings.notifications.group.business',
     items: [
       { key: 'booksy_new_visits', label: 'settings.notifications.type.booksy_new_visits' },
-      { key: 'low_inventory', label: 'settings.notifications.type.low_inventory' },
       { key: 'calendar_conflicts', label: 'settings.notifications.type.calendar_conflicts' },
     ],
+  },
+  {
+    // T23 — отдельная группа «Склад» с типом low_inventory.
+    group: 'settings.notifications.group.inventory',
+    items: [{ key: 'low_inventory', label: 'settings.notifications.type.low_inventory' }],
   },
   {
     group: 'settings.notifications.group.messaging',
@@ -70,6 +76,14 @@ const TYPE_GROUPS: Array<{
     ],
   },
 ]
+
+type Channel = 'email' | 'telegram' | 'sms'
+const CHANNELS: Channel[] = ['email', 'telegram', 'sms']
+const CHANNEL_LABEL: Record<Channel, string> = {
+  email: 'Email',
+  telegram: 'Telegram',
+  sms: 'SMS',
+}
 
 export function NotificationsTabContent({
   salon,
@@ -94,10 +108,31 @@ export function NotificationsTabContent({
     setParams(next, { replace: true })
   }
   const updatePref = useUpdateNotificationPref(salon.id)
+  const { data: profile } = useMyProfile()
   const prefs = salon.notification_prefs ?? {}
-  function isEnabled(key: NotificationTypeKey): boolean {
-    // Отсутствие ключа = включено по умолчанию
-    return prefs[key] !== false
+  const telegramLinked = !!profile?.telegram_id
+  const phoneLinked = !!profile?.phone
+
+  /** Включен ли канал для конкретного типа. Поддерживает legacy формат:
+   *  - prefs[type] === false → всё выключено
+   *  - prefs[`${type}.${channel}`] === true/false → точный канал
+   *  - иначе дефолт: email=true, telegram=true (если привязан), sms=false. */
+  function isChannelEnabled(key: NotificationTypeKey, ch: Channel): boolean {
+    if (prefs[key] === false) return false
+    const channelKey = `${key}.${ch}`
+    if (channelKey in prefs) return prefs[channelKey] === true
+    // Дефолты по каналу:
+    if (ch === 'email') return true
+    if (ch === 'telegram') return telegramLinked
+    return false // sms по умолчанию выключен
+  }
+  function toggleChannel(key: NotificationTypeKey, ch: Channel, next: boolean) {
+    updatePref.mutate(
+      { [`${key}.${ch}`]: next },
+      {
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
   }
 
   return (
@@ -181,46 +216,107 @@ export function NotificationsTabContent({
                 'Выбери события которые портал может присылать. Каналы (push/email/Telegram) — на вкладке «Каналы».',
             })}
           </p>
-          <div className="mt-5 flex flex-col gap-5">
+          {/* T23 — сворачиваемые группы (по умолчанию все свёрнуты), матрица
+              каналов справа. Telegram disabled если профиль не привязан;
+              SMS disabled если у пользователя нет номера в profile.phone. */}
+          <div className="mt-5 flex flex-col gap-3">
             {TYPE_GROUPS.map((group) => (
-              <div key={group.group}>
-                <h3 className="text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                  {t(group.group)}
-                </h3>
-                <div className="mt-2 flex flex-col gap-1.5">
-                  {group.items.map((item) => (
-                    <label
-                      key={item.key}
-                      className="hover:bg-muted/30 flex cursor-pointer items-start gap-3 rounded-md px-2 py-2"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isEnabled(item.key)}
-                        onChange={(e) => {
-                          updatePref.mutate(
-                            { [item.key]: e.target.checked },
-                            {
-                              onError: (err) =>
-                                toast.error(err instanceof Error ? err.message : String(err)),
-                            },
-                          )
-                        }}
-                        className="border-brand-border accent-brand-navy mt-0.5 size-4 cursor-pointer rounded"
-                      />
-                      <span className="text-foreground flex-1 text-sm font-medium">
-                        {t(item.label, {
-                          defaultValue: DEFAULT_TYPE_LABELS[item.key],
-                        })}
-                      </span>
-                    </label>
+              <CollapsibleNotificationGroup
+                key={group.group}
+                groupKey={group.group}
+                title={t(group.group)}
+              >
+                <div className="border-border bg-muted/10 hidden border-b px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider sm:grid sm:grid-cols-[1fr_repeat(3,80px)]">
+                  <span className="text-muted-foreground">
+                    {t('settings.notifications.col_type', { defaultValue: 'Тип' })}
+                  </span>
+                  {CHANNELS.map((ch) => (
+                    <span key={ch} className="text-muted-foreground text-center">
+                      {CHANNEL_LABEL[ch]}
+                    </span>
                   ))}
                 </div>
-              </div>
+                <div className="divide-border/40 divide-y">
+                  {group.items.map((item) => {
+                    const label = t(item.label, { defaultValue: DEFAULT_TYPE_LABELS[item.key] })
+                    return (
+                      <div
+                        key={item.key}
+                        className="grid grid-cols-[1fr_repeat(3,80px)] items-center gap-2 px-3 py-2"
+                      >
+                        <span className="text-foreground text-sm font-medium">{label}</span>
+                        {CHANNELS.map((ch) => {
+                          const disabled =
+                            (ch === 'telegram' && !telegramLinked) || (ch === 'sms' && !phoneLinked)
+                          const checked = !disabled && isChannelEnabled(item.key, ch)
+                          const title =
+                            ch === 'telegram' && !telegramLinked
+                              ? t('settings.notifications.telegram_unlinked_hint', {
+                                  defaultValue:
+                                    'Чтобы получать в Telegram — привяжи аккаунт в /settings → Telegram',
+                                })
+                              : ch === 'sms' && !phoneLinked
+                                ? t('settings.notifications.sms_no_phone_hint', {
+                                    defaultValue:
+                                      'Чтобы получать SMS — укажи телефон в Профиле пользователя',
+                                  })
+                                : undefined
+                          return (
+                            <label
+                              key={ch}
+                              title={title}
+                              className={`flex items-center justify-center ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={disabled}
+                                onChange={(e) => toggleChannel(item.key, ch, e.target.checked)}
+                                className="accent-brand-navy size-4 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </CollapsibleNotificationGroup>
             ))}
           </div>
         </section>
       )}
     </div>
+  )
+}
+
+function CollapsibleNotificationGroup({
+  groupKey,
+  title,
+  children,
+}: {
+  groupKey: string
+  title: string
+  children: React.ReactNode
+}) {
+  const { open, toggle } = usePersistedCollapse(`notif.${groupKey}`, false)
+  return (
+    <section className="border-border overflow-hidden rounded-md border">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="bg-muted/30 hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold uppercase tracking-wider"
+      >
+        {open ? (
+          <ChevronDown className="text-muted-foreground size-3.5" strokeWidth={2.2} />
+        ) : (
+          <ChevronRight className="text-muted-foreground size-3.5" strokeWidth={2.2} />
+        )}
+        <span className="text-muted-foreground">{title}</span>
+      </button>
+      <div className={open ? '' : 'hidden'}>{children}</div>
+    </section>
   )
 }
 

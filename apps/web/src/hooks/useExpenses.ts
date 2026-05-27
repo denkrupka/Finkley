@@ -63,6 +63,11 @@ export type ExpenseRow = {
   paid_amount_cents: number | null
   // ↑ для расчёта суммарных итогов (total за период, breakdown по категориям)
   //   используем effectivePaidCents() — для частичных оплат берём paid_amount_cents.
+  /** Источник авто-расхода комиссии (T14): для расходов с source='auto_commission'.
+   *  Связывает с visit/other_income, чтобы в модалке транзакций комиссии можно
+   *  было открыть исходный визит/доход по клику. */
+  commission_source_table: 'visits' | 'other_incomes' | null
+  commission_source_id: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -173,7 +178,7 @@ export function useExpenses(
       let q = supabase
         .from('expenses')
         .select(
-          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_by, bank_transaction_id, bank_account_iban, paid_amount_cents, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end',
+          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_by, bank_transaction_id, bank_account_iban, paid_amount_cents, commission_source_table, commission_source_id, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end',
         )
         .eq('salon_id', salonId)
         .is('deleted_at', null)
