@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Pre-push hook: typecheck + lint + format:check + unit tests перед push.
+# Pre-push hook: typecheck + lint + format:check перед push.
 # Чтобы не пушить заведомо красное в CI.
 #
 # Почему здесь, а не в pre-commit:
@@ -9,7 +9,14 @@
 #     резолвится из cwd=apps/web). Поэтому в pre-commit оставлено только
 #     prettier --write (мгновенный форматтер).
 #   - pre-push запускается один раз перед публикацией, можно подождать
-#     3-4 минуты (lint + typecheck + 599 тестов).
+#     30-40 секунд (lint + typecheck + format).
+#
+# Почему НЕТ unit tests:
+#   - Часть тестов (tests/unit/*-rpc.test.ts, banking-*.test.ts) требуют
+#     запущенный локальный Supabase (Docker container). Без него тесты
+#     падают, блокируя push даже если код корректен. Полный набор тестов
+#     гоняет CI — он всегда поднимает чистый Supabase под себя.
+#   - Локально: запускать `pnpm test` руками после изменений в RPC/RLS.
 
 set -e
 
@@ -22,7 +29,4 @@ pnpm lint
 echo "→ Running format:check..."
 pnpm format:check
 
-echo "→ Running unit tests..."
-pnpm test
-
-echo "✓ Pre-push checks passed"
+echo "✓ Pre-push checks passed (full test suite runs in CI)"
