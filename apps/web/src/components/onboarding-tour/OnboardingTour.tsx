@@ -221,7 +221,15 @@ function TourRenderer({
 
   return (
     <div
-      className="fixed inset-0 z-50"
+      className={cn(
+        'fixed inset-0 z-50',
+        // На шаге без target overlay не перехватывает клики — иначе юзер
+        // не может взаимодействовать с интерфейсом (это «лёгкий» режим).
+        // На шаге со spotlight overlay полупрозрачный и перехватывает
+        // клики везде, кроме самого spotlight'a (вырез — четыре div'а
+        // вокруг target, между ними «дырка»).
+        hasSpotlight ? '' : 'pointer-events-none',
+      )}
       role="dialog"
       aria-modal="true"
       aria-labelledby="tour-title"
@@ -273,14 +281,21 @@ function TourRenderer({
           />
         </>
       ) : (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        // T95 — лёгкий полупрозрачный dim для шагов без target. Юзер видит
+        // что есть подсказка, но интерфейс не «выключается» как полноэкранной
+        // модалкой. Click-through заблокирован contained tooltip.
+        <div className="pointer-events-none absolute inset-0 bg-black/15" />
       )}
 
-      {/* Tooltip / Modal — позиционируется относительно target либо центрируется. */}
+      {/* Tooltip / Modal — позиционируется относительно target либо в правом
+          нижнем углу как «всплывашка». */}
       <div
         className={cn(
-          'bg-card shadow-finxl absolute w-[min(420px,92vw)] rounded-xl p-5 sm:p-6',
-          !hasSpotlight && 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+          'bg-card shadow-finxl pointer-events-auto absolute rounded-xl p-5 sm:p-6',
+          // На шагах с spotlight — узкая подсказка (420px), на шагах без —
+          // тоже узкая, но прижата к правому нижнему углу.
+          hasSpotlight ? 'w-[min(420px,92vw)]' : 'w-[min(380px,92vw)]',
+          !hasSpotlight && 'bottom-6 right-6',
         )}
         style={
           hasSpotlight

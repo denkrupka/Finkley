@@ -392,6 +392,8 @@ export function OnboardingPage() {
                     name: state.name,
                     country_code: state.country_code,
                     salon_type: state.salon_type,
+                    address: state.address,
+                    benchmarks_opt_in: state.benchmarks_opt_in,
                   }}
                   onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
                 />
