@@ -1,4 +1,4 @@
-import { Mail, Phone, Plus, Send, Trash2, UserPlus } from 'lucide-react'
+import { Mail, Phone, Send, Trash2, UserPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
@@ -63,17 +63,11 @@ export function Step2Staff({ value, onChange }: Props) {
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         {t('onboarding.step2.title', { defaultValue: 'Твоя команда' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.step2.subtitle_v2', {
-          defaultValue:
-            'Заведи мастеров и сразу отметь «Пригласить» — после создания салона им уйдёт письмо с ссылкой на регистрацию. Booksy/блокнот подтянут остальных автоматом.',
-        })}
-      </p>
 
-      <div className="mt-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {value.map((staff, i) => {
           const initial = (staff.full_name || '?').trim().charAt(0).toUpperCase() || '?'
           const color = PALETTE[i % PALETTE.length]
@@ -201,13 +195,6 @@ export function Step2Staff({ value, onChange }: Props) {
         </button>
       </div>
 
-      <p className="text-muted-foreground mt-4 inline-flex items-center gap-1.5 text-xs">
-        <Plus className="size-3" strokeWidth={2.2} />
-        {t('onboarding.step2.hint_booksy', {
-          defaultValue:
-            'Если подключишь Booksy — мастера, аватарки и история визитов импортируются автоматом после создания салона. Здесь можно завести только тех, кого нет в Booksy.',
-        })}
-      </p>
     </div>
   )
 }

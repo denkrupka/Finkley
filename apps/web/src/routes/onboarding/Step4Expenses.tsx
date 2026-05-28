@@ -174,18 +174,12 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         {t('onboarding.step4.title_v2', { defaultValue: 'Финансовая структура' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.step4.subtitle_v3', {
-          defaultValue:
-            'Разделим финансы на 7 блоков — каждый помогает AI правильно строить отчёты. Без правильной структуры P&L не покажет реальную прибыль.',
-        })}
-      </p>
 
       {/* Sub-stepper: горизонтальная навигация по 7 категориям */}
-      <div className="mt-6 flex gap-1.5 overflow-x-auto pb-2">
+      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-2">
         {CATEGORIES.map((cat, i) => {
           const done = i < activeIndex
           const active = i === activeIndex
@@ -210,19 +204,19 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
         })}
       </div>
 
-      {/* Описание активной категории */}
-      <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 mt-4 rounded-lg border-2 border-dashed p-3.5">
+      {/* Описание активной категории — компактно */}
+      <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 mt-3 rounded-lg border-2 border-dashed px-3 py-2">
         <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
           <span aria-hidden>{activeMeta.emoji}</span>
           {activeMeta.title}
         </p>
-        <p className="text-muted-foreground mt-1.5 text-xs leading-snug">
+        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
           {activeMeta.description}
         </p>
       </div>
 
       {/* Список items с CRUD */}
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-3 flex flex-col gap-1.5">
         {visibleItems.length === 0 ? (
           <p className="text-muted-foreground py-4 text-center text-sm italic">
             Пока пусто — нажми «Добавить» ниже.
@@ -304,7 +298,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
         <button
           type="button"
           onClick={nextCategory}
-          className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
+          className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
         >
           {t('onboarding.step4.next_section', {
             defaultValue: 'Дальше: {{name}} →',
@@ -313,13 +307,6 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
           <ArrowRight className="size-3" strokeWidth={2.4} />
         </button>
       ) : null}
-
-      <p className="text-muted-foreground mt-4 text-xs">
-        {t('onboarding.step4.hint_settings_v2', {
-          defaultValue:
-            'После создания салона всё это будет в Настройки → Справочники → Финансы — там удобнее добавлять, переименовывать, архивировать.',
-        })}
-      </p>
     </div>
   )
 }

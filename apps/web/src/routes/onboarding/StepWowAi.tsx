@@ -61,9 +61,8 @@ export function StepWowAi({
       title: t('onboarding.wow.master_title', {
         defaultValue: 'AI определит твоих звёзд и тех, кому нужно расти',
       }),
-      body: t('onboarding.wow.master_body', {
-        defaultValue:
-          'Из визитов Booksy/блокнота AI посчитает выручку на мастера, средний чек, retention клиентов и долю молчунов. Видишь сразу: кто приносит 60% денег и кому стоит дать дополнительное обучение.',
+      body: t('onboarding.wow.master_body_v2', {
+        defaultValue: 'Выручка, retention, ★ на мастера. Кто звезда, кому учиться.',
       }),
       chip: t('onboarding.wow.chip_lift', { defaultValue: '+12-18% выручки в среднем' }),
     })
@@ -74,9 +73,8 @@ export function StepWowAi({
       title: t('onboarding.wow.service_title', {
         defaultValue: 'AI найдёт услуги, на которые ты сливаешь время',
       }),
-      body: t('onboarding.wow.service_body', {
-        defaultValue:
-          'Сравнит цену, материалы, время мастера — посчитает реальную маржу на каждую услугу. Подскажет какие поднять в цене, а какие убрать или сделать «акционной».',
+      body: t('onboarding.wow.service_body_v2', {
+        defaultValue: 'Реальная маржа на каждую услугу. Что поднять в цене, что убрать.',
       }),
       chip: t('onboarding.wow.chip_margin', { defaultValue: 'до +25% маржи' }),
     })
@@ -90,9 +88,8 @@ export function StepWowAi({
       title: t('onboarding.wow.clients_title', {
         defaultValue: 'RFM-сегментация + кому слать реактивацию',
       }),
-      body: t('onboarding.wow.clients_body', {
-        defaultValue:
-          'AI разобьёт базу на 6 сегментов (Чемпионы / Лояльные / Перспективные / Под риском / Спящие / Потерянные). Для каждого — готовый рассыльный шаблон, чтобы вернуть забытых клиентов.',
+      body: t('onboarding.wow.clients_body_v2', {
+        defaultValue: 'RFM-сегменты + готовые шаблоны для возврата забытых клиентов.',
       }),
       chip: t('onboarding.wow.chip_reactivation', {
         defaultValue: 'Реактивация в 5× дешевле нового клиента',
@@ -108,9 +105,8 @@ export function StepWowAi({
       title: t('onboarding.wow.reviews_title', {
         defaultValue: 'AI разберёт отзывы по полочкам',
       }),
-      body: t('onboarding.wow.reviews_body', {
-        defaultValue:
-          'За что хвалят, что бесит, какие фразы повторяются. Плюс — портрет клиента (возраст, услуги, средний чек) для каждой соцсети. Поймёшь куда лить рекламу.',
+      body: t('onboarding.wow.reviews_body_v2', {
+        defaultValue: 'За что хвалят, что бесит, портрет клиента. Куда лить рекламу.',
       }),
       chip: t('onboarding.wow.chip_review', { defaultValue: '5★ — на Google, 1-4★ — только тебе' }),
     })
@@ -124,9 +120,8 @@ export function StepWowAi({
       title: t('onboarding.wow.cashflow_title', {
         defaultValue: 'Cashflow в режиме live — без ручной вписи',
       }),
-      body: t('onboarding.wow.cashflow_body', {
-        defaultValue:
-          'Списания падают в Расходы сами. AI отметит подозрительные траты (внезапно вырос рекламный бюджет), напомнит про факт-наоборот платежи и просрочки.',
+      body: t('onboarding.wow.cashflow_body_v2', {
+        defaultValue: 'Расходы фиксируются сами. AI алертит подозрительные траты.',
       }),
       chip: t('onboarding.wow.chip_time', { defaultValue: '−5 часов рутины в неделю' }),
     })
@@ -150,34 +145,18 @@ export function StepWowAi({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-          <Sparkles className="text-brand-teal-deep size-7" strokeWidth={2} />
-          {t('onboarding.wow.title', {
-            defaultValue: 'AI уже видит, что у тебя происходит',
-          })}
-        </h2>
-        <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:text-[15px]">
-          {t('onboarding.wow.subtitle', {
-            defaultValue:
-              'Через секунду ты увидишь свой портал — но AI уже посчитал, что именно стоит улучшить. Этот разбор обновляется каждый день автоматически.',
-          })}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="space-y-3">
+      <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <Sparkles className="text-brand-teal-deep size-6" strokeWidth={2} />
+        {t('onboarding.wow.title', {
+          defaultValue: 'AI уже видит, что у тебя происходит',
+        })}
+      </h2>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {cards.map((c, i) => (
           <WowCard key={i} {...c} />
         ))}
       </div>
-
-      <p className="border-border text-muted-foreground border-t pt-4 text-center text-sm leading-relaxed">
-        {t('onboarding.wow.footer', {
-          defaultValue:
-            'Полный разбор появится на дашборде в блоке «AI-помощник видит» — и будет обновляться сам.',
-        })}
-      </p>
     </div>
   )
 }

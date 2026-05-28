@@ -28,18 +28,13 @@ export function StepIntegrationsChoice({
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-brand-navy flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <Plug className="text-brand-teal-deep size-6" strokeWidth={2} />
-          {t('onboarding.step_integrations.title')}
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {t('onboarding.step_integrations.subtitle')}
-        </p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-brand-navy flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <Plug className="text-brand-teal-deep size-6" strokeWidth={2} />
+        {t('onboarding.step_integrations.title')}
+      </h2>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {INTEGRATIONS.map(({ id, i18nKey, icon: Icon }) => {
           const checked = selected.includes(id)
           return (
@@ -69,7 +64,6 @@ export function StepIntegrationsChoice({
         })}
       </div>
 
-      <p className="text-muted-foreground text-xs">{t('onboarding.step_integrations.hint_skip')}</p>
     </div>
   )
 }

@@ -49,21 +49,17 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
   }
 
   const heroSubtitle: Record<AiBreakdownTopic, string> = {
-    services: t('onboarding.ai_services.subtitle', {
-      defaultValue:
-        'Что приносит реальную маржу, а на что ты тратишь время впустую. Покажу прямо в первый месяц работы.',
+    services: t('onboarding.ai_services.subtitle_v2', {
+      defaultValue: 'Что приносит маржу, а на что льёшь время впустую.',
     }),
-    staff: t('onboarding.ai_staff.subtitle', {
-      defaultValue:
-        'Кто из мастеров — твой кормилец, а кому нужна индивидуальная программа улучшения.',
+    staff: t('onboarding.ai_staff.subtitle_v2', {
+      defaultValue: 'Кто звезда, кому нужна программа улучшения.',
     }),
-    clients: t('onboarding.ai_clients.subtitle', {
-      defaultValue:
-        'Сегментация по 6 RFM-корзинам. Кого вернуть рассылкой, кого превратить в постоянного.',
+    clients: t('onboarding.ai_clients.subtitle_v2', {
+      defaultValue: 'RFM-сегменты — кого вернуть, кого превратить в постоянного.',
     }),
-    reviews: t('onboarding.ai_reviews.subtitle', {
-      defaultValue:
-        'За что хвалят, что бесит, какие фразы повторяются. Плюс портрет клиента по соц.сетям.',
+    reviews: t('onboarding.ai_reviews.subtitle_v2', {
+      defaultValue: 'За что хвалят, что бесит, портрет клиента из соцсетей.',
     }),
   }
 
@@ -81,85 +77,85 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
       {
         icon: TrendingUp,
         tone: 'sage',
-        title: 'Топ-3 услуги по марже',
-        body: 'Не по цене, не по выручке — а после вычета времени мастера и материалов. Чаще всего это не самые дорогие услуги, и это удивляет.',
-        chip: 'Реальная маржа, а не «средний чек»',
+        title: 'Топ-3 по марже',
+        body: 'После вычета времени мастера и материалов — чаще всего сюрприз.',
+        chip: 'Реальная маржа',
       },
       {
         icon: TrendingDown,
         tone: 'amber',
-        title: 'Услуги, которые тянут вниз',
-        body: 'AI покажет где себестоимость съедает прибыль: цена не выросла за 2 года, материал подорожал, время мастера не оплачивается. С готовой рекомендацией.',
-        chip: 'до +25% к марже',
+        title: 'Что тянет вниз',
+        body: 'Где себестоимость съедает прибыль — с готовой рекомендацией.',
+        chip: 'до +25% маржи',
       },
       {
         icon: Brain,
         tone: 'navy',
-        title: 'Где поднять цены — а где сделать акцию',
-        body: 'Сравнит с конкурентами в твоём городе (Google + Booksy) и подскажет конкретный диапазон. «Стрижка женская у конкурентов 80-120 PLN, ты — 70. Можно поднять до 95».',
+        title: 'Где поднять цены',
+        body: 'Сравнит с конкурентами Google + Booksy и подскажет диапазон.',
       },
     ],
     staff: [
       {
         icon: Star,
         tone: 'gold',
-        title: 'Твои звёзды — кому давать больше клиентов',
-        body: 'Высокая загрузка + высокий retention + ★4.5+. Этих можно ставить на самые маржинальные услуги. AI рекомендует кому добавить часы в график.',
-        chip: '+12-18% выручки в среднем',
+        title: 'Твои звёзды',
+        body: 'Высокий retention + ★4.5+ → им маржинальные услуги и больше часов.',
+        chip: '+12-18% выручки',
       },
       {
         icon: AlertTriangle,
         tone: 'amber',
-        title: 'Кому нужна программа улучшения',
-        body: 'Низкая загрузка + клиенты не возвращаются + жалобы в отзывах. AI даст конкретные точки: «менее 50% клиентов возвращаются после маникюра» — это сигнал.',
+        title: 'Кому нужна программа',
+        body: 'Низкая загрузка + клиенты не возвращаются — с точкой роста.',
       },
       {
         icon: Users,
         tone: 'sage',
-        title: 'Кто из мастеров «свои клиенты»',
-        body: 'Если мастер уходит, сколько клиентов уйдёт с ним? AI показывает «индекс лояльности к мастеру vs к салону» — критично для удержания персонала.',
+        title: 'Свои vs салона',
+        body: 'Индекс лояльности — критично для удержания персонала.',
       },
     ],
     clients: [
       {
         icon: TrendingUp,
         tone: 'sage',
-        title: 'Чемпионы и Лояльные — твоё ядро',
-        body: 'Кто приходит часто и недавно. AI покажет средний чек, любимую услугу, любимого мастера. Это люди для VIP-программы и закрытых акций.',
+        title: 'Чемпионы и Лояльные',
+        body: 'Твоё ядро. Средний чек, любимая услуга, любимый мастер.',
       },
       {
         icon: AlertTriangle,
         tone: 'amber',
-        title: 'Под риском и Спящие — кого реактивировать',
-        body: 'Раньше ходили регулярно — теперь молчат. AI готовит персонализированную рассылку для каждого: «Привет, Анна! Полгода назад ты делала окрашивание у Леси. Возвращайся — у нас бесплатный уход 1+1».',
-        chip: 'Реактивация в 5× дешевле нового клиента',
+        title: 'Под риском и Спящие',
+        body: 'AI готовит персонализированную рассылку для возврата.',
+        chip: 'Реактивация 5× дешевле',
       },
       {
         icon: Brain,
         tone: 'navy',
-        title: 'Кого ты теряешь после первого визита',
-        body: 'Главный денежный leak: 60% «новеньких» не возвращаются. AI разбирает по мастерам/услугам — где конкретно проблема (грубо: «после педикюра у Алины 78% не возвращаются — поговори с ней»).',
+        title: 'Кого теряешь после первого',
+        body: 'Главный leak — 60% новеньких не возвращаются. Где конкретно.',
       },
     ],
     reviews: [
       {
         icon: MessageSquare,
         tone: 'gold',
-        title: 'За что тебя хвалят — фразы-триггеры',
-        body: 'AI выделит повторяющиеся фразы из 5★ отзывов («чисто», «уютно», «Леся золотые руки»). Эти слова потом используем в рекламе — звучит как от реальных клиентов.',
+        title: 'За что хвалят',
+        body: 'Повторяющиеся фразы из 5★ — потом в рекламу.',
       },
       {
         icon: AlertTriangle,
         tone: 'amber',
-        title: 'Что бесит клиентов — даже когда 5★',
-        body: 'Анализ всех отзывов (включая Booksy/Google), не только 1-4★. AI находит скрытые жалобы: «всё хорошо НО долго ждать», «отлично, ХОТЯ дорого». С приоритетом — что решать первым.',
+        title: 'Что бесит',
+        body: 'Скрытые жалобы даже в 5★ — с приоритетом что решать.',
       },
       {
         icon: Sparkles,
         tone: 'sage',
-        title: '5★ — на Google, 1-4★ — только тебе',
-        body: 'Автозапрос отзыва клиенту после визита. 5★ ведут на форму Google review (твой салон поднимется в выдаче). 1-4★ — во внутренние, никто посторонний не увидит.',
-        chip: 'Защита репутации + рост в Google',
+        title: '5★ → Google, 1-4★ → тебе',
+        body: 'Автозапрос отзыва после визита. Защита репутации.',
+        chip: 'Рост в Google',
       },
     ],
   }
@@ -168,29 +164,20 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
   const topicCards = cards[topic]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-          <HeroIcon className="text-brand-teal-deep size-7" strokeWidth={2} />
+        <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <HeroIcon className="text-brand-teal-deep size-6" strokeWidth={2} />
           {heroTitle[topic]}
         </h2>
-        <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:text-[15px]">
-          {heroSubtitle[topic]}
-        </p>
+        <p className="text-muted-foreground mt-1 text-sm">{heroSubtitle[topic]}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {topicCards.map((c, i) => (
           <BreakdownCard key={i} {...c} />
         ))}
       </div>
-
-      <p className="border-border text-muted-foreground border-t pt-4 text-center text-xs leading-relaxed">
-        {t('onboarding.ai_breakdown.footer', {
-          defaultValue:
-            'Этот разбор обновляется ежедневно автоматически на дашборде и в /reports → AI Insights. После первой недели работы будет уже на твоих реальных цифрах.',
-        })}
-      </p>
     </div>
   )
 }

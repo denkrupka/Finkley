@@ -56,18 +56,12 @@ export function StepSchedule({ value, onChange }: Props) {
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-        <Clock className="text-brand-teal-deep mr-2 inline-block size-7" strokeWidth={2} />
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+        <Clock className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
         {t('onboarding.schedule.title', { defaultValue: 'Рабочий график салона' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.schedule.subtitle', {
-          defaultValue:
-            'Когда салон открыт. Нужно чтобы AI правильно считал заполненность мастеров (использованные часы / доступные часы) и не назначал визиты в нерабочее время.',
-        })}
-      </p>
 
-      <div className="mt-7 flex flex-col gap-2">
+      <div className="mt-3 flex flex-col gap-1.5">
         {DAYS.map((d) => {
           const cur = value[d.id] ?? {}
           const closed = !!cur.closed
@@ -75,7 +69,7 @@ export function StepSchedule({ value, onChange }: Props) {
             <div
               key={d.id}
               className={cn(
-                'border-border flex items-center gap-3 rounded-md border p-3 transition-colors',
+                'border-border flex items-center gap-3 rounded-md border px-3 py-2 transition-colors',
                 closed ? 'bg-muted/30' : 'bg-card',
               )}
             >
@@ -117,7 +111,7 @@ export function StepSchedule({ value, onChange }: Props) {
       <button
         type="button"
         onClick={applyToWeekdays}
-        className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
+        className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
       >
         {t('onboarding.schedule.apply_weekdays', {
           defaultValue: '← Скопировать понедельник на вт-пт',

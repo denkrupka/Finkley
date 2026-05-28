@@ -1,4 +1,4 @@
-import { Building2, FileText, Plug } from 'lucide-react'
+import { Building2, Plug } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
@@ -69,21 +69,13 @@ export function Step3Accounting({
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <Building2 className="text-brand-teal-deep size-6" strokeWidth={2} />
-          {t('onboarding.step_accounting.title', { defaultValue: 'Бухгалтерия' })}
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {t('onboarding.step_accounting.subtitle', {
-            defaultValue:
-              'NIP + компания нужны для выписки фактур из портала. А интеграция с твоей бухгалтерской системой избавит от двойного ввода.',
-          })}
-        </p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <Building2 className="text-brand-teal-deep size-6" strokeWidth={2} />
+        {t('onboarding.step_accounting.title', { defaultValue: 'Бухгалтерия' })}
+      </h2>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label
             htmlFor="ob-nip"
@@ -99,11 +91,6 @@ export function Step3Accounting({
             className="num"
             inputMode="numeric"
           />
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t('onboarding.step_accounting.nip_hint', {
-              defaultValue: 'По NIP автоматом подтянем название компании из MF White List.',
-            })}
-          </p>
         </div>
         <div>
           <Label
@@ -125,8 +112,8 @@ export function Step3Accounting({
 
       {/* T107 — секция выбора провайдера бухгалтерии */}
       {onToggleIntegration ? (
-        <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-xl border-2 border-dashed p-4">
-          <div className="mb-3 flex items-center gap-2">
+        <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-xl border-2 border-dashed p-3">
+          <div className="mb-2 flex items-center gap-2">
             <Plug className="text-brand-teal-deep size-5" strokeWidth={2} />
             <p className="text-foreground text-sm font-bold">
               {t('onboarding.step_accounting.providers_title', {
@@ -134,13 +121,7 @@ export function Step3Accounting({
               })}
             </p>
           </div>
-          <p className="text-muted-foreground mb-3 text-xs leading-snug">
-            {t('onboarding.step_accounting.providers_subtitle', {
-              defaultValue:
-                'Отметь то что используешь — после создания салона мы откроем диалоги подключения. Можно подключить несколько.',
-            })}
-          </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {ACCOUNTING_PROVIDERS.map((p) => {
               const checked = selectedIntegrations.includes(p.id as OnboardingIntegration)
               return (
@@ -172,28 +153,6 @@ export function Step3Accounting({
         </div>
       ) : null}
 
-      <div className="border-brand-teal-soft bg-brand-teal-soft/30 flex items-start gap-3 rounded-md border p-4">
-        <FileText className="text-brand-teal-deep mt-0.5 size-5 shrink-0" strokeWidth={2} />
-        <div className="text-foreground text-[12.5px] leading-relaxed">
-          <p className="font-semibold">
-            {t('onboarding.step_accounting.integrations_note_title', {
-              defaultValue: 'Зачем это нужно?',
-            })}
-          </p>
-          <p className="text-muted-foreground mt-1">
-            {t('onboarding.step_accounting.integrations_note_body', {
-              defaultValue:
-                'AI заберёт все твои выставленные/полученные фактуры и автоматически разнесёт по доходам/расходам. Никакого ручного ввода — twoja księgowa получит готовые данные.',
-            })}
-          </p>
-        </div>
-      </div>
-
-      <p className="text-muted-foreground text-xs">
-        {t('onboarding.step_accounting.hint_skip', {
-          defaultValue: 'Можно пропустить — добавишь в Настройки → Бухгалтерия позже.',
-        })}
-      </p>
     </div>
   )
 }

@@ -19,20 +19,12 @@ export function Step0Path({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('onboarding.path.title', { defaultValue: 'Как настроить — быстро или максимально?' })}
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {t('onboarding.path.subtitle', {
-            defaultValue:
-              'Выбери удобный путь. Быстрый — чтобы сразу увидеть портал в работе. Полный — чтобы получить максимум аналитики и AI-советов сразу.',
-          })}
-        </p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
+        {t('onboarding.path.title', { defaultValue: 'Как настроить — быстро или максимально?' })}
+      </h2>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <PathCard
           icon={Rocket}
           title={t('onboarding.path.quick_title', { defaultValue: 'Быстрая настройка' })}
@@ -85,12 +77,6 @@ export function Step0Path({
         />
       </div>
 
-      <p className="text-muted-foreground text-[11px]">
-        {t('onboarding.path.switch_hint', {
-          defaultValue:
-            'Не уверен? Выбирай быструю — позже сможешь догнать полную из меню «Завершить онбординг» в настройках.',
-        })}
-      </p>
     </div>
   )
 }

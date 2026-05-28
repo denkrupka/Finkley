@@ -28,15 +28,10 @@ export function Step2Address({
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('onboarding.step_address.title')}
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {t('onboarding.step_address.subtitle')}
-        </p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
+        {t('onboarding.step_address.title')}
+      </h2>
 
       <div>
         <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider">
@@ -65,7 +60,7 @@ export function Step2Address({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label
             htmlFor="ob-addr"
@@ -122,7 +117,6 @@ export function Step2Address({
         </div>
       </div>
 
-      <p className="text-muted-foreground text-xs">{t('onboarding.step_address.hint_skip')}</p>
     </div>
   )
 }

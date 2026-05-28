@@ -28,19 +28,11 @@ export function StepTelegramPhone({ value, onChange }: Props) {
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-          <Bell className="text-brand-teal-deep mr-2 inline-block size-7" strokeWidth={2} />
-          {t('onboarding.tg_phone.title', { defaultValue: 'Как с тобой связываться?' })}
-        </h1>
-        <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-          {t('onboarding.tg_phone.subtitle', {
-            defaultValue:
-              'AI отправит тебе утром краткий разбор дня + критичные алерты (выручка упала, материалы заканчиваются, отзыв 1★). Выбирай куда удобнее.',
-          })}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+        <Bell className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
+        {t('onboarding.tg_phone.title', { defaultValue: 'Как с тобой связываться?' })}
+      </h1>
 
       <Field
         id="onb-phone"
@@ -64,12 +56,6 @@ export function StepTelegramPhone({ value, onChange }: Props) {
             className="num pl-10"
           />
         </div>
-        <p className="text-muted-foreground mt-1.5 text-xs">
-          {t('onboarding.tg_phone.phone_hint', {
-            defaultValue:
-              'SMS — биллится отдельно по факту. По умолчанию выключено для всех типов; включишь нужные в Настройки → Уведомления.',
-          })}
-        </p>
       </Field>
 
       <label className="border-border bg-card hover:border-brand-teal-deep/40 flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-colors">
@@ -88,10 +74,9 @@ export function StepTelegramPhone({ value, onChange }: Props) {
               defaultValue: 'Получать инсайты в Telegram',
             })}
           </p>
-          <p className="text-muted-foreground mt-1 text-xs leading-snug">
-            {t('onboarding.tg_phone.tg_body', {
-              defaultValue:
-                'После создания салона покажем deep-link на нашего бота @finkley_tg_bot — один клик и привязка готова. Каждое утро в 9:00 будешь видеть краткий разбор.',
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {t('onboarding.tg_phone.tg_body_v2', {
+              defaultValue: 'Каждое утро в 9:00 — краткий разбор от @finkley_tg_bot.',
             })}
           </p>
         </div>

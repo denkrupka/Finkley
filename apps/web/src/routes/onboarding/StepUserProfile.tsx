@@ -43,17 +43,11 @@ export function StepUserProfile({ value, onChange }: Props) {
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         {t('onboarding.profile.title', { defaultValue: 'Расскажи о себе' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.profile.subtitle', {
-          defaultValue:
-            'Имя нужно чтобы AI обращался к тебе по имени и письма выглядели по-человечески. Аватар — по желанию.',
-        })}
-      </p>
 
-      <div className="mt-7 flex flex-col gap-5">
+      <div className="mt-3 flex flex-col gap-3">
         {/* Аватар */}
         <div className="flex items-center gap-4">
           {value.avatar_data_url ? (
@@ -119,7 +113,7 @@ export function StepUserProfile({ value, onChange }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field id="onb-first" label={t('onboarding.profile.first_name', { defaultValue: 'Имя' })}>
             <Input
               id="onb-first"

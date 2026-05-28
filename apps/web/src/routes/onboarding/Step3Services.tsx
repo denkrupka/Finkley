@@ -91,17 +91,9 @@ export function Step3Services({ value, onChange, salonType }: Props) {
   return (
     <div>
       <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-            {t('onboarding.step3.title', { defaultValue: 'Каталог услуг' })}
-          </h1>
-          <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-            {t('onboarding.step3.subtitle_v2', {
-              defaultValue:
-                'Сгруппируй услуги по категориям — так AI правильно посчитает выручку и среднюю маржу на категорию. Длительность нужна для онлайн-бронирования и расчёта загрузки.',
-            })}
-          </p>
-        </div>
+        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+          {t('onboarding.step3.title', { defaultValue: 'Каталог услуг' })}
+        </h1>
         {SEED_SERVICES_BY_TYPE[salonType].length > 0 ? (
           <button
             type="button"
@@ -113,7 +105,7 @@ export function Step3Services({ value, onChange, salonType }: Props) {
         ) : null}
       </div>
 
-      <div className="mt-7 flex flex-col gap-3">
+      <div className="mt-3 flex flex-col gap-2">
         {groups.map((group) => {
           const open = openCats.has(group.name)
           return (

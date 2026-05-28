@@ -28,18 +28,12 @@ export function StepPublicLinks({ value, onChange }: Props) {
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-        <Link2 className="text-brand-teal-deep mr-2 inline-block size-7" strokeWidth={2} />
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+        <Link2 className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
         {t('onboarding.public_links.title', { defaultValue: 'Публичные ссылки салона' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.public_links.subtitle', {
-          defaultValue:
-            'Эти ссылки попадут в письма клиентам и в подпись отзывов на Google. Можно пропустить — добавишь позже в Настройки → Профиль салона.',
-        })}
-      </p>
 
-      <div className="mt-7 flex flex-col gap-5">
+      <div className="mt-3 flex flex-col gap-3">
         <Field
           id="onb-booksy"
           label={
@@ -57,11 +51,6 @@ export function StepPublicLinks({ value, onChange }: Props) {
             onChange={(e) => onChange({ booksy_url: e.target.value })}
             placeholder="https://booksy.com/…"
           />
-          <p className="text-muted-foreground mt-1.5 text-xs">
-            {t('onboarding.public_links.booksy_hint', {
-              defaultValue: 'Используется в письмах «Запишись повторно».',
-            })}
-          </p>
         </Field>
 
         <Field
