@@ -11,6 +11,7 @@ const PlugIconSvg = Plug
 import { Button } from '@/components/ui/button'
 import { LogoLockup } from '@/components/ui/logo'
 import { useAuth } from '@/hooks/useAuth'
+import { DEFAULT_FINANCIAL_SETTINGS, type FinancialSettings } from '@/hooks/useFinancialSettings'
 import { detectCountryByIp } from '@/lib/detect-country'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -86,6 +87,11 @@ export type OnboardingIntegration =
   | 'telegram'
   | 'ical'
   | 'ocr_notebook'
+  // T107 — бухгалтерия
+  | 'ksef'
+  | 'fakturownia'
+  | 'ifirma'
+  | 'infakt'
 
 export type OnboardingState = {
   // Шаг 0 — путь (быстрый/полный). null = ещё не выбран.
@@ -129,6 +135,9 @@ export type OnboardingState = {
   booksy_url: string
   instagram_url: string
   facebook_url: string
+  // T106 — структурированный financial_settings из 7 категорий. После
+  // submit сохраняется в salons.financial_settings jsonb.
+  financial_settings: FinancialSettings
 }
 
 const INITIAL: OnboardingState = {
@@ -170,6 +179,7 @@ const INITIAL: OnboardingState = {
   booksy_url: '',
   instagram_url: '',
   facebook_url: '',
+  financial_settings: DEFAULT_FINANCIAL_SETTINGS,
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -284,6 +294,11 @@ export function OnboardingPage() {
     if (state.booksy_url.trim()) extraPatch.booksy_url = state.booksy_url.trim()
     if (state.instagram_url.trim()) extraPatch.instagram_url = state.instagram_url.trim()
     if (state.facebook_url.trim()) extraPatch.facebook_url = state.facebook_url.trim()
+    // T106 — структурированный financial_settings (только для full ветки).
+    // В quick — пропускаем, бэкенд возьмёт DEFAULT_FINANCIAL_SETTINGS.
+    if (state.path === 'full') {
+      extraPatch.financial_settings = state.financial_settings
+    }
     if (state.nip.trim()) {
       // Бухгалтерия живёт в accounting_settings jsonb (миграция 20260516000002).
       // Merge через accounting_settings — но проще держать в отдельных колонках:
@@ -602,6 +617,15 @@ export function OnboardingPage() {
                   onChange={(v) =>
                     setState((prev) => ({ ...prev, nip: v.nip, company_name: v.company_name }))
                   }
+                  selectedIntegrations={state.selected_integrations}
+                  onToggleIntegration={(id) =>
+                    patch(
+                      'selected_integrations',
+                      state.selected_integrations.includes(id)
+                        ? state.selected_integrations.filter((x) => x !== id)
+                        : [...state.selected_integrations, id],
+                    )
+                  }
                 />
               </>
             )}
@@ -798,6 +822,8 @@ export function OnboardingPage() {
                 <Step4Expenses
                   value={state.expense_categories}
                   onChange={(v) => patch('expense_categories', v)}
+                  financial={state.financial_settings}
+                  onFinancialChange={(v) => patch('financial_settings', v)}
                 />
               </>
             )}
