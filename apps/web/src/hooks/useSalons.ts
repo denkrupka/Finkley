@@ -111,10 +111,18 @@ export function useSalonMembership(salonId: string | undefined) {
     queryKey: ['salon-membership', salonId],
     queryFn: async () => {
       if (!salonId) return null
+      // ВАЖНО: фильтруем по user_id явно. RLS для admin/owner возвращает
+      // все строки salon_members (видимость всех участников), и без этого
+      // фильтра .maybeSingle() падает с "multiple rows" — sidebar теряет
+      // role и скрывает все nav-пункты кроме Dashboard/Settings.
+      const { data: userResp } = await supabase.auth.getUser()
+      const userId = userResp.user?.id
+      if (!userId) return null
       const { data, error } = await supabase
         .from('salon_members')
         .select('role, permissions')
         .eq('salon_id', salonId)
+        .eq('user_id', userId)
         .maybeSingle()
       if (error) throw error
       return (
