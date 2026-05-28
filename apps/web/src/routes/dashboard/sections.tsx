@@ -136,6 +136,8 @@ export type KpiCardsProps = {
   cashBalanceCents?: number | null
   /** План остатка кассы (опц.). */
   cashPlanCents?: number | null
+  /** T73 — открыть модалку «Деньги на счетах — детали». */
+  onCashDetailsClick?: () => void
 }
 
 export function KpiCardsRow(p: KpiCardsProps) {
@@ -378,9 +380,20 @@ function CashOnHandCard(p: KpiCardsProps) {
       : null
   return (
     <Card>
-      <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-        Деньги на счетах
-      </span>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+          Деньги на счетах
+        </span>
+        {p.onCashDetailsClick ? (
+          <button
+            type="button"
+            onClick={p.onCashDetailsClick}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/40 -mr-1 -mt-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline-offset-2 hover:underline"
+          >
+            Детали →
+          </button>
+        ) : null}
+      </div>
       <span className="num text-foreground text-2xl font-bold leading-none">
         {p.cashBalanceCents == null ? '—' : formatCurrency(p.cashBalanceCents, p.currency)}
       </span>

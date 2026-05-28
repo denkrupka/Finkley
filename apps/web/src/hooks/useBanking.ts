@@ -34,6 +34,18 @@ export type BankAccountRow = {
   name: string | null
   currency: string | null
   is_active: boolean
+  /** T73 — id привязанной кассы (financial_settings.cash_registers.items[].id).
+   *  NULL = счёт не связан ни с одной кассой (баланс не учитывается в
+   *  «Деньги на счетах → Детали»). */
+  cash_register_id?: string | null
+}
+
+export type BankAccountBalanceRow = {
+  account_id: string
+  cash_register_id: string | null
+  balance_cents: number
+  currency: string | null
+  last_tx_at: string | null
 }
 
 export type AspspRow = {
@@ -117,6 +129,50 @@ export function useBankAccountsForConnections(connectionIds: string[]) {
     },
     enabled: connectionIds.length > 0,
     staleTime: 60_000,
+  })
+}
+
+/**
+ * T73 — балансы всех банк-счетов салона (sum credit − sum debit).
+ * Для «Деньги на счетах → Детали»: фактический баланс из bank_transactions.
+ */
+export function useBankAccountBalances(salonId: string | undefined) {
+  return useQuery<BankAccountBalanceRow[]>({
+    queryKey: ['bank-account-balances', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase.rpc('bank_account_balances', {
+        p_salon_id: salonId,
+      })
+      if (error) throw error
+      return ((data ?? []) as BankAccountBalanceRow[]).map((r) => ({
+        ...r,
+        balance_cents: Number(r.balance_cents ?? 0),
+      }))
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * T73 — обновить cash_register_id у банк-счёта. NULL = снять привязку.
+ */
+export function useLinkBankAccountToRegister(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { accountId: string; cashRegisterId: string | null }) => {
+      const { error } = await supabase
+        .from('bank_accounts')
+        .update({ cash_register_id: input.cashRegisterId })
+        .eq('id', input.accountId)
+      if (error) throw error
+      return input
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bank-accounts'] })
+      qc.invalidateQueries({ queryKey: ['bank-account-balances', salonId] })
+    },
   })
 }
 

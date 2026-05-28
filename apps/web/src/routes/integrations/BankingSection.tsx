@@ -26,9 +26,11 @@ import {
   useBankConnections,
   useBankDisconnect,
   useBankSyncNow,
+  useLinkBankAccountToRegister,
   useUpdateBankSyncInterval,
   type BankConnectionRow,
 } from '@/hooks/useBanking'
+import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 
 import { BankingConnectDialog } from './BankingConnectDialog'
 
@@ -62,6 +64,13 @@ export function BankingSection({ salonId }: Props) {
   const sync = useBankSyncNow(salonId)
   const disconnect = useBankDisconnect(salonId)
   const updateInterval = useUpdateBankSyncInterval(salonId)
+  const linkRegister = useLinkBankAccountToRegister(salonId)
+  const { data: financialSettings } = useFinancialSettings(salonId)
+  // T73 — фильтр касс по cash_kind='non_cash' (только безналичные могут
+  // быть связаны с банк-счётом).
+  const nonCashRegisters = (financialSettings?.cash_registers.items ?? []).filter(
+    (r) => !r.archived && r.cash_kind === 'non_cash',
+  )
   const [connectOpen, setConnectOpen] = useState(false)
   const [reconnectFor, setReconnectFor] = useState<BankConnectionRow | null>(null)
   const autoSyncedRef = useRef<Set<string>>(new Set())
@@ -209,11 +218,72 @@ export function BankingSection({ salonId }: Props) {
                   </div>
 
                   {conAccounts.length > 0 ? (
-                    <ul className="text-muted-foreground mt-1.5 text-xs">
+                    <ul className="mt-1.5 flex flex-col gap-1.5">
                       {conAccounts.map((a) => (
-                        <li key={a.id} className="num">
-                          {a.iban ?? a.name ?? a.external_id}
-                          {a.currency ? ` · ${a.currency}` : ''}
+                        <li
+                          key={a.id}
+                          className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
+                        >
+                          <span className="text-muted-foreground num text-xs">
+                            {a.iban ?? a.name ?? a.external_id}
+                            {a.currency ? ` · ${a.currency}` : ''}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className="text-muted-foreground">
+                              {t('banking.link_register.label', {
+                                defaultValue: 'Связать с кассой:',
+                              })}
+                            </span>
+                            <Select
+                              value={a.cash_register_id ?? '__none__'}
+                              onValueChange={(v) =>
+                                linkRegister.mutate(
+                                  {
+                                    accountId: a.id,
+                                    cashRegisterId: v === '__none__' ? null : v,
+                                  },
+                                  {
+                                    onSuccess: () =>
+                                      toast.success(
+                                        t('banking.link_register.toast_saved', {
+                                          defaultValue: 'Связь обновлена',
+                                        }),
+                                      ),
+                                    onError: (err) =>
+                                      toast.error(err instanceof Error ? err.message : String(err)),
+                                  },
+                                )
+                              }
+                              disabled={linkRegister.isPending}
+                            >
+                              <SelectTrigger className="h-7 w-[200px] text-xs">
+                                <SelectValue
+                                  placeholder={t('banking.link_register.placeholder', {
+                                    defaultValue: 'Не связан',
+                                  })}
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">
+                                  {t('banking.link_register.none', { defaultValue: '— Не связан' })}
+                                </SelectItem>
+                                {nonCashRegisters.length === 0 ? (
+                                  <SelectItem value="__empty__" disabled>
+                                    {t('banking.link_register.empty', {
+                                      defaultValue:
+                                        'Нет безналичных касс — заведи в Настройках → Справочники',
+                                    })}
+                                  </SelectItem>
+                                ) : (
+                                  nonCashRegisters.map((r) => (
+                                    <SelectItem key={r.id} value={r.id}>
+                                      {r.label}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </li>
                       ))}
                     </ul>

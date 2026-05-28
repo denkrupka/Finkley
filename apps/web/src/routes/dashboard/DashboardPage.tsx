@@ -22,6 +22,7 @@ import { useVisits } from '@/hooks/useVisits'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { effectiveReceivedFromVisit } from '@/hooks/useVisits'
 
+import { CashDetailsModal } from './CashDetailsModal'
 import { CollapsibleSection } from './CollapsibleSection'
 import {
   computeActiveClients,
@@ -79,6 +80,7 @@ export function DashboardPage() {
   const period = (params.get('period') ?? 'month') as PeriodKey
   const now = new Date()
   const range = getPeriodRange(period, now, readCustomFromParams(params))
+  const [cashDetailsOpen, setCashDetailsOpen] = useState(false)
 
   // Предыдущий месяц — для MoM (Month over Month) сравнения KPI.
   const prevMonthAnchor = subMonths(startOfMonth(now), 1)
@@ -274,6 +276,14 @@ export function DashboardPage() {
         churnedClients={churnedClients}
         cashBalanceCents={cashBalanceCents}
         cashPlanCents={null}
+        onCashDetailsClick={() => setCashDetailsOpen(true)}
+      />
+
+      <CashDetailsModal
+        open={cashDetailsOpen}
+        onClose={() => setCashDetailsOpen(false)}
+        salonId={salonId}
+        currency={currency}
       />
 
       {/* Блок 2 — Клиенты + Мастера */}
