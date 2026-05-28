@@ -24,6 +24,9 @@ import {
 } from './onboarding-defaults'
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
 import { Step0Path, type OnboardingPath } from './Step0Path'
+import { StepSchedule, type OpeningHoursDraft } from './StepSchedule'
+import { StepTelegramPhone } from './StepTelegramPhone'
+import { StepUserProfile } from './StepUserProfile'
 import { StepWelcome } from './StepWelcome'
 import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
@@ -38,22 +41,27 @@ import { TutorialNote } from './TutorialNote'
 const STEPS_QUICK = [
   'welcome',
   'path',
+  'profile',
   'salon',
   'integrations_bookings',
   'integrations_social',
   'integrations_banking',
+  'tg_phone',
   'wow',
   'done',
 ] as const
 const STEPS_FULL = [
   'welcome',
   'path',
+  'profile',
   'salon',
+  'schedule',
   'address',
   'accounting',
   'integrations_bookings',
   'integrations_social',
   'integrations_banking',
+  'tg_phone',
   'staff',
   'services',
   'expenses',
@@ -98,6 +106,15 @@ export type OnboardingState = {
   /** T81 — data URL логотипа (webp blob) из ImageCropper. Заливается в
    *  Storage после создания салона (надо salon_id для RLS). NULL — без логотипа. */
   logo_data_url: string | null
+  // T96 — профиль юзера
+  first_name: string
+  last_name: string
+  avatar_data_url: string | null
+  // T97 — телефон + желание подключить Telegram
+  phone: string
+  want_telegram: boolean
+  // T98 — opening hours (full path only)
+  opening_hours: OpeningHoursDraft
 }
 
 const INITIAL: OnboardingState = {
@@ -121,6 +138,20 @@ const INITIAL: OnboardingState = {
   benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
   selected_integrations: [],
   logo_data_url: null,
+  first_name: '',
+  last_name: '',
+  avatar_data_url: null,
+  phone: '',
+  want_telegram: true,
+  opening_hours: {
+    mon: { open: '09:00', close: '20:00' },
+    tue: { open: '09:00', close: '20:00' },
+    wed: { open: '09:00', close: '20:00' },
+    thu: { open: '09:00', close: '20:00' },
+    fri: { open: '09:00', close: '20:00' },
+    sat: { open: '10:00', close: '18:00' },
+    sun: { closed: true },
+  },
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -248,6 +279,43 @@ export function OnboardingPage() {
         company_name: state.company_name.trim() || null,
       }
     }
+    // T96-T98 — сохраняем профиль юзера и opening_hours салона.
+    const fullName = `${state.first_name.trim()} ${state.last_name.trim()}`.trim()
+    if (fullName || state.phone.trim()) {
+      const profilePatch: Record<string, unknown> = {}
+      if (fullName) profilePatch.full_name = fullName
+      if (state.phone.trim()) profilePatch.phone = state.phone.trim()
+      const { data: userResp } = await supabase.auth.getUser()
+      const userId = userResp.user?.id
+      if (userId) {
+        try {
+          await supabase.from('profiles').update(profilePatch).eq('id', userId)
+        } catch (err) {
+          console.warn('profile update failed', err)
+        }
+        // T96 — аватар в avatars bucket (путь <auth.uid()>/...)
+        if (state.avatar_data_url) {
+          try {
+            const blob = await (await fetch(state.avatar_data_url)).blob()
+            const path = `${userId}/avatar-${Date.now()}.webp`
+            const up = await supabase.storage
+              .from('avatars')
+              .upload(path, blob, { upsert: true, contentType: 'image/webp' })
+            if (!up.error) {
+              const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
+              await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', userId)
+            }
+          } catch (err) {
+            console.warn('avatar upload failed', err)
+          }
+        }
+      }
+    }
+    // T98 — рабочий график в salon.opening_hours
+    if (state.path === 'full') {
+      extraPatch.opening_hours = state.opening_hours
+    }
+
     // T81 — заливаем логотип в salon-logos bucket (если был выбран). Это
     // делается ПОСЛЕ создания салона, потому что bucket-policy требует
     // salon_id в первом компоненте пути.
@@ -372,6 +440,12 @@ export function OnboardingPage() {
         })
       case 'wow':
         return t('onboarding.cta.wow', { defaultValue: 'Перейти к моему порталу →' })
+      case 'profile':
+        return t('onboarding.cta.profile', { defaultValue: 'Готово, поехали →' })
+      case 'tg_phone':
+        return t('onboarding.cta.tg_phone', { defaultValue: 'Сохранить и дальше →' })
+      case 'schedule':
+        return t('onboarding.cta.schedule', { defaultValue: 'Сохранить график →' })
       case 'staff':
         return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
       case 'services':
@@ -442,6 +516,28 @@ export function OnboardingPage() {
             {stepId === 'welcome' && <StepWelcome />}
             {stepId === 'path' && (
               <Step0Path value={state.path} onChange={(v) => patch('path', v)} />
+            )}
+            {stepId === 'profile' && (
+              <StepUserProfile
+                value={{
+                  first_name: state.first_name,
+                  last_name: state.last_name,
+                  avatar_data_url: state.avatar_data_url,
+                }}
+                onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
+              />
+            )}
+            {stepId === 'schedule' && (
+              <StepSchedule
+                value={state.opening_hours}
+                onChange={(v) => patch('opening_hours', v)}
+              />
+            )}
+            {stepId === 'tg_phone' && (
+              <StepTelegramPhone
+                value={{ phone: state.phone, want_telegram: state.want_telegram }}
+                onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
+              />
             )}
             {stepId === 'salon' && (
               <>
