@@ -133,6 +133,13 @@ function presetForRole(role: SalonRole): Record<string, Permission> {
       'settings.profile_user': 'edit',
     }
   }
+  if (role === 'external') {
+    // Внешний пользователь — по умолчанию ничего, кроме своего профиля.
+    // Владелец явно отметит галочки на тех разделах которые нужны.
+    return {
+      'settings.profile_user': 'edit',
+    }
+  }
   // accountant и др. — дефолт пустой preview
   return {
     'dashboard.*': 'view',
@@ -165,8 +172,14 @@ export function PermissionsBlock({
   onChange?: (next: PermissionsMap) => void
 }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const [openCats, setOpenCats] = useState<Set<string>>(new Set())
+  // Открыт по умолчанию: блок «Доступы» с пресетами слишком важен, чтобы
+  // его прятать за дополнительным кликом — юзеры не понимают что внутри.
+  const [open, setOpen] = useState(true)
+  // Все категории открыты по умолчанию — пользователь сразу видит все
+  // подразделы, без ещё одного шага «разверни/сверни» на каждой.
+  const [openCats, setOpenCats] = useState<Set<string>>(
+    () => new Set(CATEGORIES.filter((c) => c.items.length > 0).map((c) => c.key)),
+  )
   const preset = useMemo(() => presetForRole(role), [role])
 
   // При смене роли — если родитель не управляет state'ом, синкаем preset.

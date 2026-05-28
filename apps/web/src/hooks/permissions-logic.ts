@@ -13,7 +13,7 @@
  */
 
 export type PermissionAction = 'view' | 'edit'
-export type Role = 'owner' | 'admin' | 'staff' | 'accountant'
+export type Role = 'owner' | 'admin' | 'staff' | 'accountant' | 'external'
 export type PermissionsMap = Record<string, PermissionAction>
 
 export function lookupPermission(
@@ -86,6 +86,11 @@ export function defaultForRole(
     ) {
       return 'view'
     }
+    if (category === 'settings' && sub === 'profile_user') return 'edit'
+    return 'none'
+  }
+  // External — никаких дефолтов, только что явно прописано в permissions.
+  if (role === 'external') {
     if (category === 'settings' && sub === 'profile_user') return 'edit'
     return 'none'
   }

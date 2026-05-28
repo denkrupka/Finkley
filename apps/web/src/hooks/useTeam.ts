@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
-export type SalonRole = 'owner' | 'admin' | 'accountant' | 'staff'
+export type SalonRole = 'owner' | 'admin' | 'accountant' | 'staff' | 'external'
 
 export type TeamMember = {
   id: string

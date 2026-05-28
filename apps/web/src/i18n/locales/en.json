@@ -844,12 +844,14 @@
       "admin": "Admin",
       "accountant": "Accountant",
       "staff": "Staff",
+      "external": "External user",
       "label": "Role"
     },
     "role_hint": {
       "admin": "Full access, except billing and salon deletion",
       "accountant": "Sees and edits all finances, doesn't manage the team",
       "staff": "Sees only their own visits and clients, can't see salon finances",
+      "external": "No permissions by default — tick the boxes for sections you want to grant access to",
       "owner": "Full access to everything. Can be combined with master role — owner's card will appear in Reference → Masters."
     },
     "errors": {

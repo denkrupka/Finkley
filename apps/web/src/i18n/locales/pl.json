@@ -844,12 +844,14 @@
       "admin": "Administrator",
       "accountant": "Księgowy",
       "staff": "Specjalista",
+      "external": "Użytkownik zewnętrzny",
       "label": "Rola"
     },
     "role_hint": {
       "admin": "Pełen dostęp poza rozliczeniami i usuwaniem salonu",
       "accountant": "Widzi/edytuje całe finanse, nie zarządza zespołem",
       "staff": "Widzi tylko swoje wizyty i klientów, nie widzi finansów salonu",
+      "external": "Domyślnie brak uprawnień — zaznacz sekcje, do których chcesz dać dostęp",
       "owner": "Pełny dostęp do wszystkiego. Można łączyć z rolą mistrza — karta właściciela pojawi się w Słownik → Mistrzowie."
     },
     "errors": {

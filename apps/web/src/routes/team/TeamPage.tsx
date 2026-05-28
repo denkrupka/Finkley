@@ -42,6 +42,7 @@ const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
   { value: 'admin', key: 'team.role.admin' },
   { value: 'accountant', key: 'team.role.accountant' },
   { value: 'staff', key: 'team.role.staff' },
+  { value: 'external', key: 'team.role.external' },
 ]
 
 /**
@@ -92,6 +93,8 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
   function highestRole(): SalonRole {
     if (selectedRoles.has('admin')) return 'admin'
     if (selectedRoles.has('accountant')) return 'accountant'
+    if (selectedRoles.has('staff')) return 'staff'
+    if (selectedRoles.has('external')) return 'external'
     return 'staff'
   }
 
