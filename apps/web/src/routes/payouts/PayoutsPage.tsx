@@ -14,6 +14,7 @@ import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
 import { usePayoutsHistory, usePayoutsPreview, type PayoutPreviewRow } from '@/hooks/usePayouts'
+import { computePayoutTotals, computeRowTotals } from '@/lib/payouts/totals'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 import { StaffVisitsModal } from './StaffVisitsModal'
@@ -49,24 +50,8 @@ export function PayoutsPage() {
   const [staffModal, setStaffModal] = useState<{ id: string; name: string } | null>(null)
 
   const totals = useMemo(() => {
-    let revenue = 0
-    let payout = 0
-    let premium = 0
-    let advances = 0
-    for (const r of rows) {
-      revenue += r.revenue_cents
-      payout += r.payout_cents
-      premium += r.premium_cents
-      advances += advancesByStaff.get(r.staff_id) ?? 0
-    }
-    return {
-      revenue,
-      payout,
-      premium,
-      advances,
-      accrued: payout + premium,
-      remaining: payout + premium - advances,
-    }
+    const revenue = rows.reduce((acc, r) => acc + r.revenue_cents, 0)
+    return { revenue, ...computePayoutTotals(rows, advancesByStaff) }
   }, [rows, advancesByStaff])
 
   if (!salonId) return null
@@ -120,8 +105,7 @@ export function PayoutsPage() {
               // T116 — premium приходит из RPC calculate_payouts_for_period
               // как сумма expenses.premium_cents за период по мастеру.
               const premiumCents = r.premium_cents
-              const accruedCents = r.payout_cents + premiumCents
-              const remaining = accruedCents - advance
+              const { accrued: accruedCents, remaining } = computeRowTotals(r, advance)
               return (
                 <div
                   key={r.staff_id}
