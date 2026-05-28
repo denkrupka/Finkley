@@ -1,8 +1,10 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils/cn'
+
 import { SEED_SERVICES_BY_TYPE, type SalonTypeId } from './onboarding-defaults'
 
 export type ServiceDraft = {
@@ -10,6 +12,9 @@ export type ServiceDraft = {
   category_name: string
   name: string
   default_price_cents: number
+  /** T100 — длительность услуги в минутах (для capacity-planning и онлайн-
+   *  бронирования). Дефолт 60 если не задано. */
+  default_duration_min?: number | null
 }
 
 function makeNew(category_name = ''): ServiceDraft {
@@ -18,6 +23,7 @@ function makeNew(category_name = ''): ServiceDraft {
     category_name,
     name: '',
     default_price_cents: 0,
+    default_duration_min: 60,
   }
 }
 
@@ -27,8 +33,38 @@ type Props = {
   salonType: SalonTypeId
 }
 
+/**
+ * T100 — апгрейд Step3Services:
+ *   - Группировка по category_name (раскрываемые секции с counter'ом).
+ *   - Новое поле default_duration_min (длительность услуги в минутах).
+ *   - Drag-to-collapse секции категорий.
+ *   - Кнопка «Добавить услугу» прямо в секции категории.
+ */
 export function Step3Services({ value, onChange, salonType }: Props) {
   const { t } = useTranslation()
+
+  // Группировка по category_name. Несуществующая категория группируется
+  // как «Без категории».
+  const groups = useMemo(() => {
+    const map = new Map<string, ServiceDraft[]>()
+    for (const s of value) {
+      const key = s.category_name.trim() || 'Без категории'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(s)
+    }
+    return Array.from(map.entries()).map(([name, items]) => ({ name, items }))
+  }, [value])
+
+  const [openCats, setOpenCats] = useState<Set<string>>(() => new Set(groups.map((g) => g.name)))
+
+  function toggleCat(name: string) {
+    setOpenCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   function update(id: string, patch: Partial<ServiceDraft>) {
     onChange(value.map((s) => (s.id === id ? { ...s, ...patch } : s)))
@@ -38,9 +74,14 @@ export function Step3Services({ value, onChange, salonType }: Props) {
     onChange(value.filter((s) => s.id !== id))
   }
 
-  function add() {
-    const lastCategory = value.length > 0 ? value[value.length - 1]!.category_name : ''
-    onChange([...value, makeNew(lastCategory)])
+  function addInCategory(category: string) {
+    onChange([...value, makeNew(category === 'Без категории' ? '' : category)])
+    setOpenCats((prev) => new Set([...prev, category]))
+  }
+
+  function addNewCategory() {
+    onChange([...value, makeNew('Новая категория')])
+    setOpenCats((prev) => new Set([...prev, 'Новая категория']))
   }
 
   function resetSeed() {
@@ -52,10 +93,13 @@ export function Step3Services({ value, onChange, salonType }: Props) {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-            {t('onboarding.step3.title')}
+            {t('onboarding.step3.title', { defaultValue: 'Каталог услуг' })}
           </h1>
           <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-            {t('onboarding.step3.subtitle')}
+            {t('onboarding.step3.subtitle_v2', {
+              defaultValue:
+                'Сгруппируй услуги по категориям — так AI правильно посчитает выручку и среднюю маржу на категорию. Длительность нужна для онлайн-бронирования и расчёта загрузки.',
+            })}
           </p>
         </div>
         {SEED_SERVICES_BY_TYPE[salonType].length > 0 ? (
@@ -64,72 +108,122 @@ export function Step3Services({ value, onChange, salonType }: Props) {
             onClick={resetSeed}
             className="text-secondary text-sm font-semibold hover:underline"
           >
-            {t('onboarding.step3.reset_seed')}
+            {t('onboarding.step3.reset_seed', { defaultValue: 'Загрузить пресет' })}
           </button>
         ) : null}
       </div>
 
-      <div className="mt-7 flex flex-col gap-2">
-        <div className="text-muted-foreground hidden grid-cols-[1.5fr_2fr_120px_44px] gap-2.5 px-1 text-[11px] font-semibold uppercase tracking-wide sm:grid">
-          <span>{t('onboarding.step3.category')}</span>
-          <span>{t('onboarding.step3.service')}</span>
-          <span className="text-right">{t('onboarding.step3.price')}</span>
-          <span />
-        </div>
+      <div className="mt-7 flex flex-col gap-3">
+        {groups.map((group) => {
+          const open = openCats.has(group.name)
+          return (
+            <section key={group.name} className="border-border overflow-hidden rounded-md border">
+              <button
+                type="button"
+                onClick={() => toggleCat(group.name)}
+                className="bg-muted/30 hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2.5 text-left"
+              >
+                {open ? (
+                  <ChevronDown className="text-muted-foreground size-4 shrink-0" strokeWidth={2} />
+                ) : (
+                  <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={2} />
+                )}
+                <span className="text-foreground text-sm font-bold">{group.name}</span>
+                <span className="text-muted-foreground bg-card ml-auto rounded-full px-2 py-0.5 text-xs font-semibold">
+                  {group.items.length}
+                </span>
+              </button>
 
-        {value.map((s) => (
-          <div
-            key={s.id}
-            className="border-border bg-card grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-[1.5fr_2fr_120px_44px] sm:gap-2.5 sm:border-0 sm:bg-transparent sm:p-0"
-            data-testid="onb-service-row"
-          >
-            <Input
-              value={s.category_name}
-              onChange={(e) => update(s.id, { category_name: e.target.value })}
-              placeholder={t('onboarding.step3.category_placeholder')}
-            />
-            <Input
-              value={s.name}
-              onChange={(e) => update(s.id, { name: e.target.value })}
-              placeholder={t('onboarding.step3.service_placeholder')}
-            />
-            <div className="border-input bg-card flex items-center gap-1.5 rounded-md border px-3">
-              <Label htmlFor={`pr-${s.id}`} className="hidden">
-                {t('onboarding.step3.price')}
-              </Label>
-              <input
-                id={`pr-${s.id}`}
-                type="number"
-                min="0"
-                value={Math.round(s.default_price_cents / 100)}
-                onChange={(e) =>
-                  update(s.id, {
-                    default_price_cents: Math.max(0, Number(e.target.value)) * 100,
-                  })
-                }
-                className="num text-foreground h-10 w-full bg-transparent text-right text-sm font-semibold outline-none"
-              />
-              <span className="text-muted-foreground text-xs">€</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => remove(s.id)}
-              className="border-border text-muted-foreground hover:text-destructive grid size-11 place-items-center rounded-md border sm:size-11"
-              aria-label="remove"
-            >
-              <Trash2 className="size-4" strokeWidth={1.7} />
-            </button>
-          </div>
-        ))}
+              <div className={cn(open ? '' : 'hidden', 'px-3 py-3')}>
+                <div className="flex flex-col gap-2">
+                  {group.items.map((s) => (
+                    <div
+                      key={s.id}
+                      className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_2fr_110px_110px_44px] sm:gap-2.5"
+                      data-testid="onb-service-row"
+                    >
+                      <Input
+                        value={s.category_name}
+                        onChange={(e) => update(s.id, { category_name: e.target.value })}
+                        placeholder={t('onboarding.step3.category_placeholder', {
+                          defaultValue: 'Категория',
+                        })}
+                        className="h-9 text-sm"
+                      />
+                      <Input
+                        value={s.name}
+                        onChange={(e) => update(s.id, { name: e.target.value })}
+                        placeholder={t('onboarding.step3.service_placeholder', {
+                          defaultValue: 'Название услуги',
+                        })}
+                        className="h-9 text-sm"
+                      />
+                      {/* Цена */}
+                      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
+                        <input
+                          type="number"
+                          min="0"
+                          value={Math.round(s.default_price_cents / 100)}
+                          onChange={(e) =>
+                            update(s.id, {
+                              default_price_cents: Math.max(0, Number(e.target.value)) * 100,
+                            })
+                          }
+                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+                        />
+                        <span className="text-muted-foreground text-xs">€</span>
+                      </div>
+                      {/* Длительность */}
+                      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="15"
+                          value={s.default_duration_min ?? 60}
+                          onChange={(e) =>
+                            update(s.id, {
+                              default_duration_min: Math.max(0, Number(e.target.value)),
+                            })
+                          }
+                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+                        />
+                        <span className="text-muted-foreground text-xs">мин</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => remove(s.id)}
+                        className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md border"
+                        aria-label="remove"
+                      >
+                        <Trash2 className="size-4" strokeWidth={1.7} />
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => addInCategory(group.name)}
+                    className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary mt-1 inline-flex items-center gap-1.5 self-start rounded-md border border-dashed px-3 py-1.5 text-xs font-semibold"
+                  >
+                    <Plus className="size-3" strokeWidth={2.2} />
+                    {t('onboarding.step3.add_in_category', {
+                      defaultValue: 'Добавить услугу в эту категорию',
+                    })}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )
+        })}
 
         <button
           type="button"
-          onClick={add}
-          className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary mt-2 inline-flex items-center justify-center gap-2 self-start rounded-md border border-dashed px-4 py-2 text-sm font-semibold"
+          onClick={addNewCategory}
+          className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary inline-flex items-center justify-center gap-2 self-start rounded-md border border-dashed px-4 py-2 text-sm font-semibold"
           data-testid="onb-service-add"
         >
           <Plus className="size-4" strokeWidth={1.7} />
-          {t('onboarding.step3.add')}
+          {t('onboarding.step3.add_category', { defaultValue: 'Новая категория' })}
         </button>
       </div>
     </div>
