@@ -87,9 +87,16 @@ export function StepTelegramPhone({ value, onChange }: Props) {
         onChange({ want_telegram: true })
         return
       }
-      if (elapsed >= 60) {
+      if (elapsed >= 120) {
+        // T136 — 60s → 120s. Часто юзер тыкает Start не сразу.
         window.clearInterval(id)
         setPolling(false)
+        toast.warning(
+          t('onboarding.tg_phone.poll_timeout', {
+            defaultValue:
+              'Не получилось подтвердить. Жми «Подключить» ещё раз и дойди до Start в Telegram.',
+          }),
+        )
       }
     }, 2000)
   }

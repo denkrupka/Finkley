@@ -1,12 +1,28 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Plug } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-// Универсальная иконка-заглушка для категорий интеграций. Разные провайдеры
-// отображаются одним стилем; различие — в title.
-const PlugIconSvg = Plug
+import { BrandIcon } from './BrandIcon'
+import type { OnboardingIntegration as OnboardingIntegrationType } from './OnboardingPage'
+
+/** T133 — wrapper над BrandIcon чтобы matched LucideIcon signature
+ *  (нужен для items.icon в IntegrationCategoryStep). */
+function makeBrandIcon(provider: OnboardingIntegrationType): LucideIcon {
+  const Icon = (props: { className?: string }) => (
+    <BrandIcon provider={provider} className={props.className} />
+  )
+  Icon.displayName = `BrandIcon(${provider})`
+  return Icon as unknown as LucideIcon
+}
+const BooksyIcon = makeBrandIcon('booksy')
+const ICalIcon = makeBrandIcon('ical')
+const InstagramIcon = makeBrandIcon('instagram')
+const FacebookIcon = makeBrandIcon('facebook')
+const WhatsappIcon = makeBrandIcon('whatsapp')
+const TelegramIcon = makeBrandIcon('telegram')
+const BankingIcon = makeBrandIcon('banking')
 
 import { Button } from '@/components/ui/button'
 import { LogoLockup } from '@/components/ui/logo'
@@ -722,14 +738,14 @@ export function OnboardingPage() {
                 items={[
                   {
                     id: 'booksy',
-                    icon: PlugIconSvg,
+                    icon: BooksyIcon,
                     title: 'Booksy',
                     benefit:
                       'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
                   },
                   {
                     id: 'ical',
-                    icon: PlugIconSvg,
+                    icon: ICalIcon,
                     title: 'Google / Apple / Outlook Calendar',
                     benefit:
                       'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
@@ -754,27 +770,27 @@ export function OnboardingPage() {
                 items={[
                   {
                     id: 'instagram',
-                    icon: PlugIconSvg,
+                    icon: InstagramIcon,
                     title: 'Instagram Direct',
                     benefit:
                       'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
                   },
                   {
                     id: 'facebook',
-                    icon: PlugIconSvg,
+                    icon: FacebookIcon,
                     title: 'Facebook Messenger',
                     benefit: 'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
                   },
                   {
                     id: 'whatsapp',
-                    icon: PlugIconSvg,
+                    icon: WhatsappIcon,
                     title: 'WhatsApp Business',
                     benefit:
                       'Самый популярный мессенджер в Польше — клиенты пишут, ты отвечаешь из портала.',
                   },
                   {
                     id: 'telegram',
-                    icon: PlugIconSvg,
+                    icon: TelegramIcon,
                     title: 'Telegram',
                     benefit:
                       'Утренний разбор от @finkley_tg_bot в 9:00 + важные алерты прямо в чате.',
@@ -847,7 +863,7 @@ export function OnboardingPage() {
                 items={[
                   {
                     id: 'banking',
-                    icon: PlugIconSvg,
+                    icon: BankingIcon,
                     title: 'Банковский счёт (PSD2)',
                     benefit:
                       'Каждое списание автоматом упадёт в Расходы. Можешь подключить несколько банков сразу.',
