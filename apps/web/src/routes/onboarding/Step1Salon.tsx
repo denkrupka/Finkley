@@ -63,17 +63,11 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
 
   return (
     <div>
-      <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         {t('onboarding.step1.title', { defaultValue: 'Расскажи о салоне' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.step1.subtitle', {
-          defaultValue:
-            'Найди салон в Google — мы сразу подтянем адрес и координаты, ничего вписывать не нужно. Если нет в Google — введи имя руками.',
-        })}
-      </p>
 
-      <div className="mt-7 flex flex-col gap-6">
+      <div className="mt-4 flex flex-col gap-3">
         {/* Google Places — самое важное, сверху */}
         <Field
           id="onb-place"
@@ -133,7 +127,7 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
 
         <Field
           id="onb-country"
-          label={t('onboarding.step1.country_label', { defaultValue: 'Страна и валюта' })}
+          label={t('onboarding.step1.country_label', { defaultValue: 'Страна' })}
         >
           <div className="flex flex-wrap gap-2" data-testid="onb-country">
             {COUNTRY_OPTIONS.map((c) => {
@@ -163,11 +157,6 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
               )
             })}
           </div>
-          <p className="text-muted-foreground mt-1.5 text-xs">
-            {t('onboarding.step1.country_hint', {
-              defaultValue: 'Мы определили страну автоматически по твоему IP. Можешь поменять.',
-            })}
-          </p>
         </Field>
 
         {/* Логотип — только в полной ветке (T81). В быстрой пропускаем чтобы
@@ -292,10 +281,9 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
                 defaultValue: 'Сравнить мой салон с похожими (анонимно)',
               })}
             </p>
-            <p className="text-muted-foreground mt-1 text-xs leading-snug">
-              {t('onboarding.step1.benchmarks_body', {
-                defaultValue:
-                  'Мы будем сравнивать твои показатели (выручка/мастер, средний чек, retention) со средним по нише в твоей стране. Анонимно, твои цифры никому не показываем. Зато ты увидишь чёткое «я лучше/хуже рынка».',
+            <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+              {t('onboarding.step1.benchmarks_body_v2', {
+                defaultValue: 'Анонимно: твои цифры vs средний по нише в стране.',
               })}
             </p>
             {value.benchmarks_opt_in ? (

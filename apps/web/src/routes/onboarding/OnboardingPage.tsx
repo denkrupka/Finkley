@@ -665,7 +665,6 @@ export function OnboardingPage() {
             )}
             {stepId === 'salon' && (
               <>
-                <TutorialNote>{t('onboarding.tutorial.salon')}</TutorialNote>
                 <Step1Salon
                   value={{
                     name: state.name,
@@ -680,6 +679,7 @@ export function OnboardingPage() {
                 />
               </>
             )}
+            {/* End Step1Salon */}
             {stepId === 'address' && (
               <>
                 <TutorialNote>{t('onboarding.tutorial.address')}</TutorialNote>

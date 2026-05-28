@@ -4,145 +4,98 @@ import { useTranslation } from 'react-i18next'
 /**
  * Шаг 0 онбординга — Welcome / sales pitch.
  *
- * Не запрашивает данных. Только продающее введение: благодарность, ключевые
- * выгоды, прямые ответы на боли владельца салона.
- *
- * Все выгоды поданы как «что получит клиент», а не «что мы умеем». CTA
- * под смысл шага — «Начать зарабатывать больше», не нейтральное «Далее».
+ * T119: компактная версия — без длинных описаний, всё помещается в 4-5
+ * строк без скроллинга. 8 коротких карточек 4×2 на десктопе, 2×4 на
+ * мобильных. Подробности юзер увидит уже в портале.
  */
 export function StepWelcome() {
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h2 className="text-brand-navy text-2xl font-bold tracking-tight sm:text-3xl">
           {t('onboarding.welcome.title', {
             defaultValue: 'Привет, ты сделал важный выбор 👋',
           })}
         </h2>
-        <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:text-[15px]">
-          {t('onboarding.welcome.subtitle', {
-            defaultValue:
-              'Finkley помогает увидеть РЕАЛЬНЫЕ цифры твоего салона — сколько ты зарабатываешь после всех расходов, какие услуги приносят прибыль, а какие тянут вниз. И сразу подсказывает, что менять, чтобы увеличить доход.',
+        <p className="text-muted-foreground mt-2 text-sm">
+          {t('onboarding.welcome.subtitle_v2', {
+            defaultValue: 'Что Finkley сделает за тебя:',
           })}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <BenefitCard
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Pill
           icon={Zap}
           tone="teal"
-          title={t('onboarding.welcome.b1_title', {
-            defaultValue: 'Всё в одном месте — конец рутине',
-          })}
-          body={t('onboarding.welcome.b1_body', {
-            defaultValue:
-              'Booksy, Фейсбук, Инста, банк, бухгалтерия — больше не нужно лазить по 10 вкладкам. Интегрированно, синхронизировано, обновляется само.',
+          text={t('onboarding.welcome.p1', {
+            defaultValue: 'Всё в одном — конец рутине',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={Lock}
           tone="navy"
-          title={t('onboarding.welcome.b2_title', {
-            defaultValue: 'Твои данные — только твои',
-          })}
-          body={t('onboarding.welcome.b2_body', {
-            defaultValue:
-              'Всё зашифровано. Мы физически не имеем доступа к твоей информации. Даже на запрос гос. органов мы не сможем её передать — потому что и сами её не видим.',
+          text={t('onboarding.welcome.p2', {
+            defaultValue: 'Данные зашифрованы',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={Banknote}
           tone="sage"
-          title={t('onboarding.welcome.b3_title', {
-            defaultValue: 'Банк подключается — расходы фиксируются сами',
-          })}
-          body={t('onboarding.welcome.b3_body', {
-            defaultValue:
-              'Не нужно вечером вписывать «купила лак за 80» — банк показывает, ты подтверждаешь. Никаких забытых расходов = настоящая картина по деньгам.',
+          text={t('onboarding.welcome.p3', {
+            defaultValue: 'Банк → расходы сами',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={TrendingUp}
           tone="gold"
-          title={t('onboarding.welcome.b4_title', {
-            defaultValue: 'Профильный финансовый отчёт',
-          })}
-          body={t('onboarding.welcome.b4_body', {
-            defaultValue:
-              'Сделан финансистами с опытом 200+ салонных проектов. Показывает не «сколько заплатил клиент», а реальную прибыль — в режиме живого времени.',
+          text={t('onboarding.welcome.p4', {
+            defaultValue: 'Реальная прибыль live',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={MessageSquare}
           tone="teal"
-          title={t('onboarding.welcome.b5_title', {
-            defaultValue: 'Все сообщения — в одной ленте',
-          })}
-          body={t('onboarding.welcome.b5_body', {
-            defaultValue:
-              'Instagram, Facebook, WhatsApp, Telegram — клиент написал куда угодно, ты увидишь сразу. Никаких пропущенных сообщений = больше записей.',
+          text={t('onboarding.welcome.p5', {
+            defaultValue: 'Все сообщения вместе',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={Target}
           tone="navy"
-          title={t('onboarding.welcome.b6_title', {
-            defaultValue: 'Анализ конкурентов с советами',
-          })}
-          body={t('onboarding.welcome.b6_body', {
-            defaultValue:
-              'Их цены, отзывы, сильные и слабые стороны. AI сравнит с тобой и подскажет, где недозарабатываешь и где ты явно лучше — это можно продавать.',
+          text={t('onboarding.welcome.p6', {
+            defaultValue: 'Анализ конкурентов',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={Star}
           tone="gold"
-          title={t('onboarding.welcome.b7_title', {
-            defaultValue: 'Защита репутации + рост в Google',
-          })}
-          body={t('onboarding.welcome.b7_body', {
-            defaultValue:
-              'После визита клиенту автоматом летит просьба оценить мастера. 5★ — мягко предлагаем оставить отзыв в Google (твой салон поднимается в выдаче). 1-4★ — отзыв падает только тебе во внутренние, никто посторонний не увидит. Плюс AI-разбор: за что хвалят, что бесит клиентов, какие фразы повторяются.',
+          text={t('onboarding.welcome.p7', {
+            defaultValue: '5★ → Google, 1-4 → тебе',
           })}
         />
-        <BenefitCard
+        <Pill
           icon={Brain}
           tone="sage"
-          title={t('onboarding.welcome.b8_title', {
-            defaultValue: 'AI-помощник, который знает твой салон',
+          text={t('onboarding.welcome.p8', {
+            defaultValue: 'AI-помощник в курсе',
           })}
-          body={t('onboarding.welcome.b8_body', {
-            defaultValue:
-              'Сам отслеживает показатели, видит провалы и тренды, говорит конкретно что улучшить. Не общие советы — а на основе твоих живых данных.',
-          })}
-          className="sm:col-span-2"
         />
       </div>
-
-      <p className="text-muted-foreground border-border border-t pt-4 text-center text-sm leading-relaxed">
-        {t('onboarding.welcome.footer', {
-          defaultValue:
-            'Через несколько минут ты увидишь все свои деньги, своих мастеров и своих клиентов в одном месте. И поймёшь, что было скрыто всё это время.',
-        })}
-      </p>
     </div>
   )
 }
 
-function BenefitCard({
+function Pill({
   icon: Icon,
-  title,
-  body,
+  text,
   tone,
-  className,
 }: {
   icon: typeof Brain
-  title: string
-  body: string
+  text: string
   tone: 'teal' | 'navy' | 'sage' | 'gold'
-  className?: string
 }) {
   const iconBg =
     tone === 'teal'
@@ -154,16 +107,11 @@ function BenefitCard({
           : 'bg-brand-gold-soft text-brand-gold-deep'
 
   return (
-    <div
-      className={`border-border bg-card shadow-finsm flex items-start gap-3 rounded-xl border p-4 ${className ?? ''}`}
-    >
-      <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${iconBg}`}>
-        <Icon className="size-5" strokeWidth={2} />
+    <div className="border-border bg-card flex items-center gap-2 rounded-lg border p-2.5">
+      <div className={`grid size-8 shrink-0 place-items-center rounded-md ${iconBg}`}>
+        <Icon className="size-4" strokeWidth={2} />
       </div>
-      <div className="min-w-0">
-        <p className="text-foreground text-sm font-bold leading-snug">{title}</p>
-        <p className="text-muted-foreground mt-1 text-[12.5px] leading-snug">{body}</p>
-      </div>
+      <p className="text-foreground text-[12.5px] font-semibold leading-tight">{text}</p>
     </div>
   )
 }
