@@ -18,6 +18,7 @@ import { IntegrationsContent } from '@/routes/integrations/IntegrationsPage'
 import { TeamPage } from '@/routes/team/TeamPage'
 
 import { Button } from '@/components/ui/button'
+import { ImageCropper } from '@/components/ui/ImageCropper'
 import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -137,6 +138,7 @@ export function SettingsPage() {
   const [salonType, setSalonType] = useState<string>('hair')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
+  const [logoCropFile, setLogoCropFile] = useState<File | null>(null)
   // Адрес и публичные ссылки. Нужны для:
   //   - google_place_url → редирект 5★ отзывов в FlySMS-flow (review/<token>)
   //   - google_place_id  → импорт отзывов с Google + rating мониторинг
@@ -457,10 +459,10 @@ export function SettingsPage() {
                       <input
                         id="set-logo"
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        accept="image/jpeg,image/png,image/webp"
                         className="text-muted-foreground file:border-border file:bg-muted file:text-foreground hover:file:bg-muted/80 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
                         disabled={logoUploading}
-                        onChange={async (e) => {
+                        onChange={(e) => {
                           const file = e.target.files?.[0]
                           if (!file || !salon) return
                           if (file.size > 5 * 1024 * 1024) {
@@ -468,17 +470,8 @@ export function SettingsPage() {
                             e.target.value = ''
                             return
                           }
-                          try {
-                            setLogoUploading(true)
-                            const url = await uploadSalonLogo(salon.id, file)
-                            setLogoUrl(url)
-                            toast.success(t('settings.profile.logo_uploaded'))
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : String(err))
-                          } finally {
-                            setLogoUploading(false)
-                            e.target.value = ''
-                          }
+                          setLogoCropFile(file)
+                          e.target.value = ''
                         }}
                       />
                       {logoUrl ? (
@@ -1002,6 +995,27 @@ export function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageCropper
+        file={logoCropFile}
+        aspect={null}
+        maxOutputSize={512}
+        onCancel={() => setLogoCropFile(null)}
+        onCrop={async (blob) => {
+          if (!salon) return
+          try {
+            setLogoUploading(true)
+            const url = await uploadSalonLogo(salon.id, blob, 'webp')
+            setLogoUrl(url)
+            toast.success(t('settings.profile.logo_uploaded'))
+            setLogoCropFile(null)
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : String(err))
+          } finally {
+            setLogoUploading(false)
+          }
+        }}
+      />
     </div>
   )
 }

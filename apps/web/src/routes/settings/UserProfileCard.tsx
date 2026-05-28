@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { ImageCropper } from '@/components/ui/ImageCropper'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
@@ -31,6 +32,7 @@ export function UserProfileCard() {
   const [phone, setPhone] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -86,25 +88,30 @@ export function UserProfileCard() {
     })
   }
 
-  async function handleUploadAvatar(file: File) {
-    if (!user) return
+  function pickAvatarFile(file: File) {
     if (file.size > 5 * 1024 * 1024) {
       toast.error(t('settings.user_profile.avatar_too_large', { defaultValue: 'Макс. 5 МБ' }))
       return
     }
+    // Открываем кропер — пользователь выберет квадратную область.
+    setCropFile(file)
+  }
+
+  async function handleCroppedAvatar(blob: Blob) {
+    if (!user) return
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`
+      const path = `${user.id}/avatar-${Date.now()}.webp`
       const { error: upErr } = await supabase.storage
         .from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type })
+        .upload(path, blob, { upsert: true, contentType: 'image/webp' })
       if (upErr) throw upErr
       const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
       await update.mutateAsync({ avatar_url: pub.publicUrl })
       toast.success(
         t('settings.user_profile.toast_avatar_updated', { defaultValue: 'Аватар обновлён' }),
       )
+      setCropFile(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -135,7 +142,7 @@ export function UserProfileCard() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) void handleUploadAvatar(f)
+              if (f) pickAvatarFile(f)
               e.target.value = ''
             }}
           />
@@ -234,6 +241,14 @@ export function UserProfileCard() {
           </Button>
         </div>
       </div>
+
+      <ImageCropper
+        file={cropFile}
+        aspect={1}
+        maxOutputSize={512}
+        onCancel={() => setCropFile(null)}
+        onCrop={handleCroppedAvatar}
+      />
     </div>
   )
 }

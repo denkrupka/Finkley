@@ -60,12 +60,15 @@ export function useUpdateSalon() {
  * Path: `<salon_id>/<uuid>.<ext>`. RLS на bucket пропускает запись только
  * для owner/admin салона (см. миграцию 20260508000015).
  */
-export async function uploadSalonLogo(salonId: string, file: File): Promise<string> {
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+export async function uploadSalonLogo(
+  salonId: string,
+  file: File | Blob,
+  ext = 'webp',
+): Promise<string> {
   const path = `${salonId}/${crypto.randomUUID()}.${ext}`
   const { error: upErr } = await supabase.storage.from('salon-logos').upload(path, file, {
     upsert: false,
-    contentType: file.type || undefined,
+    contentType: file instanceof File ? file.type || undefined : `image/${ext}`,
     cacheControl: '3600',
   })
   if (upErr) throw upErr
