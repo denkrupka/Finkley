@@ -498,6 +498,20 @@ export function OnboardingPage() {
     // ломать UX онбординга (Postmark может тупить, sender signature пропасть).
     void triggerWelcomeEmail(newSalonId, state.name.trim())
 
+    // T179 — сохраняем prompt в localStorage до Stripe redirect, чтобы после
+    // возврата из Checkout (success_url) IntegrationsPage его подхватил.
+    // URL query param теряется при window.location.href в Stripe.
+    if (state.selected_integrations.length > 0) {
+      try {
+        localStorage.setItem(
+          `finkley:onboarding:prompt:${newSalonId}`,
+          state.selected_integrations.join(','),
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+
     // Paywall: если юзер не снял чек-бокс «активировать trial» — редиректим
     // в Stripe Checkout (мode=subscription, trialDays=14). Стандартный
     // success_url возвращает на settings?stripe=success → дальше dashboard.
@@ -979,6 +993,8 @@ export function OnboardingPage() {
                   onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
                   selectedIntegrations={state.selected_integrations}
                   onIntegrationsToggle={(v) => patch('selected_integrations', v)}
+                  subscribeAfterSubmit={state.subscribe_after_submit}
+                  onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
                   path={state.path}
                   onSwitchToFull={() => {
                     // T105 — переключаемся на full ветку и навигируем на

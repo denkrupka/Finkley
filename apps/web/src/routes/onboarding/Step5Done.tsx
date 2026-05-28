@@ -27,6 +27,11 @@ type Props = {
   /** T105 — обработчик переключения на полную ветку. Меняет path на 'full'
    *  и навигирует на schedule (первый full-only шаг). */
   onSwitchToFull?: () => void
+  /** T178 — Stripe Checkout opt-out (вернул после регрессии T164).
+   *  Дефолт true (юзер автоматом получает 14-дневный trial). Чек-бокс
+   *  даёт явный «без подписки» — для demo/test юзеров без Stripe ENV. */
+  subscribeAfterSubmit: boolean
+  onSubscribeToggle: (value: boolean) => void
 }
 
 const INTEGRATIONS: ReadonlyArray<{
@@ -47,10 +52,9 @@ export function Step5Done({
   onIntegrationsToggle,
   path,
   onSwitchToFull,
+  subscribeAfterSubmit,
+  onSubscribeToggle,
 }: Props) {
-  // T145+T159 — paywall убран целиком, props subscribeAfterSubmit/
-  // onSubscribeToggle тоже удалены из API. Подписка активируется
-  // автоматически в Settings → Биллинг.
   const { t } = useTranslation()
 
   function toggleIntegration(id: OnboardingIntegration) {
@@ -87,6 +91,37 @@ export function Step5Done({
           <ArrowRight className="size-4" strokeWidth={2.4} />
         </button>
       ) : null}
+
+      {/* T178 — Stripe opt-out. Дефолт включён, юзер может снять для
+          demo/test. Без всплывающего "Paywall" блока T159 — просто
+          компактный чек-бокс. */}
+      <label
+        className={`mx-auto mt-6 flex max-w-md cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+          subscribeAfterSubmit
+            ? 'border-brand-teal-deep bg-brand-teal-soft/30'
+            : 'border-border bg-card hover:bg-muted/30'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={subscribeAfterSubmit}
+          onChange={(e) => onSubscribeToggle(e.target.checked)}
+          className="mt-0.5 size-4 cursor-pointer"
+        />
+        <div className="flex-1">
+          <p className="text-foreground text-sm font-semibold">
+            {t('onboarding.step5.subscribe_label', {
+              defaultValue: 'Активировать подписку с trial 14 дней (рекомендуется)',
+            })}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {t('onboarding.step5.subscribe_hint', {
+              defaultValue:
+                'После сохранения откроется Stripe для привязки карты. Списание через 14 дней, отписаться в 1 клик.',
+            })}
+          </p>
+        </div>
+      </label>
 
       {/* Бенчмарки opt-in — дружелюбный копирайт, по умолчанию включено */}
       <label

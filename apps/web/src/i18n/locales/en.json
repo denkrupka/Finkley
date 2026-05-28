@@ -238,7 +238,8 @@
       "reset_seed": "Reset to template",
       "ocr_title": "Logging bookings manually?",
       "ocr_body": "Upload a photo of your booking journal or notebook — AI will recognize and import.",
-      "ocr_collected": "In import queue: {{count}} visits"
+      "ocr_collected": "In import queue: {{count}} visits",
+      "ocr_toggle": "I log bookings manually → upload a journal photo"
     },
     "step4": {
       "title": "Expense categories",
@@ -272,7 +273,9 @@
           "label": "Bank",
           "hint": "PSD2 import: all account debits automatically recorded as Expenses."
         }
-      }
+      },
+      "subscribe_label": "Activate subscription with a 14-day trial (recommended)",
+      "subscribe_hint": "After saving, Stripe will open to link your card. Charged after 14 days, cancel in one click."
     },
     "wow": {
       "title": "AI already sees what's happening in your salon",
@@ -886,7 +889,10 @@
     "insights": {
       "title": "What the AI assistant sees",
       "dismiss": "Dismiss",
-      "empty": "All quiet. If something needs attention — you'll see a hint here."
+      "empty": "All quiet. If something needs attention — you'll see a hint here.",
+      "run_ai": "Run AI analysis",
+      "run_done": "AI analysis ready",
+      "run_no_data": "Add a few visits first — then AI will give an analysis."
     },
     "cash_details": {
       "title": "Money in accounts — details",

@@ -3,9 +3,13 @@ import type { OnboardingIntegration } from './OnboardingPage'
 /**
  * T133+T167 — оригинальные логотипы интеграций (inline SVG из simple-icons).
  *
- * Brand glyphs скопированы из simple-icons.org (CC0 license) — это
- * официальные path data для каждого бренда. Без npm-зависимости, чтобы
- * не раздувать bundle.
+ * Brand glyphs скопированы из simple-icons.org — CC0 1.0 Universal license
+ * (https://github.com/simple-icons/simple-icons/blob/master/LICENSE.md).
+ * Path data: Instagram, Facebook, WhatsApp, Telegram. Версия на дату
+ * 2026-05-29. Если будем обновлять — взять свежие из npm-пакета
+ * simple-icons. Trademark усмотрение: бренды Meta/Booksy/Telegram/etc.
+ * принадлежат их владельцам; SVG используем по фейр-юс для UI-индикаторов
+ * подключённых интеграций, без коммерческого использования брендов.
  *
  * Для интеграций без узнаваемого бренда (banking, ical, ocr_notebook) —
  * используем абстрактные lucide-style glyphs.

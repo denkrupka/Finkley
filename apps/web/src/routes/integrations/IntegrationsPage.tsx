@@ -131,41 +131,76 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.get('fb'), params.get('ig')])
 
-  // T175 — обработка ?prompt=<provider1>,<provider2> из онбординга.
-  // OnboardingPage редиректит сюда с prompt — автоматически открываем
-  // нужные connect-dialog'и (поочерёдно: при закрытии одного — открываем
-  // следующий). Credentials pre-fill происходит автоматически в каждом
-  // dialog'е через consumeOnboardingCredentials.
+  // T175+T179 — обработка ?prompt=<provider1>,<provider2> из онбординга.
+  // Источник: URL query (свежий редирект) ИЛИ localStorage (если юзер
+  // возвращается из Stripe Checkout — query потерян).
   const promptParam = params.get('prompt')
-  useEffect(() => {
-    if (!promptParam) return
-    const queue = promptParam.split(',').filter(Boolean)
+
+  // T180 — при закрытии каждого dialog'a проверяем remaining prompt
+  // и автоматом открываем следующий. Цепочка работает даже если юзер
+  // не подтвердил один из dialog'ов.
+  function consumeNextPrompt(): void {
+    const remaining = params.get('prompt')
+    if (!remaining) return
+    const queue = remaining.split(',').filter(Boolean)
     if (queue.length === 0) return
-    const first = queue[0]
-    if (first === 'booksy') setBooksyOpen(true)
-    else if (first === 'wfirma') setWfirmaOpen(true)
-    else if (first === 'ksef') setKsefOpen(true)
-    else if (first === 'instagram' || first === 'facebook' || first === 'whatsapp') {
-      // Messenger диалог имеет свой state в IntegrationsTabsNav секции —
-      // активируем через query param `?messenger=<channel>` который читается
-      // ниже отдельным effect'ом.
+    const next = queue[0]!
+    openProviderDialog(next)
+    const rest = queue.slice(1)
+    const newParams = new URLSearchParams(params)
+    if (rest.length > 0) newParams.set('prompt', rest.join(','))
+    else newParams.delete('prompt')
+    setParams(newParams, { replace: true })
+  }
+
+  function openProviderDialog(provider: string): void {
+    if (provider === 'booksy') setBooksyOpen(true)
+    else if (provider === 'wfirma') setWfirmaOpen(true)
+    else if (provider === 'ksef') setKsefOpen(true)
+    else if (provider === 'instagram' || provider === 'facebook' || provider === 'whatsapp') {
       const next2 = new URLSearchParams(params)
-      next2.set('messenger', first)
+      next2.set('messenger', provider)
       next2.set('tab', 'messengers')
       setParams(next2, { replace: true })
-      return
     } else {
-      const def = INTEGRATIONS.find((p) => p.id === first)
+      const def = INTEGRATIONS.find((p) => p.id === provider)
       if (def) setConnecting(def)
     }
-    // Удаляем уже обработанный prompt из URL.
+  }
+
+  useEffect(() => {
+    // Если URL не имеет prompt — пытаемся восстановить из localStorage
+    // (после Stripe Checkout success_url теряет query).
+    let queue: string[] = []
+    if (promptParam) {
+      queue = promptParam.split(',').filter(Boolean)
+    } else if (salonId) {
+      try {
+        const stored = localStorage.getItem(`finkley:onboarding:prompt:${salonId}`)
+        if (stored) {
+          queue = stored.split(',').filter(Boolean)
+          localStorage.removeItem(`finkley:onboarding:prompt:${salonId}`)
+          // Восстановим в URL чтобы consumeNextPrompt мог дальше работать.
+          const next = new URLSearchParams(params)
+          next.set('prompt', queue.join(','))
+          next.set('tab', 'booking')
+          setParams(next, { replace: true })
+          return
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (queue.length === 0) return
+    const first = queue[0]!
+    openProviderDialog(first)
     const rest = queue.slice(1)
     const next = new URLSearchParams(params)
     if (rest.length > 0) next.set('prompt', rest.join(','))
     else next.delete('prompt')
     setParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptParam])
+  }, [promptParam, salonId])
 
   // Активная вкладка — в URL `?tab=booking`, дефолт booking (запись и календарь).
   const tabParam = params.get('tab')
@@ -239,7 +274,13 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
 
       <p className="text-muted-foreground mt-6 text-xs">{t('integrations.privacy_note')}</p>
 
-      <ConnectIntegrationDialog provider={connecting} onClose={() => setConnecting(null)} />
+      <ConnectIntegrationDialog
+        provider={connecting}
+        onClose={() => {
+          setConnecting(null)
+          consumeNextPrompt()
+        }}
+      />
       <BooksyConnectDialog
         open={booksyOpen}
         onClose={() => {
@@ -247,11 +288,24 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
           // После закрытия (значит config сохранён) — открываем invite-модалку
           // с задержкой, чтобы дать caталог-sync подгрузить мастеров.
           setTimeout(() => setBooksyInviteOpen(true), 800)
+          consumeNextPrompt()
         }}
       />
       <BooksyStaffInviteModal open={booksyInviteOpen} onClose={() => setBooksyInviteOpen(false)} />
-      <WfirmaConnectDialog open={wfirmaOpen} onClose={() => setWfirmaOpen(false)} />
-      <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} />
+      <WfirmaConnectDialog
+        open={wfirmaOpen}
+        onClose={() => {
+          setWfirmaOpen(false)
+          consumeNextPrompt()
+        }}
+      />
+      <KsefConnectDialog
+        open={ksefOpen}
+        onClose={() => {
+          setKsefOpen(false)
+          consumeNextPrompt()
+        }}
+      />
     </div>
   )
 }

@@ -38,12 +38,25 @@ export function InsightsWidget({
   // T170 — явный триггер «Запустить AI разбор». Вызывает generate-insights
   // и обновляет inservation кэш.
   async function runAiAnalysis() {
+    if (!salonId) return
     setGenerating(true)
     try {
-      const { error } = await supabase.functions.invoke('generate-insights', {
+      const { data, error } = await supabase.functions.invoke('generate-insights', {
         body: { salon_id: salonId },
       })
       if (error) throw error
+      const result = data as { count?: number; reason?: string } | null
+      // T182 — friendly empty: если у салона нет visits, AI вернёт
+      // count=0 или reason='no_data'. Показываем понятный toast вместо
+      // generic error.
+      if (result?.reason === 'no_data' || result?.count === 0) {
+        toast.info(
+          t('dashboard.insights.run_no_data', {
+            defaultValue: 'Сначала добавь несколько визитов — потом AI даст разбор.',
+          }),
+        )
+        return
+      }
       await qc.invalidateQueries({ queryKey: ['insights', salonId] })
       toast.success(t('dashboard.insights.run_done', { defaultValue: 'AI разбор готов' }))
     } catch (e) {

@@ -279,8 +279,9 @@ function TourRenderer({
   const realRect = useTargetRect(step.target)
   // T168 — если у шага есть target, но он не найден на странице (например,
   // FAB на странице без FAB) — рисуем «искусственный» spotlight в центре
-  // экрана, чтобы юзер всё равно видел визуальный фокус. Без этого юзер
-  // жалуется «по старому тур хочет вести - без выделения».
+  // экрана. Помечаем isArtificial=true чтобы рендерить пунктирное кольцо
+  // вместо solid (юзер видит что элемент недоступен на этой странице).
+  const isArtificial = !realRect && !!step.target
   const targetRect: DOMRect | null =
     realRect ??
     (step.target && typeof window !== 'undefined'
@@ -348,9 +349,16 @@ function TourRenderer({
               bottom: 0,
             }}
           />
-          {/* Кольцо вокруг подсвеченного элемента */}
+          {/* Кольцо вокруг подсвеченного элемента. T183 — для искусственного
+              fallback rect рисуем пунктирное полупрозрачное кольцо чтобы юзер
+              понимал что реального элемента на этой странице нет. */}
           <div
-            className="ring-primary/80 pointer-events-none absolute rounded-md ring-2 ring-offset-2 ring-offset-transparent transition-all"
+            className={cn(
+              'pointer-events-none absolute rounded-md ring-offset-2 ring-offset-transparent transition-all',
+              isArtificial
+                ? 'ring-primary/40 outline-primary/60 outline outline-dashed outline-2'
+                : 'ring-primary/80 ring-2',
+            )}
             style={{
               left: targetRect.left - 4,
               top: targetRect.top - 4,

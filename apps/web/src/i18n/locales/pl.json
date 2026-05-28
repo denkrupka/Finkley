@@ -238,7 +238,8 @@
       "reset_seed": "Przywróć szablon",
       "ocr_title": "Prowadzisz rezerwacje ręcznie?",
       "ocr_body": "Załaduj zdjęcie swojego dziennika rezerwacji lub zeszytu — AI rozpozna i wprowadzi.",
-      "ocr_collected": "W kolejce do importu: {{count}} wizyt"
+      "ocr_collected": "W kolejce do importu: {{count}} wizyt",
+      "ocr_toggle": "Prowadzę rezerwacje ręcznie → załaduj zdjęcie dziennika"
     },
     "step4": {
       "title": "Kategorie wydatków",
@@ -272,7 +273,9 @@
           "label": "Bank",
           "hint": "Import PSD2: wszystkie obciążenia konta automatycznie rejestrowane jako Wydatki."
         }
-      }
+      },
+      "subscribe_label": "Aktywuj subskrypcję z 14-dniowym okresem próbnym (zalecane)",
+      "subscribe_hint": "Po zapisaniu otworzy się Stripe do powiązania karty. Pobranie po 14 dniach, anulowanie jednym kliknięciem."
     },
     "wow": {
       "title": "AI już widzi, co dzieje się w Twoim salonie",
@@ -886,7 +889,10 @@
     "insights": {
       "title": "AI-asystent widzi",
       "dismiss": "Ukryj",
-      "empty": "Spokojnie. Jeśli coś będzie wymagało uwagi — wskazówka pojawi się tutaj."
+      "empty": "Spokojnie. Jeśli coś będzie wymagało uwagi — wskazówka pojawi się tutaj.",
+      "run_ai": "Uruchom analizę AI",
+      "run_done": "Analiza AI gotowa",
+      "run_no_data": "Dodaj kilka wizyt — potem AI da analizę."
     },
     "cash_details": {
       "title": "Pieniądze na kontach — szczegóły",
