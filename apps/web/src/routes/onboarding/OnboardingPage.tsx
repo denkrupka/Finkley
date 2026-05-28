@@ -375,6 +375,83 @@ export function OnboardingPage() {
     if (Object.keys(extraPatch).length > 0) {
       await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
     }
+
+    // T108 — импорт OCR-визитов как реальных записей в visits таблицу.
+    // visit_at: парсим из date или ставим now() как fallback.
+    // status='paid' (если есть amount) или 'pending'. Без staff_id/client_id
+    // — попозже юзер привяжет вручную. amount_cents = amount × 100.
+    if (state.ocr_visits.length > 0) {
+      try {
+        const rows = state.ocr_visits.map((v) => {
+          const dateStr = v.date ?? ''
+          let visitAt = new Date().toISOString()
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            const parsed = new Date(`${dateStr}T12:00:00Z`)
+            if (!isNaN(parsed.getTime())) visitAt = parsed.toISOString()
+          }
+          const amountCents =
+            v.amount != null && Number.isFinite(v.amount) ? Math.round(Number(v.amount) * 100) : 0
+          return {
+            salon_id: newSalonId,
+            visit_at: visitAt,
+            amount_cents: amountCents,
+            tip_cents: 0,
+            discount_cents: 0,
+            payment_method: 'cash',
+            status: amountCents > 0 ? 'paid' : 'pending',
+            service_name_snapshot: v.service ?? null,
+            source: 'ocr_notebook',
+            kind: 'visit',
+            comment: v.raw ?? null,
+          }
+        })
+        const { error: insErr } = await supabase.from('visits').insert(rows)
+        if (insErr) console.warn('ocr_visits insert failed', insErr.message)
+      } catch (err) {
+        console.warn('ocr_visits insert exception', err)
+      }
+    }
+
+    // T109 — отправка приглашений мастерам с invite=true и email. Для
+    // каждого мастера: insert в salon_invitations + триггер send-invitation
+    // (email с deep-link). RPC create_salon_with_setup уже создал staff
+    // rows — мы линкуем invitation к существующему staff по full_name.
+    const staffToInvite = state.staff.filter(
+      (s) => s.invite && s.email && s.email.trim() && s.full_name.trim(),
+    )
+    if (staffToInvite.length > 0) {
+      try {
+        // Подгружаем staff_id'ы только что созданных мастеров — для линка.
+        const { data: createdStaff } = await supabase
+          .from('staff')
+          .select('id, full_name')
+          .eq('salon_id', newSalonId)
+        const staffByName = new Map(
+          (createdStaff ?? []).map((s) => [s.full_name.trim().toLowerCase(), s.id]),
+        )
+        for (const s of staffToInvite) {
+          const linkedStaffId = staffByName.get(s.full_name.trim().toLowerCase()) ?? null
+          try {
+            await supabase.functions.invoke('send-invitation', {
+              body: {
+                salon_id: newSalonId,
+                email: s.email!.trim(),
+                role: 'staff',
+                staff_id: linkedStaffId,
+                invited_first_name: s.full_name.split(' ')[0] ?? null,
+                invited_last_name: s.full_name.split(' ').slice(1).join(' ') || null,
+                invited_phone: s.phone?.trim() || null,
+              },
+            })
+          } catch (e) {
+            console.warn(`invite for ${s.email} failed:`, e)
+          }
+        }
+      } catch (err) {
+        console.warn('staff invitations exception', err)
+      }
+    }
+
     rememberLastSalon(newSalonId)
     // Кэш `useMySalons` не знает о только что созданном салоне.
     // invalidateQueries сам по себе не блокирующий — SalonLayout мог бы
