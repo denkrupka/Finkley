@@ -15,11 +15,13 @@ export type CountryCode = (typeof COUNTRY_OPTIONS)[number]['code']
 
 export const SALON_TYPES = [
   { id: 'hair', name: 'Парикмахерская' },
-  { id: 'nails', name: 'Ногти' },
-  { id: 'spa', name: 'Спа / косметология' },
+  { id: 'nails', name: 'Маникюрный салон' },
+  { id: 'spa', name: 'Спа салон' },
+  { id: 'massage', name: 'Студия массажа' },
   { id: 'barber', name: 'Барбершоп' },
   { id: 'cosmetology', name: 'Косметология' },
-  { id: 'mixed', name: 'Смешанный' },
+  { id: 'tattoo', name: 'Тату студия' },
+  { id: 'other', name: 'Другое' },
 ] as const
 
 export type SalonTypeId = (typeof SALON_TYPES)[number]['id']
@@ -78,7 +80,18 @@ export const SEED_SERVICES_BY_TYPE: Record<
     { category_name: 'Пилинг', name: 'Пилинг', default_price_cents: 6000 },
     { category_name: 'Уколы', name: 'Уколы красоты', default_price_cents: 25000 },
   ],
-  mixed: [],
+  massage: [
+    { category_name: 'Массаж', name: 'Массаж классический', default_price_cents: 6000 },
+    { category_name: 'Массаж', name: 'Массаж спортивный', default_price_cents: 7000 },
+    { category_name: 'Массаж', name: 'Антицеллюлитный массаж', default_price_cents: 8000 },
+  ],
+  tattoo: [
+    { category_name: 'Тату', name: 'Минимализм / small', default_price_cents: 15000 },
+    { category_name: 'Тату', name: 'Средняя работа (1-3 часа)', default_price_cents: 45000 },
+    { category_name: 'Тату', name: 'Большая работа (сеанс)', default_price_cents: 80000 },
+    { category_name: 'Тату', name: 'Коррекция / cover-up', default_price_cents: 25000 },
+  ],
+  other: [],
 }
 
 /**

@@ -1,11 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { LogoLockup } from '@/components/ui/logo'
 import { useAuth } from '@/hooks/useAuth'
+import { detectCountryByIp } from '@/lib/detect-country'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -17,6 +18,7 @@ import {
   type SalonTypeId,
 } from './onboarding-defaults'
 import { Step0Path, type OnboardingPath } from './Step0Path'
+import { StepWelcome } from './StepWelcome'
 import { Step1Salon } from './Step1Salon'
 import { Step2Address, type AddressDraft } from './Step2Address'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
@@ -27,8 +29,9 @@ import { Step5Done } from './Step5Done'
 import { StepIntegrationsChoice } from './StepIntegrationsChoice'
 import { TutorialNote } from './TutorialNote'
 
-const STEPS_QUICK = ['path', 'salon', 'done'] as const
+const STEPS_QUICK = ['welcome', 'path', 'salon', 'done'] as const
 const STEPS_FULL = [
+  'welcome',
   'path',
   'salon',
   'address',
@@ -104,6 +107,20 @@ export function OnboardingPage() {
   const [state, setState] = useState<OnboardingState>(INITIAL)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // IP-based auto-detect страны. Запускается один раз при монтировании;
+  // не блокирующий. Если юзер уже что-то выбрал (или поменял страну руками
+  // в Step1Salon после монтирования) — не перезаписываем.
+  useEffect(() => {
+    let cancelled = false
+    detectCountryByIp().then((cc) => {
+      if (cancelled || !cc) return
+      setState((prev) => (prev.country_code === 'PL' ? { ...prev, country_code: cc } : prev))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
   const STEPS: readonly StepId[] = state.path === 'full' ? STEPS_FULL : STEPS_QUICK
@@ -277,6 +294,36 @@ export function OnboardingPage() {
     return true
   }
 
+  /** Продающая CTA-кнопка вместо нейтрального «Далее →». Подбирается под
+   *  смысл шага: на welcome — «Начать зарабатывать больше», на интеграциях
+   *  — «Подключить и сэкономить часы рутины», и т.п. */
+  function nextCtaLabel(): string {
+    switch (stepId) {
+      case 'welcome':
+        return t('onboarding.cta.welcome', { defaultValue: 'Начать зарабатывать больше →' })
+      case 'path':
+        return t('onboarding.cta.path', { defaultValue: 'Поехали →' })
+      case 'salon':
+        return t('onboarding.cta.salon', { defaultValue: 'Создать профиль салона →' })
+      case 'address':
+        return t('onboarding.cta.address', { defaultValue: 'Сохранить адрес →' })
+      case 'accounting':
+        return t('onboarding.cta.accounting', { defaultValue: 'Готово, дальше →' })
+      case 'integrations':
+        return t('onboarding.cta.integrations', {
+          defaultValue: 'Освободить время от рутины →',
+        })
+      case 'staff':
+        return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
+      case 'services':
+        return t('onboarding.cta.services', { defaultValue: 'Готово, к расходам →' })
+      case 'expenses':
+        return t('onboarding.cta.expenses', { defaultValue: 'Увидеть реальную прибыль →' })
+      default:
+        return `${t('common.next')} →`
+    }
+  }
+
   return (
     <div className="bg-background flex min-h-screen flex-col" data-testid="onboarding">
       <header className="border-border bg-card flex h-16 items-center justify-between border-b px-6 sm:px-9">
@@ -333,6 +380,7 @@ export function OnboardingPage() {
 
           {/* Step body */}
           <div data-testid={`onboarding-step-${stepId}`}>
+            {stepId === 'welcome' && <StepWelcome />}
             {stepId === 'path' && (
               <Step0Path value={state.path} onChange={(v) => patch('path', v)} />
             )}
@@ -471,7 +519,7 @@ export function OnboardingPage() {
                   disabled={!canProceed()}
                   data-testid="onboarding-next"
                 >
-                  {t('common.next')} →
+                  {nextCtaLabel()}
                 </Button>
               )}
             </div>

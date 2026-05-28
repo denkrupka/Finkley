@@ -144,6 +144,7 @@
       "mixed": "Mieszany"
     },
     "steps": {
+      "welcome": "Witaj",
       "path": "Start",
       "salon": "Salon",
       "address": "Adres",
