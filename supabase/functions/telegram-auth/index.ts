@@ -22,6 +22,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { withSentry } from '../_shared/sentry.ts'
 
 type TelegramPayload = {
   id: number
@@ -81,9 +82,10 @@ async function verifyTelegramSignature(payload: TelegramPayload): Promise<boolea
   return computed === hash
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+Deno.serve(
+  withSentry('telegram-auth', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
   if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
     return jsonResponse({ error: 'function_not_configured' }, 500)
@@ -182,4 +184,5 @@ Deno.serve(async (req: Request) => {
     expires_at: verified.session.expires_at,
     user_id: userId,
   })
-})
+  }),
+)

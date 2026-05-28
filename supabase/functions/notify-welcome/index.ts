@@ -15,6 +15,7 @@
 import { getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
+import { withSentry } from '../_shared/sentry.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -28,9 +29,10 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+Deno.serve(
+  withSentry('notify-welcome', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
   const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
   if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
@@ -136,4 +138,5 @@ Deno.serve(async (req: Request) => {
   )
 
   return jsonResponse({ ok: true })
-})
+  }),
+)

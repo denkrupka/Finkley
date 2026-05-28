@@ -12,6 +12,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
+import { withSentry } from '../_shared/sentry.ts'
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
@@ -59,10 +61,11 @@ function fold(line: string): string {
   return chunks.join('\r\n')
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method !== 'GET') {
-    return textResponse('Method Not Allowed', 405, 'text/plain')
-  }
+Deno.serve(
+  withSentry('calendar-feed', async (req: Request) => {
+    if (req.method !== 'GET') {
+      return textResponse('Method Not Allowed', 405, 'text/plain')
+    }
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return textResponse('Service unavailable', 503, 'text/plain')
   }
@@ -250,4 +253,5 @@ Deno.serve(async (req: Request) => {
 
   lines.push('END:VCALENDAR')
   return textResponse(lines.join('\r\n') + '\r\n')
-})
+  }),
+)

@@ -329,9 +329,13 @@ async function ingestMessage(
   if (providerToken && direction === 'in') {
     try {
       if (providerKind === 'page') {
-        // FB Messenger Profile API через Page Token: только базовые поля
-        // first_name,last_name,profile_pic. Дополнительные поля (name/username)
-        // требуют расширенных permission и могут заваливать весь запрос.
+        // T112 — стратегия с 3 fallback'ами. FB Messenger Profile API
+        // требует pages_messaging permission, которое может быть не одобрено
+        // (Development mode без тестеров → возвращает 400). Пробуем поочерёдно:
+        //   1) first_name + last_name + profile_pic (Standard endpoint)
+        //   2) только name (если первый упал на 100/200 «permission required»)
+        //   3) /{psid}/picture?type=large&redirect=false (даёт URL аватарки
+        //      даже без расширенных прав — это публичная картинка профиля)
         const profUrl = `https://graph.facebook.com/v21.0/${externalUserId}?fields=first_name,last_name,profile_pic&access_token=${encodeURIComponent(providerToken)}`
         const profResp = await fetch(profUrl)
         const prof = (await profResp.json()) as {
@@ -346,8 +350,45 @@ async function ingestMessage(
           if (prof.profile_pic) avatarUrl = prof.profile_pic
         } else if (prof.error) {
           console.warn(
-            `[webhook] FB profile fetch failed for ${externalUserId}: ${prof.error.message}`,
+            `[webhook] FB profile (first/last) failed for ${externalUserId}: code=${prof.error.code} ${prof.error.message}`,
           )
+          // Fallback 2: попробовать только name (более базовое поле)
+          try {
+            const altUrl = `https://graph.facebook.com/v21.0/${externalUserId}?fields=name&access_token=${encodeURIComponent(providerToken)}`
+            const altResp = await fetch(altUrl)
+            const alt = (await altResp.json()) as {
+              name?: string
+              error?: { message: string; code?: number }
+            }
+            if (altResp.ok && !alt.error && alt.name) {
+              displayName = alt.name
+            } else if (alt.error) {
+              console.warn(
+                `[webhook] FB profile (name) fallback failed: code=${alt.error.code} ${alt.error.message}`,
+              )
+            }
+          } catch (e) {
+            console.warn('FB name fallback exception:', (e as Error).message)
+          }
+        }
+        // Fallback 3: если аватарка ещё не получена — пробуем /picture endpoint,
+        // он часто работает даже когда профиль закрыт.
+        if (!avatarUrl) {
+          try {
+            const picUrl = `https://graph.facebook.com/v21.0/${externalUserId}/picture?type=large&redirect=false&access_token=${encodeURIComponent(providerToken)}`
+            const picResp = await fetch(picUrl)
+            if (picResp.ok) {
+              const pic = (await picResp.json()) as {
+                data?: { url?: string; is_silhouette?: boolean }
+              }
+              // is_silhouette=true означает дефолтный «человечек» — не сохраняем.
+              if (pic.data?.url && !pic.data.is_silhouette) {
+                avatarUrl = pic.data.url
+              }
+            }
+          } catch (e) {
+            console.warn('FB picture fallback exception:', (e as Error).message)
+          }
         }
       } else if (providerKind === 'ig') {
         // IG User Token → graph.instagram.com. Endpoint для профиля собеседника

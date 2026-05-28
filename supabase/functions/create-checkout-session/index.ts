@@ -20,6 +20,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { withSentry } from '../_shared/sentry.ts'
 import { createCheckoutSession } from '../_shared/stripe.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -35,7 +36,8 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(
+  withSentry('create-checkout-session', async (req: Request) => {
   if (req.method === 'OPTIONS') return preflight()
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 

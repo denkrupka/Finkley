@@ -173,7 +173,7 @@ describe('computeRfm', () => {
       { visit_count: 7, last_visit_at: daysAgo(10), created_at: daysAgo(200) },
       // Loyal: 3+ визитов, ≤60 дн (но не champion)
       { visit_count: 4, last_visit_at: daysAgo(40), created_at: daysAgo(150) },
-      // Potential: новый (≤30 дн), 1-2 визита
+      // Potential (T92): 1-2 визита, last_visit ≤30 дн (не по created_at)
       { visit_count: 1, last_visit_at: daysAgo(5), created_at: daysAgo(15) },
       // Risk: 3+ визитов, 60-90 дн
       { visit_count: 5, last_visit_at: daysAgo(75), created_at: daysAgo(300) },
@@ -189,6 +189,33 @@ describe('computeRfm', () => {
     expect(byKey.potential).toBe(1)
     expect(byKey.risk).toBe(1)
     expect(byKey.sleep).toBe(1)
+    expect(byKey.lost).toBe(1)
+  })
+
+  it('T92 fix: новый клиент с visit_count=0 НЕ попадает в Potential', () => {
+    // Этот кейс был багом до T92: при массовом импорте 922/1000 клиентов
+    // ловились в Potential потому что create_at=NOW + visit_count=0.
+    // Теперь Potential требует visits ≥ 1 И last_visit ≤30 дней.
+    const clients = Array.from({ length: 100 }, () => ({
+      visit_count: 0,
+      last_visit_at: null,
+      created_at: daysAgo(5),
+    }))
+    const result = computeRfm(clients, NOW)
+    const byKey = Object.fromEntries(result.map((s) => [s.key, s.count]))
+    expect(byKey.potential).toBe(0)
+    expect(byKey.lost).toBe(100)
+  })
+
+  it('T92 fix: импортированный клиент со старым визитом — не Potential', () => {
+    // Booksy импорт — клиенты с created_at=NOW но last_visit полгода назад.
+    // Должны идти в Lost, не в Potential.
+    const clients = [
+      { visit_count: 2, last_visit_at: daysAgo(200), created_at: daysAgo(5) },
+    ]
+    const result = computeRfm(clients, NOW)
+    const byKey = Object.fromEntries(result.map((s) => [s.key, s.count]))
+    expect(byKey.potential).toBe(0)
     expect(byKey.lost).toBe(1)
   })
 
@@ -313,7 +340,9 @@ describe('computeMarketingSources', () => {
     expect(computeMarketingSources([])).toEqual([])
   })
 
-  it('считает % по source с humanize', () => {
+  it('T92: считает % по source БЕЗ humanize (raw как введено)', () => {
+    // После T92 — никакого маппинга «instagram → Инстаграм». Раз юзер
+    // ввёл «instagram», так и показываем. Прозрачно, без магии.
     const clients = [
       { source: 'instagram' },
       { source: 'instagram' },
@@ -321,8 +350,20 @@ describe('computeMarketingSources', () => {
       { source: null },
     ]
     const result = computeMarketingSources(clients)
-    expect(result.at(0)?.name).toBe('Инстаграм')
+    expect(result.at(0)?.name).toBe('instagram')
     expect(result.at(0)?.pct).toBe(50)
+  })
+
+  it('T92: «Сарафан» и «сарафан» теперь две разные строки', () => {
+    // Раньше humanize сваливал в одну. Теперь — раздельно (поможет юзеру
+    // увидеть несогласованность в карточках клиентов и нормализовать
+    // вручную).
+    const clients = [{ source: 'Сарафан' }, { source: 'сарафан' }]
+    const result = computeMarketingSources(clients)
+    expect(result.length).toBeGreaterThanOrEqual(2)
+    const names = result.map((r) => r.name)
+    expect(names).toContain('Сарафан')
+    expect(names).toContain('сарафан')
   })
 
   it('null source → «Прочее»', () => {
