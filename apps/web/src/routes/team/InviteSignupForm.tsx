@@ -87,6 +87,14 @@ export function InviteSignupForm({ onComplete }: { onComplete: () => void }) {
       )
       return
     }
+    if (!birthday) {
+      toast.error(
+        t('invite_signup.errors.birthday_required', {
+          defaultValue: 'Укажи дату рождения',
+        }),
+      )
+      return
+    }
     if (password.length > 0 && password.length < 8) {
       toast.error(
         t('invite_signup.errors.password_short', {
@@ -232,6 +240,7 @@ export function InviteSignupForm({ onComplete }: { onComplete: () => void }) {
             type="date"
             value={birthday}
             onChange={(e) => setBirthday(e.target.value)}
+            required
           />
         </div>
         <div className="flex flex-col gap-1.5">
