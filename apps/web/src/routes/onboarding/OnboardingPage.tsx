@@ -830,6 +830,8 @@ export function OnboardingPage() {
                 hasNip={!!state.nip}
                 companyName={state.company_name}
                 ocrVisitsCount={state.ocr_visits.length}
+                salonType={state.salon_type}
+                country={state.country_code}
               />
             )}
             {stepId === 'ai_services' && <StepAiBreakdown topic="services" />}

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowDown,
@@ -7,6 +8,7 @@ import {
   Calendar,
   CheckCircle2,
   FileText,
+  Loader2,
   type LucideIcon,
   MessageSquare,
   Send,
@@ -19,9 +21,29 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 
 import type { OnboardingIntegration } from './OnboardingPage'
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  staff: Users,
+  services: Wrench,
+  bookings: Calendar,
+  banking: Banknote,
+  social: MessageSquare,
+  google: Star,
+  company: Building2,
+  general: Sparkles,
+}
+
+type AiInsight = {
+  icon: string
+  title: string
+  body: string
+}
+
+const AI_TONES = ['sage', 'navy', 'gold', 'amber'] as const
 
 /**
  * Шаг WOW — последний перед созданием салона. Показывает «что AI уже видит»
@@ -51,6 +73,8 @@ export function StepWowAi({
   hasNip = false,
   companyName = '',
   ocrVisitsCount = 0,
+  salonType,
+  country,
 }: {
   hasBookings: boolean
   hasBanking: boolean
@@ -68,8 +92,39 @@ export function StepWowAi({
   hasNip?: boolean
   companyName?: string
   ocrVisitsCount?: number
+  // T125 #2 — для AI prompt
+  salonType?: string
+  country?: string
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  // T125 #2 — реальный AI вызов на собранных данных онбординга.
+  // Дёргается один раз при mount (queryKey статичный — данные онбординга
+  // уже введены к этому моменту, заново анализ не делаем).
+  const aiPreview = useQuery({
+    queryKey: ['onboarding-ai-preview'],
+    queryFn: async (): Promise<{ insights: AiInsight[] }> => {
+      const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
+        body: {
+          salon_type: salonType,
+          country,
+          integrations: selectedIntegrations,
+          masters_count: staffCount,
+          services_count: servicesCount,
+          has_google_place: hasGooglePlace,
+          has_nip: hasNip,
+          company_name: companyName || null,
+          ocr_visits_count: ocrVisitsCount,
+          locale: i18n.language.split('-')[0],
+        },
+      })
+      if (error) throw error
+      const result = data as { insights?: AiInsight[] } | null
+      return { insights: result?.insights ?? [] }
+    },
+    retry: 1,
+    staleTime: Infinity,
+  })
 
   // T125 — карточки «AI уже знает» строятся из реальных данных из state.
   // Каждая карточка отражает что-то конкретное что юзер сделал.
@@ -320,6 +375,37 @@ export function StepWowAi({
           </p>
         ) : null}
       </div>
+      {/* T125 #2 — AI-инсайты (loading skeleton, потом реальный результат
+          от Claude Haiku 4.5). На ошибке — graceful: показываем только
+          rules-based карточки ниже. */}
+      {aiPreview.isLoading ? (
+        <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-2 rounded-xl border border-dashed p-3">
+          <Loader2 className="text-brand-teal-deep size-4 animate-spin" strokeWidth={2} />
+          <p className="text-muted-foreground text-xs">
+            {t('onboarding.wow.ai_loading', {
+              defaultValue: 'AI анализирует твой салон…',
+            })}
+          </p>
+        </div>
+      ) : aiPreview.data?.insights && aiPreview.data.insights.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {aiPreview.data.insights.slice(0, 4).map((insight: AiInsight, i: number) => {
+            const Icon = ICON_MAP[insight.icon] ?? Sparkles
+            const tone = AI_TONES[i % AI_TONES.length] ?? 'navy'
+            return (
+              <WowCard
+                key={`ai-${i}`}
+                icon={Icon}
+                tone={tone}
+                eyebrow={t('onboarding.wow.ai_eyebrow', { defaultValue: 'AI говорит' })}
+                title={insight.title}
+                body={insight.body}
+              />
+            )
+          })}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {cards.map((c, i) => (
           <WowCard key={i} {...c} />
