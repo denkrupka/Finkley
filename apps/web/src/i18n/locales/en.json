@@ -280,6 +280,120 @@
           "hint": "PSD2 import: all account debits automatically recorded as Expenses."
         }
       }
+    },
+    "wow": {
+      "title": "AI already sees what's happening in your salon",
+      "master_eyebrow": "Top performers",
+      "master_title": "AI will identify your stars and those who need to grow",
+      "master_body_v2": "Revenue, retention, ★ per master. Who's a star, who needs training.",
+      "service_eyebrow": "Services",
+      "service_title": "AI will find services that drain your time",
+      "service_body_v2": "Real margin per service. What to raise, what to drop.",
+      "clients_eyebrow": "Client base",
+      "clients_title": "RFM segmentation + who to reactivate",
+      "clients_body_v2": "RFM segments + ready-to-send templates for forgotten clients.",
+      "reviews_eyebrow": "Reviews & clients",
+      "reviews_title": "AI will break down reviews",
+      "reviews_body_v2": "What's loved, what's hated, client portrait. Where to put your ads.",
+      "cashflow_eyebrow": "Money",
+      "cashflow_title": "Live cashflow — no manual entry",
+      "cashflow_body_v2": "Expenses logged automatically. AI alerts suspicious spending.",
+      "chip_lift": "+12-18% revenue on average",
+      "chip_margin": "up to +25% margin",
+      "chip_reactivation": "Reactivation 5× cheaper than new client",
+      "chip_review": "5★ → Google, 1-4★ → you only",
+      "chip_time": "−5 hours of routine per week",
+      "empty_eyebrow": "AI ready",
+      "empty_title": "As soon as data comes in — AI will start working",
+      "empty_body": "Connect Booksy or import your notebook, and AI immediately delivers insights: which masters bring money, which services drag you down, which clients to bring back.",
+      "real_staff_eyebrow": "Team",
+      "real_staff_title": "{{count}} master(s) on the team",
+      "real_staff_body": "AI calculates revenue, retention and avg ticket per master. First numbers — in 2 weeks.",
+      "real_staff_chip": "In 14 days — top list",
+      "real_services_eyebrow": "Catalog",
+      "real_services_title": "{{count}} service(s) in catalog",
+      "real_services_body": "AI finds services where COGS eats profit and suggests a new price.",
+      "real_bookings_eyebrow": "Bookings",
+      "real_bookings_title": "Calendar connected",
+      "real_booksy_body": "Booksy → clients, masters and visit history arrive automatically in 2-5 min. AI starts immediately.",
+      "real_ocr_body": "{{count}} visits from notebook will land in the portal after creation. AI sorts by master.",
+      "real_ical_body": "iCal feed for each master — instant sync with Google/Apple Calendar.",
+      "real_banking_eyebrow": "Bank",
+      "real_banking_title": "PSD2 consent — next step",
+      "real_banking_body": "After SCA consent every debit auto-lands in 'Expenses'. AI alerts suspicious ones.",
+      "real_banking_chip": "90 days without re-connect",
+      "real_inbox_eyebrow": "Inbox",
+      "real_inbox_title": "{{channels}} — in one feed",
+      "real_inbox_body": "All messages in one place. AI replies to typical questions (prices, schedule).",
+      "real_google_eyebrow": "Google profile",
+      "real_google_title": "Google Place linked",
+      "real_google_body": "AI analyses reviews 24/7: what's praised, what bothers, client portrait. 5★ → auto-Google.",
+      "real_google_chip": "Reputation shield",
+      "real_company_eyebrow": "Company",
+      "real_company_body": "Invoice details ready. Connected accounting eliminates double entry.",
+      "real_tg_eyebrow": "Telegram",
+      "real_tg_title": "Morning briefing at 9:00",
+      "real_tg_body": "Every morning — short digest + critical alerts directly in the chat.",
+      "real_accounting_eyebrow": "Accounting",
+      "real_accounting_title": "{{provider}} — link ready",
+      "real_accounting_body": "AI picks up all invoices from inbox and auto-files into income/expenses.",
+      "real_summary": "{{integrations}} integrations · {{staff}} masters · {{services}} services"
+    },
+    "ai_services": {
+      "title": "AI breakdown — your services",
+      "subtitle_v2": "What earns margin and what wastes your time."
+    },
+    "ai_staff": {
+      "title": "AI breakdown — your masters",
+      "subtitle_v2": "Who's a star, who needs an improvement plan."
+    },
+    "ai_clients": {
+      "title": "AI breakdown — your client base",
+      "subtitle_v2": "RFM segments — who to bring back, who to turn into regular."
+    },
+    "ai_reviews": {
+      "title": "AI breakdown — reviews",
+      "subtitle_v2": "What's loved, what's hated, client portrait from socials."
+    },
+    "connect_dialog": {
+      "eyebrow": "Connection",
+      "what_happens": "What happens",
+      "cancel": "Cancel",
+      "confirm": "Connect",
+      "badge_on": "Connected"
+    },
+    "tg_phone": {
+      "title": "How should we reach you?",
+      "phone_label": "Phone number (SMS — optional)",
+      "tg_title": "Get insights in Telegram",
+      "tg_body_v2": "Every morning at 9:00 — short briefing from @finkley_tg_bot.",
+      "linked_title": "Telegram connected",
+      "linked_no_username": "You'll get briefing every morning at 9:00",
+      "connect_now": "Connect via @finkley_tg_bot",
+      "polling": "Waiting for bot confirmation…",
+      "code_hint": "Hit 'Start' in Telegram — status updates here automatically",
+      "toast_linked": "Telegram linked! Morning briefing is on the way."
+    },
+    "schedule": {
+      "title": "Salon working hours",
+      "closed": "Day off",
+      "apply_weekdays": "← Copy Monday to Tue-Fri"
+    },
+    "public_links": {
+      "title": "Salon public links",
+      "booksy": "Booksy profile",
+      "instagram": "Instagram",
+      "facebook": "Facebook page"
+    },
+    "profile": {
+      "title": "Tell us about yourself",
+      "first_name": "First name",
+      "last_name": "Last name",
+      "avatar_upload": "Upload avatar",
+      "avatar_change": "Replace",
+      "avatar_remove": "Remove",
+      "avatar_hint": "PNG / JPG / WEBP, up to 5 MB",
+      "avatar_too_large": "Max 5 MB"
     }
   },
   "nav": {
@@ -3446,8 +3560,10 @@
       "period": "Period",
       "advances": "Advances",
       "remaining": "Remaining",
-      "tips": "Tips"
+      "tips": "Tips",
+      "premium": "Bonus"
     },
+    "row_click_hint": "Open visit details",
     "visits_count_one": "{{count}} visit",
     "visits_count_few": "{{count}} visits",
     "visits_count_many": "{{count}} visits",
@@ -3562,7 +3678,15 @@
       "payroll_kind_final": "Final settlement",
       "payroll_period_start": "Period from",
       "payroll_period_end": "Period to",
-      "payroll_month": "Period (month)"
+      "payroll_month": "Period (month)",
+      "payroll_kind_v2": "Calculation",
+      "payroll_premium": "Bonus (on top)",
+      "payroll_premium_hint": "Bonus on top of base payout. Will show in Reports → Payouts as 'Bonus' column.",
+      "payroll_autofill": "Auto-fill amount",
+      "payroll_breakdown": "Breakdown",
+      "payroll_breakdown_template": "Visits: {{count}} · Revenue: {{rev}} · Tips: {{tips}} → Payout: {{payout}}",
+      "payroll_no_visits": "No visits for this master in selected period",
+      "payroll_filled": "Amount calculated"
     },
     "errors": {
       "category_required": "Pick a category",

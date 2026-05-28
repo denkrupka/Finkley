@@ -280,6 +280,120 @@
           "hint": "Import PSD2: wszystkie obciążenia konta automatycznie rejestrowane jako Wydatki."
         }
       }
+    },
+    "wow": {
+      "title": "AI już widzi, co dzieje się w Twoim salonie",
+      "master_eyebrow": "Top mistrzowie",
+      "master_title": "AI wskaże Twoje gwiazdy i tych, którzy muszą się rozwijać",
+      "master_body_v2": "Przychody, retention, ★ na mistrza. Kto gwiazda, kto do szkolenia.",
+      "service_eyebrow": "Usługi",
+      "service_title": "AI znajdzie usługi, na które tracisz czas",
+      "service_body_v2": "Realna marża na usłudze. Co podnieść, co usunąć.",
+      "clients_eyebrow": "Baza klientów",
+      "clients_title": "Segmentacja RFM + kogo zaktywizować",
+      "clients_body_v2": "Segmenty RFM + gotowe szablony do powrotu klientów.",
+      "reviews_eyebrow": "Opinie i klienci",
+      "reviews_title": "AI rozłoży opinie na czynniki",
+      "reviews_body_v2": "Za co chwalą, co denerwuje, portret klienta. Gdzie kierować reklamę.",
+      "cashflow_eyebrow": "Pieniądze",
+      "cashflow_title": "Cashflow live — bez ręcznego wprowadzania",
+      "cashflow_body_v2": "Wydatki rejestrowane same. AI alarmuje podejrzane.",
+      "chip_lift": "+12-18% przychodu średnio",
+      "chip_margin": "do +25% marży",
+      "chip_reactivation": "Reaktywacja 5× tańsza niż nowy klient",
+      "chip_review": "5★ → Google, 1-4★ → tylko Ty",
+      "chip_time": "−5 godzin rutyny tygodniowo",
+      "empty_eyebrow": "AI gotowy",
+      "empty_title": "Jak tylko pojawią się dane — AI zacznie działać",
+      "empty_body": "Podłącz Booksy lub zaimportuj zeszyt, a AI od razu da rozbiór: którzy mistrzowie przynoszą pieniądze, które usługi ciągną w dół, których klientów zwrócić rozsyłką.",
+      "real_staff_eyebrow": "Zespół",
+      "real_staff_title": "{{count}} mistrz(ów) w zespole",
+      "real_staff_body": "AI policzy przychody, retention i średni rachunek na każdego. Pierwsze liczby — za 2 tygodnie.",
+      "real_staff_chip": "Za 14 dni — top-lista",
+      "real_services_eyebrow": "Katalog",
+      "real_services_title": "{{count}} usług(i) w katalogu",
+      "real_services_body": "AI znajdzie usługi, gdzie koszt zjada zysk, i zaproponuje nową cenę.",
+      "real_bookings_eyebrow": "Rezerwacje",
+      "real_bookings_title": "Kalendarz podłączony",
+      "real_booksy_body": "Booksy → klienci, mistrzowie i historia wizyt przyjadą automatycznie w 2-5 min. AI zacznie od razu.",
+      "real_ocr_body": "{{count}} wizyt z zeszytu trafi do portalu po utworzeniu. AI rozdzieli na mistrzów.",
+      "real_ical_body": "Feed iCal dla każdego mistrza — natychmiastowa synchronizacja z Google/Apple Calendar.",
+      "real_banking_eyebrow": "Bank",
+      "real_banking_title": "PSD2-zgoda — następny krok",
+      "real_banking_body": "Po SCA-zgodzie każde obciążenie automatycznie trafi do 'Wydatków'. AI alarmuje podejrzane.",
+      "real_banking_chip": "90 dni bez ponownego łączenia",
+      "real_inbox_eyebrow": "Inbox",
+      "real_inbox_title": "{{channels}} — w jednej skrzynce",
+      "real_inbox_body": "Wszystkie wiadomości w jednym miejscu. AI odpowiada na typowe pytania (ceny, grafik).",
+      "real_google_eyebrow": "Profil Google",
+      "real_google_title": "Google Place podłączony",
+      "real_google_body": "AI analizuje opinie 24/7: za co chwalą, co denerwuje, portret klienta. 5★ → automatycznie do Google.",
+      "real_google_chip": "Ochrona reputacji",
+      "real_company_eyebrow": "Firma",
+      "real_company_body": "Dane do faktur gotowe. Podłączona księgowość zwalnia z podwójnego wprowadzania.",
+      "real_tg_eyebrow": "Telegram",
+      "real_tg_title": "Poranny briefing o 9:00",
+      "real_tg_body": "Każdego ranka — krótki digest + krytyczne alerty bezpośrednio na czacie.",
+      "real_accounting_eyebrow": "Księgowość",
+      "real_accounting_title": "{{provider}} — połączenie gotowe",
+      "real_accounting_body": "AI zabiera wszystkie faktury z inboxa i automatycznie księguje na przychody/wydatki.",
+      "real_summary": "{{integrations}} integracji · {{staff}} mistrzów · {{services}} usług"
+    },
+    "ai_services": {
+      "title": "AI-rozbiór Twoich usług",
+      "subtitle_v2": "Co przynosi marżę, a na co tracisz czas."
+    },
+    "ai_staff": {
+      "title": "AI-rozbiór Twoich mistrzów",
+      "subtitle_v2": "Kto gwiazda, kto wymaga planu poprawy."
+    },
+    "ai_clients": {
+      "title": "AI-rozbiór Twojej bazy klientów",
+      "subtitle_v2": "Segmenty RFM — kogo zwrócić, kogo zmienić w stałego."
+    },
+    "ai_reviews": {
+      "title": "AI-rozbiór opinii",
+      "subtitle_v2": "Za co chwalą, co denerwuje, portret klienta z social mediów."
+    },
+    "connect_dialog": {
+      "eyebrow": "Połączenie",
+      "what_happens": "Co się stanie",
+      "cancel": "Anuluj",
+      "confirm": "Podłącz",
+      "badge_on": "Podłączone"
+    },
+    "tg_phone": {
+      "title": "Jak się z Tobą kontaktować?",
+      "phone_label": "Numer telefonu (SMS — opcjonalnie)",
+      "tg_title": "Otrzymuj insighty w Telegramie",
+      "tg_body_v2": "Każdego ranka o 9:00 — krótki rozbiór od @finkley_tg_bot.",
+      "linked_title": "Telegram podłączony",
+      "linked_no_username": "Otrzymasz rozbiór każdego ranka o 9:00",
+      "connect_now": "Podłącz przez @finkley_tg_bot",
+      "polling": "Czekam na potwierdzenie od bota…",
+      "code_hint": "Naciśnij 'Start' w Telegramie — status zaktualizuje się tutaj automatycznie",
+      "toast_linked": "Telegram powiązany! Poranny rozbiór już w drodze."
+    },
+    "schedule": {
+      "title": "Godziny pracy salonu",
+      "closed": "Wolne",
+      "apply_weekdays": "← Skopiuj poniedziałek na wt-pt"
+    },
+    "public_links": {
+      "title": "Publiczne linki salonu",
+      "booksy": "Profil Booksy",
+      "instagram": "Instagram",
+      "facebook": "Strona Facebook"
+    },
+    "profile": {
+      "title": "Opowiedz o sobie",
+      "first_name": "Imię",
+      "last_name": "Nazwisko",
+      "avatar_upload": "Wgraj awatar",
+      "avatar_change": "Zmień",
+      "avatar_remove": "Usuń",
+      "avatar_hint": "PNG / JPG / WEBP, do 5 MB",
+      "avatar_too_large": "Maks. 5 MB"
     }
   },
   "nav": {
@@ -3447,8 +3561,10 @@
       "period": "Okres",
       "advances": "Zaliczki",
       "remaining": "Pozostało",
-      "tips": "Napiwki"
+      "tips": "Napiwki",
+      "premium": "Premia"
     },
+    "row_click_hint": "Otwórz szczegóły wizyt",
     "visits_count_one": "{{count}} wizyta",
     "visits_count_few": "{{count}} wizyty",
     "visits_count_many": "{{count}} wizyt",
@@ -3563,7 +3679,15 @@
       "payroll_kind_final": "Rozliczenie końcowe",
       "payroll_period_start": "Okres od",
       "payroll_period_end": "Okres do",
-      "payroll_month": "Okres (miesiąc)"
+      "payroll_month": "Okres (miesiąc)",
+      "payroll_kind_v2": "Wyliczenie",
+      "payroll_premium": "Premia (powyżej)",
+      "payroll_premium_hint": "Bonus powyżej bazowej wypłaty. Widoczna w Raporty → Wypłaty kolumną 'Premia'.",
+      "payroll_autofill": "Auto-wyliczenie kwoty",
+      "payroll_breakdown": "Rozbicie",
+      "payroll_breakdown_template": "Wizyt: {{count}} · Przychód: {{rev}} · Napiwki: {{tips}} → Payout: {{payout}}",
+      "payroll_no_visits": "Brak wizyt mistrza w wybranym okresie",
+      "payroll_filled": "Kwota policzona"
     },
     "errors": {
       "category_required": "Wybierz kategorię",
