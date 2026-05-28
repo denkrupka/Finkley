@@ -512,6 +512,25 @@ export function OnboardingPage() {
       }
     }
 
+    // T129 — Если юзер заполнил credentials в ConnectIntegrationDialog,
+    // сохраняем их в localStorage чтобы /settings/integrations подхватил
+    // и pre-filled connect-формы для каждого provider. localStorage ключ
+    // — finkley:onboarding:credentials:<salon_id>. Очищается после
+    // первого использования на /settings/integrations.
+    const hasCredentials = Object.values(state.pending_credentials).some(
+      (c) => c && Object.keys(c).length > 0,
+    )
+    if (hasCredentials) {
+      try {
+        localStorage.setItem(
+          `finkley:onboarding:credentials:${newSalonId}`,
+          JSON.stringify(state.pending_credentials),
+        )
+      } catch (err) {
+        console.warn('credentials localStorage failed', err)
+      }
+    }
+
     // Если юзер выбрал интеграции — отправляем сразу на settings/integrations,
     // чтобы он подключил их (там полноценные OAuth-флоу). Иначе — на dashboard.
     if (state.selected_integrations.length > 0) {
