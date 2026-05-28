@@ -4686,7 +4686,7 @@
   "review": {
     "expired": "Link expired",
     "not_found": "Link not found",
-    "already_submitted": "Thanks, your review is already submitted",
+    "already_submitted": "You've already left a review via this link — thank you 🙏 The link is one-time use. To rate a new visit, wait for the next one — we'll send you a fresh link right after the checkout.",
     "error_generic": "Something went wrong. Try again later.",
     "rate_title": "How was your visit?",
     "rate_subtitle": "{{salon}} — rate from 1 to 5 stars",

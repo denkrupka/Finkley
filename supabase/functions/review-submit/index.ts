@@ -42,12 +42,18 @@ Deno.serve(async (req: Request) => {
     if (!tokenFromQuery) return jsonResponse({ error: 'missing_token' }, 400)
     const { data: rr } = await admin
       .from('review_requests')
-      .select('id, salon_id, visit_id, expires_at')
+      .select('id, salon_id, visit_id, expires_at, submitted_at')
       .eq('token', tokenFromQuery)
       .maybeSingle()
     if (!rr) return jsonResponse({ error: 'not_found' }, 404)
     if (new Date(rr.expires_at as string).getTime() < Date.now()) {
       return jsonResponse({ error: 'expired' }, 410)
+    }
+    // T94 — токен одноразовый. Если уже использован — сразу возвращаем
+    // already_submitted чтобы фронт показал дружелюбное «спасибо, приходи
+    // в следующий визит» вместо формы оценки.
+    if (rr.submitted_at) {
+      return jsonResponse({ error: 'already_submitted' }, 409)
     }
     // Помечаем opened_at (если ещё нет).
     await admin

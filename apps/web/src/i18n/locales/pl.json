@@ -4687,7 +4687,7 @@
   "review": {
     "expired": "Link wygasł",
     "not_found": "Link nie znaleziono",
-    "already_submitted": "Dzięki, Twoja opinia już wysłana",
+    "already_submitted": "Już zostawiłeś opinię przez ten link — dziękujemy 🙏 Link jest jednorazowy. Aby ocenić nową wizytę, poczekaj na następną — wyślemy świeży link zaraz po rozliczeniu.",
     "error_generic": "Coś poszło nie tak. Spróbuj później.",
     "rate_title": "Jak przebiegła Twoja wizyta?",
     "rate_subtitle": "{{salon}} — oceń od 1 do 5 gwiazdek",

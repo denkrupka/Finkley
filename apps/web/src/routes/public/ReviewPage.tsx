@@ -97,9 +97,13 @@ export function ReviewPage() {
   async function submitFeedback() {
     if (!token || !rating || submitting) return
     setSubmitting(true)
+    // T94 — Bug fix: раньше тут не было AUTH_HEADERS и Edge Function отдавала
+    // 401 unauthorized (Supabase требует apikey/Authorization), отсюда экран
+    // «ошибка» при выборе 1-4★. На 5★ запрос работал потому что там headers
+    // были корректные.
     const res = await fetch(FN_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({
         token,
         rating,

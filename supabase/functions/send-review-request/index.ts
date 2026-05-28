@@ -120,10 +120,48 @@ async function processOneVisit(admin: SupabaseClient, visit: VisitRow): Promise<
 
   const { data: salon } = await admin
     .from('salons')
-    .select('id, name, locale, country_code')
+    .select('id, name, locale, country_code, google_place_id')
     .eq('id', visit.salon_id)
     .maybeSingle()
   if (!salon) return false
+
+  // T94 — если у салона нет google_place_id, при 5★ некуда вести клиента
+  // (Google review form требует placeid). Уведомляем владельцев один раз
+  // в день (idempotent через kind='gplace_missing'), чтобы они зашли в
+  // /settings и привязали Google-место. Само review_request всё равно
+  // отправляем — пусть клиент оставит внутренний отзыв.
+  const salonRow = salon as SalonRow & { google_place_id?: string | null }
+  if (!salonRow.google_place_id) {
+    const { data: ownerIds } = await admin
+      .from('salon_members')
+      .select('user_id')
+      .eq('salon_id', visit.salon_id)
+      .in('role', ['owner', 'admin'])
+    for (const m of (ownerIds ?? []) as Array<{ user_id: string }>) {
+      // Идемпотентность: проверяем не было ли такой нотификации сегодня.
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: existingNote } = await admin
+        .from('in_app_notifications')
+        .select('id')
+        .eq('user_id', m.user_id)
+        .eq('salon_id', visit.salon_id)
+        .eq('type', 'gplace_missing')
+        .gte('created_at', `${today}T00:00:00Z`)
+        .limit(1)
+        .maybeSingle()
+      if (existingNote) continue
+      await admin.from('in_app_notifications').insert({
+        user_id: m.user_id,
+        salon_id: visit.salon_id,
+        type: 'gplace_missing',
+        payload: {
+          salon_name: salonRow.name,
+          message:
+            'Не настроена Google-ссылка для отзывов. Клиенту с 5★ некуда вести в Google. Добавь Google Place в Настройках → Профиль салона → Адрес и публичные ссылки.',
+        },
+      })
+    }
+  }
 
   const token = makeToken()
   const { error: insErr } = await admin.from('review_requests').insert({
