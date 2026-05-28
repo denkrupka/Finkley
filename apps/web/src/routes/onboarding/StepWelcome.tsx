@@ -1,4 +1,4 @@
-import { Banknote, Brain, Lock, MessageSquare, Target, TrendingUp, Zap } from 'lucide-react'
+import { Banknote, Brain, Lock, MessageSquare, Star, Target, TrendingUp, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -97,12 +97,23 @@ export function StepWelcome() {
           })}
         />
         <BenefitCard
-          icon={Brain}
-          tone="sage"
+          icon={Star}
+          tone="gold"
           title={t('onboarding.welcome.b7_title', {
-            defaultValue: 'AI-помощник, который знает твой салон',
+            defaultValue: 'Защита репутации + рост в Google',
           })}
           body={t('onboarding.welcome.b7_body', {
+            defaultValue:
+              'После визита клиенту автоматом летит просьба оценить мастера. 5★ — мягко предлагаем оставить отзыв в Google (твой салон поднимается в выдаче). 1-4★ — отзыв падает только тебе во внутренние, никто посторонний не увидит. Плюс AI-разбор: за что хвалят, что бесит клиентов, какие фразы повторяются.',
+          })}
+        />
+        <BenefitCard
+          icon={Brain}
+          tone="sage"
+          title={t('onboarding.welcome.b8_title', {
+            defaultValue: 'AI-помощник, который знает твой салон',
+          })}
+          body={t('onboarding.welcome.b8_body', {
             defaultValue:
               'Сам отслеживает показатели, видит провалы и тренды, говорит конкретно что улучшить. Не общие советы — а на основе твоих живых данных.',
           })}

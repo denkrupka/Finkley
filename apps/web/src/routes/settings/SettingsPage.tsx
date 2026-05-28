@@ -41,11 +41,7 @@ import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalo
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
-import {
-  useSendDailyDigest,
-  useSendWeeklyDigest,
-  useUpdateDigestChannels,
-} from '@/hooks/useWeeklyDigest'
+import { useSendDailyDigest, useSendWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
@@ -125,9 +121,7 @@ export function SettingsPage() {
   const syncCompetitors = useSyncCompetitors(salonId)
   const { data: subscription } = useSubscription(salonId)
   const sendDigest = useSendWeeklyDigest(salonId)
-  const updateWeeklyChannels = useUpdateDigestChannels(salonId, 'weekly')
   const sendDailyDigest = useSendDailyDigest(salonId)
-  const updateDailyChannels = useUpdateDigestChannels(salonId, 'daily')
   const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
 
   const [name, setName] = useState('')
@@ -853,8 +847,6 @@ export function SettingsPage() {
           salon={salon}
           sendDigest={sendDigest}
           sendDailyDigest={sendDailyDigest}
-          updateWeeklyChannels={updateWeeklyChannels}
-          updateDailyChannels={updateDailyChannels}
         />
       )}
 

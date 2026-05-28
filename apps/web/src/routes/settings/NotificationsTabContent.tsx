@@ -15,7 +15,6 @@ import type {
   SendDigestResponse,
   useSendDailyDigest,
   useSendWeeklyDigest,
-  useUpdateDigestChannels,
 } from '@/hooks/useWeeklyDigest'
 
 import { PushNotificationsCard } from './PushNotificationsCard'
@@ -86,14 +85,10 @@ export function NotificationsTabContent({
   salon,
   sendDigest,
   sendDailyDigest,
-  updateWeeklyChannels,
-  updateDailyChannels,
 }: {
   salon: SalonRow
   sendDigest: ReturnType<typeof useSendWeeklyDigest>
   sendDailyDigest: ReturnType<typeof useSendDailyDigest>
-  updateWeeklyChannels: ReturnType<typeof useUpdateDigestChannels>
-  updateDailyChannels: ReturnType<typeof useUpdateDigestChannels>
 }) {
   const { t } = useTranslation()
   const updatePref = useUpdateNotificationPref(salon.id)
@@ -215,24 +210,20 @@ export function NotificationsTabContent({
         </div>
       </section>
 
-      {/* «Прислать сейчас» — еженедельный дайджест */}
-      <DigestSection
+      {/* «Отправить сейчас» — две компактные строки внизу. Каналы дайджестов
+          управляются только из матрицы выше — здесь только кнопка и
+          описание что попадёт в письмо/сообщение. */}
+      <SendNowCard
         title={t('settings.digest.title')}
         subtitle={t('settings.digest.subtitle')}
-        channels={salon.weekly_digest_channels ?? (salon.weekly_digest_enabled ? ['email'] : [])}
-        onChannelsChange={(next) =>
-          updateWeeklyChannels.mutate(next, {
-            onSuccess: () =>
-              toast.success(
-                next.length > 0
-                  ? t('settings.digest.toast_enabled')
-                  : t('settings.digest.toast_disabled'),
-              ),
-            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-          })
+        anyChannelOn={
+          isChannelEnabled('weekly_digest', 'push') ||
+          isChannelEnabled('weekly_digest', 'email') ||
+          isChannelEnabled('weekly_digest', 'telegram') ||
+          isChannelEnabled('weekly_digest', 'sms')
         }
         buttonLabel={sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
-        buttonDisabled={sendDigest.isPending || !salon.weekly_digest_enabled}
+        pending={sendDigest.isPending}
         onSend={() =>
           sendDigest.mutate(undefined, {
             onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'weekly')),
@@ -240,27 +231,19 @@ export function NotificationsTabContent({
           })
         }
       />
-
-      {/* «Прислать сейчас» — ежедневная сводка */}
-      <DigestSection
+      <SendNowCard
         title={t('settings.daily_digest.title')}
         subtitle={t('settings.daily_digest.subtitle')}
-        channels={salon.daily_digest_channels ?? (salon.daily_digest_enabled ? ['email'] : [])}
-        onChannelsChange={(next) =>
-          updateDailyChannels.mutate(next, {
-            onSuccess: () =>
-              toast.success(
-                next.length > 0
-                  ? t('settings.daily_digest.toast_enabled')
-                  : t('settings.daily_digest.toast_disabled'),
-              ),
-            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-          })
+        anyChannelOn={
+          isChannelEnabled('daily_digest', 'push') ||
+          isChannelEnabled('daily_digest', 'email') ||
+          isChannelEnabled('daily_digest', 'telegram') ||
+          isChannelEnabled('daily_digest', 'sms')
         }
         buttonLabel={
           sendDailyDigest.isPending ? t('common.loading') : t('settings.daily_digest.button')
         }
-        buttonDisabled={sendDailyDigest.isPending || !salon.daily_digest_enabled}
+        pending={sendDailyDigest.isPending}
         onSend={() =>
           sendDailyDigest.mutate(undefined, {
             onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'daily')),
@@ -269,6 +252,55 @@ export function NotificationsTabContent({
         }
       />
     </div>
+  )
+}
+
+/** Компактная карточка «Отправить сейчас» для дайджеста.
+ *  Каналы не выбираются здесь — они в матрице наверху. Если все каналы
+ *  для этого дайджеста выключены — кнопка disabled с подсказкой. */
+function SendNowCard({
+  title,
+  subtitle,
+  anyChannelOn,
+  buttonLabel,
+  pending,
+  onSend,
+}: {
+  title: string
+  subtitle: string
+  anyChannelOn: boolean
+  buttonLabel: string
+  pending: boolean
+  onSend: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <section className="border-border bg-card shadow-finsm rounded-lg border p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-brand-navy text-base font-bold tracking-tight">{title}</h2>
+          <p className="text-muted-foreground mt-0.5 text-sm">{subtitle}</p>
+          {!anyChannelOn ? (
+            <p className="text-muted-foreground mt-1.5 text-xs">
+              {t('settings.digest.no_channels_hint', {
+                defaultValue:
+                  'Сейчас не выбран ни один канал в матрице выше — поэтому отправлять некуда.',
+              })}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          variant="outline"
+          size="md"
+          onClick={onSend}
+          disabled={pending || !anyChannelOn}
+          className="shrink-0"
+        >
+          <Mail className="size-4" strokeWidth={1.7} />
+          {buttonLabel}
+        </Button>
+      </div>
+    </section>
   )
 }
 
@@ -315,74 +347,6 @@ const DEFAULT_TYPE_LABELS: Record<NotificationTypeKey, string> = {
   calendar_conflicts: 'Конфликты в календаре (двойная бронь)',
   messenger_new_message:
     'Новое сообщение в мессенджере (WhatsApp / Instagram / Facebook / Telegram)',
-}
-
-function DigestSection({
-  title,
-  subtitle,
-  channels,
-  onChannelsChange,
-  buttonLabel,
-  buttonDisabled,
-  onSend,
-}: {
-  title: string
-  subtitle: string
-  channels: DigestChannel[]
-  onChannelsChange: (next: DigestChannel[]) => void
-  buttonLabel: string
-  buttonDisabled: boolean
-  onSend: () => void
-}) {
-  const { t } = useTranslation()
-  function toggle(ch: DigestChannel) {
-    const next = channels.includes(ch) ? channels.filter((c) => c !== ch) : [...channels, ch]
-    onChannelsChange(next)
-  }
-  return (
-    <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex-1">
-          <h2 className="text-brand-navy text-base font-bold tracking-tight">{title}</h2>
-          <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>
-          <div className="mt-4">
-            <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider">
-              {t('settings.digest.channels.title')}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <label className="border-border bg-card hover:bg-muted/40 inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={channels.includes('email')}
-                  onChange={() => toggle('email')}
-                  className="accent-brand-navy size-4 cursor-pointer"
-                />
-                <span>{t('settings.digest.channels.email')}</span>
-              </label>
-              <label className="border-border bg-card hover:bg-muted/40 inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={channels.includes('telegram')}
-                  onChange={() => toggle('telegram')}
-                  className="accent-brand-navy size-4 cursor-pointer"
-                />
-                <span>{t('settings.digest.channels.telegram')}</span>
-              </label>
-            </div>
-            {channels.length === 0 && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                {t('settings.digest.channels.all_off')}
-              </p>
-            )}
-          </div>
-        </div>
-        <Button variant="outline" size="md" onClick={onSend} disabled={buttonDisabled}>
-          <Mail className="size-4" strokeWidth={1.7} />
-          {buttonLabel}
-        </Button>
-      </div>
-    </section>
-  )
 }
 
 function digestSentToastText(
