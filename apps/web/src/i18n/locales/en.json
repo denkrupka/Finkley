@@ -169,7 +169,6 @@
     },
     "path": {
       "title": "How to set up your salon?",
-      "subtitle": "Pick what's easier: bare minimum quick — or full setup with a tutorial.",
       "quick_title": "Quick setup",
       "quick_subtitle": "Bare essentials only — salon and plan. Everything else you can add later.",
       "quick_eta": "≈ 2 min",
@@ -181,8 +180,7 @@
       "full_eta": "≈ 10 min",
       "full_bullet_1": "Specialists + services + expense categories",
       "full_bullet_2": "Tutorial tips on every step",
-      "full_bullet_3": "Any step can be skipped",
-      "switch_hint": "You can switch the path anytime via the «Back» button."
+      "full_bullet_3": "Any step can be skipped"
     },
     "tutorial": {
       "salon": "Salon name will be visible to clients in emails and SMS. Country sets currency, timezone and address format. Salon type drives service templates and competitor benchmarks.",
@@ -202,19 +200,13 @@
       "address_placeholder": "100 Main St, 12345 City",
       "city_label": "City",
       "city_placeholder": "Warsaw",
-      "coords_label": "Coordinates (lat / lng)",
-      "hint_skip": "Can be skipped and added later in Settings → Profile."
+      "coords_label": "Coordinates (lat / lng)"
     },
     "step_accounting": {
       "title": "Tax information",
-      "subtitle": "Needed for accounting integrations and P&L reports. Can be skipped.",
       "nip_label": "NIP / VAT ID",
-      "nip_hint": "10 digits, no dashes. Used for wFirma/KSeF auto-export.",
       "company_label": "Legal company name",
-      "company_placeholder": "e.g. JANE DOE BEAUTY",
-      "integrations_note_title": "Accounting integrations connect afterwards",
-      "integrations_note_body": "wFirma (PL), KSeF (PL e-invoices), Fakturownia, inFakt — pick in Settings → Integrations → Accounting. Receipts and expenses auto-export there as invoices.",
-      "hint_skip": "Fields are optional. Fill later in Settings → Accounting."
+      "company_placeholder": "e.g. JANE DOE BEAUTY"
     },
     "step_integrations": {
       "title": "Which integrations to connect?",
@@ -223,7 +215,6 @@
     },
     "step1": {
       "title": "Tell us about your salon",
-      "subtitle": "We need this — to know which country and currency you work in.",
       "name_label": "Salon name",
       "name_placeholder": "For example: Anna's Studio",
       "country_label": "Country",
@@ -231,14 +222,12 @@
     },
     "step2": {
       "title": "Add your specialists",
-      "subtitle": "Takes about 2 minutes. You can edit and add more later.",
       "name_placeholder": "Specialist name",
       "percent_label": "% of revenue",
       "add": "Add specialist"
     },
     "step3": {
       "title": "What you offer",
-      "subtitle": "We've added a default list. Adjust the prices and add your own services.",
       "category": "Category",
       "category_placeholder": "Haircuts",
       "service": "Service",
@@ -360,7 +349,84 @@
       "what_happens": "What happens",
       "cancel": "Cancel",
       "confirm": "Connect",
-      "badge_on": "Connected"
+      "badge_on": "Connected",
+      "providers": {
+        "booksy": {
+          "tagline": "Visit calendar, masters, clients — everything lands in the portal automatically.",
+          "step_1": "Login to your Booksy (email + password)",
+          "step_2": "Import all visits, masters and clients",
+          "step_3": "Finances calculated automatically every day",
+          "hint": "Need Booksy email & password (we encrypt and never show them again)."
+        },
+        "wfirma": {
+          "tagline": "All invoices from inbox — into expenses and income automatically.",
+          "step_1": "Authorization via wFirma API",
+          "step_2": "AI picks up all issued and received invoices",
+          "step_3": "Counterparty-level expenses — no manual entry",
+          "hint": "Need wFirma email + password + appKey (we provide the key)."
+        },
+        "banking": {
+          "tagline": "Every debit auto-lands in 'Expenses'.",
+          "step_1": "Pick a bank from the list (mBank, ING, PKO, Santander, …)",
+          "step_2": "Secure consent via your bank app",
+          "step_3": "Read transactions for 90 days without re-connect",
+          "hint": "Connection via Enable Banking — we have read-only access."
+        },
+        "instagram": {
+          "tagline": "Client DMs land in the portal. AI replies to typical questions.",
+          "step_1": "Authorization via Facebook Business",
+          "step_2": "Pick the salon's Instagram account",
+          "step_3": "AI answers about prices/schedule automatically"
+        },
+        "facebook": {
+          "tagline": "All client messages — in one feed with Instagram and Telegram.",
+          "step_1": "Authorization via Facebook",
+          "step_2": "Pick the salon's page",
+          "step_3": "Subscribe to webhook messages"
+        },
+        "telegram": {
+          "tagline": "AI insights and alerts straight in Telegram. Every morning at 9:00 — day's briefing.",
+          "step_1": "You'll get a deep-link to @finkley_tg_bot",
+          "step_2": "One click — and linking is done",
+          "step_3": "Morning briefing + critical alerts"
+        },
+        "ical": {
+          "tagline": "Every master subscribes to their visit calendar on any phone.",
+          "step_1": "We generate a private iCal URL for each master",
+          "step_2": "Master adds it to Google/Apple/Outlook Calendar",
+          "step_3": "Visits sync automatically"
+        },
+        "ocr_notebook": {
+          "tagline": "AI recognizes handwritten notes. No manual history entry.",
+          "step_1": "Photograph the notebook pages",
+          "step_2": "AI recognizes date, client, service, amount",
+          "step_3": "You confirm — visits land in the portal"
+        },
+        "ksef": {
+          "tagline": "State e-invoice registry. Mandatory for everyone from 2026.",
+          "step_1": "Connection via company certificate",
+          "step_2": "Invoice sync every hour",
+          "step_3": "Full compliance with Ministry of Finance requirements"
+        },
+        "fakturownia": {
+          "tagline": "AI picks up all issued invoices and links them to visits.",
+          "step_1": "Fakturownia API token",
+          "step_2": "Invoice sync every 6 hours",
+          "step_3": "Invoice↔client linking automatically"
+        },
+        "ifirma": {
+          "tagline": "Cloud accounting for JDG and Sp. z o.o.",
+          "step_1": "iFirma email + password",
+          "step_2": "Import of all invoices and expenses",
+          "step_3": "Automatic categorization"
+        },
+        "infakt": {
+          "tagline": "AI recognizes invoice scans, imports PDFs and e-invoices.",
+          "step_1": "inFakt API token",
+          "step_2": "Invoice sync every 6 hours",
+          "step_3": "PDFs and e-invoices"
+        }
+      }
     },
     "tg_phone": {
       "title": "How should we reach you?",

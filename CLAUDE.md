@@ -196,6 +196,13 @@ export function formatCurrency(cents: number, currency = 'PLN', locale = 'ru-RU'
 }
 ```
 
+**Семантически разные суммы — отдельные колонки.** Если у строки есть две
+независимые суммы (например, базовый payout vs премия в `expenses` — см.
+[`decisions/027-payroll-premium-separate-column.md`](./decisions/027-payroll-premium-separate-column.md)),
+не слепляй их в одно `amount_cents` с разбивкой в `metadata`. Заводи отдельную
+колонку `<name>_cents bigint NOT NULL DEFAULT 0`. Аналитика проще, RPC быстрее,
+изменения return type RPC требуют `DROP + CREATE` функции.
+
 ### Время — всегда UTC в БД, локально на клиенте
 
 `timestamptz` в Postgres, ISO-строки в API, `Date` объекты на клиенте, отображение через `date-fns` с локалью. Часовой пояс салона хранится в `salons.timezone` (IANA, например `Europe/Warsaw`).

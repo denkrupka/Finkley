@@ -169,7 +169,6 @@
     },
     "path": {
       "title": "Jak skonfigurować salon?",
-      "subtitle": "Wybierz wygodniej: minimum szybko — lub od razu pełna konfiguracja z tutorialem.",
       "quick_title": "Szybka konfiguracja",
       "quick_subtitle": "Tylko niezbędne — salon i taryfa. Resztę dodasz w trakcie pracy.",
       "quick_eta": "≈ 2 min",
@@ -181,8 +180,7 @@
       "full_eta": "≈ 10 min",
       "full_bullet_1": "Pracownicy + usługi + kategorie wydatków",
       "full_bullet_2": "Wskazówki tutoriala na każdym kroku",
-      "full_bullet_3": "Każdy krok można pominąć",
-      "switch_hint": "Możesz zmienić ścieżkę w każdej chwili przyciskiem «Wstecz»."
+      "full_bullet_3": "Każdy krok można pominąć"
     },
     "tutorial": {
       "salon": "Nazwa salonu będzie widoczna dla klientów w mailach i SMS-ach. Kraj określa walutę, strefę czasową i format adresu. Typ salonu napędza szablony usług i porównanie z konkurencją.",
@@ -202,19 +200,13 @@
       "address_placeholder": "ul. Marszałkowska 100, 00-001 Warszawa",
       "city_label": "Miasto",
       "city_placeholder": "Warszawa",
-      "coords_label": "Współrzędne (lat / lng)",
-      "hint_skip": "Można pominąć i wypełnić później w Ustawienia → Profil."
+      "coords_label": "Współrzędne (lat / lng)"
     },
     "step_accounting": {
       "title": "Dane podatkowe",
-      "subtitle": "Potrzebne do integracji księgowych i raportów P&L. Można pominąć.",
       "nip_label": "NIP / VAT ID",
-      "nip_hint": "10 cyfr bez myślników. Używany do auto-eksportu wFirma/KSeF.",
       "company_label": "Nazwa firmy (prawna)",
-      "company_placeholder": "Np. JANE DOE BEAUTY",
-      "integrations_note_title": "Integracje księgowe podłączasz po",
-      "integrations_note_body": "wFirma (PL), KSeF (PL e-faktury), Fakturownia, inFakt — wybierz w Ustawienia → Integracje → Księgowość. Tam będą auto-eksportowane paragony i wydatki jako faktury.",
-      "hint_skip": "Pola opcjonalne. Wypełnisz później w Ustawienia → Księgowość."
+      "company_placeholder": "Np. JANE DOE BEAUTY"
     },
     "step_integrations": {
       "title": "Które integracje podłączymy?",
@@ -223,7 +215,6 @@
     },
     "step1": {
       "title": "Opowiedz o salonie",
-      "subtitle": "Bez tego ani rusz — musimy wiedzieć, w jakim kraju i w jakiej walucie pracujesz.",
       "name_label": "Nazwa salonu",
       "name_placeholder": "Na przykład: Studio Anny",
       "country_label": "Kraj",
@@ -231,14 +222,12 @@
     },
     "step2": {
       "title": "Dodaj swoich specjalistów",
-      "subtitle": "To zajmie 2 minuty. Później możesz uzupełnić i zmienić.",
       "name_placeholder": "Imię specjalisty",
       "percent_label": "% od przychodu",
       "add": "Dodaj specjalistę"
     },
     "step3": {
       "title": "Co robicie",
-      "subtitle": "Wstawiliśmy listę domyślną. Popraw ceny i dodaj swoje usługi.",
       "category": "Kategoria",
       "category_placeholder": "Strzyżenie",
       "service": "Usługa",
@@ -360,7 +349,84 @@
       "what_happens": "Co się stanie",
       "cancel": "Anuluj",
       "confirm": "Podłącz",
-      "badge_on": "Podłączone"
+      "badge_on": "Podłączone",
+      "providers": {
+        "booksy": {
+          "tagline": "Kalendarz wizyt, mistrzowie, klienci — wszystko trafi do portalu automatycznie.",
+          "step_1": "Login do swojego Booksy (email + hasło)",
+          "step_2": "Import wszystkich wizyt, mistrzów i klientów",
+          "step_3": "Finanse liczone automatycznie codziennie",
+          "hint": "Potrzebny email i hasło do Booksy (szyfrujemy i nie pokazujemy ponownie)."
+        },
+        "wfirma": {
+          "tagline": "Wszystkie faktury z inboxa — do wydatków i przychodów automatycznie.",
+          "step_1": "Autoryzacja przez wFirma API",
+          "step_2": "AI zabiera wszystkie wystawione i otrzymane faktury",
+          "step_3": "Wydatki według kontrahentów — bez ręcznego wpisywania",
+          "hint": "Potrzebny email + hasło wFirma + appKey (klucz wydajemy my)."
+        },
+        "banking": {
+          "tagline": "Każde obciążenie automatycznie trafia do sekcji „Wydatki”.",
+          "step_1": "Wybór banku z listy (mBank, ING, PKO, Santander, …)",
+          "step_2": "Bezpieczna zgoda przez aplikację banku",
+          "step_3": "Odczyt transakcji za 90 dni bez ponownego łączenia",
+          "hint": "Połączenie przez Enable Banking — mamy tylko odczyt."
+        },
+        "instagram": {
+          "tagline": "DM klientów trafiają do portalu. AI odpowiada na typowe pytania.",
+          "step_1": "Autoryzacja przez Facebook Business",
+          "step_2": "Wybór konta Instagram salonu",
+          "step_3": "AI odpowiada o cenach/grafiku automatycznie"
+        },
+        "facebook": {
+          "tagline": "Wszystkie wiadomości od klientów — w jednym feedzie z Instagramem i Telegramem.",
+          "step_1": "Autoryzacja przez Facebook",
+          "step_2": "Wybór strony salonu",
+          "step_3": "Subskrypcja webhook-wiadomości"
+        },
+        "telegram": {
+          "tagline": "Insighty AI i alerty wprost w Telegramie. Co rano o 9:00 — rozbiór dnia.",
+          "step_1": "Otrzymasz deep-link do bota @finkley_tg_bot",
+          "step_2": "Jedno kliknięcie — i powiązanie gotowe",
+          "step_3": "Poranny rozbiór + krytyczne alerty"
+        },
+        "ical": {
+          "tagline": "Każdy mistrz subskrybuje swój kalendarz wizyt na dowolnym telefonie.",
+          "step_1": "Wygenerujemy prywatny URL iCal dla każdego mistrza",
+          "step_2": "Mistrz dodaje do Google/Apple/Outlook Calendar",
+          "step_3": "Wizyty synchronizują się automatycznie"
+        },
+        "ocr_notebook": {
+          "tagline": "AI rozpoznaje pismo odręczne. Bez ręcznego wprowadzania historii.",
+          "step_1": "Sfotografujesz strony zeszytu",
+          "step_2": "AI rozpoznaje datę, klienta, usługę, kwotę",
+          "step_3": "Potwierdzisz — wizyty trafią do portalu"
+        },
+        "ksef": {
+          "tagline": "Państwowy rejestr e-faktur. Obowiązkowy dla wszystkich od 2026.",
+          "step_1": "Połączenie przez certyfikat firmy",
+          "step_2": "Synchronizacja faktur co godzinę",
+          "step_3": "Pełna zgodność z wymogami Ministerstwa Finansów"
+        },
+        "fakturownia": {
+          "tagline": "AI zabiera wszystkie wystawione faktury i łączy z wizytami.",
+          "step_1": "Token API Fakturowni",
+          "step_2": "Sync faktur co 6 godzin",
+          "step_3": "Powiązanie faktura↔klient automatyczne"
+        },
+        "ifirma": {
+          "tagline": "Księgowość chmurowa dla JDG i Sp. z o.o.",
+          "step_1": "Email + hasło iFirma",
+          "step_2": "Import wszystkich faktur i wydatków",
+          "step_3": "Automatyczna kategoryzacja"
+        },
+        "infakt": {
+          "tagline": "AI rozpoznaje skany faktur, import PDF i e-faktur.",
+          "step_1": "Token API inFakt",
+          "step_2": "Sync faktur co 6 godzin",
+          "step_3": "PDF i e-faktury"
+        }
+      }
     },
     "tg_phone": {
       "title": "Jak się z Tobą kontaktować?",

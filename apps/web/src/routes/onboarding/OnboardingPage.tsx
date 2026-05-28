@@ -711,10 +711,6 @@ export function OnboardingPage() {
                 title={t('onboarding.step_integrations.bookings_title', {
                   defaultValue: 'Запись и календари',
                 })}
-                subtitle={t('onboarding.step_integrations.bookings_subtitle', {
-                  defaultValue:
-                    'Перестань вручную переписывать визиты — мы синхронизируем их сразу из Booksy или импортируем фото блокнота через AI.',
-                })}
                 emoji="📅"
                 extra={
                   <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-lg border-2 border-dashed p-3.5">
@@ -782,10 +778,6 @@ export function OnboardingPage() {
               <IntegrationCategoryStep
                 title={t('onboarding.step_integrations.social_title', {
                   defaultValue: 'Соцсети и мессенджеры',
-                })}
-                subtitle={t('onboarding.step_integrations.social_subtitle', {
-                  defaultValue:
-                    'Все сообщения от клиентов — в одну ленту. Никаких «пропустила, потеряла визит». Плюс AI отвечает за тебя на типовые вопросы.',
                 })}
                 emoji="💬"
                 items={[
@@ -858,10 +850,6 @@ export function OnboardingPage() {
               <IntegrationCategoryStep
                 title={t('onboarding.step_integrations.banking_title', {
                   defaultValue: 'Банк и расходы',
-                })}
-                subtitle={t('onboarding.step_integrations.banking_subtitle', {
-                  defaultValue:
-                    'Каждое списание автоматом упадёт в раздел «Расходы». Никаких забытых трат — финансовая картина всегда живая.',
                 })}
                 emoji="🏦"
                 items={[

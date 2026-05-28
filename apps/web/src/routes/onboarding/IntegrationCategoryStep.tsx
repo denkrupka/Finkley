@@ -33,9 +33,6 @@ export function IntegrationCategoryStep({
   extra,
 }: {
   title: string
-  /** T123 — больше не отображается (компактизация), но оставлен в API
-   *  для обратной совместимости — вызывающий код всё ещё передаёт его. */
-  subtitle?: string
   items: IntegrationItem[]
   selected: OnboardingIntegration[]
   onToggle: (id: OnboardingIntegration) => void

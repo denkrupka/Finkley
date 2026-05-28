@@ -1873,8 +1873,9 @@ function PayrollAutoFillButton({
   currency: string
   onPick: (payoutCents: number, breakdown: string) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
+  const locale = i18n.language || 'ru-RU'
 
   const disabled = !staffId || !periodStart || !periodEnd || busy
 
@@ -1911,9 +1912,9 @@ function PayrollAutoFillButton({
         defaultValue:
           'Визитов: {{count}} · Выручка: {{rev}} · Чаевые: {{tips}} → Payout: {{payout}}',
         count: Number(row.visit_count),
-        rev: formatCurrencyShort(Number(row.revenue_cents), currency),
-        tips: formatCurrencyShort(Number(row.tips_cents), currency),
-        payout: formatCurrencyShort(payout, currency),
+        rev: formatCurrencyShort(Number(row.revenue_cents), currency, locale),
+        tips: formatCurrencyShort(Number(row.tips_cents), currency, locale),
+        payout: formatCurrencyShort(payout, currency, locale),
       })
       onPick(payout, breakdown)
       toast.success(t('expenses.form.payroll_filled', { defaultValue: 'Сумма посчитана' }))
@@ -1939,9 +1940,9 @@ function PayrollAutoFillButton({
   )
 }
 
-function formatCurrencyShort(cents: number, currency: string): string {
+function formatCurrencyShort(cents: number, currency: string, locale: string): string {
   try {
-    return new Intl.NumberFormat('ru-RU', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       maximumFractionDigits: 0,
