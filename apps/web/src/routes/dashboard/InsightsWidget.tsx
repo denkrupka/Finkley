@@ -3,18 +3,41 @@ import { useTranslation } from 'react-i18next'
 
 import { useDismissInsight, useInsights, type InsightRow } from '@/hooks/useInsights'
 
+import type { LocalInsight } from './dashboard-aggregates'
+
 /**
  * Дашборд-виджет AI-инсайтов. Показывает до 3-х актуальных инсайтов
  * (sorted by severity) с возможностью «Скрыть».
  *
- * Не отображается если инсайтов нет (стартовый салон без данных).
+ * Если в таблице insights пусто (новый салон / cron не отработал) —
+ * рендерим переданный fallback с локально-посчитанными подсказками
+ * (см. computeLocalInsights), чтобы блок «AI-помощник видит» не был
+ * пустым на дашборде.
  */
-export function InsightsWidget({ salonId }: { salonId: string }) {
+export function InsightsWidget({
+  salonId,
+  fallback = [],
+}: {
+  salonId: string
+  fallback?: LocalInsight[]
+}) {
   const { t } = useTranslation()
   const { data: insights = [] } = useInsights(salonId)
   const dismiss = useDismissInsight(salonId)
 
-  if (insights.length === 0) return null
+  const hasServerInsights = insights.length > 0
+  const hasFallback = fallback.length > 0
+
+  if (!hasServerInsights && !hasFallback) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t('dashboard.insights.empty', {
+          defaultValue:
+            'Пока всё спокойно. Если появится что-то требующее внимания — увидишь подсказку здесь.',
+        })}
+      </p>
+    )
+  }
 
   return (
     <section className="border-secondary/20 bg-secondary/5 mb-5 rounded-lg border p-4 sm:p-5">
@@ -25,16 +48,38 @@ export function InsightsWidget({ salonId }: { salonId: string }) {
         </h2>
       </div>
       <div className="flex flex-col gap-2.5">
-        {insights.map((i) => (
-          <InsightCard
-            key={i.id}
-            insight={i}
-            onDismiss={() => dismiss.mutate(i.id)}
-            disabled={dismiss.isPending}
-          />
-        ))}
+        {hasServerInsights
+          ? insights.map((i) => (
+              <InsightCard
+                key={i.id}
+                insight={i}
+                onDismiss={() => dismiss.mutate(i.id)}
+                disabled={dismiss.isPending}
+              />
+            ))
+          : fallback.map((i) => <LocalInsightCard key={i.id} insight={i} />)}
       </div>
     </section>
+  )
+}
+
+function LocalInsightCard({ insight }: { insight: LocalInsight }) {
+  const Icon =
+    insight.severity === 'critical' ? AlertTriangle : insight.severity === 'warning' ? Zap : Info
+  const colorClass =
+    insight.severity === 'critical'
+      ? 'text-destructive'
+      : insight.severity === 'warning'
+        ? 'text-amber-600'
+        : 'text-brand-teal-deep'
+  return (
+    <div className="border-border bg-card flex items-start gap-3 rounded-md border p-3">
+      <Icon className={`mt-0.5 size-4 shrink-0 ${colorClass}`} strokeWidth={2} />
+      <div className="min-w-0 flex-1">
+        <p className="text-brand-navy text-sm font-bold">{insight.title}</p>
+        <p className="text-foreground/80 mt-0.5 text-xs leading-snug">{insight.body}</p>
+      </div>
+    </div>
   )
 }
 

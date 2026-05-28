@@ -8,18 +8,39 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 
 import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
+import { useClients } from '@/hooks/useClients'
 import { useDashboardKpis, useTopStaff } from '@/hooks/useDashboard'
 import { useRegisterBalances } from '@/hooks/useCashTransfers'
-import { useAuth } from '@/hooks/useAuth'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useFinancialSettings } from '@/hooks/useFinancialSettings'
+import { useInventoryItems } from '@/hooks/useInventory'
+import { useReviews } from '@/hooks/useReviews'
 import { useSalon } from '@/hooks/useSalons'
+import { useServiceCategories, useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { useVisits } from '@/hooks/useVisits'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { effectiveReceivedFromVisit } from '@/hooks/useVisits'
 
 import { CollapsibleSection } from './CollapsibleSection'
+import {
+  computeActiveClients,
+  computeAvgRating,
+  computeLocalInsights,
+  computeMarketingSources,
+  computeMaterialsStockPct,
+  computeNeedsReactivation,
+  computeNewClientsCount,
+  computeNoShowsCount,
+  computeOccupancyPct,
+  computeOnlineBookingsPct,
+  computeRegularClientsCount,
+  computeRetentionPct,
+  computeRevenueByCategory,
+  computeRfm,
+  computeTodayAppointments,
+  workingDaysInRange,
+} from './dashboard-aggregates'
 import { InsightsWidget } from './InsightsWidget'
 import { LowStockWidget } from './LowStockWidget'
 import {
@@ -63,13 +84,13 @@ export function DashboardPage() {
   const prevMonthAnchor = subMonths(startOfMonth(now), 1)
   const prevRange = getPeriodRange('month', prevMonthAnchor)
 
-  const { user } = useAuth()
   const { data: salon } = useSalon(salonId)
   const { data: kpis } = useDashboardKpis(salonId, range)
   const { data: prevKpis } = useDashboardKpis(salonId, prevRange)
   const { data: topStaff = [] } = useTopStaff(salonId, range, 5)
   const { data: staff = [] } = useStaff(salonId)
   const { data: visits = [] } = useVisits(salonId, range)
+  const { data: prevVisits = [] } = useVisits(salonId, prevRange)
   const { data: expenses = [] } = useExpenses(salonId, {
     start: range.start.slice(0, 10),
     end: range.end.slice(0, 10),
@@ -77,11 +98,14 @@ export function DashboardPage() {
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   const { data: registerBalances = [] } = useRegisterBalances(salonId)
   const { data: financialSettings } = useFinancialSettings(salonId)
+  const { data: clients = [] } = useClients(salonId)
+  const { data: services = [] } = useServices(salonId)
+  const { data: serviceCategories = [] } = useServiceCategories(salonId)
+  const { data: inventoryItems = [] } = useInventoryItems(salonId)
+  const { data: reviews = [] } = useReviews(salonId)
 
   if (!salon || !salonId) return null
   const currency = salon.currency
-
-  const firstName = (user?.user_metadata?.full_name ?? '').split(' ')[0]
 
   // ─── Деривативные значения ────────────────────────────────────────────────
   const revenueCents = kpis?.revenue_cents ?? 0
@@ -167,22 +191,46 @@ export function DashboardPage() {
   // Маржа.
   const marginPct = revenueCents > 0 ? (profitCents / revenueCents) * 100 : null
 
+  // ─── Аггрегаты для всех секций (см. dashboard-aggregates.ts) ───────────
+  const workingDays = workingDaysInRange(new Date(range.start), new Date(range.end))
+  const revenueByCategory = computeRevenueByCategory(visits, services, serviceCategories)
+  const newClientsCount = computeNewClientsCount(clients, range)
+  const regularClientsCount = computeRegularClientsCount(clients)
+  const onlineBookingsPct = computeOnlineBookingsPct(visits)
+  const occupancyPct = computeOccupancyPct(visits, activeStaffCount, workingDays)
+  const prevOccupancyPct = computeOccupancyPct(prevVisits, activeStaffCount, 22)
+  const {
+    retentionPct,
+    returningCount: returningClients,
+    churnedCount: churnedClients,
+  } = computeRetentionPct(visits, prevVisits)
+  const totalClients = clients.length
+  const activeClients = computeActiveClients(clients, now)
+  const needsReactivation = computeNeedsReactivation(clients, now)
+  const rfm = computeRfm(clients, now)
+  const marketingSources = computeMarketingSources(clients)
+  const materialsStockPct = computeMaterialsStockPct(inventoryItems)
+  const todayAppointments = computeTodayAppointments(visits, now)
+  const noShowsCount = computeNoShowsCount(visits)
+  const { avg: avgRating, count: reviewsCount } = computeAvgRating(reviews, range)
+  const lowStockCount = inventoryItems.filter(
+    (i) => i.min_stock > 0 && i.current_stock <= i.min_stock,
+  ).length
+
+  // Local insights — генерим прямо из аггрегатов, если в insights таблице пусто.
+  const localInsights = computeLocalInsights({
+    revenueCents,
+    expenseCents,
+    profitCents,
+    prevRevenueCents,
+    cashBalanceCents,
+    needsReactivation,
+    lowStockCount,
+    occupancyPct,
+  })
+
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
-      {/* Greeting */}
-      <header className="mb-2 flex items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-            {t('dashboard.greeting', { name: firstName || 'там' })} 👋
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t(`dashboard.greeting_subtitle_${period}`, {
-              defaultValue: t('dashboard.greeting_subtitle_month'),
-            })}
-          </p>
-        </div>
-      </header>
-
       {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
 
       {/* Стартовый тур */}
@@ -202,7 +250,7 @@ export function DashboardPage() {
         title={t('dashboard.collapsible.insights', { defaultValue: 'AI-помощник видит' })}
         defaultOpen
       >
-        <InsightsWidget salonId={salonId} />
+        <InsightsWidget salonId={salonId} fallback={localInsights} />
       </CollapsibleSection>
 
       {/* Блок 1 — 5 KPI */}
@@ -218,12 +266,12 @@ export function DashboardPage() {
         prevProfitCents={prevProfitCents}
         prevCashCents={null}
         profitForecastCents={profitForecastCents}
-        occupancyPct={null}
-        prevOccupancyPct={null}
-        retentionPct={null}
+        occupancyPct={occupancyPct}
+        prevOccupancyPct={prevOccupancyPct}
+        retentionPct={retentionPct}
         prevRetentionPct={null}
-        newClients={null}
-        churnedClients={null}
+        newClients={returningClients}
+        churnedClients={churnedClients}
         cashBalanceCents={cashBalanceCents}
         cashPlanCents={null}
       />
@@ -238,24 +286,24 @@ export function DashboardPage() {
               ? ((visitsCount - prevKpis.visits_count) / prevKpis.visits_count) * 100
               : null
           }
-          newClientsCount={null}
+          newClientsCount={newClientsCount}
           newClientsMomPct={null}
-          regularClientsCount={null}
+          regularClientsCount={regularClientsCount}
           avgCheckCents={avgCheckCents}
-          onlineBookingsPct={null}
+          onlineBookingsPct={onlineBookingsPct}
           cancelledPct={cancelledPct}
-          sources={[]}
+          sources={marketingSources}
         />
         <MastersSection
           activeCount={activeStaffCount}
           totalCount={staff.length}
-          avgLoadPct={null}
-          loadPlanPct={null}
+          avgLoadPct={occupancyPct}
+          loadPlanPct={75}
           top={topStaffRows}
           currency={currency}
-          avgRating={null}
-          reviewsCount={null}
-          noShowsCount={null}
+          avgRating={avgRating}
+          reviewsCount={reviewsCount}
+          noShowsCount={noShowsCount}
         />
       </div>
 
@@ -278,15 +326,15 @@ export function DashboardPage() {
               : null
           }
           dailyRevenue={dailyRevenue}
-          revenueByCategory={[]}
+          revenueByCategory={revenueByCategory}
         />
       </div>
 
       {/* Блок 4 — Запись и операции */}
       <OperationsSection
-        todayAppointments={null}
+        todayAppointments={todayAppointments}
         waitlistCount={null}
-        materialsStockPct={null}
+        materialsStockPct={materialsStockPct}
         freeSlotsCount={null}
         totalSlotsCount={null}
       />
@@ -294,13 +342,13 @@ export function DashboardPage() {
       {/* Блок 5 — Маркетинг */}
       <MarketingSection
         currency={currency}
-        sources={[]}
+        sources={marketingSources}
         cacByChannel={[]}
         avgCacCents={null}
-        rfm={[]}
-        totalClients={null}
-        activeClients={null}
-        needsReactivation={null}
+        rfm={rfm}
+        totalClients={totalClients}
+        activeClients={activeClients}
+        needsReactivation={needsReactivation}
       />
     </div>
   )
