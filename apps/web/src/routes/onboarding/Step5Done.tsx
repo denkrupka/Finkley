@@ -1,4 +1,13 @@
-import { Banknote, Calendar, Check, FileText, Plug, Sparkles, TrendingUp } from 'lucide-react'
+import {
+  ArrowRight,
+  Banknote,
+  Calendar,
+  Check,
+  FileText,
+  Plug,
+  Sparkles,
+  TrendingUp,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OnboardingIntegration } from './OnboardingPage'
@@ -18,6 +27,13 @@ type Props = {
    *  (trial 14 дней включён), false = просто dashboard. */
   subscribeAfterSubmit: boolean
   onSubscribeToggle: (value: boolean) => void
+  /** T105 — текущий путь онбординга. В quick показываем CTA «Доделать
+   *  полный setup» — переключение на full и переход к первому шагу
+   *  отсутствующему в quick (schedule). */
+  path?: 'quick' | 'full' | null
+  /** T105 — обработчик переключения на полную ветку. Меняет path на 'full'
+   *  и навигирует на schedule (первый full-only шаг). */
+  onSwitchToFull?: () => void
 }
 
 const INTEGRATIONS: ReadonlyArray<{
@@ -38,6 +54,8 @@ export function Step5Done({
   onIntegrationsToggle,
   subscribeAfterSubmit,
   onSubscribeToggle,
+  path,
+  onSwitchToFull,
 }: Props) {
   const { t } = useTranslation()
 
@@ -66,6 +84,25 @@ export function Step5Done({
         <Card label={t('onboarding.step5.services')} value={summary.servicesCount} />
         <Card label={t('onboarding.step5.expenses')} value={summary.expensesCount} />
       </ul>
+
+      {/* T105 — кнопка «Продолжить полным setup» — только в quick-ветке.
+          Переключает на full и шагает на schedule (первый full-only шаг).
+          Уже сделанные шаги (welcome, path, profile, salon, интеграции,
+          tg_phone, wow) пропускаются автоматически. */}
+      {path === 'quick' && onSwitchToFull ? (
+        <button
+          type="button"
+          onClick={onSwitchToFull}
+          className="border-brand-teal-deep bg-brand-teal-soft/30 hover:bg-brand-teal-soft/60 text-brand-teal-deep mx-auto mt-6 inline-flex max-w-md items-center gap-2 rounded-xl border-2 border-dashed px-5 py-3 text-sm font-bold transition-colors"
+        >
+          <Sparkles className="size-4" strokeWidth={2} />
+          {t('onboarding.step5.switch_to_full', {
+            defaultValue:
+              'Хочу полный setup — лого, график, импорт мастеров и услуг, расходы, AI-разбор по 4 темам',
+          })}
+          <ArrowRight className="size-4" strokeWidth={2.4} />
+        </button>
+      ) : null}
 
       {/* Paywall: 14 дней trial, дальше платно. По умолчанию включено —
           юзер увидит Stripe Checkout сразу после submit. Можно снять. */}

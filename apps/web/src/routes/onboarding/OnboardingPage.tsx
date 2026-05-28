@@ -23,6 +23,9 @@ import {
   type SalonTypeId,
 } from './onboarding-defaults'
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
+import { OcrNotebookButton, type ParsedVisit } from './OcrNotebookButton'
+import { StepAiBreakdown } from './StepAiBreakdown'
+import { StepPublicLinks } from './StepPublicLinks'
 import { Step0Path, type OnboardingPath } from './Step0Path'
 import { StepSchedule, type OpeningHoursDraft } from './StepSchedule'
 import { StepTelegramPhone } from './StepTelegramPhone'
@@ -57,6 +60,7 @@ const STEPS_FULL = [
   'salon',
   'schedule',
   'address',
+  'public_links',
   'accounting',
   'integrations_bookings',
   'integrations_social',
@@ -65,10 +69,13 @@ const STEPS_FULL = [
   'staff',
   'services',
   'expenses',
-  'wow',
+  'ai_services',
+  'ai_staff',
+  'ai_clients',
+  'ai_reviews',
   'done',
 ] as const
-type StepId = (typeof STEPS_FULL)[number]
+type StepId = (typeof STEPS_FULL)[number] | (typeof STEPS_QUICK)[number]
 
 export type OnboardingIntegration =
   | 'booksy'
@@ -115,6 +122,13 @@ export type OnboardingState = {
   want_telegram: boolean
   // T98 — opening hours (full path only)
   opening_hours: OpeningHoursDraft
+  // T102 — визиты, распознанные AI из фото блокнота. Импортируем после
+  // создания салона как обычные visits.
+  ocr_visits: ParsedVisit[]
+  // T103 — публичные ссылки (полная ветка)
+  booksy_url: string
+  instagram_url: string
+  facebook_url: string
 }
 
 const INITIAL: OnboardingState = {
@@ -152,6 +166,10 @@ const INITIAL: OnboardingState = {
     sat: { open: '10:00', close: '18:00' },
     sun: { closed: true },
   },
+  ocr_visits: [],
+  booksy_url: '',
+  instagram_url: '',
+  facebook_url: '',
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -262,6 +280,10 @@ export function OnboardingPage() {
     }
     if (state.address.google_place_id) extraPatch.google_place_id = state.address.google_place_id
     if (state.address.google_place_url) extraPatch.google_place_url = state.address.google_place_url
+    // T103 — публичные ссылки в salons
+    if (state.booksy_url.trim()) extraPatch.booksy_url = state.booksy_url.trim()
+    if (state.instagram_url.trim()) extraPatch.instagram_url = state.instagram_url.trim()
+    if (state.facebook_url.trim()) extraPatch.facebook_url = state.facebook_url.trim()
     if (state.nip.trim()) {
       // Бухгалтерия живёт в accounting_settings jsonb (миграция 20260516000002).
       // Merge через accounting_settings — но проще держать в отдельных колонках:
@@ -446,6 +468,16 @@ export function OnboardingPage() {
         return t('onboarding.cta.tg_phone', { defaultValue: 'Сохранить и дальше →' })
       case 'schedule':
         return t('onboarding.cta.schedule', { defaultValue: 'Сохранить график →' })
+      case 'public_links':
+        return t('onboarding.cta.public_links', { defaultValue: 'Сохранить ссылки →' })
+      case 'ai_services':
+        return t('onboarding.cta.ai_services', { defaultValue: 'Перейти к мастерам →' })
+      case 'ai_staff':
+        return t('onboarding.cta.ai_staff', { defaultValue: 'Перейти к клиентам →' })
+      case 'ai_clients':
+        return t('onboarding.cta.ai_clients', { defaultValue: 'Перейти к отзывам →' })
+      case 'ai_reviews':
+        return t('onboarding.cta.ai_reviews', { defaultValue: 'Готово, к моему порталу →' })
       case 'staff':
         return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
       case 'services':
@@ -583,6 +615,34 @@ export function OnboardingPage() {
                     'Перестань вручную переписывать визиты — мы синхронизируем их сразу из Booksy или импортируем фото блокнота через AI.',
                 })}
                 emoji="📅"
+                extra={
+                  <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-lg border-2 border-dashed p-3.5">
+                    <p className="text-foreground mb-2 text-xs font-bold uppercase tracking-wider">
+                      {t('onboarding.ocr.section_title', {
+                        defaultValue: '📓 Или прямо сейчас — сфотографируй блокнот',
+                      })}
+                    </p>
+                    <p className="text-muted-foreground mb-3 text-xs leading-snug">
+                      {t('onboarding.ocr.section_body', {
+                        defaultValue:
+                          'AI распознаёт рукописные записи. Покажет тебе таблицу — отметишь какие визиты импортировать. Доступно сразу после создания салона на этом же шаге.',
+                      })}
+                    </p>
+                    <OcrNotebookButton
+                      salonId={null}
+                      onVisitsParsed={(v) => patch('ocr_visits', [...state.ocr_visits, ...v])}
+                    />
+                    {state.ocr_visits.length > 0 ? (
+                      <p className="text-brand-teal-deep mt-2 text-xs font-bold">
+                        ✓{' '}
+                        {t('onboarding.ocr.collected', {
+                          defaultValue: 'В очереди на импорт: {{count}} визитов',
+                          count: state.ocr_visits.length,
+                        })}
+                      </p>
+                    ) : null}
+                  </div>
+                }
                 items={[
                   {
                     id: 'booksy',
@@ -672,6 +732,20 @@ export function OnboardingPage() {
                 full={state.path === 'full'}
               />
             )}
+            {stepId === 'ai_services' && <StepAiBreakdown topic="services" />}
+            {stepId === 'ai_staff' && <StepAiBreakdown topic="staff" />}
+            {stepId === 'ai_clients' && <StepAiBreakdown topic="clients" />}
+            {stepId === 'ai_reviews' && <StepAiBreakdown topic="reviews" />}
+            {stepId === 'public_links' && (
+              <StepPublicLinks
+                value={{
+                  booksy_url: state.booksy_url,
+                  instagram_url: state.instagram_url,
+                  facebook_url: state.facebook_url,
+                }}
+                onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
+              />
+            )}
             {stepId === 'integrations_banking' && (
               <IntegrationCategoryStep
                 title={t('onboarding.step_integrations.banking_title', {
@@ -743,6 +817,16 @@ export function OnboardingPage() {
                   onIntegrationsToggle={(v) => patch('selected_integrations', v)}
                   subscribeAfterSubmit={state.subscribe_after_submit}
                   onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
+                  path={state.path}
+                  onSwitchToFull={() => {
+                    // T105 — переключаемся на full ветку и навигируем на
+                    // первый «новый» шаг (schedule) — он отсутствовал в
+                    // quick. Welcome/path/profile/salon/интеграции/tg_phone
+                    // уже сделаны, повторять не нужно.
+                    patch('path', 'full')
+                    const fullIndex = (STEPS_FULL as readonly string[]).indexOf('schedule')
+                    if (fullIndex >= 0) setStepIndex(fullIndex)
+                  }}
                 />
               </>
             )}

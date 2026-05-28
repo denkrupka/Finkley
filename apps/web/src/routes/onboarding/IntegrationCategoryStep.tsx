@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
@@ -28,6 +29,7 @@ export function IntegrationCategoryStep({
   selected,
   onToggle,
   emoji,
+  extra,
 }: {
   title: string
   subtitle: string
@@ -35,6 +37,9 @@ export function IntegrationCategoryStep({
   selected: OnboardingIntegration[]
   onToggle: (id: OnboardingIntegration) => void
   emoji: string
+  /** T102 — дополнительный контент после списка интеграций (например, кнопка
+   *  OCR блокнота для bookings). Рендерится перед нижней подсказкой. */
+  extra?: ReactNode
 }) {
   const { t } = useTranslation()
 
@@ -88,6 +93,8 @@ export function IntegrationCategoryStep({
           )
         })}
       </div>
+
+      {extra}
 
       <p className="text-muted-foreground text-xs">
         {t('onboarding.step_integrations.connect_after_hint', {
