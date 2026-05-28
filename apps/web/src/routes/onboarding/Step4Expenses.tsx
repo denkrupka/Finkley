@@ -187,13 +187,13 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
 
   function addItem(cat: CategoryId, parentIdOverride?: string) {
     const section = getSection(cat)
-    // T181 — для иерархических категорий (investments/flows/balance) — новый
-    // item автоматом получает parent_id первого header'a (если override
-    // не задан). Иначе попадёт в root и юзер не поймёт где он.
+    // T181+T187 — для иерархических категорий (investments/flows/balance)
+    // новый item автоматом получает parent_id первого header'a (любого,
+    // не только preset). Иначе попадёт в root и юзер не поймёт где он.
     let parentId: string | undefined = parentIdOverride
     const hierarchical = cat === 'investments' || cat === 'flows' || cat === 'balance'
     if (hierarchical && !parentId) {
-      const firstHeader = section.items.find((it) => !it.parent_id && it.preset_key)
+      const firstHeader = section.items.find((it) => !it.parent_id)
       parentId = firstHeader?.id
     }
     patchSection(cat, [

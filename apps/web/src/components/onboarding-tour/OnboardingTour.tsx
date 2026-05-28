@@ -355,15 +355,16 @@ function TourRenderer({
           <div
             className={cn(
               'pointer-events-none absolute rounded-md ring-offset-2 ring-offset-transparent transition-all',
-              isArtificial
-                ? 'ring-primary/40 outline-primary/60 outline outline-dashed outline-2'
-                : 'ring-primary/80 ring-2',
+              isArtificial ? 'ring-primary/40' : 'ring-primary/80 ring-2',
             )}
             style={{
               left: targetRect.left - 4,
               top: targetRect.top - 4,
               width: targetRect.width + 8,
               height: targetRect.height + 8,
+              // T190 — Tailwind 3 не имеет встроенного outline-dashed утилити,
+              // inline style вместо класса.
+              ...(isArtificial ? { outline: '2px dashed hsl(var(--primary) / 0.6)' } : {}),
             }}
           />
         </>

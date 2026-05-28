@@ -30,6 +30,7 @@
     "db:diff": "supabase db diff",
     "functions:serve": "supabase functions serve",
     "functions:deploy": "supabase functions deploy",
+    "tg:check": "node scripts/check-telegram-webhook.mjs",
     "prepare": "husky || true"
   },
   "devDependencies": {

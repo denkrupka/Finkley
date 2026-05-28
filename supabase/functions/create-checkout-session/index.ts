@@ -48,7 +48,7 @@ Deno.serve(
     const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
 
-    let body: { salonId?: string }
+    let body: { salonId?: string; prompt?: string }
     try {
       body = await req.json()
     } catch {
@@ -56,6 +56,13 @@ Deno.serve(
     }
     const salonId = body.salonId
     if (!salonId) return jsonResponse({ error: 'salon_id_required' }, 400)
+    // T186 — после Stripe success/cancel вернуть юзера в integrations с
+    // его prompt (онбординг ставит цепочку Booksy/wFirma/etc). Это
+    // гарантирует что юзер не теряется при cancel.
+    const promptParam = (body.prompt ?? '').trim()
+    const promptQs = promptParam
+      ? `&tab=integrations&prompt=${encodeURIComponent(promptParam)}`
+      : ''
 
     // Только owner может оформлять подписку
     const membership = await getSalonMembership(SUPABASE_URL, SERVICE_ROLE, user.userId, salonId)
@@ -83,8 +90,8 @@ Deno.serve(
         price: STRIPE_PRICE_ID,
         customerEmail: email,
         salonId,
-        successUrl: `${APP_URL}${salonId}/settings?stripe=success`,
-        cancelUrl: `${APP_URL}${salonId}/settings?stripe=cancel`,
+        successUrl: `${APP_URL}${salonId}/settings?stripe=success${promptQs}`,
+        cancelUrl: `${APP_URL}${salonId}/settings?stripe=cancel${promptQs}`,
         trialDays: 14,
         customerId: existingSub?.stripe_customer_id ?? null,
       })

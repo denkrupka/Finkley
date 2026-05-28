@@ -498,18 +498,20 @@ export function OnboardingPage() {
     // ломать UX онбординга (Postmark может тупить, sender signature пропасть).
     void triggerWelcomeEmail(newSalonId, state.name.trim())
 
-    // T179 — сохраняем prompt в localStorage до Stripe redirect, чтобы после
-    // возврата из Checkout (success_url) IntegrationsPage его подхватил.
-    // URL query param теряется при window.location.href в Stripe.
-    if (state.selected_integrations.length > 0) {
-      try {
-        localStorage.setItem(
-          `finkley:onboarding:prompt:${newSalonId}`,
-          state.selected_integrations.join(','),
-        )
-      } catch {
-        /* ignore */
-      }
+    // T179+T199 — сохраняем credentials + prompt в один localStorage entry
+    // (finkley:onboarding:<salonId>). После Stripe redirect (success или
+    // cancel) IntegrationsPage прочитает оба. Раньше было 2 отдельных
+    // localStorage ключа — упрощено в T199.
+    const hasCredentials = Object.values(state.pending_credentials).some(
+      (c) => c && Object.keys(c).length > 0,
+    )
+    const hasPrompt = state.selected_integrations.length > 0
+    if (hasCredentials || hasPrompt) {
+      const { saveOnboardingTransit } = await import('@/lib/onboarding-credentials')
+      saveOnboardingTransit(newSalonId, {
+        credentials: hasCredentials ? state.pending_credentials : undefined,
+        prompt: hasPrompt ? state.selected_integrations.join(',') : undefined,
+      })
     }
 
     // Paywall: если юзер не снял чек-бокс «активировать trial» — редиректим
@@ -519,7 +521,14 @@ export function OnboardingPage() {
       try {
         const { data: checkoutData, error: checkoutErr } = await supabase.functions.invoke(
           'create-checkout-session',
-          { body: { salonId: newSalonId } },
+          {
+            body: {
+              salonId: newSalonId,
+              // T186 — Stripe success/cancel вернёт сюда с prompt,
+              // IntegrationsPage откроет цепочку connect dialog'ов.
+              prompt: state.selected_integrations.join(','),
+            },
+          },
         )
         const url = (checkoutData as { url?: string } | null)?.url
         if (url && !checkoutErr) {
@@ -533,24 +542,8 @@ export function OnboardingPage() {
       }
     }
 
-    // T129 — Если юзер заполнил credentials в ConnectIntegrationDialog,
-    // сохраняем их в localStorage чтобы /settings/integrations подхватил
-    // и pre-filled connect-формы для каждого provider. localStorage ключ
-    // — finkley:onboarding:credentials:<salon_id>. Очищается после
-    // первого использования на /settings/integrations.
-    const hasCredentials = Object.values(state.pending_credentials).some(
-      (c) => c && Object.keys(c).length > 0,
-    )
-    if (hasCredentials) {
-      try {
-        localStorage.setItem(
-          `finkley:onboarding:credentials:${newSalonId}`,
-          JSON.stringify(state.pending_credentials),
-        )
-      } catch (err) {
-        console.warn('credentials localStorage failed', err)
-      }
-    }
+    // T199 — credentials + prompt уже сохранены в один localStorage entry
+    // выше (saveOnboardingTransit), перед Stripe redirect. Не дублируем.
 
     // Если юзер выбрал интеграции — отправляем сразу на settings/integrations,
     // чтобы он подключил их (там полноценные OAuth-флоу). Иначе — на dashboard.
@@ -804,6 +797,16 @@ export function OnboardingPage() {
                     benefit:
                       'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
                   },
+                  {
+                    // T198 — WhatsApp Business чаще канал бронирования
+                    // (клиент пишет «запишите меня на стрижку»), а не просто
+                    // social-чат. Перенесён из integrations_social.
+                    id: 'whatsapp',
+                    icon: WhatsappIcon,
+                    title: 'WhatsApp Business',
+                    benefit:
+                      'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
+                  },
                 ]}
                 selected={state.selected_integrations}
                 onToggle={(id) =>
@@ -841,13 +844,6 @@ export function OnboardingPage() {
                     icon: FacebookIcon,
                     title: 'Facebook Messenger',
                     benefit: 'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
-                  },
-                  {
-                    id: 'whatsapp',
-                    icon: WhatsappIcon,
-                    title: 'WhatsApp Business',
-                    benefit:
-                      'Самый популярный мессенджер в Польше — клиенты пишут, ты отвечаешь из портала.',
                   },
                   {
                     id: 'telegram',

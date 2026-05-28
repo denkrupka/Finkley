@@ -34,6 +34,7 @@ import {
 } from '@/hooks/useIntegrations'
 
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
+import { consumeOnboardingPrompt } from '@/lib/onboarding-credentials'
 
 import { BankingSection } from './BankingSection'
 import { SmsSection } from './SmsSection'
@@ -169,26 +170,18 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   }
 
   useEffect(() => {
-    // Если URL не имеет prompt — пытаемся восстановить из localStorage
-    // (после Stripe Checkout success_url теряет query).
+    // T192 — единый setParams call за effect (избегаем race).
+    // Источник prompt: URL query (свежий редирект) или localStorage
+    // (T199 unified — finkley:onboarding:<salonId>).
     let queue: string[] = []
+    let fromStorage = false
     if (promptParam) {
       queue = promptParam.split(',').filter(Boolean)
     } else if (salonId) {
-      try {
-        const stored = localStorage.getItem(`finkley:onboarding:prompt:${salonId}`)
-        if (stored) {
-          queue = stored.split(',').filter(Boolean)
-          localStorage.removeItem(`finkley:onboarding:prompt:${salonId}`)
-          // Восстановим в URL чтобы consumeNextPrompt мог дальше работать.
-          const next = new URLSearchParams(params)
-          next.set('prompt', queue.join(','))
-          next.set('tab', 'booking')
-          setParams(next, { replace: true })
-          return
-        }
-      } catch {
-        /* ignore */
+      const stored = consumeOnboardingPrompt(salonId)
+      if (stored) {
+        queue = stored.split(',').filter(Boolean)
+        fromStorage = true
       }
     }
     if (queue.length === 0) return
@@ -198,6 +191,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     const next = new URLSearchParams(params)
     if (rest.length > 0) next.set('prompt', rest.join(','))
     else next.delete('prompt')
+    if (fromStorage) next.set('tab', 'booking')
     setParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptParam, salonId])

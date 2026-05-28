@@ -3,6 +3,7 @@ import {
   Banknote,
   Calendar,
   Check,
+  CreditCard,
   FileText,
   Plug,
   Sparkles,
@@ -109,16 +110,12 @@ export function Step5Done({
           className="mt-0.5 size-4 cursor-pointer"
         />
         <div className="flex-1">
-          <p className="text-foreground text-sm font-semibold">
-            {t('onboarding.step5.subscribe_label', {
-              defaultValue: 'Активировать подписку с trial 14 дней (рекомендуется)',
-            })}
-          </p>
+          <div className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+            <CreditCard className="text-brand-teal-deep size-4" strokeWidth={2} />
+            {t('onboarding.step5.subscribe_label')}
+          </div>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            {t('onboarding.step5.subscribe_hint', {
-              defaultValue:
-                'После сохранения откроется Stripe для привязки карты. Списание через 14 дней, отписаться в 1 клик.',
-            })}
+            {t('onboarding.step5.subscribe_hint')}
           </p>
         </div>
       </label>
