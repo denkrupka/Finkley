@@ -818,6 +818,120 @@
           "hint": "PSD2-импорт: все списания со счёта автоматом записываются в Расходы."
         }
       }
+    },
+    "wow": {
+      "title": "AI уже видит, что у тебя происходит",
+      "master_eyebrow": "Топ мастера",
+      "master_title": "AI определит твоих звёзд и тех, кому нужно расти",
+      "master_body_v2": "Выручка, retention, ★ на мастера. Кто звезда, кому учиться.",
+      "service_eyebrow": "Услуги",
+      "service_title": "AI найдёт услуги, на которые ты сливаешь время",
+      "service_body_v2": "Реальная маржа на каждую услугу. Что поднять в цене, что убрать.",
+      "clients_eyebrow": "База клиентов",
+      "clients_title": "RFM-сегментация + кому слать реактивацию",
+      "clients_body_v2": "RFM-сегменты + готовые шаблоны для возврата забытых клиентов.",
+      "reviews_eyebrow": "Отзывы и клиенты",
+      "reviews_title": "AI разберёт отзывы по полочкам",
+      "reviews_body_v2": "За что хвалят, что бесит, портрет клиента. Куда лить рекламу.",
+      "cashflow_eyebrow": "Деньги",
+      "cashflow_title": "Cashflow в режиме live — без ручной вписи",
+      "cashflow_body_v2": "Расходы фиксируются сами. AI алертит подозрительные траты.",
+      "chip_lift": "+12-18% выручки в среднем",
+      "chip_margin": "до +25% маржи",
+      "chip_reactivation": "Реактивация в 5× дешевле нового клиента",
+      "chip_review": "5★ — на Google, 1-4★ — только тебе",
+      "chip_time": "−5 часов рутины в неделю",
+      "empty_eyebrow": "AI готов",
+      "empty_title": "Как только появятся данные — AI начнёт работать",
+      "empty_body": "Подключи Booksy или импортируй блокнот, и AI сразу даст разбор: кто из мастеров приносит деньги, какие услуги тянут вниз, кого из клиентов вернуть рассылкой.",
+      "real_staff_eyebrow": "Команда",
+      "real_staff_title": "{{count}} мастер(ов) в команде",
+      "real_staff_body": "AI рассчитает выручку, retention и средний чек на каждого. Первые цифры — через 2 недели.",
+      "real_staff_chip": "Через 14 дней — топ-лист",
+      "real_services_eyebrow": "Каталог",
+      "real_services_title": "{{count}} услуг(и) в каталоге",
+      "real_services_body": "AI найдёт услуги, где себестоимость съедает прибыль, и предложит новую цену.",
+      "real_bookings_eyebrow": "Записи",
+      "real_bookings_title": "Календарь подключён",
+      "real_booksy_body": "Booksy → клиенты, мастера и история визитов приедут автоматом за 2-5 минут. AI начнёт работать сразу.",
+      "real_ocr_body": "{{count}} визитов из блокнота попадут в портал после создания. AI разнесёт по мастерам.",
+      "real_ical_body": "iCal-фид для каждого мастера — синхронизация с Google/Apple Calendar мгновенная.",
+      "real_banking_eyebrow": "Банк",
+      "real_banking_title": "PSD2-консент — следующий шаг",
+      "real_banking_body": "После SCA-консента каждое списание автоматом упадёт в «Расходы». AI алертит подозрительные.",
+      "real_banking_chip": "90 дней без переподключения",
+      "real_inbox_eyebrow": "Inbox",
+      "real_inbox_title": "{{channels}} — в одной ленте",
+      "real_inbox_body": "Все сообщения в одном месте. AI отвечает на типовые вопросы автоматом (цены, расписание).",
+      "real_google_eyebrow": "Google профиль",
+      "real_google_title": "Google Place привязан",
+      "real_google_body": "AI анализирует отзывы 24/7: за что хвалят, что бесит, портрет клиента. 5★ — автоматом в Google.",
+      "real_google_chip": "Защита репутации",
+      "real_company_eyebrow": "Компания",
+      "real_company_body": "Реквизиты для фактур готовы. Подключённая бухгалтерия избавит от двойного ввода.",
+      "real_tg_eyebrow": "Telegram",
+      "real_tg_title": "Утренний разбор в 9:00",
+      "real_tg_body": "Каждое утро — короткий дайджест + критичные алерты прямо в чате.",
+      "real_accounting_eyebrow": "Бухгалтерия",
+      "real_accounting_title": "{{provider}} — связка готова",
+      "real_accounting_body": "AI забирает все фактуры из inbox и автоматически разносит по доходам/расходам.",
+      "real_summary": "{{integrations}} интеграций · {{staff}} мастеров · {{services}} услуг"
+    },
+    "ai_services": {
+      "title": "AI-разбор твоих услуг",
+      "subtitle_v2": "Что приносит маржу, а на что льёшь время впустую."
+    },
+    "ai_staff": {
+      "title": "AI-разбор твоих мастеров",
+      "subtitle_v2": "Кто звезда, кому нужна программа улучшения."
+    },
+    "ai_clients": {
+      "title": "AI-разбор твоей базы клиентов",
+      "subtitle_v2": "RFM-сегменты — кого вернуть, кого превратить в постоянного."
+    },
+    "ai_reviews": {
+      "title": "AI-разбор отзывов",
+      "subtitle_v2": "За что хвалят, что бесит, портрет клиента из соцсетей."
+    },
+    "connect_dialog": {
+      "eyebrow": "Подключение",
+      "what_happens": "Что произойдёт",
+      "cancel": "Отмена",
+      "confirm": "Подключить",
+      "badge_on": "Подключено"
+    },
+    "tg_phone": {
+      "title": "Как с тобой связываться?",
+      "phone_label": "Номер телефона (для SMS — по желанию)",
+      "tg_title": "Получать инсайты в Telegram",
+      "tg_body_v2": "Каждое утро в 9:00 — краткий разбор от @finkley_tg_bot.",
+      "linked_title": "Telegram подключён",
+      "linked_no_username": "Получишь разбор каждое утро в 9:00",
+      "connect_now": "Подключить через @finkley_tg_bot",
+      "polling": "Жду подтверждения от бота…",
+      "code_hint": "Жми «Start» в Telegram — статус обновится здесь автоматически",
+      "toast_linked": "Telegram привязан! Утренний разбор уже в пути."
+    },
+    "schedule": {
+      "title": "Рабочий график салона",
+      "closed": "Выходной",
+      "apply_weekdays": "← Скопировать понедельник на вт-пт"
+    },
+    "public_links": {
+      "title": "Публичные ссылки салона",
+      "booksy": "Booksy профиль",
+      "instagram": "Instagram",
+      "facebook": "Facebook страница"
+    },
+    "profile": {
+      "title": "Расскажи о себе",
+      "first_name": "Имя",
+      "last_name": "Фамилия",
+      "avatar_upload": "Загрузить аватар",
+      "avatar_change": "Заменить",
+      "avatar_remove": "Убрать",
+      "avatar_hint": "PNG / JPG / WEBP, до 5 МБ",
+      "avatar_too_large": "Макс. 5 МБ"
     }
   },
   "banking": {
@@ -4456,8 +4570,10 @@
       "advances": "Авансы",
       "remaining": "Остаток",
       "period": "Период",
-      "tips": "Чаевые"
+      "tips": "Чаевые",
+      "premium": "Премия"
     },
+    "row_click_hint": "Открыть детализацию визитов",
     "visits_count_one": "{{count}} визит",
     "visits_count_few": "{{count}} визита",
     "visits_count_many": "{{count}} визитов",
@@ -4645,6 +4761,14 @@
       "payroll_period_start": "Период с",
       "payroll_period_end": "Период по",
       "payroll_month": "Период (месяц)",
+      "payroll_kind_v2": "Расчёт",
+      "payroll_premium": "Премия (сверху)",
+      "payroll_premium_hint": "Бонус сверх базового payout. Будет видна в Отчёты → Зарплаты колонкой «Премия».",
+      "payroll_autofill": "Авто-расчёт суммы",
+      "payroll_breakdown": "Разбивка",
+      "payroll_breakdown_template": "Визитов: {{count}} · Выручка: {{rev}} · Чаевые: {{tips}} → Payout: {{payout}}",
+      "payroll_no_visits": "Нет визитов мастера за выбранный период",
+      "payroll_filled": "Сумма посчитана",
       "receipt_label": "Чек (фото или PDF)",
       "receipt_placeholder": "Прикрепить чек — JPG, PNG, PDF (до 10 МБ)",
       "receipt_placeholder_ocr": "📷 Сфоткай чек — заполню форму автоматически",
