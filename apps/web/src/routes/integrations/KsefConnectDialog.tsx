@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useKsefConnect } from '@/hooks/useIntegrations'
+import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
 
 /**
  * KsefConnectDialog — прямой коннект к Krajowy System e-Faktur через token
@@ -40,8 +41,17 @@ export function KsefConnectDialog({ open, onClose }: { open: boolean; onClose: (
     if (!open) {
       setNip('')
       setToken('')
+      return
     }
-  }, [open])
+    // T150 — pre-fill credentials собранных в онбординге.
+    if (salonId) {
+      const creds = consumeOnboardingCredentials(salonId, 'ksef')
+      if (creds) {
+        if (creds.nip) setNip(creds.nip)
+        if (creds.token) setToken(creds.token)
+      }
+    }
+  }, [open, salonId])
 
   function explainError(code: string): string {
     switch (code) {

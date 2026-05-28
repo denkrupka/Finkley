@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAccountingConnect } from '@/hooks/useIntegrations'
+import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
 
 import type { IntegrationDef, IntegrationProvider } from './integrations-config'
 
@@ -48,8 +49,15 @@ export function ConnectIntegrationDialog({
   const connect = useAccountingConnect(accountingId, salonId)
 
   useEffect(() => {
-    setValues({})
-  }, [provider?.id])
+    // T150 — pre-fill credentials собранных в онбординге для этого provider.
+    if (provider && salonId) {
+      const creds = consumeOnboardingCredentials(salonId, provider.id)
+      setValues(creds ?? {})
+    } else {
+      setValues({})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider?.id, salonId])
 
   function explainError(code: string): string {
     // Универсальные коды ошибок accounting-портала. Конкретные коды каждый

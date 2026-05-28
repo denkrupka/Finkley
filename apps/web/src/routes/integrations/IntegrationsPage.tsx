@@ -131,6 +131,42 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.get('fb'), params.get('ig')])
 
+  // T175 — обработка ?prompt=<provider1>,<provider2> из онбординга.
+  // OnboardingPage редиректит сюда с prompt — автоматически открываем
+  // нужные connect-dialog'и (поочерёдно: при закрытии одного — открываем
+  // следующий). Credentials pre-fill происходит автоматически в каждом
+  // dialog'е через consumeOnboardingCredentials.
+  const promptParam = params.get('prompt')
+  useEffect(() => {
+    if (!promptParam) return
+    const queue = promptParam.split(',').filter(Boolean)
+    if (queue.length === 0) return
+    const first = queue[0]
+    if (first === 'booksy') setBooksyOpen(true)
+    else if (first === 'wfirma') setWfirmaOpen(true)
+    else if (first === 'ksef') setKsefOpen(true)
+    else if (first === 'instagram' || first === 'facebook' || first === 'whatsapp') {
+      // Messenger диалог имеет свой state в IntegrationsTabsNav секции —
+      // активируем через query param `?messenger=<channel>` который читается
+      // ниже отдельным effect'ом.
+      const next2 = new URLSearchParams(params)
+      next2.set('messenger', first)
+      next2.set('tab', 'messengers')
+      setParams(next2, { replace: true })
+      return
+    } else {
+      const def = INTEGRATIONS.find((p) => p.id === first)
+      if (def) setConnecting(def)
+    }
+    // Удаляем уже обработанный prompt из URL.
+    const rest = queue.slice(1)
+    const next = new URLSearchParams(params)
+    if (rest.length > 0) next.set('prompt', rest.join(','))
+    else next.delete('prompt')
+    setParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptParam])
+
   // Активная вкладка — в URL `?tab=booking`, дефолт booking (запись и календарь).
   const tabParam = params.get('tab')
   const activeCategory: IntegrationCategory = isCategory(tabParam) ? tabParam : 'booking'
@@ -535,6 +571,23 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
   const disconnect = useDisconnectMessenger(salonId)
   const [openChannel, setOpenChannel] = useState<'whatsapp' | 'instagram' | 'facebook' | null>(null)
   const [tgUserbotOpen, setTgUserbotOpen] = useState(false)
+  // T175 — обработка ?messenger=<channel> из prompt-handler выше.
+  const [params, setParams] = useSearchParams()
+  const messengerParam = params.get('messenger')
+  useEffect(() => {
+    if (!messengerParam) return
+    if (
+      messengerParam === 'whatsapp' ||
+      messengerParam === 'instagram' ||
+      messengerParam === 'facebook'
+    ) {
+      setOpenChannel(messengerParam)
+      const next = new URLSearchParams(params)
+      next.delete('messenger')
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messengerParam])
   const { data: tgSessions = [] } = useTgSessions(salonId)
   const tgLogout = useTgLogout(salonId)
   const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null

@@ -276,7 +276,23 @@ function TourRenderer({
   t,
 }: TourRendererProps) {
   const Icon = step.icon
-  const targetRect = useTargetRect(step.target)
+  const realRect = useTargetRect(step.target)
+  // T168 — если у шага есть target, но он не найден на странице (например,
+  // FAB на странице без FAB) — рисуем «искусственный» spotlight в центре
+  // экрана, чтобы юзер всё равно видел визуальный фокус. Без этого юзер
+  // жалуется «по старому тур хочет вести - без выделения».
+  const targetRect: DOMRect | null =
+    realRect ??
+    (step.target && typeof window !== 'undefined'
+      ? (() => {
+          const w = window.innerWidth
+          const h = window.innerHeight
+          const size = Math.min(200, w * 0.4)
+          const left = (w - size) / 2
+          const top = h * 0.18
+          return new DOMRect(left, top, size, size)
+        })()
+      : null)
   const hasSpotlight = !!targetRect
 
   // Tooltip позиция — снизу элемента, прижата к viewport.

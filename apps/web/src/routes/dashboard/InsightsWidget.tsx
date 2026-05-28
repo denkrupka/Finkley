@@ -1,7 +1,12 @@
-import { AlertTriangle, Info, Sparkles, X, Zap } from 'lucide-react'
+import { AlertTriangle, Info, Loader2, Sparkles, X, Zap } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
 import { useDismissInsight, useInsights, type InsightRow } from '@/hooks/useInsights'
+import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase/client'
 
 import type { LocalInsight } from './dashboard-aggregates'
 
@@ -24,18 +29,54 @@ export function InsightsWidget({
   const { t } = useTranslation()
   const { data: insights = [] } = useInsights(salonId)
   const dismiss = useDismissInsight(salonId)
+  const qc = useQueryClient()
+  const [generating, setGenerating] = useState(false)
 
   const hasServerInsights = insights.length > 0
   const hasFallback = fallback.length > 0
 
+  // T170 — явный триггер «Запустить AI разбор». Вызывает generate-insights
+  // и обновляет inservation кэш.
+  async function runAiAnalysis() {
+    setGenerating(true)
+    try {
+      const { error } = await supabase.functions.invoke('generate-insights', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      await qc.invalidateQueries({ queryKey: ['insights', salonId] })
+      toast.success(t('dashboard.insights.run_done', { defaultValue: 'AI разбор готов' }))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (!hasServerInsights && !hasFallback) {
     return (
-      <p className="text-muted-foreground text-sm">
-        {t('dashboard.insights.empty', {
-          defaultValue:
-            'Пока всё спокойно. Если появится что-то требующее внимания — увидишь подсказку здесь.',
-        })}
-      </p>
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-muted-foreground text-sm">
+          {t('dashboard.insights.empty', {
+            defaultValue:
+              'Пока всё спокойно. Если появится что-то требующее внимания — увидишь подсказку здесь.',
+          })}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={generating}
+          onClick={runAiAnalysis}
+        >
+          {generating ? (
+            <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+          ) : (
+            <Sparkles className="size-3.5" strokeWidth={2} />
+          )}
+          {t('dashboard.insights.run_ai', { defaultValue: 'Запустить AI разбор' })}
+        </Button>
+      </div>
     )
   }
 

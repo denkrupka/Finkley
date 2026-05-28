@@ -216,7 +216,11 @@ const INITIAL: OnboardingState = {
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
   // /settings/billing где юзер увидит CTA «Активировать».
-  subscribe_after_submit: false,
+  // T164 — после T159 (paywall UI убран) дефолт включён: каждый юзер
+  // после онбординга идёт через Stripe Checkout с 14-дневным trial.
+  // Если юзеру не нужна подписка — отключит в Settings → Биллинг после первого
+  // dashboard'a.
+  subscribe_after_submit: true,
 }
 
 export function OnboardingPage() {

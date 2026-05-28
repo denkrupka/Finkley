@@ -215,6 +215,9 @@ one-shot consume по контракту
 [`apps/web/src/lib/onboarding-credentials.ts`](./apps/web/src/lib/onboarding-credentials.ts)
 (см. [`decisions/028-onboarding-credentials-localstorage-transit.md`](./decisions/028-onboarding-credentials-localstorage-transit.md)).
 Не передавай credentials через URL query params (history + Sentry leak).
+Для любого нового pure helper в `lib/` — пиши unit-тесты (см.
+`onboarding-credentials.test.ts` как пример). Это даёт regression safety
+и документирует ожидаемое поведение.
 
 ### Время — всегда UTC в БД, локально на клиенте
 

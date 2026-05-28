@@ -68,6 +68,9 @@ export function Step3Services({
   }, [value])
 
   const [openCats, setOpenCats] = useState<Set<string>>(() => new Set(groups.map((g) => g.name)))
+  // T176 — OCR-блок скрыт по умолчанию (юзер с Booksy его не видит), раскрывается
+  // ссылкой «Веду резервации вручную / есть фото журнала».
+  const [showOcr, setShowOcr] = useState(false)
 
   function toggleCat(name: string) {
     setOpenCats((prev) => {
@@ -117,9 +120,22 @@ export function Step3Services({
         ) : null}
       </div>
 
-      {/* T131 — если юзер ведёт резервации вручную, можно загрузить фото
-          журнала прямо здесь. AI распознает дату/клиента/услугу/сумму. */}
-      {onOcrVisitsAdded ? (
+      {/* T131+T176 — OCR-блок раскрывается явной ссылкой. Не лезет в глаза
+          если юзер с Booksy/iCal, но есть для тех кто ведёт резервации
+          вручную (Photo journal → AI). */}
+      {onOcrVisitsAdded && !showOcr ? (
+        <button
+          type="button"
+          onClick={() => setShowOcr(true)}
+          className="text-brand-teal-deep hover:bg-brand-teal-soft/30 mt-3 inline-flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-xs font-bold"
+        >
+          <Camera className="size-3.5" strokeWidth={2} />
+          {t('onboarding.step3.ocr_toggle', {
+            defaultValue: 'Веду резервации вручную → загрузить фото журнала',
+          })}
+        </button>
+      ) : null}
+      {onOcrVisitsAdded && showOcr ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 mt-3 flex flex-col gap-2 rounded-lg border-2 border-dashed p-3">
           <div className="flex items-start gap-2">
             <Camera className="text-brand-teal-deep mt-0.5 size-4 shrink-0" strokeWidth={2} />

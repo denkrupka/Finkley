@@ -32,6 +32,7 @@ type CategoryId =
   | 'investments'
   | 'flows'
   | 'other_income'
+  | 'balance'
 
 const CATEGORIES: Array<{
   id: CategoryId
@@ -81,6 +82,12 @@ const CATEGORIES: Array<{
     title: 'Финансовая деятельность',
     description: 'Кредиты, дивиденды, взносы учредителей — критично для cashflow.',
   },
+  {
+    id: 'balance',
+    icon: Layers,
+    title: 'Баланс',
+    description: 'Активы (что у тебя есть) и Пассивы (что должен). Снимок состояния компании.',
+  },
 ]
 
 const PERIOD_LABEL: Record<ParamPeriod, string> = {
@@ -102,7 +109,7 @@ const PERIOD_LABEL: Record<ParamPeriod, string> = {
 type HierarchicalItem = ParameterItem & { isGroupHeader?: boolean; depth?: number }
 
 function renderHierarchy(items: ParameterItem[], category: CategoryId): HierarchicalItem[] {
-  const hasGroups = category === 'investments' || category === 'flows'
+  const hasGroups = category === 'investments' || category === 'flows' || category === 'balance'
   if (!hasGroups) return items.map((it) => ({ ...it }))
   // Headers (без parent_id) идут первыми с подсветкой, дети — после под ним.
   const parents = items.filter((it) => !it.parent_id)
@@ -365,7 +372,9 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                       ))}
                     </select>
                   ) : null}
-                  {/* Cash kind — только cash_registers */}
+                  {/* Cash kind — только cash_registers. Системные пресеты
+                      (director/safe/gotowka/bank_karta/karta_terminal) disabled
+                      чтобы юзер не сломал cash-shift discipline. */}
                   {hasCashKind ? (
                     <select
                       value={it.cash_kind ?? 'cash'}
@@ -374,7 +383,9 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                           cash_kind: e.target.value as 'cash' | 'non_cash',
                         })
                       }
-                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold"
+                      disabled={!!it.preset_key}
+                      title={it.preset_key ? 'Тип системной кассы изменить нельзя' : undefined}
+                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="cash">наличные</option>
                       <option value="non_cash">безналичные</option>
