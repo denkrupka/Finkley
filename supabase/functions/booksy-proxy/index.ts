@@ -1001,12 +1001,32 @@ async function syncClients(
   }
 
   // ── Customers paginated ───────────────────────────────────────────────
-  let page = 1
+  // T115 fix — resume логика. Раньше при каждом sync `page = 1`,
+  // и т.к. BUDGET_MS = 50s, импорт обрывался около ~1000 клиентов;
+  // следующий sync начинал заново те же 1000 → 2000+ клиентов из
+  // Booksy никогда не загружались.
+  // Теперь сохраняем `clients_resume_page` в salon_integrations.meta;
+  // когда дошли до конца (resp.page * resp.per_page >= resp.count) —
+  // сбрасываем на 1, чтобы при следующем sync обновлять с первой страницы.
+  const { data: integRow } = await admin
+    .from('salon_integrations')
+    .select('meta')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .maybeSingle()
+  const meta = (integRow?.meta as Record<string, unknown> | null) ?? {}
+  let page = Math.max(1, Number(meta.clients_resume_page ?? 1))
+  if (!Number.isFinite(page) || page < 1) page = 1
+  console.info(`[booksy-sync] customers resume from page ${page}`)
   const perPage = 100
+  let finishedAllPages = false
   while (Date.now() - startTs < BUDGET_MS) {
     const resp = await fetchCustomersPage(accessToken, businessId, page, perPage)
     if (!resp) break
-    if (!resp.customers || resp.customers.length === 0) break
+    if (!resp.customers || resp.customers.length === 0) {
+      finishedAllPages = true
+      break
+    }
 
     for (const c of resp.customers) {
       const extId = String(c.id)
@@ -1124,10 +1144,29 @@ async function syncClients(
       }
     }
 
-    if (resp.customers.length < perPage) break
-    if (resp.page * resp.per_page >= resp.count) break
+    if (resp.customers.length < perPage) {
+      finishedAllPages = true
+      break
+    }
+    if (resp.page * resp.per_page >= resp.count) {
+      finishedAllPages = true
+      break
+    }
     page++
   }
+
+  // T115 — сохраняем resume-state. Если дошли до конца → reset на 1,
+  // иначе → следующий sync продолжит с `page` (последняя НЕ обработанная
+  // или прерванная страница).
+  const nextResumePage = finishedAllPages ? 1 : page
+  await admin
+    .from('salon_integrations')
+    .update({ meta: { ...meta, clients_resume_page: nextResumePage } })
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+  console.info(
+    `[booksy-sync] customers ${finishedAllPages ? 'fully synced' : `paused at page ${page}`}, next resume = ${nextResumePage}`,
+  )
 
   return stats
 }

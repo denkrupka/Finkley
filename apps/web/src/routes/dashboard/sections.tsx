@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
+import { InfoHelpButton } from './InfoHelpButton'
+
 /**
  * Презентационные секции дашборда. Структура / визуальный язык — по
  * образцу finsalon_dashboard.html (5 KPI-карточек, две колонки секций,
@@ -26,19 +28,19 @@ export function Card({
 }: {
   children: ReactNode
   className?: string
-  /** Подсказка по наведению — что за показатель, источник, формула.
-   *  Используется на KPI-карточках дашборда (см. RevenueCard, ProfitCard, ...). */
+  /** T113 — описание показателя для кнопки «?» в углу карточки.
+   *  Что за показатель, источник данных, формула. Открывается popover'ом
+   *  по клику (не hover'у), работает на тач-устройствах. */
   title?: string
 }) {
   return (
     <div
-      title={title}
       className={cn(
-        'border-border bg-card shadow-finsm flex flex-col gap-2 rounded-xl border p-4',
-        title ? 'cursor-help' : '',
+        'border-border bg-card shadow-finsm relative flex flex-col gap-2 rounded-xl border p-4',
         className,
       )}
     >
+      {title ? <InfoHelpButton text={title} /> : null}
       {children}
     </div>
   )
@@ -53,22 +55,20 @@ export function Section({
   title?: string
   children: ReactNode
   className?: string
-  /** Подсказка по наведению на ЗАГОЛОВОК секции — что внутри, источник
-   *  данных, как считается. */
+  /** T113 — описание секции для кнопки «?» в углу. Что внутри,
+   *  источник данных, как считается. */
   tooltip?: string
 }) {
   return (
     <div
-      className={cn('border-border bg-card shadow-finsm rounded-xl border p-4 sm:p-5', className)}
+      className={cn(
+        'border-border bg-card shadow-finsm relative rounded-xl border p-4 sm:p-5',
+        className,
+      )}
     >
+      {tooltip ? <InfoHelpButton text={tooltip} /> : null}
       {title ? (
-        <div
-          title={tooltip}
-          className={cn(
-            'text-muted-foreground mb-3 text-[11px] font-semibold uppercase tracking-wider',
-            tooltip ? 'cursor-help' : '',
-          )}
-        >
+        <div className="text-muted-foreground mb-3 text-[11px] font-semibold uppercase tracking-wider">
           {title}
         </div>
       ) : null}
