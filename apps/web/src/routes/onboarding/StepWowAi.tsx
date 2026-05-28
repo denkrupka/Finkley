@@ -27,10 +27,16 @@ export function StepWowAi({
   hasBookings,
   hasBanking,
   hasSocial,
+  full = false,
 }: {
   hasBookings: boolean
   hasBanking: boolean
   hasSocial: boolean
+  /** T83 — расширенный режим для полной ветки онбординга: показываем все
+   *  4 темы (услуги/мастера/клиенты/отзывы) с подробным разбором,
+   *  независимо от того что подключено. В быстрой ветке (full=false)
+   *  карточки появляются только под выбранные интеграции. */
+  full?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -47,7 +53,7 @@ export function StepWowAi({
     chip?: string
   }> = []
 
-  if (hasBookings) {
+  if (hasBookings || full) {
     cards.push({
       icon: TrendingUp,
       tone: 'sage',
@@ -76,7 +82,25 @@ export function StepWowAi({
     })
   }
 
-  if (hasSocial) {
+  if (full) {
+    cards.push({
+      icon: TrendingUp,
+      tone: 'navy',
+      eyebrow: t('onboarding.wow.clients_eyebrow', { defaultValue: 'База клиентов' }),
+      title: t('onboarding.wow.clients_title', {
+        defaultValue: 'RFM-сегментация + кому слать реактивацию',
+      }),
+      body: t('onboarding.wow.clients_body', {
+        defaultValue:
+          'AI разобьёт базу на 6 сегментов (Чемпионы / Лояльные / Перспективные / Под риском / Спящие / Потерянные). Для каждого — готовый рассыльный шаблон, чтобы вернуть забытых клиентов.',
+      }),
+      chip: t('onboarding.wow.chip_reactivation', {
+        defaultValue: 'Реактивация в 5× дешевле нового клиента',
+      }),
+    })
+  }
+
+  if (hasSocial || full) {
     cards.push({
       icon: Star,
       tone: 'gold',
@@ -92,7 +116,7 @@ export function StepWowAi({
     })
   }
 
-  if (hasBanking) {
+  if (hasBanking || full) {
     cards.push({
       icon: Calendar,
       tone: 'navy',

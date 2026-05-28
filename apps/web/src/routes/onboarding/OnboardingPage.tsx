@@ -573,6 +573,7 @@ export function OnboardingPage() {
                 hasSocial={state.selected_integrations.some((x) =>
                   ['instagram', 'facebook', 'telegram'].includes(x),
                 )}
+                full={state.path === 'full'}
               />
             )}
             {stepId === 'integrations_banking' && (
