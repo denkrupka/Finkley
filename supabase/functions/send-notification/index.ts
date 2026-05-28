@@ -29,12 +29,14 @@ import { sendSMS, sendTelegramToUser } from '../_shared/notify.ts'
 import {
   normalizeLocale,
   renderEmail,
+  renderPush,
   renderSms,
   renderTelegram,
   type NotificationPayload,
   type NotificationType,
 } from '../_shared/notify-templates.ts'
 import { withSentry } from '../_shared/sentry.ts'
+import { sendPushToUser } from '../_shared/web-push.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -57,8 +59,8 @@ type Body = {
   payload?: NotificationPayload
 }
 
-type Channel = 'email' | 'telegram' | 'sms'
-const ALL_CHANNELS: Channel[] = ['email', 'telegram', 'sms']
+type Channel = 'push' | 'email' | 'telegram' | 'sms'
+const ALL_CHANNELS: Channel[] = ['push', 'email', 'telegram', 'sms']
 
 Deno.serve(
   withSentry('send-notification', async (req: Request) => {
@@ -123,9 +125,11 @@ Deno.serve(
       if (prefs[type as string] === false) return false
       const key = `${type}.${ch}`
       if (key in prefs) return prefs[key] === true
+      // Дефолты по каналу:
       if (ch === 'email') return true
       if (ch === 'telegram') return !!telegramId
-      return false
+      if (ch === 'push') return true // push by default ON если юзер подписался
+      return false // sms — по умолчанию off
     }
 
     const ctx = {
@@ -137,6 +141,7 @@ Deno.serve(
     }
 
     const dispatched: Record<Channel, 'sent' | 'skipped' | 'failed'> = {
+      push: 'skipped',
       email: 'skipped',
       telegram: 'skipped',
       sms: 'skipped',
@@ -159,7 +164,11 @@ Deno.serve(
     for (const ch of ALL_CHANNELS) {
       if (!isChannelEnabled(ch)) continue
       try {
-        if (ch === 'email') {
+        if (ch === 'push') {
+          const pushPayload = renderPush(type, payload, locale, salon_id)
+          const delivered = await sendPushToUser(admin, user_id, pushPayload)
+          dispatched.push = delivered > 0 ? 'sent' : 'skipped'
+        } else if (ch === 'email') {
           if (!userEmail || !RESEND_KEY) {
             dispatched.email = 'skipped'
             continue

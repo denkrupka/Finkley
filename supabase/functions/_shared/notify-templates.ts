@@ -572,3 +572,101 @@ export function renderSms(
 function clip(s: string, n: number): string {
   return s.length <= n ? s : `${s.slice(0, n - 1)}…`
 }
+
+/**
+ * Push notification — короткий title + body для service worker'а браузера.
+ * url ведёт на соответствующую страницу в app (deep link).
+ */
+export function renderPush(
+  type: NotificationType,
+  payload: NotificationPayload,
+  locale: Locale = 'ru',
+  salonId?: string,
+): { title: string; body: string; url: string; tag: string } {
+  const s = S(locale)
+  const base = `/${salonId ?? ''}`
+  switch (type) {
+    case 'ai_insights':
+      return {
+        title: clip(`💡 ${payload.headline ?? s.sms_default}`, 60),
+        body: clip(String(payload.body ?? ''), 140),
+        url: `${base}/dashboard`,
+        tag: `ai-${payload.headline ?? ''}`,
+      }
+    case 'low_inventory': {
+      const items = (payload.items as Array<{ name: string }>) ?? []
+      return {
+        title: `📦 ${s.sms_low_inv(items.length)}`,
+        body: items
+          .slice(0, 3)
+          .map((i) => i.name)
+          .join(', '),
+        url: `${base}/inventory`,
+        tag: 'low-inventory',
+      }
+    }
+    case 'payment_due_2d':
+    case 'payment_due_1d':
+    case 'payment_due_today':
+    case 'payment_overdue': {
+      const when =
+        type === 'payment_overdue'
+          ? s.sms_overdue
+          : type === 'payment_due_today'
+            ? s.sms_due_today
+            : type === 'payment_due_1d'
+              ? s.sms_due_1d
+              : s.sms_due_2d
+      return {
+        title: clip(`💸 ${when}`, 60),
+        body: clip(`${payload.counterparty ?? ''} — ${payload.amount_formatted ?? ''}`.trim(), 140),
+        url: `${base}/expenses?tab=pending`,
+        tag: `payment-${payload.payment_id ?? ''}`,
+      }
+    }
+    case 'booksy_new_visits':
+      return {
+        title: `📅 ${s.sms_booksy(Number(payload.count ?? 0))}`,
+        body: clip(String(payload.summary ?? ''), 140),
+        url: `${base}/income?tab=visits`,
+        tag: 'booksy-new',
+      }
+    case 'calendar_conflicts': {
+      const conflicts = (payload.conflicts as Array<unknown>) ?? []
+      return {
+        title: `⚠️ ${s.sms_conflict(conflicts.length)}`,
+        body: clip(String(payload.summary ?? ''), 140),
+        url: `${base}/income?tab=visits`,
+        tag: 'cal-conflicts',
+      }
+    }
+    case 'messenger_new_message':
+      return {
+        title: `💬 ${s.sms_new_msg(String(payload.sender ?? '—'))}`,
+        body: clip(String(payload.preview ?? ''), 140),
+        url: `${base}/messenger`,
+        tag: `msg-${payload.thread_id ?? ''}`,
+      }
+    case 'weekly_digest':
+      return {
+        title: `📊 ${s.sms_weekly}`,
+        body: clip(String(payload.summary ?? 'Открой портал чтобы увидеть детали'), 140),
+        url: `${base}/dashboard`,
+        tag: 'weekly-digest',
+      }
+    case 'daily_digest':
+      return {
+        title: `🌅 ${s.sms_daily}`,
+        body: clip(String(payload.summary ?? 'Открой портал чтобы увидеть детали'), 140),
+        url: `${base}/dashboard`,
+        tag: 'daily-digest',
+      }
+    default:
+      return {
+        title: 'Finkley',
+        body: clip(String(payload.body ?? s.sms_default), 140),
+        url: base,
+        tag: 'generic',
+      }
+  }
+}

@@ -1,10 +1,8 @@
-import { Bell, ChevronDown, ChevronRight, Mail, ToggleLeft } from 'lucide-react'
+import { ChevronDown, ChevronRight, Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
 import { useMyProfile } from '@/hooks/useMyProfile'
 import { usePersistedCollapse } from '@/routes/dashboard/useCollapsedState'
 import {
@@ -22,19 +20,18 @@ import type {
 
 import { PushNotificationsCard } from './PushNotificationsCard'
 
-type SubTab = 'channels' | 'types'
-
-const SUB_TABS: PageTab<SubTab>[] = [
-  { id: 'channels', labelKey: 'settings.notifications.tab_channels', icon: Bell },
-  { id: 'types', labelKey: 'settings.notifications.tab_types', icon: ToggleLeft },
-]
-
 /**
- * Каналы: PUSH (браузер/PWA), email и Telegram для дайджестов.
- * Типы: чек-лист всех событий, на которые портал может отправить уведомление.
+ * Settings → Уведомления. Одна страница без sub-tabs:
+ *   1) Карточка PushNotificationsCard — как включить push-уведомления
+ *      в браузере (запрос permission + service worker subscription).
+ *   2) Матрица «Какие уведомления получать» — для каждого типа галочки
+ *      по 4 каналам: PUSH / EMAIL / TELEGRAM / SMS.
+ *   3) Дайджест-блоки внизу — кнопки «Прислать сейчас» weekly/daily.
  *
- * Channels отвечают «КУДА». Types отвечают «О ЧЁМ». Разделены чтобы
- * юзер не путал «отключить вечерний дайджест» с «отключить email вообще».
+ * PUSH = web-push в браузере (нужно подписаться один раз в (1)).
+ * EMAIL = всегда доступен (есть auth.user.email).
+ * TELEGRAM = доступен если профиль привязан (profile.telegram_id).
+ * SMS = доступен если указан телефон (profile.phone) — биллится отдельно.
  */
 const TYPE_GROUPS: Array<{
   group: string // i18n key
@@ -65,7 +62,6 @@ const TYPE_GROUPS: Array<{
     ],
   },
   {
-    // T23 — отдельная группа «Склад» с типом low_inventory.
     group: 'settings.notifications.group.inventory',
     items: [{ key: 'low_inventory', label: 'settings.notifications.type.low_inventory' }],
   },
@@ -77,9 +73,10 @@ const TYPE_GROUPS: Array<{
   },
 ]
 
-type Channel = 'email' | 'telegram' | 'sms'
-const CHANNELS: Channel[] = ['email', 'telegram', 'sms']
+type Channel = 'push' | 'email' | 'telegram' | 'sms'
+const CHANNELS: Channel[] = ['push', 'email', 'telegram', 'sms']
 const CHANNEL_LABEL: Record<Channel, string> = {
+  push: 'Push',
   email: 'Email',
   telegram: 'Telegram',
   sms: 'SMS',
@@ -99,32 +96,25 @@ export function NotificationsTabContent({
   updateDailyChannels: ReturnType<typeof useUpdateDigestChannels>
 }) {
   const { t } = useTranslation()
-  const [params, setParams] = useSearchParams()
-  const sub = (params.get('subtab') === 'types' ? 'types' : 'channels') as SubTab
-  function setSub(v: SubTab) {
-    const next = new URLSearchParams(params)
-    if (v === 'channels') next.delete('subtab')
-    else next.set('subtab', v)
-    setParams(next, { replace: true })
-  }
   const updatePref = useUpdateNotificationPref(salon.id)
   const { data: profile } = useMyProfile()
   const prefs = salon.notification_prefs ?? {}
   const telegramLinked = !!profile?.telegram_id
   const phoneLinked = !!profile?.phone
 
-  /** Включен ли канал для конкретного типа. Поддерживает legacy формат:
-   *  - prefs[type] === false → всё выключено
-   *  - prefs[`${type}.${channel}`] === true/false → точный канал
-   *  - иначе дефолт: email=true, telegram=true (если привязан), sms=false. */
+  /** Включен ли канал для конкретного типа. Дефолты:
+   *  - email = true
+   *  - telegram = true если привязан
+   *  - push = true (если юзер подписался — service worker сам решит)
+   *  - sms = false (биллится — opt-in осознанный) */
   function isChannelEnabled(key: NotificationTypeKey, ch: Channel): boolean {
     if (prefs[key] === false) return false
     const channelKey = `${key}.${ch}`
     if (channelKey in prefs) return prefs[channelKey] === true
-    // Дефолты по каналу:
     if (ch === 'email') return true
     if (ch === 'telegram') return telegramLinked
-    return false // sms по умолчанию выключен
+    if (ch === 'push') return true
+    return false
   }
   function toggleChannel(key: NotificationTypeKey, ch: Channel, next: boolean) {
     updatePref.mutate(
@@ -137,155 +127,147 @@ export function NotificationsTabContent({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTabsNav tabs={SUB_TABS} active={sub} onChange={setSub} t={t} size="sm" />
+      {/* Push subscription — bootstrap веб-push в браузере */}
+      <PushNotificationsCard />
 
-      {sub === 'channels' ? (
-        <>
-          {/* PUSH */}
-          <div>
-            <PushNotificationsCard />
-          </div>
-
-          {/* Еженедельный дайджест — channels */}
-          <DigestSection
-            title={t('settings.digest.title')}
-            subtitle={t('settings.digest.subtitle')}
-            channels={
-              salon.weekly_digest_channels ?? (salon.weekly_digest_enabled ? ['email'] : [])
-            }
-            onChannelsChange={(next) =>
-              updateWeeklyChannels.mutate(next, {
-                onSuccess: () =>
-                  toast.success(
-                    next.length > 0
-                      ? t('settings.digest.toast_enabled')
-                      : t('settings.digest.toast_disabled'),
-                  ),
-                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-              })
-            }
-            buttonLabel={sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
-            buttonDisabled={sendDigest.isPending || !salon.weekly_digest_enabled}
-            onSend={() =>
-              sendDigest.mutate(undefined, {
-                onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'weekly')),
-                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-              })
-            }
-          />
-
-          {/* Ежедневная сводка — channels */}
-          <DigestSection
-            title={t('settings.daily_digest.title')}
-            subtitle={t('settings.daily_digest.subtitle')}
-            channels={salon.daily_digest_channels ?? (salon.daily_digest_enabled ? ['email'] : [])}
-            onChannelsChange={(next) =>
-              updateDailyChannels.mutate(next, {
-                onSuccess: () =>
-                  toast.success(
-                    next.length > 0
-                      ? t('settings.daily_digest.toast_enabled')
-                      : t('settings.daily_digest.toast_disabled'),
-                  ),
-                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-              })
-            }
-            buttonLabel={
-              sendDailyDigest.isPending ? t('common.loading') : t('settings.daily_digest.button')
-            }
-            buttonDisabled={sendDailyDigest.isPending || !salon.daily_digest_enabled}
-            onSend={() =>
-              sendDailyDigest.mutate(undefined, {
-                onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'daily')),
-                onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-              })
-            }
-          />
-        </>
-      ) : (
-        // ТИПЫ — чек-лист
-        <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
-          <h2 className="text-brand-navy text-base font-bold tracking-tight">
-            {t('settings.notifications.types_title', {
-              defaultValue: 'Какие уведомления получать',
-            })}
-          </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t('settings.notifications.types_subtitle', {
-              defaultValue:
-                'Выбери события которые портал может присылать. Каналы (push/email/Telegram) — на вкладке «Каналы».',
-            })}
-          </p>
-          {/* T23 — сворачиваемые группы (по умолчанию все свёрнуты), матрица
-              каналов справа. Telegram disabled если профиль не привязан;
-              SMS disabled если у пользователя нет номера в profile.phone. */}
-          <div className="mt-5 flex flex-col gap-3">
-            {TYPE_GROUPS.map((group) => (
-              <CollapsibleNotificationGroup
-                key={group.group}
-                groupKey={group.group}
-                title={t(group.group)}
-              >
-                <div className="border-border bg-muted/10 hidden border-b px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider sm:grid sm:grid-cols-[1fr_repeat(3,80px)]">
-                  <span className="text-muted-foreground">
-                    {t('settings.notifications.col_type', { defaultValue: 'Тип' })}
+      {/* Матрица типов × каналов */}
+      <section className="border-border bg-card shadow-finsm rounded-lg border p-5 sm:p-6">
+        <h2 className="text-brand-navy text-base font-bold tracking-tight">
+          {t('settings.notifications.types_title', {
+            defaultValue: 'Какие уведомления получать',
+          })}
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t('settings.notifications.types_subtitle_v2', {
+            defaultValue:
+              'Для каждого события — выбери каналы. Push приходит в браузер/PWA, Email на твою почту, Telegram (если привязан), SMS (биллится).',
+          })}
+        </p>
+        <div className="mt-5 flex flex-col gap-3">
+          {TYPE_GROUPS.map((group) => (
+            <CollapsibleNotificationGroup
+              key={group.group}
+              groupKey={group.group}
+              title={t(group.group)}
+            >
+              <div className="border-border bg-muted/10 hidden border-b px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider sm:grid sm:grid-cols-[1fr_repeat(4,64px)]">
+                <span className="text-muted-foreground">
+                  {t('settings.notifications.col_type', { defaultValue: 'Тип' })}
+                </span>
+                {CHANNELS.map((ch) => (
+                  <span key={ch} className="text-muted-foreground text-center">
+                    {CHANNEL_LABEL[ch]}
                   </span>
-                  {CHANNELS.map((ch) => (
-                    <span key={ch} className="text-muted-foreground text-center">
-                      {CHANNEL_LABEL[ch]}
-                    </span>
-                  ))}
-                </div>
-                <div className="divide-border/40 divide-y">
-                  {group.items.map((item) => {
-                    const label = t(item.label, { defaultValue: DEFAULT_TYPE_LABELS[item.key] })
-                    return (
-                      <div
-                        key={item.key}
-                        className="grid grid-cols-[1fr_repeat(3,80px)] items-center gap-2 px-3 py-2"
-                      >
-                        <span className="text-foreground text-sm font-medium">{label}</span>
-                        {CHANNELS.map((ch) => {
-                          const disabled =
-                            (ch === 'telegram' && !telegramLinked) || (ch === 'sms' && !phoneLinked)
-                          const checked = !disabled && isChannelEnabled(item.key, ch)
-                          const title =
-                            ch === 'telegram' && !telegramLinked
-                              ? t('settings.notifications.telegram_unlinked_hint', {
+                ))}
+              </div>
+              <div className="divide-border/40 divide-y">
+                {group.items.map((item) => {
+                  const label = t(item.label, { defaultValue: DEFAULT_TYPE_LABELS[item.key] })
+                  return (
+                    <div
+                      key={item.key}
+                      className="grid grid-cols-[1fr_repeat(4,64px)] items-center gap-2 px-3 py-2"
+                    >
+                      <span className="text-foreground text-sm font-medium">{label}</span>
+                      {CHANNELS.map((ch) => {
+                        const disabled =
+                          (ch === 'telegram' && !telegramLinked) || (ch === 'sms' && !phoneLinked)
+                        const checked = !disabled && isChannelEnabled(item.key, ch)
+                        const title =
+                          ch === 'telegram' && !telegramLinked
+                            ? t('settings.notifications.telegram_unlinked_hint', {
+                                defaultValue:
+                                  'Чтобы получать в Telegram — привяжи аккаунт в /settings → Telegram',
+                              })
+                            : ch === 'sms' && !phoneLinked
+                              ? t('settings.notifications.sms_no_phone_hint', {
                                   defaultValue:
-                                    'Чтобы получать в Telegram — привяжи аккаунт в /settings → Telegram',
+                                    'Чтобы получать SMS — укажи телефон в Профиле пользователя',
                                 })
-                              : ch === 'sms' && !phoneLinked
-                                ? t('settings.notifications.sms_no_phone_hint', {
+                              : ch === 'push'
+                                ? t('settings.notifications.push_hint', {
                                     defaultValue:
-                                      'Чтобы получать SMS — укажи телефон в Профиле пользователя',
+                                      'Чтобы получать push — разреши уведомления в карточке выше',
                                   })
                                 : undefined
-                          return (
-                            <label
-                              key={ch}
-                              title={title}
-                              className={`flex items-center justify-center ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={disabled}
-                                onChange={(e) => toggleChannel(item.key, ch, e.target.checked)}
-                                className="accent-brand-navy size-4 cursor-pointer disabled:cursor-not-allowed"
-                              />
-                            </label>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              </CollapsibleNotificationGroup>
-            ))}
-          </div>
-        </section>
-      )}
+                        return (
+                          <label
+                            key={ch}
+                            title={title}
+                            className={`flex items-center justify-center ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={disabled}
+                              onChange={(e) => toggleChannel(item.key, ch, e.target.checked)}
+                              className="accent-brand-navy size-4 cursor-pointer disabled:cursor-not-allowed"
+                            />
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </CollapsibleNotificationGroup>
+          ))}
+        </div>
+      </section>
+
+      {/* «Прислать сейчас» — еженедельный дайджест */}
+      <DigestSection
+        title={t('settings.digest.title')}
+        subtitle={t('settings.digest.subtitle')}
+        channels={salon.weekly_digest_channels ?? (salon.weekly_digest_enabled ? ['email'] : [])}
+        onChannelsChange={(next) =>
+          updateWeeklyChannels.mutate(next, {
+            onSuccess: () =>
+              toast.success(
+                next.length > 0
+                  ? t('settings.digest.toast_enabled')
+                  : t('settings.digest.toast_disabled'),
+              ),
+            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+          })
+        }
+        buttonLabel={sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
+        buttonDisabled={sendDigest.isPending || !salon.weekly_digest_enabled}
+        onSend={() =>
+          sendDigest.mutate(undefined, {
+            onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'weekly')),
+            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+          })
+        }
+      />
+
+      {/* «Прислать сейчас» — ежедневная сводка */}
+      <DigestSection
+        title={t('settings.daily_digest.title')}
+        subtitle={t('settings.daily_digest.subtitle')}
+        channels={salon.daily_digest_channels ?? (salon.daily_digest_enabled ? ['email'] : [])}
+        onChannelsChange={(next) =>
+          updateDailyChannels.mutate(next, {
+            onSuccess: () =>
+              toast.success(
+                next.length > 0
+                  ? t('settings.daily_digest.toast_enabled')
+                  : t('settings.daily_digest.toast_disabled'),
+              ),
+            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+          })
+        }
+        buttonLabel={
+          sendDailyDigest.isPending ? t('common.loading') : t('settings.daily_digest.button')
+        }
+        buttonDisabled={sendDailyDigest.isPending || !salon.daily_digest_enabled}
+        onSend={() =>
+          sendDailyDigest.mutate(undefined, {
+            onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'daily')),
+            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+          })
+        }
+      />
     </div>
   )
 }
