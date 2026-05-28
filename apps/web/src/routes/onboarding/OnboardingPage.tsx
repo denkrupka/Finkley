@@ -1,7 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { Plug } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
+// Универсальная иконка-заглушка для категорий интеграций. Разные провайдеры
+// отображаются одним стилем; различие — в title.
+const PlugIconSvg = Plug
 
 import { Button } from '@/components/ui/button'
 import { LogoLockup } from '@/components/ui/logo'
@@ -17,6 +22,7 @@ import {
   type CountryCode,
   type SalonTypeId,
 } from './onboarding-defaults'
+import { IntegrationCategoryStep } from './IntegrationCategoryStep'
 import { Step0Path, type OnboardingPath } from './Step0Path'
 import { StepWelcome } from './StepWelcome'
 import { Step1Salon } from './Step1Salon'
@@ -26,17 +32,26 @@ import { Step3Accounting } from './Step3Accounting'
 import { Step3Services, type ServiceDraft } from './Step3Services'
 import { Step4Expenses } from './Step4Expenses'
 import { Step5Done } from './Step5Done'
-import { StepIntegrationsChoice } from './StepIntegrationsChoice'
 import { TutorialNote } from './TutorialNote'
 
-const STEPS_QUICK = ['welcome', 'path', 'salon', 'done'] as const
+const STEPS_QUICK = [
+  'welcome',
+  'path',
+  'salon',
+  'integrations_bookings',
+  'integrations_social',
+  'integrations_banking',
+  'done',
+] as const
 const STEPS_FULL = [
   'welcome',
   'path',
   'salon',
   'address',
   'accounting',
-  'integrations',
+  'integrations_bookings',
+  'integrations_social',
+  'integrations_banking',
   'staff',
   'services',
   'expenses',
@@ -44,7 +59,15 @@ const STEPS_FULL = [
 ] as const
 type StepId = (typeof STEPS_FULL)[number]
 
-export type OnboardingIntegration = 'booksy' | 'wfirma' | 'banking'
+export type OnboardingIntegration =
+  | 'booksy'
+  | 'wfirma'
+  | 'banking'
+  | 'instagram'
+  | 'facebook'
+  | 'telegram'
+  | 'ical'
+  | 'ocr_notebook'
 
 export type OnboardingState = {
   // Шаг 0 — путь (быстрый/полный). null = ещё не выбран.
@@ -309,9 +332,17 @@ export function OnboardingPage() {
         return t('onboarding.cta.address', { defaultValue: 'Сохранить адрес →' })
       case 'accounting':
         return t('onboarding.cta.accounting', { defaultValue: 'Готово, дальше →' })
-      case 'integrations':
-        return t('onboarding.cta.integrations', {
-          defaultValue: 'Освободить время от рутины →',
+      case 'integrations_bookings':
+        return t('onboarding.cta.integrations_bookings', {
+          defaultValue: 'Освободить от ручного ввода визитов →',
+        })
+      case 'integrations_social':
+        return t('onboarding.cta.integrations_social', {
+          defaultValue: 'Свести все сообщения в одну ленту →',
+        })
+      case 'integrations_banking':
+        return t('onboarding.cta.integrations_banking', {
+          defaultValue: 'Включить авто-учёт расходов →',
         })
       case 'staff':
         return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
@@ -416,14 +447,122 @@ export function OnboardingPage() {
                 />
               </>
             )}
-            {stepId === 'integrations' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.integrations')}</TutorialNote>
-                <StepIntegrationsChoice
-                  selected={state.selected_integrations}
-                  onChange={(v) => patch('selected_integrations', v)}
-                />
-              </>
+            {stepId === 'integrations_bookings' && (
+              <IntegrationCategoryStep
+                title={t('onboarding.step_integrations.bookings_title', {
+                  defaultValue: 'Запись и календари',
+                })}
+                subtitle={t('onboarding.step_integrations.bookings_subtitle', {
+                  defaultValue:
+                    'Перестань вручную переписывать визиты — мы синхронизируем их сразу из Booksy или импортируем фото блокнота через AI.',
+                })}
+                emoji="📅"
+                items={[
+                  {
+                    id: 'booksy',
+                    icon: PlugIconSvg,
+                    title: 'Booksy',
+                    benefit:
+                      'Все визиты, мастера и клиенты автоматом подтянутся в портал. Дальше — финансы считаются сами.',
+                  },
+                  {
+                    id: 'ical',
+                    icon: PlugIconSvg,
+                    title: 'iCal-фид (Google / Apple / Outlook)',
+                    benefit:
+                      'Каждый мастер подпишется на свой календарь визитов и увидит их в любом телефоне.',
+                  },
+                  {
+                    id: 'ocr_notebook',
+                    icon: PlugIconSvg,
+                    title: 'Фото блокнота → AI разнесёт по визитам',
+                    benefit:
+                      'Сфотографируй заметки/блокнот — AI распознает дату, клиента и сумму. Никакого ручного ввода.',
+                  },
+                ]}
+                selected={state.selected_integrations}
+                onToggle={(id) =>
+                  patch(
+                    'selected_integrations',
+                    state.selected_integrations.includes(id)
+                      ? state.selected_integrations.filter((x) => x !== id)
+                      : [...state.selected_integrations, id],
+                  )
+                }
+              />
+            )}
+            {stepId === 'integrations_social' && (
+              <IntegrationCategoryStep
+                title={t('onboarding.step_integrations.social_title', {
+                  defaultValue: 'Соцсети и мессенджеры',
+                })}
+                subtitle={t('onboarding.step_integrations.social_subtitle', {
+                  defaultValue:
+                    'Все сообщения от клиентов — в одну ленту. Никаких «пропустила, потеряла визит». Плюс AI отвечает за тебя на типовые вопросы.',
+                })}
+                emoji="💬"
+                items={[
+                  {
+                    id: 'instagram',
+                    icon: PlugIconSvg,
+                    title: 'Instagram Direct',
+                    benefit:
+                      'DM-ы клиентов попадают в портал. AI отвечает на цены/расписание автоматом.',
+                  },
+                  {
+                    id: 'facebook',
+                    icon: PlugIconSvg,
+                    title: 'Facebook Messenger',
+                    benefit: 'Тот же inbox — клиент пишет, ты отвечаешь из одного места.',
+                  },
+                  {
+                    id: 'telegram',
+                    icon: PlugIconSvg,
+                    title: 'Telegram',
+                    benefit:
+                      'Подключи свой канал/бота — получай дайджесты и AI-инсайты прямо в Telegram.',
+                  },
+                ]}
+                selected={state.selected_integrations}
+                onToggle={(id) =>
+                  patch(
+                    'selected_integrations',
+                    state.selected_integrations.includes(id)
+                      ? state.selected_integrations.filter((x) => x !== id)
+                      : [...state.selected_integrations, id],
+                  )
+                }
+              />
+            )}
+            {stepId === 'integrations_banking' && (
+              <IntegrationCategoryStep
+                title={t('onboarding.step_integrations.banking_title', {
+                  defaultValue: 'Банк и расходы',
+                })}
+                subtitle={t('onboarding.step_integrations.banking_subtitle', {
+                  defaultValue:
+                    'Каждое списание автоматом упадёт в раздел «Расходы». Никаких забытых трат — финансовая картина всегда живая.',
+                })}
+                emoji="🏦"
+                items={[
+                  {
+                    id: 'banking',
+                    icon: PlugIconSvg,
+                    title: 'Banking (PSD2 — Enable Banking)',
+                    benefit:
+                      'Подключим твой банковский счёт через стандарт PSD2. Безопасно (мы видим только чтение), 90 дней без переподключения.',
+                  },
+                ]}
+                selected={state.selected_integrations}
+                onToggle={(id) =>
+                  patch(
+                    'selected_integrations',
+                    state.selected_integrations.includes(id)
+                      ? state.selected_integrations.filter((x) => x !== id)
+                      : [...state.selected_integrations, id],
+                  )
+                }
+              />
             )}
             {stepId === 'staff' && (
               <>
