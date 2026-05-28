@@ -46,6 +46,32 @@ const ACCOUNTING_PROVIDERS: AccountingProvider[] = [
   },
 ]
 
+/** T138 — как ведёт бухгалтерию. */
+export type AccountingMode = 'self' | 'biuro' | 'app' | 'none'
+
+const ACCOUNTING_MODES: Array<{ id: AccountingMode; title: string; hint: string }> = [
+  {
+    id: 'self',
+    title: 'Сам(а) веду',
+    hint: 'JDG/самозанятый, делаю сам через wFirma / Fakturownia / iFirma.',
+  },
+  {
+    id: 'biuro',
+    title: 'Веду через бухгалтера / biuro',
+    hint: 'Бухгалтер ведёт всё, я просто отправляю чеки и фактуры.',
+  },
+  {
+    id: 'app',
+    title: 'Через приложение / онлайн-сервис',
+    hint: 'inFakt, KSeF или другой облачный сервис со своим интерфейсом.',
+  },
+  {
+    id: 'none',
+    title: 'Пока никак',
+    hint: 'Только начинаю — заведу позже в Настройках.',
+  },
+]
+
 type Props = {
   value: { nip: string; company_name: string }
   onChange: (v: { nip: string; company_name: string }) => void
@@ -53,6 +79,9 @@ type Props = {
    *  интеграций: после submit'a redirect в /settings/integrations?prompt=…. */
   selectedIntegrations?: OnboardingIntegration[]
   onToggleIntegration?: (id: OnboardingIntegration) => void
+  /** T138 — как ведёт бухгалтерию. По выбору фильтруем релевантных провайдеров. */
+  accountingMode?: AccountingMode
+  onAccountingModeChange?: (mode: AccountingMode) => void
 }
 
 /**
@@ -67,10 +96,15 @@ export function Step3Accounting({
   onChange,
   selectedIntegrations = [],
   onToggleIntegration,
+  accountingMode,
+  onAccountingModeChange,
 }: Props) {
   const { t } = useTranslation()
   // T122 — модалка подключения провайдера бухгалтерии при клике.
   const [pendingProvider, setPendingProvider] = useState<OnboardingIntegration | null>(null)
+  // T138 — провайдеры показываем только если юзер выбрал self/app — иначе
+  // бухгалтер всё ведёт сам в biuro или ничего пока нет.
+  const showProviders = accountingMode === 'self' || accountingMode === 'app'
 
   function handleProviderClick(id: OnboardingIntegration) {
     if (selectedIntegrations.includes(id)) onToggleIntegration?.(id)
@@ -83,6 +117,50 @@ export function Step3Accounting({
         <Building2 className="text-brand-teal-deep size-6" strokeWidth={2} />
         {t('onboarding.step_accounting.title', { defaultValue: 'Бухгалтерия' })}
       </h2>
+
+      {/* T138 — как ведёшь бухгалтерию (радио). */}
+      {onAccountingModeChange ? (
+        <div className="flex flex-col gap-2">
+          <Label className="block text-xs font-semibold uppercase tracking-wider">
+            {t('onboarding.step_accounting.mode_label', {
+              defaultValue: 'Как ведёшь бухгалтерию?',
+            })}
+          </Label>
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {ACCOUNTING_MODES.map((m) => {
+              const checked = accountingMode === m.id
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onAccountingModeChange(m.id)}
+                  className={cn(
+                    'flex items-start gap-2.5 rounded-md border-2 p-2.5 text-left transition-colors',
+                    checked
+                      ? 'border-brand-teal-deep bg-brand-teal-soft/40'
+                      : 'border-border bg-card hover:bg-muted/30',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2',
+                      checked
+                        ? 'border-brand-teal-deep bg-brand-teal-deep'
+                        : 'border-border bg-card',
+                    )}
+                  >
+                    {checked ? <div className="size-1.5 rounded-full bg-white" /> : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground text-sm font-bold">{m.title}</p>
+                    <p className="text-muted-foreground mt-0.5 text-[11px]">{m.hint}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
@@ -119,8 +197,8 @@ export function Step3Accounting({
         </div>
       </div>
 
-      {/* T107 — секция выбора провайдера бухгалтерии */}
-      {onToggleIntegration ? (
+      {/* T107/T138 — провайдеры бухгалтерии показываются только при self/app. */}
+      {onToggleIntegration && showProviders ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-xl border-2 border-dashed p-3">
           <div className="mb-2 flex items-center gap-2">
             <Plug className="text-brand-teal-deep size-5" strokeWidth={2} />

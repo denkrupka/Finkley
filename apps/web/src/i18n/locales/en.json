@@ -4540,7 +4540,7 @@
     "close": "Close",
     "steps": {
       "welcome": {
-        "title": "Welcome to Finkley 👋",
+        "title": "Welcome to Finkley",
         "body": "This is a short tour of the main features — it'll take 1 minute.\n\nI'll show where everything is and how to quickly add first data."
       },
       "nav": {

@@ -4541,7 +4541,7 @@
     "close": "Zamknij",
     "steps": {
       "welcome": {
-        "title": "Witaj w Finkley 👋",
+        "title": "Witaj w Finkley",
         "body": "To krótki tour po głównych funkcjach — zajmie 1 minutę.\n\nPokażę, gdzie co jest i jak szybko dodać pierwsze dane."
       },
       "nav": {

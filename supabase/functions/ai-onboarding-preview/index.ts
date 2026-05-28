@@ -40,6 +40,11 @@ type OnboardingPayload = {
   company_name?: string
   ocr_visits_count?: number
   locale?: string
+  /** T144 — режим ответа:
+   *   - 'insights' (default) — 3-4 короткие карточки для StepWowAi
+   *   - 'full_summary' — overview + список советов с приоритетом для StepAiSummary
+   */
+  mode?: 'insights' | 'full_summary'
 }
 
 function json(body: unknown, status = 200) {
@@ -57,12 +62,32 @@ function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
   return 'ru'
 }
 
-function systemForLocale(locale: 'ru' | 'pl' | 'en'): string {
+function systemForLocale(locale: 'ru' | 'pl' | 'en', mode: 'insights' | 'full_summary'): string {
   const langInstruction = {
     ru: 'На русском, кратко, без воды, по-деловому.',
     pl: 'Po polsku, zwięźle, bez lania wody, rzeczowo.',
     en: 'In English, concise, no fluff, business-like.',
   }[locale]
+  if (mode === 'full_summary') {
+    return `You are an onboarding assistant for the Finkley beauty-salon management app. ${langInstruction}
+
+Based on the data the owner has entered, deliver a holistic summary of the salon + 4-6 specific pieces of actionable advice prioritized.
+
+Response format — STRICTLY JSON:
+{
+  "overview": "<2-4 sentences summarizing what you understood about the salon>",
+  "advice": [
+    {
+      "title": "<headline up to 60 chars>",
+      "body": "<1-2 sentences with a concrete recommendation>",
+      "priority": "high" | "medium" | "low"
+    }
+  ]
+}
+
+JSON only, no markdown, no preface. Sort advice by priority (high first).
+Reference specific numbers from input (masters count, services count, integrations).`
+  }
   return `You are an onboarding assistant for the Finkley beauty-salon management app. ${langInstruction}
 
 Based on the data the owner has entered (salon type, integrations chosen, masters/services counts), generate 3-4 concrete insights about what AI will do for them right after the salon is created. Each insight = one icon-anchored card.
@@ -102,7 +127,7 @@ ${JSON.stringify(
 Generate 3-4 insights tailored to what the owner has actually entered. Reference specific numbers (e.g. "your team of {N} masters", "{X} services in your catalog") and integrations they picked. Skip generic advice they didn't enable.`
 }
 
-async function claudeJson(system: string, prompt: string): Promise<{ insights: Insight[] }> {
+async function claudeJson(system: string, prompt: string): Promise<unknown> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -112,7 +137,7 @@ async function claudeJson(system: string, prompt: string): Promise<{ insights: I
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
+      max_tokens: 1500,
       system,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -124,7 +149,7 @@ async function claudeJson(system: string, prompt: string): Promise<{ insights: I
   const text = (block.text as string).trim()
   const match = text.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('claude returned non-json')
-  return JSON.parse(match[0]) as { insights: Insight[] }
+  return JSON.parse(match[0])
 }
 
 Deno.serve(async (req) => {
@@ -144,8 +169,9 @@ Deno.serve(async (req) => {
   }
 
   const locale = normalizeLocale(payload.locale)
+  const mode = payload.mode === 'full_summary' ? 'full_summary' : 'insights'
   try {
-    const result = await claudeJson(systemForLocale(locale), buildPrompt(payload))
+    const result = await claudeJson(systemForLocale(locale, mode), buildPrompt(payload))
     return json(result)
   } catch (e) {
     return json({ error: 'ai_failed', detail: e instanceof Error ? e.message : String(e) }, 502)

@@ -26,6 +26,7 @@ import {
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
 import { type ParsedVisit } from './OcrNotebookButton'
 import { StepAiBreakdown } from './StepAiBreakdown'
+import { StepAiSummary } from './StepAiSummary'
 import { StepPublicLinks } from './StepPublicLinks'
 import { Step0Path, type OnboardingPath } from './Step0Path'
 import { StepSchedule, type OpeningHoursDraft } from './StepSchedule'
@@ -36,7 +37,7 @@ import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
 import { Step2Address, type AddressDraft } from './Step2Address'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
-import { Step3Accounting } from './Step3Accounting'
+import { Step3Accounting, type AccountingMode } from './Step3Accounting'
 import { Step3Services, type ServiceDraft } from './Step3Services'
 import { Step4Expenses } from './Step4Expenses'
 import { Step5Done } from './Step5Done'
@@ -74,6 +75,7 @@ const STEPS_FULL = [
   'ai_staff',
   'ai_clients',
   'ai_reviews',
+  'ai_summary',
   'done',
 ] as const
 type StepId = (typeof STEPS_FULL)[number] | (typeof STEPS_QUICK)[number]
@@ -139,6 +141,8 @@ export type OnboardingState = {
   // T106 — структурированный financial_settings из 7 категорий. После
   // submit сохраняется в salons.financial_settings jsonb.
   financial_settings: FinancialSettings
+  /** T138 — как ведёт бухгалтерию. По выбору фильтруем релевантных провайдеров. */
+  accounting_mode: AccountingMode | null
 }
 
 const INITIAL: OnboardingState = {
@@ -181,6 +185,7 @@ const INITIAL: OnboardingState = {
   instagram_url: '',
   facebook_url: '',
   financial_settings: DEFAULT_FINANCIAL_SETTINGS,
+  accounting_mode: null,
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -704,6 +709,8 @@ export function OnboardingPage() {
                         : [...state.selected_integrations, id],
                     )
                   }
+                  accountingMode={state.accounting_mode ?? undefined}
+                  onAccountingModeChange={(mode) => patch('accounting_mode', mode)}
                 />
               </>
             )}
@@ -809,6 +816,19 @@ export function OnboardingPage() {
             {stepId === 'ai_staff' && <StepAiBreakdown topic="staff" />}
             {stepId === 'ai_clients' && <StepAiBreakdown topic="clients" />}
             {stepId === 'ai_reviews' && <StepAiBreakdown topic="reviews" />}
+            {stepId === 'ai_summary' && (
+              <StepAiSummary
+                salonType={state.salon_type}
+                country={state.country_code}
+                selectedIntegrations={state.selected_integrations}
+                staffCount={state.staff.length}
+                servicesCount={state.services.length}
+                hasGooglePlace={!!state.address.google_place_id}
+                hasNip={!!state.nip}
+                companyName={state.company_name}
+                ocrVisitsCount={state.ocr_visits.length}
+              />
+            )}
             {stepId === 'public_links' && (
               <StepPublicLinks
                 value={{
