@@ -207,6 +207,21 @@ export function GooglePlaceSearchInput({
                     alt=""
                     loading="lazy"
                     className="size-full object-cover"
+                    // T121 — если фото не загрузилось (network / 401 / Google
+                    // удалил), показываем MapPin fallback вместо broken image.
+                    onError={(e) => {
+                      const img = e.currentTarget
+                      img.style.display = 'none'
+                      const parent = img.parentElement
+                      if (parent && !parent.querySelector('.photo-fallback')) {
+                        const fb = document.createElement('div')
+                        fb.className =
+                          'photo-fallback text-muted-foreground grid size-full place-items-center'
+                        fb.innerHTML =
+                          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M20 10c0 7-8 13-8 13s-8-6-8-13a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>'
+                        parent.appendChild(fb)
+                      }
+                    }}
                   />
                 ) : (
                   <div className="text-muted-foreground grid size-full place-items-center">

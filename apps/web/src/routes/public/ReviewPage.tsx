@@ -23,7 +23,9 @@ type SalonInfo = {
 export function ReviewPage() {
   const { t, i18n } = useTranslation()
   const { token } = useParams<{ token: string }>()
-  const [phase, setPhase] = useState<'loading' | 'rate' | 'feedback' | 'done' | 'error'>('loading')
+  const [phase, setPhase] = useState<
+    'loading' | 'rate' | 'feedback' | 'done' | 'done_no_google' | 'error'
+  >('loading')
   const [salon, setSalon] = useState<SalonInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [rating, setRating] = useState<number | null>(null)
@@ -75,18 +77,37 @@ export function ReviewPage() {
     if (!token || submitting) return
     if (stars === 5) {
       setSubmitting(true)
-      const res = await fetch(FN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
-        body: JSON.stringify({ token, rating: 5 }),
-      })
-      const data = await res.json()
-      if (data.action === 'redirect_google' && data.google_place_url) {
-        window.location.href = data.google_place_url
-        return
+      try {
+        const res = await fetch(FN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+          body: JSON.stringify({ token, rating: 5 }),
+        })
+        const data = await res.json()
+        // T118 — обработка already_submitted (одноразовая ссылка)
+        if (data.error === 'already_submitted') {
+          setError('already_submitted')
+          setPhase('error')
+          return
+        }
+        if (data.error) {
+          setError(data.error)
+          setPhase('error')
+          return
+        }
+        if (data.action === 'redirect_google' && data.google_place_url) {
+          window.location.href = data.google_place_url
+          return
+        }
+        // T118 — backend вернул ok но google_place_url=null (у салона
+        // не настроен google_place_id). Спец. экран вместо generic «спасибо».
+        setPhase('done_no_google')
+      } catch {
+        setError('network')
+        setPhase('error')
+      } finally {
+        setSubmitting(false)
       }
-      setPhase('done')
-      setSubmitting(false)
       return
     }
     // 1-4 → форма
@@ -101,22 +122,32 @@ export function ReviewPage() {
     // 401 unauthorized (Supabase требует apikey/Authorization), отсюда экран
     // «ошибка» при выборе 1-4★. На 5★ запрос работал потому что там headers
     // были корректные.
-    const res = await fetch(FN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
-      body: JSON.stringify({
-        token,
-        rating,
-        review_body: bodyText.trim() || null,
-        author_name: authorName.trim() || null,
-      }),
-    })
-    const data = await res.json()
-    setSubmitting(false)
-    if (data.ok) setPhase('done')
-    else {
-      setError(data.error ?? 'unknown')
+    try {
+      const res = await fetch(FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+        body: JSON.stringify({
+          token,
+          rating,
+          review_body: bodyText.trim() || null,
+          author_name: authorName.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      // T118 — детальная обработка ошибок чтобы видеть конкретный код
+      // в Sentry. setError содержит exact error для i18n маппинга
+      // (already_submitted/expired/insert_failed) — не маскируем 'unknown'.
+      if (data.ok) {
+        setPhase('done')
+      } else {
+        setError(data.error ?? 'unknown')
+        setPhase('error')
+      }
+    } catch {
+      setError('network')
       setPhase('error')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -206,6 +237,20 @@ export function ReviewPage() {
           <div className="text-center">
             <h1 className="text-brand-navy text-xl font-bold">{t('review.done_title')}</h1>
             <p className="text-muted-foreground mt-2 text-sm">{t('review.done_subtitle')}</p>
+          </div>
+        ) : phase === 'done_no_google' ? (
+          <div className="text-center">
+            <h1 className="text-brand-navy text-xl font-bold">
+              {t('review.done_no_google_title', {
+                defaultValue: 'Спасибо за 5 звёзд! ⭐',
+              })}
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm leading-snug">
+              {t('review.done_no_google_subtitle', {
+                defaultValue:
+                  'Салон ещё не настроил страницу в Google — мы передали ему твою высокую оценку. Он добавит ссылку, чтобы в следующий раз ты мог оставить отзыв и на Google. 🙏',
+              })}
+            </p>
           </div>
         ) : null}
       </div>

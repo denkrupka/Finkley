@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Иначе (1-4 ⭐) сохраняем внутренний отзыв.
-  const { error: insErr } = await admin.from('reviews').insert({
+  const reviewRow = {
     salon_id: rr.salon_id,
     source: 'internal',
     visibility: 'private',
@@ -159,10 +159,27 @@ Deno.serve(async (req: Request) => {
     staff_id: staffId,
     visit_id: rr.visit_id,
     posted_at: new Date().toISOString(),
-  })
+  }
+  const { error: insErr } = await admin.from('reviews').insert(reviewRow)
   if (insErr) {
-    console.warn('insert review failed', insErr.message)
-    return jsonResponse({ error: 'insert_failed' }, 500)
+    // T118 — расширенное логирование для Sentry. Включаем код+detail+
+    // hint чтобы диагностировать любые constraint violations / FK
+    // нарушения / RLS-блокировки. row тоже логируем (без author_name
+    // и body для GDPR).
+    console.error('insert review failed:', {
+      code: insErr.code,
+      message: insErr.message,
+      details: insErr.details,
+      hint: insErr.hint,
+      row_sample: {
+        salon_id: reviewRow.salon_id,
+        rating: reviewRow.rating,
+        client_id: reviewRow.client_id,
+        staff_id: reviewRow.staff_id,
+        visit_id: reviewRow.visit_id,
+      },
+    })
+    return jsonResponse({ error: 'insert_failed', detail: insErr.message }, 500)
   }
   await admin
     .from('review_requests')
