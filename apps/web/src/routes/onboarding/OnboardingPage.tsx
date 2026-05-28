@@ -25,6 +25,7 @@ import {
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
 import { Step0Path, type OnboardingPath } from './Step0Path'
 import { StepWelcome } from './StepWelcome'
+import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
 import { Step2Address, type AddressDraft } from './Step2Address'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
@@ -41,6 +42,7 @@ const STEPS_QUICK = [
   'integrations_bookings',
   'integrations_social',
   'integrations_banking',
+  'wow',
   'done',
 ] as const
 const STEPS_FULL = [
@@ -55,6 +57,7 @@ const STEPS_FULL = [
   'staff',
   'services',
   'expenses',
+  'wow',
   'done',
 ] as const
 type StepId = (typeof STEPS_FULL)[number]
@@ -344,6 +347,8 @@ export function OnboardingPage() {
         return t('onboarding.cta.integrations_banking', {
           defaultValue: 'Включить авто-учёт расходов →',
         })
+      case 'wow':
+        return t('onboarding.cta.wow', { defaultValue: 'Перейти к моему порталу →' })
       case 'staff':
         return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
       case 'services':
@@ -532,6 +537,17 @@ export function OnboardingPage() {
                       : [...state.selected_integrations, id],
                   )
                 }
+              />
+            )}
+            {stepId === 'wow' && (
+              <StepWowAi
+                hasBookings={state.selected_integrations.some((x) =>
+                  ['booksy', 'ical', 'ocr_notebook'].includes(x),
+                )}
+                hasBanking={state.selected_integrations.includes('banking')}
+                hasSocial={state.selected_integrations.some((x) =>
+                  ['instagram', 'facebook', 'telegram'].includes(x),
+                )}
               />
             )}
             {stepId === 'integrations_banking' && (
