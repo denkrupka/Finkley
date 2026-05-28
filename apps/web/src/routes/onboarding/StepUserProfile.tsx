@@ -44,7 +44,7 @@ export function StepUserProfile({ value, onChange }: Props) {
   return (
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-        {t('onboarding.profile.title', { defaultValue: 'Расскажи о себе' })}
+        {t('onboarding.profile.title')}
       </h1>
 
       <div className="mt-3 flex flex-col gap-3">
@@ -70,9 +70,7 @@ export function StepUserProfile({ value, onChange }: Props) {
               const f = e.target.files?.[0]
               if (!f) return
               if (f.size > 5 * 1024 * 1024) {
-                toast.error(
-                  t('onboarding.profile.avatar_too_large', { defaultValue: 'Макс. 5 МБ' }),
-                )
+                toast.error(t('onboarding.profile.avatar_too_large'))
                 e.target.value = ''
                 return
               }
@@ -93,8 +91,8 @@ export function StepUserProfile({ value, onChange }: Props) {
                 <ImagePlus className="size-3.5" strokeWidth={2} />
               )}
               {value.avatar_data_url
-                ? t('onboarding.profile.avatar_change', { defaultValue: 'Заменить' })
-                : t('onboarding.profile.avatar_upload', { defaultValue: 'Загрузить аватар' })}
+                ? t('onboarding.profile.avatar_change')
+                : t('onboarding.profile.avatar_upload')}
             </button>
             {value.avatar_data_url ? (
               <button
@@ -103,18 +101,18 @@ export function StepUserProfile({ value, onChange }: Props) {
                 className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 self-start text-xs"
               >
                 <Trash2 className="size-3" strokeWidth={1.8} />
-                {t('onboarding.profile.avatar_remove', { defaultValue: 'Убрать' })}
+                {t('onboarding.profile.avatar_remove')}
               </button>
             ) : (
               <p className="text-muted-foreground text-[11px]">
-                {t('onboarding.profile.avatar_hint', { defaultValue: 'PNG / JPG / WEBP, до 5 МБ' })}
+                {t('onboarding.profile.avatar_hint')}
               </p>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field id="onb-first" label={t('onboarding.profile.first_name', { defaultValue: 'Имя' })}>
+          <Field id="onb-first" label={t('onboarding.profile.first_name')}>
             <Input
               id="onb-first"
               value={value.first_name}
@@ -124,10 +122,7 @@ export function StepUserProfile({ value, onChange }: Props) {
               autoFocus
             />
           </Field>
-          <Field
-            id="onb-last"
-            label={t('onboarding.profile.last_name', { defaultValue: 'Фамилия' })}
-          >
+          <Field id="onb-last" label={t('onboarding.profile.last_name')}>
             <Input
               id="onb-last"
               value={value.last_name}

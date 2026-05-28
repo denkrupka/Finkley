@@ -97,7 +97,7 @@ export function IntegrationCategoryStep({
               </div>
               {checked ? (
                 <span className="bg-brand-teal-deep mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                  ✓ {t('onboarding.connect_dialog.badge_on', { defaultValue: 'Подключено' })}
+                  ✓ {t('onboarding.connect_dialog.badge_on')}
                 </span>
               ) : null}
             </button>

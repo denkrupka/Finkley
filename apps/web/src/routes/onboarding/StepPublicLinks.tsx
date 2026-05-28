@@ -30,7 +30,7 @@ export function StepPublicLinks({ value, onChange }: Props) {
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         <Link2 className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
-        {t('onboarding.public_links.title', { defaultValue: 'Публичные ссылки салона' })}
+        {t('onboarding.public_links.title')}
       </h1>
 
       <div className="mt-3 flex flex-col gap-3">
@@ -39,7 +39,7 @@ export function StepPublicLinks({ value, onChange }: Props) {
           label={
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="text-brand-teal-deep size-4" strokeWidth={2} />
-              {t('onboarding.public_links.booksy', { defaultValue: 'Booksy профиль' })}
+              {t('onboarding.public_links.booksy')}
             </span>
           }
         >
@@ -58,7 +58,7 @@ export function StepPublicLinks({ value, onChange }: Props) {
           label={
             <span className="inline-flex items-center gap-1.5">
               <Instagram className="size-4" strokeWidth={2} style={{ color: '#E1306C' }} />
-              {t('onboarding.public_links.instagram', { defaultValue: 'Instagram' })}
+              {t('onboarding.public_links.instagram')}
             </span>
           }
         >
@@ -77,7 +77,7 @@ export function StepPublicLinks({ value, onChange }: Props) {
           label={
             <span className="inline-flex items-center gap-1.5">
               <Facebook className="size-4" strokeWidth={2} style={{ color: '#1877F2' }} />
-              {t('onboarding.public_links.facebook', { defaultValue: 'Facebook страница' })}
+              {t('onboarding.public_links.facebook')}
             </span>
           }
         >

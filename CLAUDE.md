@@ -215,8 +215,17 @@ one-shot consume по контракту
 [`apps/web/src/lib/onboarding-credentials.ts`](./apps/web/src/lib/onboarding-credentials.ts)
 (см. [`decisions/028-onboarding-credentials-localstorage-transit.md`](./decisions/028-onboarding-credentials-localstorage-transit.md)).
 Не передавай credentials через URL query params (history + Sentry leak).
+
+**T199 — Unified storage shape.** Один localStorage ключ
+`finkley:onboarding:<salon_id>` хранит JSON `{ credentials: {...}, prompt: '...' }`.
+Helpers: `saveOnboardingTransit()` для записи, `consumeOnboardingCredentials()`
+и `consumeOnboardingPrompt()` для one-shot чтения. Legacy ключи
+(`finkley:onboarding:credentials:*`, `finkley:onboarding:prompt:*`) читаются
+и автоматически мигрируются при первом доступе (см. `readStorage`).
+
 Для любого нового pure helper в `lib/` — пиши unit-тесты (см.
-`onboarding-credentials.test.ts` как пример). Это даёт regression safety
+`onboarding-credentials.test.ts`, `onboarding-prompt-queue.test.ts`,
+`onboarding-add-item.test.ts` как пример). Это даёт regression safety
 и документирует ожидаемое поведение.
 
 ### Время — всегда UTC в БД, локально на клиенте

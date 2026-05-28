@@ -22,6 +22,7 @@ import {
   type ParameterItem,
   type ParameterSection,
 } from '@/hooks/useFinancialSettings'
+import { pickDefaultParentId } from '@/lib/onboarding-add-item'
 import { cn } from '@/lib/utils/cn'
 
 type CategoryId =
@@ -187,15 +188,9 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
 
   function addItem(cat: CategoryId, parentIdOverride?: string) {
     const section = getSection(cat)
-    // T181+T187 — для иерархических категорий (investments/flows/balance)
-    // новый item автоматом получает parent_id первого header'a (любого,
-    // не только preset). Иначе попадёт в root и юзер не поймёт где он.
-    let parentId: string | undefined = parentIdOverride
-    const hierarchical = cat === 'investments' || cat === 'flows' || cat === 'balance'
-    if (hierarchical && !parentId) {
-      const firstHeader = section.items.find((it) => !it.parent_id)
-      parentId = firstHeader?.id
-    }
+    // T181+T187 — для иерархических категорий новый item автоматом
+    // получает parent_id первого header'a (см. pickDefaultParentId).
+    const parentId = pickDefaultParentId(section.items, cat, parentIdOverride)
     patchSection(cat, [
       ...section.items,
       {
@@ -242,7 +237,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
   return (
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-        {t('onboarding.step4.title_v2', { defaultValue: 'Финансовая структура' })}
+        {t('onboarding.step4.title_v2')}
       </h1>
 
       {/* Sub-stepper: горизонтальная навигация по 7 категориям */}
@@ -323,9 +318,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                   <Input
                     value={it.label}
                     onChange={(e) => updateItem(activeCategory, it.id, { label: e.target.value })}
-                    placeholder={t('onboarding.step4.label_placeholder', {
-                      defaultValue: 'Название позиции',
-                    })}
+                    placeholder={t('onboarding.step4.label_placeholder')}
                     className="h-9 text-sm"
                   />
                   {/* Сумма / процент */}
@@ -421,7 +414,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
           className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary mt-2 inline-flex items-center justify-center gap-2 self-start rounded-md border border-dashed px-4 py-2 text-sm font-semibold"
         >
           <Plus className="size-4" strokeWidth={1.7} />
-          {t('onboarding.step4.add_in_section', { defaultValue: 'Добавить позицию' })}
+          {t('onboarding.step4.add_in_section')}
         </button>
       </div>
 
@@ -432,10 +425,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
           onClick={nextCategory}
           className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
         >
-          {t('onboarding.step4.next_section', {
-            defaultValue: 'Дальше: {{name}} →',
-            name: CATEGORIES[activeIndex + 1]!.title,
-          })}
+          {t('onboarding.step4.next_section', { name: CATEGORIES[activeIndex + 1]!.title })}
           <ArrowRight className="size-3" strokeWidth={2.4} />
         </button>
       ) : null}
@@ -461,13 +451,10 @@ function LegacyFlat({ value, onChange }: { value: string[]; onChange: (v: string
   return (
     <div>
       <h1 className="text-brand-navy text-3xl font-extrabold tracking-tight">
-        {t('onboarding.step4.title', { defaultValue: 'Расходы салона' })}
+        {t('onboarding.step4.title')}
       </h1>
       <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.step4.subtitle', {
-          defaultValue:
-            'Категории расходов. Точные суммы укажешь позже в Настройках → Справочники → Финансы.',
-        })}
+        {t('onboarding.step4.subtitle')}
       </p>
       <div className="mt-7 flex flex-col gap-2">
         {value.map((cat, i) => (
@@ -475,9 +462,7 @@ function LegacyFlat({ value, onChange }: { value: string[]; onChange: (v: string
             <Input
               value={cat}
               onChange={(e) => update(i, e.target.value)}
-              placeholder={t('onboarding.step4.placeholder', {
-                defaultValue: 'Название категории',
-              })}
+              placeholder={t('onboarding.step4.placeholder')}
             />
             <button
               type="button"
@@ -494,7 +479,7 @@ function LegacyFlat({ value, onChange }: { value: string[]; onChange: (v: string
           className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary mt-2 inline-flex items-center justify-center gap-2 self-start rounded-md border border-dashed px-4 py-2 text-sm font-semibold"
         >
           <Plus className="size-4" strokeWidth={1.7} />
-          {t('onboarding.step4.add', { defaultValue: 'Добавить' })}
+          {t('onboarding.step4.add')}
         </button>
       </div>
     </div>

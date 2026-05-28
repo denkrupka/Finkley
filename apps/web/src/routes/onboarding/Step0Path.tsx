@@ -21,30 +21,20 @@ export function Step0Path({
   return (
     <div className="space-y-3">
       <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
-        {t('onboarding.path.title', { defaultValue: 'Как настроить — быстро или максимально?' })}
+        {t('onboarding.path.title')}
       </h2>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <PathCard
           icon={Rocket}
-          title={t('onboarding.path.quick_title', { defaultValue: 'Быстрая настройка' })}
-          subtitle={t('onboarding.path.quick_subtitle', {
-            defaultValue: '5 минут — и ты внутри портала со своими данными',
-          })}
-          eta={t('onboarding.path.quick_eta', { defaultValue: '≈ 5 минут' })}
+          title={t('onboarding.path.quick_title')}
+          subtitle={t('onboarding.path.quick_subtitle')}
+          eta={t('onboarding.path.quick_eta')}
           bullets={[
-            t('onboarding.path.quick_bullet_1', {
-              defaultValue: 'Базовый профиль салона + тип',
-            }),
-            t('onboarding.path.quick_bullet_2', {
-              defaultValue: 'Подключение Booksy / банка / соцсетей — за 2 клика',
-            }),
-            t('onboarding.path.quick_bullet_3', {
-              defaultValue: 'WOW-разбор данных AI сразу после интеграций',
-            }),
-            t('onboarding.path.quick_bullet_4', {
-              defaultValue: 'Полную настройку можно добавить потом',
-            }),
+            t('onboarding.path.quick_bullet_1'),
+            t('onboarding.path.quick_bullet_2'),
+            t('onboarding.path.quick_bullet_3'),
+            t('onboarding.path.quick_bullet_4'),
           ]}
           active={value === 'quick'}
           onClick={() => onChange('quick')}
@@ -52,24 +42,14 @@ export function Step0Path({
         />
         <PathCard
           icon={Sparkles}
-          title={t('onboarding.path.full_title', { defaultValue: 'Максимальный старт' })}
-          subtitle={t('onboarding.path.full_subtitle', {
-            defaultValue: 'Все настройки + импорт мастеров и услуг + расходы + полный AI-разбор',
-          })}
-          eta={t('onboarding.path.full_eta', { defaultValue: '≈ 20 минут' })}
+          title={t('onboarding.path.full_title')}
+          subtitle={t('onboarding.path.full_subtitle')}
+          eta={t('onboarding.path.full_eta')}
           bullets={[
-            t('onboarding.path.full_bullet_1', {
-              defaultValue: 'Всё из быстрой настройки +',
-            }),
-            t('onboarding.path.full_bullet_2', {
-              defaultValue: 'Логотип, адрес, рабочий график, бухгалтерия',
-            }),
-            t('onboarding.path.full_bullet_3', {
-              defaultValue: 'Импорт мастеров с приглашениями + полный каталог услуг',
-            }),
-            t('onboarding.path.full_bullet_4', {
-              defaultValue: 'Расходы по категориям + Полный AI-разбор по 4 темам',
-            }),
+            t('onboarding.path.full_bullet_1'),
+            t('onboarding.path.full_bullet_2'),
+            t('onboarding.path.full_bullet_3'),
+            t('onboarding.path.full_bullet_4'),
           ]}
           active={value === 'full'}
           onClick={() => onChange('full')}

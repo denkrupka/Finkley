@@ -180,7 +180,9 @@
       "full_eta": "≈ 10 min",
       "full_bullet_1": "Specialists + services + expense categories",
       "full_bullet_2": "Tutorial tips on every step",
-      "full_bullet_3": "Any step can be skipped"
+      "full_bullet_3": "Any step can be skipped",
+      "quick_bullet_4": "Полную настройку можно добавить потом",
+      "full_bullet_4": "Расходы по категориям + Полный AI-разбор по 4 темам"
     },
     "tutorial": {
       "salon": "Salon name will be visible to clients in emails and SMS. Country sets currency, timezone and address format. Salon type drives service templates and competitor benchmarks.",
@@ -207,25 +209,41 @@
       "nip_label": "NIP / VAT ID",
       "company_label": "Legal company name",
       "company_placeholder": "e.g. JANE DOE BEAUTY",
-      "mode_label": "How do you do accounting?"
+      "mode_label": "How do you do accounting?",
+      "providers_title": "Подключить бухгалтерскую систему"
     },
     "step_integrations": {
       "title": "Which integrations to connect?",
       "subtitle": "Check what you need — you'll land on their setup right after onboarding. No need to connect everything now.",
-      "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime."
+      "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime.",
+      "bookings_title": "Запись и календари",
+      "social_title": "Соцсети и мессенджеры",
+      "banking_title": "Банк и расходы"
     },
     "step1": {
       "title": "Tell us about your salon",
       "name_label": "Salon name",
       "name_placeholder": "For example: Anna's Studio",
       "country_label": "Country",
-      "type_label": "Salon type"
+      "type_label": "Salon type",
+      "place_label": "Найти салон в Google",
+      "logo_label": "Логотип салона",
+      "logo_too_large": "Макс. 5 МБ",
+      "logo_change": "Заменить",
+      "logo_upload": "Загрузить логотип",
+      "logo_remove": "Убрать",
+      "logo_hint": "Покажем в шапке и в письмах клиентам. PNG / JPG / WEBP, до 5 МБ.",
+      "benchmarks_title": "Сравнить мой салон с похожими (анонимно)",
+      "benchmarks_body_v2": "Анонимно: твои цифры vs средний по нише в стране.",
+      "benchmarks_on": "Согласие — сравнивать"
     },
     "step2": {
       "title": "Add your specialists",
       "name_placeholder": "Specialist name",
       "percent_label": "% of revenue",
-      "add": "Add specialist"
+      "add": "Add specialist",
+      "invite_need_email": "Укажи email чтобы пригласить",
+      "invite_label": "Пригласить в портал после создания"
     },
     "step3": {
       "title": "What you offer",
@@ -239,13 +257,19 @@
       "ocr_title": "Logging bookings manually?",
       "ocr_body": "Upload a photo of your booking journal or notebook — AI will recognize and import.",
       "ocr_collected": "In import queue: {{count}} visits",
-      "ocr_toggle": "I log bookings manually → upload a journal photo"
+      "ocr_toggle": "I log bookings manually → upload a journal photo",
+      "add_in_category": "Добавить услугу в эту категорию",
+      "add_category": "Новая категория"
     },
     "step4": {
       "title": "Expense categories",
       "subtitle": "These are the main buckets your money goes into. You can add more later.",
       "placeholder": "Category name",
-      "add": "Add category"
+      "add": "Add category",
+      "title_v2": "Финансовая структура",
+      "label_placeholder": "Название позиции",
+      "add_in_section": "Добавить позицию",
+      "next_section": "Дальше: {{name}} →"
     },
     "step5": {
       "title": "All set, {{name}}!",
@@ -275,7 +299,8 @@
         }
       },
       "subscribe_label": "Activate subscription with a 14-day trial (recommended)",
-      "subscribe_hint": "After saving, Stripe will open to link your card. Charged after 14 days, cancel in one click."
+      "subscribe_hint": "After saving, Stripe will open to link your card. Charged after 14 days, cancel in one click.",
+      "switch_to_full": "Хочу полный setup — лого, график, импорт мастеров и услуг, расходы, AI-разбор"
     },
     "wow": {
       "title": "AI already sees what's happening in your salon",
@@ -333,7 +358,9 @@
       "real_accounting_eyebrow": "Accounting",
       "real_accounting_title": "{{provider}} — link ready",
       "real_accounting_body": "AI picks up all invoices from inbox and auto-files into income/expenses.",
-      "real_summary": "{{integrations}} integrations · {{staff}} masters · {{services}} services"
+      "real_summary": "{{integrations}} integrations · {{staff}} masters · {{services}} services",
+      "ai_loading": "AI анализирует твой салон…",
+      "ai_eyebrow": "AI говорит"
     },
     "ai_services": {
       "title": "AI breakdown — your services",
@@ -478,6 +505,52 @@
       "loading": "AI is collecting all data and preparing the analysis…",
       "fallback": "AI couldn't gather the analysis yet — finish onboarding, I'll arrive with the analysis on the dashboard within 5 minutes.",
       "advice_header": "Advice by priority"
+    },
+    "ocr": {
+      "no_salon": "Доступно после создания салона. Сначала пройди до Финиша.",
+      "too_large": "Макс. 4 МБ",
+      "toast_done": "Распознано визитов: {{count}}",
+      "toast_fail": "Не получилось распознать: {{msg}}",
+      "toast_imported": "Добавлено визитов: {{count}} — импортируем после создания салона.",
+      "loading": "AI читает страницу…",
+      "upload": "📷 Сфотографировать страницу блокнота",
+      "preview_title": "AI распознал — отметь что импортировать",
+      "empty": "Ничего не распознано на этой странице.",
+      "import": "Добавить выбранные ({{count}})"
+    },
+    "cta": {
+      "welcome": "Начать зарабатывать больше →",
+      "path": "Поехали →",
+      "salon": "Создать профиль салона →",
+      "address": "Сохранить адрес →",
+      "accounting": "Готово, дальше →",
+      "integrations_bookings": "Освободить от ручного ввода визитов →",
+      "integrations_social": "Свести все сообщения в одну ленту →",
+      "integrations_banking": "Включить авто-учёт расходов →",
+      "wow": "Перейти к моему порталу →",
+      "profile": "Готово, поехали →",
+      "tg_phone": "Сохранить и дальше →",
+      "schedule": "Сохранить график →",
+      "public_links": "Сохранить ссылки →",
+      "ai_services": "Перейти к мастерам →",
+      "ai_staff": "Перейти к клиентам →",
+      "ai_clients": "Перейти к отзывам →",
+      "ai_reviews": "Готово, к моему порталу →",
+      "staff": "Подключить команду →",
+      "services": "Готово, к расходам →",
+      "expenses": "Увидеть реальную прибыль →"
+    },
+    "welcome": {
+      "title": "Привет, ты сделал важный выбор 👋",
+      "subtitle_v2": "Что Finkley сделает за тебя:",
+      "p1": "Всё в одном — конец рутине",
+      "p2": "Данные зашифрованы",
+      "p3": "Банк → расходы сами",
+      "p4": "Реальная прибыль live",
+      "p5": "Все сообщения вместе",
+      "p6": "Анализ конкурентов",
+      "p7": "5★ → Google, 1-4 → тебе",
+      "p8": "AI-помощник в курсе"
     }
   },
   "nav": {

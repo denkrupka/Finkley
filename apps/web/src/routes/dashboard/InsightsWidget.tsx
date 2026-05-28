@@ -36,15 +36,14 @@ export function InsightsWidget({
   const hasFallback = fallback.length > 0
 
   // T170 — явный триггер «Запустить AI разбор». Вызывает generate-insights
-  // и обновляет inservation кэш.
+  // и обновляет inservation кэш. T206 — setGenerating(true) ставится ПЕРЕД
+  // guard'ом, чтобы catch/finally имел смысл при любом раннем выходе.
   async function runAiAnalysis() {
+    setGenerating(true)
     if (!salonId) {
-      // T191 — early return НЕ оставляет generating=true (тут он ещё false,
-      // но защита от регрессии если кто-то поменяет порядок).
       setGenerating(false)
       return
     }
-    setGenerating(true)
     try {
       const { data, error } = await supabase.functions.invoke('generate-insights', {
         body: { salon_id: salonId },
@@ -69,12 +68,7 @@ export function InsightsWidget({
   if (!hasServerInsights && !hasFallback) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p className="text-muted-foreground text-sm">
-          {t('dashboard.insights.empty', {
-            defaultValue:
-              'Пока всё спокойно. Если появится что-то требующее внимания — увидишь подсказку здесь.',
-          })}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('dashboard.insights.empty')}</p>
         <Button
           type="button"
           variant="outline"
@@ -87,7 +81,7 @@ export function InsightsWidget({
           ) : (
             <Sparkles className="size-3.5" strokeWidth={2} />
           )}
-          {t('dashboard.insights.run_ai', { defaultValue: 'Запустить AI разбор' })}
+          {t('dashboard.insights.run_ai')}
         </Button>
       </div>
     )

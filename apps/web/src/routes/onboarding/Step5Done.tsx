@@ -85,10 +85,7 @@ export function Step5Done({
           className="border-brand-teal-deep bg-brand-teal-soft/30 hover:bg-brand-teal-soft/60 text-brand-teal-deep mx-auto mt-6 inline-flex max-w-md items-center gap-2 rounded-xl border-2 border-dashed px-5 py-3 text-sm font-bold transition-colors"
         >
           <Sparkles className="size-4" strokeWidth={2} />
-          {t('onboarding.step5.switch_to_full', {
-            defaultValue:
-              'Хочу полный setup — лого, график, импорт мастеров и услуг, расходы, AI-разбор',
-          })}
+          {t('onboarding.step5.switch_to_full')}
           <ArrowRight className="size-4" strokeWidth={2.4} />
         </button>
       ) : null}

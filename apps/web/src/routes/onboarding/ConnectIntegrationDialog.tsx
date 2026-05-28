@@ -152,7 +152,7 @@ export function ConnectIntegrationDialog({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-muted-foreground text-[10.5px] font-bold uppercase tracking-wider">
-              {t('onboarding.connect_dialog.eyebrow', { defaultValue: 'Подключение' })}
+              {t('onboarding.connect_dialog.eyebrow')}
             </p>
             <h2 className="text-brand-navy text-lg font-bold tracking-tight">{providerName}</h2>
             <p className="text-muted-foreground mt-1 text-sm leading-snug">{tagline}</p>
@@ -161,7 +161,7 @@ export function ConnectIntegrationDialog({
 
         <div className="bg-muted/30 border-border mt-4 rounded-lg border p-3">
           <p className="text-foreground mb-2 text-xs font-bold uppercase tracking-wider">
-            {t('onboarding.connect_dialog.what_happens', { defaultValue: 'Что произойдёт' })}
+            {t('onboarding.connect_dialog.what_happens')}
           </p>
           <ul className="space-y-1.5">
             {steps
@@ -181,7 +181,7 @@ export function ConnectIntegrationDialog({
         {fields.length > 0 ? (
           <div className="mt-4 flex flex-col gap-2">
             <p className="text-foreground text-xs font-bold uppercase tracking-wider">
-              {t('onboarding.connect_dialog.credentials_label', { defaultValue: 'Данные доступа' })}
+              {t('onboarding.connect_dialog.credentials_label')}
             </p>
             {fields.map((f) => (
               <div key={f.key} className="flex flex-col gap-1">
@@ -198,10 +198,7 @@ export function ConnectIntegrationDialog({
               </div>
             ))}
             <p className="text-muted-foreground text-[11px]">
-              {t('onboarding.connect_dialog.credentials_hint', {
-                defaultValue:
-                  'Данные шифруются и используются только для подключения после создания салона.',
-              })}
+              {t('onboarding.connect_dialog.credentials_hint')}
             </p>
           </div>
         ) : null}
@@ -211,17 +208,14 @@ export function ConnectIntegrationDialog({
         {/* Для интеграций без credentials (OAuth-based: banking/IG/FB/WhatsApp/Telegram/iCal) */}
         {fields.length === 0 ? (
           <p className="text-muted-foreground mt-3 text-xs">
-            {t('onboarding.connect_dialog.oauth_note', {
-              defaultValue:
-                'После создания салона мы откроем окно подключения этого сервиса — нажмёшь подтверждение в их интерфейсе.',
-            })}
+            {t('onboarding.connect_dialog.oauth_note')}
           </p>
         ) : null}
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onClose} className="sm:order-1">
             <X className="size-4" strokeWidth={2} />
-            {t('onboarding.connect_dialog.cancel', { defaultValue: 'Отмена' })}
+            {t('onboarding.connect_dialog.cancel')}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -230,7 +224,7 @@ export function ConnectIntegrationDialog({
             data-testid="onb-connect-confirm"
           >
             <Check className="size-4" strokeWidth={2.4} />
-            {t('onboarding.connect_dialog.confirm', { defaultValue: 'Подключить' })}
+            {t('onboarding.connect_dialog.confirm')}
           </Button>
         </div>
       </DialogContent>

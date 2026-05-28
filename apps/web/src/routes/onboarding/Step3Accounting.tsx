@@ -134,16 +134,14 @@ export function Step3Accounting({
     <div className="space-y-3">
       <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
         <Building2 className="text-brand-teal-deep size-6" strokeWidth={2} />
-        {t('onboarding.step_accounting.title', { defaultValue: 'Бухгалтерия' })}
+        {t('onboarding.step_accounting.title')}
       </h2>
 
       {/* T138 — как ведёшь бухгалтерию (радио). */}
       {onAccountingModeChange ? (
         <div className="flex flex-col gap-2">
           <Label className="block text-xs font-semibold uppercase tracking-wider">
-            {t('onboarding.step_accounting.mode_label', {
-              defaultValue: 'Как ведёшь бухгалтерию?',
-            })}
+            {t('onboarding.step_accounting.mode_label')}
           </Label>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {ACCOUNTING_MODES.map((m) => {
@@ -187,7 +185,7 @@ export function Step3Accounting({
             htmlFor="ob-nip"
             className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
           >
-            {t('onboarding.step_accounting.nip_label', { defaultValue: 'NIP компании' })}
+            {t('onboarding.step_accounting.nip_label')}
           </Label>
           <Input
             id="ob-nip"
@@ -203,15 +201,13 @@ export function Step3Accounting({
             htmlFor="ob-comp"
             className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
           >
-            {t('onboarding.step_accounting.company_label', { defaultValue: 'Название компании' })}
+            {t('onboarding.step_accounting.company_label')}
           </Label>
           <Input
             id="ob-comp"
             value={value.company_name}
             onChange={(e) => onChange({ ...value, company_name: e.target.value })}
-            placeholder={t('onboarding.step_accounting.company_placeholder', {
-              defaultValue: 'Salon ABC Sp. z o.o.',
-            })}
+            placeholder={t('onboarding.step_accounting.company_placeholder')}
           />
         </div>
       </div>
@@ -222,9 +218,7 @@ export function Step3Accounting({
           <div className="mb-2 flex items-center gap-2">
             <Plug className="text-brand-teal-deep size-5" strokeWidth={2} />
             <p className="text-foreground text-sm font-bold">
-              {t('onboarding.step_accounting.providers_title', {
-                defaultValue: 'Подключить бухгалтерскую систему',
-              })}
+              {t('onboarding.step_accounting.providers_title')}
             </p>
           </div>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">

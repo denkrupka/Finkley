@@ -34,33 +34,17 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
   }
 
   const heroTitle: Record<AiBreakdownTopic, string> = {
-    services: t('onboarding.ai_services.title', {
-      defaultValue: 'AI-разбор твоих услуг',
-    }),
-    staff: t('onboarding.ai_staff.title', {
-      defaultValue: 'AI-разбор твоих мастеров',
-    }),
-    clients: t('onboarding.ai_clients.title', {
-      defaultValue: 'AI-разбор твоей базы клиентов',
-    }),
-    reviews: t('onboarding.ai_reviews.title', {
-      defaultValue: 'AI-разбор отзывов',
-    }),
+    services: t('onboarding.ai_services.title'),
+    staff: t('onboarding.ai_staff.title'),
+    clients: t('onboarding.ai_clients.title'),
+    reviews: t('onboarding.ai_reviews.title'),
   }
 
   const heroSubtitle: Record<AiBreakdownTopic, string> = {
-    services: t('onboarding.ai_services.subtitle_v2', {
-      defaultValue: 'Что приносит маржу, а на что льёшь время впустую.',
-    }),
-    staff: t('onboarding.ai_staff.subtitle_v2', {
-      defaultValue: 'Кто звезда, кому нужна программа улучшения.',
-    }),
-    clients: t('onboarding.ai_clients.subtitle_v2', {
-      defaultValue: 'RFM-сегменты — кого вернуть, кого превратить в постоянного.',
-    }),
-    reviews: t('onboarding.ai_reviews.subtitle_v2', {
-      defaultValue: 'За что хвалят, что бесит, портрет клиента из соцсетей.',
-    }),
+    services: t('onboarding.ai_services.subtitle_v2'),
+    staff: t('onboarding.ai_staff.subtitle_v2'),
+    clients: t('onboarding.ai_clients.subtitle_v2'),
+    reviews: t('onboarding.ai_reviews.subtitle_v2'),
   }
 
   const cards: Record<

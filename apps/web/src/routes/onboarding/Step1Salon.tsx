@@ -64,15 +64,12 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
   return (
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-        {t('onboarding.step1.title', { defaultValue: 'Расскажи о салоне' })}
+        {t('onboarding.step1.title')}
       </h1>
 
       <div className="mt-4 flex flex-col gap-3">
         {/* Google Places — самое важное, сверху */}
-        <Field
-          id="onb-place"
-          label={t('onboarding.step1.place_label', { defaultValue: 'Найти салон в Google' })}
-        >
+        <Field id="onb-place" label={t('onboarding.step1.place_label')}>
           <GooglePlaceSearchInput
             initialName={value.name || null}
             initialPlaceId={value.address.google_place_id ?? null}
@@ -118,17 +115,12 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
             id="onb-name"
             value={value.name}
             onChange={(e) => onChange({ name: e.target.value })}
-            placeholder={t('onboarding.step1.name_placeholder', {
-              defaultValue: 'Например, «Wonderful Beauty»',
-            })}
+            placeholder={t('onboarding.step1.name_placeholder')}
             data-testid="onb-name"
           />
         </Field>
 
-        <Field
-          id="onb-country"
-          label={t('onboarding.step1.country_label', { defaultValue: 'Страна' })}
-        >
+        <Field id="onb-country" label={t('onboarding.step1.country_label')}>
           <div className="flex flex-wrap gap-2" data-testid="onb-country">
             {COUNTRY_OPTIONS.map((c) => {
               const active = value.country_code === c.code
@@ -162,10 +154,7 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
         {/* Логотип — только в полной ветке (T81). В быстрой пропускаем чтобы
             не задерживать на необязательном поле. */}
         {showLogo ? (
-          <Field
-            id="onb-logo"
-            label={t('onboarding.step1.logo_label', { defaultValue: 'Логотип салона' })}
-          >
+          <Field id="onb-logo" label={t('onboarding.step1.logo_label')}>
             <div className="flex items-center gap-4">
               {value.logo_data_url ? (
                 <img
@@ -187,9 +176,7 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
                   const f = e.target.files?.[0]
                   if (!f) return
                   if (f.size > 5 * 1024 * 1024) {
-                    toast.error(
-                      t('onboarding.step1.logo_too_large', { defaultValue: 'Макс. 5 МБ' }),
-                    )
+                    toast.error(t('onboarding.step1.logo_too_large'))
                     e.target.value = ''
                     return
                   }
@@ -210,8 +197,8 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
                     <ImagePlus className="size-3.5" strokeWidth={2} />
                   )}
                   {value.logo_data_url
-                    ? t('onboarding.step1.logo_change', { defaultValue: 'Заменить' })
-                    : t('onboarding.step1.logo_upload', { defaultValue: 'Загрузить логотип' })}
+                    ? t('onboarding.step1.logo_change')
+                    : t('onboarding.step1.logo_upload')}
                 </button>
                 {value.logo_data_url ? (
                   <button
@@ -220,23 +207,18 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
                     className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 self-start text-xs"
                   >
                     <Trash2 className="size-3" strokeWidth={1.8} />
-                    {t('onboarding.step1.logo_remove', { defaultValue: 'Убрать' })}
+                    {t('onboarding.step1.logo_remove')}
                   </button>
                 ) : null}
               </div>
             </div>
             <p className="text-muted-foreground mt-1.5 text-xs">
-              {t('onboarding.step1.logo_hint', {
-                defaultValue: 'Покажем в шапке и в письмах клиентам. PNG / JPG / WEBP, до 5 МБ.',
-              })}
+              {t('onboarding.step1.logo_hint')}
             </p>
           </Field>
         ) : null}
 
-        <Field
-          id="onb-type"
-          label={t('onboarding.step1.type_label', { defaultValue: 'Тип салона' })}
-        >
+        <Field id="onb-type" label={t('onboarding.step1.type_label')}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="onb-type">
             {SALON_TYPES.map((typ) => {
               const active = value.salon_type === typ.id
@@ -277,19 +259,15 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
           <div className="min-w-0 flex-1">
             <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
               <Sparkles className="text-brand-sage size-4" strokeWidth={2} />
-              {t('onboarding.step1.benchmarks_title', {
-                defaultValue: 'Сравнить мой салон с похожими (анонимно)',
-              })}
+              {t('onboarding.step1.benchmarks_title')}
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-              {t('onboarding.step1.benchmarks_body_v2', {
-                defaultValue: 'Анонимно: твои цифры vs средний по нише в стране.',
-              })}
+              {t('onboarding.step1.benchmarks_body_v2')}
             </p>
             {value.benchmarks_opt_in ? (
               <p className="text-brand-sage-deep mt-1.5 inline-flex items-center gap-1 text-xs font-bold">
                 <CheckCircle2 className="size-3.5" strokeWidth={2.2} />
-                {t('onboarding.step1.benchmarks_on', { defaultValue: 'Согласие — сравнивать' })}
+                {t('onboarding.step1.benchmarks_on')}
               </p>
             ) : null}
           </div>

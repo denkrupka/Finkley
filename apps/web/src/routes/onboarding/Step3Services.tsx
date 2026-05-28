@@ -107,7 +107,7 @@ export function Step3Services({
     <div>
       <div className="flex items-end justify-between gap-4">
         <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-          {t('onboarding.step3.title', { defaultValue: 'Каталог услуг' })}
+          {t('onboarding.step3.title')}
         </h1>
         {SEED_SERVICES_BY_TYPE[salonType].length > 0 ? (
           <button
@@ -115,7 +115,7 @@ export function Step3Services({
             onClick={resetSeed}
             className="text-secondary text-sm font-semibold hover:underline"
           >
-            {t('onboarding.step3.reset_seed', { defaultValue: 'Загрузить пресет' })}
+            {t('onboarding.step3.reset_seed')}
           </button>
         ) : null}
       </div>
@@ -130,9 +130,7 @@ export function Step3Services({
           className="text-brand-teal-deep hover:bg-brand-teal-soft/30 mt-3 inline-flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-xs font-bold"
         >
           <Camera className="size-3.5" strokeWidth={2} />
-          {t('onboarding.step3.ocr_toggle', {
-            defaultValue: 'Веду резервации вручную → загрузить фото журнала',
-          })}
+          {t('onboarding.step3.ocr_toggle')}
         </button>
       ) : null}
       {onOcrVisitsAdded && showOcr ? (
@@ -140,16 +138,9 @@ export function Step3Services({
           <div className="flex items-start gap-2">
             <Camera className="text-brand-teal-deep mt-0.5 size-4 shrink-0" strokeWidth={2} />
             <div className="min-w-0 flex-1">
-              <p className="text-foreground text-sm font-bold">
-                {t('onboarding.step3.ocr_title', {
-                  defaultValue: 'Ведёшь резервации вручную?',
-                })}
-              </p>
+              <p className="text-foreground text-sm font-bold">{t('onboarding.step3.ocr_title')}</p>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                {t('onboarding.step3.ocr_body', {
-                  defaultValue:
-                    'Загрузи фото своего журнала резерваций или документа где ведёшь записи — AI распознает и внесёт.',
-                })}
+                {t('onboarding.step3.ocr_body')}
               </p>
             </div>
           </div>
@@ -159,10 +150,7 @@ export function Step3Services({
           />
           {ocrVisits.length > 0 ? (
             <p className="text-brand-teal-deep text-xs font-bold">
-              {t('onboarding.step3.ocr_collected', {
-                defaultValue: 'В очереди на импорт: {{count}} визитов',
-                count: ocrVisits.length,
-              })}
+              {t('onboarding.step3.ocr_collected', { count: ocrVisits.length })}
             </p>
           ) : null}
         </div>
@@ -200,17 +188,13 @@ export function Step3Services({
                       <Input
                         value={s.category_name}
                         onChange={(e) => update(s.id, { category_name: e.target.value })}
-                        placeholder={t('onboarding.step3.category_placeholder', {
-                          defaultValue: 'Категория',
-                        })}
+                        placeholder={t('onboarding.step3.category_placeholder')}
                         className="h-9 text-sm"
                       />
                       <Input
                         value={s.name}
                         onChange={(e) => update(s.id, { name: e.target.value })}
-                        placeholder={t('onboarding.step3.service_placeholder', {
-                          defaultValue: 'Название услуги',
-                        })}
+                        placeholder={t('onboarding.step3.service_placeholder')}
                         className="h-9 text-sm"
                       />
                       {/* Цена */}
@@ -261,9 +245,7 @@ export function Step3Services({
                     className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary mt-1 inline-flex items-center gap-1.5 self-start rounded-md border border-dashed px-3 py-1.5 text-xs font-semibold"
                   >
                     <Plus className="size-3" strokeWidth={2.2} />
-                    {t('onboarding.step3.add_in_category', {
-                      defaultValue: 'Добавить услугу в эту категорию',
-                    })}
+                    {t('onboarding.step3.add_in_category')}
                   </button>
                 </div>
               </div>
@@ -278,7 +260,7 @@ export function Step3Services({
           data-testid="onb-service-add"
         >
           <Plus className="size-4" strokeWidth={1.7} />
-          {t('onboarding.step3.add_category', { defaultValue: 'Новая категория' })}
+          {t('onboarding.step3.add_category')}
         </button>
       </div>
     </div>

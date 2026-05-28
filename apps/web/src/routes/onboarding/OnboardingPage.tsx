@@ -593,51 +593,45 @@ export function OnboardingPage() {
   function nextCtaLabel(): string {
     switch (stepId) {
       case 'welcome':
-        return t('onboarding.cta.welcome', { defaultValue: 'Начать зарабатывать больше →' })
+        return t('onboarding.cta.welcome')
       case 'path':
-        return t('onboarding.cta.path', { defaultValue: 'Поехали →' })
+        return t('onboarding.cta.path')
       case 'salon':
-        return t('onboarding.cta.salon', { defaultValue: 'Создать профиль салона →' })
+        return t('onboarding.cta.salon')
       case 'address':
-        return t('onboarding.cta.address', { defaultValue: 'Сохранить адрес →' })
+        return t('onboarding.cta.address')
       case 'accounting':
-        return t('onboarding.cta.accounting', { defaultValue: 'Готово, дальше →' })
+        return t('onboarding.cta.accounting')
       case 'integrations_bookings':
-        return t('onboarding.cta.integrations_bookings', {
-          defaultValue: 'Освободить от ручного ввода визитов →',
-        })
+        return t('onboarding.cta.integrations_bookings')
       case 'integrations_social':
-        return t('onboarding.cta.integrations_social', {
-          defaultValue: 'Свести все сообщения в одну ленту →',
-        })
+        return t('onboarding.cta.integrations_social')
       case 'integrations_banking':
-        return t('onboarding.cta.integrations_banking', {
-          defaultValue: 'Включить авто-учёт расходов →',
-        })
+        return t('onboarding.cta.integrations_banking')
       case 'wow':
-        return t('onboarding.cta.wow', { defaultValue: 'Перейти к моему порталу →' })
+        return t('onboarding.cta.wow')
       case 'profile':
-        return t('onboarding.cta.profile', { defaultValue: 'Готово, поехали →' })
+        return t('onboarding.cta.profile')
       case 'tg_phone':
-        return t('onboarding.cta.tg_phone', { defaultValue: 'Сохранить и дальше →' })
+        return t('onboarding.cta.tg_phone')
       case 'schedule':
-        return t('onboarding.cta.schedule', { defaultValue: 'Сохранить график →' })
+        return t('onboarding.cta.schedule')
       case 'public_links':
-        return t('onboarding.cta.public_links', { defaultValue: 'Сохранить ссылки →' })
+        return t('onboarding.cta.public_links')
       case 'ai_services':
-        return t('onboarding.cta.ai_services', { defaultValue: 'Перейти к мастерам →' })
+        return t('onboarding.cta.ai_services')
       case 'ai_staff':
-        return t('onboarding.cta.ai_staff', { defaultValue: 'Перейти к клиентам →' })
+        return t('onboarding.cta.ai_staff')
       case 'ai_clients':
-        return t('onboarding.cta.ai_clients', { defaultValue: 'Перейти к отзывам →' })
+        return t('onboarding.cta.ai_clients')
       case 'ai_reviews':
-        return t('onboarding.cta.ai_reviews', { defaultValue: 'Готово, к моему порталу →' })
+        return t('onboarding.cta.ai_reviews')
       case 'staff':
-        return t('onboarding.cta.staff', { defaultValue: 'Подключить команду →' })
+        return t('onboarding.cta.staff')
       case 'services':
-        return t('onboarding.cta.services', { defaultValue: 'Готово, к расходам →' })
+        return t('onboarding.cta.services')
       case 'expenses':
-        return t('onboarding.cta.expenses', { defaultValue: 'Увидеть реальную прибыль →' })
+        return t('onboarding.cta.expenses')
       default:
         return `${t('common.next')} →`
     }
@@ -779,9 +773,7 @@ export function OnboardingPage() {
             )}
             {stepId === 'integrations_bookings' && (
               <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.bookings_title', {
-                  defaultValue: 'Запись и календари',
-                })}
+                title={t('onboarding.step_integrations.bookings_title')}
                 items={[
                   {
                     id: 'booksy',
@@ -828,9 +820,7 @@ export function OnboardingPage() {
             )}
             {stepId === 'integrations_social' && (
               <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.social_title', {
-                  defaultValue: 'Соцсети и мессенджеры',
-                })}
+                title={t('onboarding.step_integrations.social_title')}
                 items={[
                   {
                     id: 'instagram',
@@ -921,9 +911,7 @@ export function OnboardingPage() {
             )}
             {stepId === 'integrations_banking' && (
               <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.banking_title', {
-                  defaultValue: 'Банк и расходы',
-                })}
+                title={t('onboarding.step_integrations.banking_title')}
                 items={[
                   {
                     id: 'banking',

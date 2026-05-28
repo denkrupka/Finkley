@@ -362,9 +362,9 @@ function TourRenderer({
               top: targetRect.top - 4,
               width: targetRect.width + 8,
               height: targetRect.height + 8,
-              // T190 — Tailwind 3 не имеет встроенного outline-dashed утилити,
-              // inline style вместо класса.
-              ...(isArtificial ? { outline: '2px dashed hsl(var(--primary) / 0.6)' } : {}),
+              // T190+T207 — Tailwind 3 не имеет outline-dashed утилити.
+              // rgba() вместо hsl()/var() для Safari <15 совместимости.
+              ...(isArtificial ? { outline: '2px dashed rgba(13, 148, 136, 0.6)' } : {}),
             }}
           />
         </>

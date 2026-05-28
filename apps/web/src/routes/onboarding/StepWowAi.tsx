@@ -143,18 +143,10 @@ export function StepWowAi({
     cards.push({
       icon: Users,
       tone: 'sage',
-      eyebrow: t('onboarding.wow.real_staff_eyebrow', { defaultValue: 'Команда' }),
-      title: t('onboarding.wow.real_staff_title', {
-        defaultValue: '{{count}} мастер(ов) в команде',
-        count: staffCount,
-      }),
-      body: t('onboarding.wow.real_staff_body', {
-        defaultValue:
-          'AI рассчитает выручку, retention и средний чек на каждого. Первые цифры — через 2 недели.',
-      }),
-      chip: t('onboarding.wow.real_staff_chip', {
-        defaultValue: 'Через 14 дней — топ-лист',
-      }),
+      eyebrow: t('onboarding.wow.real_staff_eyebrow'),
+      title: t('onboarding.wow.real_staff_title', { count: staffCount }),
+      body: t('onboarding.wow.real_staff_body'),
+      chip: t('onboarding.wow.real_staff_chip'),
     })
   }
 
@@ -162,44 +154,26 @@ export function StepWowAi({
     cards.push({
       icon: Wrench,
       tone: 'amber',
-      eyebrow: t('onboarding.wow.real_services_eyebrow', { defaultValue: 'Каталог' }),
-      title: t('onboarding.wow.real_services_title', {
-        defaultValue: '{{count}} услуг(и) в каталоге',
-        count: servicesCount,
-      }),
-      body: t('onboarding.wow.real_services_body', {
-        defaultValue:
-          'AI найдёт услуги, где себестоимость съедает прибыль, и предложит новую цену.',
-      }),
-      chip: t('onboarding.wow.chip_margin', { defaultValue: 'до +25% маржи' }),
+      eyebrow: t('onboarding.wow.real_services_eyebrow'),
+      title: t('onboarding.wow.real_services_title', { count: servicesCount }),
+      body: t('onboarding.wow.real_services_body'),
+      chip: t('onboarding.wow.chip_margin'),
     })
   }
 
   if (hasBookings) {
     const note = selectedIntegrations.includes('booksy')
-      ? t('onboarding.wow.real_booksy_body', {
-          defaultValue:
-            'Booksy → клиенты, мастера и история визитов приедут автоматом за 2-5 минут. AI начнёт работать сразу.',
-        })
+      ? t('onboarding.wow.real_booksy_body')
       : ocrVisitsCount > 0
-        ? t('onboarding.wow.real_ocr_body', {
-            defaultValue:
-              '{{count}} визитов из блокнота попадут в портал после создания. AI разнесёт по мастерам.',
-            count: ocrVisitsCount,
-          })
-        : t('onboarding.wow.real_ical_body', {
-            defaultValue:
-              'iCal-фид для каждого мастера — синхронизация с Google/Apple Calendar мгновенная.',
-          })
+        ? t('onboarding.wow.real_ocr_body', { count: ocrVisitsCount })
+        : t('onboarding.wow.real_ical_body')
     cards.push({
       icon: Calendar,
       tone: 'navy',
-      eyebrow: t('onboarding.wow.real_bookings_eyebrow', { defaultValue: 'Записи' }),
-      title: t('onboarding.wow.real_bookings_title', {
-        defaultValue: 'Календарь подключён',
-      }),
+      eyebrow: t('onboarding.wow.real_bookings_eyebrow'),
+      title: t('onboarding.wow.real_bookings_title'),
       body: note,
-      chip: t('onboarding.wow.chip_time', { defaultValue: '−5 часов рутины в неделю' }),
+      chip: t('onboarding.wow.chip_time'),
     })
   }
 
@@ -207,15 +181,10 @@ export function StepWowAi({
     cards.push({
       icon: Banknote,
       tone: 'navy',
-      eyebrow: t('onboarding.wow.real_banking_eyebrow', { defaultValue: 'Банк' }),
-      title: t('onboarding.wow.real_banking_title', {
-        defaultValue: 'PSD2-консент — следующий шаг',
-      }),
-      body: t('onboarding.wow.real_banking_body', {
-        defaultValue:
-          'После SCA-консента каждое списание автоматом упадёт в «Расходы». AI алертит подозрительные.',
-      }),
-      chip: t('onboarding.wow.real_banking_chip', { defaultValue: '90 дней без переподключения' }),
+      eyebrow: t('onboarding.wow.real_banking_eyebrow'),
+      title: t('onboarding.wow.real_banking_title'),
+      body: t('onboarding.wow.real_banking_body'),
+      chip: t('onboarding.wow.real_banking_chip'),
     })
   }
 
@@ -227,15 +196,9 @@ export function StepWowAi({
     cards.push({
       icon: MessageSquare,
       tone: 'gold',
-      eyebrow: t('onboarding.wow.real_inbox_eyebrow', { defaultValue: 'Inbox' }),
-      title: t('onboarding.wow.real_inbox_title', {
-        defaultValue: '{{channels}} — в одной ленте',
-        channels: socials.join(' + ') || 'Соцсети',
-      }),
-      body: t('onboarding.wow.real_inbox_body', {
-        defaultValue:
-          'Все сообщения в одном месте. AI отвечает на типовые вопросы автоматом (цены, расписание).',
-      }),
+      eyebrow: t('onboarding.wow.real_inbox_eyebrow'),
+      title: t('onboarding.wow.real_inbox_title', { channels: socials.join(' + ') || 'Соцсети' }),
+      body: t('onboarding.wow.real_inbox_body'),
     })
   }
 
@@ -243,15 +206,10 @@ export function StepWowAi({
     cards.push({
       icon: Star,
       tone: 'gold',
-      eyebrow: t('onboarding.wow.real_google_eyebrow', { defaultValue: 'Google профиль' }),
-      title: t('onboarding.wow.real_google_title', {
-        defaultValue: 'Google Place привязан',
-      }),
-      body: t('onboarding.wow.real_google_body', {
-        defaultValue:
-          'AI анализирует отзывы 24/7: за что хвалят, что бесит, портрет клиента. 5★ — автоматом в Google.',
-      }),
-      chip: t('onboarding.wow.real_google_chip', { defaultValue: 'Защита репутации' }),
+      eyebrow: t('onboarding.wow.real_google_eyebrow'),
+      title: t('onboarding.wow.real_google_title'),
+      body: t('onboarding.wow.real_google_body'),
+      chip: t('onboarding.wow.real_google_chip'),
     })
   }
 
@@ -259,12 +217,9 @@ export function StepWowAi({
     cards.push({
       icon: Building2,
       tone: 'navy',
-      eyebrow: t('onboarding.wow.real_company_eyebrow', { defaultValue: 'Компания' }),
+      eyebrow: t('onboarding.wow.real_company_eyebrow'),
       title: companyName,
-      body: t('onboarding.wow.real_company_body', {
-        defaultValue:
-          'Реквизиты для фактур готовы. Подключённая бухгалтерия избавит от двойного ввода.',
-      }),
+      body: t('onboarding.wow.real_company_body'),
     })
   }
 
@@ -272,11 +227,9 @@ export function StepWowAi({
     cards.push({
       icon: Send,
       tone: 'sage',
-      eyebrow: t('onboarding.wow.real_tg_eyebrow', { defaultValue: 'Telegram' }),
-      title: t('onboarding.wow.real_tg_title', { defaultValue: 'Утренний разбор в 9:00' }),
-      body: t('onboarding.wow.real_tg_body', {
-        defaultValue: 'Каждое утро — короткий дайджест + критичные алерты прямо в чате.',
-      }),
+      eyebrow: t('onboarding.wow.real_tg_eyebrow'),
+      title: t('onboarding.wow.real_tg_title'),
+      body: t('onboarding.wow.real_tg_body'),
     })
   }
 
@@ -293,16 +246,12 @@ export function StepWowAi({
     cards.push({
       icon: FileText,
       tone: 'amber',
-      eyebrow: t('onboarding.wow.real_accounting_eyebrow', { defaultValue: 'Бухгалтерия' }),
+      eyebrow: t('onboarding.wow.real_accounting_eyebrow'),
       title: t('onboarding.wow.real_accounting_title', {
-        defaultValue: '{{provider}} — связка готова',
         provider:
           accounting === 'ksef' ? 'KSeF' : (accounting ?? '').replace(/^./, (c) => c.toUpperCase()),
       }),
-      body: t('onboarding.wow.real_accounting_body', {
-        defaultValue:
-          'AI забирает все фактуры из inbox и автоматически разносит по доходам/расходам.',
-      }),
+      body: t('onboarding.wow.real_accounting_body'),
     })
   }
 
@@ -312,39 +261,26 @@ export function StepWowAi({
       cards.push({
         icon: TrendingUp,
         tone: 'sage',
-        eyebrow: t('onboarding.wow.master_eyebrow', { defaultValue: 'Топ мастера' }),
-        title: t('onboarding.wow.master_title', {
-          defaultValue: 'AI определит твоих звёзд и тех, кому нужно расти',
-        }),
-        body: t('onboarding.wow.master_body_v2', {
-          defaultValue: 'Выручка, retention, ★ на мастера. Кто звезда, кому учиться.',
-        }),
-        chip: t('onboarding.wow.chip_lift', { defaultValue: '+12-18% выручки в среднем' }),
+        eyebrow: t('onboarding.wow.master_eyebrow'),
+        title: t('onboarding.wow.master_title'),
+        body: t('onboarding.wow.master_body_v2'),
+        chip: t('onboarding.wow.chip_lift'),
       })
       cards.push({
         icon: TrendingDown,
         tone: 'amber',
-        eyebrow: t('onboarding.wow.service_eyebrow', { defaultValue: 'Услуги' }),
-        title: t('onboarding.wow.service_title', {
-          defaultValue: 'AI найдёт услуги, на которые ты сливаешь время',
-        }),
-        body: t('onboarding.wow.service_body_v2', {
-          defaultValue: 'Реальная маржа на каждую услугу. Что поднять в цене, что убрать.',
-        }),
-        chip: t('onboarding.wow.chip_margin', { defaultValue: 'до +25% маржи' }),
+        eyebrow: t('onboarding.wow.service_eyebrow'),
+        title: t('onboarding.wow.service_title'),
+        body: t('onboarding.wow.service_body_v2'),
+        chip: t('onboarding.wow.chip_margin'),
       })
     } else {
       cards.push({
         icon: Sparkles,
         tone: 'navy',
-        eyebrow: t('onboarding.wow.empty_eyebrow', { defaultValue: 'AI готов' }),
-        title: t('onboarding.wow.empty_title', {
-          defaultValue: 'Как только появятся данные — AI начнёт работать',
-        }),
-        body: t('onboarding.wow.empty_body', {
-          defaultValue:
-            'Подключи Booksy или импортируй блокнот, и AI сразу даст разбор: кто из мастеров приносит деньги, какие услуги тянут вниз, кого из клиентов вернуть рассылкой.',
-        }),
+        eyebrow: t('onboarding.wow.empty_eyebrow'),
+        title: t('onboarding.wow.empty_title'),
+        body: t('onboarding.wow.empty_body'),
       })
     }
   }
@@ -356,17 +292,13 @@ export function StepWowAi({
       <div>
         <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Sparkles className="text-brand-teal-deep size-6" strokeWidth={2} />
-          {t('onboarding.wow.title', {
-            defaultValue: 'AI уже видит, что у тебя происходит',
-          })}
+          {t('onboarding.wow.title')}
         </h2>
         {integrationCount + staffCount + servicesCount > 0 ? (
           <p className="text-muted-foreground mt-1 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
             <CheckCircle2 className="text-brand-sage-deep size-3.5" strokeWidth={2.2} />
             <span>
               {t('onboarding.wow.real_summary', {
-                defaultValue:
-                  '{{integrations}} интеграций · {{staff}} мастеров · {{services}} услуг',
                 integrations: integrationCount,
                 staff: staffCount,
                 services: servicesCount,
@@ -381,11 +313,7 @@ export function StepWowAi({
       {aiPreview.isLoading ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-2 rounded-xl border border-dashed p-3">
           <Loader2 className="text-brand-teal-deep size-4 animate-spin" strokeWidth={2} />
-          <p className="text-muted-foreground text-xs">
-            {t('onboarding.wow.ai_loading', {
-              defaultValue: 'AI анализирует твой салон…',
-            })}
-          </p>
+          <p className="text-muted-foreground text-xs">{t('onboarding.wow.ai_loading')}</p>
         </div>
       ) : aiPreview.data?.insights && aiPreview.data.insights.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -397,7 +325,7 @@ export function StepWowAi({
                 key={`ai-${i}`}
                 icon={Icon}
                 tone={tone}
-                eyebrow={t('onboarding.wow.ai_eyebrow', { defaultValue: 'AI говорит' })}
+                eyebrow={t('onboarding.wow.ai_eyebrow')}
                 title={insight.title}
                 body={insight.body}
               />

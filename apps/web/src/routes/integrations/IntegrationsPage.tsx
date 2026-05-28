@@ -132,6 +132,32 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.get('fb'), params.get('ig')])
 
+  // T204 — Stripe success/cancel feedback toast после возврата из Checkout.
+  // success_url/cancel_url ставит ?stripe=success или ?stripe=cancel + prompt
+  // (см. create-checkout-session T186).
+  const stripeStatus = params.get('stripe')
+  useEffect(() => {
+    if (stripeStatus === 'success') {
+      toast.success(
+        t('integrations.stripe_success', {
+          defaultValue: 'Подписка активирована. Продолжаем подключение интеграций.',
+        }),
+      )
+    } else if (stripeStatus === 'cancel') {
+      toast.info(
+        t('integrations.stripe_cancel', {
+          defaultValue: 'Подписка отменена. Можешь продолжить подключение интеграций без trial.',
+        }),
+      )
+    }
+    if (stripeStatus) {
+      const next = new URLSearchParams(params)
+      next.delete('stripe')
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeStatus])
+
   // T175+T179 — обработка ?prompt=<provider1>,<provider2> из онбординга.
   // Источник: URL query (свежий редирект) ИЛИ localStorage (если юзер
   // возвращается из Stripe Checkout — query потерян).

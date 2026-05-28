@@ -110,7 +110,11 @@ if (failures > 0) {
   )
   console.error('  2. Deploy telegram-user-bot edge function')
   console.error('  3. Set TELEGRAM_USER_WEBHOOK_SECRET in Supabase secrets')
+  // T211 — explicit exit чтобы Windows не валился UV assertion.
   process.exit(1)
 }
 
 console.log('\n✓ All telegram webhook checks passed')
+// T211 — явный process.exit для clean shutdown на Windows (без него
+// libuv assertion `!(handle->flags & UV_HANDLE_CLOSING)` в конце).
+process.exit(0)

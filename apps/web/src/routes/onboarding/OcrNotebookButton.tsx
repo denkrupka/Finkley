@@ -57,15 +57,11 @@ export function OcrNotebookButton({
 
   async function handleFile(file: File) {
     if (!salonId) {
-      toast.error(
-        t('onboarding.ocr.no_salon', {
-          defaultValue: 'Доступно после создания салона. Сначала пройди до Финиша.',
-        }),
-      )
+      toast.error(t('onboarding.ocr.no_salon'))
       return
     }
     if (file.size > 4 * 1024 * 1024) {
-      toast.error(t('onboarding.ocr.too_large', { defaultValue: 'Макс. 4 МБ' }))
+      toast.error(t('onboarding.ocr.too_large'))
       return
     }
     setLoading(true)
@@ -79,18 +75,10 @@ export function OcrNotebookButton({
       if (res.error || !res.visits) throw new Error(res.error ?? 'no_visits')
       setPreview(res.visits)
       setSelected(new Set(res.visits.map((_, i) => i)))
-      toast.success(
-        t('onboarding.ocr.toast_done', {
-          defaultValue: 'Распознано визитов: {{count}}',
-          count: res.visits.length,
-        }),
-      )
+      toast.success(t('onboarding.ocr.toast_done', { count: res.visits.length }))
     } catch (e) {
       toast.error(
-        t('onboarding.ocr.toast_fail', {
-          defaultValue: 'Не получилось распознать: {{msg}}',
-          msg: e instanceof Error ? e.message : String(e),
-        }),
+        t('onboarding.ocr.toast_fail', { msg: e instanceof Error ? e.message : String(e) }),
       )
     } finally {
       setLoading(false)
@@ -103,12 +91,7 @@ export function OcrNotebookButton({
     onVisitsParsed(picked)
     setPreview(null)
     setSelected(new Set())
-    toast.success(
-      t('onboarding.ocr.toast_imported', {
-        defaultValue: 'Добавлено визитов: {{count}} — импортируем после создания салона.',
-        count: picked.length,
-      }),
-    )
+    toast.success(t('onboarding.ocr.toast_imported', { count: picked.length }))
   }
 
   return (
@@ -140,9 +123,7 @@ export function OcrNotebookButton({
         ) : (
           <Camera className="size-4" strokeWidth={2} />
         )}
-        {loading
-          ? t('onboarding.ocr.loading', { defaultValue: 'AI читает страницу…' })
-          : t('onboarding.ocr.upload', { defaultValue: '📷 Сфотографировать страницу блокнота' })}
+        {loading ? t('onboarding.ocr.loading') : t('onboarding.ocr.upload')}
       </button>
 
       {/* Preview list */}
@@ -151,9 +132,7 @@ export function OcrNotebookButton({
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
               <FileImage className="text-brand-teal-deep size-4" strokeWidth={2} />
-              {t('onboarding.ocr.preview_title', {
-                defaultValue: 'AI распознал — отметь что импортировать',
-              })}
+              {t('onboarding.ocr.preview_title')}
             </p>
             <button
               type="button"
@@ -166,11 +145,7 @@ export function OcrNotebookButton({
           </div>
 
           {preview.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              {t('onboarding.ocr.empty', {
-                defaultValue: 'Ничего не распознано на этой странице.',
-              })}
-            </p>
+            <p className="text-muted-foreground text-sm">{t('onboarding.ocr.empty')}</p>
           ) : (
             <div className="flex max-h-60 flex-col gap-1.5 overflow-auto">
               {preview.map((v, i) => {
@@ -217,10 +192,7 @@ export function OcrNotebookButton({
               className="bg-brand-teal-deep hover:bg-brand-teal-deep/90 mt-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold text-white"
             >
               <Check className="size-3.5" strokeWidth={2.4} />
-              {t('onboarding.ocr.import', {
-                defaultValue: 'Добавить выбранные ({{count}})',
-                count: selected.size,
-              })}
+              {t('onboarding.ocr.import', { count: selected.size })}
             </button>
           ) : null}
         </div>

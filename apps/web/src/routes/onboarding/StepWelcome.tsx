@@ -15,74 +15,20 @@ export function StepWelcome() {
     <div className="space-y-5">
       <div>
         <h2 className="text-brand-navy text-2xl font-bold tracking-tight sm:text-3xl">
-          {t('onboarding.welcome.title', {
-            defaultValue: 'Привет, ты сделал важный выбор 👋',
-          })}
+          {t('onboarding.welcome.title')}
         </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {t('onboarding.welcome.subtitle_v2', {
-            defaultValue: 'Что Finkley сделает за тебя:',
-          })}
-        </p>
+        <p className="text-muted-foreground mt-2 text-sm">{t('onboarding.welcome.subtitle_v2')}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Pill
-          icon={Zap}
-          tone="teal"
-          text={t('onboarding.welcome.p1', {
-            defaultValue: 'Всё в одном — конец рутине',
-          })}
-        />
-        <Pill
-          icon={Lock}
-          tone="navy"
-          text={t('onboarding.welcome.p2', {
-            defaultValue: 'Данные зашифрованы',
-          })}
-        />
-        <Pill
-          icon={Banknote}
-          tone="sage"
-          text={t('onboarding.welcome.p3', {
-            defaultValue: 'Банк → расходы сами',
-          })}
-        />
-        <Pill
-          icon={TrendingUp}
-          tone="gold"
-          text={t('onboarding.welcome.p4', {
-            defaultValue: 'Реальная прибыль live',
-          })}
-        />
-        <Pill
-          icon={MessageSquare}
-          tone="teal"
-          text={t('onboarding.welcome.p5', {
-            defaultValue: 'Все сообщения вместе',
-          })}
-        />
-        <Pill
-          icon={Target}
-          tone="navy"
-          text={t('onboarding.welcome.p6', {
-            defaultValue: 'Анализ конкурентов',
-          })}
-        />
-        <Pill
-          icon={Star}
-          tone="gold"
-          text={t('onboarding.welcome.p7', {
-            defaultValue: '5★ → Google, 1-4 → тебе',
-          })}
-        />
-        <Pill
-          icon={Brain}
-          tone="sage"
-          text={t('onboarding.welcome.p8', {
-            defaultValue: 'AI-помощник в курсе',
-          })}
-        />
+        <Pill icon={Zap} tone="teal" text={t('onboarding.welcome.p1')} />
+        <Pill icon={Lock} tone="navy" text={t('onboarding.welcome.p2')} />
+        <Pill icon={Banknote} tone="sage" text={t('onboarding.welcome.p3')} />
+        <Pill icon={TrendingUp} tone="gold" text={t('onboarding.welcome.p4')} />
+        <Pill icon={MessageSquare} tone="teal" text={t('onboarding.welcome.p5')} />
+        <Pill icon={Target} tone="navy" text={t('onboarding.welcome.p6')} />
+        <Pill icon={Star} tone="gold" text={t('onboarding.welcome.p7')} />
+        <Pill icon={Brain} tone="sage" text={t('onboarding.welcome.p8')} />
       </div>
     </div>
   )

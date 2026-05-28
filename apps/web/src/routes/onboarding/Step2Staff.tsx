@@ -64,7 +64,7 @@ export function Step2Staff({ value, onChange }: Props) {
   return (
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-        {t('onboarding.step2.title', { defaultValue: 'Твоя команда' })}
+        {t('onboarding.step2.title')}
       </h1>
 
       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -95,9 +95,7 @@ export function Step2Staff({ value, onChange }: Props) {
               </div>
               <div className="mt-3 flex flex-col gap-2">
                 <Input
-                  placeholder={t('onboarding.step2.name_placeholder', {
-                    defaultValue: 'Имя и фамилия',
-                  })}
+                  placeholder={t('onboarding.step2.name_placeholder')}
                   value={staff.full_name}
                   onChange={(e) => update(staff.id, { full_name: e.target.value })}
                 />
@@ -131,7 +129,7 @@ export function Step2Staff({ value, onChange }: Props) {
                 </div>
                 <div>
                   <Label htmlFor={`p-${staff.id}`} className="mb-1 block text-xs">
-                    {t('onboarding.step2.percent_label', { defaultValue: 'Процент от выручки' })}
+                    {t('onboarding.step2.percent_label')}
                   </Label>
                   <div className="border-brand-yellow-deep bg-brand-yellow flex items-center gap-2 rounded-md border-[1.5px] px-3 py-1.5">
                     <input
@@ -152,13 +150,7 @@ export function Step2Staff({ value, onChange }: Props) {
                     staff.invite && 'border-brand-teal-deep bg-brand-teal-soft/40',
                     !staff.email && 'cursor-not-allowed opacity-50',
                   )}
-                  title={
-                    !staff.email
-                      ? t('onboarding.step2.invite_need_email', {
-                          defaultValue: 'Укажи email чтобы пригласить',
-                        })
-                      : undefined
-                  }
+                  title={!staff.email ? t('onboarding.step2.invite_need_email') : undefined}
                 >
                   <input
                     type="checkbox"
@@ -168,11 +160,7 @@ export function Step2Staff({ value, onChange }: Props) {
                     className="accent-brand-teal-deep size-4 cursor-pointer disabled:cursor-not-allowed"
                   />
                   <Send className="text-brand-teal-deep size-3.5" strokeWidth={2} />
-                  <span>
-                    {t('onboarding.step2.invite_label', {
-                      defaultValue: 'Пригласить в портал после создания',
-                    })}
-                  </span>
+                  <span>{t('onboarding.step2.invite_label')}</span>
                 </label>
               </div>
             </div>
@@ -189,9 +177,7 @@ export function Step2Staff({ value, onChange }: Props) {
           <div className="border-brand-border-strong bg-card grid size-11 place-items-center rounded-full border-[1.5px]">
             <UserPlus className="size-[18px]" strokeWidth={1.7} />
           </div>
-          <span className="text-sm font-semibold">
-            {t('onboarding.step2.add', { defaultValue: 'Добавить мастера' })}
-          </span>
+          <span className="text-sm font-semibold">{t('onboarding.step2.add')}</span>
         </button>
       </div>
     </div>

@@ -81,33 +81,20 @@ export function StepAiSummary({
       <div>
         <h2 className="text-brand-navy inline-flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Brain className="text-brand-teal-deep size-6" strokeWidth={2} />
-          {t('onboarding.ai_summary.title', { defaultValue: 'Общий анализ от AI' })}
+          {t('onboarding.ai_summary.title')}
         </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {t('onboarding.ai_summary.subtitle', {
-            defaultValue: 'Что AI понял про твой салон и куда расти в первую очередь.',
-          })}
-        </p>
+        <p className="text-muted-foreground mt-1 text-sm">{t('onboarding.ai_summary.subtitle')}</p>
       </div>
 
       {summary.isLoading ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-3 rounded-xl border border-dashed p-4">
           <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
-          <p className="text-muted-foreground text-sm">
-            {t('onboarding.ai_summary.loading', {
-              defaultValue: 'AI собирает все данные и готовит разбор…',
-            })}
-          </p>
+          <p className="text-muted-foreground text-sm">{t('onboarding.ai_summary.loading')}</p>
         </div>
       ) : summary.isError ? (
         <div className="border-border bg-card flex items-start gap-3 rounded-xl border p-4">
           <Sparkles className="text-brand-teal-deep size-5" strokeWidth={2} />
-          <p className="text-foreground text-sm">
-            {t('onboarding.ai_summary.fallback', {
-              defaultValue:
-                'AI пока не смог собрать разбор — пройди онбординг до конца, и я приду с анализом на дашборде в течение 5 минут.',
-            })}
-          </p>
+          <p className="text-foreground text-sm">{t('onboarding.ai_summary.fallback')}</p>
         </div>
       ) : (
         <>
@@ -120,9 +107,7 @@ export function StepAiSummary({
           {summary.data?.advice && summary.data.advice.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p className="text-muted-foreground text-[10.5px] font-bold uppercase tracking-wider">
-                {t('onboarding.ai_summary.advice_header', {
-                  defaultValue: 'Советы по приоритету',
-                })}
+                {t('onboarding.ai_summary.advice_header')}
               </p>
               {summary.data.advice.map((a, i) => (
                 <AdviceCard key={i} advice={a} />

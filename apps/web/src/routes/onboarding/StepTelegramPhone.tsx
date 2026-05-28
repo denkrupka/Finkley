@@ -57,11 +57,7 @@ export function StepTelegramPhone({ value, onChange }: Props) {
         '_blank',
         'noopener,noreferrer',
       )
-      toast.info(
-        t('onboarding.tg_phone.code_hint', {
-          defaultValue: 'Жми «Start» в Telegram — статус обновится здесь автоматически',
-        }),
-      )
+      toast.info(t('onboarding.tg_phone.code_hint'))
       pollLinkStatus()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
@@ -79,11 +75,7 @@ export function StepTelegramPhone({ value, onChange }: Props) {
       if (data?.telegram_id) {
         window.clearInterval(id)
         setPolling(false)
-        toast.success(
-          t('onboarding.tg_phone.toast_linked', {
-            defaultValue: 'Telegram привязан! Утренний разбор уже в пути.',
-          }),
-        )
+        toast.success(t('onboarding.tg_phone.toast_linked'))
         onChange({ want_telegram: true })
         return
       }
@@ -91,12 +83,7 @@ export function StepTelegramPhone({ value, onChange }: Props) {
         // T136 — 60s → 120s. Часто юзер тыкает Start не сразу.
         window.clearInterval(id)
         setPolling(false)
-        toast.warning(
-          t('onboarding.tg_phone.poll_timeout', {
-            defaultValue:
-              'Не получилось подтвердить. Жми «Подключить» ещё раз и дойди до Start в Telegram.',
-          }),
-        )
+        toast.warning(t('onboarding.tg_phone.poll_timeout'))
       }
     }, 2000)
   }
@@ -105,15 +92,10 @@ export function StepTelegramPhone({ value, onChange }: Props) {
     <div className="space-y-4">
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         <Bell className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
-        {t('onboarding.tg_phone.title', { defaultValue: 'Как с тобой связываться?' })}
+        {t('onboarding.tg_phone.title')}
       </h1>
 
-      <Field
-        id="onb-phone"
-        label={t('onboarding.tg_phone.phone_label', {
-          defaultValue: 'Номер телефона (для SMS — по желанию)',
-        })}
-      >
+      <Field id="onb-phone" label={t('onboarding.tg_phone.phone_label')}>
         <div className="relative">
           <Phone
             className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
@@ -139,16 +121,12 @@ export function StepTelegramPhone({ value, onChange }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-foreground text-sm font-bold">
-              {t('onboarding.tg_phone.linked_title', {
-                defaultValue: 'Telegram подключён',
-              })}
+              {t('onboarding.tg_phone.linked_title')}
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs">
               {profile?.telegram_username
                 ? `@${profile.telegram_username}`
-                : t('onboarding.tg_phone.linked_no_username', {
-                    defaultValue: 'Получишь разбор каждое утро в 9:00',
-                  })}
+                : t('onboarding.tg_phone.linked_no_username')}
             </p>
           </div>
         </div>
@@ -162,14 +140,10 @@ export function StepTelegramPhone({ value, onChange }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-foreground text-sm font-bold">
-                {t('onboarding.tg_phone.tg_title', {
-                  defaultValue: 'Получать инсайты в Telegram',
-                })}
+                {t('onboarding.tg_phone.tg_title')}
               </p>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                {t('onboarding.tg_phone.tg_body_v2', {
-                  defaultValue: 'Каждое утро в 9:00 — краткий разбор от @finkley_tg_bot.',
-                })}
+                {t('onboarding.tg_phone.tg_body_v2')}
               </p>
             </div>
           </div>
@@ -186,13 +160,7 @@ export function StepTelegramPhone({ value, onChange }: Props) {
                 <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
               </svg>
             )}
-            {polling
-              ? t('onboarding.tg_phone.polling', {
-                  defaultValue: 'Жду подтверждения от бота…',
-                })
-              : t('onboarding.tg_phone.connect_now', {
-                  defaultValue: 'Подключить через @finkley_tg_bot',
-                })}
+            {polling ? t('onboarding.tg_phone.polling') : t('onboarding.tg_phone.connect_now')}
           </Button>
         </div>
       )}

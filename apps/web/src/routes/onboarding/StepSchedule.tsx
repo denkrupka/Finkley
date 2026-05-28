@@ -58,7 +58,7 @@ export function StepSchedule({ value, onChange }: Props) {
     <div>
       <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
         <Clock className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
-        {t('onboarding.schedule.title', { defaultValue: 'Рабочий график салона' })}
+        {t('onboarding.schedule.title')}
       </h1>
 
       <div className="mt-3 flex flex-col gap-1.5">
@@ -100,7 +100,7 @@ export function StepSchedule({ value, onChange }: Props) {
                 </>
               ) : (
                 <span className="text-muted-foreground flex-1 text-sm italic">
-                  {t('onboarding.schedule.closed', { defaultValue: 'Выходной' })}
+                  {t('onboarding.schedule.closed')}
                 </span>
               )}
             </div>
@@ -113,9 +113,7 @@ export function StepSchedule({ value, onChange }: Props) {
         onClick={applyToWeekdays}
         className="text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold"
       >
-        {t('onboarding.schedule.apply_weekdays', {
-          defaultValue: '← Скопировать понедельник на вт-пт',
-        })}
+        {t('onboarding.schedule.apply_weekdays')}
       </button>
     </div>
   )

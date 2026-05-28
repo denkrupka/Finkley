@@ -31,9 +31,33 @@ function storageKey(salonId: string): string {
 function readStorage(salonId: string): StorageShape {
   try {
     const raw = localStorage.getItem(storageKey(salonId))
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as StorageShape
-    return typeof parsed === 'object' && parsed !== null ? parsed : {}
+    if (raw) {
+      const parsed = JSON.parse(raw) as StorageShape
+      return typeof parsed === 'object' && parsed !== null ? parsed : {}
+    }
+    // T203 — backward-compat миграция: legacy keys
+    // finkley:onboarding:credentials:<salon> и finkley:onboarding:prompt:<salon>
+    // читаются и записываются в новый unified формат.
+    const legacyCreds = localStorage.getItem(`finkley:onboarding:credentials:${salonId}`)
+    const legacyPrompt = localStorage.getItem(`finkley:onboarding:prompt:${salonId}`)
+    if (!legacyCreds && !legacyPrompt) return {}
+    const migrated: StorageShape = {}
+    if (legacyCreds) {
+      try {
+        const c = JSON.parse(legacyCreds) as CredentialsBySalon
+        if (typeof c === 'object' && c !== null) migrated.credentials = c
+      } catch {
+        /* ignore malformed */
+      }
+    }
+    if (legacyPrompt) migrated.prompt = legacyPrompt
+    // Записываем в новый ключ и удаляем legacy.
+    if (Object.keys(migrated).length > 0) {
+      localStorage.setItem(storageKey(salonId), JSON.stringify(migrated))
+    }
+    localStorage.removeItem(`finkley:onboarding:credentials:${salonId}`)
+    localStorage.removeItem(`finkley:onboarding:prompt:${salonId}`)
+    return migrated
   } catch {
     return {}
   }
