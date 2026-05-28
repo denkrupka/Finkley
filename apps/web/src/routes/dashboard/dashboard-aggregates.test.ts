@@ -210,9 +210,7 @@ describe('computeRfm', () => {
   it('T92 fix: импортированный клиент со старым визитом — не Potential', () => {
     // Booksy импорт — клиенты с created_at=NOW но last_visit полгода назад.
     // Должны идти в Lost, не в Potential.
-    const clients = [
-      { visit_count: 2, last_visit_at: daysAgo(200), created_at: daysAgo(5) },
-    ]
+    const clients = [{ visit_count: 2, last_visit_at: daysAgo(200), created_at: daysAgo(5) }]
     const result = computeRfm(clients, NOW)
     const byKey = Object.fromEntries(result.map((s) => [s.key, s.count]))
     expect(byKey.potential).toBe(0)

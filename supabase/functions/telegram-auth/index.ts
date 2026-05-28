@@ -87,102 +87,102 @@ Deno.serve(
     if (req.method === 'OPTIONS') return preflight()
     if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-  if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    return jsonResponse({ error: 'function_not_configured' }, 500)
-  }
+    if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
-  let payload: TelegramPayload
-  try {
-    payload = (await req.json()) as TelegramPayload
-  } catch {
-    return jsonResponse({ error: 'invalid_json' }, 400)
-  }
+    let payload: TelegramPayload
+    try {
+      payload = (await req.json()) as TelegramPayload
+    } catch {
+      return jsonResponse({ error: 'invalid_json' }, 400)
+    }
 
-  // 1. Валидация HMAC
-  const valid = await verifyTelegramSignature(payload)
-  if (!valid) return jsonResponse({ error: 'invalid_signature' }, 401)
+    // 1. Валидация HMAC
+    const valid = await verifyTelegramSignature(payload)
+    if (!valid) return jsonResponse({ error: 'invalid_signature' }, 401)
 
-  // 2. Защита от replay — auth_date не старше 5 минут
-  const ageSec = Math.floor(Date.now() / 1000) - Number(payload.auth_date)
-  if (Number.isNaN(ageSec) || ageSec > 300 || ageSec < -60) {
-    return jsonResponse({ error: 'stale_auth_date', age_sec: ageSec }, 401)
-  }
+    // 2. Защита от replay — auth_date не старше 5 минут
+    const ageSec = Math.floor(Date.now() / 1000) - Number(payload.auth_date)
+    if (Number.isNaN(ageSec) || ageSec > 300 || ageSec < -60) {
+      return jsonResponse({ error: 'stale_auth_date', age_sec: ageSec }, 401)
+    }
 
-  const tgId = Number(payload.id)
-  const fakeEmail = `tg_${tgId}@telegram.finkley.app`
-  const fullName = [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
+    const tgId = Number(payload.id)
+    const fakeEmail = `tg_${tgId}@telegram.finkley.app`
+    const fullName = [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  // 3. Существует ли уже пользователь с этим telegram_id?
-  const { data: existing, error: lookupErr } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('telegram_id', tgId)
-    .maybeSingle()
-  if (lookupErr) {
-    console.error('profiles lookup failed', lookupErr)
-    return jsonResponse({ error: 'lookup_failed' }, 500)
-  }
-
-  let userId: string
-  if (existing) {
-    userId = existing.id
-  } else {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email: fakeEmail,
-      email_confirm: true,
-      user_metadata: { full_name: fullName, telegram_username: payload.username ?? null },
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
     })
-    if (createErr || !created.user) {
-      console.error('createUser failed', createErr)
-      return jsonResponse({ error: 'create_user_failed' }, 500)
-    }
-    userId = created.user.id
 
-    // handle_new_user-триггер уже создал profile; обновляем telegram_id и имя
-    const { error: updErr } = await admin
+    // 3. Существует ли уже пользователь с этим telegram_id?
+    const { data: existing, error: lookupErr } = await admin
       .from('profiles')
-      .update({
-        telegram_id: tgId,
-        full_name: fullName || null,
-        avatar_url: payload.photo_url ?? null,
-      })
-      .eq('id', userId)
-    if (updErr) {
-      console.error('profile update failed', updErr)
-      // не фейлим — юзер создан, профиль можно дозаполнить позже
+      .select('id')
+      .eq('telegram_id', tgId)
+      .maybeSingle()
+    if (lookupErr) {
+      console.error('profiles lookup failed', lookupErr)
+      return jsonResponse({ error: 'lookup_failed' }, 500)
     }
-  }
 
-  // 4. Получаем валидную пару tokens. `generateLink` с типом `magiclink`
-  //    возвращает hashed_token (одноразовый), который мы здесь же verify'ем
-  //    через `verifyOtp`, чтобы получить session.
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: fakeEmail,
-  })
-  if (linkErr || !link?.properties?.hashed_token) {
-    console.error('generateLink failed', linkErr)
-    return jsonResponse({ error: 'generate_link_failed' }, 500)
-  }
+    let userId: string
+    if (existing) {
+      userId = existing.id
+    } else {
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email: fakeEmail,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, telegram_username: payload.username ?? null },
+      })
+      if (createErr || !created.user) {
+        console.error('createUser failed', createErr)
+        return jsonResponse({ error: 'create_user_failed' }, 500)
+      }
+      userId = created.user.id
 
-  const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
-    type: 'magiclink',
-    token_hash: link.properties.hashed_token,
-  })
-  if (verifyErr || !verified.session) {
-    console.error('verifyOtp failed', verifyErr)
-    return jsonResponse({ error: 'verify_otp_failed' }, 500)
-  }
+      // handle_new_user-триггер уже создал profile; обновляем telegram_id и имя
+      const { error: updErr } = await admin
+        .from('profiles')
+        .update({
+          telegram_id: tgId,
+          full_name: fullName || null,
+          avatar_url: payload.photo_url ?? null,
+        })
+        .eq('id', userId)
+      if (updErr) {
+        console.error('profile update failed', updErr)
+        // не фейлим — юзер создан, профиль можно дозаполнить позже
+      }
+    }
 
-  return jsonResponse({
-    access_token: verified.session.access_token,
-    refresh_token: verified.session.refresh_token,
-    expires_at: verified.session.expires_at,
-    user_id: userId,
-  })
+    // 4. Получаем валидную пару tokens. `generateLink` с типом `magiclink`
+    //    возвращает hashed_token (одноразовый), который мы здесь же verify'ем
+    //    через `verifyOtp`, чтобы получить session.
+    const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: fakeEmail,
+    })
+    if (linkErr || !link?.properties?.hashed_token) {
+      console.error('generateLink failed', linkErr)
+      return jsonResponse({ error: 'generate_link_failed' }, 500)
+    }
+
+    const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
+      type: 'magiclink',
+      token_hash: link.properties.hashed_token,
+    })
+    if (verifyErr || !verified.session) {
+      console.error('verifyOtp failed', verifyErr)
+      return jsonResponse({ error: 'verify_otp_failed' }, 500)
+    }
+
+    return jsonResponse({
+      access_token: verified.session.access_token,
+      refresh_token: verified.session.refresh_token,
+      expires_at: verified.session.expires_at,
+      user_id: userId,
+    })
   }),
 )

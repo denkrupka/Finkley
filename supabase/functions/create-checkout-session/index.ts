@@ -38,62 +38,63 @@ function jsonResponse(body: unknown, status = 200) {
 
 Deno.serve(
   withSentry('create-checkout-session', async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-  if (!STRIPE_KEY || !STRIPE_PRICE_ID || !SUPABASE_URL || !SERVICE_ROLE) {
-    return jsonResponse({ error: 'function_not_configured' }, 500)
-  }
+    if (!STRIPE_KEY || !STRIPE_PRICE_ID || !SUPABASE_URL || !SERVICE_ROLE) {
+      return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
-  const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
-  if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
+    const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
 
-  let body: { salonId?: string }
-  try {
-    body = await req.json()
-  } catch {
-    return jsonResponse({ error: 'invalid_json' }, 400)
-  }
-  const salonId = body.salonId
-  if (!salonId) return jsonResponse({ error: 'salon_id_required' }, 400)
+    let body: { salonId?: string }
+    try {
+      body = await req.json()
+    } catch {
+      return jsonResponse({ error: 'invalid_json' }, 400)
+    }
+    const salonId = body.salonId
+    if (!salonId) return jsonResponse({ error: 'salon_id_required' }, 400)
 
-  // Только owner может оформлять подписку
-  const membership = await getSalonMembership(SUPABASE_URL, SERVICE_ROLE, user.userId, salonId)
-  if (!membership || membership.role !== 'owner') {
-    return jsonResponse({ error: 'forbidden' }, 403)
-  }
+    // Только owner может оформлять подписку
+    const membership = await getSalonMembership(SUPABASE_URL, SERVICE_ROLE, user.userId, salonId)
+    if (!membership || membership.role !== 'owner') {
+      return jsonResponse({ error: 'forbidden' }, 403)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-
-  // Email для передачи в Stripe — берём из auth.users
-  const { data: userData } = await admin.auth.admin.getUserById(user.userId)
-  const email = userData.user?.email ?? ''
-
-  // Если у салона уже есть stripe_customer_id — переиспользуем
-  const { data: existingSub } = await admin
-    .from('salon_subscriptions')
-    .select('stripe_customer_id')
-    .eq('salon_id', salonId)
-    .maybeSingle()
-
-  try {
-    const session = await createCheckoutSession(STRIPE_KEY, {
-      price: STRIPE_PRICE_ID,
-      customerEmail: email,
-      salonId,
-      successUrl: `${APP_URL}${salonId}/settings?stripe=success`,
-      cancelUrl: `${APP_URL}${salonId}/settings?stripe=cancel`,
-      trialDays: 14,
-      customerId: existingSub?.stripe_customer_id ?? null,
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      auth: { persistSession: false, autoRefreshToken: false },
     })
-    return jsonResponse({ url: session.url })
-  } catch (err) {
-    console.error('checkout session failed', err)
-    return jsonResponse(
-      { error: 'stripe_error', message: err instanceof Error ? err.message : String(err) },
-      500,
-    )
-  }
-})
+
+    // Email для передачи в Stripe — берём из auth.users
+    const { data: userData } = await admin.auth.admin.getUserById(user.userId)
+    const email = userData.user?.email ?? ''
+
+    // Если у салона уже есть stripe_customer_id — переиспользуем
+    const { data: existingSub } = await admin
+      .from('salon_subscriptions')
+      .select('stripe_customer_id')
+      .eq('salon_id', salonId)
+      .maybeSingle()
+
+    try {
+      const session = await createCheckoutSession(STRIPE_KEY, {
+        price: STRIPE_PRICE_ID,
+        customerEmail: email,
+        salonId,
+        successUrl: `${APP_URL}${salonId}/settings?stripe=success`,
+        cancelUrl: `${APP_URL}${salonId}/settings?stripe=cancel`,
+        trialDays: 14,
+        customerId: existingSub?.stripe_customer_id ?? null,
+      })
+      return jsonResponse({ url: session.url })
+    } catch (err) {
+      console.error('checkout session failed', err)
+      return jsonResponse(
+        { error: 'stripe_error', message: err instanceof Error ? err.message : String(err) },
+        500,
+      )
+    }
+  }),
+)
