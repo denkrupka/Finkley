@@ -1248,38 +1248,8 @@ export function ExpenseFormModal({
                 )}
               />
 
-              <Controller
-                name="payroll_kind"
-                control={form.control}
-                render={({ field }) => (
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs">{t('expenses.form.payroll_kind')}</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['advance', 'final'] as const).map((kind) => {
-                        const active = field.value === kind
-                        return (
-                          <button
-                            key={kind}
-                            type="button"
-                            onClick={() => field.onChange(active ? '' : kind)}
-                            className={`flex h-10 items-center justify-center rounded-md border-[1.5px] text-sm font-semibold transition-colors ${
-                              active
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-card hover:bg-muted/40'
-                            }`}
-                          >
-                            {t(`expenses.form.payroll_kind_${kind}`)}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              />
-
-              {/* Image #55: владелец просит один селектор месяца вместо
-                  даты-с/даты-по. В БД храним полный диапазон (первое и
-                  последнее число месяца), а в UI — единый <input type="month">. */}
+              {/* T116 — порядок Мастер → Период → Расчёт (kind).
+                  Месяц идёт сразу после мастера. */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t('expenses.form.payroll_month')}</Label>
                 <Input
@@ -1304,6 +1274,39 @@ export function ExpenseFormModal({
                   }}
                 />
               </div>
+
+              <Controller
+                name="payroll_kind"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">
+                      {t('expenses.form.payroll_kind_v2', {
+                        defaultValue: 'Расчёт',
+                      })}
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['advance', 'final'] as const).map((kind) => {
+                        const active = field.value === kind
+                        return (
+                          <button
+                            key={kind}
+                            type="button"
+                            onClick={() => field.onChange(active ? '' : kind)}
+                            className={`flex h-10 items-center justify-center rounded-md border-[1.5px] text-sm font-semibold transition-colors ${
+                              active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-border bg-card hover:bg-muted/40'
+                            }`}
+                          >
+                            {t(`expenses.form.payroll_kind_${kind}`)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              />
             </div>
           ) : null}
 
