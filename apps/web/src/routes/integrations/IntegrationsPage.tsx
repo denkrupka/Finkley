@@ -18,8 +18,6 @@ import { toast } from 'sonner'
 
 import { useQueryClient } from '@tanstack/react-query'
 
-import { CalendarFeedCard } from '@/routes/settings/CalendarFeedCard'
-
 import {
   BOOKSY_SYNC_INTERVAL_OPTIONS,
   useAccountingSync,
@@ -200,11 +198,6 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
               onConnect={() => handleConnect(p)}
             />
           ))}
-          {activeCategory === 'booking' ? (
-            <div className="sm:col-span-2">
-              <CalendarFeedCard />
-            </div>
-          ) : null}
         </div>
       )}
 

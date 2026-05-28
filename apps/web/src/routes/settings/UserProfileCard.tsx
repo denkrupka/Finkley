@@ -1,6 +1,7 @@
 import { Loader2, Lock, Upload, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { useChangeMyPassword, useMyProfile, useUpdateMyProfile } from '@/hooks/useMyProfile'
+import { useSalonMembership } from '@/hooks/useSalons'
 import { supabase } from '@/lib/supabase/client'
+
+import { CalendarFeedCard } from './CalendarFeedCard'
 
 /**
  * Блок «Профиль пользователя» внутри /settings → Профиль. Юзер может:
@@ -24,7 +28,9 @@ import { supabase } from '@/lib/supabase/client'
 export function UserProfileCard() {
   const { t } = useTranslation()
   const { user } = useAuth()
+  const { salonId } = useParams<{ salonId: string }>()
   const { data: profile, isLoading } = useMyProfile()
+  const { data: membership } = useSalonMembership(salonId)
   const update = useUpdateMyProfile()
   const changePassword = useChangeMyPassword()
 
@@ -249,6 +255,16 @@ export function UserProfileCard() {
         onCancel={() => setCropFile(null)}
         onCrop={handleCroppedAvatar}
       />
+
+      {/* iCal-фид — только для мастеров (membership.staff_id != null).
+          Каждый мастер подписывается на ленту своих визитов в Google/Apple/
+          Outlook. Не-мастерам (бухгалтер/админ без staff_id/внешний) блок не
+          показываем — им свой календарь визитов не нужен. */}
+      {membership?.staff_id ? (
+        <div className="border-border border-t pt-4">
+          <CalendarFeedCard />
+        </div>
+      ) : null}
     </div>
   )
 }

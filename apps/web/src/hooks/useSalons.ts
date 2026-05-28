@@ -107,7 +107,11 @@ export function useMySalons() {
  * NULL = preset по роли (см. PermissionsBlock.presetForRole).
  */
 export function useSalonMembership(salonId: string | undefined) {
-  return useQuery<{ role: string; permissions: Record<string, 'view' | 'edit'> | null } | null>({
+  return useQuery<{
+    role: string
+    permissions: Record<string, 'view' | 'edit'> | null
+    staff_id: string | null
+  } | null>({
     queryKey: ['salon-membership', salonId],
     queryFn: async () => {
       if (!salonId) return null
@@ -120,7 +124,7 @@ export function useSalonMembership(salonId: string | undefined) {
       if (!userId) return null
       const { data, error } = await supabase
         .from('salon_members')
-        .select('role, permissions')
+        .select('role, permissions, staff_id')
         .eq('salon_id', salonId)
         .eq('user_id', userId)
         .maybeSingle()
@@ -129,6 +133,7 @@ export function useSalonMembership(salonId: string | undefined) {
         (data as {
           role: string
           permissions: Record<string, 'view' | 'edit'> | null
+          staff_id: string | null
         } | null) ?? null
       )
     },
