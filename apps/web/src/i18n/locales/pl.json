@@ -1944,6 +1944,21 @@
       "full_page_hint": "Potrzebujesz pełnego ekranu?",
       "full_page_link": "Otwórz stronę pomocy →"
     },
+    "user_profile": {
+      "title": "Profil użytkownika",
+      "name_label": "Imię i nazwisko",
+      "phone_label": "Numer telefonu",
+      "email_hint": "Zmianę email obsługuje wsparcie",
+      "upload_avatar": "Wgraj awatar",
+      "avatar_too_large": "Maks. 5 MB",
+      "password_title": "Zmień hasło",
+      "new_password_label": "Nowe hasło",
+      "password_too_short": "Minimum 8 znaków",
+      "change_password": "Zmień hasło",
+      "toast_saved": "Profil zaktualizowany",
+      "toast_avatar_updated": "Awatar zaktualizowany",
+      "toast_password_changed": "Hasło zmienione"
+    },
     "cash_discipline": {
       "title": "Dyscyplina kasowa",
       "description": "Dzień kasowy — każdy kasjer wprowadza faktyczną kwotę gotówki na początek zmiany, na koniec dnia robi uzgodnienie: ile powinno być i ile rzeczywiście jest. Chroni przed sytuacjami 'przyjąłem płatność, ale zapomniałem zapisać' i pomaga znajdować niedobory. Gdy włączone — w Finanse pojawia się osobna zakładka 'Kasa', a rozliczenie wizyty lub dodanie wydatku wymaga otwartej zmiany.",

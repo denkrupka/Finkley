@@ -2564,6 +2564,21 @@
       "full_page_hint": "Нужен полный экран?",
       "full_page_link": "Открыть страницу справки →"
     },
+    "user_profile": {
+      "title": "Профиль пользователя",
+      "name_label": "Имя и фамилия",
+      "phone_label": "Номер телефона",
+      "email_hint": "Изменить email можно через поддержку",
+      "upload_avatar": "Загрузить аватар",
+      "avatar_too_large": "Макс. 5 МБ",
+      "password_title": "Сменить пароль",
+      "new_password_label": "Новый пароль",
+      "password_too_short": "Минимум 8 символов",
+      "change_password": "Изменить пароль",
+      "toast_saved": "Профиль обновлён",
+      "toast_avatar_updated": "Аватар обновлён",
+      "toast_password_changed": "Пароль изменён"
+    },
     "profile": {
       "title": "Профиль салона",
       "name_label": "Имя салона",

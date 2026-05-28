@@ -1944,6 +1944,21 @@
       "full_page_hint": "Need full screen?",
       "full_page_link": "Open help page →"
     },
+    "user_profile": {
+      "title": "User profile",
+      "name_label": "First and last name",
+      "phone_label": "Phone number",
+      "email_hint": "Email change goes through support",
+      "upload_avatar": "Upload avatar",
+      "avatar_too_large": "Max 5 MB",
+      "password_title": "Change password",
+      "new_password_label": "New password",
+      "password_too_short": "Minimum 8 characters",
+      "change_password": "Change password",
+      "toast_saved": "Profile updated",
+      "toast_avatar_updated": "Avatar updated",
+      "toast_password_changed": "Password changed"
+    },
     "cash_discipline": {
       "title": "Cash discipline",
       "description": "Cash day — each cashier enters actual cash at start of shift, at end of day does reconciliation: how much should be and how much really is. Protects against 'took payment but forgot to record' situations and helps find shortfalls. When enabled — Finance gets a separate 'Cash' tab, and charging visit or adding expense requires an open shift.",
