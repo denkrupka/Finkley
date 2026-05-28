@@ -90,11 +90,14 @@ export function PayoutsPage() {
       </div>
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        <div className="text-muted-foreground grid min-w-[860px] grid-cols-[1.4fr_1.2fr_0.9fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
+        <div className="text-muted-foreground grid min-w-[960px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
           <div>{t('payouts.col.staff')}</div>
           <div>{t('payouts.col.scheme')}</div>
           <div className="text-right">{t('payouts.col.revenue')}</div>
           <div className="text-right">{t('payouts.col.tips')}</div>
+          <div className="text-right">
+            {t('payouts.col.premium', { defaultValue: 'Премия' })}
+          </div>
           <div className="text-right">{t('payouts.col.payout')}</div>
           <div className="text-right">{t('payouts.col.advances')}</div>
           <div className="text-right">{t('payouts.col.remaining')}</div>
@@ -107,12 +110,18 @@ export function PayoutsPage() {
           ) : (
             rows.map((r) => {
               const advance = advancesByStaff.get(r.staff_id) ?? 0
-              const remaining = r.payout_cents - advance
+              // T117: Премия — отдельная сущность (expense с category=ЗП и
+              // sub=premium). Сейчас источника данных нет (T116 закроет:
+              // ExpenseFormModal позволит указать premium для типа ЗП).
+              // Заглушка = 0; Начислено = payout + premium учитывает 0.
+              const premiumCents = 0
+              const accruedCents = r.payout_cents + premiumCents
+              const remaining = accruedCents - advance
               return (
                 <div
                   key={r.staff_id}
                   onClick={() => setStaffModal({ id: r.staff_id, name: r.full_name })}
-                  className="hover:bg-muted/30 grid min-w-[860px] cursor-pointer grid-cols-[1.4fr_1.2fr_0.9fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 transition-colors sm:px-5"
+                  className="hover:bg-muted/30 grid min-w-[960px] cursor-pointer grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 transition-colors sm:px-5"
                   title={t('payouts.row_click_hint', {
                     defaultValue: 'Открыть детализацию визитов',
                   })}
@@ -130,10 +139,13 @@ export function PayoutsPage() {
                   <div className="num text-brand-gold-deep text-right text-sm">
                     {r.tips_cents > 0 ? formatCurrency(r.tips_cents, currency) : '—'}
                   </div>
+                  <div className="num text-right text-sm text-emerald-700">
+                    {premiumCents > 0 ? `+${formatCurrency(premiumCents, currency)}` : '—'}
+                  </div>
                   <div
-                    className={`num text-right text-sm font-bold ${r.payout_cents < 0 ? 'text-destructive' : 'text-brand-navy'}`}
+                    className={`num text-right text-sm font-bold ${accruedCents < 0 ? 'text-destructive' : 'text-brand-navy'}`}
                   >
-                    {formatCurrency(r.payout_cents, currency)}
+                    {formatCurrency(accruedCents, currency)}
                   </div>
                   <div className="num text-right text-sm text-amber-700">
                     {advance > 0 ? `−${formatCurrency(advance, currency)}` : '—'}
