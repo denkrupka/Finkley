@@ -29,8 +29,13 @@ type Step = {
   ctaPath?: (salonId: string) => string
   /** T45 — CSS-селектор элемента для spotlight'а. Если задан — overlay
    *  оставляет вокруг него прозрачный «вырез» и показывает tooltip рядом.
-   *  Если элемент не найден на DOM — fallback на центрированную модалку. */
+   *  Если элемент не найден на DOM — fallback на верхнюю четверть. */
   target?: string
+  /** T127 — путь куда автонавигировать ПЕРЕД measure'ом target. Если
+   *  target живёт на другой странице, юзер увидит как тур сам переходит
+   *  туда + spotlight подсвечивает нужный элемент.
+   *  Релативный путь без salonId, salonId подставляется автоматом. */
+  navigatePath?: string
   /** Какие роли видят этот шаг. По умолчанию — все. */
   roles?: Array<'owner' | 'admin' | 'staff' | 'accountant'>
 }
@@ -41,6 +46,9 @@ const STEPS: Step[] = [
     icon: Sparkles,
     titleKey: 'tour.steps.welcome.title',
     bodyKey: 'tour.steps.welcome.body',
+    // T127 — фокус на логотипе/sidebar чтобы spotlight был и на welcome'е.
+    target: '[data-tour="sidebar"]',
+    navigatePath: '/dashboard',
   },
   {
     id: 'nav',
@@ -48,6 +56,7 @@ const STEPS: Step[] = [
     titleKey: 'tour.steps.nav.title',
     bodyKey: 'tour.steps.nav.body',
     target: '[data-tour="sidebar"]',
+    navigatePath: '/dashboard',
   },
   {
     id: 'visit',
@@ -57,6 +66,7 @@ const STEPS: Step[] = [
     ctaKey: 'tour.steps.visit.cta',
     ctaPath: (id) => `/${id}/income?tab=visits`,
     target: '[data-tour="fab-add"]',
+    navigatePath: '/income?tab=visits',
   },
   {
     id: 'expense',
@@ -65,6 +75,8 @@ const STEPS: Step[] = [
     bodyKey: 'tour.steps.expense.body',
     ctaKey: 'tour.steps.expense.cta',
     ctaPath: (id) => `/${id}/expenses`,
+    target: '[data-tour-nav="expenses"]',
+    navigatePath: '/expenses',
     roles: ['owner', 'admin', 'accountant'],
   },
   {
@@ -72,6 +84,8 @@ const STEPS: Step[] = [
     icon: Banknote,
     titleKey: 'tour.steps.retail.title',
     bodyKey: 'tour.steps.retail.body',
+    target: '[data-tour-nav="income"]',
+    navigatePath: '/income?tab=sales',
     roles: ['owner', 'admin'],
   },
   {
@@ -79,6 +93,8 @@ const STEPS: Step[] = [
     icon: Calendar,
     titleKey: 'tour.steps.calendar.title',
     bodyKey: 'tour.steps.calendar.body',
+    target: '[data-tour-nav="reports"]',
+    navigatePath: '/reports',
   },
   {
     id: 'notifications',
@@ -94,6 +110,8 @@ const STEPS: Step[] = [
     bodyKey: 'tour.steps.integrations.body',
     ctaKey: 'tour.steps.integrations.cta',
     ctaPath: (id) => `/${id}/settings?tab=integrations`,
+    target: '[data-tour-nav="settings"]',
+    navigatePath: '/settings?tab=integrations',
     roles: ['owner', 'admin'],
   },
   {
@@ -103,6 +121,8 @@ const STEPS: Step[] = [
     bodyKey: 'tour.steps.team.body',
     ctaKey: 'tour.steps.team.cta',
     ctaPath: (id) => `/${id}/settings/team`,
+    target: '[data-tour-nav="settings"]',
+    navigatePath: '/settings?tab=team',
     roles: ['owner'],
   },
 ]
@@ -153,11 +173,24 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
     setOpen(false)
   }
 
-  if (!open) return null
-
   const step = steps[Math.min(stepIndex, steps.length - 1)]!
   const isLast = stepIndex >= steps.length - 1
   const isFirst = stepIndex === 0
+
+  // T127 — auto-navigate перед measure target. Каждый шаг может иметь
+  // navigatePath; если он отличается от текущего pathname — навигируем
+  // туда. useTargetRect перемеряет каждые 800ms и сам поймает элемент
+  // после нового рендера страницы.
+  useEffect(() => {
+    if (!open || !step.navigatePath) return
+    const full = `/${salonId}${step.navigatePath}`
+    const current = window.location.pathname + window.location.search
+    const fullPath = full.split('?')[0]!
+    if (current.startsWith(fullPath)) return
+    navigate(full)
+  }, [open, stepIndex, step.navigatePath, salonId, navigate])
+
+  if (!open) return null
 
   function next() {
     if (isLast) dismiss()
@@ -287,15 +320,16 @@ function TourRenderer({
         <div className="pointer-events-none absolute inset-0 bg-black/15" />
       )}
 
-      {/* Tooltip / Modal — позиционируется относительно target либо в правом
-          нижнем углу как «всплывашка». */}
+      {/* Tooltip / Modal — позиционируется относительно target либо в верхней
+          четверти экрана как floating-card (раньше был центр — перекрывал
+          важные UI элементы, FAB и т.д.). */}
       <div
         className={cn(
           'bg-card shadow-finxl pointer-events-auto absolute rounded-xl p-5 sm:p-6',
-          // На шагах с spotlight — узкая подсказка (420px), на шагах без —
-          // тоже узкая, но прижата к правому нижнему углу.
-          hasSpotlight ? 'w-[min(420px,92vw)]' : 'w-[min(380px,92vw)]',
-          !hasSpotlight && 'bottom-6 right-6',
+          hasSpotlight ? 'w-[min(420px,92vw)]' : 'w-[min(420px,92vw)]',
+          // T126: fallback позиционирование — top-[12%], центр по X. Это
+          // не перекрывает ни FAB (правый низ), ни sidebar (левый край).
+          !hasSpotlight && 'left-1/2 top-[12%] -translate-x-1/2',
         )}
         style={
           hasSpotlight

@@ -97,6 +97,7 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
               to={`/${salonId}/${item.id}`}
               onClick={onNavigate}
               title={collapsed ? t(item.i18nKey) : undefined}
+              data-tour-nav={item.id}
               className={({ isActive }) =>
                 cn(
                   'flex items-center rounded-md text-sm transition-colors',
