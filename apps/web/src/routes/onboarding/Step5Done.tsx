@@ -52,11 +52,11 @@ export function Step5Done({
   onBenchmarksToggle,
   selectedIntegrations,
   onIntegrationsToggle,
-  subscribeAfterSubmit,
-  onSubscribeToggle,
   path,
   onSwitchToFull,
 }: Props) {
+  // T145 — paywall убран, но props subscribeAfterSubmit/onSubscribeToggle
+  // оставлены в Props для backward-compat (OnboardingPage всё ещё их передаёт).
   const { t } = useTranslation()
 
   function toggleIntegration(id: OnboardingIntegration) {
@@ -75,20 +75,10 @@ export function Step5Done({
       <h1 className="text-brand-navy mt-6 text-3xl font-extrabold tracking-tight">
         {t('onboarding.step5.title', { name: summary.salonName.trim() || '...' })}
       </h1>
-      <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">
-        {t('onboarding.step5.subtitle')}
-      </p>
 
-      <ul className="mx-auto mt-8 grid max-w-md grid-cols-2 gap-4 sm:grid-cols-3">
-        <Card label={t('onboarding.step5.staff')} value={summary.staffCount} />
-        <Card label={t('onboarding.step5.services')} value={summary.servicesCount} />
-        <Card label={t('onboarding.step5.expenses')} value={summary.expensesCount} />
-      </ul>
-
-      {/* T105 — кнопка «Продолжить полным setup» — только в quick-ветке.
-          Переключает на full и шагает на schedule (первый full-only шаг).
-          Уже сделанные шаги (welcome, path, profile, salon, интеграции,
-          tg_phone, wow) пропускаются автоматически. */}
+      {/* T145 — убраны: subtitle про "Дашборд на месте/пустой/добавь визит",
+          плитки счётчиков (мастеров/услуг/категорий), блок paywall с trial.
+          Подписка теперь активируется автоматически в Settings → Биллинг. */}
       {path === 'quick' && onSwitchToFull ? (
         <button
           type="button"
@@ -98,38 +88,11 @@ export function Step5Done({
           <Sparkles className="size-4" strokeWidth={2} />
           {t('onboarding.step5.switch_to_full', {
             defaultValue:
-              'Хочу полный setup — лого, график, импорт мастеров и услуг, расходы, AI-разбор по 4 темам',
+              'Хочу полный setup — лого, график, импорт мастеров и услуг, расходы, AI-разбор',
           })}
           <ArrowRight className="size-4" strokeWidth={2.4} />
         </button>
       ) : null}
-
-      {/* Paywall: 14 дней trial, дальше платно. По умолчанию включено —
-          юзер увидит Stripe Checkout сразу после submit. Можно снять. */}
-      <div className="border-brand-gold-deep bg-brand-gold-soft/40 mx-auto mt-6 max-w-md rounded-xl border-2 p-5 text-left">
-        <div className="text-brand-navy flex items-start gap-3">
-          <div className="bg-brand-gold-deep grid size-10 shrink-0 place-items-center rounded-lg text-white">
-            <Sparkles className="size-5" strokeWidth={2} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold">{t('onboarding.step5.paywall_title')}</p>
-            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              {t('onboarding.step5.paywall_subtitle')}
-            </p>
-          </div>
-        </div>
-        <label className="border-border bg-card mt-3 flex cursor-pointer items-start gap-3 rounded-md border p-3">
-          <input
-            type="checkbox"
-            checked={subscribeAfterSubmit}
-            onChange={(e) => onSubscribeToggle(e.target.checked)}
-            className="mt-0.5 size-4 cursor-pointer"
-          />
-          <div className="text-foreground flex-1 text-[12.5px] leading-snug">
-            {t('onboarding.step5.paywall_optin')}
-          </div>
-        </label>
-      </div>
 
       {/* Бенчмарки opt-in — дружелюбный копирайт, по умолчанию включено */}
       <label
@@ -199,14 +162,5 @@ export function Step5Done({
         </div>
       </div>
     </div>
-  )
-}
-
-function Card({ label, value }: { label: string; value: number }) {
-  return (
-    <li className="border-border bg-card shadow-finsm rounded-lg border p-4 text-center">
-      <div className="num text-brand-navy text-2xl font-bold">{value}</div>
-      <div className="text-muted-foreground mt-1 text-xs">{label}</div>
-    </li>
   )
 }

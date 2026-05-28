@@ -24,7 +24,7 @@ import {
   type SalonTypeId,
 } from './onboarding-defaults'
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
-import { OcrNotebookButton, type ParsedVisit } from './OcrNotebookButton'
+import { type ParsedVisit } from './OcrNotebookButton'
 import { StepAiBreakdown } from './StepAiBreakdown'
 import { StepPublicLinks } from './StepPublicLinks'
 import { Step0Path, type OnboardingPath } from './Step0Path'
@@ -84,6 +84,7 @@ export type OnboardingIntegration =
   | 'banking'
   | 'instagram'
   | 'facebook'
+  | 'whatsapp'
   | 'telegram'
   | 'ical'
   | 'ocr_notebook'
@@ -711,56 +712,20 @@ export function OnboardingPage() {
                 title={t('onboarding.step_integrations.bookings_title', {
                   defaultValue: 'Запись и календари',
                 })}
-                emoji="📅"
-                extra={
-                  <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 rounded-lg border-2 border-dashed p-3.5">
-                    <p className="text-foreground mb-2 text-xs font-bold uppercase tracking-wider">
-                      {t('onboarding.ocr.section_title', {
-                        defaultValue: '📓 Или прямо сейчас — сфотографируй блокнот',
-                      })}
-                    </p>
-                    <p className="text-muted-foreground mb-3 text-xs leading-snug">
-                      {t('onboarding.ocr.section_body', {
-                        defaultValue:
-                          'AI распознаёт рукописные записи. Покажет тебе таблицу — отметишь какие визиты импортировать. Доступно сразу после создания салона на этом же шаге.',
-                      })}
-                    </p>
-                    <OcrNotebookButton
-                      salonId={null}
-                      onVisitsParsed={(v) => patch('ocr_visits', [...state.ocr_visits, ...v])}
-                    />
-                    {state.ocr_visits.length > 0 ? (
-                      <p className="text-brand-teal-deep mt-2 text-xs font-bold">
-                        ✓{' '}
-                        {t('onboarding.ocr.collected', {
-                          defaultValue: 'В очереди на импорт: {{count}} визитов',
-                          count: state.ocr_visits.length,
-                        })}
-                      </p>
-                    ) : null}
-                  </div>
-                }
                 items={[
                   {
                     id: 'booksy',
                     icon: PlugIconSvg,
                     title: 'Booksy',
                     benefit:
-                      'Все визиты, мастера и клиенты автоматом подтянутся в портал. Дальше — финансы считаются сами.',
+                      'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
                   },
                   {
                     id: 'ical',
                     icon: PlugIconSvg,
-                    title: 'iCal-фид (Google / Apple / Outlook)',
+                    title: 'Google / Apple / Outlook Calendar',
                     benefit:
-                      'Каждый мастер подпишется на свой календарь визитов и увидит их в любом телефоне.',
-                  },
-                  {
-                    id: 'ocr_notebook',
-                    icon: PlugIconSvg,
-                    title: 'Фото блокнота → AI разнесёт по визитам',
-                    benefit:
-                      'Сфотографируй заметки/блокнот — AI распознает дату, клиента и сумму. Никакого ручного ввода.',
+                      'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
                   },
                 ]}
                 selected={state.selected_integrations}
@@ -779,27 +744,33 @@ export function OnboardingPage() {
                 title={t('onboarding.step_integrations.social_title', {
                   defaultValue: 'Соцсети и мессенджеры',
                 })}
-                emoji="💬"
                 items={[
                   {
                     id: 'instagram',
                     icon: PlugIconSvg,
                     title: 'Instagram Direct',
                     benefit:
-                      'DM-ы клиентов попадают в портал. AI отвечает на цены/расписание автоматом.',
+                      'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
                   },
                   {
                     id: 'facebook',
                     icon: PlugIconSvg,
                     title: 'Facebook Messenger',
-                    benefit: 'Тот же inbox — клиент пишет, ты отвечаешь из одного места.',
+                    benefit: 'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
+                  },
+                  {
+                    id: 'whatsapp',
+                    icon: PlugIconSvg,
+                    title: 'WhatsApp Business',
+                    benefit:
+                      'Самый популярный мессенджер в Польше — клиенты пишут, ты отвечаешь из портала.',
                   },
                   {
                     id: 'telegram',
                     icon: PlugIconSvg,
                     title: 'Telegram',
                     benefit:
-                      'Подключи свой канал/бота — получай дайджесты и AI-инсайты прямо в Telegram.',
+                      'Утренний разбор от @finkley_tg_bot в 9:00 + важные алерты прямо в чате.',
                   },
                 ]}
                 selected={state.selected_integrations}
@@ -853,14 +824,13 @@ export function OnboardingPage() {
                 title={t('onboarding.step_integrations.banking_title', {
                   defaultValue: 'Банк и расходы',
                 })}
-                emoji="🏦"
                 items={[
                   {
                     id: 'banking',
                     icon: PlugIconSvg,
-                    title: 'Banking (PSD2 — Enable Banking)',
+                    title: 'Банковский счёт (PSD2)',
                     benefit:
-                      'Подключим твой банковский счёт через стандарт PSD2. Безопасно (мы видим только чтение), 90 дней без переподключения.',
+                      'Каждое списание автоматом упадёт в Расходы. Можешь подключить несколько банков сразу.',
                   },
                 ]}
                 selected={state.selected_integrations}

@@ -1,4 +1,16 @@
-import { ArrowRight, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Banknote,
+  Building2,
+  Layers,
+  Plus,
+  Receipt,
+  Sparkles,
+  TrendingUp,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -6,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
   type FinancialSettings,
+  type ParamPeriod,
   type ParameterItem,
   type ParameterSection,
 } from '@/hooks/useFinancialSettings'
@@ -22,60 +35,61 @@ type CategoryId =
 
 const CATEGORIES: Array<{
   id: CategoryId
-  emoji: string
+  icon: LucideIcon
   title: string
   description: string
 }> = [
   {
     id: 'cash_registers',
-    emoji: '💵',
+    icon: Wallet,
     title: 'Кассы и счета',
-    description:
-      'Где у тебя физически лежат деньги. Наличные кассы (Касса директора, Сейф, Готовка) и безналичные (Карта, Терминал эквайринга). К каждой безналичной — позже привяжешь конкретный банк-счёт.',
+    description: 'Где у тебя физически лежат деньги — наличные кассы и безналичные счета.',
   },
   {
     id: 'fixed',
-    emoji: '📌',
+    icon: Receipt,
     title: 'Фиксированные расходы',
-    description:
-      'Те, что платишь каждый месяц независимо от выручки: аренда, ЗП администратора, ZUS, реклама-абонемент, лизинг. Из них AI строит точку безубыточности — «сколько надо заработать чтобы выйти в ноль».',
+    description: 'Аренда, ЗП администратора, ZUS, абонементы — то что платишь каждый месяц.',
   },
   {
     id: 'variable',
-    emoji: '📈',
+    icon: TrendingUp,
     title: 'Переменные расходы',
-    description:
-      '% от выручки: ЗП администратора по проценту, банковская комиссия эквайринга, премии, реклама по % от продаж. AI автоматически вычитает их при расчёте прибыли на каждый визит.',
+    description: 'Процент от выручки: комиссия банка, премии, реклама от продаж.',
   },
   {
     id: 'taxes',
-    emoji: '🏛',
+    icon: Building2,
     title: 'Налоги и взносы',
-    description:
-      'ZUS, PIT, CIT, VAT, налог на прибыль. В P&L они идут отдельной строкой после операционной прибыли — так видна реальная чистая прибыль владельца.',
+    description: 'PIT, CIT, VAT, ZUS — отдельная строка в P&L после операционной прибыли.',
   },
   {
     id: 'other_income',
-    emoji: '💰',
+    icon: Banknote,
     title: 'Прочие доходы',
-    description:
-      'Помимо услуг — аренда субаренды, кэшбэк, % с продажи продуктов на витрине. Если ничего такого нет — оставь пустым.',
+    description: 'Аренда субаренды, кэшбэк, продажа продуктов на витрине.',
   },
   {
     id: 'investments',
-    emoji: '🏗',
+    icon: Layers,
     title: 'Инвестиционная деятельность',
-    description:
-      'Большие покупки (оборудование, ремонт, мебель) и продажа активов. Это НЕ операционные расходы — AI учитывает их в Cashflow Statement, но не в P&L.',
+    description: 'Покупка оборудования, ремонт, мебель. В P&L не идёт, только в cashflow.',
   },
   {
     id: 'flows',
-    emoji: '🔄',
+    icon: Sparkles,
     title: 'Финансовая деятельность',
-    description:
-      'Кредиты полученные/погашенные, выплата дивидендов владельцу, взносы учредителей. Тоже отдельно от операционных расходов — важно для cashflow.',
+    description: 'Кредиты, дивиденды, взносы учредителей — критично для cashflow.',
   },
 ]
+
+const PERIOD_LABEL: Record<ParamPeriod, string> = {
+  day: 'день',
+  month: 'мес',
+  '2months': '2 мес',
+  quarter: 'квартал',
+  year: 'год',
+}
 
 export type ExpensesDraft = FinancialSettings
 
@@ -162,9 +176,12 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
 
   const activeIndex = CATEGORIES.findIndex((c) => c.id === activeCategory)
   const activeMeta = CATEGORIES[activeIndex]!
+  const ActiveIcon = activeMeta.icon
   const activeSection = getSection(activeCategory)
   const visibleItems = activeSection.items.filter((it) => !it.archived)
   const isPercent = activeCategory === 'variable'
+  const hasPeriod = activeCategory === 'fixed' || activeCategory === 'taxes'
+  const hasCashKind = activeCategory === 'cash_registers'
 
   function nextCategory() {
     if (activeIndex < CATEGORIES.length - 1) {
@@ -183,6 +200,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
         {CATEGORIES.map((cat, i) => {
           const done = i < activeIndex
           const active = i === activeIndex
+          const Icon = cat.icon
           return (
             <button
               key={cat.id}
@@ -197,7 +215,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                     : 'border-border bg-card text-muted-foreground hover:bg-muted/40',
               )}
             >
-              <span aria-hidden>{cat.emoji}</span>
+              <Icon className="size-3.5" strokeWidth={2} />
               <span>{cat.title}</span>
             </button>
           )
@@ -207,7 +225,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
       {/* Описание активной категории — компактно */}
       <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 mt-3 rounded-lg border-2 border-dashed px-3 py-2">
         <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
-          <span aria-hidden>{activeMeta.emoji}</span>
+          <ActiveIcon className="size-3.5" strokeWidth={2} />
           {activeMeta.title}
         </p>
         <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug">
@@ -222,65 +240,113 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
             Пока пусто — нажми «Добавить» ниже.
           </p>
         ) : (
-          visibleItems.map((it) => (
-            <div
-              key={it.id}
-              className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_140px_44px] sm:gap-2.5"
-            >
-              <Input
-                value={it.label}
-                onChange={(e) => updateItem(activeCategory, it.id, { label: e.target.value })}
-                placeholder={t('onboarding.step4.label_placeholder', {
-                  defaultValue: 'Название позиции',
-                })}
-                className="h-9 text-sm"
-              />
-              {/* Сумма (либо amount_cents в основной валюте, либо pct% для variable) */}
-              <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
-                {isPercent ? (
-                  <>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={it.pct ?? 0}
-                      onChange={(e) =>
-                        updateItem(activeCategory, it.id, {
-                          pct: Math.max(0, Math.min(100, Number(e.target.value))),
-                        })
-                      }
-                      className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
-                    />
-                    <span className="text-muted-foreground text-xs">%</span>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      type="number"
-                      min="0"
-                      value={Math.round((it.amount_cents ?? 0) / 100)}
-                      onChange={(e) =>
-                        updateItem(activeCategory, it.id, {
-                          amount_cents: Math.max(0, Number(e.target.value)) * 100,
-                        })
-                      }
-                      className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
-                    />
-                    <span className="text-muted-foreground text-xs">€/мес</span>
-                  </>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => removeItem(activeCategory, it.id)}
-                className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md border"
-                aria-label="remove"
+          visibleItems.map((it) => {
+            // T142 — per-category колонки. fixed/taxes — добавляем селектор
+            // period (мес/квартал/год). cash_registers — селектор cash/non-cash.
+            const cols = hasPeriod
+              ? '1fr 140px 100px 44px'
+              : hasCashKind
+                ? '1fr 140px 130px 44px'
+                : '1fr 140px 44px'
+            return (
+              <div
+                key={it.id}
+                className="grid grid-cols-1 gap-2 sm:gap-2.5"
+                style={{ gridTemplateColumns: '' }}
               >
-                <Trash2 className="size-4" strokeWidth={1.7} />
-              </button>
-            </div>
-          ))
+                <div
+                  className="grid grid-cols-1 gap-2 sm:gap-2.5"
+                  style={{ gridTemplateColumns: cols }}
+                >
+                  <Input
+                    value={it.label}
+                    onChange={(e) => updateItem(activeCategory, it.id, { label: e.target.value })}
+                    placeholder={t('onboarding.step4.label_placeholder', {
+                      defaultValue: 'Название позиции',
+                    })}
+                    className="h-9 text-sm"
+                  />
+                  {/* Сумма / процент */}
+                  <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
+                    {isPercent ? (
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={it.pct ?? 0}
+                          onChange={(e) =>
+                            updateItem(activeCategory, it.id, {
+                              pct: Math.max(0, Math.min(100, Number(e.target.value))),
+                            })
+                          }
+                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+                        />
+                        <span className="text-muted-foreground text-xs">%</span>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          value={Math.round((it.amount_cents ?? 0) / 100)}
+                          onChange={(e) =>
+                            updateItem(activeCategory, it.id, {
+                              amount_cents: Math.max(0, Number(e.target.value)) * 100,
+                            })
+                          }
+                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+                        />
+                        <span className="text-muted-foreground text-xs">PLN</span>
+                      </>
+                    )}
+                  </div>
+                  {/* Period — только fixed/taxes */}
+                  {hasPeriod ? (
+                    <select
+                      value={it.period ?? 'month'}
+                      onChange={(e) =>
+                        updateItem(activeCategory, it.id, {
+                          period: e.target.value as ParamPeriod,
+                        })
+                      }
+                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold"
+                    >
+                      {Object.entries(PERIOD_LABEL).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  {/* Cash kind — только cash_registers */}
+                  {hasCashKind ? (
+                    <select
+                      value={it.cash_kind ?? 'cash'}
+                      onChange={(e) =>
+                        updateItem(activeCategory, it.id, {
+                          cash_kind: e.target.value as 'cash' | 'non_cash',
+                        })
+                      }
+                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold"
+                    >
+                      <option value="cash">наличные</option>
+                      <option value="non_cash">безналичные</option>
+                    </select>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => removeItem(activeCategory, it.id)}
+                    className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md border"
+                    aria-label="remove"
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.7} />
+                  </button>
+                </div>
+              </div>
+            )
+          })
         )}
 
         <button

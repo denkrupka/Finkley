@@ -19,6 +19,9 @@ import { useSalonMembership } from '@/hooks/useSalons'
 import { cn } from '@/lib/utils/cn'
 
 const STORAGE_KEY = 'finkley:tour:dismissed'
+// T147 — сохраняем индекс шага. При возврате на /dashboard тур не начинается
+// сначала, а продолжает с того места где юзер был.
+const STORAGE_STEP_KEY = 'finkley:tour:step'
 
 type Step = {
   id: string
@@ -145,28 +148,55 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
   const { data: membership } = useSalonMembership(salonId)
   const role = (membership?.role ?? 'owner') as 'owner' | 'admin' | 'staff' | 'accountant'
   const [open, setOpen] = useState(false)
-  const [stepIndex, setStepIndex] = useState(0)
+  const [stepIndex, setStepIndexState] = useState(0)
 
   // Фильтруем шаги по роли текущего юзера.
   const steps = STEPS.filter((s) => !s.roles || s.roles.includes(role))
 
+  // T147 — wrapper для setStepIndex который persist'ит index в localStorage.
+  function setStepIndex(value: number | ((prev: number) => number)) {
+    setStepIndexState((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      try {
+        localStorage.setItem(STORAGE_STEP_KEY, String(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+
   useEffect(() => {
     if (force) {
       setOpen(true)
-      setStepIndex(0)
+      setStepIndexState(0)
+      try {
+        localStorage.removeItem(STORAGE_STEP_KEY)
+      } catch {
+        /* ignore */
+      }
       return
     }
     try {
       const dismissed = localStorage.getItem(STORAGE_KEY) === '1'
-      if (!dismissed) setOpen(true)
+      if (!dismissed) {
+        // T147 — продолжаем с сохранённого step'а (если есть)
+        const savedStep = Number(localStorage.getItem(STORAGE_STEP_KEY) ?? '0')
+        if (Number.isFinite(savedStep) && savedStep > 0) {
+          setStepIndexState(Math.min(savedStep, steps.length - 1))
+        }
+        setOpen(true)
+      }
     } catch {
       // localStorage недоступен (SSR / private mode) — не показываем
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [force])
 
   function dismiss() {
     try {
       localStorage.setItem(STORAGE_KEY, '1')
+      localStorage.removeItem(STORAGE_STEP_KEY)
     } catch {
       // ignore
     }

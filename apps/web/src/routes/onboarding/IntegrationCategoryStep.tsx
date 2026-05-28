@@ -29,16 +29,13 @@ export function IntegrationCategoryStep({
   items,
   selected,
   onToggle,
-  emoji,
   extra,
 }: {
   title: string
   items: IntegrationItem[]
   selected: OnboardingIntegration[]
   onToggle: (id: OnboardingIntegration) => void
-  emoji: string
-  /** T102 — дополнительный контент после списка интеграций (например, кнопка
-   *  OCR блокнота для bookings). Рендерится перед нижней подсказкой. */
+  /** T102 — дополнительный контент после списка интеграций. */
   extra?: ReactNode
 }) {
   const { t } = useTranslation()
@@ -56,12 +53,7 @@ export function IntegrationCategoryStep({
 
   return (
     <div className="space-y-3">
-      <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
-        <span aria-hidden className="mr-1.5">
-          {emoji}
-        </span>
-        {title}
-      </h2>
+      <h2 className="text-brand-navy text-2xl font-bold tracking-tight">{title}</h2>
 
       <div className="grid gap-2">
         {items.map((it) => {

@@ -22,12 +22,13 @@ import type { OnboardingIntegration } from './OnboardingPage'
 const PROVIDER_NAME: Record<OnboardingIntegration, string> = {
   booksy: 'Booksy',
   wfirma: 'wFirma',
-  banking: 'Banking (PSD2)',
+  banking: 'Банковский счёт',
   instagram: 'Instagram Direct',
   facebook: 'Facebook Messenger',
+  whatsapp: 'WhatsApp Business',
   telegram: 'Telegram',
-  ical: 'iCal',
-  ocr_notebook: 'OCR',
+  ical: 'Google / Apple Calendar',
+  ocr_notebook: 'Фото журнала',
   ksef: 'KSeF',
   fakturownia: 'Fakturownia',
   ifirma: 'iFirma',
@@ -44,6 +45,7 @@ const PROVIDER_HAS_HINT: Record<OnboardingIntegration, boolean> = {
   banking: true,
   instagram: false,
   facebook: false,
+  whatsapp: false,
   telegram: false,
   ical: false,
   ocr_notebook: false,
@@ -82,7 +84,7 @@ export function ConnectIntegrationDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="flex max-h-[90vh] max-w-md flex-col overflow-y-auto">
         <div className="flex items-start gap-3">
           <div className="bg-brand-teal-deep grid size-11 shrink-0 place-items-center rounded-lg text-white">
             <Plug className="size-5" strokeWidth={2} />
