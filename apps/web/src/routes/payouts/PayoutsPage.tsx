@@ -104,9 +104,7 @@ export function PayoutsPage() {
           <div>{t('payouts.col.scheme')}</div>
           <div className="text-right">{t('payouts.col.revenue')}</div>
           <div className="text-right">{t('payouts.col.tips')}</div>
-          <div className="text-right">
-            {t('payouts.col.premium', { defaultValue: 'Премия' })}
-          </div>
+          <div className="text-right">{t('payouts.col.premium', { defaultValue: 'Премия' })}</div>
           <div className="text-right">{t('payouts.col.payout')}</div>
           <div className="text-right">{t('payouts.col.advances')}</div>
           <div className="text-right">{t('payouts.col.remaining')}</div>

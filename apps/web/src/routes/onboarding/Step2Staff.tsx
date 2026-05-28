@@ -194,7 +194,6 @@ export function Step2Staff({ value, onChange }: Props) {
           </span>
         </button>
       </div>
-
     </div>
   )
 }

@@ -76,7 +76,6 @@ export function Step0Path({
           tone="full"
         />
       </div>
-
     </div>
   )
 }

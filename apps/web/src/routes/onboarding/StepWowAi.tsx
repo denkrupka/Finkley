@@ -241,7 +241,8 @@ export function StepWowAi({
       eyebrow: t('onboarding.wow.real_accounting_eyebrow', { defaultValue: 'Бухгалтерия' }),
       title: t('onboarding.wow.real_accounting_title', {
         defaultValue: '{{provider}} — связка готова',
-        provider: accounting === 'ksef' ? 'KSeF' : (accounting ?? '').replace(/^./, (c) => c.toUpperCase()),
+        provider:
+          accounting === 'ksef' ? 'KSeF' : (accounting ?? '').replace(/^./, (c) => c.toUpperCase()),
       }),
       body: t('onboarding.wow.real_accounting_body', {
         defaultValue:

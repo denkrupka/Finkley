@@ -1916,9 +1916,7 @@ function PayrollAutoFillButton({
         payout: formatCurrencyShort(payout, currency),
       })
       onPick(payout, breakdown)
-      toast.success(
-        t('expenses.form.payroll_filled', { defaultValue: 'Сумма посчитана' }),
-      )
+      toast.success(t('expenses.form.payroll_filled', { defaultValue: 'Сумма посчитана' }))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {

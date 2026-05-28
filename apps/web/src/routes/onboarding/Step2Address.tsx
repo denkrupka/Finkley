@@ -116,7 +116,6 @@ export function Step2Address({
           </div>
         </div>
       </div>
-
     </div>
   )
 }

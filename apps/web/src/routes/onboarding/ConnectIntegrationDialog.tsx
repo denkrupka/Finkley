@@ -64,11 +64,7 @@ const META: Record<
   facebook: {
     name: 'Facebook Messenger',
     tagline: 'Все сообщения от клиентов — в одну ленту с Instagram и Telegram.',
-    steps: [
-      'Авторизация через Facebook',
-      'Выбор страницы салона',
-      'Подписка на webhook-сообщения',
-    ],
+    steps: ['Авторизация через Facebook', 'Выбор страницы салона', 'Подписка на webhook-сообщения'],
   },
   telegram: {
     name: 'Telegram',
@@ -109,11 +105,7 @@ const META: Record<
   fakturownia: {
     name: 'Fakturownia',
     tagline: 'AI забирает все выставленные счета и связывает с визитами.',
-    steps: [
-      'API-токен Fakturownia',
-      'Sync счетов каждые 6 часов',
-      'Связь счёт↔клиент автоматом',
-    ],
+    steps: ['API-токен Fakturownia', 'Sync счетов каждые 6 часов', 'Связь счёт↔клиент автоматом'],
   },
   ifirma: {
     name: 'iFirma',

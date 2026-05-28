@@ -149,9 +149,7 @@ export function Step3Accounting({
                   <div
                     className={cn(
                       'mt-0.5 grid size-5 shrink-0 place-items-center rounded',
-                      checked
-                        ? 'bg-brand-teal-deep text-white'
-                        : 'border-border bg-card border',
+                      checked ? 'bg-brand-teal-deep text-white' : 'border-border bg-card border',
                     )}
                   >
                     {checked ? <Check className="size-3" strokeWidth={3} /> : null}
@@ -177,7 +175,6 @@ export function Step3Accounting({
           if (pendingProvider) onToggleIntegration?.(pendingProvider)
         }}
       />
-
     </div>
   )
 }
