@@ -22,6 +22,7 @@
  */
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { withSentry } from '../_shared/sentry.ts'
 import {
   ALLOWED_TEMPLATES,
   normalizeEmailLocale,
@@ -58,63 +59,65 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
+Deno.serve(
+  withSentry('send-email', async (req: Request) => {
+    if (req.method === 'OPTIONS') return preflight()
+    if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-  if (!RESEND_KEY || !FUNCTION_SECRET) {
-    return jsonResponse({ error: 'function_not_configured' }, 500)
-  }
+    if (!RESEND_KEY || !FUNCTION_SECRET) {
+      return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
-  const got = req.headers.get('x-finkley-secret') || req.headers.get('X-Finkley-Secret') || ''
-  if (!timingSafeEqual(got, FUNCTION_SECRET)) {
-    return jsonResponse({ error: 'unauthorized' }, 401)
-  }
+    const got = req.headers.get('x-finkley-secret') || req.headers.get('X-Finkley-Secret') || ''
+    if (!timingSafeEqual(got, FUNCTION_SECRET)) {
+      return jsonResponse({ error: 'unauthorized' }, 401)
+    }
 
-  let body: SendInput
-  try {
-    body = (await req.json()) as SendInput
-  } catch {
-    return jsonResponse({ error: 'invalid_json' }, 400)
-  }
+    let body: SendInput
+    try {
+      body = (await req.json()) as SendInput
+    } catch {
+      return jsonResponse({ error: 'invalid_json' }, 400)
+    }
 
-  if (!body.template || !ALLOWED_TEMPLATES.has(body.template)) {
-    return jsonResponse({ error: 'unknown_template' }, 400)
-  }
-  if (!body.to || !/.+@.+\..+/.test(body.to)) {
-    return jsonResponse({ error: 'invalid_to' }, 400)
-  }
+    if (!body.template || !ALLOWED_TEMPLATES.has(body.template)) {
+      return jsonResponse({ error: 'unknown_template' }, 400)
+    }
+    if (!body.to || !/.+@.+\..+/.test(body.to)) {
+      return jsonResponse({ error: 'invalid_to' }, 400)
+    }
 
-  const locale = normalizeEmailLocale(body.locale)
-  const tpl = pickTemplate(body.template, locale)
-  const vars = body.vars ?? {}
-  const subject = render(tpl.subject, vars)
-  const html = render(tpl.html, vars)
+    const locale = normalizeEmailLocale(body.locale)
+    const tpl = pickTemplate(body.template, locale)
+    const vars = body.vars ?? {}
+    const subject = render(tpl.subject, vars)
+    const html = render(tpl.html, vars)
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${RESEND_KEY}`,
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM,
-      to: [body.to],
-      subject,
-      html,
-      tags: [{ name: 'template', value: body.template }],
-    }),
-  })
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${RESEND_KEY}`,
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM,
+        to: [body.to],
+        subject,
+        html,
+        tags: [{ name: 'template', value: body.template }],
+      }),
+    })
 
-  const json = (await res.json()) as { id?: string; name?: string; message?: string }
-  if (!res.ok) {
-    console.error('resend error', json)
-    return jsonResponse(
-      { error: 'resend_error', message: json.message ?? `HTTP ${res.status}` },
-      502,
-    )
-  }
+    const json = (await res.json()) as { id?: string; name?: string; message?: string }
+    if (!res.ok) {
+      console.error('resend error', json)
+      return jsonResponse(
+        { error: 'resend_error', message: json.message ?? `HTTP ${res.status}` },
+        502,
+      )
+    }
 
-  return jsonResponse({ ok: true, message_id: json.id })
-})
+    return jsonResponse({ ok: true, message_id: json.id })
+  }),
+)
