@@ -51,13 +51,22 @@ export function PayoutsPage() {
   const totals = useMemo(() => {
     let revenue = 0
     let payout = 0
+    let premium = 0
     let advances = 0
     for (const r of rows) {
       revenue += r.revenue_cents
       payout += r.payout_cents
+      premium += r.premium_cents
       advances += advancesByStaff.get(r.staff_id) ?? 0
     }
-    return { revenue, payout, advances, remaining: payout - advances }
+    return {
+      revenue,
+      payout,
+      premium,
+      advances,
+      accrued: payout + premium,
+      remaining: payout + premium - advances,
+    }
   }, [rows, advancesByStaff])
 
   if (!salonId) return null
@@ -110,11 +119,9 @@ export function PayoutsPage() {
           ) : (
             rows.map((r) => {
               const advance = advancesByStaff.get(r.staff_id) ?? 0
-              // T117: Премия — отдельная сущность (expense с category=ЗП и
-              // sub=premium). Сейчас источника данных нет (T116 закроет:
-              // ExpenseFormModal позволит указать premium для типа ЗП).
-              // Заглушка = 0; Начислено = payout + premium учитывает 0.
-              const premiumCents = 0
+              // T116 — premium приходит из RPC calculate_payouts_for_period
+              // как сумма expenses.premium_cents за период по мастеру.
+              const premiumCents = r.premium_cents
               const accruedCents = r.payout_cents + premiumCents
               const remaining = accruedCents - advance
               return (
@@ -163,11 +170,15 @@ export function PayoutsPage() {
           )}
         </div>
         {rows.length > 0 ? (
-          <div className="border-border bg-muted/30 grid min-w-[760px] grid-cols-[1.4fr_1.2fr_0.9fr_0.9fr_0.9fr_0.9fr] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
+          <div className="border-border bg-muted/30 grid min-w-[960px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
             <div className="text-brand-navy col-span-2">{t('payouts.total')}</div>
             <div className="num text-right">{formatCurrency(totals.revenue, currency)}</div>
+            <div className="num text-brand-gold-deep text-right">—</div>
+            <div className="num text-right text-emerald-700">
+              {totals.premium > 0 ? `+${formatCurrency(totals.premium, currency)}` : '—'}
+            </div>
             <div className="num text-brand-navy text-right">
-              {formatCurrency(totals.payout, currency)}
+              {formatCurrency(totals.accrued, currency)}
             </div>
             <div className="num text-right text-amber-700">
               {totals.advances > 0 ? `−${formatCurrency(totals.advances, currency)}` : '—'}

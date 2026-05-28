@@ -34,6 +34,8 @@ export type ExpenseRow = {
   payroll_kind: PayrollKind | null
   payroll_period_start: string | null
   payroll_period_end: string | null
+  /** T116 — премия мастеру сверх базового payout. Учитывается в /payouts. */
+  premium_cents: number
   /**
    * Произвольные метаданные jsonb. Известные ключи:
    *   ksef_id           — NumerKSeF фактуры; уникальный кросс-портал ключ
@@ -178,7 +180,7 @@ export function useExpenses(
       let q = supabase
         .from('expenses')
         .select(
-          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_by, bank_transaction_id, bank_account_iban, paid_amount_cents, commission_source_table, commission_source_id, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end',
+          'id, salon_id, category_id, expense_at, amount_cents, payment_method, description, document_number, counterparty_id, cash_register_id, comment, source, receipt_url, recurrence, next_occurrence_at, recurrence_parent_id, metadata, contractor_name, sub_article, created_by, bank_transaction_id, bank_account_iban, paid_amount_cents, commission_source_table, commission_source_id, created_at, updated_at, deleted_at, payroll_staff_id, payroll_kind, payroll_period_start, payroll_period_end, premium_cents',
         )
         .eq('salon_id', salonId)
         .is('deleted_at', null)
@@ -225,6 +227,8 @@ export type CreateExpenseInput = {
   payroll_kind?: PayrollKind | null
   payroll_period_start?: string | null
   payroll_period_end?: string | null
+  /** T116 — премия (centах). 0 если не задано. */
+  premium_cents?: number
   /** IBAN получателя — для расходов оплаченных переводом. */
   bank_account_iban?: string | null
 }

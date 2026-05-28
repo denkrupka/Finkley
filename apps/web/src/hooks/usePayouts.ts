@@ -13,6 +13,10 @@ export type PayoutPreviewRow = {
   /** Сумма чаевых за период. Добавлено в миграции 20260521000012 — нужно
    *  отображать в /payouts отдельной колонкой (чаевые идут мастеру 100%). */
   tips_cents: number
+  /** T116 — сумма expenses.premium_cents (категория payroll) за период
+   *  по мастеру. Отображается в /payouts отдельной колонкой между Чаевые
+   *  и Начислено. Premium входит в «Начислено» сверх payout_cents. */
+  premium_cents: number
   payout_cents: number
 }
 
@@ -41,6 +45,7 @@ export function usePayoutsPreview(
         visit_count: Number(r.visit_count),
         revenue_cents: Number(r.revenue_cents),
         tips_cents: Number(r.tips_cents ?? 0),
+        premium_cents: Number(r.premium_cents ?? 0),
         payout_cents: Number(r.payout_cents),
       }))
     },

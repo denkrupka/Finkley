@@ -92,6 +92,8 @@ type FormValues = {
   payroll_kind: PayrollKind | ''
   payroll_period_start: string
   payroll_period_end: string
+  /** T116 — премия мастеру (отдельно от amount). В centах — но в UI строка. */
+  premium: string
   /** Чекбокс «частичная оплата» — если true, в paid_amount храним то что
    *  юзер ввёл (а в amount — полная сумма по документу). False = full paid. */
   is_partial_payment: boolean
@@ -127,6 +129,7 @@ const schema = z.object({
   payroll_kind: z.enum(['advance', 'final', '']).optional().default(''),
   payroll_period_start: z.string().optional().default(''),
   payroll_period_end: z.string().optional().default(''),
+  premium: z.string().optional().default(''),
   is_partial_payment: z.boolean().default(false),
   paid_amount: z.string().optional().default(''),
   bank_account_iban: z.string().optional().default(''),
@@ -313,6 +316,8 @@ export function ExpenseFormModal({
   const { data: counterparties = [] } = useCounterparties(salonId)
   const [counterpartyModalOpen, setCounterpartyModalOpen] = useState(false)
   const [gateOpen, setGateOpen] = useState(false)
+  // T116 — breakdown текст после клика «Авто-расчёт» («Выручка X × Y% = Z»).
+  const [payrollBreakdown, setPayrollBreakdown] = useState<string | null>(null)
   const [dictationPrefillForNewCp, setDictationPrefillForNewCp] = useState<{
     name?: string
     nip?: string
@@ -412,6 +417,7 @@ export function ExpenseFormModal({
       payroll_kind: '',
       payroll_period_start: '',
       payroll_period_end: '',
+      premium: '',
       is_partial_payment: false,
       paid_amount: '',
       bank_account_iban: '',
@@ -467,6 +473,10 @@ export function ExpenseFormModal({
         payroll_kind: (expense.payroll_kind as PayrollKind) ?? '',
         payroll_period_start: expense.payroll_period_start ?? '',
         payroll_period_end: expense.payroll_period_end ?? '',
+        premium:
+          expense.premium_cents && expense.premium_cents > 0
+            ? (expense.premium_cents / 100).toFixed(2)
+            : '',
         is_partial_payment: isPartial,
         paid_amount: isPartial ? ((expense.paid_amount_cents ?? 0) / 100).toFixed(2) : '',
         bank_account_iban: formatIbanForDisplay(expense.bank_account_iban ?? ''),
@@ -677,18 +687,24 @@ export function ExpenseFormModal({
     // Edit-mode: простое UPDATE без OCR/auto-push/upload (этого хватает для
     // правки уже-созданного расхода — поля те же, что при создании).
     // Payroll-поля: записываем только если категория зарплатная.
+    // T116 — premium_cents отдельно от amount_cents (база vs бонус).
+    const premiumCents = isPayrollCategory
+      ? Math.max(0, Math.round(Number((values.premium || '0').replace(',', '.')) * 100))
+      : 0
     const payrollFields = isPayrollCategory
       ? {
           payroll_staff_id: values.payroll_staff_id || null,
           payroll_kind: (values.payroll_kind || null) as PayrollKind | null,
           payroll_period_start: values.payroll_period_start || null,
           payroll_period_end: values.payroll_period_end || null,
+          premium_cents: premiumCents,
         }
       : {
           payroll_staff_id: null,
           payroll_kind: null,
           payroll_period_start: null,
           payroll_period_end: null,
+          premium_cents: 0,
         }
 
     if (isEdit && expense) {
@@ -1307,6 +1323,58 @@ export function ExpenseFormModal({
                   </div>
                 )}
               />
+
+              {/* T116 — Премия (отдельной строкой, сохраняется в premium_cents). */}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="exp-premium" className="text-xs">
+                  {t('expenses.form.payroll_premium', { defaultValue: 'Премия (сверху)' })}
+                </Label>
+                <div className="border-input bg-card flex h-10 items-center gap-2 rounded-md border px-3">
+                  <span className="num text-muted-foreground text-base font-semibold">+</span>
+                  <input
+                    id="exp-premium"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    placeholder="0"
+                    {...form.register('premium')}
+                    className="num text-foreground w-full bg-transparent text-sm font-semibold outline-none"
+                  />
+                  <span className="num text-muted-foreground text-xs">{currencySymbol}</span>
+                </div>
+                <p className="text-muted-foreground text-[11px]">
+                  {t('expenses.form.payroll_premium_hint', {
+                    defaultValue:
+                      'Бонус сверх базового payout. Будет видна в Отчёты → Зарплаты колонкой «Премия».',
+                  })}
+                </p>
+              </div>
+
+              {/* T116 — Авто-расчёт: подставляем amount из calculate_payouts_for_period
+                  для выбранного мастера+периода. Premium идёт сверху. */}
+              <PayrollAutoFillButton
+                salonId={salonId}
+                staffId={form.watch('payroll_staff_id')}
+                periodStart={form.watch('payroll_period_start')}
+                periodEnd={form.watch('payroll_period_end')}
+                currency={currency}
+                onPick={(payoutCents, breakdownText) => {
+                  form.setValue('amount', (payoutCents / 100).toFixed(2), {
+                    shouldValidate: true,
+                  })
+                  setPayrollBreakdown(breakdownText)
+                }}
+              />
+
+              {payrollBreakdown ? (
+                <div className="border-brand-teal-deep/30 bg-card rounded-md border border-dashed p-2.5">
+                  <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
+                    {t('expenses.form.payroll_breakdown', { defaultValue: 'Разбивка' })}
+                  </p>
+                  <p className="text-foreground mt-0.5 text-xs">{payrollBreakdown}</p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -1782,4 +1850,105 @@ function InstallmentsList({
       </ul>
     </div>
   )
+}
+
+/**
+ * T116 — кнопка авто-расчёта payout для выбранного staff+период.
+ * Дёргает RPC calculate_payouts_for_period, находит строку конкретного
+ * мастера и передаёт в onPick payout_cents + breakdown текст
+ * («Визитов N · Выручка X · Чаевые Y · = Z PLN»).
+ */
+function PayrollAutoFillButton({
+  salonId,
+  staffId,
+  periodStart,
+  periodEnd,
+  currency,
+  onPick,
+}: {
+  salonId: string
+  staffId: string
+  periodStart: string
+  periodEnd: string
+  currency: string
+  onPick: (payoutCents: number, breakdown: string) => void
+}) {
+  const { t } = useTranslation()
+  const [busy, setBusy] = useState(false)
+
+  const disabled = !staffId || !periodStart || !periodEnd || busy
+
+  async function run() {
+    if (disabled) return
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.rpc('calculate_payouts_for_period', {
+        p_salon_id: salonId,
+        p_period_start: periodStart,
+        p_period_end: periodEnd,
+      })
+      if (error) throw error
+      const row = (
+        data as Array<{
+          staff_id: string
+          visit_count: number
+          revenue_cents: number
+          tips_cents: number
+          payout_cents: number
+        }> | null
+      )?.find((r) => r.staff_id === staffId)
+      if (!row) {
+        toast.info(
+          t('expenses.form.payroll_no_visits', {
+            defaultValue: 'Нет визитов мастера за выбранный период',
+          }),
+        )
+        onPick(0, '')
+        return
+      }
+      const payout = Number(row.payout_cents)
+      const breakdown = t('expenses.form.payroll_breakdown_template', {
+        defaultValue:
+          'Визитов: {{count}} · Выручка: {{rev}} · Чаевые: {{tips}} → Payout: {{payout}}',
+        count: Number(row.visit_count),
+        rev: formatCurrencyShort(Number(row.revenue_cents), currency),
+        tips: formatCurrencyShort(Number(row.tips_cents), currency),
+        payout: formatCurrencyShort(payout, currency),
+      })
+      onPick(payout, breakdown)
+      toast.success(
+        t('expenses.form.payroll_filled', { defaultValue: 'Сумма посчитана' }),
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      onClick={run}
+      className="self-start"
+    >
+      {busy ? <Loader2 className="size-3.5 animate-spin" strokeWidth={2} /> : null}
+      {t('expenses.form.payroll_autofill', { defaultValue: 'Авто-расчёт суммы' })}
+    </Button>
+  )
+}
+
+function formatCurrencyShort(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(cents / 100)
+  } catch {
+    return `${(cents / 100).toFixed(0)} ${currency}`
+  }
 }
