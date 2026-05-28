@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
-import type { OnboardingIntegration } from './OnboardingPage'
+import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
 const INTEGRATIONS: ReadonlyArray<{
   id: OnboardingIntegration
@@ -18,9 +18,13 @@ const INTEGRATIONS: ReadonlyArray<{
 export function StepIntegrationsChoice({
   selected,
   onChange,
+  credentials,
+  onCredentialsChange,
 }: {
   selected: OnboardingIntegration[]
   onChange: (v: OnboardingIntegration[]) => void
+  credentials?: Partial<Record<OnboardingIntegration, PendingCredentials>>
+  onCredentialsChange?: (id: OnboardingIntegration, creds: PendingCredentials | null) => void
 }) {
   const { t } = useTranslation()
   // T122 — открываем модалку подключения при клике на не-выбранную интеграцию.
@@ -90,8 +94,12 @@ export function StepIntegrationsChoice({
         integration={pending}
         open={pending !== null}
         onClose={() => setPending(null)}
-        onConfirm={() => {
-          if (pending) toggle(pending)
+        existingCredentials={pending ? credentials?.[pending] : undefined}
+        onConfirm={(creds) => {
+          if (pending) {
+            toggle(pending)
+            onCredentialsChange?.(pending, creds)
+          }
         }}
       />
     </div>

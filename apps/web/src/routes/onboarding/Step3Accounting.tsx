@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils/cn'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
-import type { OnboardingIntegration } from './OnboardingPage'
+import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
 type AccountingProvider = {
   id: 'wfirma' | 'ksef' | 'fakturownia' | 'ifirma' | 'infakt'
@@ -82,6 +82,9 @@ type Props = {
   /** T138 — как ведёт бухгалтерию. По выбору фильтруем релевантных провайдеров. */
   accountingMode?: AccountingMode
   onAccountingModeChange?: (mode: AccountingMode) => void
+  /** T129 — credentials per provider. */
+  credentials?: Partial<Record<OnboardingIntegration, PendingCredentials>>
+  onCredentialsChange?: (id: OnboardingIntegration, creds: PendingCredentials | null) => void
 }
 
 /**
@@ -98,6 +101,8 @@ export function Step3Accounting({
   onToggleIntegration,
   accountingMode,
   onAccountingModeChange,
+  credentials,
+  onCredentialsChange,
 }: Props) {
   const { t } = useTranslation()
   // T122 — модалка подключения провайдера бухгалтерии при клике.
@@ -249,8 +254,12 @@ export function Step3Accounting({
         integration={pendingProvider}
         open={pendingProvider !== null}
         onClose={() => setPendingProvider(null)}
-        onConfirm={() => {
-          if (pendingProvider) onToggleIntegration?.(pendingProvider)
+        existingCredentials={pendingProvider ? credentials?.[pendingProvider] : undefined}
+        onConfirm={(creds) => {
+          if (pendingProvider) {
+            onToggleIntegration?.(pendingProvider)
+            onCredentialsChange?.(pendingProvider, creds)
+          }
         }}
       />
     </div>

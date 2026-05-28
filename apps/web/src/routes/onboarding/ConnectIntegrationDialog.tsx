@@ -1,10 +1,48 @@
-import { Check, Plug, X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-import type { OnboardingIntegration } from './OnboardingPage'
+import { BrandIcon } from './BrandIcon'
+import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
+
+/** T129 — credential fields для каждой интеграции. Для интеграций без
+ *  credentials (banking/instagram/facebook/whatsapp/telegram/ical/ocr_notebook)
+ *  — модалка показывает только описание + кнопку «Подключить».
+ *  Реальное подключение происходит после submit'a онбординга в
+ *  OnboardingPage.applyPendingIntegrations(). */
+const CREDENTIAL_FIELDS: Partial<
+  Record<
+    OnboardingIntegration,
+    Array<{ key: string; label: string; type: 'text' | 'password' | 'email' }>
+  >
+> = {
+  booksy: [
+    { key: 'email', label: 'Email от Booksy', type: 'email' },
+    { key: 'password', label: 'Пароль', type: 'password' },
+  ],
+  wfirma: [
+    { key: 'email', label: 'Email от wFirma', type: 'email' },
+    { key: 'password', label: 'Пароль', type: 'password' },
+  ],
+  ksef: [
+    { key: 'nip', label: 'NIP компании', type: 'text' },
+    { key: 'token', label: 'Auth Token (из Mój KSeF)', type: 'password' },
+  ],
+  fakturownia: [
+    { key: 'subdomain', label: 'Поддомен (например, mojaaplikacja)', type: 'text' },
+    { key: 'api_token', label: 'API-токен', type: 'password' },
+  ],
+  ifirma: [
+    { key: 'email', label: 'Email от iFirma', type: 'email' },
+    { key: 'api_key', label: 'API-ключ', type: 'password' },
+  ],
+  infakt: [{ key: 'api_token', label: 'API-токен inFakt', type: 'password' }],
+}
 
 /**
  * T122 — модалка мгновенного подключения интеграции из онбординга.
@@ -60,13 +98,25 @@ export function ConnectIntegrationDialog({
   open,
   onClose,
   onConfirm,
+  existingCredentials,
 }: {
   integration: OnboardingIntegration | null
   open: boolean
   onClose: () => void
-  onConfirm: () => void
+  /** T129 — onConfirm получает заполненные credentials (или null если их нет
+   *  для этой интеграции — banking/IG/FB/etc делают OAuth-flow после submit). */
+  onConfirm: (credentials: PendingCredentials | null) => void
+  existingCredentials?: PendingCredentials | null
 }) {
   const { t } = useTranslation()
+  // T129 — локальное состояние полей credentials (заполняется юзером).
+  const [creds, setCreds] = useState<PendingCredentials>({})
+
+  // Pre-fill из existingCredentials при открытии (если юзер уже сохранял).
+  useEffect(() => {
+    setCreds(existingCredentials ?? {})
+  }, [existingCredentials, integration])
+
   if (!integration) return null
   const providerName = PROVIDER_NAME[integration]
   const tagline = t(`onboarding.connect_dialog.providers.${integration}.tagline`, {
@@ -81,13 +131,24 @@ export function ConnectIntegrationDialog({
   const hint = PROVIDER_HAS_HINT[integration]
     ? t(`onboarding.connect_dialog.providers.${integration}.hint`, { defaultValue: '' })
     : null
+  const fields = CREDENTIAL_FIELDS[integration] ?? []
+  const allRequiredFilled = fields.every((f) => (creds[f.key] ?? '').trim().length > 0)
+
+  function handleConfirm() {
+    if (fields.length > 0) {
+      onConfirm({ ...creds })
+    } else {
+      onConfirm(null)
+    }
+    onClose()
+  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="flex max-h-[90vh] max-w-md flex-col overflow-y-auto">
         <div className="flex items-start gap-3">
           <div className="bg-brand-teal-deep grid size-11 shrink-0 place-items-center rounded-lg text-white">
-            <Plug className="size-5" strokeWidth={2} />
+            <BrandIcon provider={integration} className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-muted-foreground text-[10.5px] font-bold uppercase tracking-wider">
@@ -116,7 +177,46 @@ export function ConnectIntegrationDialog({
           </ul>
         </div>
 
+        {/* T129 — Inline credentials форма. Заполнится в onConfirm callback. */}
+        {fields.length > 0 ? (
+          <div className="mt-4 flex flex-col gap-2">
+            <p className="text-foreground text-xs font-bold uppercase tracking-wider">
+              {t('onboarding.connect_dialog.credentials_label', { defaultValue: 'Данные доступа' })}
+            </p>
+            {fields.map((f) => (
+              <div key={f.key} className="flex flex-col gap-1">
+                <Label htmlFor={`cred-${f.key}`} className="text-xs">
+                  {f.label}
+                </Label>
+                <Input
+                  id={`cred-${f.key}`}
+                  type={f.type}
+                  value={creds[f.key] ?? ''}
+                  onChange={(e) => setCreds({ ...creds, [f.key]: e.target.value })}
+                  autoComplete={f.type === 'password' ? 'new-password' : 'off'}
+                />
+              </div>
+            ))}
+            <p className="text-muted-foreground text-[11px]">
+              {t('onboarding.connect_dialog.credentials_hint', {
+                defaultValue:
+                  'Данные шифруются и используются только для подключения после создания салона.',
+              })}
+            </p>
+          </div>
+        ) : null}
+
         {hint ? <p className="text-muted-foreground mt-3 text-xs italic">{hint}</p> : null}
+
+        {/* Для интеграций без credentials (OAuth-based: banking/IG/FB/WhatsApp/Telegram/iCal) */}
+        {fields.length === 0 ? (
+          <p className="text-muted-foreground mt-3 text-xs">
+            {t('onboarding.connect_dialog.oauth_note', {
+              defaultValue:
+                'После создания салона мы откроем окно подключения этого сервиса — нажмёшь подтверждение в их интерфейсе.',
+            })}
+          </p>
+        ) : null}
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onClose} className="sm:order-1">
@@ -124,10 +224,8 @@ export function ConnectIntegrationDialog({
             {t('onboarding.connect_dialog.cancel', { defaultValue: 'Отмена' })}
           </Button>
           <Button
-            onClick={() => {
-              onConfirm()
-              onClose()
-            }}
+            onClick={handleConfirm}
+            disabled={fields.length > 0 && !allRequiredFilled}
             className="sm:order-2"
             data-testid="onb-connect-confirm"
           >

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils/cn'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
-import type { OnboardingIntegration } from './OnboardingPage'
+import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
 export type IntegrationItem = {
   id: OnboardingIntegration
@@ -30,6 +30,8 @@ export function IntegrationCategoryStep({
   selected,
   onToggle,
   extra,
+  credentials,
+  onCredentialsChange,
 }: {
   title: string
   items: IntegrationItem[]
@@ -37,6 +39,10 @@ export function IntegrationCategoryStep({
   onToggle: (id: OnboardingIntegration) => void
   /** T102 — дополнительный контент после списка интеграций. */
   extra?: ReactNode
+  /** T129 — сохранённые credentials per provider. */
+  credentials?: Partial<Record<OnboardingIntegration, PendingCredentials>>
+  /** T129 — обновляет credentials для конкретного провайдера. */
+  onCredentialsChange?: (id: OnboardingIntegration, creds: PendingCredentials | null) => void
 }) {
   const { t } = useTranslation()
   // T122 — модалка подключения. При клике на не-выбранную интеграцию
@@ -105,8 +111,12 @@ export function IntegrationCategoryStep({
         integration={pending}
         open={pending !== null}
         onClose={() => setPending(null)}
-        onConfirm={() => {
-          if (pending) onToggle(pending)
+        existingCredentials={pending ? credentials?.[pending] : undefined}
+        onConfirm={(creds) => {
+          if (pending) {
+            onToggle(pending)
+            onCredentialsChange?.(pending, creds)
+          }
         }}
       />
     </div>

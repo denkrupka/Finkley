@@ -159,7 +159,13 @@ export type OnboardingState = {
   financial_settings: FinancialSettings
   /** T138 — как ведёт бухгалтерию. По выбору фильтруем релевантных провайдеров. */
   accounting_mode: AccountingMode | null
+  /** T129 — credentials собранные в ConnectIntegrationDialog. После создания
+   *  салона мы вызываем соответствующие connect-функции с этими данными. */
+  pending_credentials: Partial<Record<OnboardingIntegration, PendingCredentials>>
 }
+
+/** T129 — credentials для одной интеграции (email/password/token/etc.). */
+export type PendingCredentials = Record<string, string>
 
 const INITIAL: OnboardingState = {
   path: null,
@@ -202,6 +208,7 @@ const INITIAL: OnboardingState = {
   facebook_url: '',
   financial_settings: DEFAULT_FINANCIAL_SETTINGS,
   accounting_mode: null,
+  pending_credentials: {},
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -727,6 +734,13 @@ export function OnboardingPage() {
                   }
                   accountingMode={state.accounting_mode ?? undefined}
                   onAccountingModeChange={(mode) => patch('accounting_mode', mode)}
+                  credentials={state.pending_credentials}
+                  onCredentialsChange={(id, creds) =>
+                    patch('pending_credentials', {
+                      ...state.pending_credentials,
+                      [id]: creds ?? {},
+                    })
+                  }
                 />
               </>
             )}
@@ -759,6 +773,13 @@ export function OnboardingPage() {
                       ? state.selected_integrations.filter((x) => x !== id)
                       : [...state.selected_integrations, id],
                   )
+                }
+                credentials={state.pending_credentials}
+                onCredentialsChange={(id, creds) =>
+                  patch('pending_credentials', {
+                    ...state.pending_credentials,
+                    [id]: creds ?? {},
+                  })
                 }
               />
             )}
@@ -804,6 +825,13 @@ export function OnboardingPage() {
                       ? state.selected_integrations.filter((x) => x !== id)
                       : [...state.selected_integrations, id],
                   )
+                }
+                credentials={state.pending_credentials}
+                onCredentialsChange={(id, creds) =>
+                  patch('pending_credentials', {
+                    ...state.pending_credentials,
+                    [id]: creds ?? {},
+                  })
                 }
               />
             )}
@@ -878,6 +906,13 @@ export function OnboardingPage() {
                       : [...state.selected_integrations, id],
                   )
                 }
+                credentials={state.pending_credentials}
+                onCredentialsChange={(id, creds) =>
+                  patch('pending_credentials', {
+                    ...state.pending_credentials,
+                    [id]: creds ?? {},
+                  })
+                }
               />
             )}
             {stepId === 'staff' && (
@@ -893,6 +928,8 @@ export function OnboardingPage() {
                   value={state.services}
                   onChange={(v) => patch('services', v)}
                   salonType={state.salon_type}
+                  ocrVisits={state.ocr_visits}
+                  onOcrVisitsAdded={(v) => patch('ocr_visits', v)}
                 />
               </>
             )}
