@@ -774,6 +774,27 @@
       "more": "i jeszcze {{count}}…"
     }
   },
+  "invite_signup": {
+    "title": "Uzupełnij profil",
+    "subtitle": "Jednorazowo — potem zmienisz w Ustawieniach.",
+    "first_name": "Imię",
+    "last_name": "Nazwisko",
+    "phone": "Numer telefonu",
+    "birthday": "Data urodzenia",
+    "password": "Hasło (min. 8 znaków)",
+    "password_confirm": "Powtórz hasło",
+    "submit": "Zapisz i kontynuuj",
+    "upload_avatar": "Awatar",
+    "avatar_too_large": "Maks. 5 MB",
+    "toast_done": "Profil zapisany",
+    "errors": {
+      "name_required": "Podaj imię i nazwisko",
+      "phone_required": "Podaj numer telefonu",
+      "birthday_required": "Podaj datę urodzenia",
+      "password_short": "Hasło musi mieć co najmniej 8 znaków",
+      "password_mismatch": "Hasła nie pasują"
+    }
+  },
   "team": {
     "title": "Zespół",
     "subtitle": "Zaproś księgową, asystenta lub specjalistów do salonu. Każdy widzi tylko tyle danych, ile potrzebuje do swojej pracy.",

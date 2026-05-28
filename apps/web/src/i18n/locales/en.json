@@ -774,6 +774,27 @@
       "more": "and {{count}} more…"
     }
   },
+  "invite_signup": {
+    "title": "Complete your profile",
+    "subtitle": "One-time setup — you can change it later in Settings.",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "phone": "Phone number",
+    "birthday": "Date of birth",
+    "password": "Password (min. 8 chars)",
+    "password_confirm": "Repeat password",
+    "submit": "Save and continue",
+    "upload_avatar": "Avatar",
+    "avatar_too_large": "Max 5 MB",
+    "toast_done": "Profile saved",
+    "errors": {
+      "name_required": "Enter first and last name",
+      "phone_required": "Enter phone number",
+      "birthday_required": "Enter date of birth",
+      "password_short": "Password must be at least 8 chars",
+      "password_mismatch": "Passwords don't match"
+    }
+  },
   "team": {
     "title": "Team",
     "subtitle": "Invite teammates: an accountant, an assistant, specialists. Each one sees exactly the data they need for their job.",
