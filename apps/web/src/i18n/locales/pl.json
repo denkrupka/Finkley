@@ -677,7 +677,20 @@
     },
     "insights": {
       "title": "AI-asystent widzi",
-      "dismiss": "Ukryj"
+      "dismiss": "Ukryj",
+      "empty": "Spokojnie. Jeśli coś będzie wymagało uwagi — wskazówka pojawi się tutaj."
+    },
+    "cash_details": {
+      "title": "Pieniądze na kontach — szczegóły",
+      "empty": "Kasy jeszcze nie skonfigurowane. Otwórz Ustawienia → Słownik → Kasy.",
+      "cash": "Gotówka",
+      "non_cash": "Bezgotówkowe",
+      "balance": "Aktualne saldo",
+      "fact_bank": "Stan faktyczny (z banku)",
+      "plan": "Plan (z naszych zapisów)",
+      "expected_incoming": "Oczekiwany wpływ: {{amount}}",
+      "discrepancy": "Różnica: bank pokazuje o {{amount}} więcej",
+      "not_linked": "Kasa nie jest połączona z kontem bankowym. Połącz w /settings → Integracje → Bankowość, aby zobaczyć stan faktyczny."
     },
     "benchmarks": {
       "title": "Ty vs średnia w branży",
@@ -1656,8 +1669,8 @@
       }
     },
     "calendar": {
-      "title": "Kalendarz wizyt (iCal)",
-      "subtitle": "Subskrybuj kanał wizyt w Google Calendar / Apple Calendar / Outlook. Aktualizuje się automatycznie — zobaczysz wszystkie rezerwacje wprost w swoim kalendarzu.",
+      "title": "Mój kalendarz wizyt (iCal)",
+      "subtitle": "Subskrybuj kanał własnych wizyt w Google Calendar / Apple Calendar / Outlook. Każdy specjalista widzi tylko swoje rezerwacje — aktualizuje się automatycznie.",
       "copy": "Kopiuj",
       "how_to": "Otwórz Google/Apple Calendar → „Subskrybuj kalendarz” → wklej URL. W Outlook: „Dodaj kalendarz” → „Subskrybuj z internetu”.",
       "revoke": "Cofnij link i wygeneruj nowy",
@@ -2088,6 +2101,11 @@
       "tab_types": "Typy",
       "types_title": "Jakie powiadomienia otrzymywać",
       "types_subtitle": "Wybierz zdarzenia, o których portal może powiadamiać. Kanały (push/email/Telegram) — na karcie «Kanały».",
+      "types_subtitle_v2": "Dla każdego zdarzenia — wybierz kanały. Push trafia do przeglądarki/PWA, Email na twój adres, Telegram (jeśli powiązany), SMS (rozliczany).",
+      "push_hint": "Aby otrzymywać push — zezwól na powiadomienia w karcie powyżej",
+      "telegram_unlinked_hint": "Aby otrzymywać przez Telegram — połącz konto w /settings → Telegram",
+      "sms_no_phone_hint": "Aby otrzymywać SMS — wpisz telefon w Profilu użytkownika",
+      "col_type": "Typ",
       "group": {
         "summary": "Podsumowania",
         "payments": "Płatności i faktury",
@@ -4125,6 +4143,13 @@
     "section_subtitle": "Podłącz bank przez Enable Banking — każde obciążenie automatycznie trafi do 'Wydatków'.",
     "add_bank": "+ Podłącz bank",
     "empty": "Brak podłączonych banków. Kliknij '+ Podłącz bank', aby automatycznie importować obciążenia.",
+    "link_register": {
+      "label": "Połącz z kasą:",
+      "placeholder": "Nie połączono",
+      "none": "— Nie połączono",
+      "empty": "Brak kas bezgotówkowych — dodaj w Ustawienia → Słownik",
+      "toast_saved": "Powiązanie zaktualizowane"
+    },
     "status_connected": "Połączony",
     "status_pending": "Oczekuje",
     "status_expired": "Consent wygasł",
@@ -4673,5 +4698,10 @@
     "submit": "Wyślij",
     "done_title": "Dzięki za opinię!",
     "done_subtitle": "Twoja opinia pomoże ulepszyć serwis."
+  },
+  "cropper": {
+    "title": "Przytnij obraz",
+    "hint": "Przeciągnij, aby wyrównać. Kółko myszy — powiększenie.",
+    "apply": "Zapisz"
   }
 }

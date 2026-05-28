@@ -51,8 +51,11 @@ export function computeRevenueByCategory(
     let label = 'Прочее'
     if (v.kind === 'retail') label = 'Продажа материалов'
     else if (v.service_id) {
+      // У услуги может не быть category_id — это валидно, всё равно
+      // показываем «Без категории» а не сваливаем в общую корзину
+      // «Прочее» (где визиты без service_id вообще).
       const catId = serviceCatId.get(v.service_id)
-      if (catId) label = catName.get(catId) ?? 'Без категории'
+      label = catId ? (catName.get(catId) ?? 'Без категории') : 'Без категории'
     }
     bucket.set(label, (bucket.get(label) ?? 0) + cents)
     total += cents

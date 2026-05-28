@@ -677,7 +677,20 @@
     },
     "insights": {
       "title": "What the AI assistant sees",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "empty": "All quiet. If something needs attention — you'll see a hint here."
+    },
+    "cash_details": {
+      "title": "Money in accounts — details",
+      "empty": "No cash registers configured yet. Open Settings → Reference → Cash registers.",
+      "cash": "Cash",
+      "non_cash": "Non-cash",
+      "balance": "Current balance",
+      "fact_bank": "Actual (from bank)",
+      "plan": "Planned (from our records)",
+      "expected_incoming": "Expected incoming: {{amount}}",
+      "discrepancy": "Discrepancy: bank shows {{amount}} more",
+      "not_linked": "Register not linked to a bank account. Link in /settings → Integrations → Banking to see the actual balance."
     },
     "benchmarks": {
       "title": "You vs industry average",
@@ -1656,8 +1669,8 @@
       }
     },
     "calendar": {
-      "title": "Visit calendar (iCal)",
-      "subtitle": "Subscribe to your visit feed in Google Calendar / Apple Calendar / Outlook. Updates automatically — you'll see all your bookings right in your calendar.",
+      "title": "My visit calendar (iCal)",
+      "subtitle": "Subscribe to your own visit feed in Google Calendar / Apple Calendar / Outlook. Each specialist sees only their own bookings — updates automatically.",
       "copy": "Copy",
       "how_to": "Open Google/Apple Calendar → \"Subscribe to calendar\" → paste the URL. In Outlook: \"Add calendar\" → \"Subscribe from internet\".",
       "revoke": "Revoke link and generate a new one",
@@ -2088,6 +2101,11 @@
       "tab_types": "Types",
       "types_title": "Which notifications to receive",
       "types_subtitle": "Pick events the portal can notify you about. Channels (push/email/Telegram) are on the «Channels» tab.",
+      "types_subtitle_v2": "For each event — pick channels. Push lands in browser/PWA, Email in your inbox, Telegram (if linked), SMS (billed separately).",
+      "push_hint": "To get push — allow notifications in the card above",
+      "telegram_unlinked_hint": "To get on Telegram — link your account in /settings → Telegram",
+      "sms_no_phone_hint": "To get SMS — set your phone in User Profile",
+      "col_type": "Type",
       "group": {
         "summary": "Summaries",
         "payments": "Payments & invoices",
@@ -4124,6 +4142,13 @@
     "section_subtitle": "Connect a bank via Enable Banking — every debit will automatically fall into 'Expenses'.",
     "add_bank": "+ Connect bank",
     "empty": "No banks connected yet. Hit '+ Connect bank' to import debits automatically.",
+    "link_register": {
+      "label": "Link to register:",
+      "placeholder": "Not linked",
+      "none": "— Not linked",
+      "empty": "No non-cash registers — add one in Settings → Reference",
+      "toast_saved": "Link updated"
+    },
     "status_connected": "Connected",
     "status_pending": "Pending",
     "status_expired": "Consent expired",
@@ -4672,5 +4697,10 @@
     "submit": "Submit",
     "done_title": "Thanks for your feedback!",
     "done_subtitle": "Your feedback helps us improve the service."
+  },
+  "cropper": {
+    "title": "Crop image",
+    "hint": "Drag to align. Mouse wheel — zoom.",
+    "apply": "Save"
   }
 }
