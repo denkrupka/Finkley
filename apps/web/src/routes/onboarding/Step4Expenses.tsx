@@ -91,6 +91,39 @@ const PERIOD_LABEL: Record<ParamPeriod, string> = {
   year: 'год',
 }
 
+/**
+ * T154 — отдаёт items в иерархическом порядке: сначала parent (без parent_id),
+ * сразу за ним — все его дети. Для категорий investments/flows/balance это
+ * группы Поступления/Выбытия и Активы/Пассивы.
+ *
+ * Помечает groupHeader=true для родительских группировок (рендерится
+ * заголовком, не редактируется как обычный item).
+ */
+type HierarchicalItem = ParameterItem & { isGroupHeader?: boolean; depth?: number }
+
+function renderHierarchy(items: ParameterItem[], category: CategoryId): HierarchicalItem[] {
+  const hasGroups = category === 'investments' || category === 'flows'
+  if (!hasGroups) return items.map((it) => ({ ...it }))
+  // Headers (без parent_id) идут первыми с подсветкой, дети — после под ним.
+  const parents = items.filter((it) => !it.parent_id)
+  const childrenByParent = new Map<string, ParameterItem[]>()
+  for (const it of items) {
+    if (it.parent_id) {
+      const arr = childrenByParent.get(it.parent_id) ?? []
+      arr.push(it)
+      childrenByParent.set(it.parent_id, arr)
+    }
+  }
+  const out: HierarchicalItem[] = []
+  for (const p of parents) {
+    out.push({ ...p, isGroupHeader: true, depth: 0 })
+    for (const child of childrenByParent.get(p.id) ?? []) {
+      out.push({ ...child, depth: 1 })
+    }
+  }
+  return out
+}
+
 export type ExpensesDraft = FinancialSettings
 
 type Props = {
@@ -240,7 +273,19 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
             Пока пусто — нажми «Добавить» ниже.
           </p>
         ) : (
-          visibleItems.map((it) => {
+          renderHierarchy(visibleItems, activeCategory).map((it) => {
+            // T154 — group header (Поступления / Выбытия) рендерится
+            // отдельным заголовком без полей суммы.
+            if (it.isGroupHeader) {
+              return (
+                <div
+                  key={it.id}
+                  className="text-brand-navy mt-2 text-xs font-bold uppercase tracking-wider"
+                >
+                  {it.label}
+                </div>
+              )
+            }
             // T142 — per-category колонки. fixed/taxes — добавляем селектор
             // period (мес/квартал/год). cash_registers — селектор cash/non-cash.
             const cols = hasPeriod
@@ -252,7 +297,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
               <div
                 key={it.id}
                 className="grid grid-cols-1 gap-2 sm:gap-2.5"
-                style={{ gridTemplateColumns: '' }}
+                style={{ paddingLeft: it.depth ? 16 : 0 }}
               >
                 <div
                   className="grid grid-cols-1 gap-2 sm:gap-2.5"

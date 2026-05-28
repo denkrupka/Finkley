@@ -206,7 +206,8 @@
       "title": "Tax information",
       "nip_label": "NIP / VAT ID",
       "company_label": "Legal company name",
-      "company_placeholder": "e.g. JANE DOE BEAUTY"
+      "company_placeholder": "e.g. JANE DOE BEAUTY",
+      "mode_label": "How do you do accounting?"
     },
     "step_integrations": {
       "title": "Which integrations to connect?",
@@ -234,7 +235,10 @@
       "service_placeholder": "Women's haircut",
       "price": "Price",
       "add": "Add service",
-      "reset_seed": "Reset to template"
+      "reset_seed": "Reset to template",
+      "ocr_title": "Logging bookings manually?",
+      "ocr_body": "Upload a photo of your booking journal or notebook — AI will recognize and import.",
+      "ocr_collected": "In import queue: {{count}} visits"
     },
     "step4": {
       "title": "Expense categories",
@@ -350,6 +354,9 @@
       "cancel": "Cancel",
       "confirm": "Connect",
       "badge_on": "Connected",
+      "credentials_label": "Access credentials",
+      "credentials_hint": "Credentials are encrypted and used only to connect after the salon is created.",
+      "oauth_note": "After the salon is created we'll open a connect window for this service — confirm there.",
       "providers": {
         "booksy": {
           "tagline": "Visit calendar, masters, clients — everything lands in the portal automatically.",
@@ -438,7 +445,8 @@
       "connect_now": "Connect via @finkley_tg_bot",
       "polling": "Waiting for bot confirmation…",
       "code_hint": "Hit 'Start' in Telegram — status updates here automatically",
-      "toast_linked": "Telegram linked! Morning briefing is on the way."
+      "toast_linked": "Telegram linked! Morning briefing is on the way.",
+      "poll_timeout": "Couldn't confirm. Tap «Connect» again and hit Start in Telegram."
     },
     "schedule": {
       "title": "Salon working hours",
@@ -460,6 +468,13 @@
       "avatar_remove": "Remove",
       "avatar_hint": "PNG / JPG / WEBP, up to 5 MB",
       "avatar_too_large": "Max 5 MB"
+    },
+    "ai_summary": {
+      "title": "AI overall analysis",
+      "subtitle": "What AI understood about your salon and where to grow first.",
+      "loading": "AI is collecting all data and preparing the analysis…",
+      "fallback": "AI couldn't gather the analysis yet — finish onboarding, I'll arrive with the analysis on the dashboard within 5 minutes.",
+      "advice_header": "Advice by priority"
     }
   },
   "nav": {

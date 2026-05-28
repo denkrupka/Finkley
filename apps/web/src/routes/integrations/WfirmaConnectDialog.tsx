@@ -20,6 +20,7 @@ import {
   useWfirmaConnectWithLogin,
   type WfirmaCompanyChoice,
 } from '@/hooks/useIntegrations'
+import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
 
 /**
  * WfirmaConnectDialog — Hybrid X3 (см. ADR-012):
@@ -60,8 +61,17 @@ export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose:
       setCompanyId('')
       setPendingCompanies(null)
       setSelectedCompanyId('')
+      return
     }
-  }, [open])
+    // T150 — pre-fill credentials собранных в онбординге.
+    if (salonId) {
+      const creds = consumeOnboardingCredentials(salonId, 'wfirma')
+      if (creds) {
+        if (creds.email) setEmail(creds.email)
+        if (creds.password) setPassword(creds.password)
+      }
+    }
+  }, [open, salonId])
 
   function explainError(code: string): string {
     switch (code) {

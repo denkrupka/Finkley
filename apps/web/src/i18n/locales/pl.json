@@ -206,7 +206,8 @@
       "title": "Dane podatkowe",
       "nip_label": "NIP / VAT ID",
       "company_label": "Nazwa firmy (prawna)",
-      "company_placeholder": "Np. JANE DOE BEAUTY"
+      "company_placeholder": "Np. JANE DOE BEAUTY",
+      "mode_label": "Jak prowadzisz księgowość?"
     },
     "step_integrations": {
       "title": "Które integracje podłączymy?",
@@ -234,7 +235,10 @@
       "service_placeholder": "Strzyżenie damskie",
       "price": "Cena",
       "add": "Dodaj usługę",
-      "reset_seed": "Przywróć szablon"
+      "reset_seed": "Przywróć szablon",
+      "ocr_title": "Prowadzisz rezerwacje ręcznie?",
+      "ocr_body": "Załaduj zdjęcie swojego dziennika rezerwacji lub zeszytu — AI rozpozna i wprowadzi.",
+      "ocr_collected": "W kolejce do importu: {{count}} wizyt"
     },
     "step4": {
       "title": "Kategorie wydatków",
@@ -350,6 +354,9 @@
       "cancel": "Anuluj",
       "confirm": "Podłącz",
       "badge_on": "Podłączone",
+      "credentials_label": "Dane dostępowe",
+      "credentials_hint": "Dane są szyfrowane i używane tylko do połączenia po utworzeniu salonu.",
+      "oauth_note": "Po utworzeniu salonu otworzymy okno połączenia tego serwisu — potwierdzisz w nim.",
       "providers": {
         "booksy": {
           "tagline": "Kalendarz wizyt, mistrzowie, klienci — wszystko trafi do portalu automatycznie.",
@@ -438,7 +445,8 @@
       "connect_now": "Podłącz przez @finkley_tg_bot",
       "polling": "Czekam na potwierdzenie od bota…",
       "code_hint": "Naciśnij 'Start' w Telegramie — status zaktualizuje się tutaj automatycznie",
-      "toast_linked": "Telegram powiązany! Poranny rozbiór już w drodze."
+      "toast_linked": "Telegram powiązany! Poranny rozbiór już w drodze.",
+      "poll_timeout": "Nie udało się potwierdzić. Kliknij «Podłącz» ponownie i naciśnij Start w Telegramie."
     },
     "schedule": {
       "title": "Godziny pracy salonu",
@@ -460,6 +468,13 @@
       "avatar_remove": "Usuń",
       "avatar_hint": "PNG / JPG / WEBP, do 5 MB",
       "avatar_too_large": "Maks. 5 MB"
+    },
+    "ai_summary": {
+      "title": "Ogólna analiza AI",
+      "subtitle": "Co AI zrozumiał o twoim salonie i gdzie rosnąć w pierwszej kolejności.",
+      "loading": "AI zbiera wszystkie dane i przygotowuje rozbiór…",
+      "fallback": "AI jeszcze nie zebrał rozbioru — dokończ onboarding, przyjdę z analizą na dashboard w ciągu 5 minut.",
+      "advice_header": "Porady według priorytetu"
     }
   },
   "nav": {

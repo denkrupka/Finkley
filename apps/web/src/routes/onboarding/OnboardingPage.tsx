@@ -69,6 +69,9 @@ const STEPS_QUICK = [
   'integrations_banking',
   'tg_phone',
   'wow',
+  // T157 — даже в быстрой ветке показываем общий AI-анализ. Это главная
+  // wow-фича, юзер должен её увидеть.
+  'ai_summary',
   'done',
 ] as const
 const STEPS_FULL = [
@@ -967,18 +970,11 @@ export function OnboardingPage() {
               <>
                 <TutorialNote>{t('onboarding.tutorial.done')}</TutorialNote>
                 <Step5Done
-                  summary={{
-                    salonName: state.name,
-                    staffCount: state.staff.filter((s) => s.full_name.trim()).length,
-                    servicesCount: state.services.filter((s) => s.name.trim()).length,
-                    expensesCount: state.expense_categories.filter((c) => c.trim()).length,
-                  }}
+                  summary={{ salonName: state.name }}
                   benchmarksOptIn={state.benchmarks_opt_in}
                   onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
                   selectedIntegrations={state.selected_integrations}
                   onIntegrationsToggle={(v) => patch('selected_integrations', v)}
-                  subscribeAfterSubmit={state.subscribe_after_submit}
-                  onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
                   path={state.path}
                   onSwitchToFull={() => {
                     // T105 — переключаемся на full ветку и навигируем на

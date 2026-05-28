@@ -15,18 +15,11 @@ import type { OnboardingIntegration } from './OnboardingPage'
 type Props = {
   summary: {
     salonName: string
-    staffCount: number
-    servicesCount: number
-    expensesCount: number
   }
   benchmarksOptIn: boolean
   onBenchmarksToggle: (value: boolean) => void
   selectedIntegrations: OnboardingIntegration[]
   onIntegrationsToggle: (value: OnboardingIntegration[]) => void
-  /** Подписаться в Stripe после submit: true = редирект в Stripe Checkout
-   *  (trial 14 дней включён), false = просто dashboard. */
-  subscribeAfterSubmit: boolean
-  onSubscribeToggle: (value: boolean) => void
   /** T105 — текущий путь онбординга. В quick показываем CTA «Доделать
    *  полный setup» — переключение на full и переход к первому шагу
    *  отсутствующему в quick (schedule). */
@@ -55,8 +48,9 @@ export function Step5Done({
   path,
   onSwitchToFull,
 }: Props) {
-  // T145 — paywall убран, но props subscribeAfterSubmit/onSubscribeToggle
-  // оставлены в Props для backward-compat (OnboardingPage всё ещё их передаёт).
+  // T145+T159 — paywall убран целиком, props subscribeAfterSubmit/
+  // onSubscribeToggle тоже удалены из API. Подписка активируется
+  // автоматически в Settings → Биллинг.
   const { t } = useTranslation()
 
   function toggleIntegration(id: OnboardingIntegration) {

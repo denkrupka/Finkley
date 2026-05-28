@@ -203,6 +203,19 @@ export function formatCurrency(cents: number, currency = 'PLN', locale = 'ru-RU'
 колонку `<name>_cents bigint NOT NULL DEFAULT 0`. Аналитика проще, RPC быстрее,
 изменения return type RPC требуют `DROP + CREATE` функции.
 
+**Логотипы интеграций — BrandIcon.** Для онбординга/интеграций используй
+`apps/web/src/routes/onboarding/BrandIcon.tsx` (inline SVG, 13 провайдеров).
+Не добавляй npm-зависимости типа `@lobehub/icons` или `simple-icons` без ADR —
+inline SVG достаточно для текущего набора, а deps добавляют kBs к bundle.
+
+**Транзит данных между онбордингом и settings — localStorage.** Когда
+онбординг собирает данные которые должны pre-fill формы в `/settings/...`
+(credentials провайдеров, scratch-данные), используй `localStorage` с
+one-shot consume по контракту
+[`apps/web/src/lib/onboarding-credentials.ts`](./apps/web/src/lib/onboarding-credentials.ts)
+(см. [`decisions/028-onboarding-credentials-localstorage-transit.md`](./decisions/028-onboarding-credentials-localstorage-transit.md)).
+Не передавай credentials через URL query params (history + Sentry leak).
+
 ### Время — всегда UTC в БД, локально на клиенте
 
 `timestamptz` в Postgres, ISO-строки в API, `Date` объекты на клиенте, отображение через `date-fns` с локалью. Часовой пояс салона хранится в `salons.timezone` (IANA, например `Europe/Warsaw`).

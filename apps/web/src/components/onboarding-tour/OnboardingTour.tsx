@@ -474,10 +474,18 @@ function useTargetRect(selector: string | undefined): DOMRect | null {
     measure()
     const onResize = () => measure()
     window.addEventListener('resize', onResize)
-    const interval = window.setInterval(measure, 800) // обновляем если DOM меняется
+    // T155 — частое measure первые 3 секунды (когда юзер навигировал на
+    // новую страницу и DOM монтируется), потом редкий polling.
+    const fastInterval = window.setInterval(measure, 150)
+    const fastTimeout = window.setTimeout(() => {
+      window.clearInterval(fastInterval)
+    }, 3000)
+    const slowInterval = window.setInterval(measure, 800)
     return () => {
       window.removeEventListener('resize', onResize)
-      window.clearInterval(interval)
+      window.clearInterval(fastInterval)
+      window.clearTimeout(fastTimeout)
+      window.clearInterval(slowInterval)
     }
   }, [selector])
   return rect

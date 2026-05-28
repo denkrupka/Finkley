@@ -23,6 +23,7 @@ import {
   useUpdateBooksyInterval,
 } from '@/hooks/useIntegrations'
 import { BOOKSY_HCAPTCHA_SITEKEY, loadHCaptcha } from '@/lib/hcaptcha'
+import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
 
 /**
  * BooksyConnectDialog — двух-шаговый flow:
@@ -63,8 +64,17 @@ export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose:
       setCaptchaError(null)
       setMarksPaymentsInBooksy(null)
       setDeletesVisitsInBooksy(null)
+      return
     }
-  }, [open])
+    // T150 — pre-fill credentials собранных в онбординге.
+    if (salonId) {
+      const creds = consumeOnboardingCredentials(salonId, 'booksy')
+      if (creds) {
+        if (creds.email) setEmail(creds.email)
+        if (creds.password) setPassword(creds.password)
+      }
+    }
+  }, [open, salonId])
 
   useEffect(() => {
     if (!open || step !== 'login') return
