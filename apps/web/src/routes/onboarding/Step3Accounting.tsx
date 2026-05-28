@@ -1,10 +1,12 @@
-import { Building2, Plug } from 'lucide-react'
+import { Building2, Check, Plug } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils/cn'
 
+import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration } from './OnboardingPage'
 
 type AccountingProvider = {
@@ -67,6 +69,13 @@ export function Step3Accounting({
   onToggleIntegration,
 }: Props) {
   const { t } = useTranslation()
+  // T122 — модалка подключения провайдера бухгалтерии при клике.
+  const [pendingProvider, setPendingProvider] = useState<OnboardingIntegration | null>(null)
+
+  function handleProviderClick(id: OnboardingIntegration) {
+    if (selectedIntegrations.includes(id)) onToggleIntegration?.(id)
+    else setPendingProvider(id)
+  }
 
   return (
     <div className="space-y-3">
@@ -123,35 +132,51 @@ export function Step3Accounting({
           </div>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {ACCOUNTING_PROVIDERS.map((p) => {
-              const checked = selectedIntegrations.includes(p.id as OnboardingIntegration)
+              const id = p.id as OnboardingIntegration
+              const checked = selectedIntegrations.includes(id)
               return (
-                <label
+                <button
                   key={p.id}
+                  type="button"
+                  onClick={() => handleProviderClick(id)}
                   className={cn(
-                    'flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 transition-colors',
+                    'flex items-start gap-2.5 rounded-md border p-2.5 text-left transition-colors',
                     checked
                       ? 'border-brand-teal-deep bg-brand-teal-soft/40'
                       : 'border-border bg-card hover:bg-muted/30',
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggleIntegration(p.id as OnboardingIntegration)}
-                    className="accent-brand-teal-deep mt-0.5 size-4 shrink-0 cursor-pointer"
-                  />
+                  <div
+                    className={cn(
+                      'mt-0.5 grid size-5 shrink-0 place-items-center rounded',
+                      checked
+                        ? 'bg-brand-teal-deep text-white'
+                        : 'border-border bg-card border',
+                    )}
+                  >
+                    {checked ? <Check className="size-3" strokeWidth={3} /> : null}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-foreground text-sm font-bold">{p.name}</p>
-                    <p className="text-muted-foreground mt-0.5 text-[11px] leading-snug">
+                    <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[11px]">
                       {p.description}
                     </p>
                   </div>
-                </label>
+                </button>
               )
             })}
           </div>
         </div>
       ) : null}
+
+      <ConnectIntegrationDialog
+        integration={pendingProvider}
+        open={pendingProvider !== null}
+        onClose={() => setPendingProvider(null)}
+        onConfirm={() => {
+          if (pendingProvider) onToggleIntegration?.(pendingProvider)
+        }}
+      />
 
     </div>
   )

@@ -1,6 +1,8 @@
-import { Banknote, Calendar, FileText, Plug } from 'lucide-react'
+import { Banknote, Calendar, Check, FileText, Plug } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration } from './OnboardingPage'
 
 const INTEGRATIONS: ReadonlyArray<{
@@ -21,10 +23,17 @@ export function StepIntegrationsChoice({
   onChange: (v: OnboardingIntegration[]) => void
 }) {
   const { t } = useTranslation()
+  // T122 — открываем модалку подключения при клике на не-выбранную интеграцию.
+  const [pending, setPending] = useState<OnboardingIntegration | null>(null)
 
   function toggle(id: OnboardingIntegration) {
     if (selected.includes(id)) onChange(selected.filter((x) => x !== id))
     else onChange([...selected, id])
+  }
+
+  function handleClick(id: OnboardingIntegration) {
+    if (selected.includes(id)) toggle(id)
+    else setPending(id)
   }
 
   return (
@@ -38,32 +47,53 @@ export function StepIntegrationsChoice({
         {INTEGRATIONS.map(({ id, i18nKey, icon: Icon }) => {
           const checked = selected.includes(id)
           return (
-            <label
+            <button
               key={id}
-              className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors ${
+              type="button"
+              onClick={() => handleClick(id)}
+              className={`flex items-start gap-3 rounded-lg border-2 p-3 text-left transition-colors ${
                 checked
                   ? 'border-brand-teal-deep bg-brand-teal-soft/30'
                   : 'border-border bg-card hover:border-brand-teal-deep/40'
               }`}
             >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggle(id)}
-                className="mt-0.5 size-5 cursor-pointer"
-              />
-              <Icon className="text-brand-teal-deep mt-0.5 size-5 shrink-0" strokeWidth={1.8} />
+              <div
+                className={`grid size-9 shrink-0 place-items-center rounded-lg ${
+                  checked
+                    ? 'bg-brand-teal-deep text-white'
+                    : 'bg-brand-teal-soft text-brand-teal-deep'
+                }`}
+              >
+                {checked ? (
+                  <Check className="size-5" strokeWidth={2.4} />
+                ) : (
+                  <Icon className="size-5" strokeWidth={1.8} />
+                )}
+              </div>
               <div className="flex-1">
                 <p className="text-foreground text-sm font-bold">{t(`${i18nKey}.label`)}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
                   {t(`${i18nKey}.hint`)}
                 </p>
               </div>
-            </label>
+              {checked ? (
+                <span className="bg-brand-teal-deep mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                  ✓
+                </span>
+              ) : null}
+            </button>
           )
         })}
       </div>
 
+      <ConnectIntegrationDialog
+        integration={pending}
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        onConfirm={() => {
+          if (pending) toggle(pending)
+        }}
+      />
     </div>
   )
 }

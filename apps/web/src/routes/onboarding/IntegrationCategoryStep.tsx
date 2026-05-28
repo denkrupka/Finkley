@@ -1,9 +1,11 @@
+import { Check } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
 
+import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration } from './OnboardingPage'
 
 export type IntegrationItem = {
@@ -24,7 +26,6 @@ export type IntegrationItem = {
  */
 export function IntegrationCategoryStep({
   title,
-  subtitle,
   items,
   selected,
   onToggle,
@@ -32,7 +33,9 @@ export function IntegrationCategoryStep({
   extra,
 }: {
   title: string
-  subtitle: string
+  /** T123 — больше не отображается (компактизация), но оставлен в API
+   *  для обратной совместимости — вызывающий код всё ещё передаёт его. */
+  subtitle?: string
   items: IntegrationItem[]
   selected: OnboardingIntegration[]
   onToggle: (id: OnboardingIntegration) => void
@@ -42,66 +45,81 @@ export function IntegrationCategoryStep({
   extra?: ReactNode
 }) {
   const { t } = useTranslation()
+  // T122 — модалка подключения. При клике на не-выбранную интеграцию
+  // открываем dialog с описанием. На confirm → toggle.
+  const [pending, setPending] = useState<OnboardingIntegration | null>(null)
+
+  function handleCardClick(id: OnboardingIntegration) {
+    if (selected.includes(id)) {
+      onToggle(id) // снять выбор без модалки
+    } else {
+      setPending(id) // открыть модалку
+    }
+  }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
-          <span aria-hidden className="mr-1.5">
-            {emoji}
-          </span>
-          {title}
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{subtitle}</p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="text-brand-navy text-2xl font-bold tracking-tight">
+        <span aria-hidden className="mr-1.5">
+          {emoji}
+        </span>
+        {title}
+      </h2>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {items.map((it) => {
           const checked = selected.includes(it.id)
           const Icon = it.icon
           return (
-            <label
+            <button
               key={it.id}
+              type="button"
+              onClick={() => handleCardClick(it.id)}
               className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-colors',
+                'flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors',
                 checked
                   ? 'border-brand-teal-deep bg-brand-teal-soft/30'
                   : 'border-border bg-card hover:border-brand-teal-deep/40',
               )}
             >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => onToggle(it.id)}
-                className="accent-brand-teal-deep mt-1 size-5 shrink-0 cursor-pointer"
-              />
               <div
                 className={cn(
-                  'grid size-10 shrink-0 place-items-center rounded-lg',
+                  'grid size-9 shrink-0 place-items-center rounded-lg',
                   checked
                     ? 'bg-brand-teal-deep text-white'
                     : 'bg-brand-teal-soft text-brand-teal-deep',
                 )}
               >
-                <Icon className="size-5" strokeWidth={1.8} />
+                {checked ? (
+                  <Check className="size-5" strokeWidth={2.4} />
+                ) : (
+                  <Icon className="size-5" strokeWidth={1.8} />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-foreground text-sm font-bold">{it.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-snug">{it.benefit}</p>
+                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{it.benefit}</p>
               </div>
-            </label>
+              {checked ? (
+                <span className="bg-brand-teal-deep mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                  ✓ {t('onboarding.connect_dialog.badge_on', { defaultValue: 'Подключено' })}
+                </span>
+              ) : null}
+            </button>
           )
         })}
       </div>
 
       {extra}
 
-      <p className="text-muted-foreground text-xs">
-        {t('onboarding.step_integrations.connect_after_hint', {
-          defaultValue:
-            'Подключим после создания салона — откроем тебе нужные диалоги один за другим. Можешь пропустить — позже зайдёшь в Настройки → Интеграции.',
-        })}
-      </p>
+      <ConnectIntegrationDialog
+        integration={pending}
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        onConfirm={() => {
+          if (pending) onToggle(pending)
+        }}
+      />
     </div>
   )
 }

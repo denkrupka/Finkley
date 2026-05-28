@@ -831,6 +831,13 @@ export function OnboardingPage() {
                   ['instagram', 'facebook', 'telegram'].includes(x),
                 )}
                 full={state.path === 'full'}
+                selectedIntegrations={state.selected_integrations}
+                staffCount={state.staff.length}
+                servicesCount={state.services.length}
+                hasGooglePlace={!!state.address.google_place_id}
+                hasNip={!!state.nip}
+                companyName={state.company_name}
+                ocrVisitsCount={state.ocr_visits.length}
               />
             )}
             {stepId === 'ai_services' && <StepAiBreakdown topic="services" />}
