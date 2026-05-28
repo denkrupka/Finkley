@@ -95,6 +95,9 @@ export type OnboardingState = {
   selected_integrations: OnboardingIntegration[]
   /** В Done step: после submit редиректить в Stripe Checkout (trial 14д). */
   subscribe_after_submit: boolean
+  /** T81 — data URL логотипа (webp blob) из ImageCropper. Заливается в
+   *  Storage после создания салона (надо salon_id для RLS). NULL — без логотипа. */
+  logo_data_url: string | null
 }
 
 const INITIAL: OnboardingState = {
@@ -117,6 +120,7 @@ const INITIAL: OnboardingState = {
   expense_categories: [...DEFAULT_EXPENSE_CATEGORIES],
   benchmarks_opt_in: true, // дефолт ON — большинство соглашается, можно выключить
   selected_integrations: [],
+  logo_data_url: null,
   // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
   // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
   // без редиректа в Stripe Checkout. Активация подписки переехала в
@@ -244,6 +248,25 @@ export function OnboardingPage() {
         company_name: state.company_name.trim() || null,
       }
     }
+    // T81 — заливаем логотип в salon-logos bucket (если был выбран). Это
+    // делается ПОСЛЕ создания салона, потому что bucket-policy требует
+    // salon_id в первом компоненте пути.
+    if (state.logo_data_url) {
+      try {
+        const blob = await (await fetch(state.logo_data_url)).blob()
+        const path = `${newSalonId}/${crypto.randomUUID()}.webp`
+        const up = await supabase.storage
+          .from('salon-logos')
+          .upload(path, blob, { upsert: false, contentType: 'image/webp', cacheControl: '3600' })
+        if (!up.error) {
+          const { data: pub } = supabase.storage.from('salon-logos').getPublicUrl(path)
+          extraPatch.logo_url = pub.publicUrl
+        }
+      } catch (err) {
+        console.warn('logo upload failed', err)
+      }
+    }
+
     if (Object.keys(extraPatch).length > 0) {
       await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
     }
@@ -430,8 +453,10 @@ export function OnboardingPage() {
                     salon_type: state.salon_type,
                     address: state.address,
                     benchmarks_opt_in: state.benchmarks_opt_in,
+                    logo_data_url: state.logo_data_url,
                   }}
                   onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
+                  showLogo={state.path === 'full'}
                 />
               </>
             )}

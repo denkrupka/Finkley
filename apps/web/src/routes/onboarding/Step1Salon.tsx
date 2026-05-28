@@ -1,8 +1,11 @@
-import { CheckCircle2, MapPin, Sparkles } from 'lucide-react'
+import { CheckCircle2, ImagePlus, Loader2, MapPin, Sparkles, Trash2 } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
 import { Field } from '@/components/ui/field'
+import { ImageCropper } from '@/components/ui/ImageCropper'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils/cn'
 
@@ -21,8 +24,13 @@ type Props = {
     salon_type: SalonTypeId
     address: AddressDraft
     benchmarks_opt_in: boolean
+    /** Полная ветка: data URL логотипа (webp blob, ≤512px). После submit
+     *  отправляется в Storage. NULL — без логотипа. */
+    logo_data_url: string | null
   }
   onChange: (v: Partial<Props['value']>) => void
+  /** В полной ветке показываем блок загрузки логотипа — в быстрой нет. */
+  showLogo?: boolean
 }
 
 /**
@@ -37,9 +45,21 @@ type Props = {
  *      по умолчанию, юзер может снять. Прямо тут — чтобы не возвращать
  *      на финальный шаг для одного чекбокса.
  */
-export function Step1Salon({ value, onChange }: Props) {
+export function Step1Salon({ value, onChange, showLogo = false }: Props) {
   const { t } = useTranslation()
   const placePicked = !!value.address.google_place_id
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(String(r.result))
+      r.onerror = reject
+      r.readAsDataURL(blob)
+    })
+  }
 
   return (
     <div>
@@ -150,6 +170,80 @@ export function Step1Salon({ value, onChange }: Props) {
           </p>
         </Field>
 
+        {/* Логотип — только в полной ветке (T81). В быстрой пропускаем чтобы
+            не задерживать на необязательном поле. */}
+        {showLogo ? (
+          <Field
+            id="onb-logo"
+            label={t('onboarding.step1.logo_label', { defaultValue: 'Логотип салона' })}
+          >
+            <div className="flex items-center gap-4">
+              {value.logo_data_url ? (
+                <img
+                  src={value.logo_data_url}
+                  alt="logo preview"
+                  className="border-border bg-card size-16 rounded-md border object-contain"
+                />
+              ) : (
+                <div className="border-border bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-md border text-xs">
+                  —
+                </div>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  if (f.size > 5 * 1024 * 1024) {
+                    toast.error(
+                      t('onboarding.step1.logo_too_large', { defaultValue: 'Макс. 5 МБ' }),
+                    )
+                    e.target.value = ''
+                    return
+                  }
+                  setCropFile(f)
+                  e.target.value = ''
+                }}
+              />
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-semibold disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <ImagePlus className="size-3.5" strokeWidth={2} />
+                  )}
+                  {value.logo_data_url
+                    ? t('onboarding.step1.logo_change', { defaultValue: 'Заменить' })
+                    : t('onboarding.step1.logo_upload', { defaultValue: 'Загрузить логотип' })}
+                </button>
+                {value.logo_data_url ? (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ logo_data_url: null })}
+                    className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 self-start text-xs"
+                  >
+                    <Trash2 className="size-3" strokeWidth={1.8} />
+                    {t('onboarding.step1.logo_remove', { defaultValue: 'Убрать' })}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <p className="text-muted-foreground mt-1.5 text-xs">
+              {t('onboarding.step1.logo_hint', {
+                defaultValue: 'Покажем в шапке и в письмах клиентам. PNG / JPG / WEBP, до 5 МБ.',
+              })}
+            </p>
+          </Field>
+        ) : null}
+
         <Field
           id="onb-type"
           label={t('onboarding.step1.type_label', { defaultValue: 'Тип салона' })}
@@ -213,6 +307,23 @@ export function Step1Salon({ value, onChange }: Props) {
           </div>
         </label>
       </div>
+
+      <ImageCropper
+        file={cropFile}
+        aspect={null}
+        maxOutputSize={512}
+        onCancel={() => setCropFile(null)}
+        onCrop={async (blob) => {
+          setUploading(true)
+          try {
+            const dataUrl = await blobToDataUrl(blob)
+            onChange({ logo_data_url: dataUrl })
+            setCropFile(null)
+          } finally {
+            setUploading(false)
+          }
+        }}
+      />
     </div>
   )
 }
