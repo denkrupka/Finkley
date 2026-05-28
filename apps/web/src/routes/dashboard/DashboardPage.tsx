@@ -1,11 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { format, startOfMonth, subMonths } from 'date-fns'
+import { startOfMonth, subMonths } from 'date-fns'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { getDateLocale } from '@/lib/utils/format-date'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
+  currentMonthPeriod,
+  periodLabel,
+  periodToRange,
+  shiftPeriod,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -22,7 +29,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useServiceCategories, useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { useVisits } from '@/hooks/useVisits'
-import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
+import { type PeriodKey } from '@/lib/period'
 import { effectiveReceivedFromVisit } from '@/hooks/useVisits'
 
 import { CashDetailsModal } from './CashDetailsModal'
@@ -77,22 +84,34 @@ export function DashboardPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
-  // Дашборд всегда показывает текущий месяц — никаких custom периодов,
-  // weekly/daily выборок. Юзер явно просил: «все данные — за текущий месяц,
-  // явно показано сверху». Параметр period в URL игнорируем; period-picker
-  // тут не нужен — для детальных отчётов есть /finance и /reports.
-  const period: PeriodKey = 'month'
-  void params
+  // T114 — динамический период. Дефолт = текущий месяц, но юзер может
+  // выбрать любой через плашку справа сверху (PeriodPickerPopover):
+  // месяц / год / range / последние N дней.
+  const [periodValue, setPeriodValue] = useState<PeriodValue>(() => currentMonthPeriod())
+  const periodRangeDates = periodToRange(periodValue)
+  const range = {
+    start: periodRangeDates.start.toISOString(),
+    end: periodRangeDates.end.toISOString(),
+  }
+  // Для legacy кода с PeriodKey остаётся 'month' (используется только
+  // в profitForecast — но он валиден только для month-режима в любом случае).
+  const period: PeriodKey = periodValue.kind === 'month' ? 'month' : 'custom'
   const now = new Date()
-  const range = getPeriodRange(period, now, readCustomFromParams(new URLSearchParams()))
   const [cashDetailsOpen, setCashDetailsOpen] = useState(false)
 
-  // Заголовок периода: «Май 2026» — в locale юзера. Для дашборд-плашки.
-  const monthLabel = format(startOfMonth(now), 'LLLL yyyy', { locale: getDateLocale() })
+  void periodLabel // PeriodPickerPopover сам рендерит лейбл
 
-  // Предыдущий месяц — для MoM (Month over Month) сравнения KPI.
-  const prevMonthAnchor = subMonths(startOfMonth(now), 1)
-  const prevRange = getPeriodRange('month', prevMonthAnchor)
+  // Предыдущий период — для MoM сравнения KPI. shiftPeriod сдвигает
+  // выбранный период на 1 шаг назад (год, месяц, range, recent).
+  const prevPeriodValue = shiftPeriod(periodValue, -1)
+  const prevRangeDates = periodToRange(prevPeriodValue)
+  const prevRange = {
+    start: prevRangeDates.start.toISOString(),
+    end: prevRangeDates.end.toISOString(),
+  }
+  void params
+  void subMonths
+  void startOfMonth
 
   const { data: salon } = useSalon(salonId)
   const { data: kpis } = useDashboardKpis(salonId, range)
@@ -262,14 +281,11 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
-      {/* T89 — явная плашка периода. Дашборд показывает только текущий
-          месяц; для других диапазонов есть /finance и /reports. */}
-      <div
-        className="border-border bg-card text-muted-foreground mb-1 inline-flex w-fit items-center gap-1.5 self-start rounded-full border px-3 py-1 text-xs font-semibold"
-        title="Все показатели на дашборде считаются только за текущий месяц. Для других периодов используй разделы Финансы → P&L и Отчёты."
-      >
-        <span className="bg-brand-sage size-1.5 rounded-full" />
-        <span>Данные за {monthLabel}</span>
+      {/* T114 — плашка периода в правом верхнем углу. Кликабельная,
+          открывает PeriodPickerPopover (месяц/год/range/recent N дней).
+          Применяется ко всем KPI, секциям и MoM-сравнениям. */}
+      <div className="mb-1 flex items-center justify-end">
+        <PeriodPickerPopover value={periodValue} onChange={setPeriodValue} />
       </div>
 
       {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
