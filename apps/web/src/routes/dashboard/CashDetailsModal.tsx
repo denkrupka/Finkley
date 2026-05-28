@@ -1,7 +1,8 @@
-import { Banknote, Building2, X } from 'lucide-react'
+import { ArrowRight, Banknote, Building2, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useBankAccountBalances } from '@/hooks/useBanking'
 import { useRegisterBalances } from '@/hooks/useCashTransfers'
 import { useFinancialSettings } from '@/hooks/useFinancialSettings'
@@ -9,18 +10,20 @@ import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
 /**
- * T73 — модалка «Детали по кассам» открывается из KPI «Деньги на счетах»
- * на дашборде. Показывает плитки по каждой кассе из financial_settings:
+ * T73/T87 — модалка «Детали по кассам» открывается из KPI «Деньги на счетах»
+ * на дашборде.
  *
- *   - Cash касса (cash_kind='cash'): plan = текущий баланс по нашим
- *     проводкам (compute_all_register_balances). Факт совпадает с планом
- *     потому что мы сами ведём учёт.
- *   - Non-cash касса (cash_kind='non_cash'):
- *     * Если есть привязка к bank_account: ФАКТ = balance из bank_transactions
- *       (банк уже подтвердил поступления). ПЛАН = наш расчётный баланс.
- *       «Ожидается поступление = план - факт» — клиент заплатил картой,
- *       эквайринг ещё не провёл.
- *     * Если нет привязки: показываем только наш расчётный баланс (план).
+ * Структура для каждой кассы:
+ *   - Cash (cash_kind='cash'): один баланс = текущий по нашим проводкам
+ *     (compute_all_register_balances). Факт = план, мы сами ведём учёт.
+ *   - Non-cash со связью bank_account: ФАКТ из bank_transactions + ПЛАН +
+ *     «Ожидается поступление = план - факт» (картой заплатили, эквайринг
+ *     ещё не провёл).
+ *   - Non-cash БЕЗ связи: только наш расчётный план + явный CTA на привязку
+ *     bank_account → cash_register в /settings → Интеграции → Банкинг.
+ *
+ * Кнопку закрытия (X) рисует shadcn DialogContent сам в правом верхнем
+ * углу — свою НЕ добавляем (был дубль в первой версии).
  */
 export function CashDetailsModal({
   open,
@@ -52,21 +55,21 @@ export function CashDetailsModal({
 
   const registers = (settings?.cash_registers.items ?? []).filter((r) => !r.archived)
 
+  // Подсказка про не-связанную безналичную кассу — есть ли вообще
+  // подключенные банк-аккаунты? Если есть, но эта касса не связана — у
+  // юзера всё готово, нужен один клик связать. Если банка нет вообще —
+  // другой CTA (подключить банк).
+  const hasAnyBankAccount = bankBalances.length > 0
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl p-0">
-        <DialogTitle className="border-border flex items-center justify-between border-b px-5 py-3 text-base font-bold">
-          {t('dashboard.cash_details.title', { defaultValue: 'Деньги на счетах — детали' })}
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
-            aria-label="Close"
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </button>
-        </DialogTitle>
-        <div className="flex flex-col gap-4 p-5">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>
+            {t('dashboard.cash_details.title', { defaultValue: 'Деньги на счетах — детали' })}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           {registers.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               {t('dashboard.cash_details.empty', {
@@ -74,7 +77,7 @@ export function CashDetailsModal({
               })}
             </p>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {registers.map((r) => {
                 const isCash = r.cash_kind !== 'non_cash'
                 const planCents = balanceByRegister.get(r.id) ?? 0
@@ -84,31 +87,32 @@ export function CashDetailsModal({
                 return (
                   <div
                     key={r.id}
-                    className="border-border bg-card shadow-finsm flex flex-col gap-2.5 rounded-xl border p-3.5"
+                    className="border-border bg-card shadow-finsm flex flex-col gap-3 rounded-xl border p-5"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          'grid size-10 shrink-0 place-items-center rounded-lg',
+                          isCash
+                            ? 'bg-brand-sage-soft text-brand-sage-deep'
+                            : 'bg-brand-teal-soft text-brand-teal-deep',
+                        )}
+                      >
+                        {isCash ? (
+                          <Banknote className="size-5" strokeWidth={1.8} />
+                        ) : (
+                          <Building2 className="size-5" strokeWidth={1.8} />
+                        )}
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <span className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
-                          {isCash ? (
-                            <Banknote
-                              className="text-muted-foreground size-3.5"
-                              strokeWidth={1.8}
-                            />
-                          ) : (
-                            <Building2
-                              className="text-muted-foreground size-3.5"
-                              strokeWidth={1.8}
-                            />
-                          )}
-                          {r.label}
-                        </span>
-                        <span className="text-muted-foreground mt-0.5 block text-[10px] font-semibold uppercase tracking-wider">
+                        <p className="text-foreground truncate text-base font-bold">{r.label}</p>
+                        <p className="text-muted-foreground mt-0.5 text-[10px] font-semibold uppercase tracking-wider">
                           {isCash
                             ? t('dashboard.cash_details.cash', { defaultValue: 'Наличные' })
                             : t('dashboard.cash_details.non_cash', {
                                 defaultValue: 'Безналичные',
                               })}
-                        </span>
+                        </p>
                       </div>
                     </div>
 
@@ -117,29 +121,29 @@ export function CashDetailsModal({
                     {linked && !isCash ? (
                       <>
                         <div>
-                          <span className="text-muted-foreground text-[11px]">
+                          <span className="text-muted-foreground text-xs">
                             {t('dashboard.cash_details.fact_bank', {
                               defaultValue: 'Факт (по банку)',
                             })}
                           </span>
-                          <div className="num text-foreground text-lg font-bold leading-none">
+                          <div className="num text-foreground mt-0.5 break-all text-xl font-bold leading-tight">
                             {formatCurrency(factCents ?? 0, currency)}
                           </div>
                         </div>
                         <div>
-                          <span className="text-muted-foreground text-[11px]">
+                          <span className="text-muted-foreground text-xs">
                             {t('dashboard.cash_details.plan', {
                               defaultValue: 'План (по нашим записям)',
                             })}
                           </span>
-                          <div className="num text-muted-foreground text-sm font-semibold leading-none">
+                          <div className="num text-muted-foreground mt-0.5 break-all text-sm font-semibold leading-tight">
                             {formatCurrency(planCents, currency)}
                           </div>
                         </div>
                         {Math.abs(expected) > 100 ? (
                           <div
                             className={cn(
-                              'rounded-md px-2 py-1.5 text-[11px] font-semibold',
+                              'rounded-md px-2.5 py-2 text-xs font-semibold leading-snug',
                               expected > 0
                                 ? 'bg-amber-50 text-amber-800'
                                 : 'bg-rose-50 text-rose-700',
@@ -158,22 +162,21 @@ export function CashDetailsModal({
                         ) : null}
                       </>
                     ) : (
-                      <div>
-                        <span className="text-muted-foreground text-[11px]">
-                          {t('dashboard.cash_details.balance', { defaultValue: 'Текущий баланс' })}
-                        </span>
-                        <div className="num text-foreground text-lg font-bold leading-none">
-                          {formatCurrency(planCents, currency)}
+                      <>
+                        <div>
+                          <span className="text-muted-foreground text-xs">
+                            {t('dashboard.cash_details.balance', {
+                              defaultValue: 'Текущий баланс',
+                            })}
+                          </span>
+                          <div className="num text-foreground mt-0.5 break-all text-xl font-bold leading-tight">
+                            {formatCurrency(planCents, currency)}
+                          </div>
                         </div>
                         {!isCash ? (
-                          <p className="text-muted-foreground mt-1 text-[11px]">
-                            {t('dashboard.cash_details.not_linked', {
-                              defaultValue:
-                                'Касса не связана с банк-счётом. Привяжи в /settings → Интеграции → Банкинг чтобы видеть факт.',
-                            })}
-                          </p>
+                          <UnlinkedHint salonId={salonId} hasAnyBankAccount={hasAnyBankAccount} />
                         ) : null}
-                      </div>
+                      </>
                     )}
                   </div>
                 )
@@ -183,5 +186,48 @@ export function CashDetailsModal({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Подсказка для безналичной кассы без привязки к банк-аккаунту.
+ *  Два сценария:
+ *    - У салона есть подключенный банк, но эта касса не связана с конкретным
+ *      счётом → «Связь не настроена» + кнопка «Связать сейчас».
+ *    - Банк не подключен вообще → «Подключи банк чтобы видеть факт».
+ */
+function UnlinkedHint({
+  salonId,
+  hasAnyBankAccount,
+}: {
+  salonId: string
+  hasAnyBankAccount: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="border-border bg-muted/30 flex flex-col gap-2 rounded-md border border-dashed p-2.5">
+      <div className="text-muted-foreground inline-flex items-start gap-1.5 text-[11px] leading-snug">
+        <Link2Off className="mt-0.5 size-3 shrink-0" strokeWidth={1.8} />
+        <span>
+          {hasAnyBankAccount
+            ? t('dashboard.cash_details.unlinked_with_bank', {
+                defaultValue:
+                  'Банк подключён, но эту кассу ещё не связали с конкретным счётом — поэтому факт не виден.',
+              })
+            : t('dashboard.cash_details.unlinked_no_bank', {
+                defaultValue:
+                  'Подключи банк через Enable Banking и привяжи к этой кассе — увидишь фактический баланс автоматом.',
+              })}
+        </span>
+      </div>
+      <Link
+        to={`/${salonId}/settings?tab=integrations&intab=banking`}
+        className="text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center gap-1 self-start rounded px-1 py-0.5 text-[11px] font-bold"
+      >
+        {hasAnyBankAccount
+          ? t('dashboard.cash_details.link_now', { defaultValue: 'Связать сейчас' })
+          : t('dashboard.cash_details.connect_bank', { defaultValue: 'Подключить банк' })}
+        <ArrowRight className="size-3" strokeWidth={2.2} />
+      </Link>
+    </div>
   )
 }

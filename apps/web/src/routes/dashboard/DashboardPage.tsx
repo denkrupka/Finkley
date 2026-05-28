@@ -1,13 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths } from 'date-fns'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { getDateLocale } from '@/lib/utils/format-date'
+
 import { supabase } from '@/lib/supabase/client'
 
 import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
+import { useBankAccountBalances } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import { useDashboardKpis, useTopStaff } from '@/hooks/useDashboard'
 import { useRegisterBalances } from '@/hooks/useCashTransfers'
@@ -29,7 +32,6 @@ import {
   computeAvgRating,
   computeLocalInsights,
   computeMarketingSources,
-  computeMaterialsStockPct,
   computeNeedsReactivation,
   computeNewClientsCount,
   computeNoShowsCount,
@@ -39,7 +41,6 @@ import {
   computeRetentionPct,
   computeRevenueByCategory,
   computeRfm,
-  computeTodayAppointments,
   workingDaysInRange,
 } from './dashboard-aggregates'
 import { InsightsWidget } from './InsightsWidget'
@@ -51,7 +52,6 @@ import {
   KpiCardsRow,
   MarketingSection,
   MastersSection,
-  OperationsSection,
 } from './sections'
 import { aggregateDailyRevenue } from './sections-utils'
 
@@ -77,10 +77,18 @@ export function DashboardPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
-  const period = (params.get('period') ?? 'month') as PeriodKey
+  // Дашборд всегда показывает текущий месяц — никаких custom периодов,
+  // weekly/daily выборок. Юзер явно просил: «все данные — за текущий месяц,
+  // явно показано сверху». Параметр period в URL игнорируем; period-picker
+  // тут не нужен — для детальных отчётов есть /finance и /reports.
+  const period: PeriodKey = 'month'
+  void params
   const now = new Date()
-  const range = getPeriodRange(period, now, readCustomFromParams(params))
+  const range = getPeriodRange(period, now, readCustomFromParams(new URLSearchParams()))
   const [cashDetailsOpen, setCashDetailsOpen] = useState(false)
+
+  // Заголовок периода: «Май 2026» — в locale юзера. Для дашборд-плашки.
+  const monthLabel = format(startOfMonth(now), 'LLLL yyyy', { locale: getDateLocale() })
 
   // Предыдущий месяц — для MoM (Month over Month) сравнения KPI.
   const prevMonthAnchor = subMonths(startOfMonth(now), 1)
@@ -99,6 +107,7 @@ export function DashboardPage() {
   })
   const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   const { data: registerBalances = [] } = useRegisterBalances(salonId)
+  const { data: bankBalances = [] } = useBankAccountBalances(salonId)
   const { data: financialSettings } = useFinancialSettings(salonId)
   const { data: clients = [] } = useClients(salonId)
   const { data: services = [] } = useServices(salonId)
@@ -135,6 +144,28 @@ export function DashboardPage() {
 
   // Сумма всех касс «сейчас».
   const cashBalanceCents = registerBalances.reduce((acc, b) => acc + b.balance_cents, 0)
+
+  // T90 — «Ожидается к поступлению» = Σ (план − факт) по non-cash кассам
+  // со связью к bank_account. Это деньги клиента (картой) которые эквайринг
+  // ещё не зачислил на счёт. Только положительная часть (план > факт);
+  // отрицательная разница — рассинхрон, в виджет не идёт.
+  const bankFactByRegister = new Map<string, number>()
+  for (const ba of bankBalances) {
+    if (!ba.cash_register_id) continue
+    bankFactByRegister.set(
+      ba.cash_register_id,
+      (bankFactByRegister.get(ba.cash_register_id) ?? 0) + ba.balance_cents,
+    )
+  }
+  let expectedIncomingCents = 0
+  for (const r of financialSettings?.cash_registers.items ?? []) {
+    if (r.archived || r.cash_kind !== 'non_cash') continue
+    const fact = bankFactByRegister.get(r.id)
+    if (fact == null) continue
+    const plan = registerBalances.find((b) => b.register_id === r.id)?.balance_cents ?? 0
+    const diff = plan - fact
+    if (diff > 0) expectedIncomingCents += diff
+  }
 
   // MoM% выручки / прибыли.
   const prevRevenueCents = prevKpis?.revenue_cents ?? null
@@ -211,8 +242,6 @@ export function DashboardPage() {
   const needsReactivation = computeNeedsReactivation(clients, now)
   const rfm = computeRfm(clients, now)
   const marketingSources = computeMarketingSources(clients)
-  const materialsStockPct = computeMaterialsStockPct(inventoryItems)
-  const todayAppointments = computeTodayAppointments(visits, now)
   const noShowsCount = computeNoShowsCount(visits)
   const { avg: avgRating, count: reviewsCount } = computeAvgRating(reviews, range)
   const lowStockCount = inventoryItems.filter(
@@ -233,6 +262,16 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
+      {/* T89 — явная плашка периода. Дашборд показывает только текущий
+          месяц; для других диапазонов есть /finance и /reports. */}
+      <div
+        className="border-border bg-card text-muted-foreground mb-1 inline-flex w-fit items-center gap-1.5 self-start rounded-full border px-3 py-1 text-xs font-semibold"
+        title="Все показатели на дашборде считаются только за текущий месяц. Для других периодов используй разделы Финансы → P&L и Отчёты."
+      >
+        <span className="bg-brand-sage size-1.5 rounded-full" />
+        <span>Данные за {monthLabel}</span>
+      </div>
+
       {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
 
       {/* Стартовый тур */}
@@ -276,6 +315,7 @@ export function DashboardPage() {
         churnedClients={churnedClients}
         cashBalanceCents={cashBalanceCents}
         cashPlanCents={null}
+        expectedIncomingCents={expectedIncomingCents}
         onCashDetailsClick={() => setCashDetailsOpen(true)}
       />
 
@@ -340,16 +380,9 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* Блок 4 — Запись и операции */}
-      <OperationsSection
-        todayAppointments={todayAppointments}
-        waitlistCount={null}
-        materialsStockPct={materialsStockPct}
-        freeSlotsCount={null}
-        totalSlotsCount={null}
-      />
-
-      {/* Блок 5 — Маркетинг */}
+      {/* Блок 4 — Маркетинг (раньше тут был «Запись и операции», удалён по
+          запросу владельца — записи на сегодня и материалы и так видны в
+          /reports и в виджете «Заканчиваются материалы» наверху). */}
       <MarketingSection
         currency={currency}
         sources={marketingSources}

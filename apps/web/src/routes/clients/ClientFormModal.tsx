@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChevronDown, Facebook, Instagram, Plus, Send, Trash2 } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { ChevronDown, Facebook, Instagram, Send, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -46,7 +46,10 @@ const COUNTRY_OPTIONS: {
   { code: 'OTHER', dial: '+', label: '…' },
 ]
 
-type SocialKind = 'instagram' | 'facebook' | 'telegram' | 'custom'
+// «Своя» соцсеть (custom) удалена по запросу — в реальной жизни 99% клиентов
+// используют только Instagram/Facebook/Telegram. Если когда-нибудь понадобится
+// VK/TikTok/др — вернём позже отдельной задачей.
+type SocialKind = 'instagram' | 'facebook' | 'telegram'
 
 type FormValues = {
   name: string
@@ -55,7 +58,7 @@ type FormValues = {
   email: string
   source: string
   notes: string
-  socials: { kind: SocialKind; label?: string; handle: string }[]
+  socials: { kind: SocialKind; handle: string }[]
   discountPercent: string // строкой в форме чтобы пустое = null
 }
 
@@ -74,8 +77,7 @@ const schema = z.object({
   socials: z
     .array(
       z.object({
-        kind: z.enum(['instagram', 'facebook', 'telegram', 'custom']),
-        label: z.string().max(40).optional(),
+        kind: z.enum(['instagram', 'facebook', 'telegram']),
         handle: z.string().max(200),
       }),
     )
@@ -185,7 +187,11 @@ export function ClientFormModal({
       email: client?.email ?? '',
       source: client?.source ?? '',
       notes: client?.notes ?? '',
-      socials: client?.socials ?? [],
+      // Custom-соцсети из legacy данных фильтруем — теперь поддерживаются
+      // только instagram/facebook/telegram.
+      socials: (client?.socials ?? []).filter(
+        (s): s is { kind: SocialKind; handle: string } => s.kind !== 'custom',
+      ),
       discountPercent:
         client?.discount_percent !== null && client?.discount_percent !== undefined
           ? String(client.discount_percent)
@@ -211,7 +217,6 @@ export function ClientFormModal({
       .filter((s) => s.handle && s.handle.trim())
       .map((s) => ({
         kind: s.kind,
-        ...(s.kind === 'custom' && s.label ? { label: s.label.trim() } : {}),
         handle: s.handle.trim(),
       }))
 
@@ -261,17 +266,17 @@ export function ClientFormModal({
   }
 
   function addSocial(kind: SocialKind) {
-    append({ kind, handle: '', ...(kind === 'custom' ? { label: '' } : {}) })
+    append({ kind, handle: '' })
   }
 
-  const usedKinds = new Set(fields.filter((f) => f.kind !== 'custom').map((f) => f.kind))
+  const usedKinds = new Set(fields.map((f) => f.kind))
   const availableSocials: SocialKind[] = (['instagram', 'facebook', 'telegram'] as const).filter(
     (k) => !usedKinds.has(k),
   )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(540px,96vw)] max-w-none">
+      <DialogContent className="w-[min(820px,96vw)] max-w-none">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? t('clients.form.title_edit') : t('clients.form.title_new')}
@@ -279,7 +284,7 @@ export function ClientFormModal({
         </DialogHeader>
 
         <form
-          className="flex max-h-[75vh] flex-col gap-3 overflow-y-auto px-5 pb-2 pt-3"
+          className="flex flex-col gap-3 px-5 pb-2 pt-3"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
@@ -359,19 +364,11 @@ export function ClientFormModal({
                 {fields.map((f, idx) => (
                   <div key={f.id} className="flex items-center gap-2">
                     <SocialIcon kind={f.kind} />
-                    {f.kind === 'custom' ? (
-                      <Input
-                        placeholder={t('clients.form.social_kind_placeholder')}
-                        {...form.register(`socials.${idx}.label` as const)}
-                        className="h-9 w-[110px] shrink-0 text-sm"
-                      />
-                    ) : (
-                      <span className="text-foreground w-[110px] shrink-0 text-sm font-semibold">
-                        {socialKindLabel(f.kind, t)}
-                      </span>
-                    )}
+                    <span className="text-foreground w-[110px] shrink-0 text-sm font-semibold">
+                      {socialKindLabel(f.kind)}
+                    </span>
                     <Input
-                      placeholder={socialPlaceholder(f.kind, t)}
+                      placeholder={socialPlaceholder(f.kind)}
                       {...form.register(`socials.${idx}.handle` as const)}
                       className="h-9 flex-1 text-sm"
                     />
@@ -387,8 +384,8 @@ export function ClientFormModal({
                 ))}
               </div>
             ) : null}
-            {/* Кнопки добавления — в одну строку (flex-nowrap), как просил
-                пользователь. На узких экранах допускаем перенос. */}
+            {/* Кнопки добавления соцсетей. «Своя» удалена — 99% клиентов
+                используют только эти три, лишнее загромождало UI. */}
             <div className="flex flex-wrap gap-1.5 sm:flex-nowrap">
               {availableSocials.map((k) => (
                 <button
@@ -398,44 +395,23 @@ export function ClientFormModal({
                   className="border-border bg-card hover:bg-muted/40 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold"
                 >
                   <SocialIcon kind={k} />
-                  {socialKindLabel(k, t)}
+                  {socialKindLabel(k)}
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => addSocial('custom')}
-                className="border-border bg-card hover:bg-muted/40 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold"
-              >
-                <Plus className="size-3" strokeWidth={2} />
-                {t('clients.form.social_add_custom')}
-              </button>
             </div>
           </div>
 
-          {/* Источник — Input + datalist стилизованный как dropdown. История
-              ранее введённых значений сохраняется автоматически (distinct
-              source у клиентов салона). */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cl-source">{t('clients.form.source_label')}</Label>
-            <div className="relative">
-              <Input
-                id="cl-source"
-                placeholder={t('clients.form.source_placeholder')}
-                {...form.register('source')}
-                list="cl-source-suggestions"
-                className="pr-9"
-              />
-              <ChevronDown
-                className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2"
-                strokeWidth={1.7}
-              />
-            </div>
-            <datalist id="cl-source-suggestions">
-              {sourceSuggestions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </div>
+          {/* Источник — combobox с поиском и опцией «Добавить новый».
+              Distinct source у уже созданных клиентов салона + дефолтные
+              подсказки если база пуста. */}
+          <SourceCombobox
+            value={form.watch('source')}
+            onChange={(v) => form.setValue('source', v)}
+            suggestions={sourceSuggestions}
+            placeholder={t('clients.form.source_placeholder')}
+            label={t('clients.form.source_label')}
+            addPrefix={t('clients.form.source_add', { defaultValue: 'Добавить:' })}
+          />
 
           {/* Персональная скидка % — auto-apply в форме визита */}
           <div className="flex flex-col gap-1.5">
@@ -504,12 +480,10 @@ function SocialIcon({ kind }: { kind: SocialKind }) {
     return <Instagram className="text-muted-foreground size-4 shrink-0" strokeWidth={1.8} />
   if (kind === 'facebook')
     return <Facebook className="text-muted-foreground size-4 shrink-0" strokeWidth={1.8} />
-  if (kind === 'telegram')
-    return <Send className="text-muted-foreground size-4 shrink-0" strokeWidth={1.8} />
-  return <Plus className="text-muted-foreground size-4 shrink-0" strokeWidth={2} />
+  return <Send className="text-muted-foreground size-4 shrink-0" strokeWidth={1.8} />
 }
 
-function socialKindLabel(kind: SocialKind, t: (k: string) => string): string {
+function socialKindLabel(kind: SocialKind): string {
   switch (kind) {
     case 'instagram':
       return 'Instagram'
@@ -517,12 +491,10 @@ function socialKindLabel(kind: SocialKind, t: (k: string) => string): string {
       return 'Facebook'
     case 'telegram':
       return 'Telegram'
-    default:
-      return t('clients.form.social_custom')
   }
 }
 
-function socialPlaceholder(kind: SocialKind, t: (k: string) => string): string {
+function socialPlaceholder(kind: SocialKind): string {
   switch (kind) {
     case 'instagram':
       return '@username'
@@ -530,9 +502,112 @@ function socialPlaceholder(kind: SocialKind, t: (k: string) => string): string {
       return 'facebook.com/…'
     case 'telegram':
       return '@username или +48…'
-    default:
-      return t('clients.form.social_handle_placeholder')
   }
+}
+
+/**
+ * Combobox для поля «Откуда пришёл клиент»:
+ *   - Input с поиском (фильтрует по substring case-insensitive).
+ *   - Dropdown со списком отфильтрованных подсказок.
+ *   - Если в подсказках нет точного совпадения — пункт «+ Добавить "X"»
+ *     которое сразу сохраняет value (новое значение).
+ *   - Закрытие по клику снаружи и Escape.
+ */
+function SourceCombobox({
+  value,
+  onChange,
+  suggestions,
+  placeholder,
+  label,
+  addPrefix,
+}: {
+  value: string
+  onChange: (v: string) => void
+  suggestions: string[]
+  placeholder: string
+  label: string
+  addPrefix: string
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocDown(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const query = value.trim().toLowerCase()
+  const filtered = query ? suggestions.filter((s) => s.toLowerCase().includes(query)) : suggestions
+  const exactMatch = suggestions.some((s) => s.toLowerCase() === query)
+  const canAdd = !!value.trim() && !exactMatch
+
+  return (
+    <div className="flex flex-col gap-1.5" ref={wrapRef}>
+      <Label htmlFor="cl-source">{label}</Label>
+      <div className="relative">
+        <Input
+          id="cl-source"
+          ref={inputRef}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="pr-9"
+          autoComplete="off"
+        />
+        <ChevronDown
+          className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2"
+          strokeWidth={1.7}
+        />
+        {open && (filtered.length > 0 || canAdd) ? (
+          <div className="border-border bg-card shadow-finmd absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border py-1">
+            {filtered.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  onChange(s)
+                  setOpen(false)
+                }}
+                className="hover:bg-muted/50 text-foreground block w-full px-3 py-1.5 text-left text-sm"
+              >
+                {s}
+              </button>
+            ))}
+            {canAdd ? (
+              <button
+                type="button"
+                onClick={() => {
+                  // Просто закрываем — value уже введено юзером, оно сохранится
+                  // как новое (база distinct.source автоматически подхватит для
+                  // следующего клиента).
+                  setOpen(false)
+                }}
+                className="hover:bg-muted/50 text-brand-teal-deep border-border block w-full border-t px-3 py-1.5 text-left text-sm font-semibold"
+              >
+                {addPrefix} <span className="text-foreground">«{value.trim()}»</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
 }
 
 /**

@@ -117,12 +117,17 @@ export function computeRfm(
     const daysSinceLast = lastVisitMs > 0 ? (ts - lastVisitMs) / day : Infinity
     const daysSinceCreate = createdMs > 0 ? (ts - createdMs) / day : Infinity
 
+    // T92 — Perspective опираемся на last_visit, не created_at. При импорте
+    // всех клиентов разом created_at = NOW → 922 «перспективных» из 1000.
+    // По last_visit ≤30 дней мы реально видим тех, кто пришёл недавно
+    // первый-второй раз и его ещё можно дотянуть в лояльных.
     if (visits >= 5 && daysSinceLast <= 30) counts.champions++
     else if (visits >= 3 && daysSinceLast <= 60) counts.loyal++
-    else if (visits <= 2 && daysSinceCreate <= 30) counts.potential++
+    else if (visits >= 1 && visits <= 2 && daysSinceLast <= 30) counts.potential++
     else if (visits >= 3 && daysSinceLast > 60 && daysSinceLast <= 90) counts.risk++
     else if (daysSinceLast > 90 && daysSinceLast <= 180) counts.sleep++
     else counts.lost++
+    void daysSinceCreate
   }
   return [
     {
@@ -265,8 +270,12 @@ const SOURCE_COLORS = [
 ]
 
 /**
- * Топ-5 источников клиентов по проценту от всей базы. clients.source
- * — свободное поле (instagram, booksy, recommendation, ...) или null.
+ * Топ-5 источников клиентов по проценту от всей базы. clients.source —
+ * свободное поле (юзер сам вписывает). Никакого humanize / маппинга —
+ * показываем РОВНО то что вписали в карточке клиента (по запросу
+ * владельца: если он завёл «Сарафан» и «сарафан» — это будут две разные
+ * строки, что прозрачнее «магической» нормализации).
+ *
  * Null/пустые группируются как «Прочее».
  */
 export function computeMarketingSources(
@@ -276,8 +285,7 @@ export function computeMarketingSources(
   const bucket = new Map<string, number>()
   for (const c of clients) {
     const src = (c.source ?? '').trim() || 'Прочее'
-    const label = humanizeSource(src)
-    bucket.set(label, (bucket.get(label) ?? 0) + 1)
+    bucket.set(src, (bucket.get(src) ?? 0) + 1)
   }
   const total = clients.length
   return Array.from(bucket.entries())
@@ -285,21 +293,6 @@ export function computeMarketingSources(
     .sort((a, b) => b.pct - a.pct)
     .slice(0, 5)
     .map((item, i) => ({ ...item, color: SOURCE_COLORS[i % SOURCE_COLORS.length]! }))
-}
-
-function humanizeSource(s: string): string {
-  const norm = s.toLowerCase().trim()
-  if (norm.includes('instagram') || norm === 'ig') return 'Инстаграм'
-  if (norm.includes('booksy')) return 'Booksy'
-  if (norm.includes('google') || norm.includes('карт')) return 'Google / карты'
-  if (norm.includes('сараф') || norm.includes('recommend') || norm.includes('friend'))
-    return 'Сарафан'
-  if (norm.includes('сайт') || norm.includes('website')) return 'Сайт'
-  if (norm.includes('facebook') || norm === 'fb') return 'Facebook'
-  if (norm.includes('telegram') || norm === 'tg') return 'Telegram'
-  if (norm.includes('walk') || norm.includes('улиц')) return 'С улицы'
-  // Capitalize first letter
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 // ─── Операции: материалы / запись на сегодня / no-shows ───────────────────

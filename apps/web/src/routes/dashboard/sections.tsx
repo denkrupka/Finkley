@@ -19,11 +19,23 @@ import { formatCurrency } from '@/lib/utils/format-currency'
 
 // ─── Базовые карточки ──────────────────────────────────────────────────────
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className,
+  title,
+}: {
+  children: ReactNode
+  className?: string
+  /** Подсказка по наведению — что за показатель, источник, формула.
+   *  Используется на KPI-карточках дашборда (см. RevenueCard, ProfitCard, ...). */
+  title?: string
+}) {
   return (
     <div
+      title={title}
       className={cn(
         'border-border bg-card shadow-finsm flex flex-col gap-2 rounded-xl border p-4',
+        title ? 'cursor-help' : '',
         className,
       )}
     >
@@ -36,17 +48,27 @@ export function Section({
   title,
   children,
   className,
+  tooltip,
 }: {
   title?: string
   children: ReactNode
   className?: string
+  /** Подсказка по наведению на ЗАГОЛОВОК секции — что внутри, источник
+   *  данных, как считается. */
+  tooltip?: string
 }) {
   return (
     <div
       className={cn('border-border bg-card shadow-finsm rounded-xl border p-4 sm:p-5', className)}
     >
       {title ? (
-        <div className="text-muted-foreground mb-3 text-[11px] font-semibold uppercase tracking-wider">
+        <div
+          title={tooltip}
+          className={cn(
+            'text-muted-foreground mb-3 text-[11px] font-semibold uppercase tracking-wider',
+            tooltip ? 'cursor-help' : '',
+          )}
+        >
           {title}
         </div>
       ) : null}
@@ -136,6 +158,10 @@ export type KpiCardsProps = {
   cashBalanceCents?: number | null
   /** План остатка кассы (опц.). */
   cashPlanCents?: number | null
+  /** T90 — сумма ожидаемых поступлений = Σ (план − факт) по non-cash кассам
+   *  со связью к bank_account. Деньги клиента (картой) которые эквайринг
+   *  ещё не зачислил на счёт. Заменяет «К плану» в карточке. */
+  expectedIncomingCents?: number | null
   /** T73 — открыть модалку «Деньги на счетах — детали». */
   onCashDetailsClick?: () => void
 }
@@ -198,7 +224,14 @@ function RevenueCard(p: KpiCardsProps) {
       ? ((p.revenueCents - p.prevRevenueCents) / Math.abs(p.prevRevenueCents)) * 100
       : null
   return (
-    <Card>
+    <Card
+      title={
+        'Выручка за текущий месяц.\n\n' +
+        'Источник: visits (только status=paid) — суммируются amount_cents − discount_cents + tip_cents (для каждого визита). При частичной оплате (paid_amount_cents) используется реально полученная сумма.\n\n' +
+        '«Безубыточность» = сумма твоих фиксированных расходов + налогов из Настроек → Справочники → Финансы.\n\n' +
+        '«Пред. месяц» = выручка прошлого месяца, и стрелка показывает MoM %.'
+      }
+    >
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
         Выручка
       </span>
@@ -244,7 +277,14 @@ function ProfitCard(p: KpiCardsProps) {
       ? ((p.profitCents - p.prevProfitCents) / Math.abs(p.prevProfitCents)) * 100
       : null
   return (
-    <Card>
+    <Card
+      title={
+        'Прибыль за текущий месяц = Выручка − Расходы.\n\n' +
+        'Источник: visits (paid) − expenses за месяц.\n\n' +
+        '«Прогноз» = текущая прибыль × дней в месяце / дней прошло. Грубая линейная экстраполяция.\n\n' +
+        '«Пред. месяц» = прибыль прошлого месяца, стрелка — MoM %.'
+      }
+    >
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
         Прибыль
       </span>
@@ -286,7 +326,15 @@ function OccupancyCard(p: KpiCardsProps) {
   const label = tone === 'green' ? 'Хорошо' : tone === 'amber' ? 'Ниже нормы' : 'Низко'
   const momPct = pct != null && p.prevOccupancyPct != null ? pct - p.prevOccupancyPct : null
   return (
-    <Card>
+    <Card
+      title={
+        'Заполненность мастеров за месяц.\n\n' +
+        'Формула: использованные часы / доступные часы × 100.\n' +
+        'Доступные = активные мастера × 8 ч × рабочие дни месяца (пн-сб).\n' +
+        'Использованные = сумма visit.duration_min для paid визитов (не retail).\n\n' +
+        '≥85% — хорошо, 70-85% — норма, <70% — низко.'
+      }
+    >
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
         Заполненность
       </span>
@@ -328,7 +376,15 @@ function RetentionCard(p: KpiCardsProps) {
   const label = tone === 'green' ? 'Хорошо' : tone === 'amber' ? 'Ниже нормы' : 'Низко'
   const momPct = pct != null && p.prevRetentionPct != null ? pct - p.prevRetentionPct : null
   return (
-    <Card>
+    <Card
+      title={
+        'Возврат клиентов за месяц.\n\n' +
+        'Формула: клиенты пришедшие И в этом месяце, И в прошлом / клиенты пришедшие в прошлом месяце × 100.\n\n' +
+        'Источник: visits.client_id с status=paid за текущий и прошлый периоды.\n\n' +
+        '«+приток» = вернувшиеся, «−отток» = из прошлого месяца не пришли.\n\n' +
+        '≥75% — хорошо, 60-75% — норма, <60% — низко.'
+      }
+    >
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
         Возврат клиентов
       </span>
@@ -369,17 +425,20 @@ function RetentionCard(p: KpiCardsProps) {
   )
 }
 
+const CASH_TOOLTIP =
+  'Деньги на счетах сейчас (не за месяц — а текущее состояние касс и счетов).\n\n' +
+  'Сумма всех касс из Настройки → Справочники → Финансы → Кассы (compute_all_register_balances).\n\n' +
+  '«Ожидается к поступлению» = разница плана и факта по безналичным кассам со связью с банком: клиент заплатил картой, эквайринг ещё не зачислил на счёт. Подробности — кнопка «Детали».\n\n' +
+  '«Пред. месяц» = баланс на конец прошлого месяца.'
+
 function CashOnHandCard(p: KpiCardsProps) {
   const momPct =
     p.cashBalanceCents != null && p.prevCashCents != null && p.prevCashCents !== 0
       ? ((p.cashBalanceCents - p.prevCashCents) / Math.abs(p.prevCashCents)) * 100
       : null
-  const planDeltaPct =
-    p.cashBalanceCents != null && p.cashPlanCents != null && p.cashPlanCents !== 0
-      ? ((p.cashBalanceCents - p.cashPlanCents) / Math.abs(p.cashPlanCents)) * 100
-      : null
+  void p.cashPlanCents // больше не показываем «К плану» — заменено на «Ожидается к поступлению»
   return (
-    <Card>
+    <Card title={CASH_TOOLTIP}>
       <div className="flex items-start justify-between gap-2">
         <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
           Деньги на счетах
@@ -399,7 +458,20 @@ function CashOnHandCard(p: KpiCardsProps) {
       </span>
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
-        <MomFoot pct={planDeltaPct} label="К плану" />
+        <Foot
+          label="Ожидается"
+          value={
+            p.expectedIncomingCents == null ? (
+              <span className="text-muted-foreground">—</span>
+            ) : p.expectedIncomingCents > 0 ? (
+              <span className="text-amber-700">
+                +{formatCurrency(p.expectedIncomingCents, p.currency)}
+              </span>
+            ) : (
+              <span className="text-emerald-700">синхронно</span>
+            )
+          }
+        />
         <MomFoot pct={momPct} label="Пред. месяц" />
       </div>
     </Card>
@@ -423,7 +495,18 @@ export type ClientsSectionProps = {
 
 export function ClientsSection(p: ClientsSectionProps) {
   return (
-    <Section title="Клиенты">
+    <Section
+      title="Клиенты"
+      tooltip={
+        'Метрики по клиентам за текущий месяц.\n\n' +
+        '• Визитов = visits за период (любой статус).\n' +
+        '• Новых = clients.created_at в этом месяце.\n' +
+        '• Постоянных = клиенты с visit_count ≥ 3.\n' +
+        '• Средний чек = сумма paid визитов / число paid визитов.\n' +
+        '• Онлайн-записей = % визитов с source booksy/online/web.\n' +
+        '• Источники записи = группировка clients.source.'
+      }
+    >
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Metric
           label="Визитов за месяц"
@@ -464,18 +547,6 @@ export function ClientsSection(p: ClientsSectionProps) {
         label="Онлайн-записей"
         value={p.onlineBookingsPct == null ? '—' : `${Math.round(p.onlineBookingsPct)}%`}
       />
-      <DataRow
-        label="Отменённых записей"
-        value={
-          p.cancelledPct == null ? (
-            '—'
-          ) : (
-            <Badge tone={p.cancelledPct < 8 ? 'green' : p.cancelledPct < 15 ? 'amber' : 'red'}>
-              {Math.round(p.cancelledPct)}%
-            </Badge>
-          )
-        }
-      />
       {p.sources && p.sources.length > 0 ? (
         <>
           <div className="text-muted-foreground mt-3 text-[11px] font-semibold uppercase tracking-wider">
@@ -514,7 +585,16 @@ export type MastersSectionProps = {
 export function MastersSection(p: MastersSectionProps) {
   const max = Math.max(1, ...p.top.map((s) => s.revenueCents))
   return (
-    <Section title="Мастера">
+    <Section
+      title="Мастера"
+      tooltip={
+        'Метрики по команде за текущий месяц.\n\n' +
+        '• Активных = staff с is_active=true / всего записей в staff.\n' +
+        '• Ср. загрузка = занятые часы / доступные (см. KPI «Заполненность»).\n' +
+        '• Топ по выручке = top_staff_by_revenue RPC.\n' +
+        '• Ср. рейтинг и отзывов = reviews.rating, посчитанные за период.'
+      }
+    >
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Metric label="Активных мастеров" value={`${p.activeCount} / ${p.totalCount}`} />
         <Metric
@@ -578,18 +658,6 @@ export function MastersSection(p: MastersSectionProps) {
           label="Отзывов за месяц"
           value={p.reviewsCount == null ? '—' : p.reviewsCount.toLocaleString('ru-RU')}
         />
-        <DataRow
-          label="Опоздания / пропуски"
-          value={
-            p.noShowsCount == null ? (
-              '—'
-            ) : (
-              <Badge tone={p.noShowsCount === 0 ? 'green' : p.noShowsCount <= 3 ? 'amber' : 'red'}>
-                {p.noShowsCount}
-              </Badge>
-            )
-          }
-        />
       </div>
     </Section>
   )
@@ -611,7 +679,15 @@ export function ExpensesSection(p: ExpensesSectionProps) {
       : null
   const max = Math.max(1, ...p.categories.map((c) => c.amountCents))
   return (
-    <Section title="Расходы">
+    <Section
+      title="Расходы"
+      tooltip={
+        'Расходы за текущий месяц.\n\n' +
+        'Источник: expenses (status=paid + pending) сгруппированы по category_id → expense_categories.name.\n\n' +
+        '«План» = сумма фиксированных + налогов из Настройки → Справочники → Финансы.\n\n' +
+        'Top 6 категорий по сумме.'
+      }
+    >
       <div className="mb-3">
         <Metric
           label="Итого за месяц"
@@ -664,7 +740,16 @@ export type FinancesSectionProps = {
 export function FinancesSection(p: FinancesSectionProps) {
   const max = Math.max(1, ...p.dailyRevenue.map((d) => d.cents))
   return (
-    <Section title="Финансы">
+    <Section
+      title="Финансы"
+      tooltip={
+        'Финансовая картина за текущий месяц.\n\n' +
+        '• Выручка и Прибыль — из visits paid (см. KPI выше).\n' +
+        '• Маржа = Прибыль / Выручка × 100.\n' +
+        '• Динамика выручки = bar по дням (aggregateDailyRevenue) с интенсивностью.\n' +
+        '• Распределение по категориям = visits сгруппированы по service.category_id, top 5.'
+      }
+    >
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Metric
           label="Выручка"
@@ -812,7 +897,22 @@ export type MarketingSectionProps = {
 
 export function MarketingSection(p: MarketingSectionProps) {
   return (
-    <Section title="Маркетинг">
+    <Section
+      title="Маркетинг"
+      tooltip={
+        'Маркетинговая сегментация по базе клиентов.\n\n' +
+        '• Источники = clients.source как введено в карточке клиента (без нормализации).\n\n' +
+        '• RFM (Recency / Frequency / Monetary):\n' +
+        '   – Чемпионы: ≥5 визитов, последний ≤30 дн.\n' +
+        '   – Лояльные: ≥3 визитов, последний ≤60 дн.\n' +
+        '   – Перспективные: 1-2 визита, последний ≤30 дн.\n' +
+        '   – Под риском: ≥3 визитов, последний 60-90 дн.\n' +
+        '   – Спящие: последний 90-180 дн.\n' +
+        '   – Потерянные: >180 дн или нет визитов.\n\n' +
+        '• Активные = clients.last_visit ≤ 90 дн.\n' +
+        '• Нужна реактивация = clients.last_visit 90-180 дн.'
+      }
+    >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Левая колонка: источники + CAC */}
         <div>
@@ -838,35 +938,6 @@ export function MarketingSection(p: MarketingSectionProps) {
                 </span>
               </div>
             ))
-          )}
-
-          <div className="text-muted-foreground mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wider">
-            Стоимость привлечения (CAC)
-          </div>
-          {!p.cacByChannel || p.cacByChannel.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Нет данных</p>
-          ) : (
-            <>
-              {p.cacByChannel.map((c) => (
-                <DataRow
-                  key={c.channel}
-                  label={c.channel}
-                  value={
-                    c.cacCents == null ? (
-                      '—'
-                    ) : c.cacCents === 0 ? (
-                      <span className="text-emerald-700">0 {p.currency}</span>
-                    ) : (
-                      formatCurrency(c.cacCents, p.currency)
-                    )
-                  }
-                />
-              ))}
-              <DataRow
-                label="Ср. по всем каналам"
-                value={p.avgCacCents == null ? '—' : formatCurrency(p.avgCacCents, p.currency)}
-              />
-            </>
           )}
         </div>
 
