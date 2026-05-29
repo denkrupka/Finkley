@@ -19,6 +19,8 @@ export default defineConfig({
       'tests/unit/**/*.{test,spec}.{ts,tsx}',
       // T49 — pure-логика Edge Function shared-helpers (без Deno API).
       '../../supabase/functions/_shared/**/*.{test,spec}.ts',
+      // I4 — pure-логика send-email/templates (pickTemplate, render, normalize).
+      '../../supabase/functions/send-email/*.{test,spec}.ts',
     ],
     exclude: ['node_modules', 'dist', 'tests/e2e/**'],
     // RPC/edge-function тесты ходят в реальный Supabase staging — иногда

@@ -175,12 +175,14 @@
       "quick_bullet_1": "Just salon name + type",
       "quick_bullet_2": "Import visits/services from Booksy later",
       "quick_bullet_3": "Straight to subscription and work",
+      "quick_bullet_4": "Full setup can be added later",
       "full_title": "Full setup",
       "full_subtitle": "We'll walk through all sections, explaining what and why. Fill in and you're ready.",
       "full_eta": "≈ 10 min",
       "full_bullet_1": "Specialists + services + expense categories",
       "full_bullet_2": "Tutorial tips on every step",
-      "full_bullet_3": "Any step can be skipped"
+      "full_bullet_3": "Any step can be skipped",
+      "full_bullet_4": "Expenses by category + full AI breakdown across 4 topics"
     },
     "tutorial": {
       "salon": "Salon name will be visible to clients in emails and SMS. Country sets currency, timezone and address format. Salon type drives service templates and competitor benchmarks.",
@@ -207,12 +209,16 @@
       "nip_label": "NIP / VAT ID",
       "company_label": "Legal company name",
       "company_placeholder": "e.g. JANE DOE BEAUTY",
-      "mode_label": "How do you do accounting?"
+      "mode_label": "How do you do accounting?",
+      "providers_title": "Connect an accounting system"
     },
     "step_integrations": {
       "title": "Which integrations to connect?",
       "subtitle": "Check what you need — you'll land on their setup right after onboarding. No need to connect everything now.",
-      "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime."
+      "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime.",
+      "bookings_title": "Bookings & calendars",
+      "social_title": "Social & messengers",
+      "banking_title": "Bank & expenses"
     },
     "connect_now": "Connect",
     "connect_loading_hint": "Connection is instant — data starts importing right away.",
@@ -221,13 +227,25 @@
       "name_label": "Salon name",
       "name_placeholder": "For example: Anna's Studio",
       "country_label": "Country",
-      "type_label": "Salon type"
+      "type_label": "Salon type",
+      "place_label": "Find your salon on Google",
+      "logo_label": "Salon logo",
+      "logo_too_large": "Max 5 MB",
+      "logo_change": "Replace",
+      "logo_upload": "Upload logo",
+      "logo_remove": "Remove",
+      "logo_hint": "Shown in the header and in emails to clients. PNG / JPG / WEBP, up to 5 MB.",
+      "benchmarks_title": "Compare my salon to similar ones (anonymously)",
+      "benchmarks_body_v2": "Anonymous: your numbers vs the niche average in the country.",
+      "benchmarks_on": "Opted in — comparison enabled"
     },
     "step2": {
       "title": "Add your specialists",
       "name_placeholder": "Specialist name",
       "percent_label": "% of revenue",
-      "add": "Add specialist"
+      "add": "Add specialist",
+      "invite_need_email": "Enter an email to invite",
+      "invite_label": "Invite to the portal after creation"
     },
     "step3": {
       "title": "What you offer",
@@ -241,13 +259,19 @@
       "ocr_title": "Logging bookings manually?",
       "ocr_body": "Upload a photo of your booking journal or notebook — AI will recognize and import.",
       "ocr_collected": "In import queue: {{count}} visits",
-      "ocr_toggle": "I log bookings manually → upload a journal photo"
+      "ocr_toggle": "I log bookings manually → upload a journal photo",
+      "add_in_category": "Add a service to this category",
+      "add_category": "New category"
     },
     "step4": {
       "title": "Expense categories",
       "subtitle": "These are the main buckets your money goes into. You can add more later.",
       "placeholder": "Category name",
-      "add": "Add category"
+      "add": "Add category",
+      "title_v2": "Financial structure",
+      "label_placeholder": "Item name",
+      "add_in_section": "Add an item",
+      "next_section": "Next: {{name}} →"
     },
     "step5": {
       "title": "All set, {{name}}!",
@@ -277,9 +301,12 @@
         }
       },
       "subscribe_label": "Activate subscription with a 14-day trial (recommended)",
-      "subscribe_hint": "After saving, Stripe will open to link your card. Charged after 14 days, cancel in one click."
+      "subscribe_hint": "After saving, Stripe will open to link your card. Charged after 14 days, cancel in one click.",
+      "switch_to_full": "I want full setup — logo, schedule, master & service import, expenses, AI breakdown"
     },
     "wow": {
+      "ai_loading": "AI is analysing your salon…",
+      "ai_eyebrow": "AI says",
       "title": "AI already sees what's happening in your salon",
       "master_eyebrow": "Top performers",
       "master_title": "AI will identify your stars and those who need to grow",
@@ -481,9 +508,52 @@
       "fallback": "AI couldn't gather the analysis yet — finish onboarding, I'll arrive with the analysis on the dashboard within 5 minutes.",
       "advice_header": "Advice by priority"
     },
-    "ocr": {},
-    "cta": {},
-    "welcome": {}
+    "ocr": {
+      "no_salon": "Available after the salon is created. Reach Finish first.",
+      "too_large": "Max 4 MB",
+      "toast_done": "Visits recognized: {{count}}",
+      "toast_fail": "Couldn't recognize: {{msg}}",
+      "toast_imported": "Visits added: {{count}} — import after the salon is created.",
+      "loading": "AI is reading the page…",
+      "upload": "Photograph a notebook page",
+      "preview_title": "AI recognized — mark what to import",
+      "empty": "Nothing recognized on this page.",
+      "import": "Add selected ({{count}})"
+    },
+    "cta": {
+      "welcome": "Start earning more →",
+      "path": "Let's go →",
+      "salon": "Create salon profile →",
+      "address": "Save address →",
+      "accounting": "Done, next →",
+      "integrations_bookings": "Free me from manual visit entry →",
+      "integrations_social": "Bring all messages into one feed →",
+      "integrations_banking": "Turn on auto-tracking of expenses →",
+      "wow": "Go to my portal →",
+      "profile": "Done, let's go →",
+      "tg_phone": "Save and continue →",
+      "schedule": "Save schedule →",
+      "public_links": "Save links →",
+      "ai_services": "On to masters →",
+      "ai_staff": "On to clients →",
+      "ai_clients": "On to reviews →",
+      "ai_reviews": "Done, to my portal →",
+      "staff": "Connect the team →",
+      "services": "Done, on to expenses →",
+      "expenses": "See real profit →"
+    },
+    "welcome": {
+      "title": "Hi — you've made an important choice",
+      "subtitle_v2": "What Finkley will do for you:",
+      "p1": "All in one — end of routine",
+      "p2": "Data is encrypted",
+      "p3": "Bank → expenses on their own",
+      "p4": "Real profit, live",
+      "p5": "All messages together",
+      "p6": "Competitor analysis",
+      "p7": "5★ → Google, 1-4 → you",
+      "p8": "AI assistant in the loop"
+    }
   },
   "nav": {
     "dashboard": "Home",

@@ -175,12 +175,14 @@
       "quick_bullet_1": "Tylko nazwa salonu + typ",
       "quick_bullet_2": "Import wizyt/usług z Booksy później",
       "quick_bullet_3": "Od razu do subskrypcji i pracy",
+      "quick_bullet_4": "Pełną konfigurację można dodać później",
       "full_title": "Pełna konfiguracja",
       "full_subtitle": "Przejdziemy przez wszystkie sekcje, wyjaśniając po co i jak. Wypełnisz — i gotowe.",
       "full_eta": "≈ 10 min",
       "full_bullet_1": "Pracownicy + usługi + kategorie wydatków",
       "full_bullet_2": "Wskazówki tutoriala na każdym kroku",
-      "full_bullet_3": "Każdy krok można pominąć"
+      "full_bullet_3": "Każdy krok można pominąć",
+      "full_bullet_4": "Wydatki według kategorii + pełny rozbiór AI po 4 tematach"
     },
     "tutorial": {
       "salon": "Nazwa salonu będzie widoczna dla klientów w mailach i SMS-ach. Kraj określa walutę, strefę czasową i format adresu. Typ salonu napędza szablony usług i porównanie z konkurencją.",
@@ -207,12 +209,16 @@
       "nip_label": "NIP / VAT ID",
       "company_label": "Nazwa firmy (prawna)",
       "company_placeholder": "Np. JANE DOE BEAUTY",
-      "mode_label": "Jak prowadzisz księgowość?"
+      "mode_label": "Jak prowadzisz księgowość?",
+      "providers_title": "Podłącz system księgowy"
     },
     "step_integrations": {
       "title": "Które integracje podłączymy?",
       "subtitle": "Zaznacz potrzebne — po onboardingu od razu trafisz do ich konfiguracji. Nie musisz wszystkiego podłączać teraz.",
-      "hint_skip": "Jeśli nie masz pewności — pomiń. Wszystko dostępne w Ustawienia → Integracje w dowolnym momencie."
+      "hint_skip": "Jeśli nie masz pewności — pomiń. Wszystko dostępne w Ustawienia → Integracje w dowolnym momencie.",
+      "bookings_title": "Rezerwacje i kalendarze",
+      "social_title": "Social media i komunikatory",
+      "banking_title": "Bank i wydatki"
     },
     "connect_now": "Podłącz",
     "connect_loading_hint": "Połączenie jest natychmiastowe — dane zaczną się importować od razu.",
@@ -221,13 +227,25 @@
       "name_label": "Nazwa salonu",
       "name_placeholder": "Na przykład: Studio Anny",
       "country_label": "Kraj",
-      "type_label": "Typ salonu"
+      "type_label": "Typ salonu",
+      "place_label": "Znajdź salon w Google",
+      "logo_label": "Logo salonu",
+      "logo_too_large": "Maks. 5 MB",
+      "logo_change": "Zmień",
+      "logo_upload": "Wgraj logo",
+      "logo_remove": "Usuń",
+      "logo_hint": "Pokażemy w nagłówku i w mailach do klientów. PNG / JPG / WEBP, do 5 MB.",
+      "benchmarks_title": "Porównaj mój salon z podobnymi (anonimowo)",
+      "benchmarks_body_v2": "Anonimowo: Twoje liczby vs średnia w branży w kraju.",
+      "benchmarks_on": "Zgoda — porównuj"
     },
     "step2": {
       "title": "Dodaj swoich specjalistów",
       "name_placeholder": "Imię specjalisty",
       "percent_label": "% od przychodu",
-      "add": "Dodaj specjalistę"
+      "add": "Dodaj specjalistę",
+      "invite_need_email": "Wpisz email, aby zaprosić",
+      "invite_label": "Zaproś do portalu po utworzeniu"
     },
     "step3": {
       "title": "Co robicie",
@@ -241,13 +259,19 @@
       "ocr_title": "Prowadzisz rezerwacje ręcznie?",
       "ocr_body": "Załaduj zdjęcie swojego dziennika rezerwacji lub zeszytu — AI rozpozna i wprowadzi.",
       "ocr_collected": "W kolejce do importu: {{count}} wizyt",
-      "ocr_toggle": "Prowadzę rezerwacje ręcznie → załaduj zdjęcie dziennika"
+      "ocr_toggle": "Prowadzę rezerwacje ręcznie → załaduj zdjęcie dziennika",
+      "add_in_category": "Dodaj usługę do tej kategorii",
+      "add_category": "Nowa kategoria"
     },
     "step4": {
       "title": "Kategorie wydatków",
       "subtitle": "To Twoje główne „kubełki”, do których trafiają pieniądze. Możesz uzupełnić później.",
       "placeholder": "Nazwa kategorii",
-      "add": "Dodaj kategorię"
+      "add": "Dodaj kategorię",
+      "title_v2": "Struktura finansowa",
+      "label_placeholder": "Nazwa pozycji",
+      "add_in_section": "Dodaj pozycję",
+      "next_section": "Dalej: {{name}} →"
     },
     "step5": {
       "title": "Gotowe, {{name}}!",
@@ -277,9 +301,12 @@
         }
       },
       "subscribe_label": "Aktywuj subskrypcję z 14-dniowym okresem próbnym (zalecane)",
-      "subscribe_hint": "Po zapisaniu otworzy się Stripe do powiązania karty. Pobranie po 14 dniach, anulowanie jednym kliknięciem."
+      "subscribe_hint": "Po zapisaniu otworzy się Stripe do powiązania karty. Pobranie po 14 dniach, anulowanie jednym kliknięciem.",
+      "switch_to_full": "Chcę pełną konfigurację — logo, grafik, import mistrzów i usług, wydatki, rozbiór AI"
     },
     "wow": {
+      "ai_loading": "AI analizuje Twój salon…",
+      "ai_eyebrow": "AI mówi",
       "title": "AI już widzi, co dzieje się w Twoim salonie",
       "master_eyebrow": "Top mistrzowie",
       "master_title": "AI wskaże Twoje gwiazdy i tych, którzy muszą się rozwijać",
@@ -481,9 +508,52 @@
       "fallback": "AI jeszcze nie zebrał rozbioru — dokończ onboarding, przyjdę z analizą na dashboard w ciągu 5 minut.",
       "advice_header": "Porady według priorytetu"
     },
-    "ocr": {},
-    "cta": {},
-    "welcome": {}
+    "ocr": {
+      "no_salon": "Dostępne po utworzeniu salonu. Najpierw dotrzyj do Finiszu.",
+      "too_large": "Maks. 4 MB",
+      "toast_done": "Rozpoznano wizyt: {{count}}",
+      "toast_fail": "Nie udało się rozpoznać: {{msg}}",
+      "toast_imported": "Dodano wizyt: {{count}} — zaimportujemy po utworzeniu salonu.",
+      "loading": "AI czyta stronę…",
+      "upload": "Sfotografuj stronę zeszytu",
+      "preview_title": "AI rozpoznał — zaznacz co zaimportować",
+      "empty": "Nic nie rozpoznano na tej stronie.",
+      "import": "Dodaj wybrane ({{count}})"
+    },
+    "cta": {
+      "welcome": "Zacznij zarabiać więcej →",
+      "path": "Jedziemy →",
+      "salon": "Utwórz profil salonu →",
+      "address": "Zapisz adres →",
+      "accounting": "Gotowe, dalej →",
+      "integrations_bookings": "Uwolnij się od ręcznego wpisywania wizyt →",
+      "integrations_social": "Zbierz wszystkie wiadomości w jednym feedzie →",
+      "integrations_banking": "Włącz auto-księgowanie wydatków →",
+      "wow": "Przejdź do mojego portalu →",
+      "profile": "Gotowe, jedziemy →",
+      "tg_phone": "Zapisz i dalej →",
+      "schedule": "Zapisz grafik →",
+      "public_links": "Zapisz linki →",
+      "ai_services": "Przejdź do mistrzów →",
+      "ai_staff": "Przejdź do klientów →",
+      "ai_clients": "Przejdź do opinii →",
+      "ai_reviews": "Gotowe, do mojego portalu →",
+      "staff": "Podłącz zespół →",
+      "services": "Gotowe, do wydatków →",
+      "expenses": "Zobacz realny zysk →"
+    },
+    "welcome": {
+      "title": "Cześć — dokonałeś ważnego wyboru",
+      "subtitle_v2": "Co Finkley zrobi za Ciebie:",
+      "p1": "Wszystko w jednym — koniec rutyny",
+      "p2": "Dane zaszyfrowane",
+      "p3": "Bank → wydatki same",
+      "p4": "Realny zysk live",
+      "p5": "Wszystkie wiadomości razem",
+      "p6": "Analiza konkurencji",
+      "p7": "5★ → Google, 1-4 → Ty",
+      "p8": "AI-asystent na bieżąco"
+    }
   },
   "nav": {
     "dashboard": "Główna",

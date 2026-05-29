@@ -80,7 +80,31 @@ function useMessengerUnreadConversations(salonId: string | undefined) {
   })
 }
 
+/** Legacy localStorage ключ (per-device) — читаем для миграции. После
+ *  миграции на profiles.notifications_last_seen_at (I2) ключ остаётся
+ *  fallback'ом для офлайн-режима. */
 const LAST_SEEN_KEY = (salonId: string) => `finkley:notif-last-seen:${salonId}`
+
+/** I2 — cross-device last-seen из profiles.notifications_last_seen_at. */
+function useProfileLastSeen() {
+  return useQuery<number>({
+    queryKey: ['profile-notifs-last-seen'],
+    queryFn: async () => {
+      const { data: userResp } = await supabase.auth.getUser()
+      const userId = userResp.user?.id
+      if (!userId) return 0
+      const { data } = await supabase
+        .from('profiles')
+        .select('notifications_last_seen_at')
+        .eq('id', userId)
+        .maybeSingle()
+      const raw = (data as { notifications_last_seen_at?: string | null } | null)
+        ?.notifications_last_seen_at
+      return raw ? new Date(raw).getTime() : 0
+    },
+    staleTime: 30_000,
+  })
+}
 
 /** Тип уведомления → ссылка в портале + severity. */
 function deriveLink(salonId: string | undefined, type: string): string | undefined {
@@ -299,12 +323,14 @@ export function useMarkInAppRead() {
  */
 export function useNotifications(salonId: string | undefined) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const { data: insights = [] } = useInsights(salonId)
   const { data: upcoming = [] } = useUpcomingTemplates(salonId, 0) // только overdue/today
   const { data: budgets = [] } = useCategoryBudgets(salonId)
   const { data: unreadConvos = [] } = useMessengerUnreadConversations(salonId)
   const { data: salon } = useSalon(salonId)
   const { data: inAppList = [] } = useInAppNotificationsList()
+  const { data: profileLastSeen = 0 } = useProfileLastSeen()
   const markAllInApp = useMarkAllInAppRead()
   // benchmark не показываем как нотификацию — это скорее интересный факт, не алерт
   useBenchmarkComparison(salonId) // подгружаем в кэш для consistency
@@ -402,19 +428,31 @@ export function useNotifications(salonId: string | undefined) {
     return out.sort((a, b) => b.ts.localeCompare(a.ts))
   }, [insights, upcoming, budgets, unreadConvos, messengerNotifEnabled, inAppList, salonId, t])
 
-  const lastSeen =
+  // I2 — cross-device last-seen из profiles. Fallback на localStorage если
+  // запрос ещё не вернулся (initial render) — даёт нулевую задержку UI.
+  const localLastSeen =
     salonId && typeof window !== 'undefined'
       ? Number(localStorage.getItem(LAST_SEEN_KEY(salonId)) ?? '0')
       : 0
+  const lastSeen = Math.max(profileLastSeen, localLastSeen)
 
   // T43 — unread считаем: для in_app — по read_at в БД; для derive-источников —
-  // по lastSeen в localStorage. Это даёт точный счётчик после frontend mark-read.
+  // по lastSeen (cross-device через profiles, fallback на localStorage).
   const unreadCount = items.filter((i) => {
     if (i.kind === 'in_app') return !i.read
     return new Date(i.ts).getTime() > lastSeen
   }).length
 
-  function markAllRead() {
+  async function markAllRead() {
+    const now = new Date().toISOString()
+    // I2 — записываем в profiles чтобы счётчик был cross-device.
+    const { data: userResp } = await supabase.auth.getUser()
+    const userId = userResp.user?.id
+    if (userId) {
+      await supabase.from('profiles').update({ notifications_last_seen_at: now }).eq('id', userId)
+      qc.invalidateQueries({ queryKey: ['profile-notifs-last-seen'] })
+    }
+    // Дублируем в localStorage для офлайн-режима / оптимистичного UI.
     if (typeof window !== 'undefined' && salonId) {
       localStorage.setItem(LAST_SEEN_KEY(salonId), String(Date.now()))
     }
