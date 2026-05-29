@@ -1,8 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- helper rememberLastSalon co-located with RootRedirect */
+import { useQuery } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 
 import { useIsAppAdmin } from '@/hooks/useMediaPosts'
 import { useMySalons } from '@/hooks/useSalons'
+import { supabase } from '@/lib/supabase/client'
 
 const LAST_SALON_KEY = 'finkley:last-salon-id'
 
@@ -20,8 +22,25 @@ const LAST_SALON_KEY = 'finkley:last-salon-id'
 export function RootRedirect() {
   const { data: salons, isLoading, error } = useMySalons()
   const { data: isAdmin, isLoading: adminLoading } = useIsAppAdmin()
+  // ADR-030: если у юзера есть brown-salon (не дошёл до финального
+  // submit'a в онбординге) — возвращаем на /onboarding с ?salon=<id>,
+  // чтобы OnboardingPage восстановил state и продолжил с того же шага.
+  const { data: unfinished, isLoading: unfinishedLoading } = useQuery({
+    queryKey: ['onboarding-unfinished'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('salons')
+        .select('id')
+        .is('onboarding_completed_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return (data as { id: string } | null) ?? null
+    },
+    staleTime: 30_000,
+  })
 
-  if (isLoading || adminLoading) {
+  if (isLoading || adminLoading || unfinishedLoading) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="bg-muted size-10 animate-pulse rounded-md" aria-hidden />
@@ -39,6 +58,11 @@ export function RootRedirect() {
 
   if (isAdmin) {
     return <Navigate to="/admin/overview" replace />
+  }
+
+  // Brown salon обнаружен → принудительный resume онбординга.
+  if (unfinished) {
+    return <Navigate to={`/onboarding?salon=${unfinished.id}`} replace />
   }
 
   if (!salons || salons.length === 0) {

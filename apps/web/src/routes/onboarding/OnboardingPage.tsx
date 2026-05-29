@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { BrandIcon } from './BrandIcon'
 import type { OnboardingIntegration as OnboardingIntegrationType } from './OnboardingPage'
@@ -246,15 +246,16 @@ export function OnboardingPage() {
   const { signOut } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const [stepIndex, setStepIndex] = useState(0)
   const [state, setState] = useState<OnboardingState>(INITIAL)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
 
-  // IP-based auto-detect страны. Запускается один раз при монтировании;
-  // не блокирующий. Если юзер уже что-то выбрал (или поменял страну руками
-  // в Step1Salon после монтирования) — не перезаписываем.
+  // IP-based auto-detect страны (только если ещё не hydrated из БД).
   useEffect(() => {
+    if (!hydrated) return
     let cancelled = false
     detectCountryByIp().then((cc) => {
       if (cancelled || !cc) return
@@ -263,7 +264,91 @@ export function OnboardingPage() {
     return () => {
       cancelled = true
     }
+  }, [hydrated])
+
+  // Resume: если в query ?salon=<id> или у юзера в БД есть unfinished
+  // salon (onboarding_completed_at IS NULL) — подтянем сохранённый state
+  // и stepId. ADR-030 + миграция 20260529000005.
+  useEffect(() => {
+    let cancelled = false
+    async function hydrate() {
+      try {
+        const querySalonId = searchParams.get('salon')
+        const querySalon = querySalonId
+          ? await supabase
+              .from('salons')
+              .select('id, onboarding_state, onboarding_step_id, onboarding_completed_at')
+              .eq('id', querySalonId)
+              .maybeSingle()
+          : null
+        const myUnfinishedRes = querySalon?.data
+          ? null
+          : await supabase
+              .from('salons')
+              .select('id, onboarding_state, onboarding_step_id, onboarding_completed_at')
+              .is('onboarding_completed_at', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+        const row = (querySalon?.data ?? myUnfinishedRes?.data) as {
+          id: string
+          onboarding_state: OnboardingState | null
+          onboarding_step_id: string | null
+          onboarding_completed_at: string | null
+        } | null
+        if (cancelled || !row || row.onboarding_completed_at) return
+        if (row.onboarding_state) {
+          setState({ ...row.onboarding_state, created_salon_id: row.id })
+        } else {
+          setState((prev) => ({ ...prev, created_salon_id: row.id }))
+        }
+        // stepId восстановим после первого render (нужен STEPS массив).
+        if (row.onboarding_step_id) {
+          requestAnimationFrame(() => {
+            setState((cur) => {
+              const list = cur.path === 'full' ? STEPS_FULL : STEPS_QUICK
+              const idx = (list as readonly string[]).indexOf(row.onboarding_step_id!)
+              if (idx >= 0) setStepIndex(idx)
+              return cur
+            })
+          })
+        }
+      } catch (err) {
+        console.warn('onboarding hydrate failed', err)
+      } finally {
+        if (!cancelled) setHydrated(true)
+      }
+    }
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Autosave: при изменении state/stepIndex (после hydrate) пишем snapshot
+  // в salons.onboarding_state + onboarding_step_id. Debounced 1.5s чтобы
+  // не флудить запросами при типе/кликах.
+  useEffect(() => {
+    if (!hydrated || !state.created_salon_id) return
+    const sid = state.created_salon_id
+    const stepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
+      stepIndex
+    ]
+    const timer = window.setTimeout(() => {
+      supabase
+        .from('salons')
+        .update({
+          onboarding_state: state,
+          onboarding_step_id: stepId,
+        })
+        .eq('id', sid)
+        .then(({ error }) => {
+          if (error) console.warn('onboarding autosave failed', error)
+        })
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [state, stepIndex, hydrated])
 
   // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
   // Address-шаг скипаем если на Step "salon" юзер уже выбрал место в Google
