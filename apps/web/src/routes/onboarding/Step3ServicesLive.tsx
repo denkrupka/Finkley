@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -116,9 +116,19 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8">
-        <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
-        <p className="text-muted-foreground text-sm">{t('common.loading')}</p>
+      <div>
+        <div className="bg-muted/50 mb-3 h-8 w-1/3 animate-pulse rounded-md" />
+        {[0, 1, 2].map((g) => (
+          <div
+            key={g}
+            className="border-border mb-2 animate-pulse overflow-hidden rounded-md border"
+            style={{ animationDelay: `${g * 80}ms` }}
+          >
+            <div className="bg-muted/30 h-10" />
+            <div className="bg-muted mx-2 my-2 h-9 rounded" />
+            <div className="bg-muted mx-2 my-2 h-9 rounded" />
+          </div>
+        ))}
       </div>
     )
   }

@@ -99,11 +99,26 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8">
-        <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
-        <p className="text-muted-foreground text-sm">
-          {t('common.loading', { defaultValue: 'Загрузка…' })}
-        </p>
+      <div>
+        <div className="bg-muted/50 mb-3 h-8 w-1/3 animate-pulse rounded-md" />
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="border-border bg-card animate-pulse rounded-lg border p-4"
+              style={{ animationDelay: `${i * 100}ms` }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="bg-muted size-12 rounded-full" />
+                <div className="flex-1">
+                  <div className="bg-muted h-4 w-2/3 rounded" />
+                  <div className="bg-muted mt-2 h-3 w-1/2 rounded" />
+                </div>
+              </div>
+              <div className="bg-muted mt-3 h-9 rounded-md" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
