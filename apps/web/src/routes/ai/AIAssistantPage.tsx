@@ -1,32 +1,58 @@
-import { Bot, Loader2, RotateCcw, Send, Sparkles, User } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  Bot,
+  Check,
+  Loader2,
+  Receipt,
+  RotateCcw,
+  Send,
+  Sparkles,
+  User,
+  UserPlus,
+  Wrench,
+  X,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { useAIHistory, useResetAIChat, useSendAIMessage } from '@/hooks/useAIAssistant'
+import {
+  useAIHistory,
+  useAISuggestions,
+  useResetAIChat,
+  useSendAIMessage,
+  useUndoToolCall,
+  type AIToolCall,
+} from '@/hooks/useAIAssistant'
 import { cn } from '@/lib/utils/cn'
-
-const SUGGESTIONS = [
-  'ai.suggestions.revenue_this_month',
-  'ai.suggestions.top_master',
-  'ai.suggestions.compare_prev',
-  'ai.suggestions.what_to_improve',
-] as const
 
 export function AIAssistantPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const { data, isLoading } = useAIHistory(salonId)
+  const { data: suggestions } = useAISuggestions(salonId)
   const sendMsg = useSendAIMessage(salonId)
   const reset = useResetAIChat(salonId)
+  const undo = useUndoToolCall(salonId)
 
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // Автоскролл вниз при новом сообщении
+  // Группируем tool_calls по message_id для быстрого lookup
+  const toolCallsByMessage = useMemo(() => {
+    const m = new Map<string, AIToolCall[]>()
+    for (const tc of data?.tool_calls ?? []) {
+      const list = m.get(tc.message_id) ?? []
+      list.push(tc)
+      m.set(tc.message_id, list)
+    }
+    return m
+  }, [data?.tool_calls])
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -45,9 +71,7 @@ export function AIAssistantPage() {
     )
   }
 
-  // Префилл prompt из AiInsightsPanel («Что с этим делать?»): при mount-е
-  // читаем sessionStorage и автоотправляем — юзер сразу видит ответ AI.
-  // Ждём пока загрузится история (чтобы прикрепить к существующей беседе).
+  // Префилл prompt из AiInsightsPanel («Что с этим делать?»): sessionStorage.
   const consumedPrefillRef = useRef(false)
   useEffect(() => {
     if (consumedPrefillRef.current) return
@@ -109,7 +133,6 @@ export function AIAssistantPage() {
 
       {/* Body */}
       <div className="border-border bg-card shadow-finsm flex min-h-0 flex-1 flex-col rounded-lg border">
-        {/* Сообщения */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {isLoading ? (
             <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
@@ -117,18 +140,38 @@ export function AIAssistantPage() {
               {t('common.loading')}
             </div>
           ) : isEmpty ? (
-            <EmptyState onPick={(key) => send(t(key))} />
+            <EmptyState suggestions={suggestions ?? []} onPick={(prompt) => send(prompt)} />
           ) : (
             <div className="flex flex-col gap-4">
               {messages.map((m) => (
-                <MessageBubble key={m.id} role={m.role} content={m.content} />
+                <div key={m.id}>
+                  <MessageBubble role={m.role} content={m.content} />
+                  {/* Inline tool-call карточки под сообщением ассистента */}
+                  {m.role === 'assistant' && toolCallsByMessage.has(m.id) ? (
+                    <div className="ml-9 mt-2 flex flex-col gap-1.5">
+                      {toolCallsByMessage.get(m.id)!.map((tc) => (
+                        <ToolCallCard
+                          key={tc.id}
+                          tc={tc}
+                          onUndo={() =>
+                            undo.mutate(tc.id, {
+                              onError: (e) =>
+                                toast.error(e instanceof Error ? e.message : String(e)),
+                              onSuccess: () => toast.success(t('ai.tool_undone')),
+                            })
+                          }
+                          undoing={undo.isPending}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ))}
               {sendMsg.isPending ? <MessageBubble role="assistant" content="" pending /> : null}
             </div>
           )}
         </div>
 
-        {/* Input */}
         <form
           className="border-border flex items-end gap-2 border-t bg-white px-3 py-3 sm:px-4"
           onSubmit={(e) => {
@@ -164,8 +207,22 @@ export function AIAssistantPage() {
   )
 }
 
-function EmptyState({ onPick }: { onPick: (key: string) => void }) {
+function EmptyState({
+  suggestions,
+  onPick,
+}: {
+  suggestions: { prompt: string; reason?: string }[]
+  onPick: (prompt: string) => void
+}) {
   const { t } = useTranslation()
+  // Fallback на статичные подсказки если динамические ещё не загрузились.
+  const staticFallback = [
+    t('ai.suggestions.revenue_this_month'),
+    t('ai.suggestions.top_master'),
+    t('ai.suggestions.compare_prev'),
+    t('ai.suggestions.what_to_improve'),
+  ]
+  const items = suggestions.length > 0 ? suggestions.map((s) => s.prompt) : staticFallback
   return (
     <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 py-12 text-center">
       <span
@@ -182,14 +239,14 @@ function EmptyState({ onPick }: { onPick: (key: string) => void }) {
         <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
           {t('ai.suggestions_label')}
         </p>
-        {SUGGESTIONS.map((key) => (
+        {items.map((prompt) => (
           <button
-            key={key}
+            key={prompt}
             type="button"
-            onClick={() => onPick(key)}
+            onClick={() => onPick(prompt)}
             className="border-border bg-card hover:border-secondary hover:bg-secondary/5 rounded-md border px-3 py-2 text-left text-sm transition-colors"
           >
-            {t(key)}
+            {prompt}
           </button>
         ))}
       </div>
@@ -241,6 +298,83 @@ function MessageBubble({
         >
           <User className="size-4" strokeWidth={1.7} />
         </span>
+      ) : null}
+    </div>
+  )
+}
+
+const TOOL_ICONS: Record<string, typeof Receipt> = {
+  create_visit: Receipt,
+  create_expense: Receipt,
+  create_client: UserPlus,
+  create_service: Wrench,
+  transfer_cash: ArrowLeftRight,
+}
+
+function ToolCallCard({
+  tc,
+  onUndo,
+  undoing,
+}: {
+  tc: AIToolCall
+  onUndo: () => void
+  undoing: boolean
+}) {
+  const { t } = useTranslation()
+  const Icon = TOOL_ICONS[tc.tool_name] ?? Sparkles
+  const isError = tc.status === 'error'
+  const isUndone = tc.status === 'undone' || tc.undone_at !== null
+  const canUndo = tc.status === 'success' && !isUndone && !!tc.entity_id
+
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs',
+        isError
+          ? 'border-destructive/30 bg-destructive/5 text-destructive'
+          : isUndone
+            ? 'border-border bg-muted/30 text-muted-foreground'
+            : 'border-emerald-200 bg-emerald-50/60 text-emerald-900',
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 grid size-5 shrink-0 place-items-center rounded-full',
+          isError
+            ? 'bg-destructive/20'
+            : isUndone
+              ? 'bg-muted-foreground/20'
+              : 'bg-emerald-200/70 text-emerald-700',
+        )}
+        aria-hidden
+      >
+        {isError ? (
+          <AlertCircle className="size-3" strokeWidth={2} />
+        ) : isUndone ? (
+          <X className="size-3" strokeWidth={2.2} />
+        ) : (
+          <Check className="size-3" strokeWidth={2.5} />
+        )}
+      </span>
+      <div className="flex-1 leading-snug">
+        <div className="flex items-center gap-1.5 font-bold">
+          <Icon className="size-3.5" strokeWidth={1.8} />
+          <span>{t(`ai.tools.${tc.tool_name}`, { defaultValue: tc.tool_name })}</span>
+        </div>
+        <div className="mt-0.5">
+          {isError ? (tc.error_message ?? t('ai.tool_error_generic')) : (tc.result_summary ?? '—')}
+          {isUndone ? ` · ${t('ai.tool_status_undone')}` : null}
+        </div>
+      </div>
+      {canUndo ? (
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={undoing}
+          className="text-muted-foreground hover:text-foreground shrink-0 self-center text-[11px] underline-offset-2 hover:underline disabled:opacity-50"
+        >
+          {undoing ? <Loader2 className="size-3 animate-spin" strokeWidth={2} /> : t('ai.undo')}
+        </button>
       ) : null}
     </div>
   )
