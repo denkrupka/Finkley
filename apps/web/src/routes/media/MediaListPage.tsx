@@ -35,26 +35,17 @@ export function MediaListPage() {
             ← Finkley
           </Link>
           <h1 className="text-brand-navy mt-4 text-4xl font-bold tracking-tight sm:text-5xl">
-            {t('media.list.title', { defaultValue: 'Блог Finkley' })}
+            {t('media.list.title')}
           </h1>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-base">
-            {t('media.list.intro', {
-              defaultValue:
-                'Управленческий учёт, маржа, маркетинг и операционка салона красоты — без воды, с цифрами.',
-            })}
-          </p>
+          <p className="text-muted-foreground mt-3 max-w-2xl text-base">{t('media.list.intro')}</p>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">
-            {t('media.list.loading', { defaultValue: 'Загрузка…' })}
-          </p>
+          <p className="text-muted-foreground text-sm">{t('media.list.loading')}</p>
         ) : posts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {t('media.list.empty', { defaultValue: 'Статей пока нет.' })}
-          </p>
+          <p className="text-muted-foreground text-sm">{t('media.list.empty')}</p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((p) => (
@@ -99,7 +90,7 @@ export function MediaListPage() {
                     </div>
                   ) : null}
                   <div className="text-secondary mt-4 inline-flex items-center gap-1 text-xs font-semibold transition-transform group-hover:translate-x-1">
-                    {t('media.list.read_cta', { defaultValue: 'Читать' })}
+                    {t('media.list.read_cta')}
                     <ArrowRight className="size-3.5" strokeWidth={2} />
                   </div>
                 </div>

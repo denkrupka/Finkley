@@ -224,7 +224,9 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
                           }}
                           className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
                         />
-                        <span className="text-muted-foreground text-xs">мин</span>
+                        <span className="text-muted-foreground text-xs">
+                          {t('onboarding.services.duration_unit')}
+                        </span>
                       </div>
                       <button
                         type="button"

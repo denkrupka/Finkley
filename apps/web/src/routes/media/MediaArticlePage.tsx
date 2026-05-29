@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Calendar, Tag } from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 
 import { supabase } from '@/lib/supabase/client'
@@ -16,6 +17,7 @@ import { type MediaPost } from '@/hooks/useMediaPosts'
  * норм с 2019 года).
  */
 export function MediaArticlePage() {
+  const { t } = useTranslation()
   const { slug } = useParams<{ slug: string }>()
   const { data: post, isLoading } = useQuery<MediaPost | null>({
     queryKey: ['media-post', slug],
@@ -74,16 +76,16 @@ export function MediaArticlePage() {
   if (isLoading) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground text-sm">Загрузка…</p>
+        <p className="text-muted-foreground text-sm">{t('media.article.loading')}</p>
       </div>
     )
   }
   if (!post) {
     return (
       <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-3 p-8 text-center">
-        <h1 className="text-brand-navy text-2xl font-bold">Статья не найдена</h1>
+        <h1 className="text-brand-navy text-2xl font-bold">{t('media.article.not_found')}</h1>
         <Link to="/media" className="text-secondary text-sm underline">
-          ← Все статьи блога
+          {t('media.article.all_articles_link')}
         </Link>
       </div>
     )
@@ -100,7 +102,7 @@ export function MediaArticlePage() {
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
             <ArrowLeft className="size-3" strokeWidth={2} />
-            Все статьи
+            {t('media.article.all_articles_link_short')}
           </Link>
         </div>
       </header>
