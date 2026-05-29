@@ -65,17 +65,11 @@ export function CashDetailsModal({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>
-            {t('dashboard.cash_details.title', { defaultValue: 'Деньги на счетах — детали' })}
-          </DialogTitle>
+          <DialogTitle>{t('dashboard.cash_details.title')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           {registers.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              {t('dashboard.cash_details.empty', {
-                defaultValue: 'Кассы ещё не настроены. Зайди в Настройки → Справочники → Кассы.',
-              })}
-            </p>
+            <p className="text-muted-foreground text-sm">{t('dashboard.cash_details.empty')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {registers.map((r) => {
@@ -108,10 +102,8 @@ export function CashDetailsModal({
                         <p className="text-foreground truncate text-base font-bold">{r.label}</p>
                         <p className="text-muted-foreground mt-0.5 text-[10px] font-semibold uppercase tracking-wider">
                           {isCash
-                            ? t('dashboard.cash_details.cash', { defaultValue: 'Наличные' })
-                            : t('dashboard.cash_details.non_cash', {
-                                defaultValue: 'Безналичные',
-                              })}
+                            ? t('dashboard.cash_details.cash')
+                            : t('dashboard.cash_details.non_cash')}
                         </p>
                       </div>
                     </div>
@@ -122,9 +114,7 @@ export function CashDetailsModal({
                       <>
                         <div>
                           <span className="text-muted-foreground text-xs">
-                            {t('dashboard.cash_details.fact_bank', {
-                              defaultValue: 'Факт (по банку)',
-                            })}
+                            {t('dashboard.cash_details.fact_bank')}
                           </span>
                           <div className="num text-foreground mt-0.5 break-all text-xl font-bold leading-tight">
                             {formatCurrency(factCents ?? 0, currency)}
@@ -132,9 +122,7 @@ export function CashDetailsModal({
                         </div>
                         <div>
                           <span className="text-muted-foreground text-xs">
-                            {t('dashboard.cash_details.plan', {
-                              defaultValue: 'План (по нашим записям)',
-                            })}
+                            {t('dashboard.cash_details.plan')}
                           </span>
                           <div className="num text-muted-foreground mt-0.5 break-all text-sm font-semibold leading-tight">
                             {formatCurrency(planCents, currency)}
@@ -151,11 +139,9 @@ export function CashDetailsModal({
                           >
                             {expected > 0
                               ? t('dashboard.cash_details.expected_incoming', {
-                                  defaultValue: 'Ожидается поступление: {{amount}}',
                                   amount: formatCurrency(expected, currency),
                                 })
                               : t('dashboard.cash_details.discrepancy', {
-                                  defaultValue: 'Разница: банк показывает на {{amount}} больше',
                                   amount: formatCurrency(-expected, currency),
                                 })}
                           </div>
@@ -165,9 +151,7 @@ export function CashDetailsModal({
                       <>
                         <div>
                           <span className="text-muted-foreground text-xs">
-                            {t('dashboard.cash_details.balance', {
-                              defaultValue: 'Текущий баланс',
-                            })}
+                            {t('dashboard.cash_details.balance')}
                           </span>
                           <div className="num text-foreground mt-0.5 break-all text-xl font-bold leading-tight">
                             {formatCurrency(planCents, currency)}
@@ -209,14 +193,8 @@ function UnlinkedHint({
         <Link2Off className="mt-0.5 size-3 shrink-0" strokeWidth={1.8} />
         <span>
           {hasAnyBankAccount
-            ? t('dashboard.cash_details.unlinked_with_bank', {
-                defaultValue:
-                  'Банк подключён, но эту кассу ещё не связали с конкретным счётом — поэтому факт не виден.',
-              })
-            : t('dashboard.cash_details.unlinked_no_bank', {
-                defaultValue:
-                  'Подключи банк через Enable Banking и привяжи к этой кассе — увидишь фактический баланс автоматом.',
-              })}
+            ? t('dashboard.cash_details.unlinked_with_bank')
+            : t('dashboard.cash_details.unlinked_no_bank')}
         </span>
       </div>
       <Link
@@ -224,8 +202,8 @@ function UnlinkedHint({
         className="text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center gap-1 self-start rounded px-1 py-0.5 text-[11px] font-bold"
       >
         {hasAnyBankAccount
-          ? t('dashboard.cash_details.link_now', { defaultValue: 'Связать сейчас' })
-          : t('dashboard.cash_details.connect_bank', { defaultValue: 'Подключить банк' })}
+          ? t('dashboard.cash_details.link_now')
+          : t('dashboard.cash_details.connect_bank')}
         <ArrowRight className="size-3" strokeWidth={2.2} />
       </Link>
     </div>

@@ -228,6 +228,13 @@ Helpers: `saveOnboardingTransit()` для записи, `consumeOnboardingCreden
 `onboarding-add-item.test.ts` как пример). Это даёт regression safety
 и документирует ожидаемое поведение.
 
+**EN/PL переводы — никогда не кладите русский текст в `en.json`/`pl.json`.**
+i18next падёт на `ru` через `fallbackLng: 'ru'` если ключ отсутствует —
+это лучше чем русский текст под видом английского. Текущие незакрытые
+переводы — в `docs/i18n-todo.md`. `pnpm i18n:sync` синхронизирует
+`defaultValue` → `ru.json` без записи в EN/PL. `pnpm i18n:clean` чистит
+случайно попавший русский из EN/PL и обновляет TODO-список.
+
 ### Время — всегда UTC в БД, локально на клиенте
 
 `timestamptz` в Postgres, ISO-строки в API, `Date` объекты на клиенте, отображение через `date-fns` с локалью. Часовой пояс салона хранится в `salons.timezone` (IANA, например `Europe/Warsaw`).

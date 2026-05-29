@@ -31,6 +31,8 @@
     "functions:serve": "supabase functions serve",
     "functions:deploy": "supabase functions deploy",
     "tg:check": "node scripts/check-telegram-webhook.mjs",
+    "i18n:sync": "node scripts/sync-default-values.mjs",
+    "i18n:clean": "node scripts/fix-russian-in-en-pl.mjs",
     "prepare": "husky || true"
   },
   "devDependencies": {

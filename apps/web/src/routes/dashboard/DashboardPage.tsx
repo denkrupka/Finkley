@@ -294,19 +294,11 @@ export function DashboardPage() {
       <OnboardingTour salonId={salonId} force={params.get('showTour') === '1'} />
 
       {/* Сворачиваемые блоки — единственное что осталось с прошлой версии */}
-      <CollapsibleSection
-        id="lowStock"
-        title={t('dashboard.collapsible.low_stock', { defaultValue: 'Заканчиваются материалы' })}
-        defaultOpen
-      >
+      <CollapsibleSection id="lowStock" title={t('dashboard.collapsible.low_stock')} defaultOpen>
         <LowStockWidget salonId={salonId} />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        id="insights"
-        title={t('dashboard.collapsible.insights', { defaultValue: 'AI-помощник видит' })}
-        defaultOpen
-      >
+      <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>
         <InsightsWidget salonId={salonId} fallback={localInsights} />
       </CollapsibleSection>
 

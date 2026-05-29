@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useDismissInsight, useInsights, type InsightRow } from '@/hooks/useInsights'
 import { useQueryClient } from '@tanstack/react-query'
+import { interpretInsightsResult, type InsightsResult } from '@/lib/insights-result'
 import { supabase } from '@/lib/supabase/client'
 
 import type { LocalInsight } from './dashboard-aggregates'
@@ -48,16 +49,17 @@ export function InsightsWidget({
       const { data, error } = await supabase.functions.invoke('generate-insights', {
         body: { salon_id: salonId },
       })
-      if (error) throw error
-      // T188 — реальный response format: { ok: true, mode: 'manual', generated: N }.
-      // generated=0 → у салона нет данных, показываем friendly empty toast.
-      const result = data as { ok?: boolean; generated?: number } | null
-      if (result?.generated === 0) {
-        toast.info(t('dashboard.insights.run_no_data'))
-        return
-      }
+      // T219 — invalidate cache всегда (даже при generated=0 — stale server data).
       await qc.invalidateQueries({ queryKey: ['insights', salonId] })
-      toast.success(t('dashboard.insights.run_done'))
+      // T188+T226 — pure helper интерпретации ответа (тестируется отдельно).
+      const outcome = interpretInsightsResult(data as InsightsResult, error)
+      if (outcome === 'no_data') {
+        toast.info(t('dashboard.insights.run_no_data'))
+      } else if (outcome === 'error') {
+        throw new Error(error?.message ?? 'unknown')
+      } else {
+        toast.success(t('dashboard.insights.run_done'))
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {

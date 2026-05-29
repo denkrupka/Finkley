@@ -69,8 +69,31 @@ function writeStorage(salonId: string, value: StorageShape): void {
     const hasPrompt = !!value.prompt
     if (!hasCreds && !hasPrompt) {
       localStorage.removeItem(storageKey(salonId))
+      // T221 — также чистим legacy на write-empty (deploy rollback safety).
+      localStorage.removeItem(`finkley:onboarding:credentials:${salonId}`)
+      localStorage.removeItem(`finkley:onboarding:prompt:${salonId}`)
     } else {
       localStorage.setItem(storageKey(salonId), JSON.stringify(value))
+      // T221 — dual-write в legacy формат на случай rollback'a в ближайшие
+      // 2 недели. После 2026-06-15 эти строки можно удалить — все юзеры
+      // пройдут через unified формат.
+      if (hasCreds) {
+        try {
+          localStorage.setItem(
+            `finkley:onboarding:credentials:${salonId}`,
+            JSON.stringify(value.credentials),
+          )
+        } catch {
+          /* ignore */
+        }
+      }
+      if (hasPrompt) {
+        try {
+          localStorage.setItem(`finkley:onboarding:prompt:${salonId}`, value.prompt!)
+        } catch {
+          /* ignore */
+        }
+      }
     }
   } catch {
     // ignore — storage недоступен (private mode)

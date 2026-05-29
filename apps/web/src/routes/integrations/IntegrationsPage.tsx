@@ -35,6 +35,11 @@ import {
 
 import { InstallAppButton } from '@/components/pwa/InstallAppButton'
 import { consumeOnboardingPrompt } from '@/lib/onboarding-credentials'
+import {
+  parsePromptQueue,
+  serializePromptQueue,
+  shiftPromptQueue,
+} from '@/lib/onboarding-prompt-queue'
 
 import { BankingSection } from './BankingSection'
 import { SmsSection } from './SmsSection'
@@ -138,17 +143,9 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   const stripeStatus = params.get('stripe')
   useEffect(() => {
     if (stripeStatus === 'success') {
-      toast.success(
-        t('integrations.stripe_success', {
-          defaultValue: 'Подписка активирована. Продолжаем подключение интеграций.',
-        }),
-      )
+      toast.success(t('integrations.stripe_success'))
     } else if (stripeStatus === 'cancel') {
-      toast.info(
-        t('integrations.stripe_cancel', {
-          defaultValue: 'Подписка отменена. Можешь продолжить подключение интеграций без trial.',
-        }),
-      )
+      toast.info(t('integrations.stripe_cancel'))
     }
     if (stripeStatus) {
       const next = new URLSearchParams(params)
@@ -163,19 +160,16 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   // возвращается из Stripe Checkout — query потерян).
   const promptParam = params.get('prompt')
 
-  // T180 — при закрытии каждого dialog'a проверяем remaining prompt
-  // и автоматом открываем следующий. Цепочка работает даже если юзер
-  // не подтвердил один из dialog'ов.
+  // T180+T218 — при закрытии каждого dialog'a берём следующий prompt
+  // через pure helpers (см. lib/onboarding-prompt-queue, 14 unit-тестов).
   function consumeNextPrompt(): void {
-    const remaining = params.get('prompt')
-    if (!remaining) return
-    const queue = remaining.split(',').filter(Boolean)
-    if (queue.length === 0) return
-    const next = queue[0]!
-    openProviderDialog(next)
-    const rest = queue.slice(1)
+    const queue = parsePromptQueue(params.get('prompt'))
+    const { head, rest } = shiftPromptQueue(queue)
+    if (!head) return
+    openProviderDialog(head)
     const newParams = new URLSearchParams(params)
-    if (rest.length > 0) newParams.set('prompt', rest.join(','))
+    const serialized = serializePromptQueue(rest)
+    if (serialized) newParams.set('prompt', serialized)
     else newParams.delete('prompt')
     setParams(newParams, { replace: true })
   }
@@ -196,26 +190,24 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   }
 
   useEffect(() => {
-    // T192 — единый setParams call за effect (избегаем race).
+    // T192+T218 — единый setParams call за effect (избегаем race).
     // Источник prompt: URL query (свежий редирект) или localStorage
-    // (T199 unified — finkley:onboarding:<salonId>).
-    let queue: string[] = []
+    // (T199 unified). Парсинг через pure helpers (T218).
+    let queue = parsePromptQueue(promptParam)
     let fromStorage = false
-    if (promptParam) {
-      queue = promptParam.split(',').filter(Boolean)
-    } else if (salonId) {
+    if (queue.length === 0 && salonId) {
       const stored = consumeOnboardingPrompt(salonId)
       if (stored) {
-        queue = stored.split(',').filter(Boolean)
+        queue = parsePromptQueue(stored)
         fromStorage = true
       }
     }
-    if (queue.length === 0) return
-    const first = queue[0]!
-    openProviderDialog(first)
-    const rest = queue.slice(1)
+    const { head, rest } = shiftPromptQueue(queue)
+    if (!head) return
+    openProviderDialog(head)
     const next = new URLSearchParams(params)
-    if (rest.length > 0) next.set('prompt', rest.join(','))
+    const serialized = serializePromptQueue(rest)
+    if (serialized) next.set('prompt', serialized)
     else next.delete('prompt')
     if (fromStorage) next.set('tab', 'booking')
     setParams(next, { replace: true })
@@ -565,29 +557,18 @@ function IntegrationCard({
                   onClick={() => {
                     backfillAppts.mutate(undefined, {
                       onSuccess: ({ scanned, patched }) =>
-                        toast.success(
-                          t('integrations.toast_backfill_done', {
-                            defaultValue: 'Починено {{patched}} визитов из {{scanned}}',
-                            patched,
-                            scanned,
-                          }),
-                        ),
+                        toast.success(t('integrations.toast_backfill_done', { patched, scanned })),
                       onError: (err) =>
                         toast.error(err instanceof Error ? err.message : String(err)),
                     })
                   }}
                   disabled={backfillAppts.isPending}
                   className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
-                  title={t('integrations.backfill_appt_uids_hint', {
-                    defaultValue:
-                      'Восстановить связь legacy-визитов с Booksy чтобы delete каскадил',
-                  })}
+                  title={t('integrations.backfill_appt_uids_hint')}
                 >
                   {backfillAppts.isPending
                     ? t('common.loading')
-                    : t('integrations.backfill_appt_uids', {
-                        defaultValue: 'Починить legacy связь',
-                      })}
+                    : t('integrations.backfill_appt_uids')}
                 </button>
               </>
             ) : null}

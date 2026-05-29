@@ -230,9 +230,7 @@ export function BankingSection({ salonId }: Props) {
                           </span>
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="text-muted-foreground">
-                              {t('banking.link_register.label', {
-                                defaultValue: 'Связать с кассой:',
-                              })}
+                              {t('banking.link_register.label')}
                             </span>
                             <Select
                               value={a.cash_register_id ?? '__none__'}
@@ -244,11 +242,7 @@ export function BankingSection({ salonId }: Props) {
                                   },
                                   {
                                     onSuccess: () =>
-                                      toast.success(
-                                        t('banking.link_register.toast_saved', {
-                                          defaultValue: 'Связь обновлена',
-                                        }),
-                                      ),
+                                      toast.success(t('banking.link_register.toast_saved')),
                                     onError: (err) =>
                                       toast.error(err instanceof Error ? err.message : String(err)),
                                   },
@@ -257,22 +251,15 @@ export function BankingSection({ salonId }: Props) {
                               disabled={linkRegister.isPending}
                             >
                               <SelectTrigger className="h-7 w-[200px] text-xs">
-                                <SelectValue
-                                  placeholder={t('banking.link_register.placeholder', {
-                                    defaultValue: 'Не связан',
-                                  })}
-                                />
+                                <SelectValue placeholder={t('banking.link_register.placeholder')} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none__">
-                                  {t('banking.link_register.none', { defaultValue: '— Не связан' })}
+                                  {t('banking.link_register.none')}
                                 </SelectItem>
                                 {nonCashRegisters.length === 0 ? (
                                   <SelectItem value="__empty__" disabled>
-                                    {t('banking.link_register.empty', {
-                                      defaultValue:
-                                        'Нет безналичных касс — заведи в Настройках → Справочники',
-                                    })}
+                                    {t('banking.link_register.empty')}
                                   </SelectItem>
                                 ) : (
                                   nonCashRegisters.map((r) => (

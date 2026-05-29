@@ -42,12 +42,10 @@ export function OccupancyHeatmapWidget({ salonId }: { salonId: string }) {
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border p-4">
       <h2 className="text-brand-navy mb-3 text-sm font-bold uppercase tracking-wider">
-        {t('dashboard.heatmap.title', { defaultValue: 'Загрузка по дням и часам (30 дней)' })}
+        {t('dashboard.heatmap.title')}
       </h2>
       {cells.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t('dashboard.heatmap.empty', { defaultValue: 'Нет визитов за последние 30 дней' })}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('dashboard.heatmap.empty')}</p>
       ) : (
         <div className="overflow-x-auto">
           <div

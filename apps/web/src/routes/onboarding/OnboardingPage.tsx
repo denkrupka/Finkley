@@ -29,6 +29,7 @@ import { LogoLockup } from '@/components/ui/logo'
 import { useAuth } from '@/hooks/useAuth'
 import { DEFAULT_FINANCIAL_SETTINGS, type FinancialSettings } from '@/hooks/useFinancialSettings'
 import { detectCountryByIp } from '@/lib/detect-country'
+import { saveOnboardingTransit } from '@/lib/onboarding-credentials'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -507,7 +508,6 @@ export function OnboardingPage() {
     )
     const hasPrompt = state.selected_integrations.length > 0
     if (hasCredentials || hasPrompt) {
-      const { saveOnboardingTransit } = await import('@/lib/onboarding-credentials')
       saveOnboardingTransit(newSalonId, {
         credentials: hasCredentials ? state.pending_credentials : undefined,
         prompt: hasPrompt ? state.selected_integrations.join(',') : undefined,

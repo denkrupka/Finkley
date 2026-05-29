@@ -111,8 +111,11 @@ export function Step3Accounting({
   // бухгалтер всё ведёт сам в biuro или ничего пока нет.
   const showProviders = accountingMode === 'self' || accountingMode === 'app'
 
-  // T177 — при переключении на biuro/none снимаем уже-выбранных провайдеров
-  // бухгалтерии чтобы не было «invisible badge» (selected но карточка скрыта).
+  // T177+T224 — при переключении на biuro/none снимаем уже-выбранных
+  // провайдеров бухгалтерии чтобы не было «invisible badge» (selected
+  // но карточка скрыта) И очищаем pending_credentials через
+  // onCredentialsChange(id, null) — иначе credentials уйдут в localStorage
+  // при submit и pre-fill для dialog'а который юзер уже скрыл.
   function handleModeChange(mode: AccountingMode) {
     onAccountingModeChange?.(mode)
     if (mode === 'biuro' || mode === 'none') {
@@ -121,6 +124,7 @@ export function Step3Accounting({
         if (selectedIntegrations.includes(id)) {
           onToggleIntegration?.(id)
         }
+        onCredentialsChange?.(id, null)
       }
     }
   }
