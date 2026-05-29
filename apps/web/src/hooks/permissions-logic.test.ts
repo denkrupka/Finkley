@@ -55,8 +55,15 @@ describe('lookupPermission', () => {
     expect(lookupPermission('accountant', {}, 'inventory')).toBe('none')
   })
 
-  it('null role → none', () => {
-    expect(lookupPermission(null, { 'income.*': 'edit' }, 'income')).toBe('none')
+  it('null role → view (optimistic для предотвращения Sidebar flash)', () => {
+    // Раньше при role=null возвращалось 'none' (membership грузится →
+    // блокируем доступ). Это вызывало flash в Sidebar: «2 пункта → потом
+    // 12». Image #31 в фидбеке. Теперь оптимистично 'view': пока
+    // загружается membership показываем все nav-пункты, после загрузки
+    // фильтр уточняется. Реальные actions защищены RequirePermission
+    // на роутах.
+    expect(lookupPermission(null, { 'income.*': 'edit' }, 'income')).toBe('view')
+    expect(lookupPermission(null, null, 'expenses')).toBe('view')
   })
 })
 
