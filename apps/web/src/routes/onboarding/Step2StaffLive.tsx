@@ -1,0 +1,279 @@
+import { Loader2, Mail, Phone, Send, Trash2, UserPlus } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { supabase } from '@/lib/supabase/client'
+import { useStaff } from '@/hooks/useStaff'
+import { useInviteMember } from '@/hooks/useTeam'
+import { useQueryClient } from '@tanstack/react-query'
+
+/**
+ * Live-режим Step2Staff: показывает мастеров уже импортированных из
+ * Booksy (после login в предыдущем шаге их подтягивает background-sync).
+ * Каждая карточка с avatar + email/phone + кнопка «Пригласить» (one-shot
+ * link через send-invitation edge function). Возможность добавить
+ * нового мастера прямо тут.
+ *
+ * Используется в OnboardingPage когда state.created_salon_id есть.
+ * Без salonId — fallback на старый Step2Staff (draft в state).
+ */
+export function Step2StaffLive({ salonId }: { salonId: string }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const { data: staff = [], isLoading } = useStaff(salonId, { activeOnly: true })
+  const invite = useInviteMember(salonId)
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newPercent, setNewPercent] = useState(40)
+  const [adding, setAdding] = useState(false)
+
+  async function addStaff() {
+    if (!newName.trim()) return
+    setAdding(true)
+    try {
+      const { error } = await supabase.from('staff').insert({
+        salon_id: salonId,
+        full_name: newName.trim(),
+        email: newEmail.trim() || null,
+        payout_scheme: 'percent_revenue',
+        payout_percent: Math.max(0, Math.min(100, newPercent)),
+        is_active: true,
+      })
+      if (error) throw error
+      toast.success(t('onboarding.step2.added', { defaultValue: 'Мастер добавлен' }))
+      setNewName('')
+      setNewEmail('')
+      setNewPhone('')
+      setNewPercent(40)
+      setAddOpen(false)
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function removeStaff(id: string) {
+    if (!confirm(t('common.confirm_delete', { defaultValue: 'Удалить?' }))) return
+    try {
+      const { error } = await supabase.from('staff').update({ is_active: false }).eq('id', id)
+      if (error) throw error
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  function sendInvite(s: { id: string; full_name: string; email: string | null }) {
+    if (!s.email) {
+      toast.error(t('onboarding.step2.invite_need_email'))
+      return
+    }
+    invite.mutate(
+      {
+        email: s.email,
+        role: 'staff',
+        staffId: s.id,
+        first_name: s.full_name.split(' ')[0],
+        last_name: s.full_name.split(' ').slice(1).join(' '),
+      },
+      {
+        onSuccess: () =>
+          toast.success(
+            t('onboarding.step2.invite_sent', {
+              email: s.email,
+              defaultValue: 'Приглашение отправлено на {{email}}',
+            }),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      },
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-8">
+        <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
+        <p className="text-muted-foreground text-sm">
+          {t('common.loading', { defaultValue: 'Загрузка…' })}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+        {t('onboarding.step2.title')}
+      </h1>
+
+      {staff.length === 0 ? (
+        <p className="text-muted-foreground mt-3 text-sm">
+          {t('onboarding.step2.empty_hint', {
+            defaultValue:
+              'Пока пусто. Если только что подключил Booksy — мастера подтянутся через 2-5 минут. Можешь добавить вручную ниже.',
+          })}
+        </p>
+      ) : null}
+
+      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {staff.map((s) => {
+          const initial = (s.full_name || '?').trim().charAt(0).toUpperCase() || '?'
+          return (
+            <div
+              key={s.id}
+              className="border-border bg-card shadow-finsm rounded-lg border p-4"
+              data-testid="onb-staff-card-live"
+            >
+              <div className="flex items-start gap-3">
+                {s.avatar_url ? (
+                  <img
+                    src={s.avatar_url}
+                    alt={s.full_name}
+                    className="size-12 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="bg-brand-teal-soft text-brand-teal-deep grid size-12 shrink-0 place-items-center rounded-full text-base font-bold">
+                    {initial}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground truncate text-sm font-bold">{s.full_name}</p>
+                  {s.email ? (
+                    <p className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 truncate text-xs">
+                      <Mail className="size-3" strokeWidth={1.8} /> {s.email}
+                    </p>
+                  ) : null}
+                  {s.external_source === 'booksy' ? (
+                    <span className="bg-brand-teal-soft text-brand-teal-deep mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                      Booksy
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeStaff(s.id)}
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label="remove"
+                >
+                  <Trash2 className="size-4" strokeWidth={1.7} />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => sendInvite(s)}
+                disabled={invite.isPending || !s.email || !!s.invite_sent_at}
+                className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Send className="size-3.5" strokeWidth={2} />
+                {s.invite_sent_at
+                  ? t('onboarding.step2.invite_already_sent', {
+                      defaultValue: 'Приглашение уже отправлено',
+                    })
+                  : t('onboarding.step2.invite_send', {
+                      defaultValue: 'Отправить приглашение',
+                    })}
+              </button>
+            </div>
+          )
+        })}
+
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-transparent p-4 transition-colors"
+          data-testid="onb-staff-add-live"
+        >
+          <div className="border-brand-border-strong bg-card grid size-11 place-items-center rounded-full border-[1.5px]">
+            <UserPlus className="size-[18px]" strokeWidth={1.7} />
+          </div>
+          <span className="text-sm font-semibold">{t('onboarding.step2.add')}</span>
+        </button>
+      </div>
+
+      {addOpen ? (
+        <div className="border-brand-teal-deep bg-brand-teal-soft/10 mt-4 rounded-lg border-2 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="new-name" className="text-xs">
+                {t('onboarding.step2.name_placeholder')}
+              </Label>
+              <Input
+                id="new-name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-pct" className="text-xs">
+                {t('onboarding.step2.percent_label')}
+              </Label>
+              <Input
+                id="new-pct"
+                type="number"
+                min="0"
+                max="100"
+                value={newPercent}
+                onChange={(e) => setNewPercent(Number(e.target.value))}
+                className="num"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-email" className="text-xs">
+                Email
+              </Label>
+              <Input
+                id="new-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-phone" className="text-xs">
+                <Phone className="mr-1 inline size-3" /> Phone
+              </Label>
+              <Input
+                id="new-phone"
+                type="tel"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="+48 …"
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={addStaff}
+              disabled={!newName.trim() || adding}
+              className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {adding ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <UserPlus className="size-4" />
+              )}
+              {t('onboarding.step2.add')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddOpen(false)}
+              className="text-muted-foreground hover:text-foreground text-sm"
+            >
+              {t('common.cancel', { defaultValue: 'Отмена' })}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}

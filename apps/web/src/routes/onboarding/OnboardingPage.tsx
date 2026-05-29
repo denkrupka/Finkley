@@ -57,8 +57,12 @@ import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
 import { Step2Address, type AddressDraft } from './Step2Address'
 import { Step2Staff, type StaffDraft } from './Step2Staff'
+import { Step2StaffLive } from './Step2StaffLive'
 import { Step3Accounting, type AccountingMode } from './Step3Accounting'
+import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
+import { ShieldCheck } from 'lucide-react'
 import { Step3Services, type ServiceDraft } from './Step3Services'
+import { Step3ServicesLive } from './Step3ServicesLive'
 import { Step4Expenses } from './Step4Expenses'
 import { Step5Done } from './Step5Done'
 import { TutorialNote } from './TutorialNote'
@@ -878,32 +882,57 @@ export function OnboardingPage() {
             )}
             {stepId === 'accounting' && (
               <>
-                <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
-                <Step3Accounting
-                  salonId={state.created_salon_id}
-                  value={{ nip: state.nip, company_name: state.company_name }}
-                  onChange={(v) =>
-                    setState((prev) => ({ ...prev, nip: v.nip, company_name: v.company_name }))
-                  }
-                  selectedIntegrations={state.selected_integrations}
-                  onToggleIntegration={(id) =>
-                    patch(
-                      'selected_integrations',
-                      state.selected_integrations.includes(id)
-                        ? state.selected_integrations.filter((x) => x !== id)
-                        : [...state.selected_integrations, id],
-                    )
-                  }
-                  accountingMode={state.accounting_mode ?? undefined}
-                  onAccountingModeChange={(mode) => patch('accounting_mode', mode)}
-                  credentials={state.pending_credentials}
-                  onCredentialsChange={(id, creds) =>
-                    patch('pending_credentials', {
-                      ...state.pending_credentials,
-                      [id]: creds ?? {},
-                    })
-                  }
-                />
+                {/* Privacy-note сверху: данные не передаём третьим лицам,
+                    нужны только для автоматизации доставки фактур/чеков
+                    бухгалтеру. */}
+                <div className="border-brand-teal-deep/30 bg-brand-teal-soft/20 mb-4 flex items-start gap-3 rounded-lg border-2 p-3">
+                  <ShieldCheck
+                    className="text-brand-teal-deep mt-0.5 size-5 shrink-0"
+                    strokeWidth={2}
+                  />
+                  <p className="text-foreground/90 text-sm leading-snug">
+                    {t('onboarding.step_accounting.privacy_note', {
+                      defaultValue:
+                        'Эти данные конфиденциальны. Мы не передаём их третьим лицам — они нужны только для автоматизации доставки фактур и чеков твоему бухгалтеру.',
+                    })}
+                  </p>
+                </div>
+                {state.created_salon_id ? (
+                  <AccountingSettingsCard salonId={state.created_salon_id} />
+                ) : (
+                  <>
+                    <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
+                    <Step3Accounting
+                      salonId={state.created_salon_id}
+                      value={{ nip: state.nip, company_name: state.company_name }}
+                      onChange={(v) =>
+                        setState((prev) => ({
+                          ...prev,
+                          nip: v.nip,
+                          company_name: v.company_name,
+                        }))
+                      }
+                      selectedIntegrations={state.selected_integrations}
+                      onToggleIntegration={(id) =>
+                        patch(
+                          'selected_integrations',
+                          state.selected_integrations.includes(id)
+                            ? state.selected_integrations.filter((x) => x !== id)
+                            : [...state.selected_integrations, id],
+                        )
+                      }
+                      accountingMode={state.accounting_mode ?? undefined}
+                      onAccountingModeChange={(mode) => patch('accounting_mode', mode)}
+                      credentials={state.pending_credentials}
+                      onCredentialsChange={(id, creds) =>
+                        patch('pending_credentials', {
+                          ...state.pending_credentials,
+                          [id]: creds ?? {},
+                        })
+                      }
+                    />
+                  </>
+                )}
               </>
             )}
             {stepId === 'integrations_bookings' && (
@@ -1161,17 +1190,25 @@ export function OnboardingPage() {
             {stepId === 'staff' && (
               <>
                 <TutorialNote>{t('onboarding.tutorial.staff')}</TutorialNote>
-                <Step2Staff value={state.staff} onChange={(v) => patch('staff', v)} />
+                {state.created_salon_id ? (
+                  <Step2StaffLive salonId={state.created_salon_id} />
+                ) : (
+                  <Step2Staff value={state.staff} onChange={(v) => patch('staff', v)} />
+                )}
               </>
             )}
             {stepId === 'services' && (
               <>
                 <TutorialNote>{t('onboarding.tutorial.services')}</TutorialNote>
-                <Step3Services
-                  value={state.services}
-                  onChange={(v) => patch('services', v)}
-                  salonType={state.salon_type}
-                />
+                {state.created_salon_id ? (
+                  <Step3ServicesLive salonId={state.created_salon_id} />
+                ) : (
+                  <Step3Services
+                    value={state.services}
+                    onChange={(v) => patch('services', v)}
+                    salonType={state.salon_type}
+                  />
+                )}
               </>
             )}
             {stepId === 'expenses' && (
