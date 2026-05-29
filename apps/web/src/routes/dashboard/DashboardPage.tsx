@@ -298,34 +298,38 @@ export function DashboardPage() {
         <LowStockWidget salonId={salonId} />
       </CollapsibleSection>
 
-      <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>
-        <InsightsWidget salonId={salonId} fallback={localInsights} />
-      </CollapsibleSection>
+      <div data-tour="dashboard-insights">
+        <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>
+          <InsightsWidget salonId={salonId} fallback={localInsights} />
+        </CollapsibleSection>
+      </div>
 
       {/* Блок 1 — 5 KPI */}
-      <KpiCardsRow
-        currency={currency}
-        revenueCents={revenueCents}
-        profitCents={profitCents}
-        expenseCents={expenseCents}
-        revenuePlanCents={null}
-        profitPlanCents={null}
-        breakEvenCents={breakEvenCents}
-        prevRevenueCents={prevRevenueCents}
-        prevProfitCents={prevProfitCents}
-        prevCashCents={null}
-        profitForecastCents={profitForecastCents}
-        occupancyPct={occupancyPct}
-        prevOccupancyPct={prevOccupancyPct}
-        retentionPct={retentionPct}
-        prevRetentionPct={null}
-        newClients={returningClients}
-        churnedClients={churnedClients}
-        cashBalanceCents={cashBalanceCents}
-        cashPlanCents={null}
-        expectedIncomingCents={expectedIncomingCents}
-        onCashDetailsClick={() => setCashDetailsOpen(true)}
-      />
+      <div data-tour="dashboard-kpi">
+        <KpiCardsRow
+          currency={currency}
+          revenueCents={revenueCents}
+          profitCents={profitCents}
+          expenseCents={expenseCents}
+          revenuePlanCents={null}
+          profitPlanCents={null}
+          breakEvenCents={breakEvenCents}
+          prevRevenueCents={prevRevenueCents}
+          prevProfitCents={prevProfitCents}
+          prevCashCents={null}
+          profitForecastCents={profitForecastCents}
+          occupancyPct={occupancyPct}
+          prevOccupancyPct={prevOccupancyPct}
+          retentionPct={retentionPct}
+          prevRetentionPct={null}
+          newClients={returningClients}
+          churnedClients={churnedClients}
+          cashBalanceCents={cashBalanceCents}
+          cashPlanCents={null}
+          expectedIncomingCents={expectedIncomingCents}
+          onCashDetailsClick={() => setCashDetailsOpen(true)}
+        />
+      </div>
 
       <CashDetailsModal
         open={cashDetailsOpen}

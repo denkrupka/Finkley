@@ -4867,6 +4867,7 @@ export type Database = {
       staff_performance_advanced: {
         Args: { p_end_ts: string; p_salon_id: string; p_start_ts: string }
         Returns: {
+          churn_pct: number
           full_name: string
           hire_date: string
           is_active: boolean
@@ -4875,6 +4876,7 @@ export type Database = {
           returned_clients_count: number
           revenue_6m_cents: number
           scheduled_minutes: number
+          scoring: number
           staff_id: string
           tips_cents: number
           total_revenue_cents: number

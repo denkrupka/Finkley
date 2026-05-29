@@ -108,10 +108,20 @@ export function InventoryPage() {
               <Upload className="size-4" strokeWidth={1.8} />
               {t('inventory.import_button_generic')}
             </Button>
-            <Button variant="outline" size="md" onClick={() => setStocktakeOpen(true)}>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setStocktakeOpen(true)}
+              data-tour="inventory-stocktake"
+            >
               {t('inventory.stocktake_button')}
             </Button>
-            <Button variant="primary" size="md" onClick={() => setCreateOpen(true)}>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setCreateOpen(true)}
+              data-tour="inventory-add"
+            >
               <Plus className="size-4" strokeWidth={2.4} />
               {t('inventory.add_button')}
             </Button>
@@ -170,6 +180,7 @@ export function InventoryPage() {
               label={t('inventory.kpi.low_stock')}
               value={String(summary.lowStockCount)}
               tone={summary.lowStockCount > 0 ? 'amber' : 'navy'}
+              dataTour="inventory-low-kpi"
             />
             <KpiCard
               label={t('inventory.kpi.out_of_stock')}
@@ -208,7 +219,10 @@ export function InventoryPage() {
           </div>
 
           {/* Items list */}
-          <div className="border-border bg-card shadow-finsm rounded-lg border">
+          <div
+            className="border-border bg-card shadow-finsm rounded-lg border"
+            data-tour="inventory-list"
+          >
             <div className="border-border flex items-baseline justify-between border-b px-5 py-4">
               <h2 className="text-brand-navy text-base font-bold tracking-tight">
                 {t('inventory.list_title')}
@@ -364,7 +378,17 @@ export function InventoryPage() {
 
 type Tone = 'navy' | 'sage' | 'amber' | 'red'
 
-function KpiCard({ label, value, tone }: { label: string; value: string; tone: Tone }) {
+function KpiCard({
+  label,
+  value,
+  tone,
+  dataTour,
+}: {
+  label: string
+  value: string
+  tone: Tone
+  dataTour?: string
+}) {
   const colorClass: Record<Tone, string> = {
     navy: 'border-l-brand-navy',
     sage: 'border-l-brand-sage',
@@ -373,6 +397,7 @@ function KpiCard({ label, value, tone }: { label: string; value: string; tone: T
   }
   return (
     <div
+      data-tour={dataTour}
       className={`border-border bg-card shadow-finsm rounded-lg border border-l-4 p-4 ${colorClass[tone]}`}
     >
       <div className="text-muted-foreground text-xs font-semibold">{label}</div>

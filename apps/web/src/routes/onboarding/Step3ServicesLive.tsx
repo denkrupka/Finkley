@@ -36,7 +36,7 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
       const cat = visibleCategories.find((c) => c.id === catId)
       return {
         catId,
-        name: cat?.name ?? t('onboarding.step3.no_category', { defaultValue: 'Без категории' }),
+        name: cat?.name ?? t('onboarding.step3.no_category'),
         items,
       }
     })
@@ -149,12 +149,7 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-muted-foreground mt-3 text-sm">
-          {t('onboarding.step3.empty_hint', {
-            defaultValue:
-              'Пока пусто. После Booksy login услуги подтянутся через 2-5 минут. Можешь добавить вручную.',
-          })}
-        </p>
+        <p className="text-muted-foreground mt-3 text-sm">{t('onboarding.step3.empty_hint')}</p>
       ) : null}
 
       <div className="mt-3 flex flex-col gap-2">
@@ -197,9 +192,7 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
                         {s.external_source === 'booksy' ? (
                           <span
                             className="bg-brand-teal-soft text-brand-teal-deep absolute right-2 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
-                            title={t('onboarding.step3.imported_from_booksy', {
-                              defaultValue: 'Импортировано из Booksy',
-                            })}
+                            title={t('onboarding.step3.imported_from_booksy')}
                           >
                             Booksy
                           </span>

@@ -26,6 +26,9 @@ const PATHS = [
   'apps/web/src/routes/onboarding',
   'apps/web/src/routes/dashboard',
   'apps/web/src/routes/integrations',
+  'apps/web/src/routes/knowledge',
+  'apps/web/src/routes/media',
+  'apps/web/src/routes/reports-hub',
   'apps/web/src/components/onboarding-tour',
 ]
 

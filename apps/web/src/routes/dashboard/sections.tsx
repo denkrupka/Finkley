@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -214,6 +215,7 @@ function Foot({ label, value }: { label: ReactNode; value: ReactNode }) {
 }
 
 function RevenueCard(p: KpiCardsProps) {
+  const { t } = useTranslation()
   const planPct =
     p.revenuePlanCents != null && p.revenuePlanCents > 0
       ? Math.round((p.revenueCents / p.revenuePlanCents) * 100)
@@ -224,16 +226,9 @@ function RevenueCard(p: KpiCardsProps) {
       ? ((p.revenueCents - p.prevRevenueCents) / Math.abs(p.prevRevenueCents)) * 100
       : null
   return (
-    <Card
-      title={
-        'Выручка за текущий месяц.\n\n' +
-        'Источник: visits (только status=paid) — суммируются amount_cents − discount_cents + tip_cents (для каждого визита). При частичной оплате (paid_amount_cents) используется реально полученная сумма.\n\n' +
-        '«Безубыточность» = сумма твоих фиксированных расходов + налогов из Настроек → Справочники → Финансы.\n\n' +
-        '«Пред. месяц» = выручка прошлого месяца, и стрелка показывает MoM %.'
-      }
-    >
+    <Card title={t('dashboard.sections.revenue.tooltip')}>
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-        Выручка
+        {t('dashboard.sections.revenue.label')}
       </span>
       <span className="num text-foreground text-2xl font-bold leading-none">
         {formatCurrency(p.revenueCents, p.currency)}
@@ -249,7 +244,7 @@ function RevenueCard(p: KpiCardsProps) {
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
         <Foot
-          label="До безубыточности"
+          label={t('dashboard.sections.revenue.to_breakeven')}
           value={
             breakevenDelta == null ? (
               <span className="text-muted-foreground">—</span>
@@ -261,13 +256,14 @@ function RevenueCard(p: KpiCardsProps) {
             )
           }
         />
-        <MomFoot pct={momPct} label="Пред. месяц" />
+        <MomFoot pct={momPct} label={t('dashboard.sections.common.prev_month')} />
       </div>
     </Card>
   )
 }
 
 function ProfitCard(p: KpiCardsProps) {
+  const { t } = useTranslation()
   const planPct =
     p.profitPlanCents != null && p.profitPlanCents > 0
       ? Math.round((p.profitCents / p.profitPlanCents) * 100)
@@ -277,16 +273,9 @@ function ProfitCard(p: KpiCardsProps) {
       ? ((p.profitCents - p.prevProfitCents) / Math.abs(p.prevProfitCents)) * 100
       : null
   return (
-    <Card
-      title={
-        'Прибыль за текущий месяц = Выручка − Расходы.\n\n' +
-        'Источник: visits (paid) − expenses за месяц.\n\n' +
-        '«Прогноз» = текущая прибыль × дней в месяце / дней прошло. Грубая линейная экстраполяция.\n\n' +
-        '«Пред. месяц» = прибыль прошлого месяца, стрелка — MoM %.'
-      }
-    >
+    <Card title={t('dashboard.sections.profit.tooltip')}>
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-        Прибыль
+        {t('dashboard.sections.profit.label')}
       </span>
       <span className="num text-foreground text-2xl font-bold leading-none">
         {formatCurrency(p.profitCents, p.currency)}
@@ -302,7 +291,7 @@ function ProfitCard(p: KpiCardsProps) {
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
         <Foot
-          label="Прогноз"
+          label={t('dashboard.sections.profit.forecast')}
           value={
             p.profitForecastCents == null ? (
               <span className="text-muted-foreground">—</span>
@@ -313,30 +302,28 @@ function ProfitCard(p: KpiCardsProps) {
             )
           }
         />
-        <MomFoot pct={momPct} label="Пред. месяц" />
+        <MomFoot pct={momPct} label={t('dashboard.sections.common.prev_month')} />
       </div>
     </Card>
   )
 }
 
 function OccupancyCard(p: KpiCardsProps) {
+  const { t } = useTranslation()
   const pct = p.occupancyPct ?? null
   const tone: 'green' | 'amber' | 'red' =
     pct == null ? 'amber' : pct >= 85 ? 'green' : pct >= 70 ? 'amber' : 'red'
-  const label = tone === 'green' ? 'Хорошо' : tone === 'amber' ? 'Ниже нормы' : 'Низко'
+  const label =
+    tone === 'green'
+      ? t('dashboard.sections.tone.good')
+      : tone === 'amber'
+        ? t('dashboard.sections.tone.below_norm')
+        : t('dashboard.sections.tone.low')
   const momPct = pct != null && p.prevOccupancyPct != null ? pct - p.prevOccupancyPct : null
   return (
-    <Card
-      title={
-        'Заполненность мастеров за месяц.\n\n' +
-        'Формула: использованные часы / доступные часы × 100.\n' +
-        'Доступные = активные мастера × 8 ч × рабочие дни месяца (пн-сб).\n' +
-        'Использованные = сумма visit.duration_min для paid визитов (не retail).\n\n' +
-        '≥85% — хорошо, 70-85% — норма, <70% — низко.'
-      }
-    >
+    <Card title={t('dashboard.sections.occupancy.tooltip')}>
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-        Заполненность
+        {t('dashboard.sections.occupancy.label')}
       </span>
       <span className="num text-foreground text-2xl font-bold leading-none">
         {pct == null ? '—' : `${Math.round(pct)}%`}
@@ -363,30 +350,28 @@ function OccupancyCard(p: KpiCardsProps) {
       </div>
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
-        <MomFoot pct={momPct} label="Пред. месяц" />
+        <MomFoot pct={momPct} label={t('dashboard.sections.common.prev_month')} />
       </div>
     </Card>
   )
 }
 
 function RetentionCard(p: KpiCardsProps) {
+  const { t } = useTranslation()
   const pct = p.retentionPct ?? null
   const tone: 'green' | 'amber' | 'red' =
     pct == null ? 'amber' : pct >= 75 ? 'green' : pct >= 60 ? 'amber' : 'red'
-  const label = tone === 'green' ? 'Хорошо' : tone === 'amber' ? 'Ниже нормы' : 'Низко'
+  const label =
+    tone === 'green'
+      ? t('dashboard.sections.tone.good')
+      : tone === 'amber'
+        ? t('dashboard.sections.tone.below_norm')
+        : t('dashboard.sections.tone.low')
   const momPct = pct != null && p.prevRetentionPct != null ? pct - p.prevRetentionPct : null
   return (
-    <Card
-      title={
-        'Возврат клиентов за месяц.\n\n' +
-        'Формула: клиенты пришедшие И в этом месяце, И в прошлом / клиенты пришедшие в прошлом месяце × 100.\n\n' +
-        'Источник: visits.client_id с status=paid за текущий и прошлый периоды.\n\n' +
-        '«+приток» = вернувшиеся, «−отток» = из прошлого месяца не пришли.\n\n' +
-        '≥75% — хорошо, 60-75% — норма, <60% — низко.'
-      }
-    >
+    <Card title={t('dashboard.sections.retention.tooltip')}>
       <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-        Возврат клиентов
+        {t('dashboard.sections.retention.label')}
       </span>
       <span className="num text-foreground text-2xl font-bold leading-none">
         {pct == null ? '—' : `${Math.round(pct)}%`}
@@ -413,35 +398,34 @@ function RetentionCard(p: KpiCardsProps) {
       </div>
       {(p.newClients != null || p.churnedClients != null) && (
         <div className="flex gap-2.5 text-[11px] font-semibold">
-          <span className="text-emerald-700">+{p.newClients ?? 0} приток</span>
-          <span className="text-rose-600">−{p.churnedClients ?? 0} отток</span>
+          <span className="text-emerald-700">
+            +{p.newClients ?? 0} {t('dashboard.sections.retention.inflow')}
+          </span>
+          <span className="text-rose-600">
+            −{p.churnedClients ?? 0} {t('dashboard.sections.retention.outflow')}
+          </span>
         </div>
       )}
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
-        <MomFoot pct={momPct} label="Пред. месяц" />
+        <MomFoot pct={momPct} label={t('dashboard.sections.common.prev_month')} />
       </div>
     </Card>
   )
 }
 
-const CASH_TOOLTIP =
-  'Деньги на счетах сейчас (не за месяц — а текущее состояние касс и счетов).\n\n' +
-  'Сумма всех касс из Настройки → Справочники → Финансы → Кассы (compute_all_register_balances).\n\n' +
-  '«Ожидается к поступлению» = разница плана и факта по безналичным кассам со связью с банком: клиент заплатил картой, эквайринг ещё не зачислил на счёт. Подробности — кнопка «Детали».\n\n' +
-  '«Пред. месяц» = баланс на конец прошлого месяца.'
-
 function CashOnHandCard(p: KpiCardsProps) {
+  const { t } = useTranslation()
   const momPct =
     p.cashBalanceCents != null && p.prevCashCents != null && p.prevCashCents !== 0
       ? ((p.cashBalanceCents - p.prevCashCents) / Math.abs(p.prevCashCents)) * 100
       : null
   void p.cashPlanCents // больше не показываем «К плану» — заменено на «Ожидается к поступлению»
   return (
-    <Card title={CASH_TOOLTIP}>
+    <Card title={t('dashboard.sections.cash.tooltip')}>
       <div className="flex items-start justify-between gap-2">
         <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
-          Деньги на счетах
+          {t('dashboard.sections.cash.label')}
         </span>
         {p.onCashDetailsClick ? (
           <button
@@ -449,7 +433,7 @@ function CashOnHandCard(p: KpiCardsProps) {
             onClick={p.onCashDetailsClick}
             className="text-muted-foreground hover:text-foreground hover:bg-muted/40 -mr-1 -mt-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline-offset-2 hover:underline"
           >
-            Детали →
+            {t('dashboard.sections.cash.details')}
           </button>
         ) : null}
       </div>
@@ -459,7 +443,7 @@ function CashOnHandCard(p: KpiCardsProps) {
       <hr className="border-border/60" />
       <div className="flex items-end justify-between gap-3">
         <Foot
-          label="Ожидается"
+          label={t('dashboard.sections.cash.expected')}
           value={
             p.expectedIncomingCents == null ? (
               <span className="text-muted-foreground">—</span>
@@ -468,11 +452,11 @@ function CashOnHandCard(p: KpiCardsProps) {
                 +{formatCurrency(p.expectedIncomingCents, p.currency)}
               </span>
             ) : (
-              <span className="text-emerald-700">синхронно</span>
+              <span className="text-emerald-700">{t('dashboard.sections.cash.in_sync')}</span>
             )
           }
         />
-        <MomFoot pct={momPct} label="Пред. месяц" />
+        <MomFoot pct={momPct} label={t('dashboard.sections.common.prev_month')} />
       </div>
     </Card>
   )
@@ -494,36 +478,31 @@ export type ClientsSectionProps = {
 }
 
 export function ClientsSection(p: ClientsSectionProps) {
+  const { t } = useTranslation()
   return (
     <Section
-      title="Клиенты"
-      tooltip={
-        'Метрики по клиентам за текущий месяц.\n\n' +
-        '• Визитов = visits за период (любой статус).\n' +
-        '• Новых = clients.created_at в этом месяце.\n' +
-        '• Постоянных = клиенты с visit_count ≥ 3.\n' +
-        '• Средний чек = сумма paid визитов / число paid визитов.\n' +
-        '• Онлайн-записей = % визитов с source booksy/online/web.\n' +
-        '• Источники записи = группировка clients.source.'
-      }
+      title={t('dashboard.sections.clients.title')}
+      tooltip={t('dashboard.sections.clients.tooltip')}
     >
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Metric
-          label="Визитов за месяц"
+          label={t('dashboard.sections.clients.visits_in_month')}
           value={p.visitsCount.toLocaleString('ru-RU')}
           sub={
             p.visitsMomPct == null ? (
-              <span className="text-muted-foreground">— к пред. мес.</span>
+              <span className="text-muted-foreground">
+                — {t('dashboard.sections.common.to_prev_month')}
+              </span>
             ) : (
               <span className={p.visitsMomPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                {p.visitsMomPct >= 0 ? '↑' : '↓'} {Math.abs(p.visitsMomPct).toFixed(0)}% к пред.
-                мес.
+                {p.visitsMomPct >= 0 ? '↑' : '↓'} {Math.abs(p.visitsMomPct).toFixed(0)}%{' '}
+                {t('dashboard.sections.common.to_prev_month')}
               </span>
             )
           }
         />
         <Metric
-          label="Новых клиентов"
+          label={t('dashboard.sections.clients.new_clients')}
           value={p.newClientsCount == null ? '—' : p.newClientsCount.toLocaleString('ru-RU')}
           sub={
             p.newClientsMomPct == null ? null : (
@@ -536,21 +515,21 @@ export function ClientsSection(p: ClientsSectionProps) {
         />
       </div>
       <DataRow
-        label="Постоянных клиентов"
+        label={t('dashboard.sections.clients.regular_clients')}
         value={p.regularClientsCount == null ? '—' : p.regularClientsCount.toLocaleString('ru-RU')}
       />
       <DataRow
-        label="Средний чек"
+        label={t('dashboard.sections.clients.avg_check')}
         value={p.avgCheckCents == null ? '—' : formatCurrency(p.avgCheckCents, p.currency)}
       />
       <DataRow
-        label="Онлайн-записей"
+        label={t('dashboard.sections.clients.online_bookings')}
         value={p.onlineBookingsPct == null ? '—' : `${Math.round(p.onlineBookingsPct)}%`}
       />
       {p.sources && p.sources.length > 0 ? (
         <>
           <div className="text-muted-foreground mt-3 text-[11px] font-semibold uppercase tracking-wider">
-            Источники записи
+            {t('dashboard.sections.clients.sources_heading')}
           </div>
           {p.sources.map((s) => (
             <DataRow
@@ -583,22 +562,20 @@ export type MastersSectionProps = {
 }
 
 export function MastersSection(p: MastersSectionProps) {
+  const { t } = useTranslation()
   const max = Math.max(1, ...p.top.map((s) => s.revenueCents))
   return (
     <Section
-      title="Мастера"
-      tooltip={
-        'Метрики по команде за текущий месяц.\n\n' +
-        '• Активных = staff с is_active=true / всего записей в staff.\n' +
-        '• Ср. загрузка = занятые часы / доступные (см. KPI «Заполненность»).\n' +
-        '• Топ по выручке = top_staff_by_revenue RPC.\n' +
-        '• Ср. рейтинг и отзывов = reviews.rating, посчитанные за период.'
-      }
+      title={t('dashboard.sections.masters.title')}
+      tooltip={t('dashboard.sections.masters.tooltip')}
     >
       <div className="mb-3 grid grid-cols-2 gap-3">
-        <Metric label="Активных мастеров" value={`${p.activeCount} / ${p.totalCount}`} />
         <Metric
-          label="Ср. загрузка"
+          label={t('dashboard.sections.masters.active_label')}
+          value={`${p.activeCount} / ${p.totalCount}`}
+        />
+        <Metric
+          label={t('dashboard.sections.masters.avg_load')}
           value={p.avgLoadPct == null ? '—' : `${Math.round(p.avgLoadPct)}%`}
           sub={
             p.loadPlanPct == null ? null : (
@@ -613,17 +590,17 @@ export function MastersSection(p: MastersSectionProps) {
                         : 'red'
                 }
               >
-                план {Math.round(p.loadPlanPct)}%
+                {t('dashboard.sections.masters.plan_pct', { pct: Math.round(p.loadPlanPct) })}
               </Badge>
             )
           }
         />
       </div>
       <div className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
-        Топ по выручке
+        {t('dashboard.sections.masters.top_revenue_heading')}
       </div>
       {p.top.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Нет данных</p>
+        <p className="text-muted-foreground text-sm">{t('dashboard.sections.common.no_data')}</p>
       ) : (
         p.top.map((s, i) => {
           const pct = (s.revenueCents / max) * 100
@@ -651,11 +628,11 @@ export function MastersSection(p: MastersSectionProps) {
       )}
       <div className="mt-2">
         <DataRow
-          label="Ср. рейтинг"
+          label={t('dashboard.sections.masters.avg_rating')}
           value={p.avgRating == null ? '—' : `★ ${p.avgRating.toFixed(1)}`}
         />
         <DataRow
-          label="Отзывов за месяц"
+          label={t('dashboard.sections.masters.reviews_count')}
           value={p.reviewsCount == null ? '—' : p.reviewsCount.toLocaleString('ru-RU')}
         />
       </div>
@@ -673,6 +650,7 @@ export type ExpensesSectionProps = {
 }
 
 export function ExpensesSection(p: ExpensesSectionProps) {
+  const { t } = useTranslation()
   const overshootPct =
     p.planCents != null && p.planCents > 0
       ? ((p.totalCents - p.planCents) / p.planCents) * 100
@@ -680,31 +658,30 @@ export function ExpensesSection(p: ExpensesSectionProps) {
   const max = Math.max(1, ...p.categories.map((c) => c.amountCents))
   return (
     <Section
-      title="Расходы"
-      tooltip={
-        'Расходы за текущий месяц.\n\n' +
-        'Источник: expenses (status=paid + pending) сгруппированы по category_id → expense_categories.name.\n\n' +
-        '«План» = сумма фиксированных + налогов из Настройки → Справочники → Финансы.\n\n' +
-        'Top 6 категорий по сумме.'
-      }
+      title={t('dashboard.sections.expenses.title')}
+      tooltip={t('dashboard.sections.expenses.tooltip')}
     >
       <div className="mb-3">
         <Metric
-          label="Итого за месяц"
+          label={t('dashboard.sections.expenses.total_in_month')}
           value={formatCurrency(p.totalCents, p.currency)}
           sub={
             overshootPct == null ? null : overshootPct > 10 ? (
-              <Badge tone="red">Превышение +{Math.round(overshootPct)}%</Badge>
+              <Badge tone="red">
+                {t('dashboard.sections.expenses.overshoot', { pct: Math.round(overshootPct) })}
+              </Badge>
             ) : overshootPct > 0 ? (
-              <Badge tone="amber">+{Math.round(overshootPct)}% к плану</Badge>
+              <Badge tone="amber">
+                {t('dashboard.sections.expenses.plan_overshoot', { pct: Math.round(overshootPct) })}
+              </Badge>
             ) : (
-              <Badge tone="green">В рамках плана</Badge>
+              <Badge tone="green">{t('dashboard.sections.expenses.within_plan')}</Badge>
             )
           }
         />
       </div>
       {p.categories.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Нет расходов за период</p>
+        <p className="text-muted-foreground text-sm">{t('dashboard.sections.expenses.empty')}</p>
       ) : (
         <div className="flex flex-col gap-2.5">
           {p.categories.map((c) => {
@@ -738,21 +715,16 @@ export type FinancesSectionProps = {
 }
 
 export function FinancesSection(p: FinancesSectionProps) {
+  const { t } = useTranslation()
   const max = Math.max(1, ...p.dailyRevenue.map((d) => d.cents))
   return (
     <Section
-      title="Финансы"
-      tooltip={
-        'Финансовая картина за текущий месяц.\n\n' +
-        '• Выручка и Прибыль — из visits paid (см. KPI выше).\n' +
-        '• Маржа = Прибыль / Выручка × 100.\n' +
-        '• Динамика выручки = bar по дням (aggregateDailyRevenue) с интенсивностью.\n' +
-        '• Распределение по категориям = visits сгруппированы по service.category_id, top 5.'
-      }
+      title={t('dashboard.sections.finances.title')}
+      tooltip={t('dashboard.sections.finances.tooltip')}
     >
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Metric
-          label="Выручка"
+          label={t('dashboard.sections.finances.revenue')}
           value={formatCurrency(p.revenueCents, p.currency)}
           sub={
             p.revenueMomPct == null ? null : (
@@ -763,20 +735,24 @@ export function FinancesSection(p: FinancesSectionProps) {
           }
         />
         <Metric
-          label="Прибыль"
+          label={t('dashboard.sections.finances.profit')}
           value={formatCurrency(p.profitCents, p.currency)}
           sub={
             p.marginPct == null ? null : (
-              <span className="text-muted-foreground">маржа {Math.round(p.marginPct)}%</span>
+              <span className="text-muted-foreground">
+                {t('dashboard.sections.finances.margin', { pct: Math.round(p.marginPct) })}
+              </span>
             )
           }
         />
       </div>
       <div className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
-        Динамика выручки
+        {t('dashboard.sections.finances.revenue_dynamics')}
       </div>
       {p.dailyRevenue.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Нет визитов за период</p>
+        <p className="text-muted-foreground text-sm">
+          {t('dashboard.sections.finances.no_visits')}
+        </p>
       ) : (
         <div className="flex h-12 items-end gap-[3px]">
           {p.dailyRevenue.map((d) => {
@@ -823,28 +799,31 @@ export type OperationsSectionProps = {
 }
 
 export function OperationsSection(p: OperationsSectionProps) {
+  const { t } = useTranslation()
   return (
-    <Section title="Запись и операции">
+    <Section title={t('dashboard.sections.operations.title')}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Metric
-          label="Записей на сегодня"
+          label={t('dashboard.sections.operations.today_appointments')}
           value={p.todayAppointments == null ? '—' : p.todayAppointments.toLocaleString('ru-RU')}
         />
         <Metric
-          label="Лист ожидания"
+          label={t('dashboard.sections.operations.waitlist')}
           value={p.waitlistCount == null ? '—' : p.waitlistCount.toLocaleString('ru-RU')}
           sub={
             p.waitlistCount == null ? null : (
               <Badge
                 tone={p.waitlistCount === 0 ? 'green' : p.waitlistCount <= 5 ? 'amber' : 'red'}
               >
-                {p.waitlistCount === 0 ? 'нет очереди' : 'требуют реакции'}
+                {p.waitlistCount === 0
+                  ? t('dashboard.sections.operations.no_queue')
+                  : t('dashboard.sections.operations.needs_reaction')}
               </Badge>
             )
           }
         />
         <Metric
-          label="Остаток материалов"
+          label={t('dashboard.sections.operations.materials_stock')}
           value={p.materialsStockPct == null ? '—' : `${Math.round(p.materialsStockPct)}%`}
           sub={
             p.materialsStockPct == null ? null : (
@@ -854,20 +833,22 @@ export function OperationsSection(p: OperationsSectionProps) {
                 }
               >
                 {p.materialsStockPct >= 50
-                  ? 'норма'
+                  ? t('dashboard.sections.operations.stock_normal')
                   : p.materialsStockPct >= 25
-                    ? 'низкий'
-                    : 'критично'}
+                    ? t('dashboard.sections.operations.stock_low')
+                    : t('dashboard.sections.operations.stock_critical')}
               </Badge>
             )
           }
         />
         <Metric
-          label="Свободных окон"
+          label={t('dashboard.sections.operations.free_slots')}
           value={p.freeSlotsCount == null ? '—' : p.freeSlotsCount.toLocaleString('ru-RU')}
           sub={
             p.totalSlotsCount == null ? null : (
-              <Badge tone="green">из {p.totalSlotsCount} слотов</Badge>
+              <Badge tone="green">
+                {t('dashboard.sections.operations.of_total_slots', { total: p.totalSlotsCount })}
+              </Badge>
             )
           }
         />
@@ -896,31 +877,22 @@ export type MarketingSectionProps = {
 }
 
 export function MarketingSection(p: MarketingSectionProps) {
+  const { t } = useTranslation()
   return (
     <Section
-      title="Маркетинг"
-      tooltip={
-        'Маркетинговая сегментация по базе клиентов.\n\n' +
-        '• Источники = clients.source как введено в карточке клиента (без нормализации).\n\n' +
-        '• RFM (Recency / Frequency / Monetary):\n' +
-        '   – Чемпионы: ≥5 визитов, последний ≤30 дн.\n' +
-        '   – Лояльные: ≥3 визитов, последний ≤60 дн.\n' +
-        '   – Перспективные: 1-2 визита, последний ≤30 дн.\n' +
-        '   – Под риском: ≥3 визитов, последний 60-90 дн.\n' +
-        '   – Спящие: последний 90-180 дн.\n' +
-        '   – Потерянные: >180 дн или нет визитов.\n\n' +
-        '• Активные = clients.last_visit ≤ 90 дн.\n' +
-        '• Нужна реактивация = clients.last_visit 90-180 дн.'
-      }
+      title={t('dashboard.sections.marketing.title')}
+      tooltip={t('dashboard.sections.marketing.tooltip')}
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Левая колонка: источники + CAC */}
         <div>
           <div className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
-            Источники клиентов
+            {t('dashboard.sections.marketing.sources_heading')}
           </div>
           {!p.sources || p.sources.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Нет данных</p>
+            <p className="text-muted-foreground text-sm">
+              {t('dashboard.sections.common.no_data')}
+            </p>
           ) : (
             p.sources.map((s) => (
               <div key={s.name} className="flex items-center gap-2 py-1">
@@ -944,10 +916,12 @@ export function MarketingSection(p: MarketingSectionProps) {
         {/* Правая колонка: RFM */}
         <div>
           <div className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">
-            База клиентов — RFM
+            {t('dashboard.sections.marketing.rfm_heading')}
           </div>
           {!p.rfm || p.rfm.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Нет данных для сегментации</p>
+            <p className="text-muted-foreground text-sm">
+              {t('dashboard.sections.marketing.no_rfm_data')}
+            </p>
           ) : (
             <div className="grid grid-cols-3 gap-1.5">
               {p.rfm.map((s) => (
@@ -970,13 +944,15 @@ export function MarketingSection(p: MarketingSectionProps) {
           )}
           <div className="mt-3">
             <DataRow
-              label="Всего в базе"
+              label={t('dashboard.sections.marketing.total_in_base')}
               value={
-                p.totalClients == null ? '—' : `${p.totalClients.toLocaleString('ru-RU')} клиентов`
+                p.totalClients == null
+                  ? '—'
+                  : t('dashboard.sections.marketing.clients_count', { count: p.totalClients })
               }
             />
             <DataRow
-              label="Активных (≤90 дней)"
+              label={t('dashboard.sections.marketing.active_le_90')}
               value={
                 p.activeClients == null ? (
                   '—'
@@ -988,7 +964,7 @@ export function MarketingSection(p: MarketingSectionProps) {
               }
             />
             <DataRow
-              label="Требуют реактивации"
+              label={t('dashboard.sections.marketing.needs_reactivation')}
               value={
                 p.needsReactivation == null ? (
                   '—'

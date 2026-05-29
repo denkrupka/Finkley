@@ -8,15 +8,14 @@ import {
   Receipt,
   Sparkles,
   Users,
-  X,
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-import { Button } from '@/components/ui/button'
 import { useSalonMembership } from '@/hooks/useSalons'
-import { cn } from '@/lib/utils/cn'
+
+import { TourStage } from './TourStage'
 
 const STORAGE_KEY = 'finkley:tour:dismissed'
 // T147 — сохраняем индекс шага. При возврате на /dashboard тур не начинается
@@ -135,9 +134,11 @@ const STEPS: Step[] = [
  * и per-role шагами (Мастер видит короткий тур: welcome → nav → visit →
  * calendar → notifications; Owner — все 9 шагов с админскими разделами).
  *
- * Spotlight реализован через overlay с box-shadow inset — нет react-joyride
- * зависимости. Если data-tour атрибут не найден на странице — шаг
- * fallback'ится на центрированную модалку.
+ * Spotlight реализован через overlay с 4-мя затемняющими div'ами —
+ * нет react-joyride зависимости. Общий рендерер в `./TourStage` —
+ * тот же используется в `PageTour` (T214) чтобы локальные туры выглядели
+ * идентично главному: spotlight cutout + tooltip рядом с таргетом,
+ * а не центрированная модалка.
  *
  * Показывается раз в жизни юзера (localStorage). Повторный запуск — через
  * /help → «Показать тур» (?showTour=1 в query).
@@ -239,7 +240,7 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
   }
 
   return (
-    <TourRenderer
+    <TourStage
       step={step}
       steps={steps}
       stepIndex={stepIndex}
@@ -247,320 +248,9 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
       isLast={isLast}
       onNext={next}
       onBack={() => setStepIndex((i) => Math.max(0, i - 1))}
-      onSkip={dismiss}
+      onSkip={() => dismiss()}
       onCta={tryCta}
       t={t}
     />
   )
-}
-
-type TourRendererProps = {
-  step: Step
-  steps: Step[]
-  stepIndex: number
-  isFirst: boolean
-  isLast: boolean
-  onNext: () => void
-  onBack: () => void
-  onSkip: () => void
-  onCta: () => void
-  t: (k: string) => string
-}
-
-function TourRenderer({
-  step,
-  steps,
-  stepIndex,
-  isFirst,
-  isLast,
-  onNext,
-  onBack,
-  onSkip,
-  onCta,
-  t,
-}: TourRendererProps) {
-  const Icon = step.icon
-  const realRect = useTargetRect(step.target)
-  // T168 — если у шага есть target, но он не найден на странице (например,
-  // FAB на странице без FAB) — рисуем «искусственный» spotlight в центре
-  // экрана. Помечаем isArtificial=true чтобы рендерить пунктирное кольцо
-  // вместо solid (юзер видит что элемент недоступен на этой странице).
-  const isArtificial = !realRect && !!step.target
-  const targetRect: DOMRect | null =
-    realRect ??
-    (step.target && typeof window !== 'undefined'
-      ? (() => {
-          const w = window.innerWidth
-          const h = window.innerHeight
-          const size = Math.min(200, w * 0.4)
-          const left = (w - size) / 2
-          const top = h * 0.18
-          return new DOMRect(left, top, size, size)
-        })()
-      : null)
-  const hasSpotlight = !!targetRect
-
-  // Tooltip позиция — снизу элемента, прижата к viewport.
-  const tooltipPos = useTooltipPosition(targetRect)
-
-  return (
-    <div
-      className={cn(
-        'fixed inset-0 z-50',
-        // На шаге без target overlay не перехватывает клики — иначе юзер
-        // не может взаимодействовать с интерфейсом (это «лёгкий» режим).
-        // На шаге со spotlight overlay полупрозрачный и перехватывает
-        // клики везде, кроме самого spotlight'a (вырез — четыре div'а
-        // вокруг target, между ними «дырка»).
-        hasSpotlight ? '' : 'pointer-events-none',
-      )}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tour-title"
-    >
-      {hasSpotlight && targetRect ? (
-        <>
-          {/* Spotlight overlay — затемняет всё кроме bbox через 4 div'а
-              (proper cutout без mask svg; работает в любом браузере). */}
-          <div
-            className="absolute bg-black/55 backdrop-blur-[1px] transition-opacity"
-            style={{ left: 0, top: 0, right: 0, height: Math.max(0, targetRect.top - 6) }}
-          />
-          <div
-            className="absolute bg-black/55 backdrop-blur-[1px] transition-opacity"
-            style={{
-              left: 0,
-              top: targetRect.top - 6,
-              width: Math.max(0, targetRect.left - 6),
-              height: targetRect.height + 12,
-            }}
-          />
-          <div
-            className="absolute bg-black/55 backdrop-blur-[1px] transition-opacity"
-            style={{
-              left: targetRect.left + targetRect.width + 6,
-              top: targetRect.top - 6,
-              right: 0,
-              height: targetRect.height + 12,
-            }}
-          />
-          <div
-            className="absolute bg-black/55 backdrop-blur-[1px] transition-opacity"
-            style={{
-              left: 0,
-              top: targetRect.top + targetRect.height + 6,
-              right: 0,
-              bottom: 0,
-            }}
-          />
-          {/* Кольцо вокруг подсвеченного элемента. T183 — для искусственного
-              fallback rect рисуем пунктирное полупрозрачное кольцо чтобы юзер
-              понимал что реального элемента на этой странице нет. */}
-          <div
-            className={cn(
-              'pointer-events-none absolute rounded-md ring-offset-2 ring-offset-transparent transition-all',
-              isArtificial ? 'ring-primary/40' : 'ring-primary/80 ring-2',
-            )}
-            style={{
-              left: targetRect.left - 4,
-              top: targetRect.top - 4,
-              width: targetRect.width + 8,
-              height: targetRect.height + 8,
-              // T190+T207+T220 — Tailwind 3 не имеет outline-dashed.
-              // CSS variable с rgba fallback для Safari <15 и dark-mode.
-              ...(isArtificial
-                ? {
-                    outline: '2px dashed var(--tour-spotlight-color, rgba(13, 148, 136, 0.6))',
-                  }
-                : {}),
-            }}
-          />
-        </>
-      ) : (
-        // T95 — лёгкий полупрозрачный dim для шагов без target. Юзер видит
-        // что есть подсказка, но интерфейс не «выключается» как полноэкранной
-        // модалкой. Click-through заблокирован contained tooltip.
-        <div className="pointer-events-none absolute inset-0 bg-black/15" />
-      )}
-
-      {/* Tooltip / Modal — позиционируется относительно target либо в верхней
-          четверти экрана как floating-card (раньше был центр — перекрывал
-          важные UI элементы, FAB и т.д.). */}
-      <div
-        className={cn(
-          'bg-card shadow-finxl pointer-events-auto absolute rounded-xl p-5 sm:p-6',
-          hasSpotlight ? 'w-[min(420px,92vw)]' : 'w-[min(420px,92vw)]',
-          // T126: fallback позиционирование — top-[12%], центр по X. Это
-          // не перекрывает ни FAB (правый низ), ни sidebar (левый край).
-          !hasSpotlight && 'left-1/2 top-[12%] -translate-x-1/2',
-        )}
-        style={
-          hasSpotlight
-            ? {
-                left: tooltipPos.left,
-                top: tooltipPos.top,
-                transform: tooltipPos.transform,
-              }
-            : undefined
-        }
-      >
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-muted-foreground hover:text-foreground absolute right-3 top-3 grid size-7 place-items-center rounded-md"
-          aria-label={t('tour.close')}
-        >
-          <X className="size-4" strokeWidth={1.7} />
-        </button>
-
-        {/* Progress dots */}
-        <div className="mb-4 flex items-center gap-1.5">
-          {steps.map((_, i) => (
-            <span
-              key={i}
-              className={cn(
-                'h-1.5 rounded-full transition-all',
-                i === stepIndex
-                  ? 'bg-primary w-6'
-                  : i < stepIndex
-                    ? 'bg-primary/50 w-1.5'
-                    : 'bg-border w-1.5',
-              )}
-            />
-          ))}
-        </div>
-
-        <div className="bg-brand-teal-soft text-brand-teal-deep mb-3 grid size-11 place-items-center rounded-xl">
-          <Icon className="size-5" strokeWidth={1.7} />
-        </div>
-
-        <h2 id="tour-title" className="text-brand-navy text-lg font-bold tracking-tight">
-          {t(step.titleKey)}
-        </h2>
-        <p className="text-foreground/80 mt-2 whitespace-pre-line text-sm leading-relaxed">
-          {t(step.bodyKey)}
-        </p>
-
-        <div className="mt-5 flex flex-col gap-2">
-          {step.ctaKey && step.ctaPath ? (
-            <Button type="button" size="md" onClick={onCta}>
-              {t(step.ctaKey)}
-            </Button>
-          ) : null}
-          <div className="flex items-center gap-2">
-            {!isFirst ? (
-              <Button type="button" size="md" variant="outline" onClick={onBack} className="flex-1">
-                {t('tour.back')}
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              size="md"
-              variant={step.ctaKey ? 'outline' : 'primary'}
-              onClick={onNext}
-              className="flex-1"
-            >
-              {isLast ? t('tour.finish') : t('tour.next')}
-            </Button>
-          </div>
-          {!isLast ? (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="text-muted-foreground hover:text-foreground self-center text-xs"
-            >
-              {t('tour.skip')}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Хуки позиционирования ────────────────────────────────────────────────
-
-function useTargetRect(selector: string | undefined): DOMRect | null {
-  const [rect, setRect] = useState<DOMRect | null>(null)
-  useLayoutEffect(() => {
-    if (!selector) {
-      setRect(null)
-      return
-    }
-    function measure() {
-      const el = document.querySelector(selector!)
-      if (!el) {
-        setRect(null)
-        return
-      }
-      // Scroll элемент в viewport если он за пределами (для мобильного).
-      const r = el.getBoundingClientRect()
-      if (r.top < 0 || r.bottom > window.innerHeight) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-      // Перемеряем после возможного scroll.
-      requestAnimationFrame(() => {
-        const r2 = el.getBoundingClientRect()
-        setRect(r2)
-      })
-    }
-    measure()
-    const onResize = () => measure()
-    window.addEventListener('resize', onResize)
-    // T155 — частое measure первые 3 секунды (когда юзер навигировал на
-    // новую страницу и DOM монтируется), потом редкий polling.
-    const fastInterval = window.setInterval(measure, 150)
-    const fastTimeout = window.setTimeout(() => {
-      window.clearInterval(fastInterval)
-    }, 3000)
-    const slowInterval = window.setInterval(measure, 800)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      window.clearInterval(fastInterval)
-      window.clearTimeout(fastTimeout)
-      window.clearInterval(slowInterval)
-    }
-  }, [selector])
-  return rect
-}
-
-function useTooltipPosition(target: DOMRect | null) {
-  const TOOLTIP_W = 420
-  const TOOLTIP_H_ESTIMATE = 280
-  if (!target) return { left: 0, top: 0, transform: '' }
-
-  const margin = 16
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-
-  // Пробуем снизу.
-  let top = target.top + target.height + margin
-  let placement: 'bottom' | 'top' | 'right' | 'left' = 'bottom'
-
-  if (top + TOOLTIP_H_ESTIMATE > vh - 8) {
-    // Если внизу не помещается — сверху.
-    placement = 'top'
-    top = target.top - TOOLTIP_H_ESTIMATE - margin
-  }
-
-  // Если ни снизу ни сверху — справа от элемента.
-  if (top < 8) {
-    placement = 'right'
-    top = Math.max(8, Math.min(vh - TOOLTIP_H_ESTIMATE - 8, target.top))
-  }
-
-  // По горизонтали — центрируем относительно target, прижимаем к viewport.
-  let left = target.left + target.width / 2 - TOOLTIP_W / 2
-  if (placement === 'right') {
-    left = target.left + target.width + margin
-    if (left + TOOLTIP_W > vw - 8) {
-      // справа не лезет — слева.
-      placement = 'left'
-      left = target.left - TOOLTIP_W - margin
-    }
-  }
-  left = Math.max(8, Math.min(vw - TOOLTIP_W - 8, left))
-  void placement
-
-  return { left, top, transform: '' }
 }

@@ -21,6 +21,14 @@ export type StaffPerformanceRow = {
   scheduled_minutes: number
   worked_minutes: number
   utilization_pct: number
+  /** % клиентов мастера, у которых последний визит у него = последний визит
+   *  в салон вообще И прошло > salon.retention_window_days. Server-side из
+   *  миграции 20260530000002_staff_churn_scoring. */
+  churn_pct: number
+  /** Единая оценка эффективности:
+   *  (rebook_share × retention_regular_share) / max(churn_share, 0.01).
+   *  Чем выше — тем лучше. См. миграцию 20260530000002. */
+  scoring: number
 }
 
 /**

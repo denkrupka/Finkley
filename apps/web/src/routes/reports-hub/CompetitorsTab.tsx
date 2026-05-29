@@ -292,7 +292,7 @@ function DataSection({
                     <td className="text-foreground px-4 py-3 font-semibold">{c.name}</td>
                     <td className="text-muted-foreground px-4 py-3 text-xs">
                       {latest
-                        ? renderSnapshotData(latest, currency)
+                        ? renderSnapshotData(latest, currency, t)
                         : t('reports_hub.competitors.no_data')}
                     </td>
                     <td className="num text-muted-foreground px-3 py-3 text-right text-xs">
@@ -449,6 +449,7 @@ function RatingCells({
   count: number | null
   url: string | null
 }) {
+  const { t } = useTranslation()
   return (
     <>
       <td className="num px-3 py-3 text-right text-sm font-semibold">
@@ -461,7 +462,7 @@ function RatingCells({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground ml-1"
-                title="Открыть отзывы"
+                title={t('reports.competitors.open_reviews')}
               >
                 <Eye className="size-3.5" strokeWidth={2} />
               </a>
@@ -808,7 +809,8 @@ function OwnSalonRow({
       if (ownContent.followers != null) parts.push(`👥 ${ownContent.followers}`)
       if (ownContent.posts != null) parts.push(`📷 ${ownContent.posts}`)
       if (ownContent.following != null) parts.push(`➡ ${ownContent.following}`)
-      if (ownContent.posts_per_month != null) parts.push(`📅 ${ownContent.posts_per_month}/мес`)
+      if (ownContent.posts_per_month != null)
+        parts.push(`📅 ${ownContent.posts_per_month}/${t('reports.competitors.per_month_suffix')}`)
       if (ownContent.fb_likes != null) parts.push(`👍 ${ownContent.fb_likes}`)
       dataCell = <span>{parts.join(' · ')}</span>
     } else {
@@ -841,6 +843,7 @@ function OwnSalonRow({
 function renderSnapshotData(
   s: ReturnType<typeof useCompetitorSnapshots>['data'] extends (infer R)[] | undefined ? R : never,
   currency: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const data = s.data as Record<string, unknown>
   if (s.kind === 'price') {
@@ -864,7 +867,7 @@ function renderSnapshotData(
     parts.push(`👥 ${followers ?? '?'}`)
     parts.push(`📷 ${posts ?? '?'}`)
     if (following != null) parts.push(`➡ ${following}`)
-    if (ppm != null) parts.push(`📅 ${ppm}/мес`)
+    if (ppm != null) parts.push(`📅 ${ppm}/${t('reports.competitors.per_month_suffix')}`)
     return parts.join(' · ')
   }
   if (s.kind === 'occupancy') {

@@ -970,10 +970,7 @@ export function OnboardingPage() {
                     strokeWidth={2}
                   />
                   <p className="text-foreground/90 text-sm leading-snug">
-                    {t('onboarding.step_accounting.privacy_note', {
-                      defaultValue:
-                        'Эти данные конфиденциальны. Мы не передаём их третьим лицам — они нужны только для автоматизации доставки фактур и чеков твоему бухгалтеру.',
-                    })}
+                    {t('onboarding.step_accounting.privacy_note')}
                   </p>
                 </div>
                 {state.created_salon_id ? (

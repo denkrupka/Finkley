@@ -34,35 +34,54 @@ import { cn } from '@/lib/utils/cn'
 
 import { KB_SEED } from './kb-seed'
 
-const SECTIONS: ReadonlyArray<{
+type SectionDef = {
   id: KbSection
-  title: string
-  subtitle: string
+  titleKey: string
+  titleDefault: string
+  subtitleKey: string
+  subtitleDefault: string
   icon: typeof BookOpen
-}> = [
+}
+
+const SECTIONS: ReadonlyArray<SectionDef> = [
   {
     id: 'staff',
-    title: 'Персонал',
-    subtitle: 'Найм, управление, контроль, расчёт зарплаты',
+    titleKey: 'knowledge.sections.staff.title',
+    titleDefault: 'Персонал',
+    subtitleKey: 'knowledge.sections.staff.subtitle',
+    subtitleDefault: 'Найм, управление, контроль, расчёт зарплаты',
     icon: UserPlus,
   },
   {
     id: 'clients',
-    title: 'Клиенты',
-    subtitle: 'Привлечение новых, удержание постоянных',
+    titleKey: 'knowledge.sections.clients.title',
+    titleDefault: 'Клиенты',
+    subtitleKey: 'knowledge.sections.clients.subtitle',
+    subtitleDefault: 'Привлечение новых, удержание постоянных',
     icon: Users,
   },
-  { id: 'finance', title: 'Финансы', subtitle: 'Управление прибылью салона', icon: Banknote },
+  {
+    id: 'finance',
+    titleKey: 'knowledge.sections.finance.title',
+    titleDefault: 'Финансы',
+    subtitleKey: 'knowledge.sections.finance.subtitle',
+    subtitleDefault: 'Управление прибылью салона',
+    icon: Banknote,
+  },
   {
     id: 'schedule',
-    title: 'Расписание',
-    subtitle: 'Работа администратора, записи, напоминания',
+    titleKey: 'knowledge.sections.schedule.title',
+    titleDefault: 'Расписание',
+    subtitleKey: 'knowledge.sections.schedule.subtitle',
+    subtitleDefault: 'Работа администратора, записи, напоминания',
     icon: CalendarClock,
   },
   {
     id: 'operations',
-    title: 'Операционные вопросы',
-    subtitle: 'Расходники, площадь, доп.продажи, скрипты',
+    titleKey: 'knowledge.sections.operations.title',
+    titleDefault: 'Операционные вопросы',
+    subtitleKey: 'knowledge.sections.operations.subtitle',
+    subtitleDefault: 'Расходники, площадь, доп.продажи, скрипты',
     icon: Settings,
   },
 ]
@@ -116,14 +135,14 @@ export function KnowledgePage() {
   function saveEdit() {
     if (!editingId) return
     if (!editTitle.trim()) {
-      toast.error('Введи заголовок')
+      toast.error(t('knowledge.toast.title_required'))
       return
     }
     update.mutate(
       { id: editingId, title: editTitle.trim(), body: editBody },
       {
         onSuccess: () => {
-          toast.success('Сохранено')
+          toast.success(t('knowledge.toast.saved'))
           cancelEdit()
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
@@ -132,9 +151,9 @@ export function KnowledgePage() {
   }
 
   function deleteArticle(id: string) {
-    if (!confirm('Удалить статью?')) return
+    if (!confirm(t('knowledge.confirm.delete_article'))) return
     remove.mutate(id, {
-      onSuccess: () => toast.success('Удалено'),
+      onSuccess: () => toast.success(t('knowledge.toast.deleted')),
       onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
     })
   }
@@ -148,14 +167,14 @@ export function KnowledgePage() {
   function saveNew() {
     if (!creatingInSection) return
     if (!editTitle.trim()) {
-      toast.error('Введи заголовок')
+      toast.error(t('knowledge.toast.title_required'))
       return
     }
     create.mutate(
       { section: creatingInSection, title: editTitle.trim(), body: editBody },
       {
         onSuccess: (created) => {
-          toast.success('Статья создана')
+          toast.success(t('knowledge.toast.article_created'))
           setOpenArticle(created.id)
           setCreatingInSection(null)
           setEditTitle('')
@@ -178,7 +197,7 @@ export function KnowledgePage() {
         {canEdit ? (
           <Button size="sm" onClick={startCreate} disabled={create.isPending}>
             <Plus className="size-4" strokeWidth={2} />
-            Добавить статью
+            {t('knowledge.add_article')}
           </Button>
         ) : null}
       </header>
@@ -207,7 +226,7 @@ export function KnowledgePage() {
                 )}
               >
                 <Icon className="size-4" strokeWidth={1.8} />
-                {s.title}
+                {t(s.titleKey, { defaultValue: s.titleDefault })}
               </button>
             )
           })}
@@ -217,39 +236,45 @@ export function KnowledgePage() {
       {/* Section header */}
       <div className="mb-4">
         <h2 className="text-brand-navy text-lg font-bold">
-          {SECTIONS.find((s) => s.id === activeSection)?.title}
+          {(() => {
+            const s = SECTIONS.find((x) => x.id === activeSection)
+            return s ? t(s.titleKey, { defaultValue: s.titleDefault }) : ''
+          })()}
         </h2>
         <p className="text-muted-foreground text-sm">
-          {SECTIONS.find((s) => s.id === activeSection)?.subtitle}
+          {(() => {
+            const s = SECTIONS.find((x) => x.id === activeSection)
+            return s ? t(s.subtitleKey, { defaultValue: s.subtitleDefault }) : ''
+          })()}
         </p>
       </div>
 
       {/* New article form (если creating в этой секции) */}
       {creatingInSection === activeSection ? (
         <div className="border-secondary/40 bg-secondary/5 mb-3 rounded-lg border p-4">
-          <Label className="mb-1.5 block">Заголовок</Label>
+          <Label className="mb-1.5 block">{t('knowledge.form.title_label')}</Label>
           <Input
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Например: Как бороться с NOSHOW"
+            placeholder={t('knowledge.form.title_placeholder')}
             className="mb-2"
           />
-          <Label className="mb-1.5 block">Текст</Label>
+          <Label className="mb-1.5 block">{t('knowledge.form.body_label')}</Label>
           <textarea
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}
             rows={8}
-            placeholder="Используй переносы строк для абзацев. «- » в начале — список."
+            placeholder={t('knowledge.form.body_placeholder')}
             className="border-border bg-card text-foreground w-full rounded-md border p-3 text-sm leading-relaxed outline-none"
           />
           <div className="mt-3 flex gap-2">
             <Button size="sm" onClick={saveNew} disabled={create.isPending}>
               <Save className="size-4" strokeWidth={2} />
-              Создать
+              {t('knowledge.form.create')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setCreatingInSection(null)}>
               <X className="size-4" strokeWidth={2} />
-              Отмена
+              {t('knowledge.form.cancel')}
             </Button>
           </div>
         </div>
@@ -259,7 +284,7 @@ export function KnowledgePage() {
       {isLoading || (articles.length === 0 && seed.isPending) ? (
         <div className="bg-muted/40 h-32 animate-pulse rounded-md" />
       ) : sectionArticles.length === 0 ? (
-        <p className="text-muted-foreground text-sm">В этой секции пока нет статей.</p>
+        <p className="text-muted-foreground text-sm">{t('knowledge.empty_section')}</p>
       ) : (
         <ul className="border-border bg-card shadow-finsm divide-border divide-y overflow-hidden rounded-lg border">
           {sectionArticles.map((a) => {
@@ -289,13 +314,13 @@ export function KnowledgePage() {
                   <div className="px-5 pb-4">
                     {isEditingThis ? (
                       <>
-                        <Label className="mb-1.5 block">Заголовок</Label>
+                        <Label className="mb-1.5 block">{t('knowledge.form.title_label')}</Label>
                         <Input
                           value={editTitle}
                           onChange={(e) => setEditTitle(e.target.value)}
                           className="mb-2"
                         />
-                        <Label className="mb-1.5 block">Текст</Label>
+                        <Label className="mb-1.5 block">{t('knowledge.form.body_label')}</Label>
                         <textarea
                           value={editBody}
                           onChange={(e) => setEditBody(e.target.value)}
@@ -305,11 +330,11 @@ export function KnowledgePage() {
                         <div className="mt-3 flex gap-2">
                           <Button size="sm" onClick={saveEdit} disabled={update.isPending}>
                             <Save className="size-4" strokeWidth={2} />
-                            Сохранить
+                            {t('knowledge.form.save')}
                           </Button>
                           <Button size="sm" variant="outline" onClick={cancelEdit}>
                             <X className="size-4" strokeWidth={2} />
-                            Отмена
+                            {t('knowledge.form.cancel')}
                           </Button>
                         </div>
                       </>
@@ -326,7 +351,7 @@ export function KnowledgePage() {
                               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium"
                             >
                               <Pencil className="size-3" strokeWidth={2} />
-                              Редактировать
+                              {t('knowledge.actions.edit')}
                             </button>
                             <button
                               type="button"
@@ -334,7 +359,7 @@ export function KnowledgePage() {
                               className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1 text-xs font-medium"
                             >
                               <Trash2 className="size-3" strokeWidth={2} />
-                              Удалить
+                              {t('knowledge.actions.delete')}
                             </button>
                           </div>
                         ) : null}
@@ -349,9 +374,7 @@ export function KnowledgePage() {
       )}
 
       <p className="text-muted-foreground mt-6 text-xs">
-        {canEdit
-          ? 'Стартовый контент можно редактировать и расширять под свой салон.'
-          : 'Только владелец/администратор могут редактировать статьи.'}
+        {canEdit ? t('knowledge.footer.editable_hint') : t('knowledge.footer.readonly_hint')}
       </p>
     </div>
   )

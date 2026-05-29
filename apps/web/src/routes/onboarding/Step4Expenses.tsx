@@ -390,8 +390,10 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                       }
                       className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold"
                     >
-                      <option value="cash">наличные</option>
-                      <option value="non_cash">безналичные</option>
+                      <option value="cash">{t('onboarding.expenses.cash_kind.cash')}</option>
+                      <option value="non_cash">
+                        {t('onboarding.expenses.cash_kind.non_cash')}
+                      </option>
                     </select>
                   ) : null}
                   <button

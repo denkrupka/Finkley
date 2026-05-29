@@ -37,6 +37,7 @@ export function CommissionsPin({ salonId, currency, expenses, onOpenSource }: Pr
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-tour="commissions-pin"
         className="border-border hover:bg-muted/30 group flex w-full items-center justify-between gap-3 border-b px-5 py-3 text-left transition-colors"
       >
         <div className="flex items-center gap-3">

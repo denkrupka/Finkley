@@ -89,7 +89,10 @@ export function FinancePage() {
       <PageTour name="finance" steps={FINANCE_TOUR_STEPS} force={params.get('tour') === '1'} />
       {/* Image #62: header «P&L, ДДС, счета на оплату» убран — он дублировал
           навигацию sidebar'а и съедал место когда у Финансов 5 табов. */}
-      <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
+      {/* T214 — анкор data-tour для PageTour spotlight'а вокруг ряда табов. */}
+      <div data-tour="finance-tabs">
+        <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
+      </div>
 
       {active === 'pnl' ? (
         <ReportsPage />

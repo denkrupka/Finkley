@@ -443,8 +443,8 @@ function ClientsListTab({
               type="button"
               onClick={() => setPeriod(null)}
               className="text-muted-foreground hover:text-foreground hover:bg-muted/40 grid size-9 place-items-center rounded-md text-sm"
-              aria-label={t('clients.period_clear', { defaultValue: 'Сбросить период' })}
-              title={t('clients.period_clear', { defaultValue: 'Сбросить период' })}
+              aria-label={t('clients.period_clear')}
+              title={t('clients.period_clear')}
             >
               ✕
             </button>

@@ -47,7 +47,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
         is_active: true,
       })
       if (error) throw error
-      toast.success(t('onboarding.step2.added', { defaultValue: 'Мастер добавлен' }))
+      toast.success(t('onboarding.step2.added'))
       setNewName('')
       setNewEmail('')
       setNewPhone('')
@@ -62,7 +62,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
   }
 
   async function removeStaff(id: string) {
-    if (!confirm(t('common.confirm_delete', { defaultValue: 'Удалить?' }))) return
+    if (!confirm(t('common.confirm_delete'))) return
     try {
       const { error } = await supabase.from('staff').update({ is_active: false }).eq('id', id)
       if (error) throw error
@@ -82,9 +82,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
       return
     }
     if (channel === 'sms' && !s.phone) {
-      toast.error(
-        t('onboarding.step2.invite_need_phone', { defaultValue: 'Укажи телефон для SMS' }),
-      )
+      toast.error(t('onboarding.step2.invite_need_phone'))
       return
     }
     invite.mutate(
@@ -150,12 +148,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
       </h1>
 
       {staff.length === 0 ? (
-        <p className="text-muted-foreground mt-3 text-sm">
-          {t('onboarding.step2.empty_hint', {
-            defaultValue:
-              'Пока пусто. Если только что подключил Booksy — мастера подтянутся через 2-5 минут. Можешь добавить вручную ниже.',
-          })}
-        </p>
+        <p className="text-muted-foreground mt-3 text-sm">{t('onboarding.step2.empty_hint')}</p>
       ) : null}
 
       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -209,9 +202,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
               {s.invite_sent_at ? (
                 <div className="border-brand-sage bg-brand-sage-soft/30 text-brand-sage-deep mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] px-3 py-2 text-xs font-bold">
                   <Send className="size-3.5" strokeWidth={2} />
-                  {t('onboarding.step2.invite_already_sent', {
-                    defaultValue: 'Приглашение уже отправлено',
-                  })}
+                  {t('onboarding.step2.invite_already_sent')}
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -223,9 +214,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                     className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center justify-center gap-1 rounded-md border-[1.5px] px-2 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Mail className="size-3.5" strokeWidth={2} />
-                    {t('onboarding.step2.invite_email_btn', {
-                      defaultValue: 'Email',
-                    })}
+                    {t('onboarding.step2.invite_email_btn')}
                   </button>
                   <button
                     type="button"
@@ -235,9 +224,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                     className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center justify-center gap-1 rounded-md border-[1.5px] px-2 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Phone className="size-3.5" strokeWidth={2} />
-                    {t('onboarding.step2.invite_sms_btn', {
-                      defaultValue: 'SMS',
-                    })}
+                    {t('onboarding.step2.invite_sms_btn')}
                   </button>
                 </div>
               )}
@@ -329,7 +316,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
               onClick={() => setAddOpen(false)}
               className="text-muted-foreground hover:text-foreground text-sm"
             >
-              {t('common.cancel', { defaultValue: 'Отмена' })}
+              {t('common.cancel')}
             </button>
           </div>
         </div>

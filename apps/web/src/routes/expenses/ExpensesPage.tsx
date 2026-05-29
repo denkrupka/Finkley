@@ -474,6 +474,7 @@ export function ExpensesPage({
                 setFormOpen(true)
               }}
               data-testid="add-expense"
+              data-tour="expense-add"
             >
               <Plus className="size-4" strokeWidth={2.4} />
               {t('expenses.add')}
@@ -483,7 +484,10 @@ export function ExpensesPage({
       )}
 
       {/* Табы Оплачено / Не оплачено */}
-      <div className="border-border bg-card shadow-finsm mb-4 inline-flex rounded-lg border p-1">
+      <div
+        className="border-border bg-card shadow-finsm mb-4 inline-flex rounded-lg border p-1"
+        data-tour="expenses-tabs"
+      >
         <button
           type="button"
           onClick={() => setTab('paid')}
@@ -520,6 +524,7 @@ export function ExpensesPage({
           <button
             type="button"
             onClick={() => setTab('banking')}
+            data-tour="expenses-tab-banking"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
               tab === 'banking'
