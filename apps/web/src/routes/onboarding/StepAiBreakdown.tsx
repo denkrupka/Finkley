@@ -1,7 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowUp,
   Brain,
+  Loader2,
   type LucideIcon,
   MessageSquare,
   Sparkles,
@@ -12,19 +14,47 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 
 export type AiBreakdownTopic = 'services' | 'staff' | 'clients' | 'reviews'
 
 /**
  * T104 — отдельный шаг полной ветки онбординга для каждой из 4 тем
- * AI-разбора (по запросу владельца — «по шагам», а не одной страницей).
+ * AI-разбора. После D1+ (real grounded data) принимает salonId и
+ * запрашивает у Claude реальный анализ конкретной темы на основе
+ * импортированных visits/staff/services/clients/отзывов.
  *
- * Каждая страница — превью: что AI уже посчитает после первой недели
- * работы. Реальный анализ доступен на дашборде + в /reports → AI Insights.
+ * Если salonId не задан или AI упал — fallback на статичные карточки
+ * из ru.json (legacy preview).
  */
-export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
-  const { t } = useTranslation()
+export function StepAiBreakdown({
+  topic,
+  salonId,
+}: {
+  topic: AiBreakdownTopic
+  salonId?: string | null
+}) {
+  const { t, i18n } = useTranslation()
+
+  const ai = useQuery({
+    queryKey: ['onboarding-ai-breakdown', topic, salonId ?? null],
+    enabled: !!salonId,
+    staleTime: Infinity,
+    retry: 1,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
+        body: {
+          salon_id: salonId,
+          mode: 'breakdown',
+          topic,
+          locale: i18n.language.split('-')[0],
+        },
+      })
+      if (error) throw error
+      return data as { insights?: Array<{ title: string; body: string; chip?: string }> }
+    },
+  })
 
   const heroIcon: Record<AiBreakdownTopic, LucideIcon> = {
     services: TrendingUp,
@@ -145,7 +175,11 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
   }
 
   const HeroIcon = heroIcon[topic]
-  const topicCards = cards[topic]
+  const staticCards = cards[topic]
+
+  // Если salonId есть и AI вернул insights — рендерим реальный анализ.
+  // Иначе fallback на статичный preview (legacy).
+  const aiInsights = ai.data?.insights ?? null
 
   return (
     <div className="space-y-3">
@@ -157,11 +191,31 @@ export function StepAiBreakdown({ topic }: { topic: AiBreakdownTopic }) {
         <p className="text-muted-foreground mt-1 text-sm">{heroSubtitle[topic]}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {topicCards.map((c, i) => (
-          <BreakdownCard key={i} {...c} />
-        ))}
-      </div>
+      {salonId && ai.isLoading ? (
+        <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-3 rounded-xl border border-dashed p-4">
+          <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
+          <p className="text-muted-foreground text-sm">{t('onboarding.wow.ai_loading')}</p>
+        </div>
+      ) : aiInsights && aiInsights.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {aiInsights.map((c, i) => (
+            <BreakdownCard
+              key={i}
+              icon={staticCards[i % staticCards.length]!.icon}
+              tone={staticCards[i % staticCards.length]!.tone}
+              title={c.title}
+              body={c.body}
+              chip={c.chip}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {staticCards.map((c, i) => (
+            <BreakdownCard key={i} {...c} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

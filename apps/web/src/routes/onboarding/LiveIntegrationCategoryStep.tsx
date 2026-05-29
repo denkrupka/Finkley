@@ -8,6 +8,7 @@ import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useTgSessions } from '@/hooks/useTgUserbot'
 import { cn } from '@/lib/utils/cn'
 import { brandColor, isFullColorBrand } from './BrandIcon'
+import { BankingConnectDialog } from '@/routes/integrations/BankingConnectDialog'
 import { BooksyConnectDialog } from '@/routes/integrations/BooksyConnectDialog'
 import { ConnectIntegrationDialog as SettingsConnectDialog } from '@/routes/integrations/ConnectIntegrationDialog'
 import { INTEGRATIONS as INTEGRATIONS_REGISTRY } from '@/routes/integrations/integrations-config'
@@ -54,6 +55,7 @@ export function LiveIntegrationCategoryStep({
   const [booksyOpen, setBooksyOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
   const [ksefOpen, setKsefOpen] = useState(false)
+  const [bankingOpen, setBankingOpen] = useState(false)
   const [tgUserbotOpen, setTgUserbotOpen] = useState(false)
   const [messengerOpen, setMessengerOpen] = useState<MessengerChannel | null>(null)
   const [settingsConnectOpen, setSettingsConnectOpen] = useState<OnboardingIntegration | null>(null)
@@ -97,10 +99,7 @@ export function LiveIntegrationCategoryStep({
         setMessengerOpen(id)
         return
       case 'banking':
-        // BankingSection живёт в /settings/integrations — открываем PSD2 flow
-        // в новой вкладке, не в модалке (Enable Banking редиректит на свой
-        // requisition URL). Юзер возвращается через /banking/callback.
-        window.open(`/${salonId}/settings/integrations?tab=banking`, '_blank')
+        setBankingOpen(true)
         return
       case 'fakturownia':
       case 'ifirma':
@@ -193,6 +192,11 @@ export function LiveIntegrationCategoryStep({
         salonId={salonId}
       />
       <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} salonId={salonId} />
+      <BankingConnectDialog
+        open={bankingOpen}
+        onClose={() => setBankingOpen(false)}
+        salonId={salonId}
+      />
       <TelegramUserbotConnectDialog
         open={tgUserbotOpen}
         salonId={salonId}

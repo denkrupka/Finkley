@@ -43,8 +43,12 @@ type OnboardingPayload = {
   /** T144 — режим ответа:
    *   - 'insights' (default) — 3-4 короткие карточки для StepWowAi
    *   - 'full_summary' — overview + список советов с приоритетом для StepAiSummary
+   *   - 'breakdown' — конкретная тема (services/staff/clients/reviews)
+   *     для StepAiBreakdown. Возвращает insights[3] с title/body/chip.
    */
-  mode?: 'insights' | 'full_summary'
+  mode?: 'insights' | 'full_summary' | 'breakdown'
+  /** Для mode='breakdown' — какую тему анализируем. */
+  topic?: 'services' | 'staff' | 'clients' | 'reviews'
   /** D1+ — если early-create salon уже произошёл, передаём salon_id.
    *  Edge function подгружает реальные данные (visits/staff/services/
    *  clients/integrations) из БД и подаёт Claude'у в prompt. */
@@ -79,12 +83,43 @@ function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
   return 'ru'
 }
 
-function systemForLocale(locale: 'ru' | 'pl' | 'en', mode: 'insights' | 'full_summary'): string {
+function systemForLocale(
+  locale: 'ru' | 'pl' | 'en',
+  mode: 'insights' | 'full_summary' | 'breakdown',
+  topic?: string,
+): string {
   const langInstruction = {
     ru: 'На русском, кратко, без воды, по-деловому.',
     pl: 'Po polsku, zwięźle, bez lania wody, rzeczowo.',
     en: 'In English, concise, no fluff, business-like.',
   }[locale]
+  if (mode === 'breakdown') {
+    const topicHint =
+      topic === 'services'
+        ? 'service-level margin, time-spend, pricing recommendations'
+        : topic === 'staff'
+          ? 'per-master revenue, retention, occupancy, loyalty index'
+          : topic === 'clients'
+            ? 'RFM segments (Champions/Loyal/At-risk/Sleeping), churn after first visit'
+            : 'review themes (praise / complaints), Google reputation, automation hooks'
+    return `You are an onboarding assistant for the Finkley beauty-salon management app. ${langInstruction}
+
+Topic-specific AI breakdown for "${topic}". Focus on: ${topicHint}.
+Use REAL data from the salon's DB (visits/staff/services/clients/reviews). If real_data block is provided — reference concrete numbers and names.
+
+Response format — STRICTLY JSON:
+{
+  "insights": [
+    {
+      "title": "<headline up to 60 chars>",
+      "body": "<1-2 sentences with concrete numbers from real_data>",
+      "chip": "<optional short metric badge, e.g. '+12% revenue'>"
+    }
+  ]
+}
+
+JSON only, no markdown, no preface. Return 3 insights.`
+  }
   if (mode === 'full_summary') {
     return `You are an onboarding assistant for the Finkley beauty-salon management app. ${langInstruction}
 
@@ -312,7 +347,12 @@ Deno.serve(async (req) => {
   }
 
   const locale = normalizeLocale(payload.locale)
-  const mode = payload.mode === 'full_summary' ? 'full_summary' : 'insights'
+  const mode: 'insights' | 'full_summary' | 'breakdown' =
+    payload.mode === 'full_summary'
+      ? 'full_summary'
+      : payload.mode === 'breakdown'
+        ? 'breakdown'
+        : 'insights'
 
   // D1+ — если есть salon_id и юзер has access — подгружаем реальные данные.
   // Падение fetchRealData не блокирует AI: возвращаем insights только по
@@ -327,7 +367,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const result = await claudeJson(systemForLocale(locale, mode), buildPrompt(payload, real))
+    const result = await claudeJson(
+      systemForLocale(locale, mode, payload.topic),
+      buildPrompt(payload, real),
+    )
     return json(result)
   } catch (e) {
     return json({ error: 'ai_failed', detail: e instanceof Error ? e.message : String(e) }, 502)

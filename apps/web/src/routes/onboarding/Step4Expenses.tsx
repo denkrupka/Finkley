@@ -386,9 +386,7 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
                           cash_kind: e.target.value as 'cash' | 'non_cash',
                         })
                       }
-                      disabled={!!it.preset_key}
-                      title={it.preset_key ? 'Тип системной кассы изменить нельзя' : undefined}
-                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                      className="border-input bg-card text-foreground h-9 rounded-md border px-2.5 text-xs font-semibold"
                     >
                       <option value="cash">наличные</option>
                       <option value="non_cash">безналичные</option>

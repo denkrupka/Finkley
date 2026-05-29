@@ -1076,10 +1076,18 @@ export function OnboardingPage() {
                 salonId={state.created_salon_id}
               />
             )}
-            {stepId === 'ai_services' && <StepAiBreakdown topic="services" />}
-            {stepId === 'ai_staff' && <StepAiBreakdown topic="staff" />}
-            {stepId === 'ai_clients' && <StepAiBreakdown topic="clients" />}
-            {stepId === 'ai_reviews' && <StepAiBreakdown topic="reviews" />}
+            {stepId === 'ai_services' && (
+              <StepAiBreakdown topic="services" salonId={state.created_salon_id} />
+            )}
+            {stepId === 'ai_staff' && (
+              <StepAiBreakdown topic="staff" salonId={state.created_salon_id} />
+            )}
+            {stepId === 'ai_clients' && (
+              <StepAiBreakdown topic="clients" salonId={state.created_salon_id} />
+            )}
+            {stepId === 'ai_reviews' && (
+              <StepAiBreakdown topic="reviews" salonId={state.created_salon_id} />
+            )}
             {stepId === 'ai_summary' && (
               <StepAiSummary
                 salonType={state.salon_type}

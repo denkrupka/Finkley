@@ -12,7 +12,7 @@
  * Поэтому submit-кнопки используют HTML атрибут form="..." чтобы сабмитить
  * вынесенную из footer форму.
  */
-import { Loader2, Phone, Send, ShieldAlert } from 'lucide-react'
+import { Loader2, Phone, Send } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -150,18 +150,6 @@ export function TelegramUserbotConnectDialog({
         {/* Middle row — единый div чтобы grid-row 1fr не растягивал каждый
             ребёнок отдельно. overflow-y-auto на случай длинного контента. */}
         <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-2 pt-1">
-          {step === 'phone' ? (
-            <div className="border-brand-yellow-deep/40 bg-brand-yellow/30 flex items-start gap-2 rounded-md border p-3 text-xs">
-              <ShieldAlert className="text-brand-navy mt-0.5 size-4 shrink-0" strokeWidth={2} />
-              <div className="text-brand-navy">
-                <p className="font-bold">{t('integrations.telegram_userbot.warning_title')}</p>
-                <p className="mt-1 leading-relaxed">
-                  {t('integrations.telegram_userbot.warning_body')}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
           {step === 'phone' && (
             <form id={FORM_PHONE} className="flex flex-col gap-1.5" onSubmit={submitPhone}>
               <Label htmlFor="tg-phone">{t('integrations.telegram_userbot.phone_label')}</Label>

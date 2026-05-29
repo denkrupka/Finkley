@@ -140,7 +140,9 @@ export function ConnectIntegrationDialog({
           <div className="border-secondary/30 bg-secondary/5 flex items-start gap-2 rounded-md border p-3">
             <Lock className="text-secondary mt-0.5 size-4 shrink-0" strokeWidth={1.7} />
             <p className="text-foreground/80 text-xs leading-snug">
-              {t('integrations.security_note')}
+              {accountingId
+                ? t('integrations.security_note_accounting')
+                : t('integrations.security_note')}
             </p>
           </div>
         </form>

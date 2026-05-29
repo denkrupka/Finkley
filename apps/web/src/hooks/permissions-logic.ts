@@ -22,8 +22,12 @@ export function lookupPermission(
   category: string,
   sub?: string,
 ): PermissionAction | 'none' {
-  // Null role — membership ещё не подгружен; не даём доступ до загрузки.
-  if (!role) return 'none'
+  // Null role — membership ещё не подгружен. Оптимистично возвращаем
+  // 'view' чтобы Sidebar не моргал «сначала 2 пункта → потом все 12»
+  // (image #31). После загрузки membership фильтр уточнится, лишние
+  // пункты скроются. Реальные actions защищены отдельно через
+  // RequirePermission на роутах.
+  if (!role) return 'view'
 
   // Owner / admin — всегда edit.
   if (role === 'owner' || role === 'admin') return 'edit'
