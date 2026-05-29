@@ -1001,7 +1001,9 @@ function ShiftHistoryTable({
           </Select>
         ) : null}
       </div>
-      <table className="w-full text-sm">
+      {/* Mobile audit (2026-05-30): min-w на таблице — иначе на iPhone
+          (375-414px) 8+ колонок сжимаются в нечитаемую кашу. */}
+      <table className="w-full min-w-[720px] text-sm">
         <thead className="bg-muted/40 text-muted-foreground text-[11px] uppercase tracking-wider">
           <tr>
             <th className="px-3 py-2 text-left font-semibold">{t('finance.cash.col_date')}</th>
