@@ -1,24 +1,33 @@
-// Применяет supabase/migrations/*.sql на prod ИЛИ staging через Management
-// API. Используется как обходной путь, если supabase CLI не понимает новый
-// формат токена sbp_v0_*.
+#!/usr/bin/env node
+// Wrapper: применяет миграции на staging/prod через pooler (см.
+// apply-migrations-via-pooler.mjs). Старая версия использовала Management
+// API /database/query, который с 28 мая 2026 принудительно в read-only
+// режиме (PreventCommandIfReadOnly, SQLSTATE 25006) — DDL не проходят.
+//
+// Имя файла сохранено для обратной совместимости с deploy-supabase.yml.
 //
 // Run:
-//   node scripts/apply-migrations-staging.mjs            # → staging (default)
-//   node scripts/apply-migrations-staging.mjs prod       # → prod
+//   node scripts/apply-migrations-staging.mjs staging
+//   node scripts/apply-migrations-staging.mjs prod
 //
-// Required env (читаются из apps/web/.env.local):
-//   SUPABASE_ACCESS_TOKEN
-//   VITE_SUPABASE_URL       (для prod)
-//   VITE_SUPABASE_URL_TEST  (для staging)
-import { readFileSync, readdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+// Required env (читаются из apps/web/.env.local или CI):
+//   - VITE_SUPABASE_URL          (для prod, чтобы извлечь PROJECT_REF)
+//   - VITE_SUPABASE_URL_TEST     (для staging)
+//   - SUPABASE_DB_PASSWORD_PROD  (для prod, GitHub secret)
+//   - SUPABASE_DB_PASSWORD_TEST  (для staging, GitHub secret)
+//   - SUPABASE_DB_REGION         (optional, default 'eu-west-1')
+import { readFileSync, existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 
 function readEnv() {
-  const raw = readFileSync(join(ROOT, 'apps/web/.env.local'), 'utf8')
+  const path = join(ROOT, 'apps/web/.env.local')
+  if (!existsSync(path)) return {}
+  const raw = readFileSync(path, 'utf8')
   const env = {}
   for (const line of raw.split(/\r?\n/)) {
     const m = line.match(/^([A-Z_]+)=(.*)$/)
@@ -27,81 +36,36 @@ function readEnv() {
   return env
 }
 
-const env = readEnv()
-const TOKEN = env.SUPABASE_ACCESS_TOKEN
-if (!TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN missing in .env.local')
-
+const fileEnv = readEnv()
 const target = (process.argv[2] ?? 'staging').toLowerCase()
+
 const urlVar = target === 'prod' ? 'VITE_SUPABASE_URL' : 'VITE_SUPABASE_URL_TEST'
-const refMatch = (env[urlVar] ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)
+const pwdVar = target === 'prod' ? 'SUPABASE_DB_PASSWORD_PROD' : 'SUPABASE_DB_PASSWORD_TEST'
+
+const url = process.env[urlVar] ?? fileEnv[urlVar]
+const password = process.env[pwdVar] ?? fileEnv[pwdVar]
+const region = process.env.SUPABASE_DB_REGION ?? fileEnv.SUPABASE_DB_REGION ?? 'eu-west-1'
+
+const refMatch = (url ?? '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)
 const REF = refMatch?.[1]
-if (!REF) throw new Error(`Cannot resolve project ref from ${urlVar}`)
+if (!REF) throw new Error(`Cannot resolve project ref from ${urlVar}: ${url}`)
+if (!password) throw new Error(`${pwdVar} missing (env or .env.local)`)
 
-console.log(`Target ${target}: ${REF}`)
+console.log(`Target ${target}: ${REF} (region ${region})`)
 
-async function exec(sql) {
-  const res = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
+// Запускаем pooler-based applier как child process, чтобы не плодить
+// дубль кода. Передаём ref в argv, password через env.
+const child = spawn(
+  process.execPath,
+  [join(__dirname, 'apply-migrations-via-pooler.mjs'), REF],
+  {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      SUPABASE_DB_PASSWORD: password,
+      SUPABASE_DB_REGION: region,
     },
-    body: JSON.stringify({ query: sql }),
-  })
-  const text = await res.text()
-  if (!res.ok) {
-    let err
-    try { err = JSON.parse(text) } catch { err = text }
-    throw new Error(`HTTP ${res.status}: ${typeof err === 'string' ? err : JSON.stringify(err)}`)
-  }
-  return text
-}
+  },
+)
 
-const dir = join(ROOT, 'supabase/migrations')
-const files = readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
-
-console.log(`Found ${files.length} migration files`)
-
-// Сначала запишем metadata: создаём supabase_migrations.schema_migrations если нет
-// (CLI создаёт автоматически; через API сделаем то же).
-await exec(`
-  create schema if not exists supabase_migrations;
-  create table if not exists supabase_migrations.schema_migrations (
-    version text primary key,
-    name text,
-    statements text[]
-  );
-`)
-
-for (const file of files) {
-  const version = file.match(/^(\d{14})/)?.[1]
-  if (!version) {
-    console.log(`SKIP ${file} (no version prefix)`)
-    continue
-  }
-
-  // Уже применена?
-  const checkSql = `select 1 from supabase_migrations.schema_migrations where version='${version}'`
-  const existing = await exec(checkSql)
-  if (existing.trim() && existing.trim() !== '[]') {
-    console.log(`✓ ${file} — already applied`)
-    continue
-  }
-
-  const sql = readFileSync(join(dir, file), 'utf8')
-  console.log(`→ ${file} (${sql.length} chars)…`)
-
-  try {
-    await exec(sql)
-    // Помечаем как применённую
-    await exec(
-      `insert into supabase_migrations.schema_migrations(version, name) values ('${version}', '${file.replace(/'/g, "''")}') on conflict do nothing`
-    )
-    console.log(`✓ ${file}`)
-  } catch (e) {
-    console.error(`✗ ${file}: ${e.message}`)
-    process.exit(1)
-  }
-}
-
-console.log('\nAll migrations applied to staging.')
+child.on('exit', (code) => process.exit(code ?? 1))

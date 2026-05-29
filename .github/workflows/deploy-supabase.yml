@@ -39,11 +39,21 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 20
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - name: Install root deps (pg для pooler-based migrations)
+        run: pnpm install --frozen-lockfile
 
       - name: Apply migrations (staging)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VITE_SUPABASE_URL_TEST: ${{ secrets.VITE_SUPABASE_URL_TEST }}
+          # NEW (since 28 May 2026 RO Management API): прямое подключение к
+          # Postgres через pooler — Supabase Management API /database/query
+          # больше не принимает DDL. Заведи в Repo Settings → Secrets:
+          #   SUPABASE_DB_PASSWORD_TEST — DB password staging проекта
+          #   SUPABASE_DB_PASSWORD_PROD — DB password prod проекта
+          SUPABASE_DB_PASSWORD_TEST: ${{ secrets.SUPABASE_DB_PASSWORD_TEST }}
         run: |
           mkdir -p apps/web
           {
@@ -97,11 +107,16 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 20
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - name: Install root deps (pg для pooler-based migrations)
+        run: pnpm install --frozen-lockfile
 
       - name: Apply migrations (production)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          SUPABASE_DB_PASSWORD_PROD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
         run: |
           mkdir -p apps/web
           {
