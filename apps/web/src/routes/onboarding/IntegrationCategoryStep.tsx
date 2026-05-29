@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
 
-import { brandColor } from './BrandIcon'
+import { brandColor, isFullColorBrand } from './BrandIcon'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
@@ -79,11 +79,19 @@ export function IntegrationCategoryStep({
               )}
             >
               <div
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-white"
-                style={{ background: checked ? '#0d9488' : brandColor(it.id) }}
+                className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg text-white"
+                style={{
+                  background: checked
+                    ? '#0d9488'
+                    : isFullColorBrand(it.id)
+                      ? 'transparent'
+                      : brandColor(it.id),
+                }}
               >
                 {checked ? (
                   <Check className="size-5" strokeWidth={2.4} />
+                ) : isFullColorBrand(it.id) ? (
+                  <Icon className="size-9" strokeWidth={1.8} />
                 ) : (
                   <Icon className="size-5" strokeWidth={1.8} />
                 )}

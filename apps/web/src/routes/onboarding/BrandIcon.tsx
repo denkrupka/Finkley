@@ -24,16 +24,27 @@ export function BrandIcon({ provider, className = 'size-5' }: Props) {
   switch (provider) {
     case 'booksy':
       return (
-        // Booksy — стилизованная буква B
-        <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-          <path d="M5 4h8a5 5 0 0 1 2.6 9.27A5 5 0 0 1 13.5 22H5V4Zm3 3v4h5a2 2 0 0 0 0-4H8Zm0 7v5h5.5a2.5 2.5 0 0 0 0-5H8Z" />
+        // Booksy — розовый квадрат-приложение со стилизованной "b". Узнаваемая
+        // форма иконки приложения (закруглённый квадрат) + lowercase b.
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="5.4" fill="#FF0073" />
+          <path
+            d="M9.2 6.5v5.05c.7-.78 1.7-1.27 2.9-1.27 2.42 0 4.1 1.92 4.1 4.36 0 2.43-1.68 4.36-4.1 4.36-1.2 0-2.2-.5-2.9-1.28v1.03H6.6V6.5h2.6Zm2.55 9.92c1.18 0 2.04-.88 2.04-2.13 0-1.26-.86-2.13-2.04-2.13-1.18 0-2.04.87-2.04 2.13 0 1.25.86 2.13 2.04 2.13Z"
+            fill="#fff"
+          />
         </svg>
       )
     case 'wfirma':
       return (
-        // wFirma — буква W
-        <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-          <path d="M3 5h3.2l1.9 9.6L10.4 5h3.2l2.3 9.6L17.8 5H21l-3.5 14h-3.5L11.7 9.2 9.4 19H5.9L3 5Z" />
+        // wFirma — синий квадрат со стилизованной 'w' (продолговатые штрихи
+        // как в реальном лого).
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#005CA9" />
+          <path
+            d="M3.6 7.2h2.7l1.6 6.4 1.7-6.4h2.4l1.7 6.4 1.6-6.4h2.7l-2.8 9.6h-2.7L9 11l-1.4 5.8H4.9L2.1 7.2h1.5Z"
+            transform="translate(1.7 -.4)"
+            fill="#fff"
+          />
         </svg>
       )
     case 'instagram':
@@ -97,67 +108,65 @@ export function BrandIcon({ provider, className = 'size-5' }: Props) {
       )
     case 'ksef':
       return (
-        // KSeF — щит с галочкой (госреестр)
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={className}
-          aria-hidden="true"
-        >
-          <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z" />
-          <path d="m9 12 2 2 4-4" />
+        // KSeF — государственный реестр e-фактур Минфина PL. Тёмно-красный
+        // щит (мин-финансовый) + текст KSeF белым. Не официальный лого
+        // (его нет), но узнаваемый паттерн "MF + e-faktura shield".
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <path
+            d="M12 1.5 3 4.2v6.3c0 5.3 3.6 9.8 9 11.5 5.4-1.7 9-6.2 9-11.5V4.2L12 1.5Z"
+            fill="#8B0000"
+          />
+          <text
+            x="12"
+            y="14.5"
+            textAnchor="middle"
+            fontSize="6.5"
+            fontWeight="700"
+            fill="#fff"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            KSeF
+          </text>
         </svg>
       )
     case 'fakturownia':
       return (
-        // Документ-фактура
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={className}
-          aria-hidden="true"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="8" y1="13" x2="16" y2="13" />
-          <line x1="8" y1="17" x2="13" y2="17" />
+        // Fakturownia — оранжевый квадрат, белая 'f' (lowercase) + "tick"-волна
+        // как в их официальной иконке.
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#F26522" />
+          <path
+            d="M13.5 6.2c-1.7 0-2.8 1-2.8 2.8v1.6H8.5v2.2h2.2v6h2.5v-6h2.6v-2.2h-2.6V9.4c0-.7.3-1 1-1h1.7V6.2h-2.4Z"
+            fill="#fff"
+          />
         </svg>
       )
     case 'ifirma':
       return (
-        // iFirma — i + квадрат
-        <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-          <rect
-            x="3"
-            y="3"
-            width="18"
-            height="18"
-            rx="3"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-          <circle cx="12" cy="8" r="1.5" />
-          <rect x="10.5" y="11" width="3" height="8" rx="1" />
+        // iFirma — зелёный квадрат с белой 'i' (lowercase) — узнаваемая
+        // форма из их иконки приложения.
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#00A651" />
+          <circle cx="12" cy="7.2" r="1.7" fill="#fff" />
+          <rect x="10.3" y="10.5" width="3.4" height="9" rx="1" fill="#fff" />
         </svg>
       )
     case 'infakt':
       return (
-        // inFakt — папка
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={className}
-          aria-hidden="true"
-        >
-          <path d="M4 4h4l2 3h10v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-          <line x1="12" y1="14" x2="16" y2="14" />
+        // inFakt — фиолетовый квадрат с белой 'iF' / документной графикой.
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#7B68EE" />
+          <text
+            x="12"
+            y="15.5"
+            textAnchor="middle"
+            fontSize="8"
+            fontWeight="700"
+            fill="#fff"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            iF
+          </text>
         </svg>
       )
     case 'ocr_notebook':
@@ -188,6 +197,27 @@ export function BrandIcon({ provider, className = 'size-5' }: Props) {
           <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
         </svg>
       )
+  }
+}
+
+/** True если SVG сам рисуется в брендовом цвете (full-color glyph) — в
+ *  карточках бренда такая иконка ставится на белый фон, а не на цветной
+ *  bg, чтобы не было «двойного» цвета. Для упрощённых glyph'ов
+ *  (banking/ical/ocr_notebook) используем bg=brandColor + currentColor. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function isFullColorBrand(provider: OnboardingIntegration): boolean {
+  switch (provider) {
+    case 'booksy':
+    case 'wfirma':
+    case 'ksef':
+    case 'fakturownia':
+    case 'ifirma':
+    case 'infakt':
+      return true
+    default:
+      // instagram/facebook/whatsapp/telegram — simple-icons currentColor
+      // glyph (не self-colored): рендерим белым на брендовом bg.
+      return false
   }
 }
 

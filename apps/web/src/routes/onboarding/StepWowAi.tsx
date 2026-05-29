@@ -75,6 +75,7 @@ export function StepWowAi({
   ocrVisitsCount = 0,
   salonType,
   country,
+  salonId,
 }: {
   hasBookings: boolean
   hasBanking: boolean
@@ -95,14 +96,17 @@ export function StepWowAi({
   // T125 #2 — для AI prompt
   salonType?: string
   country?: string
+  /** D1+ — early-created salon ID. Если есть, edge function подгружает
+   *  реальные visits/staff/services из БД для grounding AI. */
+  salonId?: string | null
 }) {
   const { t, i18n } = useTranslation()
 
-  // T125 #2 — реальный AI вызов на собранных данных онбординга.
-  // Дёргается один раз при mount (queryKey статичный — данные онбординга
-  // уже введены к этому моменту, заново анализ не делаем).
   const aiPreview = useQuery({
-    queryKey: ['onboarding-ai-preview'],
+    // D1+ — queryKey включает salonId; если салон создан между mount'ами
+    // (например, юзер вернулся назад и заполнил step1) — перезапрашиваем
+    // с реальными данными.
+    queryKey: ['onboarding-ai-preview', salonId ?? null],
     queryFn: async (): Promise<{ insights: AiInsight[] }> => {
       const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
         body: {
@@ -116,6 +120,7 @@ export function StepWowAi({
           company_name: companyName || null,
           ocr_visits_count: ocrVisitsCount,
           locale: i18n.language.split('-')[0],
+          salon_id: salonId ?? undefined,
         },
       })
       if (error) throw error

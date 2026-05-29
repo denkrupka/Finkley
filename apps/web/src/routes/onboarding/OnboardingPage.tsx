@@ -1070,6 +1070,7 @@ export function OnboardingPage() {
                 ocrVisitsCount={state.ocr_visits.length}
                 salonType={state.salon_type}
                 country={state.country_code}
+                salonId={state.created_salon_id}
               />
             )}
             {stepId === 'ai_services' && <StepAiBreakdown topic="services" />}
@@ -1087,6 +1088,7 @@ export function OnboardingPage() {
                 hasNip={!!state.nip}
                 companyName={state.company_name}
                 ocrVisitsCount={state.ocr_visits.length}
+                salonId={state.created_salon_id}
               />
             )}
             {stepId === 'public_links' && (

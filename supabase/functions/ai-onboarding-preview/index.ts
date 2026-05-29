@@ -45,6 +45,23 @@ type OnboardingPayload = {
    *   - 'full_summary' — overview + список советов с приоритетом для StepAiSummary
    */
   mode?: 'insights' | 'full_summary'
+  /** D1+ — если early-create salon уже произошёл, передаём salon_id.
+   *  Edge function подгружает реальные данные (visits/staff/services/
+   *  clients/integrations) из БД и подаёт Claude'у в prompt. */
+  salon_id?: string
+}
+
+/** D1+ — реальные данные из БД для конкретного salon_id. */
+type SalonRealData = {
+  visits_total: number
+  visits_last_7d: number
+  revenue_total_cents: number
+  staff_total: number
+  services_total: number
+  clients_total: number
+  top_services: Array<{ name: string; visits: number }>
+  top_staff: Array<{ name: string; visits: number }>
+  connected_integrations: string[]
 }
 
 function json(body: unknown, status = 200) {
@@ -107,10 +124,8 @@ JSON only, no markdown, no preface. Return 3-4 insights.
 Pick icons that match: staff for masters, services for catalog, bookings for Booksy/calendar, banking for PSD2, social for IG/FB/Telegram, google for Google Place, company for NIP.`
 }
 
-function buildPrompt(payload: OnboardingPayload): string {
-  return `Owner's onboarding state (JSON):
-${JSON.stringify(
-  {
+function buildPrompt(payload: OnboardingPayload, real: SalonRealData | null): string {
+  const state = {
     salon_type: payload.salon_type ?? 'unknown',
     country: payload.country ?? 'PL',
     integrations: payload.integrations ?? [],
@@ -119,12 +134,140 @@ ${JSON.stringify(
     has_google_place: !!payload.has_google_place,
     company_name: payload.company_name || null,
     ocr_visits_count: payload.ocr_visits_count ?? 0,
-  },
-  null,
-  2,
-)}
+  }
+  const realBlock = real
+    ? `\n\nReal data fetched from the salon's DB right now (use these as ground truth, they override estimates from onboarding state):
+${JSON.stringify(real, null, 2)}`
+    : ''
+  return `Owner's onboarding state (JSON):
+${JSON.stringify(state, null, 2)}${realBlock}
 
-Generate 3-4 insights tailored to what the owner has actually entered. Reference specific numbers (e.g. "your team of {N} masters", "{X} services in your catalog") and integrations they picked. Skip generic advice they didn't enable.`
+Generate 3-4 insights tailored to what the owner has actually entered. Reference specific numbers (e.g. "your team of {N} masters", "{X} services in your catalog") and integrations they picked. Skip generic advice they didn't enable.${real ? ' Prefer real numbers from the DB over onboarding estimates.' : ''}`
+}
+
+/** D1+ — pulls live data from Supabase REST API using service role.
+ *  Возвращает null если salon_id невалидный или юзер не имеет доступа
+ *  (verified via salon_members). */
+async function fetchRealData(salonId: string, userId: string): Promise<SalonRealData | null> {
+  const headers = {
+    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    'content-type': 'application/json',
+  }
+
+  const memRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/salon_members?select=role&salon_id=eq.${salonId}&user_id=eq.${userId}&limit=1`,
+    { headers },
+  )
+  const memJson = (await memRes.json()) as Array<{ role: string }>
+  if (!Array.isArray(memJson) || memJson.length === 0) return null
+
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  async function getCount(table: string, filter = ''): Promise<number> {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/${table}?select=id&salon_id=eq.${salonId}${filter}`,
+      { headers: { ...headers, Prefer: 'count=exact', Range: '0-0' } },
+    )
+    const range = r.headers.get('content-range') ?? ''
+    const m = range.match(/\/(\d+)$/)
+    return m ? Number(m[1]) : 0
+  }
+
+  async function sumRevenue(): Promise<number> {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/visits?select=amount_cents&salon_id=eq.${salonId}&status=eq.paid&limit=10000`,
+      { headers },
+    )
+    const rows = (await r.json()) as Array<{ amount_cents: number }>
+    if (!Array.isArray(rows)) return 0
+    return rows.reduce((acc, x) => acc + (x.amount_cents ?? 0), 0)
+  }
+
+  async function topServices(): Promise<Array<{ name: string; visits: number }>> {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/visits?select=service_name_snapshot&salon_id=eq.${salonId}&limit=5000`,
+      { headers },
+    )
+    const rows = (await r.json()) as Array<{ service_name_snapshot: string | null }>
+    if (!Array.isArray(rows)) return []
+    const tally = new Map<string, number>()
+    for (const v of rows) {
+      const name = v.service_name_snapshot?.trim()
+      if (!name) continue
+      tally.set(name, (tally.get(name) ?? 0) + 1)
+    }
+    return Array.from(tally.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, visits]) => ({ name, visits }))
+  }
+
+  async function topStaff(): Promise<Array<{ name: string; visits: number }>> {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/visits?select=staff_id,staff:staff_id(full_name)&salon_id=eq.${salonId}&limit=5000`,
+      { headers },
+    )
+    const rows = (await r.json()) as Array<{
+      staff_id: string | null
+      staff: { full_name: string } | null
+    }>
+    if (!Array.isArray(rows)) return []
+    const tally = new Map<string, number>()
+    for (const v of rows) {
+      const name = v.staff?.full_name?.trim()
+      if (!name) continue
+      tally.set(name, (tally.get(name) ?? 0) + 1)
+    }
+    return Array.from(tally.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, visits]) => ({ name, visits }))
+  }
+
+  async function connectedIntegrations(): Promise<string[]> {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/salon_integrations?select=provider,status&salon_id=eq.${salonId}`,
+      { headers },
+    )
+    const rows = (await r.json()) as Array<{ provider: string; status: string }>
+    if (!Array.isArray(rows)) return []
+    return rows.filter((r) => r.status !== 'disconnected').map((r) => r.provider)
+  }
+
+  const [
+    visits_total,
+    visits_last_7d,
+    revenue_total_cents,
+    staff_total,
+    services_total,
+    clients_total,
+    top_services,
+    top_staff,
+    connected_integrations,
+  ] = await Promise.all([
+    getCount('visits'),
+    getCount('visits', `&visit_at=gte.${since}`),
+    sumRevenue(),
+    getCount('staff'),
+    getCount('services'),
+    getCount('clients'),
+    topServices(),
+    topStaff(),
+    connectedIntegrations(),
+  ])
+
+  return {
+    visits_total,
+    visits_last_7d,
+    revenue_total_cents,
+    staff_total,
+    services_total,
+    clients_total,
+    top_services,
+    top_staff,
+    connected_integrations,
+  }
 }
 
 async function claudeJson(system: string, prompt: string): Promise<unknown> {
@@ -170,8 +313,21 @@ Deno.serve(async (req) => {
 
   const locale = normalizeLocale(payload.locale)
   const mode = payload.mode === 'full_summary' ? 'full_summary' : 'insights'
+
+  // D1+ — если есть salon_id и юзер has access — подгружаем реальные данные.
+  // Падение fetchRealData не блокирует AI: возвращаем insights только по
+  // metadata (legacy mode).
+  let real: SalonRealData | null = null
+  if (payload.salon_id) {
+    try {
+      real = await fetchRealData(payload.salon_id, user.id)
+    } catch (e) {
+      console.warn('fetchRealData failed', e)
+    }
+  }
+
   try {
-    const result = await claudeJson(systemForLocale(locale, mode), buildPrompt(payload))
+    const result = await claudeJson(systemForLocale(locale, mode), buildPrompt(payload, real))
     return json(result)
   } catch (e) {
     return json({ error: 'ai_failed', detail: e instanceof Error ? e.message : String(e) }, 502)

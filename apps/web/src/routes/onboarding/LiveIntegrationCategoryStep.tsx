@@ -7,7 +7,7 @@ import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useTgSessions } from '@/hooks/useTgUserbot'
 import { cn } from '@/lib/utils/cn'
-import { brandColor } from './BrandIcon'
+import { brandColor, isFullColorBrand } from './BrandIcon'
 import { BooksyConnectDialog } from '@/routes/integrations/BooksyConnectDialog'
 import { ConnectIntegrationDialog as SettingsConnectDialog } from '@/routes/integrations/ConnectIntegrationDialog'
 import { INTEGRATIONS as INTEGRATIONS_REGISTRY } from '@/routes/integrations/integrations-config'
@@ -140,11 +140,19 @@ export function LiveIntegrationCategoryStep({
               )}
             >
               <div
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-white"
-                style={{ background: connected ? '#16a34a' : brandColor(it.id) }}
+                className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg text-white"
+                style={{
+                  background: connected
+                    ? '#16a34a'
+                    : isFullColorBrand(it.id)
+                      ? 'transparent'
+                      : brandColor(it.id),
+                }}
               >
                 {connected ? (
                   <Check className="size-5" strokeWidth={2.4} />
+                ) : isFullColorBrand(it.id) ? (
+                  <Icon className="size-9" strokeWidth={1.8} />
                 ) : (
                   <Icon className="size-5" strokeWidth={1.8} />
                 )}

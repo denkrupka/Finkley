@@ -34,6 +34,7 @@ export function StepAiSummary({
   hasNip,
   companyName,
   ocrVisitsCount,
+  salonId,
 }: {
   salonType?: string
   country?: string
@@ -44,11 +45,13 @@ export function StepAiSummary({
   hasNip?: boolean
   companyName?: string
   ocrVisitsCount?: number
+  /** D1+ — early-created salon ID для real-data grounding AI. */
+  salonId?: string | null
 }) {
   const { t, i18n } = useTranslation()
 
   const summary = useQuery({
-    queryKey: ['onboarding-ai-summary'],
+    queryKey: ['onboarding-ai-summary', salonId ?? null],
     queryFn: async (): Promise<AiSummary> => {
       const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
         body: {
@@ -63,6 +66,7 @@ export function StepAiSummary({
           ocr_visits_count: ocrVisitsCount ?? 0,
           locale: i18n.language.split('-')[0],
           mode: 'full_summary',
+          salon_id: salonId ?? undefined,
         },
       })
       if (error) throw error
