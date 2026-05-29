@@ -64,7 +64,22 @@ export function BankingCallbackPage() {
   // Куда возвращать юзера: салон, в котором он был, либо первый из его списка.
   const targetSalon =
     salons.find((s) => s.id === localStorage.getItem('finkley:last-salon')) ?? salons[0] ?? null
-  const backHref = targetSalon ? `/${targetSalon.id}/settings?tab=integrations` : '/'
+  // OAuth-return-onboarding флаг приоритетнее: если юзер запустил PSD2
+  // из онбординга — вернёмся туда вместо /settings/integrations.
+  const onboardingReturn =
+    typeof window !== 'undefined' ? localStorage.getItem('finkley:oauth-return-onboarding') : null
+  if (onboardingReturn && done?.ok) {
+    try {
+      localStorage.removeItem('finkley:oauth-return-onboarding')
+    } catch {
+      /* ignore */
+    }
+  }
+  const backHref = onboardingReturn
+    ? `/onboarding?salon=${onboardingReturn}`
+    : targetSalon
+      ? `/${targetSalon.id}/settings?tab=integrations`
+      : '/'
 
   if (targetSalon) rememberLastSalon(targetSalon.id)
 

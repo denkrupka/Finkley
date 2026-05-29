@@ -49,6 +49,16 @@ export function MessengerConnectDialog({ open, channel, salonId, onClose }: Prop
     if (!isMetaOAuth) return
     startOAuth.mutate(channel as 'facebook' | 'instagram' | 'whatsapp', {
       onSuccess: (authorizeUrl) => {
+        // Если запуск OAuth из онбординга — сохраняем флаг чтобы после
+        // Meta-redirect IntegrationsPage вернул юзера на /onboarding
+        // вместо того чтобы оставить его в /settings/integrations.
+        try {
+          if (window.location.pathname.includes('/onboarding')) {
+            localStorage.setItem('finkley:oauth-return-onboarding', salonId)
+          }
+        } catch {
+          /* ignore */
+        }
         window.location.href = authorizeUrl
       },
       onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),

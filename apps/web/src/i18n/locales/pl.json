@@ -212,7 +212,8 @@
       "company_label": "Nazwa firmy (prawna)",
       "company_placeholder": "Np. JANE DOE BEAUTY",
       "mode_label": "Jak prowadzisz księgowość?",
-      "providers_title": "Podłącz system księgowy"
+      "providers_title": "Podłącz system księgowy",
+      "privacy_note": "Te dane są poufne. Nie udostępniamy ich stronom trzecim — potrzebne są tylko do automatyzacji dostarczania faktur i paragonów księgowemu."
     },
     "step_integrations": {
       "title": "Które integracje podłączymy?",
@@ -246,8 +247,13 @@
       "name_placeholder": "Imię specjalisty",
       "percent_label": "% od przychodu",
       "add": "Dodaj specjalistę",
+      "added": "Specjalista dodany",
       "invite_need_email": "Wpisz email, aby zaprosić",
-      "invite_label": "Zaproś do portalu po utworzeniu"
+      "invite_label": "Zaproś do portalu po utworzeniu",
+      "invite_send": "Wyślij zaproszenie",
+      "invite_sent": "Zaproszenie wysłane na {{email}}",
+      "invite_already_sent": "Zaproszenie już wysłane",
+      "empty_hint": "Na razie pusto. Jeśli właśnie podłączyłeś Booksy — specjaliści zostaną pobrani w 2-5 minut. Możesz dodać ręcznie poniżej."
     },
     "step3": {
       "title": "Co robicie",
@@ -263,7 +269,9 @@
       "ocr_collected": "W kolejce do importu: {{count}} wizyt",
       "ocr_toggle": "Prowadzę rezerwacje ręcznie → załaduj zdjęcie dziennika",
       "add_in_category": "Dodaj usługę do tej kategorii",
-      "add_category": "Nowa kategoria"
+      "add_category": "Nowa kategoria",
+      "no_category": "Bez kategorii",
+      "empty_hint": "Na razie pusto. Po loginie do Booksy usługi pojawią się w 2-5 minut. Możesz dodać ręcznie."
     },
     "step4": {
       "title": "Kategorie wydatków",
@@ -4682,6 +4690,24 @@
       }
     },
     "page": {
+      "dashboard": {
+        "kpi": {
+          "title": "5 głównych KPI",
+          "body": "Przychód, zysk, obłożenie, % powrotów, saldo kas. Kliknij dowolny — zobaczysz szczegółowy breakdown za okres."
+        },
+        "insights": {
+          "title": "Asystent AI widzi",
+          "body": "AI analizuje wizyty, wydatki, opinie i podpowiada co jest ważne teraz. Odłóż lub działaj bezpośrednio stąd."
+        },
+        "fab": {
+          "title": "Szybkie dodanie",
+          "body": "Duży przycisk w prawym dolnym rogu — dodaj wizytę, wydatek lub sprzedaż jednym kliknięciem. Dodatkowo: zdjęcie paragonu (OCR), skan kodu kreskowego."
+        },
+        "notifications": {
+          "title": "Powiadomienia",
+          "body": "Dzwoneczek u góry — nowe wiadomości, zaległe płatności, niski stan, insighty AI. Kliknięcie przenosi do źródła."
+        }
+      },
       "expenses": {
         "tabs": {
           "title": "Trzy zakładki wydatków",

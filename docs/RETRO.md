@@ -5,6 +5,140 @@
 
 ---
 
+## Batch 9 — Live-mode онбординга, resume, deploy-pipeline fix · 29 мая 2026 (вечер)
+
+**Релиз:** ~15 коммитов в `main`, все запушены и автодеплоились через
+исправленный pipeline (см. ниже). Сессия одного дня, итерация на
+живых скриншотах от владельца — 30+ итераций фидбека.
+
+### Что сделано
+
+**Pipeline fix (критично):**
+
+- Supabase Management API `/database/query` endpoint с 28 мая 2026
+  принудительно открывает read-only transaction → ВСЕ deploy-supabase
+  runs падали с 25006 `cannot execute CREATE SCHEMA`. Direct host
+  `db.PROJECT_REF.supabase.co` Supabase больше не резолвят.
+- Новый `scripts/apply-migrations-via-pooler.mjs`: подключается к
+  Postgres через session pooler (`aws-0-eu-west-1.pooler.supabase.com:5432`)
+  и делает `set session default_transaction_read_only = off` +
+  явный `begin read write` перед DDL. Миграции применяются как раньше.
+- `scripts/apply-migrations-staging.mjs` стал обёрткой — читает target
+  (staging/prod), резолвит REF из VITE*SUPABASE_URL, password из
+  SUPABASE_DB_PASSWORD*{TEST,PROD} env, спавнит pooler-applier.
+- `deploy-supabase.yml` обновлён: pnpm install корня (pg dep),
+  SUPABASE*DB_PASSWORD*\* в env.
+- pg ^8.21.0 в корневой `package.json` devDeps.
+- GitHub secrets выставлены (staging вручную, prod через юзера).
+
+**ADR-030 завершение — Resume онбординга:**
+
+- Миграция 20260529000005: `salons.onboarding_state jsonb` +
+  `onboarding_step_id text`.
+- OnboardingPage hydrate на mount (query `?salon=<id>` или БД).
+- Autosave debounced 1.5s на изменение state/stepIndex.
+- RootRedirect force-resume через query `onboarding-unfinished`.
+- OAuth-return-onboarding localStorage флаг для Meta+Banking
+  callbacks — после OAuth юзер возвращается на /onboarding, не на
+  /settings.
+
+**Live-mode компоненты в онбординге:**
+
+- Step2StaffLive: useStaff(salonId), кнопка Invite через useInviteMember,
+  inline-форма добавления, Booksy badge на импортированных.
+- Step3ServicesLive: useServices + useServiceCategories, editable
+  price/duration, кнопки добавления.
+- Step3Accounting → AccountingSettingsCard если salonId (Datapport
+  NIP lookup, VAT, правная форма, document_delivery, portal+email,
+  frequency picker — всё из существующего компонента).
+- Privacy-note ShieldCheck сверху accounting шага.
+
+**UX-полиш по фидбеку владельца (30+ итераций):**
+
+- BooksyConnectDialog: solvingCaptcha local flag (предотвращает
+  double-click), полный sync в фоне с toast progress (диалог не
+  висит после save).
+- Bookings секция: убраны WhatsApp+iCal, добавлены Fresha/Treatwell/
+  YCLIENTS как coming_soon (badge «В разработке»).
+- DialogContent: flex+overflow-y-auto вместо grid (контент не
+  срезался). Тип системной кассы (cash_kind) больше не disabled.
+- Telegram warning блок про userbots правила убран.
+- security_note_accounting текст для fakturownia/инFakt (про фактуры,
+  не визиты).
+- Step5Done вернул subscribe-чекбокс с trial 14д.
+- Stepper: пройденные шаги bg-brand-sage (зелёный), активный navy,
+  ai_summary в i18n.steps добавлен (был raw).
+- PageTour ждёт пока главный OnboardingTour dismissed, не запускается
+  во время него. OnboardingTour финиш → navigate /dashboard, там
+  локальный DASHBOARD_TOUR_STEPS (4 шага: kpi/insights/fab/notifications).
+- Sidebar flash fix: permissions-logic при role=null возвращает
+  'view' вместо 'none' — все nav-пункты появляются сразу.
+
+**Email validation при регистрации:** Supabase «user_already_exists»
+маппится на friendly auth.errors.email_already_used (RU/EN/PL) под
+полем email через form.setError.
+
+**AI breakdown на реальных данных:**
+
+- StepAiBreakdown принимает salonId, запрашивает ai-onboarding-preview
+  с mode='breakdown' + topic.
+- Edge function расширен: новый breakdown mode, topic-specific prompt
+  (services→margin, staff→retention, clients→RFM, reviews→praise).
+- Real_data block (visits/staff/services/clients/integrations) в prompt
+  как ground truth.
+
+**Тип кассы (cash_kind):** select больше не disabled для preset_key —
+можно переключать наличные/безналичные у системных касс.
+
+**EN/PL переводы:** добавлены для всех новых ключей сессии
+(step2/step3 live-mode helpers, step_accounting.privacy_note,
+auth.errors.email_already_used, integrations.security_note_accounting +
+toast_sync_started, tour.page.dashboard.\*).
+
+### Что хорошо
+
+- **Pooler-based migrations.** Решение оказалось чистым и
+  работоспособным локально для staging без правок CI. После
+  проставления prod-password в GitHub secret pipeline сразу
+  оживел. Без эпопеи с CLI/credentials.
+- **Live-mode dual компоненты.** Step2StaffLive + Step3ServicesLive
+  имеют минимум кода (рендерят из useStaff/useServices) и
+  переиспользуют edge function send-invitation. Реальный код,
+  ноль mocks.
+- **Iterative scrolling feedback.** Владелец слал по 1-3 скриншота
+  с конкретными правками — все 30+ итераций удалось закрыть в один
+  день. Помогло разбиение на коммиты-пачки (~5 правок каждый).
+
+### Что плохо / уроки
+
+- **Supabase Management API breaking change без warning.** Сидели
+  на /database/query 6 месяцев, в один день перестало работать.
+  Урок: не использовать undocumented endpoints для критичного flow
+  (миграции), всегда иметь fallback на CLI.
+- **Скриншоты без кода → много гадания.** Юзер слал картинку с
+  жалобой «висит» — приходилось гадать в каком из 50 диалогов
+  проблема. Лучше сразу спрашивать конкретный URL/название
+  диалога.
+- **Большие компоненты типа AccountingSettingsCard в онбординге.**
+  Удобно переиспользовать, но UI слегка не подходит (Settings-стили,
+  кнопка Save вместо Next). Если станет проблемой — отдельный
+  Step3AccountingFull с теми же hooks но онбординг-стилем.
+
+### Новые ADR
+
+- (Нет новых, всё подпало под ADR-030 расширение.)
+
+### Известные хвосты (не критичные)
+
+- Дублирующая логика выбора провайдеров в AccountingSettingsCard
+  (Settings) и онбординг bookings (Live). Если меняется список
+  поддерживаемых порталов — править в обоих местах. Helper-функция
+  в `lib/integrations/portals.ts` была бы лучше.
+- Step3ServicesLive не показывает Booksy badge у импортированных
+  услуг (только Step2StaffLive показывает у мастеров). Минор UX.
+
+---
+
 ## Batch 8 — Реальные авторизации в онбординге · 29 мая 2026
 
 **Релиз:** 4 коммита в `main`, не запушено в origin (ожидает решения

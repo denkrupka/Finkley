@@ -243,6 +243,41 @@ usage). Если хочешь переиспользовать диалог гд
 cron'ом через RPC `cleanup_brown_salons()` через 7 дней. Owner
 настраивает pg_cron job отдельно. Подробности — [ADR-030](./decisions/030-early-create-onboarding.md).
 
+**Resume онбординга — autosave + hydrate.** Миграция
+`20260529000005_salons_onboarding_state` добавила колонки
+`salons.onboarding_state jsonb` (snapshot всего `OnboardingState`) и
+`salons.onboarding_step_id text` (last active stepId). OnboardingPage:
+
+- На mount: hydrate из `?salon=<id>` query (после OAuth callback) или
+  из БД по `onboarding_completed_at IS NULL` (твой последний
+  unfinished salon).
+- Autosave: debounced 1.5s UPDATE при каждом изменении state/stepIndex.
+- RootRedirect: если у юзера есть brown-salon → принудительно
+  `/onboarding?salon=<id>`. Юзер физически не попадёт на dashboard
+  пока не завершит онбординг.
+
+OAuth-возврат (Meta + Banking) использует localStorage флаг
+`finkley:oauth-return-onboarding` = `<salonId>`. Выставляется в
+`MessengerConnectDialog.handleOAuth` / `BankingConnectDialog.connect`
+если `window.location.pathname.includes('/onboarding')`. Проверяется
+в `IntegrationsPage` useEffect (Meta callback) и `BankingCallbackPage`
+(PSD2 callback) — если флаг есть → `navigate('/onboarding?salon=...')`
+с удалением флага.
+
+**Live-mode компоненты в онбординге.** Паттерн: `<StepFoo>` (offline,
+draft в state) + `<StepFooLive salonId>` (online, читает из БД).
+OnboardingPage переключается через `state.created_salon_id ?
+<StepFooLive salonId={...} /> : <StepFoo .../>`. Примеры:
+
+- `Step2StaffLive` — `useStaff(salonId)` + кнопка `Send invitation`
+  через `useInviteMember` + inline-форма добавления.
+- `Step3ServicesLive` — `useServices(salonId)` + `useServiceCategories`
+  - editable price/duration onBlur.
+- `Step3Accounting` (live = `<AccountingSettingsCard salonId>`) —
+  переиспользует existing компонент из `/settings/profile`.
+
+Если делаешь новый шаг с реальными данными — следуй этой схеме.
+
 Для любого нового pure helper в `lib/` — пиши unit-тесты (см.
 `onboarding-credentials.test.ts`, `onboarding-prompt-queue.test.ts`,
 `onboarding-add-item.test.ts` как пример). Это даёт regression safety

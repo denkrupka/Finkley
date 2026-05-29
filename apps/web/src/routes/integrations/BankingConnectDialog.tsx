@@ -91,6 +91,15 @@ export function BankingConnectDialog({ salonId, open, onClose, prefillBank }: Pr
           // EB также вернёт `state=<connection_id>` в редиректе — это primary
           // источник, sessionStorage = backup для UX-аналитики.
           sessionStorage.setItem('finkley:banking:pending_connection', res.connection_id)
+          // OAuth-return-onboarding флаг: если юзер сейчас в онбординге —
+          // после Banking callback вернёмся туда, а не в /settings.
+          try {
+            if (window.location.pathname.includes('/onboarding') && salonId) {
+              localStorage.setItem('finkley:oauth-return-onboarding', salonId)
+            }
+          } catch {
+            /* ignore */
+          }
           window.location.href = res.auth_url
         },
         onError: (err) =>

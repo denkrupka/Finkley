@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -86,6 +86,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
   const [ksefOpen, setKsefOpen] = useState(false)
   const { data: connected = [] } = useSalonIntegrations(salonId)
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   // OAuth callback: после возврата с Meta наш edge function редиректит сюда
   // с ?fb=connected или ?ig=connected (success) или ?fb=error&reason=... (failure).
@@ -133,6 +134,18 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
       const next = new URLSearchParams(params)
       for (const k of ['fb', 'ig', 'ig_via_page', 'page', 'account', 'reason']) next.delete(k)
       setParams(next, { replace: true })
+
+      // Если OAuth был запущен из онбординга — возвращаемся туда (флаг
+      // выставляется в MessengerConnectDialog.handleOAuth).
+      try {
+        const returnSalonId = localStorage.getItem('finkley:oauth-return-onboarding')
+        if (returnSalonId) {
+          localStorage.removeItem('finkley:oauth-return-onboarding')
+          navigate(`/onboarding?salon=${returnSalonId}`, { replace: true })
+        }
+      } catch {
+        /* ignore */
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.get('fb'), params.get('ig')])

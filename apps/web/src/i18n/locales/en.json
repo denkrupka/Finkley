@@ -212,7 +212,8 @@
       "company_label": "Legal company name",
       "company_placeholder": "e.g. JANE DOE BEAUTY",
       "mode_label": "How do you do accounting?",
-      "providers_title": "Connect an accounting system"
+      "providers_title": "Connect an accounting system",
+      "privacy_note": "This data is confidential. We don't share it with third parties — it's needed only to automate delivery of invoices and receipts to your accountant."
     },
     "step_integrations": {
       "title": "Which integrations to connect?",
@@ -246,8 +247,13 @@
       "name_placeholder": "Specialist name",
       "percent_label": "% of revenue",
       "add": "Add specialist",
+      "added": "Specialist added",
       "invite_need_email": "Enter an email to invite",
-      "invite_label": "Invite to the portal after creation"
+      "invite_label": "Invite to the portal after creation",
+      "invite_send": "Send invitation",
+      "invite_sent": "Invitation sent to {{email}}",
+      "invite_already_sent": "Invitation already sent",
+      "empty_hint": "Empty for now. If you just connected Booksy — specialists will pull in 2-5 minutes. You can add manually below."
     },
     "step3": {
       "title": "What you offer",
@@ -263,7 +269,9 @@
       "ocr_collected": "In import queue: {{count}} visits",
       "ocr_toggle": "I log bookings manually → upload a journal photo",
       "add_in_category": "Add a service to this category",
-      "add_category": "New category"
+      "add_category": "New category",
+      "no_category": "Uncategorized",
+      "empty_hint": "Empty for now. After Booksy login services will pull in 2-5 minutes. You can add manually."
     },
     "step4": {
       "title": "Expense categories",
@@ -4681,6 +4689,24 @@
       }
     },
     "page": {
+      "dashboard": {
+        "kpi": {
+          "title": "5 main KPIs",
+          "body": "Revenue, profit, occupancy, return rate, register balance. Click any to see a detailed breakdown for the period."
+        },
+        "insights": {
+          "title": "AI assistant sees",
+          "body": "AI analyses your visits, expenses, reviews and suggests what's important right now. Snooze or act directly from here."
+        },
+        "fab": {
+          "title": "Quick add",
+          "body": "Big button in the bottom-right — add a visit, expense or sale in one click. Plus: receipt photo (OCR), barcode scan."
+        },
+        "notifications": {
+          "title": "Notifications",
+          "body": "Bell at the top — new messages, overdue payments, low stock, AI insights. Click takes you to the source."
+        }
+      },
       "expenses": {
         "tabs": {
           "title": "Three expense tabs",
