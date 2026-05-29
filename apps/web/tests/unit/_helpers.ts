@@ -10,7 +10,16 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 export const SUPABASE_URL = process.env.VITE_SUPABASE_URL_TEST || 'http://127.0.0.1:54321'
 export const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY_TEST || ''
 export const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY_TEST || ''
-export const shouldSkip = !SUPABASE_ANON || !SUPABASE_SERVICE
+
+/** Явный opt-out для локальных запусков `pnpm test`. Когда юзер делает
+ *  full-suite run после большого рефактора, эти интеграционные тесты
+ *  ловят `AuthApiError: Database error creating new user` от Supabase
+ *  staging (rate-limit на 30/час) и маскируют реальные регрессии в
+ *  pure-unit тестах. Set SKIP_INTEGRATION_TESTS=1 (или просто не задавай
+ *  *_TEST env) — тесты скипнутся через describe.skipIf(shouldSkip). */
+const SKIP_INTEGRATION = process.env.SKIP_INTEGRATION_TESTS === '1'
+
+export const shouldSkip = SKIP_INTEGRATION || !SUPABASE_ANON || !SUPABASE_SERVICE
 
 let counter = 0
 export function makeClient(key: string, prefix = 'test'): SupabaseClient {

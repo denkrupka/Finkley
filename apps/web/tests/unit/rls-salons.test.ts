@@ -19,13 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Локальный Supabase URL по умолчанию (от supabase start)
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL_TEST || 'http://127.0.0.1:54321'
-const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY_TEST || ''
-const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY_TEST || ''
-
-// Skip если нет локального Supabase или ключей
-const shouldSkip = !SUPABASE_ANON || !SUPABASE_SERVICE
+import { SUPABASE_ANON, SUPABASE_SERVICE, SUPABASE_URL, shouldSkip } from './_helpers'
 
 interface TestUser {
   id: string

@@ -15,10 +15,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL_TEST || 'http://127.0.0.1:54321'
-const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY_TEST || ''
-const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY_TEST || ''
-const shouldSkip = !SUPABASE_ANON || !SUPABASE_SERVICE
+import { SUPABASE_SERVICE, SUPABASE_URL, shouldSkip } from './_helpers'
 
 let counter = 0
 function makeClient(key: string): SupabaseClient {
