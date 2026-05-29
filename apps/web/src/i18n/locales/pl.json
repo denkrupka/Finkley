@@ -557,16 +557,18 @@
       "expenses": "Zobacz realny zysk →"
     },
     "welcome": {
-      "title": "Cześć — dokonałeś ważnego wyboru",
-      "subtitle_v2": "Co Finkley zrobi za Ciebie:",
-      "p1": "Wszystko w jednym — koniec rutyny",
-      "p2": "Dane zaszyfrowane",
-      "p3": "Bank → wydatki same",
-      "p4": "Realny zysk live",
-      "p5": "Wszystkie wiadomości razem",
-      "p6": "Analiza konkurencji",
-      "p7": "5★ → Google, 1-4 → Ty",
-      "p8": "AI-asystent na bieżąco"
+      "title": "Witaj w Finkley",
+      "subtitle_v2": "Tutaj zobaczysz nie tylko dzienny przychód — ale realny obraz swojego biznesu. Oto co znajdziesz wewnątrz.",
+      "dashboard_title": "Dashboard — główne wskaźniki salonu",
+      "dashboard_body": "Wizyty, przychody i zysk w jednym miejscu. Aktywuje się od razu po podłączeniu importu wizyt.",
+      "expenses_title": "Wydatki pod kontrolą",
+      "expenses_body": "Czynsz, materiały, wynagrodzenia, inne koszty — zawsze widać dokąd idą pieniądze i w jakich kategoriach.",
+      "reports_title": "Raporty",
+      "reports_body": "Wizualna analityka klientów, mistrzów, usług i konkurencji — bez tabel i zbędnych pytań.",
+      "messenger_title": "Komunikator",
+      "messenger_body": "Rozmawiaj z klientami w jednym oknie — podłącz wszystkie kanały, żadnych zgubionych wiadomości.",
+      "ai_title": "AI wyjaśnia zmiany",
+      "ai_body": "Zysk spadł lub wzrósł — system napisze dlaczego, bez skomplikowanych raportów i pytań do księgowego."
     }
   },
   "nav": {

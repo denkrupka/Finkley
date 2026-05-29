@@ -557,16 +557,18 @@
       "expenses": "See real profit →"
     },
     "welcome": {
-      "title": "Hi — you've made an important choice",
-      "subtitle_v2": "What Finkley will do for you:",
-      "p1": "All in one — end of routine",
-      "p2": "Data is encrypted",
-      "p3": "Bank → expenses on their own",
-      "p4": "Real profit, live",
-      "p5": "All messages together",
-      "p6": "Competitor analysis",
-      "p7": "5★ → Google, 1-4 → you",
-      "p8": "AI assistant in the loop"
+      "title": "Welcome to Finkley",
+      "subtitle_v2": "Here you'll see not just daily revenue — but a real picture of your business. Here's what's inside.",
+      "dashboard_title": "Dashboard — the key salon metrics",
+      "dashboard_body": "Visits, revenue and profit in one place. Activates as soon as you import visits.",
+      "expenses_title": "Expenses under control",
+      "expenses_body": "Rent, supplies, salaries, other costs — always clear where money goes and by what category.",
+      "reports_title": "Reports",
+      "reports_body": "Visual analytics on clients, specialists, services and competitors — no spreadsheets, no extra questions.",
+      "messenger_title": "Messenger",
+      "messenger_body": "Talk to clients from one window — connect all channels, no more lost conversations.",
+      "ai_title": "AI explains changes",
+      "ai_body": "Profit went up or down — the system tells you why, no complex reports, no calls to the accountant."
     }
   },
   "nav": {
