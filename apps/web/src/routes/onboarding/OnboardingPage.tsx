@@ -535,9 +535,10 @@ export function OnboardingPage() {
       }
     }
 
-    if (Object.keys(extraPatch).length > 0) {
-      await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
-    }
+    // ADR-030 — отмечаем салон как «прошёл финальный submit» (не brown).
+    // Делается всегда — без этого cleanup-cron удалит салон через 7 дней.
+    extraPatch.onboarding_completed_at = new Date().toISOString()
+    await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
 
     // T108 — импорт OCR-визитов как реальных записей в visits таблицу.
     // visit_at: парсим из date или ставим now() как fallback.
