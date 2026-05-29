@@ -17,10 +17,11 @@ function makeBrandIcon(provider: OnboardingIntegrationType): LucideIcon {
   return Icon as unknown as LucideIcon
 }
 const BooksyIcon = makeBrandIcon('booksy')
-const ICalIcon = makeBrandIcon('ical')
+const FreshaIcon = makeBrandIcon('fresha')
+const TreatwellIcon = makeBrandIcon('treatwell')
+const YclientsIcon = makeBrandIcon('yclients')
 const InstagramIcon = makeBrandIcon('instagram')
 const FacebookIcon = makeBrandIcon('facebook')
-const WhatsappIcon = makeBrandIcon('whatsapp')
 const TelegramIcon = makeBrandIcon('telegram')
 const BankingIcon = makeBrandIcon('banking')
 
@@ -117,6 +118,10 @@ export type OnboardingIntegration =
   | 'fakturownia'
   | 'ifirma'
   | 'infakt'
+  // Booking-провайдеры в очереди (coming_soon в UI)
+  | 'fresha'
+  | 'treatwell'
+  | 'yclients'
 
 export type OnboardingState = {
   // Шаг 0 — путь (быстрый/полный). null = ещё не выбран.
@@ -920,20 +925,30 @@ export function OnboardingPage() {
                       title: 'Booksy',
                       benefit:
                         'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
+                      status: 'available',
                     },
                     {
-                      id: 'whatsapp',
-                      icon: WhatsappIcon,
-                      title: 'WhatsApp Business',
+                      id: 'fresha',
+                      icon: FreshaIcon,
+                      title: 'Fresha',
                       benefit:
-                        'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
+                        'Глобальная платформа бронирования (UK / EU / US). Бесплатная для салонов.',
+                      status: 'coming_soon',
                     },
                     {
-                      id: 'ical',
-                      icon: ICalIcon,
-                      title: 'Google / Apple / Outlook Calendar',
+                      id: 'treatwell',
+                      icon: TreatwellIcon,
+                      title: 'Treatwell',
+                      benefit: 'Британская и европейская marketplace бронирования салонов красоты.',
+                      status: 'coming_soon',
+                    },
+                    {
+                      id: 'yclients',
+                      icon: YclientsIcon,
+                      title: 'YCLIENTS',
                       benefit:
-                        'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
+                        'Популярная платформа в Украине, России и Казахстане. CRM + онлайн-запись.',
+                      status: 'coming_soon',
                     },
                   ]}
                 />
@@ -947,20 +962,6 @@ export function OnboardingPage() {
                       title: 'Booksy',
                       benefit:
                         'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
-                    },
-                    {
-                      id: 'whatsapp',
-                      icon: WhatsappIcon,
-                      title: 'WhatsApp Business',
-                      benefit:
-                        'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
-                    },
-                    {
-                      id: 'ical',
-                      icon: ICalIcon,
-                      title: 'Google / Apple / Outlook Calendar',
-                      benefit:
-                        'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
                     },
                   ]}
                   selected={state.selected_integrations}
@@ -1189,6 +1190,8 @@ export function OnboardingPage() {
                 summary={{ salonName: state.name }}
                 benchmarksOptIn={state.benchmarks_opt_in}
                 onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
+                subscribeAfterSubmit={state.subscribe_after_submit}
+                onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
                 path={state.path}
                 onSwitchToFull={() => {
                   patch('path', 'full')

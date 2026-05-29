@@ -1,13 +1,16 @@
 import {
   AlertTriangle,
   Banknote,
+  Bell,
   CalendarClock,
   CreditCard,
   Landmark,
+  LineChart,
   Package,
   PiggyBank,
   Receipt,
   ScanLine,
+  Sparkles,
   TrendingUp,
 } from 'lucide-react'
 
@@ -83,6 +86,35 @@ export const FINANCE_TOUR_STEPS: TourStep[] = [
     icon: Banknote,
     titleKey: 'tour.page.finance.transfers.title',
     bodyKey: 'tour.page.finance.transfers.body',
+  },
+]
+
+export const DASHBOARD_TOUR_STEPS: TourStep[] = [
+  {
+    id: 'kpi',
+    icon: LineChart,
+    titleKey: 'tour.page.dashboard.kpi.title',
+    bodyKey: 'tour.page.dashboard.kpi.body',
+  },
+  {
+    id: 'insights',
+    icon: Sparkles,
+    titleKey: 'tour.page.dashboard.insights.title',
+    bodyKey: 'tour.page.dashboard.insights.body',
+  },
+  {
+    id: 'fab',
+    icon: Receipt,
+    titleKey: 'tour.page.dashboard.fab.title',
+    bodyKey: 'tour.page.dashboard.fab.body',
+    target: '[data-tour="fab-add"]',
+  },
+  {
+    id: 'notifications',
+    icon: Bell,
+    titleKey: 'tour.page.dashboard.notifications.title',
+    bodyKey: 'tour.page.dashboard.notifications.body',
+    target: '[data-tour="bell"]',
   },
 ]
 

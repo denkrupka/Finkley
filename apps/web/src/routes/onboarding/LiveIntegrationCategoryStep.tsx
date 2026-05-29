@@ -24,6 +24,8 @@ export type LiveIntegrationItem = {
   icon: LucideIcon
   title: string
   benefit: string
+  /** Если 'coming_soon' — карточка disabled, badge «Скоро». */
+  status?: 'available' | 'coming_soon'
 }
 
 type MessengerChannel = 'instagram' | 'facebook' | 'whatsapp'
@@ -128,6 +130,7 @@ export function LiveIntegrationCategoryStep({
         {items.map((it) => {
           const connected = isConnected(it.id)
           const Icon = it.icon
+          const isComingSoon = it.status === 'coming_soon'
           return (
             <div
               key={it.id}
@@ -135,7 +138,9 @@ export function LiveIntegrationCategoryStep({
                 'flex items-start gap-3 rounded-xl border-2 p-3 transition-colors',
                 connected
                   ? 'border-brand-sage bg-brand-sage-soft/30'
-                  : 'border-border bg-card hover:border-brand-teal-deep/40',
+                  : isComingSoon
+                    ? 'border-border bg-muted/30 opacity-70'
+                    : 'border-border bg-card hover:border-brand-teal-deep/40',
               )}
             >
               <div
@@ -164,6 +169,10 @@ export function LiveIntegrationCategoryStep({
                 <span className="bg-brand-sage mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                   <Check className="size-3" strokeWidth={2.5} />
                   {t('integrations.status.connected')}
+                </span>
+              ) : isComingSoon ? (
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  {t('integrations.status.coming_soon')}
                 </span>
               ) : (
                 <button

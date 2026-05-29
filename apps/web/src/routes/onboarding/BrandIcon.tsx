@@ -169,6 +169,40 @@ export function BrandIcon({ provider, className = 'size-5' }: Props) {
           </text>
         </svg>
       )
+    case 'fresha':
+      return (
+        // Fresha — оранжевый квадрат с белой "F".
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#FF7657" />
+          <path d="M8 6.5h8v2.4h-5.2v3.1h4.6v2.3h-4.6V19H8V6.5Z" fill="#fff" />
+        </svg>
+      )
+    case 'treatwell':
+      return (
+        // Treatwell — фиолетовый квадрат с белой "tw".
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#5B3FBF" />
+          <text
+            x="12"
+            y="15.5"
+            textAnchor="middle"
+            fontSize="9"
+            fontWeight="800"
+            fill="#fff"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            tw
+          </text>
+        </svg>
+      )
+    case 'yclients':
+      return (
+        // YCLIENTS — синий квадрат с белой "Y".
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#5183F5" />
+          <path d="M6.5 6.5h3.1l2.4 5.4 2.4-5.4h3.1L13 14v5h-2.6v-5L6.5 6.5Z" fill="#fff" />
+        </svg>
+      )
     case 'ocr_notebook':
       return (
         // Камера / OCR
@@ -213,6 +247,9 @@ export function isFullColorBrand(provider: OnboardingIntegration): boolean {
     case 'fakturownia':
     case 'ifirma':
     case 'infakt':
+    case 'fresha':
+    case 'treatwell':
+    case 'yclients':
       return true
     default:
       // instagram/facebook/whatsapp/telegram — simple-icons currentColor
@@ -245,6 +282,12 @@ export function brandColor(provider: OnboardingIntegration): string {
       return '#00B5AD'
     case 'infakt':
       return '#7B68EE'
+    case 'fresha':
+      return '#FF7657'
+    case 'treatwell':
+      return '#5B3FBF'
+    case 'yclients':
+      return '#5183F5'
     case 'banking':
       return '#0F766E'
     case 'ical':

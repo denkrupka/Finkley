@@ -71,6 +71,9 @@ const PROVIDER_NAME: Record<OnboardingIntegration, string> = {
   fakturownia: 'Fakturownia',
   ifirma: 'iFirma',
   infakt: 'inFakt',
+  fresha: 'Fresha',
+  treatwell: 'Treatwell',
+  yclients: 'YCLIENTS',
 }
 
 /** Сколько шагов «что произойдёт» для каждой интеграции — 3 у всех. */
@@ -91,6 +94,9 @@ const PROVIDER_HAS_HINT: Record<OnboardingIntegration, boolean> = {
   fakturownia: false,
   ifirma: false,
   infakt: false,
+  fresha: false,
+  treatwell: false,
+  yclients: false,
 }
 
 export function ConnectIntegrationDialog({

@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { DASHBOARD_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
+import { PageTour } from '@/components/onboarding-tour/PageTour'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import {
   currentMonthPeriod,
@@ -288,6 +290,8 @@ export function DashboardPage() {
       </div>
 
       {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
+
+      <PageTour name="dashboard" steps={DASHBOARD_TOUR_STEPS} force={params.get('tour') === '1'} />
 
       {/* Сворачиваемые блоки — единственное что осталось с прошлой версии */}
       <CollapsibleSection id="lowStock" title={t('dashboard.collapsible.low_stock')} defaultOpen>

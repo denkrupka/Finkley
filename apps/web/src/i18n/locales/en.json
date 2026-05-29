@@ -118,7 +118,8 @@
       "password_too_short": "Password must be at least 8 characters",
       "password_confirm_required": "Please confirm your password",
       "passwords_do_not_match": "Passwords don't match",
-      "email_invalid": "Invalid email format"
+      "email_invalid": "Invalid email format",
+      "email_already_used": "This email is already registered. Sign in via «Login» or use a different address."
     }
   },
   "onboarding": {
@@ -2641,6 +2642,7 @@
     },
     "toast_saved_stub": "Integration in development — coming soon 🛠",
     "toast_connected": "✅ Connected to {{name}}",
+    "toast_sync_started": "{{name}} sync started — specialists, services and visits will be pulled in the background.",
     "toast_synced": "Synced: +{{staff}} specialists, +{{services}} services, +{{visits}} visits",
     "toast_disconnected": "Integration disconnected",
     "last_sync_at": "Last sync: {{date}}",
@@ -2670,6 +2672,7 @@
     "locked_hint": "Coming soon",
     "privacy_note": "All passwords are encrypted on the server with AES-256 and never stored in plain text. You can disconnect any time — the data is deleted.",
     "security_note": "We use access only to read visits and clients. We don't write anything to your account on the platform.",
+    "security_note_accounting": "Token/access is used only to read invoices and expenses. We don't write anything to your accounting portal. Data is confidential and not shared with third parties — needed only to automatically deliver receipts and invoices to your accountant.",
     "fields": {
       "email": "Account email",
       "email_or_phone": "Account email or phone",

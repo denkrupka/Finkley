@@ -118,7 +118,8 @@
       "password_too_short": "Hasło musi mieć co najmniej 8 znaków",
       "password_confirm_required": "Potwierdź hasło",
       "passwords_do_not_match": "Hasła nie są takie same",
-      "email_invalid": "Nieprawidłowy format email"
+      "email_invalid": "Nieprawidłowy format email",
+      "email_already_used": "Ten email jest już zarejestrowany. Zaloguj się przez «Login» lub użyj innego adresu."
     }
   },
   "onboarding": {
@@ -2641,6 +2642,7 @@
     },
     "toast_saved_stub": "Integracja w przygotowaniu — wkrótce zadziała 🛠",
     "toast_connected": "✅ Konto {{name}} podłączone",
+    "toast_sync_started": "Synchronizacja {{name}} uruchomiona — pracownicy, usługi i wizyty zostaną pobrane w tle.",
     "toast_synced": "Synchronizacja: +{{staff}} specjalistów, +{{services}} usług, +{{visits}} wizyt",
     "toast_disconnected": "Integracja odłączona",
     "last_sync_at": "Ostatnia synchronizacja: {{date}}",
@@ -2670,6 +2672,7 @@
     "locked_hint": "Wkrótce dostępne",
     "privacy_note": "Wszystkie hasła są szyfrowane na serwerze z użyciem AES-256, nigdzie nie są przechowywane w postaci jawnej. Integrację można odłączyć w każdej chwili — dane zostaną usunięte.",
     "security_note": "Dostęp używamy wyłącznie do odczytu wizyt i klientów. Niczego nie zapisujemy na Twoim koncie na platformie.",
+    "security_note_accounting": "Token/dostęp wykorzystywany jest wyłącznie do odczytu faktur i wydatków. Niczego nie zapisujemy w Twoim portalu księgowym. Dane są poufne i nie są udostępniane stronom trzecim — potrzebne tylko do automatycznego dostarczania paragonów i faktur księgowemu.",
     "fields": {
       "email": "Email z konta",
       "email_or_phone": "Email lub telefon z konta",
