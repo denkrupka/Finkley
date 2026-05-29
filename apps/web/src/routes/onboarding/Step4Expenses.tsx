@@ -300,6 +300,11 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
             }
             // T142 — per-category колонки. fixed/taxes — добавляем селектор
             // period (мес/квартал/год). cash_registers — селектор cash/non-cash.
+            // Mobile audit (2026-05-30): фикс. сетка `1fr 140px 100px 44px`
+            // (≈384px) переполняется на iPhone 375px. На <sm используем
+            // flex-wrap (label на всю ширину, остальные элементы flex-wrap
+            // ниже). На ≥sm применяем оригинальный grid через CSS-переменную
+            // --sm-cols (см. .step4-row в globals.css).
             const cols = hasPeriod
               ? '1fr 140px 100px 44px'
               : hasCashKind
@@ -308,13 +313,10 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
             return (
               <div
                 key={it.id}
-                className="grid grid-cols-1 gap-2 sm:gap-2.5"
+                className="flex flex-col gap-2 sm:gap-2.5"
                 style={{ paddingLeft: it.depth ? 16 : 0 }}
               >
-                <div
-                  className="grid grid-cols-1 gap-2 sm:gap-2.5"
-                  style={{ gridTemplateColumns: cols }}
-                >
+                <div className="step4-row" style={{ ['--sm-cols' as 'gridTemplateColumns']: cols }}>
                   <Input
                     value={it.label}
                     onChange={(e) => updateItem(activeCategory, it.id, { label: e.target.value })}

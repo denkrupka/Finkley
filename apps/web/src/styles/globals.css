@@ -223,3 +223,30 @@
 .reviews-dots > span:nth-child(3) {
   animation-delay: 0.3s;
 }
+
+/*
+ * Step4Expenses row layout (mobile-audit 2026-05-30).
+ * На мобиле (<sm = <640px) — flex-wrap, label на всю ширину, остальные
+ * элементы (amount 140px, period 100px, kind 130px, remove 44px)
+ * переносятся на следующую строку. На sm+ — фиксированная сетка через
+ * CSS-переменную --sm-cols (задаётся inline-стилем в JSX).
+ */
+.step4-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.step4-row > :first-child {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+@media (min-width: 640px) {
+  .step4-row {
+    display: grid;
+    grid-template-columns: var(--sm-cols);
+    gap: 0.625rem;
+  }
+  .step4-row > :first-child {
+    flex: initial;
+  }
+}

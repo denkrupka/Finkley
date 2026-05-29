@@ -92,6 +92,35 @@ export const DialogDescription = forwardRef<
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
-export function DialogFooter({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('flex flex-col gap-2 px-5 pb-5 pt-2', className)}>{children}</div>
+/**
+ * DialogFooter. По умолчанию — обычный footer в конце формы.
+ *
+ * Mobile audit (2026-05-30): пропс `sticky` делает футер прилипшим к низу
+ * scroll-area (DialogContent сам scroll-area через `overflow-y-auto`).
+ * Использовать в длинных формах (ExpenseFormModal, QuickEntryModal) чтобы
+ * на iPhone (375-414px) кнопка Submit была видна без скролла к самому низу.
+ *
+ * Без `sticky` — поведение как раньше. Opt-in, чтобы не ломать диалоги
+ * которые сами стилизуют свой footer.
+ */
+export function DialogFooter({
+  children,
+  className,
+  sticky = false,
+}: {
+  children: ReactNode
+  className?: string
+  sticky?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-2 px-5 pb-5 pt-2',
+        sticky && 'bg-card/95 border-border sticky bottom-0 z-10 border-t pt-3 backdrop-blur-sm',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
 }

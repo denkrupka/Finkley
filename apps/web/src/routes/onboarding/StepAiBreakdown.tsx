@@ -108,6 +108,13 @@ export function StepAiBreakdown({
         title: 'Где поднять цены',
         body: 'Сравнит с конкурентами Google + Booksy и подскажет диапазон.',
       },
+      {
+        icon: Sparkles,
+        tone: 'gold',
+        title: 'Кого с кем апсейлить',
+        body: 'Соберёт пары услуг которые ходят вместе → бандл-цена на ресепшене.',
+        chip: '+15% AOV',
+      },
     ],
     staff: [
       {
@@ -128,6 +135,13 @@ export function StepAiBreakdown({
         tone: 'sage',
         title: 'Свои vs салона',
         body: 'Индекс лояльности — критично для удержания персонала.',
+      },
+      {
+        icon: TrendingUp,
+        tone: 'navy',
+        title: 'Загрузка кресла',
+        body: 'Кто пустует, у кого окна — авто-оффер в Telegram/Instagram.',
+        chip: '+10% часов',
       },
     ],
     clients: [
@@ -150,6 +164,13 @@ export function StepAiBreakdown({
         title: 'Кого теряешь после первого',
         body: 'Главный leak — 60% новеньких не возвращаются. Где конкретно.',
       },
+      {
+        icon: Users,
+        tone: 'gold',
+        title: 'Кто приводит друзей',
+        body: 'Топ-адвокаты бренда — им VIP-условия и реферальная программа.',
+        chip: 'Органический рост',
+      },
     ],
     reviews: [
       {
@@ -171,15 +192,35 @@ export function StepAiBreakdown({
         body: 'Автозапрос отзыва после визита. Защита репутации.',
         chip: 'Рост в Google',
       },
+      {
+        icon: Star,
+        tone: 'navy',
+        title: 'Профиль каждого мастера',
+        body: 'Кого хвалят персонально — выведет в карточку Booksy/Instagram.',
+        chip: 'Бренд мастера',
+      },
     ],
   }
 
   const HeroIcon = heroIcon[topic]
   const staticCards = cards[topic]
 
-  // Если salonId есть и AI вернул insights — рендерим реальный анализ.
-  // Иначе fallback на статичный preview (legacy).
-  const aiInsights = ai.data?.insights ?? null
+  // T228 — гарантируем РОВНО 4 карточки. Если AI вернул меньше — добиваем
+  // статичными (из локального списка). Если больше — слайсим до 4.
+  // Это чтобы UI всегда выглядел консистентно: 2×2 grid с инсайтами,
+  // а не «иногда 3, иногда 4».
+  const aiInsightsRaw = ai.data?.insights ?? null
+  const merged: Array<{ title: string; body: string; chip?: string }> = []
+  if (aiInsightsRaw && aiInsightsRaw.length > 0) {
+    for (const c of aiInsightsRaw.slice(0, 4)) {
+      merged.push({ title: c.title, body: c.body, chip: c.chip })
+    }
+    // Если AI вернул < 4 — добиваем из staticCards по позиции.
+    for (let i = merged.length; i < 4; i += 1) {
+      const s = staticCards[i]!
+      merged.push({ title: s.title, body: s.body, chip: s.chip })
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -196,13 +237,13 @@ export function StepAiBreakdown({
           <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
           <p className="text-muted-foreground text-sm">{t('onboarding.wow.ai_loading')}</p>
         </div>
-      ) : aiInsights && aiInsights.length > 0 ? (
+      ) : merged.length === 4 ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {aiInsights.map((c, i) => (
+          {merged.map((c, i) => (
             <BreakdownCard
               key={i}
-              icon={staticCards[i % staticCards.length]!.icon}
-              tone={staticCards[i % staticCards.length]!.tone}
+              icon={staticCards[i]!.icon}
+              tone={staticCards[i]!.tone}
               title={c.title}
               body={c.body}
               chip={c.chip}
@@ -211,7 +252,7 @@ export function StepAiBreakdown({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {staticCards.map((c, i) => (
+          {staticCards.slice(0, 4).map((c, i) => (
             <BreakdownCard key={i} {...c} />
           ))}
         </div>

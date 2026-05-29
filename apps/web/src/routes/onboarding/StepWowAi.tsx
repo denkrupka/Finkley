@@ -314,7 +314,9 @@ export function StepWowAi({
       </div>
       {/* T125 #2 — AI-инсайты (loading skeleton, потом реальный результат
           от Claude Haiku 4.5). На ошибке — graceful: показываем только
-          rules-based карточки ниже. */}
+          rules-based карточки ниже.
+          T228 — добиваем до РОВНО 4 AI-карточек из rules-based если AI
+          вернул меньше. Это критично для consistent UI: всегда 2×2 grid. */}
       {aiPreview.isLoading ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-2 rounded-xl border border-dashed p-3">
           <Loader2 className="text-brand-teal-deep size-4 animate-spin" strokeWidth={2} />
@@ -322,28 +324,49 @@ export function StepWowAi({
         </div>
       ) : aiPreview.data?.insights && aiPreview.data.insights.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {aiPreview.data.insights.slice(0, 4).map((insight: AiInsight, i: number) => {
-            const Icon = ICON_MAP[insight.icon] ?? Sparkles
-            const tone = AI_TONES[i % AI_TONES.length] ?? 'navy'
-            return (
+          {(() => {
+            const aiCards = aiPreview.data.insights.slice(0, 4)
+            const padded: Array<{
+              key: string
+              icon: LucideIcon
+              tone: (typeof AI_TONES)[number]
+              eyebrow: string
+              title: string
+              body: string
+              chip?: string
+            }> = aiCards.map((insight, i) => ({
+              key: `ai-${i}`,
+              icon: ICON_MAP[insight.icon] ?? Sparkles,
+              tone: AI_TONES[i % AI_TONES.length] ?? 'navy',
+              eyebrow: t('onboarding.wow.ai_eyebrow'),
+              title: insight.title,
+              body: insight.body,
+            }))
+            // Добиваем из rules-based cards если AI вернул < 4
+            for (let i = padded.length; i < 4 && i - aiCards.length < cards.length; i += 1) {
+              const c = cards[i - aiCards.length]!
+              padded.push({ key: `pad-${i}`, ...c })
+            }
+            return padded.map((c) => (
               <WowCard
-                key={`ai-${i}`}
-                icon={Icon}
-                tone={tone}
-                eyebrow={t('onboarding.wow.ai_eyebrow')}
-                title={insight.title}
-                body={insight.body}
+                key={c.key}
+                icon={c.icon}
+                tone={c.tone}
+                eyebrow={c.eyebrow}
+                title={c.title}
+                body={c.body}
+                chip={c.chip}
               />
-            )
-          })}
+            ))
+          })()}
         </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {cards.map((c, i) => (
-          <WowCard key={i} {...c} />
-        ))}
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {cards.slice(0, 4).map((c, i) => (
+            <WowCard key={i} {...c} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

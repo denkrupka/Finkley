@@ -1205,7 +1205,10 @@ export function QuickEntryModal({
           </div>
         </form>
 
-        <DialogFooter className={isEdit ? 'sm:justify-between' : undefined}>
+        {/* Mobile audit (2026-05-30): sticky footer на iPhone (375-414px) —
+            форма с услугами и временем длинная, кнопка Сохранить теряется
+            внизу при скролле. */}
+        <DialogFooter sticky className={isEdit ? 'sm:justify-between' : undefined}>
           {isEdit && editVisit ? (
             <>
               <Button

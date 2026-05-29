@@ -1630,7 +1630,10 @@ export function ExpenseFormModal({
           ) : null}
         </form>
 
-        <DialogFooter>
+        {/* Mobile audit (2026-05-30): sticky footer чтобы кнопка Save была
+            видна без скролла к концу формы на iPhone (375-414px). Форма
+            длинная (40+ полей) — иначе кнопка теряется. */}
+        <DialogFooter sticky>
           <Button
             type="button"
             size="lg"

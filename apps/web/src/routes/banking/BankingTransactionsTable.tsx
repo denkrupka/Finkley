@@ -387,10 +387,16 @@ export function BankingTransactionsTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          {/* Mobile audit (2026-05-30): min-w на таблице — чтобы 7 колонок
+              не сжимались в кашу. Sticky первая колонка (Дата) + bg-card —
+              при горизонтальном скролле на iPhone (375-414px) дата
+              остаётся видна слева как ориентир. */}
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-border text-muted-foreground border-b text-xs font-semibold uppercase tracking-wider">
-                <th className="px-4 py-2 text-left">{t('banking.transactions.col_date')}</th>
+                <th className="bg-card sticky left-0 z-10 px-4 py-2 text-left">
+                  {t('banking.transactions.col_date')}
+                </th>
                 <th className="px-4 py-2 text-left">
                   {t('banking.transactions.col_counterparty')}
                 </th>
@@ -497,12 +503,21 @@ function TransactionRow({
     <tr
       onClick={isPickerMode ? onLink : undefined}
       className={cn(
-        'border-border hover:bg-muted/30 border-b last:border-b-0',
+        'border-border hover:bg-muted/30 group border-b last:border-b-0',
         tx.needs_review && 'bg-amber-50/40',
         isPickerMode && 'cursor-pointer',
       )}
     >
-      <td className="text-foreground whitespace-nowrap px-4 py-2.5 text-xs">
+      {/* Mobile audit (2026-05-30): sticky первая колонка + bg-card
+          (needs_review кейс наследуем явный amber через ternary, иначе
+          в Safari sticky-ячейке цвет ряда теряется). z-[5] меньше
+          z-10 header'a — заголовок остаётся поверх. */}
+      <td
+        className={cn(
+          'text-foreground sticky left-0 z-[5] whitespace-nowrap px-4 py-2.5 text-xs',
+          tx.needs_review ? 'bg-amber-50' : 'bg-card group-hover:bg-muted/30',
+        )}
+      >
         {formatExpenseDate(tx.executed_at)}
       </td>
       <td className="text-foreground px-4 py-2.5 text-sm font-medium">

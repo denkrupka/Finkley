@@ -29,6 +29,7 @@ import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
 import { useStaff, type WeeklySchedule } from '@/hooks/useStaff'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useToggleStaffCalendarVisibility } from '@/hooks/useStaffMutations'
 import { useUpdateVisit, useVisits, type VisitRow } from '@/hooks/useVisits'
 import { cn } from '@/lib/utils/cn'
@@ -111,6 +112,13 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const dayStart = startOfDay(cursor)
   const dayEnd = addDays(dayStart, 1)
   const range = { start: dayStart.toISOString(), end: dayEnd.toISOString() }
+
+  // Mobile audit (2026-05-30): на iPhone (<sm = <640px) сжимаем колонку
+  // мастера и time-axis чтобы 2 мастера помещались без горизонтального
+  // скролла. 64+200*2=464 > 375. После: 48+140*2=328 ≈ 375-padding.
+  const isMobile = useIsMobile()
+  const colWidthBase = isMobile ? 140 : COL_WIDTH_PX
+  const timeAxisWidth = isMobile ? 48 : TIME_AXIS_WIDTH_PX
 
   // Booksy day-sync: на смену дня — silent autosync (debounce 600ms +
   // rate-limit 8s одного и того же дня). На кнопке «Синхронизировать»
@@ -375,8 +383,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         isFullscreen ? 'bg-background fixed inset-0 z-[60] flex-1' : 'flex-1',
       )}
     >
-      {/* Шапка с навигацией по дням */}
-      <div className="border-border bg-card flex items-center justify-between gap-3 border-b px-4 py-3">
+      {/* Шапка с навигацией по дням. Mobile audit (2026-05-30):
+          на iPhone (375px) уменьшаем gap/padding и сокращаем заголовок
+          (см. ниже) — иначе навигация и кнопка fullscreen не помещаются. */}
+      <div className="border-border bg-card flex items-center justify-between gap-1.5 border-b px-2 py-3 sm:gap-3 sm:px-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setCursor(addDays(cursor, -1))}>
             <ChevronLeft className="size-4" strokeWidth={2} />
@@ -410,8 +420,13 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
             <ChevronRight className="size-4" strokeWidth={2} />
           </Button>
         </div>
-        <h2 className="text-brand-navy text-base font-bold tracking-tight">
-          {format(cursor, 'EEEE, d MMMM yyyy', { locale: getDateLocale() })}
+        <h2 className="text-brand-navy truncate text-sm font-bold tracking-tight sm:text-base">
+          {/* Mobile audit: на iPhone короткая дата `6 мая`, на sm+ —
+              полная `Понедельник, 6 мая 2026`. */}
+          <span className="sm:hidden">{format(cursor, 'd MMM', { locale: getDateLocale() })}</span>
+          <span className="hidden sm:inline">
+            {format(cursor, 'EEEE, d MMMM yyyy', { locale: getDateLocale() })}
+          </span>
         </h2>
         <Button
           variant="outline"
@@ -456,7 +471,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                 // minmax(COL_WIDTH_PX, 1fr) — когда мастеров мало, колонки
                 // растягиваются на всю доступную ширину; когда много —
                 // удерживают минимальную и появляется горизонтальный скролл.
-                gridTemplateColumns: `${TIME_AXIS_WIDTH_PX}px repeat(${staff.length}, minmax(${COL_WIDTH_PX}px, 1fr))`,
+                // Mobile audit (2026-05-30): на <sm base 140px (вместо 200),
+                // time-axis 48 (вместо 64) — чтобы 2 мастера помещались
+                // в 375px без horizontal-scroll.
+                gridTemplateColumns: `${timeAxisWidth}px repeat(${staff.length}, minmax(${colWidthBase}px, 1fr))`,
               }}
             >
               {/* Sticky header row с аватарами мастеров */}
@@ -538,10 +556,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                 {hourLines.map((h) => (
                   <div
                     key={h}
-                    className="text-muted-foreground absolute -translate-y-1/2 pr-2 text-right text-[11px]"
+                    className="text-muted-foreground absolute -translate-y-1/2 pr-1 text-right text-[10px] sm:pr-2 sm:text-[11px]"
                     style={{
                       top: pxTopForMinutes(h * 60),
-                      width: TIME_AXIS_WIDTH_PX,
+                      width: timeAxisWidth,
                     }}
                   >
                     {String(h).padStart(2, '0')}:00

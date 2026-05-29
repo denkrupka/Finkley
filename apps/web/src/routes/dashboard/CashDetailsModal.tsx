@@ -63,15 +63,15 @@ export function CashDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:!w-[min(1024px,96vw)] sm:!max-w-[1024px]">
         <DialogHeader>
           <DialogTitle>{t('dashboard.cash_details.title')}</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-6">
           {registers.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('dashboard.cash_details.empty')}</p>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
               {registers.map((r) => {
                 const isCash = r.cash_kind !== 'non_cash'
                 const planCents = balanceByRegister.get(r.id) ?? 0
@@ -99,7 +99,13 @@ export function CashDetailsModal({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-foreground truncate text-base font-bold">{r.label}</p>
+                        {/* Mobile audit (2026-05-30): line-clamp-2 +
+                            break-words чтобы длинные имена касс не
+                            обрезались как «...» на iPhone (≤414px).
+                            Заголовок мог быть «Karta terminala (BLIK + EMV)». */}
+                        <p className="text-foreground line-clamp-2 break-words text-base font-bold leading-tight">
+                          {r.label}
+                        </p>
                         <p className="text-muted-foreground mt-0.5 text-[10px] font-semibold uppercase tracking-wider">
                           {isCash
                             ? t('dashboard.cash_details.cash')
