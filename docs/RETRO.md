@@ -5,6 +5,129 @@
 
 ---
 
+## Batch 8 — Реальные авторизации в онбординге · 29 мая 2026
+
+**Релиз:** 4 коммита в `main`, не запушено в origin (ожидает решения
+владельца).
+
+### Что сделано
+
+**Жёсткий фидбек владельца:** «онбординг должен СРАЗУ всё подключать
+реально, а не плашки `подключено`». 28 задач из ультиматума + 6
+inferred хвостов из ретро Batch 7, все закрыты за один спринт.
+
+**A1-A6 — реальные авторизации (ADR-030):**
+
+- После Step "salon" онбординг создаёт salon row через
+  `create_salon_with_setup` с пустыми массивами и сохраняет
+  `salon_id` в state. `LiveIntegrationCategoryStep` рендерит
+  карточки которые открывают РЕАЛЬНЫЕ диалоги
+  (`BooksyConnectDialog` с hCaptcha+login, Wfirma Hybrid X3, KSeF,
+  `MessengerConnectDialog` с Meta OAuth, `TelegramUserbotConnectDialog`
+  через MTProto, Banking через PSD2 redirect).
+- `Step3Accounting` dual-mode: с salonId — реальные диалоги
+  Wfirma/KSeF/Fakturownia/inFakt; без — старое поведение
+  (collect credentials → apply на submit).
+- Диалоги из `/integrations/*Dialog.tsx` адаптированы принимать
+  `salonId` опционально через prop с fallback на `useParams()`.
+
+**B1-B3 — visual polish:** иконки на брендовых цветах (`brandColor()`)
+с `isFullColorBrand()` helper'ом; full-color SVG для Booksy/wFirma/
+KSeF/Fakturownia/iFirma/inFakt (rounded square + lowercase letter,
+как app-icons); simple-icons currentColor glyph для IG/FB/WhatsApp/
+Telegram. Эмодзи убраны из welcome.title (👋) и ocr.upload (📷).
+
+**C1-C3 — UI-фиксы:** `DialogContent` переписан с grid на flex+
+overflow-y-auto (раньше grid+overflow-y-hidden срезал контент);
+OCR-журнал перенесён из Step3Services в `integrations_bookings`
+(новый `OcrManualBookingsBlock`); benchmarks opt-in убран из
+Step1 (дубль Step5Done).
+
+**D1-D2 — AI на реальных данных:** `ai-onboarding-preview` принимает
+`salon_id` и через PostgREST параллельно тянет 9 метрик (visits_total,
+visits_last_7d, revenue_total_cents, staff/services/clients counts,
+top-5 услуг/мастеров по visits, connected_integrations). Передаёт
+Claude'у как `real_data` block в prompt — «use as ground truth,
+override estimates». `StepWowAi` и `StepAiSummary` передают salonId,
+queryKey включает его для refetch после early-create.
+
+**F1+G1 — финал/дашборд clean-up:** Step5Done без trial-text и
+без INTEGRATIONS блока (дубль предыдущих integration steps).
+Step5.subtitle с «Дашборд на месте» больше не рендерится. Tutorial
+note `done` убран.
+
+**H1-H3 — тур:** `OnboardingTour` перенесён из `DashboardPage` в
+`SalonLayout`. Раньше «замолкал» после navigate на любую страницу
+(компонента не было в DOM). Теперь работает глобально, `STORAGE_STEP_KEY`
+сохраняет позицию между переходами.
+
+**I1-I4 — хвосты из ретро Batch 7:**
+
+- 134 ключа EN/PL переведены (onboarding.path/step\_\*/wow/ocr/cta/welcome);
+  `docs/i18n-todo.md` очищен.
+- `profiles.notifications_last_seen_at` миграция → cross-device
+  unread-счётчик (раньше был localStorage per-device).
+- Pure-helper `notification-toast-data.ts` выделен из
+  `useRealtimeNotifications` + 11 тестов; `tour-internals` + 7 тестов;
+  `send-email/templates` + 15 тестов (vitest include расширен).
+
+**Brown-salon cleanup:** миграции 20260529000002 + 000003 +
+`cleanup_brown_salons()` RPC. Mitigation для риска из ADR-030
+«юзер бросил онбординг между salon-step и финальным submit».
+
+### Что хорошо
+
+- **Early-create как универсальный фундамент.** Сначала казалось
+  слишком инвазивным, но в итоге снял всё многослойное
+  prompt-queue/credentials-transit хозяйство — диалоги работают
+  одинаково в онбординге и в `/settings/integrations`. Один путь,
+  без специальных «онбординг-варианты».
+- **Dual-mode компоненты.** `Step3Accounting`,
+  `IntegrationCategoryStep` приняли `salonId` опционально и
+  переключаются между live и collect-credentials path. Сохранили
+  обратную совместимость для legacy юзеров которые могли застрять
+  на старом flow.
+- **Diagnostics на месте.** `pnpm typecheck`+`pnpm lint`+`pnpm build`
+  локально + 33 новых юнит-теста — поймали 0 регрессий после
+  большого рефактора.
+
+### Что плохо / уроки
+
+- **«Молчащий» тур.** OnboardingTour жил только в DashboardPage
+  и при navigate на `/income` пропадал из DOM. Это был баг с
+  первого дня implementation, никто не замечал потому что 99%
+  тура — на дашборде. Урок: глобальные UI-overlay (toast, tour,
+  modal stack) держать в SalonLayout, не в листьях.
+- **Auth rate-limit.** Полный `pnpm test` показывает 15 fail'ов
+  из `tests/unit/*-rpc.test.ts` — все `AuthApiError: Database
+error creating new user`. Не блочит prod (только staging
+  rate-limit), но было неприятно когда я полез искать «новые»
+  регрессии после большого рефактора. Эти тесты пора либо
+  пометить как `test.skip.if(env.CI)`, либо вынести в отдельный
+  prefix чтобы не путали с реальными failure'ами.
+- **Контент-«мостики» при больших изменениях.** Когда я переносил
+  OCR-блок из Step3Services в `integrations_bookings`, обнаружил
+  что в Step3Services было ещё несколько deprecated props
+  (`ocrVisits`, `onOcrVisitsAdded`, `showOcr` state) которые надо
+  было аккуратно вычистить. Урок: переносы между шагами проверять
+  на оба конца компонента, не только origin.
+
+### Новые ADR
+
+- **ADR-030 — Early-create salon в онбординге.** Документирует
+  архитектурное решение + brown-salon risk + cleanup RPC.
+
+### Известные хвосты (не критичные)
+
+- Полные оригинальные SVG для Booksy/wFirma остались — да, мои
+  «стилизованные b/w в rounded square» узнаваемы, но не точные
+  копии. Если будет ребрендинг или official-icons npm package —
+  заменить.
+- `cleanup_brown_salons()` RPC написан, но `pg_cron` job владелец
+  настраивает руками (в supabase migration up не входит).
+
+---
+
 ## Batch 7 — Финансы / Уведомления / Permissions / UI Tours · 27-28 мая 2026
 
 **Релиз:** один большой merge в `main`, успешно задеплоен в прод

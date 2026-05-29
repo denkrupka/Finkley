@@ -223,6 +223,26 @@ Helpers: `saveOnboardingTransit()` для записи, `consumeOnboardingCreden
 (`finkley:onboarding:credentials:*`, `finkley:onboarding:prompt:*`) читаются
 и автоматически мигрируются при первом доступе (см. `readStorage`).
 
+**ADR-030 — Early-create salon в онбординге.** После Step "salon" (юзер
+ввёл имя салона) онбординг **сразу создаёт salon row** через
+`create_salon_with_setup` с пустыми массивами, сохраняет `salon_id` в
+`OnboardingState.created_salon_id`. Все последующие integration steps
+(bookings/social/banking/accounting) открывают РЕАЛЬНЫЕ диалоги
+подключения (`BooksyConnectDialog`, `WfirmaConnectDialog`,
+`MessengerConnectDialog`, etc.) с этим salonId — не плашки. Финальный
+`submit()` НЕ создаёт салон повторно, а доинсёртит staff/services/
+expense_categories + patch'ит остальные поля + ставит
+`salons.onboarding_completed_at = now()`.
+
+Диалоги из `/integrations/*Dialog.tsx` принимают `salonId` опционально
+как prop (fallback на `useParams()` для legacy `/settings/integrations`
+usage). Если хочешь переиспользовать диалог где-то ещё — следуй той
+же конвенции: `const salonId = salonIdProp ?? salonIdFromUrl`.
+
+«Brown» салоны (не дошёл до финального submit) удаляются ежедневным
+cron'ом через RPC `cleanup_brown_salons()` через 7 дней. Owner
+настраивает pg_cron job отдельно. Подробности — [ADR-030](./decisions/030-early-create-onboarding.md).
+
 Для любого нового pure helper в `lib/` — пиши unit-тесты (см.
 `onboarding-credentials.test.ts`, `onboarding-prompt-queue.test.ts`,
 `onboarding-add-item.test.ts` как пример). Это даёт regression safety
