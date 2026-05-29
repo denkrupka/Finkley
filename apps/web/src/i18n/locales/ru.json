@@ -790,7 +790,11 @@
       "invite_label": "Пригласить в портал после создания",
       "invite_send": "Отправить приглашение",
       "invite_sent": "Приглашение отправлено на {{email}}",
+      "invite_sent_sms": "SMS-приглашение отправлено на {{phone}}",
       "invite_already_sent": "Приглашение уже отправлено",
+      "invite_need_phone": "Укажи телефон для SMS",
+      "invite_email_btn": "Email",
+      "invite_sms_btn": "SMS",
       "empty_hint": "Пока пусто. Если только что подключил Booksy — мастера подтянутся через 2-5 минут. Можешь добавить вручную ниже."
     },
     "step3": {

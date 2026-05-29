@@ -41,6 +41,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
         salon_id: salonId,
         full_name: newName.trim(),
         email: newEmail.trim() || null,
+        phone: newPhone.trim() || null,
         payout_scheme: 'percent_revenue',
         payout_percent: Math.max(0, Math.min(100, newPercent)),
         is_active: true,
@@ -71,26 +72,45 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
     }
   }
 
-  function sendInvite(s: { id: string; full_name: string; email: string | null }) {
-    if (!s.email) {
+  function sendInvite(
+    s: { id: string; full_name: string; email: string | null; phone: string | null },
+    channel: 'email' | 'sms',
+  ) {
+    // Для SMS требуется phone; для email — email. Если ничего нет — guard.
+    if (channel === 'email' && !s.email) {
       toast.error(t('onboarding.step2.invite_need_email'))
+      return
+    }
+    if (channel === 'sms' && !s.phone) {
+      toast.error(
+        t('onboarding.step2.invite_need_phone', { defaultValue: 'Укажи телефон для SMS' }),
+      )
       return
     }
     invite.mutate(
       {
-        email: s.email,
+        // Email обязателен для accept-flow; для SMS-only ставим заглушку,
+        // backend всё равно создаст row и пошлёт SMS со ссылкой.
+        email: s.email ?? `staff+${s.id}@no-email.finkley.local`,
         role: 'staff',
         staffId: s.id,
+        phone: s.phone ?? undefined,
         first_name: s.full_name.split(' ')[0],
         last_name: s.full_name.split(' ').slice(1).join(' '),
+        channel,
       },
       {
         onSuccess: () =>
           toast.success(
-            t('onboarding.step2.invite_sent', {
-              email: s.email,
-              defaultValue: 'Приглашение отправлено на {{email}}',
-            }),
+            channel === 'sms'
+              ? t('onboarding.step2.invite_sent_sms', {
+                  phone: s.phone,
+                  defaultValue: 'SMS-приглашение отправлено на {{phone}}',
+                })
+              : t('onboarding.step2.invite_sent', {
+                  email: s.email,
+                  defaultValue: 'Приглашение отправлено на {{email}}',
+                }),
           ),
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
       },
@@ -166,6 +186,11 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                       <Mail className="size-3" strokeWidth={1.8} /> {s.email}
                     </p>
                   ) : null}
+                  {s.phone ? (
+                    <p className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 truncate text-xs">
+                      <Phone className="size-3" strokeWidth={1.8} /> {s.phone}
+                    </p>
+                  ) : null}
                   {s.external_source === 'booksy' ? (
                     <span className="bg-brand-teal-soft text-brand-teal-deep mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">
                       Booksy
@@ -181,21 +206,41 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                   <Trash2 className="size-4" strokeWidth={1.7} />
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => sendInvite(s)}
-                disabled={invite.isPending || !s.email || !!s.invite_sent_at}
-                className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Send className="size-3.5" strokeWidth={2} />
-                {s.invite_sent_at
-                  ? t('onboarding.step2.invite_already_sent', {
-                      defaultValue: 'Приглашение уже отправлено',
-                    })
-                  : t('onboarding.step2.invite_send', {
-                      defaultValue: 'Отправить приглашение',
+              {s.invite_sent_at ? (
+                <div className="border-brand-sage bg-brand-sage-soft/30 text-brand-sage-deep mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] px-3 py-2 text-xs font-bold">
+                  <Send className="size-3.5" strokeWidth={2} />
+                  {t('onboarding.step2.invite_already_sent', {
+                    defaultValue: 'Приглашение уже отправлено',
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => sendInvite(s, 'email')}
+                    disabled={invite.isPending || !s.email}
+                    title={!s.email ? t('onboarding.step2.invite_need_email') : undefined}
+                    className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center justify-center gap-1 rounded-md border-[1.5px] px-2 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Mail className="size-3.5" strokeWidth={2} />
+                    {t('onboarding.step2.invite_email_btn', {
+                      defaultValue: 'Email',
                     })}
-              </button>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendInvite(s, 'sms')}
+                    disabled={invite.isPending || !s.phone}
+                    title={!s.phone ? t('onboarding.step2.invite_need_phone') : undefined}
+                    className="border-brand-teal-deep text-brand-teal-deep hover:bg-brand-teal-soft/40 inline-flex items-center justify-center gap-1 rounded-md border-[1.5px] px-2 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Phone className="size-3.5" strokeWidth={2} />
+                    {t('onboarding.step2.invite_sms_btn', {
+                      defaultValue: 'SMS',
+                    })}
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}

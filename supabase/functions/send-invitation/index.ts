@@ -16,6 +16,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 import { renderLogoBlock, sendEmail } from '../_shared/notify.ts'
+import { sendSms } from '../_shared/sms.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -64,6 +65,10 @@ async function handleCreate(
     invited_avatar_url?: string
     /** T30 — матрица прав { "<cat>.<sub>": "view"|"edit" }. NULL = preset по роли. */
     permissions?: Record<string, 'view' | 'edit'> | null
+    /** 'email' (default) или 'sms'. Если 'sms' и invited_phone задан —
+     *  отправляем SMS вместо письма. Email-инвитейшен всё равно создаётся
+     *  в БД (для последующего accept-flow). */
+    channel?: 'email' | 'sms'
   },
 ): Promise<Response> {
   if (!body.salon_id || !body.email || !body.role) {
@@ -214,25 +219,60 @@ async function handleCreate(
     }
   }
 
-  try {
-    await sendEmail(
-      'team_invitation',
-      email,
-      {
-        inviter_name: inviterName,
-        salon_name: salon?.name ?? 'Salon',
-        logo_block: renderLogoBlock((salon as { logo_url?: string | null } | null)?.logo_url),
-        role: localizedRole,
-        invite_url: finalInviteUrl,
-        expires_in_days: '14',
-      },
-      locale,
-    )
-  } catch (e) {
-    console.warn('email send failed, invitation still created:', e instanceof Error ? e.message : e)
+  // Email-инвайт всегда создаётся (даже если channel='sms') — accept-flow
+  // в нашем UI работает через token, не зависит от канала доставки.
+  // Канал контролирует ТОЛЬКО куда мы шлём ссылку: email/SMS/оба.
+  const channel = body.channel === 'sms' ? 'sms' : 'email'
+
+  if (channel === 'email') {
+    try {
+      await sendEmail(
+        'team_invitation',
+        email,
+        {
+          inviter_name: inviterName,
+          salon_name: salon?.name ?? 'Salon',
+          logo_block: renderLogoBlock((salon as { logo_url?: string | null } | null)?.logo_url),
+          role: localizedRole,
+          invite_url: finalInviteUrl,
+          expires_in_days: '14',
+        },
+        locale,
+      )
+    } catch (e) {
+      console.warn(
+        'email send failed, invitation still created:',
+        e instanceof Error ? e.message : e,
+      )
+    }
+  } else {
+    // SMS-инвайт: короткий текст со ссылкой. Берём invited_phone.
+    const phone = (body.invited_phone ?? '').trim()
+    if (!phone) {
+      return jsonResponse(
+        { ok: true, invitation_id: inv.id, invite_url: finalInviteUrl, warning: 'sms_no_phone' },
+        200,
+      )
+    }
+    const { data: salonCountry } = await admin
+      .from('salons')
+      .select('country_code')
+      .eq('id', body.salon_id)
+      .maybeSingle()
+    const cc =
+      (salonCountry as { country_code?: string } | null)?.country_code?.toUpperCase() ?? 'PL'
+    const smsText = `${inviterName} приглашает тебя в Finkley «${salon?.name ?? 'Salon'}» как ${localizedRole}. Принять: ${finalInviteUrl}`
+    try {
+      const r = await sendSms(phone, smsText, undefined, cc)
+      if (!r.ok) {
+        console.warn('SMS send failed:', r.error)
+      }
+    } catch (e) {
+      console.warn('SMS send exception:', e instanceof Error ? e.message : e)
+    }
   }
 
-  return jsonResponse({ ok: true, invitation_id: inv.id, invite_url: finalInviteUrl })
+  return jsonResponse({ ok: true, invitation_id: inv.id, invite_url: finalInviteUrl, channel })
 }
 
 async function handleCancel(

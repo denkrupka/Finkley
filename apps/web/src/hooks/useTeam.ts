@@ -109,6 +109,10 @@ export function useInviteMember(salonId: string | undefined) {
       avatar_url?: string
       /** T30 — матрица прав { "<cat>.<sub>": "view"|"edit" }. NULL/undefined = дефолт по role. */
       permissions?: Record<string, 'view' | 'edit'> | null
+      /** Канал доставки приглашения. По умолчанию email. SMS работает
+       *  если у инвайтика есть invited_phone — backend дёргает SmsApi
+       *  с ссылкой на /accept-invite. */
+      channel?: 'email' | 'sms'
     }) => {
       const { data, error } = await supabase.functions.invoke('send-invitation', {
         body: {
@@ -123,6 +127,7 @@ export function useInviteMember(salonId: string | undefined) {
           invited_phone: input.phone?.trim() || null,
           invited_avatar_url: input.avatar_url?.trim() || null,
           permissions: input.permissions ?? null,
+          channel: input.channel ?? 'email',
         },
       })
       if (error) throw error

@@ -252,7 +252,11 @@
       "invite_label": "Zaproś do portalu po utworzeniu",
       "invite_send": "Wyślij zaproszenie",
       "invite_sent": "Zaproszenie wysłane na {{email}}",
+      "invite_sent_sms": "Zaproszenie SMS wysłane na {{phone}}",
       "invite_already_sent": "Zaproszenie już wysłane",
+      "invite_need_phone": "Wpisz numer telefonu dla SMS",
+      "invite_email_btn": "Email",
+      "invite_sms_btn": "SMS",
       "empty_hint": "Na razie pusto. Jeśli właśnie podłączyłeś Booksy — specjaliści zostaną pobrani w 2-5 minut. Możesz dodać ręcznie poniżej."
     },
     "step3": {

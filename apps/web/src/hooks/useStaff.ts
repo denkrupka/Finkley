@@ -35,6 +35,8 @@ export type StaffRow = {
   salon_id: string
   full_name: string
   email: string | null
+  /** E.164 формат, например +48501234567. NULL если не задан. */
+  phone: string | null
   avatar_url: string | null
   payout_scheme: StaffPayoutScheme
   payout_percent: number | null
@@ -52,7 +54,7 @@ export type StaffRow = {
 }
 
 const STAFF_FIELDS =
-  'id, salon_id, full_name, email, avatar_url, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days, external_id, external_source, invite_sent_at, visible_on_calendar'
+  'id, salon_id, full_name, email, phone, avatar_url, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days, external_id, external_source, invite_sent_at, visible_on_calendar'
 
 export function useStaff(salonId: string | undefined, opts?: { activeOnly?: boolean }) {
   const activeOnly = opts?.activeOnly ?? true
