@@ -56,13 +56,13 @@ export type DictKey =
 
 export const dict: Record<Lang, Record<DictKey, string>> = {
   ru: {
-    'nav.product': 'О продукте',
-    'nav.features': 'Возможности',
+    'nav.product': 'Как это работает',
+    'nav.features': 'Интеграции',
     'nav.pricing': 'Цены',
     'nav.media': 'Медиа',
     'nav.login': 'Войти',
     'nav.signup': 'Начать бесплатно',
-    'hero.tagline': 'Управленческий учёт для салонов красоты',
+    'hero.tagline': 'Учёт денег для салонов красоты',
     'hero.title': 'Видишь свою прибыль, а не только запись клиентов',
     'hero.subtitle':
       'Finkley собирает деньги, визиты, расходы и сообщения от клиентов в один экран. Считает прибыль каждый день — без бухгалтера и Excel-таблиц.',
@@ -95,8 +95,8 @@ export const dict: Record<Lang, Record<DictKey, string>> = {
     'footer.rights': '© 2026 Finkley. Все права защищены.',
   },
   en: {
-    'nav.product': 'Product',
-    'nav.features': 'Features',
+    'nav.product': 'How it works',
+    'nav.features': 'Integrations',
     'nav.pricing': 'Pricing',
     'nav.media': 'Blog',
     'nav.login': 'Sign in',
@@ -133,8 +133,8 @@ export const dict: Record<Lang, Record<DictKey, string>> = {
     'footer.rights': '© 2026 Finkley. All rights reserved.',
   },
   pl: {
-    'nav.product': 'O produkcie',
-    'nav.features': 'Funkcje',
+    'nav.product': 'Jak to działa',
+    'nav.features': 'Integracje',
     'nav.pricing': 'Cennik',
     'nav.media': 'Blog',
     'nav.login': 'Zaloguj się',

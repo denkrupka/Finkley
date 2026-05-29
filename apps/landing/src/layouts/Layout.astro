@@ -11,7 +11,7 @@ interface Props {
 
 const {
   title,
-  description = 'Finkley — управленческий учёт для малых салонов красоты. Видишь свою прибыль, а не записи клиентов.',
+  description = 'Finkley — учёт денег для салонов красоты. Видишь свою прибыль, а не только записи клиентов.',
   active = 'home',
 } = Astro.props
 
@@ -68,7 +68,7 @@ const APP_URL = '/app/'
             {t['nav.product']}
           </a>
           <a
-            href="/features/messenger/"
+            href="/features/integrations/"
             class={`text-sm font-medium ${active === 'features' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
             data-i18n="nav.features"
           >
@@ -81,16 +81,22 @@ const APP_URL = '/app/'
           >
             {t['nav.pricing']}
           </a>
-          <a
-            href="/media/"
-            class={`text-sm font-medium ${active === 'media' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
-            data-i18n="nav.media"
-          >
-            {t['nav.media']}
-          </a>
         </nav>
 
         <div class="flex items-center gap-3">
+          <!-- Mobile burger toggle -->
+          <button
+            type="button"
+            id="mobile-menu-btn"
+            class="inline-flex size-10 items-center justify-center rounded-md border border-brand-border bg-white text-brand-navy md:hidden"
+            aria-label="Menu"
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
           <div class="relative">
             <button
               type="button"
@@ -127,7 +133,7 @@ const APP_URL = '/app/'
           </div>
           <a
             href={APP_URL + 'login'}
-            class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text sm:inline"
+            class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text md:inline"
             data-i18n="nav.login"
           >
             {t['nav.login']}
@@ -140,6 +146,40 @@ const APP_URL = '/app/'
             {t['nav.signup']}
           </a>
         </div>
+      </div>
+
+      <!-- Mobile menu (collapsible) -->
+      <div id="mobile-menu" class="hidden border-t border-brand-border bg-white md:hidden">
+        <nav class="mx-auto flex max-w-7xl flex-col px-4 py-3 text-base font-medium">
+          <a
+            href="/"
+            class={`flex h-12 items-center ${active === 'home' ? 'text-brand-navy' : 'text-brand-text'}`}
+            data-i18n="nav.product"
+          >
+            {t['nav.product']}
+          </a>
+          <a
+            href="/features/integrations/"
+            class={`flex h-12 items-center ${active === 'features' ? 'text-brand-navy' : 'text-brand-text'}`}
+            data-i18n="nav.features"
+          >
+            {t['nav.features']}
+          </a>
+          <a
+            href="/pricing"
+            class={`flex h-12 items-center ${active === 'pricing' ? 'text-brand-navy' : 'text-brand-text'}`}
+            data-i18n="nav.pricing"
+          >
+            {t['nav.pricing']}
+          </a>
+          <a
+            href={APP_URL + 'login'}
+            class="flex h-12 items-center text-brand-text-muted"
+            data-i18n="nav.login"
+          >
+            {t['nav.login']}
+          </a>
+        </nav>
       </div>
     </header>
 
@@ -161,6 +201,13 @@ const APP_URL = '/app/'
           <span class="text-brand-text-faint" data-i18n="footer.rights">{t['footer.rights']}</span>
         </div>
         <nav class="flex flex-wrap gap-5">
+          <a
+            href="/media/"
+            class={active === 'media' ? 'text-brand-navy' : 'hover:text-brand-text'}
+            data-i18n="nav.media"
+          >
+            {t['nav.media']}
+          </a>
           <a
             href="/privacy"
             class={active === 'privacy' ? 'text-brand-navy' : 'hover:text-brand-text'}
@@ -235,6 +282,15 @@ const APP_URL = '/app/'
           menu?.classList.toggle('hidden')
         })
         document.addEventListener('click', () => menu?.classList.add('hidden'))
+
+        // Mobile burger menu toggle
+        const mobBtn = document.getElementById('mobile-menu-btn')
+        const mobMenu = document.getElementById('mobile-menu')
+        mobBtn?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          const isHidden = mobMenu?.classList.toggle('hidden')
+          mobBtn.setAttribute('aria-expanded', isHidden ? 'false' : 'true')
+        })
 
         // Выбор языка
         document.querySelectorAll<HTMLButtonElement>('.lang-option').forEach((b) => {
