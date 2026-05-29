@@ -41,6 +41,8 @@ import {
   type SalonTypeId,
 } from './onboarding-defaults'
 import { IntegrationCategoryStep } from './IntegrationCategoryStep'
+import { LiveIntegrationCategoryStep } from './LiveIntegrationCategoryStep'
+import { OcrManualBookingsBlock } from './OcrManualBookingsBlock'
 import { type ParsedVisit } from './OcrNotebookButton'
 import { StepAiBreakdown } from './StepAiBreakdown'
 import { StepAiSummary } from './StepAiSummary'
@@ -166,6 +168,11 @@ export type OnboardingState = {
   /** T129 — credentials собранные в ConnectIntegrationDialog. После создания
    *  салона мы вызываем соответствующие connect-функции с этими данными. */
   pending_credentials: Partial<Record<OnboardingIntegration, PendingCredentials>>
+  /** Early-create salon ID. Создаётся после Step "salon" — даёт реальный
+   *  salonId для последующих integration steps (Booksy/Banking/Telegram/
+   *  Meta OAuth/etc), чтобы юзер реально подключал интеграции прямо в
+   *  онбординге, а не получал плашку «подключено». */
+  created_salon_id: string | null
 }
 
 /** T129 — credentials для одной интеграции (email/password/token/etc.). */
@@ -222,6 +229,7 @@ const INITIAL: OnboardingState = {
   // Если юзеру не нужна подписка — отключит в Settings → Биллинг после первого
   // dashboard'a.
   subscribe_after_submit: true,
+  created_salon_id: null,
 }
 
 export function OnboardingPage() {
@@ -264,10 +272,54 @@ export function OnboardingPage() {
     setState((prev) => ({ ...prev, [key]: value }))
   }
 
-  function next() {
+  /** Early-create salon после Step "salon" — даёт реальный salonId для
+   *  последующих integration steps. Если уже создан и юзер изменил
+   *  name/country/type — обновляем salons row. */
+  async function ensureSalonCreated(): Promise<string | null> {
+    if (state.created_salon_id) {
+      // Update только базовых полей (name/type/country may have changed)
+      try {
+        await supabase
+          .from('salons')
+          .update({
+            name: state.name.trim(),
+            salon_type: state.salon_type,
+            country_code: state.country_code,
+          })
+          .eq('id', state.created_salon_id)
+      } catch (err) {
+        console.warn('salon update failed', err)
+      }
+      return state.created_salon_id
+    }
+    if (!state.name.trim()) return null
+    const country = COUNTRY_OPTIONS.find((c) => c.code === state.country_code)!
+    const { data, error } = await supabase.rpc('create_salon_with_setup', {
+      p_name: state.name.trim(),
+      p_country_code: country.code,
+      p_currency: country.currency,
+      p_timezone: country.timezone,
+      p_salon_type: state.salon_type,
+      p_locale: i18n.language.split('-')[0] || 'ru',
+    })
+    if (error) {
+      console.warn('early-create salon failed', error.message)
+      return null
+    }
+    const newSalonId = data as unknown as string
+    setState((prev) => ({ ...prev, created_salon_id: newSalonId }))
+    rememberLastSalon(newSalonId)
+    await queryClient.refetchQueries({ queryKey: ['salons'] })
+    return newSalonId
+  }
+
+  async function next() {
     if (stepIndex === 1) {
-      // переход 2→3 — заполнить services seed по выбранному типу
       patch('services', ensureServicesSeed(state.salon_type, state.services))
+    }
+    // Early-create после Step "salon" — если юзер ввёл имя, создаём салон.
+    if (stepId === 'salon' && state.name.trim()) {
+      await ensureSalonCreated()
     }
     setStepIndex((i) => Math.min(i + 1, STEPS.length - 1))
   }
@@ -283,33 +335,107 @@ export function OnboardingPage() {
   async function submit() {
     setSubmitting(true)
     setSubmitError(null)
-    const country = COUNTRY_OPTIONS.find((c) => c.code === state.country_code)!
-    const { data, error } = await supabase.rpc('create_salon_with_setup', {
-      p_name: state.name.trim(),
-      p_country_code: country.code,
-      p_currency: country.currency,
-      p_timezone: country.timezone,
-      p_salon_type: state.salon_type,
-      p_locale: 'ru',
-      p_staff: state.staff
+    let newSalonId = state.created_salon_id
+    // Если early-create не сработал (юзер пропустил salon шаг, или сбой
+    // RPC) — создаём салон сейчас с полным набором staff/services.
+    if (!newSalonId) {
+      const country = COUNTRY_OPTIONS.find((c) => c.code === state.country_code)!
+      const { data, error } = await supabase.rpc('create_salon_with_setup', {
+        p_name: state.name.trim(),
+        p_country_code: country.code,
+        p_currency: country.currency,
+        p_timezone: country.timezone,
+        p_salon_type: state.salon_type,
+        p_locale: 'ru',
+        p_staff: state.staff
+          .filter((s) => s.full_name.trim())
+          .map((s) => ({ full_name: s.full_name.trim(), payout_percent: s.payout_percent })),
+        p_services: state.services
+          .filter((s) => s.name.trim())
+          .map((s) => ({
+            category_name: s.category_name,
+            name: s.name.trim(),
+            default_price_cents: s.default_price_cents,
+          })),
+        p_expense_categories: state.expense_categories.filter((c) => c.trim()),
+      })
+      if (error) {
+        setSubmitting(false)
+        setSubmitError(error.message)
+        return
+      }
+      newSalonId = data as unknown as string
+    } else {
+      // Early-create уже сделал салон без staff/services/expense_categories.
+      // Доинсёртим их сейчас. Используем тот же RPC — но через update path:
+      // INSERT staff/services/expense_categories напрямую (RPC так не умеет
+      // после факта). Сохраняем только не-пустые записи.
+      const staffRows = state.staff
         .filter((s) => s.full_name.trim())
-        .map((s) => ({ full_name: s.full_name.trim(), payout_percent: s.payout_percent })),
-      p_services: state.services
+        .map((s) => ({
+          salon_id: newSalonId!,
+          full_name: s.full_name.trim(),
+          payout_scheme: 'percent_revenue' as const,
+          payout_percent: Math.max(0, Math.min(100, s.payout_percent ?? 40)),
+        }))
+      if (staffRows.length > 0) {
+        try {
+          await supabase.from('staff').insert(staffRows)
+        } catch (err) {
+          console.warn('staff insert failed', err)
+        }
+      }
+      const expCats = state.expense_categories.filter((c) => c.trim())
+      if (expCats.length > 0) {
+        try {
+          await supabase.from('expense_categories').insert(
+            expCats.map((c, idx) => ({
+              salon_id: newSalonId!,
+              name: c.trim(),
+              is_system: true,
+              sort_order: idx,
+            })),
+          )
+        } catch (err) {
+          console.warn('expense_categories insert failed', err)
+        }
+      }
+      const servicesByCategory = new Map<string, string>()
+      for (const s of state.services) {
+        if (!s.name.trim() || !s.category_name) continue
+        if (!servicesByCategory.has(s.category_name)) {
+          try {
+            const { data: cat } = await supabase
+              .from('service_categories')
+              .insert({
+                salon_id: newSalonId!,
+                name: s.category_name,
+                sort_order: servicesByCategory.size,
+              })
+              .select('id')
+              .single()
+            if (cat?.id) servicesByCategory.set(s.category_name, cat.id as string)
+          } catch (err) {
+            console.warn('service_category insert failed', err)
+          }
+        }
+      }
+      const servicesRows = state.services
         .filter((s) => s.name.trim())
         .map((s) => ({
-          category_name: s.category_name,
+          salon_id: newSalonId!,
+          category_id: s.category_name ? (servicesByCategory.get(s.category_name) ?? null) : null,
           name: s.name.trim(),
-          default_price_cents: s.default_price_cents,
-        })),
-      p_expense_categories: state.expense_categories.filter((c) => c.trim()),
-    })
-    setSubmitting(false)
-
-    if (error) {
-      setSubmitError(error.message)
-      return
+          default_price_cents: s.default_price_cents ?? 0,
+        }))
+      if (servicesRows.length > 0) {
+        try {
+          await supabase.from('services').insert(servicesRows)
+        } catch (err) {
+          console.warn('services insert failed', err)
+        }
+      }
     }
-    const newSalonId = data as unknown as string
     // Доп. поля из full path (если заданы) — обновляем салон после создания.
     // create_salon_with_setup RPC принимает только базовые параметры; address,
     // координаты, NIP — настройки которые юзер мог пропустить на quick path.
@@ -746,6 +872,7 @@ export function OnboardingPage() {
               <>
                 <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
                 <Step3Accounting
+                  salonId={state.created_salon_id}
                   value={{ nip: state.nip, company_name: state.company_name }}
                   onChange={(v) =>
                     setState((prev) => ({ ...prev, nip: v.nip, company_name: v.company_name }))
@@ -772,95 +899,158 @@ export function OnboardingPage() {
               </>
             )}
             {stepId === 'integrations_bookings' && (
-              <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.bookings_title')}
-                items={[
-                  {
-                    id: 'booksy',
-                    icon: BooksyIcon,
-                    title: 'Booksy',
-                    benefit:
-                      'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
-                  },
-                  {
-                    id: 'ical',
-                    icon: ICalIcon,
-                    title: 'Google / Apple / Outlook Calendar',
-                    benefit:
-                      'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
-                  },
-                  {
-                    // T198 — WhatsApp Business чаще канал бронирования
-                    // (клиент пишет «запишите меня на стрижку»), а не просто
-                    // social-чат. Перенесён из integrations_social.
-                    id: 'whatsapp',
-                    icon: WhatsappIcon,
-                    title: 'WhatsApp Business',
-                    benefit:
-                      'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
-                  },
-                ]}
-                selected={state.selected_integrations}
-                onToggle={(id) =>
-                  patch(
-                    'selected_integrations',
-                    state.selected_integrations.includes(id)
-                      ? state.selected_integrations.filter((x) => x !== id)
-                      : [...state.selected_integrations, id],
-                  )
-                }
-                credentials={state.pending_credentials}
-                onCredentialsChange={(id, creds) =>
-                  patch('pending_credentials', {
-                    ...state.pending_credentials,
-                    [id]: creds ?? {},
-                  })
-                }
+              <OcrManualBookingsBlock
+                salonId={state.created_salon_id}
+                ocrVisits={state.ocr_visits}
+                onOcrVisitsAdded={(v) => patch('ocr_visits', v)}
               />
             )}
-            {stepId === 'integrations_social' && (
-              <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.social_title')}
-                items={[
-                  {
-                    id: 'instagram',
-                    icon: InstagramIcon,
-                    title: 'Instagram Direct',
-                    benefit:
-                      'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
-                  },
-                  {
-                    id: 'facebook',
-                    icon: FacebookIcon,
-                    title: 'Facebook Messenger',
-                    benefit: 'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
-                  },
-                  {
-                    id: 'telegram',
-                    icon: TelegramIcon,
-                    title: 'Telegram',
-                    benefit:
-                      'Утренний разбор от @finkley_tg_bot в 9:00 + важные алерты прямо в чате.',
-                  },
-                ]}
-                selected={state.selected_integrations}
-                onToggle={(id) =>
-                  patch(
-                    'selected_integrations',
-                    state.selected_integrations.includes(id)
-                      ? state.selected_integrations.filter((x) => x !== id)
-                      : [...state.selected_integrations, id],
-                  )
-                }
-                credentials={state.pending_credentials}
-                onCredentialsChange={(id, creds) =>
-                  patch('pending_credentials', {
-                    ...state.pending_credentials,
-                    [id]: creds ?? {},
-                  })
-                }
-              />
-            )}
+            {stepId === 'integrations_bookings' &&
+              (state.created_salon_id ? (
+                <LiveIntegrationCategoryStep
+                  title={t('onboarding.step_integrations.bookings_title')}
+                  salonId={state.created_salon_id}
+                  items={[
+                    {
+                      id: 'booksy',
+                      icon: BooksyIcon,
+                      title: 'Booksy',
+                      benefit:
+                        'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
+                    },
+                    {
+                      id: 'whatsapp',
+                      icon: WhatsappIcon,
+                      title: 'WhatsApp Business',
+                      benefit:
+                        'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
+                    },
+                    {
+                      id: 'ical',
+                      icon: ICalIcon,
+                      title: 'Google / Apple / Outlook Calendar',
+                      benefit:
+                        'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
+                    },
+                  ]}
+                />
+              ) : (
+                <IntegrationCategoryStep
+                  title={t('onboarding.step_integrations.bookings_title')}
+                  items={[
+                    {
+                      id: 'booksy',
+                      icon: BooksyIcon,
+                      title: 'Booksy',
+                      benefit:
+                        'Импортируем всех клиентов, мастеров и историю визитов — финансы сразу видны.',
+                    },
+                    {
+                      id: 'whatsapp',
+                      icon: WhatsappIcon,
+                      title: 'WhatsApp Business',
+                      benefit:
+                        'Клиент пишет на WhatsApp — заявка попадает в портал, AI отвечает на типовые вопросы.',
+                    },
+                    {
+                      id: 'ical',
+                      icon: ICalIcon,
+                      title: 'Google / Apple / Outlook Calendar',
+                      benefit:
+                        'Каждый мастер видит свои визиты в календаре на телефоне без лишних движений.',
+                    },
+                  ]}
+                  selected={state.selected_integrations}
+                  onToggle={(id) =>
+                    patch(
+                      'selected_integrations',
+                      state.selected_integrations.includes(id)
+                        ? state.selected_integrations.filter((x) => x !== id)
+                        : [...state.selected_integrations, id],
+                    )
+                  }
+                  credentials={state.pending_credentials}
+                  onCredentialsChange={(id, creds) =>
+                    patch('pending_credentials', {
+                      ...state.pending_credentials,
+                      [id]: creds ?? {},
+                    })
+                  }
+                />
+              ))}
+            {stepId === 'integrations_social' &&
+              (state.created_salon_id ? (
+                <LiveIntegrationCategoryStep
+                  title={t('onboarding.step_integrations.social_title')}
+                  salonId={state.created_salon_id}
+                  items={[
+                    {
+                      id: 'instagram',
+                      icon: InstagramIcon,
+                      title: 'Instagram Direct',
+                      benefit:
+                        'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
+                    },
+                    {
+                      id: 'facebook',
+                      icon: FacebookIcon,
+                      title: 'Facebook Messenger',
+                      benefit:
+                        'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
+                    },
+                    {
+                      id: 'telegram',
+                      icon: TelegramIcon,
+                      title: 'Telegram',
+                      benefit:
+                        'Подключаем твой личный Telegram через MTProto — отвечаешь клиентам прямо из портала.',
+                    },
+                  ]}
+                />
+              ) : (
+                <IntegrationCategoryStep
+                  title={t('onboarding.step_integrations.social_title')}
+                  items={[
+                    {
+                      id: 'instagram',
+                      icon: InstagramIcon,
+                      title: 'Instagram Direct',
+                      benefit:
+                        'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
+                    },
+                    {
+                      id: 'facebook',
+                      icon: FacebookIcon,
+                      title: 'Facebook Messenger',
+                      benefit:
+                        'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
+                    },
+                    {
+                      id: 'telegram',
+                      icon: TelegramIcon,
+                      title: 'Telegram',
+                      benefit:
+                        'Подключаем твой личный Telegram через MTProto — отвечаешь клиентам прямо из портала.',
+                    },
+                  ]}
+                  selected={state.selected_integrations}
+                  onToggle={(id) =>
+                    patch(
+                      'selected_integrations',
+                      state.selected_integrations.includes(id)
+                        ? state.selected_integrations.filter((x) => x !== id)
+                        : [...state.selected_integrations, id],
+                    )
+                  }
+                  credentials={state.pending_credentials}
+                  onCredentialsChange={(id, creds) =>
+                    patch('pending_credentials', {
+                      ...state.pending_credentials,
+                      [id]: creds ?? {},
+                    })
+                  }
+                />
+              ))}
             {stepId === 'wow' && (
               <StepWowAi
                 hasBookings={state.selected_integrations.some((x) =>
@@ -909,36 +1099,51 @@ export function OnboardingPage() {
                 onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
               />
             )}
-            {stepId === 'integrations_banking' && (
-              <IntegrationCategoryStep
-                title={t('onboarding.step_integrations.banking_title')}
-                items={[
-                  {
-                    id: 'banking',
-                    icon: BankingIcon,
-                    title: 'Банковский счёт (PSD2)',
-                    benefit:
-                      'Каждое списание автоматом упадёт в Расходы. Можешь подключить несколько банков сразу.',
-                  },
-                ]}
-                selected={state.selected_integrations}
-                onToggle={(id) =>
-                  patch(
-                    'selected_integrations',
-                    state.selected_integrations.includes(id)
-                      ? state.selected_integrations.filter((x) => x !== id)
-                      : [...state.selected_integrations, id],
-                  )
-                }
-                credentials={state.pending_credentials}
-                onCredentialsChange={(id, creds) =>
-                  patch('pending_credentials', {
-                    ...state.pending_credentials,
-                    [id]: creds ?? {},
-                  })
-                }
-              />
-            )}
+            {stepId === 'integrations_banking' &&
+              (state.created_salon_id ? (
+                <LiveIntegrationCategoryStep
+                  title={t('onboarding.step_integrations.banking_title')}
+                  salonId={state.created_salon_id}
+                  items={[
+                    {
+                      id: 'banking',
+                      icon: BankingIcon,
+                      title: 'Банковский счёт (PSD2)',
+                      benefit:
+                        'Каждое списание автоматом упадёт в Расходы. Можешь подключить несколько банков сразу.',
+                    },
+                  ]}
+                />
+              ) : (
+                <IntegrationCategoryStep
+                  title={t('onboarding.step_integrations.banking_title')}
+                  items={[
+                    {
+                      id: 'banking',
+                      icon: BankingIcon,
+                      title: 'Банковский счёт (PSD2)',
+                      benefit:
+                        'Каждое списание автоматом упадёт в Расходы. Можешь подключить несколько банков сразу.',
+                    },
+                  ]}
+                  selected={state.selected_integrations}
+                  onToggle={(id) =>
+                    patch(
+                      'selected_integrations',
+                      state.selected_integrations.includes(id)
+                        ? state.selected_integrations.filter((x) => x !== id)
+                        : [...state.selected_integrations, id],
+                    )
+                  }
+                  credentials={state.pending_credentials}
+                  onCredentialsChange={(id, creds) =>
+                    patch('pending_credentials', {
+                      ...state.pending_credentials,
+                      [id]: creds ?? {},
+                    })
+                  }
+                />
+              ))}
             {stepId === 'staff' && (
               <>
                 <TutorialNote>{t('onboarding.tutorial.staff')}</TutorialNote>
@@ -952,8 +1157,6 @@ export function OnboardingPage() {
                   value={state.services}
                   onChange={(v) => patch('services', v)}
                   salonType={state.salon_type}
-                  ocrVisits={state.ocr_visits}
-                  onOcrVisitsAdded={(v) => patch('ocr_visits', v)}
                 />
               </>
             )}
@@ -969,28 +1172,17 @@ export function OnboardingPage() {
               </>
             )}
             {stepId === 'done' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.done')}</TutorialNote>
-                <Step5Done
-                  summary={{ salonName: state.name }}
-                  benchmarksOptIn={state.benchmarks_opt_in}
-                  onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
-                  selectedIntegrations={state.selected_integrations}
-                  onIntegrationsToggle={(v) => patch('selected_integrations', v)}
-                  subscribeAfterSubmit={state.subscribe_after_submit}
-                  onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
-                  path={state.path}
-                  onSwitchToFull={() => {
-                    // T105 — переключаемся на full ветку и навигируем на
-                    // первый «новый» шаг (schedule) — он отсутствовал в
-                    // quick. Welcome/path/profile/salon/интеграции/tg_phone
-                    // уже сделаны, повторять не нужно.
-                    patch('path', 'full')
-                    const fullIndex = (STEPS_FULL as readonly string[]).indexOf('schedule')
-                    if (fullIndex >= 0) setStepIndex(fullIndex)
-                  }}
-                />
-              </>
+              <Step5Done
+                summary={{ salonName: state.name }}
+                benchmarksOptIn={state.benchmarks_opt_in}
+                onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
+                path={state.path}
+                onSwitchToFull={() => {
+                  patch('path', 'full')
+                  const fullIndex = (STEPS_FULL as readonly string[]).indexOf('schedule')
+                  if (fullIndex >= 0) setStepIndex(fullIndex)
+                }}
+              />
             )}
           </div>
 

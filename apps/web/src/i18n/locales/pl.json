@@ -214,6 +214,8 @@
       "subtitle": "Zaznacz potrzebne — po onboardingu od razu trafisz do ich konfiguracji. Nie musisz wszystkiego podłączać teraz.",
       "hint_skip": "Jeśli nie masz pewności — pomiń. Wszystko dostępne w Ustawienia → Integracje w dowolnym momencie."
     },
+    "connect_now": "Podłącz",
+    "connect_loading_hint": "Połączenie jest natychmiastowe — dane zaczną się importować od razu.",
     "step1": {
       "title": "Opowiedz o salonie",
       "name_label": "Nazwa salonu",

@@ -1,4 +1,4 @@
-import { CheckCircle2, ImagePlus, Loader2, MapPin, Sparkles, Trash2 } from 'lucide-react'
+import { ImagePlus, Loader2, MapPin, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -240,38 +240,6 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
             })}
           </div>
         </Field>
-
-        {/* Бенчмарки opt-in — самая «продажная» галка. Включено по умолчанию. */}
-        <label
-          className={cn(
-            'flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all',
-            value.benchmarks_opt_in
-              ? 'border-brand-sage bg-brand-sage-soft/30'
-              : 'border-border bg-card hover:border-brand-sage/50',
-          )}
-        >
-          <input
-            type="checkbox"
-            checked={value.benchmarks_opt_in}
-            onChange={(e) => onChange({ benchmarks_opt_in: e.target.checked })}
-            className="accent-brand-sage mt-0.5 size-5 shrink-0 cursor-pointer"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-foreground inline-flex items-center gap-1.5 text-sm font-bold">
-              <Sparkles className="text-brand-sage size-4" strokeWidth={2} />
-              {t('onboarding.step1.benchmarks_title')}
-            </p>
-            <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-              {t('onboarding.step1.benchmarks_body_v2')}
-            </p>
-            {value.benchmarks_opt_in ? (
-              <p className="text-brand-sage-deep mt-1.5 inline-flex items-center gap-1 text-xs font-bold">
-                <CheckCircle2 className="size-3.5" strokeWidth={2.2} />
-                {t('onboarding.step1.benchmarks_on')}
-              </p>
-            ) : null}
-          </div>
-        </label>
       </div>
 
       <ImageCropper

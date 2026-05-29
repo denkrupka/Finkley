@@ -29,9 +29,18 @@ import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
  *   - Tab «Вручную»: 3 поля access/secret/companyId — для юзеров с 2FA или
  *     если auto-login сломался.
  */
-export function WfirmaConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function WfirmaConnectDialog({
+  open,
+  onClose,
+  salonId: salonIdProp,
+}: {
+  open: boolean
+  onClose: () => void
+  salonId?: string
+}) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const { salonId: salonIdFromUrl } = useParams<{ salonId: string }>()
+  const salonId = salonIdProp ?? salonIdFromUrl
   const [mode, setMode] = useState<'quick' | 'manual'>('quick')
 
   // Quick (X2)

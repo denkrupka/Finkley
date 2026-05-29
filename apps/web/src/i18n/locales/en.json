@@ -214,6 +214,8 @@
       "subtitle": "Check what you need — you'll land on their setup right after onboarding. No need to connect everything now.",
       "hint_skip": "If unsure — skip. Everything is available in Settings → Integrations anytime."
     },
+    "connect_now": "Connect",
+    "connect_loading_hint": "Connection is instant — data starts importing right away.",
     "step1": {
       "title": "Tell us about your salon",
       "name_label": "Salon name",

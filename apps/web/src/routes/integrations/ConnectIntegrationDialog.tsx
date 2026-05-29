@@ -37,12 +37,15 @@ function isAccountingProvider(id: IntegrationProvider): id is 'fakturownia' | 'i
 export function ConnectIntegrationDialog({
   provider,
   onClose,
+  salonId: salonIdProp,
 }: {
   provider: IntegrationDef | null
   onClose: () => void
+  salonId?: string
 }) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const { salonId: salonIdFromUrl } = useParams<{ salonId: string }>()
+  const salonId = salonIdProp ?? salonIdFromUrl
   const [values, setValues] = useState<Record<string, string>>({})
 
   const accountingId = provider && isAccountingProvider(provider.id) ? provider.id : null

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
 
+import { brandColor } from './BrandIcon'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
@@ -78,12 +79,8 @@ export function IntegrationCategoryStep({
               )}
             >
               <div
-                className={cn(
-                  'grid size-9 shrink-0 place-items-center rounded-lg',
-                  checked
-                    ? 'bg-brand-teal-deep text-white'
-                    : 'bg-brand-teal-soft text-brand-teal-deep',
-                )}
+                className="grid size-9 shrink-0 place-items-center rounded-lg text-white"
+                style={{ background: checked ? '#0d9488' : brandColor(it.id) }}
               >
                 {checked ? (
                   <Check className="size-5" strokeWidth={2.4} />

@@ -5,11 +5,12 @@ import { Suspense, useEffect, useState } from 'react'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { getDateLocale } from '@/lib/utils/format-date'
 import { useTranslation } from 'react-i18next'
-import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useParams, useSearchParams } from 'react-router-dom'
 
 import { trackUserAction } from '@/lib/analytics/track-user-action'
 
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
+import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
 import {
   DialogContent as DialogContentUi,
   DialogDescription,
@@ -61,6 +62,8 @@ export function SalonLayout() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const tourForce = searchParams.get('showTour') === '1'
   // Скрываем FAB «+Визит» на страницах-«рабочих столах» где он мешает
   // основному CTA (мессенджер имеет свою кнопку «Создать визит» в шапке чата).
   // Image #53: на /finance кнопка +Визит не релевантна — это страница для
@@ -242,6 +245,7 @@ export function SalonLayout() {
         </main>
       </div>
 
+      <OnboardingTour salonId={salon.id} force={tourForce} />
       {hideFab ? null : (
         <FAB
           onVisit={() => {

@@ -33,9 +33,18 @@ import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
  */
 type Step = 'login' | 'config'
 
-export function BooksyConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function BooksyConnectDialog({
+  open,
+  onClose,
+  salonId: salonIdProp,
+}: {
+  open: boolean
+  onClose: () => void
+  salonId?: string
+}) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const { salonId: salonIdFromUrl } = useParams<{ salonId: string }>()
+  const salonId = salonIdProp ?? salonIdFromUrl
   const [step, setStep] = useState<Step>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

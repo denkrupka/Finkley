@@ -4,7 +4,12 @@ import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { cn } from '@/lib/utils/cn'
+import { ConnectIntegrationDialog as SettingsConnectDialog } from '@/routes/integrations/ConnectIntegrationDialog'
+import { INTEGRATIONS as INTEGRATIONS_REGISTRY } from '@/routes/integrations/integrations-config'
+import { KsefConnectDialog } from '@/routes/integrations/KsefConnectDialog'
+import { WfirmaConnectDialog } from '@/routes/integrations/WfirmaConnectDialog'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
 import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
@@ -85,6 +90,10 @@ type Props = {
   /** T129 — credentials per provider. */
   credentials?: Partial<Record<OnboardingIntegration, PendingCredentials>>
   onCredentialsChange?: (id: OnboardingIntegration, creds: PendingCredentials | null) => void
+  /** Early-created salon ID. Если есть — открываем реальные connect-диалоги
+   *  провайдеров; если null — старое поведение (collect credentials, apply
+   *  после создания салона). */
+  salonId?: string | null
 }
 
 /**
@@ -103,10 +112,16 @@ export function Step3Accounting({
   onAccountingModeChange,
   credentials,
   onCredentialsChange,
+  salonId,
 }: Props) {
   const { t } = useTranslation()
-  // T122 — модалка подключения провайдера бухгалтерии при клике.
+  // T122 — модалка подключения провайдера бухгалтерии при клике (без salonId).
   const [pendingProvider, setPendingProvider] = useState<OnboardingIntegration | null>(null)
+  // Live (with salonId) — реальные диалоги провайдеров.
+  const [wfirmaOpen, setWfirmaOpen] = useState(false)
+  const [ksefOpen, setKsefOpen] = useState(false)
+  const [settingsConnectOpen, setSettingsConnectOpen] = useState<OnboardingIntegration | null>(null)
+  const { data: connected = [] } = useSalonIntegrations(salonId ?? undefined)
   // T138 — провайдеры показываем только если юзер выбрал self/app — иначе
   // бухгалтер всё ведёт сам в biuro или ничего пока нет.
   const showProviders = accountingMode === 'self' || accountingMode === 'app'
@@ -130,8 +145,24 @@ export function Step3Accounting({
   }
 
   function handleProviderClick(id: OnboardingIntegration) {
+    if (salonId) {
+      // Live mode — открываем реальный диалог провайдера.
+      if (id === 'wfirma') setWfirmaOpen(true)
+      else if (id === 'ksef') setKsefOpen(true)
+      else if (id === 'fakturownia' || id === 'infakt' || id === 'ifirma') {
+        setSettingsConnectOpen(id)
+      }
+      return
+    }
+    // Fallback: collect credentials, apply после submit.
     if (selectedIntegrations.includes(id)) onToggleIntegration?.(id)
     else setPendingProvider(id)
+  }
+
+  function isLiveConnected(id: OnboardingIntegration): boolean {
+    if (!salonId) return false
+    const c = connected.find((ci) => ci.provider === id)
+    return !!c && c.status !== 'disconnected'
   }
 
   return (
@@ -228,7 +259,7 @@ export function Step3Accounting({
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {ACCOUNTING_PROVIDERS.map((p) => {
               const id = p.id as OnboardingIntegration
-              const checked = selectedIntegrations.includes(id)
+              const checked = salonId ? isLiveConnected(id) : selectedIntegrations.includes(id)
               return (
                 <button
                   key={p.id}
@@ -274,6 +305,25 @@ export function Step3Accounting({
           }
         }}
       />
+      {salonId ? (
+        <>
+          <WfirmaConnectDialog
+            open={wfirmaOpen}
+            onClose={() => setWfirmaOpen(false)}
+            salonId={salonId}
+          />
+          <KsefConnectDialog open={ksefOpen} onClose={() => setKsefOpen(false)} salonId={salonId} />
+          <SettingsConnectDialog
+            provider={
+              settingsConnectOpen
+                ? (INTEGRATIONS_REGISTRY.find((p) => p.id === settingsConnectOpen) ?? null)
+                : null
+            }
+            onClose={() => setSettingsConnectOpen(null)}
+            salonId={salonId}
+          />
+        </>
+      ) : null}
     </div>
   )
 }

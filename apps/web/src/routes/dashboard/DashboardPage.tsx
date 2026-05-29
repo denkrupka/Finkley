@@ -16,7 +16,6 @@ import {
 
 import { supabase } from '@/lib/supabase/client'
 
-import { OnboardingTour } from '@/components/onboarding-tour/OnboardingTour'
 import { useBankAccountBalances } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import { useDashboardKpis, useTopStaff } from '@/hooks/useDashboard'
@@ -289,9 +288,6 @@ export function DashboardPage() {
       </div>
 
       {visitsCount === 0 && expenseCents === 0 ? <DashboardEmpty /> : null}
-
-      {/* Стартовый тур */}
-      <OnboardingTour salonId={salonId} force={params.get('showTour') === '1'} />
 
       {/* Сворачиваемые блоки — единственное что осталось с прошлой версии */}
       <CollapsibleSection id="lowStock" title={t('dashboard.collapsible.low_stock')} defaultOpen>

@@ -28,9 +28,18 @@ import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
  *   - поле token (длинная hex-строка)
  *   - radio test/prod environment (по умолчанию test пока MVP)
  */
-export function KsefConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function KsefConnectDialog({
+  open,
+  onClose,
+  salonId: salonIdProp,
+}: {
+  open: boolean
+  onClose: () => void
+  salonId?: string
+}) {
   const { t } = useTranslation()
-  const { salonId } = useParams<{ salonId: string }>()
+  const { salonId: salonIdFromUrl } = useParams<{ salonId: string }>()
+  const salonId = salonIdProp ?? salonIdFromUrl
 
   const [nip, setNip] = useState('')
   const [token, setToken] = useState('')
