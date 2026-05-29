@@ -287,6 +287,19 @@ UI: список с чекбоксами (имя, email из Booksy), редак
 
 ---
 
+## 10.1. Дробление initial sync (2026-05-30)
+
+Изначально `action:'sync'` без `day` всегда дёргал все три tier'а в одной edge-инвокации с порядком `[catalog, clients, visits]`. Каждый tier имеет внутренний budget (catalog без лимита, clients=50s, visits=45s). На крупных салонах суммарный walltime превышал Supabase edge limit (~150s), и **visits-tier фактически не выполнялся**. Юзер импортировал мастеров через онбординг, но `/payouts` показывал «0 PLN / 0 визитов» т.к. визиты не успели импортироваться до timeout.
+
+Фикс:
+
+1. **Default tier order сменён на `[catalog, visits, clients]`** — critical staff/services + сами визиты идут первыми. Clients-tier (с history backfill, самый длинный) уходит в конец и при необходимости резюмируется через `clients_resume_page` (T115) при следующем cron tick.
+2. **`action:'sync'` теперь принимает optional `tiers: string[]`** — позволяет UI дробить тяжёлый initial sync на отдельные edge-вызовы, каждый со своим walltime budget. `BooksyConnectDialog` после получения config делает 2 последовательных вызова: `tiers:['catalog','visits']` (ждём результат для toast), затем fire-and-forget `tiers:['clients']`.
+
+Cron-job `cron_run_booksy_syncs` продолжает работать как раньше — он сам решает какие tier'ы due (см. §2), и Supabase edge wall для каждой due-комбинации обычно укладывается в budget.
+
+---
+
 ## 11. Утверждённый выбор владельца (2026-05-19)
 
 1. **Скидка клиента:** `discount_percent` (0–100).

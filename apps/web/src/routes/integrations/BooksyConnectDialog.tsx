@@ -208,27 +208,39 @@ export function BooksyConnectDialog({
       {
         onSuccess: () => {
           toast.success(t('integrations.toast_connected', { name: 'Booksy' }))
-          // Полный sync (мастера + услуги + клиенты + история визитов)
-          // занимает минуты — НЕ ждём его завершения, иначе диалог «висит»
-          // и юзер не понимает что происходит. Запускаем в фоне с
-          // отдельным toast о прогрессе, диалог закрываем сразу.
+          // Initial sync дробим на ДВЕ edge-инвокации, чтобы не упереться
+          // в Supabase walltime (~150s) и точно успеть импортировать визиты:
+          //   фаза 1 — catalog (staff/services/часы) + visits (±60 дн)
+          //   фаза 2 — clients с history backfill (самая длинная, может
+          //            резюмироваться через clients_resume_page при cron
+          //            tick — см. T115)
+          // До фикса все 3 tier'а шли одним вызовом, calendar+clients
+          // съедали весь walltime и до syncVisits дело не доходило →
+          // /payouts показывал «0 PLN / 0 визитов» после импорта мастеров.
+          // См. ADR-017 §10.1.
           toast.info(t('integrations.toast_sync_started', { name: 'Booksy' }), {
             duration: 6000,
           })
-          booksySync.mutate(undefined, {
-            onSuccess: (stats) => {
-              toast.success(
-                t('integrations.toast_synced', {
-                  staff: stats?.staff_synced ?? 0,
-                  services: stats?.services_synced ?? 0,
-                  visits: stats?.visits_synced ?? 0,
-                }),
-              )
+          booksySync.mutate(
+            { tiers: ['catalog', 'visits'] },
+            {
+              onSuccess: (stats) => {
+                toast.success(
+                  t('integrations.toast_synced', {
+                    staff: stats?.staff_synced ?? 0,
+                    services: stats?.services_synced ?? 0,
+                    visits: stats?.visits_synced ?? 0,
+                  }),
+                )
+                // Фаза 2 — clients (fire-and-forget, ошибки тихие — cron
+                // подтянет на следующем тике через clients_resume_page).
+                booksySync.mutate({ tiers: ['clients'] }, { onError: () => undefined })
+              },
+              onError: (err) => {
+                toast.error(err instanceof Error ? err.message : String(err))
+              },
             },
-            onError: (err) => {
-              toast.error(err instanceof Error ? err.message : String(err))
-            },
-          })
+          )
           onClose()
         },
         onError: (err) => {

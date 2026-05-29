@@ -2932,6 +2932,7 @@ async function handleSync(
   userId: string,
   salonId: string,
   day?: string,
+  tiers?: ('catalog' | 'clients' | 'visits')[],
 ): Promise<Response> {
   if (!(await ensureMember(admin, userId, salonId))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403)
@@ -2951,7 +2952,21 @@ async function handleSync(
     }
     return jsonResponse({ ok: true, stats: res.stats, day })
   }
-  const res = await runSyncForSalon(admin, salonId, ['catalog', 'clients', 'visits'])
+  // Если клиент передал явный список tiers — используем его (позволяет
+  // дробить тяжёлый initial sync на отдельные edge-вызовы, каждый со
+  // своим walltime budget — иначе Supabase edge ~150s wall не успевает
+  // обработать [catalog, clients, visits] подряд и до visits не доходит,
+  // юзер видит «0 PLN / 0 визитов» в /payouts).
+  // Default — [catalog, visits, clients]: critical staff/services + сами
+  // визиты идут ПЕРВЫМИ, чтобы выручка мастеров считалась даже когда
+  // clients-tier (самый длинный) обрывается по walltime. Clients-tier
+  // при необходимости резюмируется через clients_resume_page (T115).
+  // См. ADR-017 §10.1.
+  const safeTiers = (tiers ?? []).filter(
+    (t) => t === 'catalog' || t === 'clients' || t === 'visits',
+  )
+  const useTiers = safeTiers.length > 0 ? safeTiers : (['catalog', 'visits', 'clients'] as const)
+  const res = await runSyncForSalon(admin, salonId, [...useTiers])
   if (!res.ok) {
     return jsonResponse({ ok: false, error: 'sync_failed', message: res.message }, res.status)
   }
@@ -3120,7 +3135,7 @@ Deno.serve(
         }
         return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
       case 'sync':
-        return handleSync(admin, userId, body.salon_id, body.day)
+        return handleSync(admin, userId, body.salon_id, body.day, body.tiers)
       case 'clear_visits':
         return handleClearVisits(admin, userId, body.salon_id)
       case 'backfill_appt_uids':

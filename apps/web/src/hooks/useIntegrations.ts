@@ -201,27 +201,40 @@ export function useBooksySyncDay(salonId: string | undefined) {
   })
 }
 
-/** Триггер синка Booksy (полный — staff/services/visits). */
+export type BooksySyncInput = { tiers?: ('catalog' | 'clients' | 'visits')[] } | undefined
+export type BooksySyncStats = {
+  staff_synced?: number
+  services_synced?: number
+  visits_synced?: number
+  reservations_synced?: number
+  clients_synced?: number
+}
+
+/**
+ * Триггер синка Booksy. По умолчанию — полный (staff/services/visits/clients).
+ * Можно передать `tiers` для частичного синка — критично при initial connect,
+ * когда нужно дробить вызовы чтобы не упереться в Supabase edge walltime
+ * (~150s) и точно успеть импортировать visits, а не только catalog+clients.
+ * См. ADR-017 §10.1.
+ */
 export function useBooksySync(salonId: string | undefined) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
+  return useMutation<BooksySyncStats, Error, BooksySyncInput>({
+    mutationFn: async (input?: BooksySyncInput) => {
       if (!salonId) throw new Error('no salon')
-      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
-        body: { action: 'sync', salon_id: salonId },
-      })
+      const body: {
+        action: 'sync'
+        salon_id: string
+        tiers?: ('catalog' | 'clients' | 'visits')[]
+      } = { action: 'sync', salon_id: salonId }
+      if (input?.tiers && input.tiers.length > 0) body.tiers = input.tiers
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', { body })
       if (error) throw error
       const json = data as {
         ok?: boolean
         error?: string
         message?: string
-        stats?: {
-          staff_synced?: number
-          services_synced?: number
-          visits_synced?: number
-          reservations_synced?: number
-          clients_synced?: number
-        }
+        stats?: BooksySyncStats
       }
       if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
       return json.stats ?? {}
@@ -232,6 +245,7 @@ export function useBooksySync(salonId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['services', salonId] })
       qc.invalidateQueries({ queryKey: ['visits', salonId] })
       qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
+      qc.invalidateQueries({ queryKey: ['payouts', salonId] })
     },
   })
 }
