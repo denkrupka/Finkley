@@ -193,7 +193,7 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [force])
 
-  function dismiss() {
+  function dismiss(opts?: { navigateHome?: boolean }) {
     try {
       localStorage.setItem(STORAGE_KEY, '1')
       localStorage.removeItem(STORAGE_STEP_KEY)
@@ -201,6 +201,9 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
       // ignore
     }
     setOpen(false)
+    // В конце тура — на дашборд, чтобы запустился локальный PageTour
+    // дашборда (он ждёт MAIN_TOUR_KEY=1, теперь это true).
+    if (opts?.navigateHome && salonId) navigate(`/${salonId}/dashboard`)
   }
 
   const step = steps[Math.min(stepIndex, steps.length - 1)]!
@@ -223,7 +226,8 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
   if (!open) return null
 
   function next() {
-    if (isLast) dismiss()
+    // Финиш тура → редирект на дашборд (там запустится локальный PageTour).
+    if (isLast) dismiss({ navigateHome: true })
     else setStepIndex((i) => i + 1)
   }
 

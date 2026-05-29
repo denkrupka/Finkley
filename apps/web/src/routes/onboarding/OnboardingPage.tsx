@@ -806,7 +806,7 @@ export function OnboardingPage() {
                     <div
                       className={cn(
                         'h-[5px] w-full rounded-full',
-                        done || active ? 'bg-primary' : 'bg-border',
+                        done ? 'bg-brand-sage' : active ? 'bg-primary' : 'bg-border',
                       )}
                     />
                     {active ? (

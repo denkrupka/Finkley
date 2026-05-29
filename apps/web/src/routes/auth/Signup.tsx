@@ -45,6 +45,19 @@ export function SignupPage() {
       values.password,
     )
     if (error) {
+      // Supabase возвращает "User already registered" /
+      // "user already exists" / 422 — показываем понятный текст под
+      // полем email вместо generic-ошибки.
+      const msg = error.message || ''
+      const isDuplicate =
+        /already registered|already exists|email.*taken|user_already_exists/i.test(msg)
+      if (isDuplicate) {
+        form.setError('email', {
+          type: 'manual',
+          message: 'auth.errors.email_already_used',
+        })
+        return
+      }
       setServerError(error.message)
       return
     }

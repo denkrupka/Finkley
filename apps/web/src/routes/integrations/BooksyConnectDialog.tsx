@@ -51,6 +51,11 @@ export function BooksyConnectDialog({
   const [interval, setInterval] = useState<number>(60)
   const [captchaReady, setCaptchaReady] = useState(false)
   const [captchaError, setCaptchaError] = useState<string | null>(null)
+  // Local pending state — между кликом на «Подключить» и моментом когда
+  // booksyLogin.isPending становится true, hCaptcha.execute() выполняет
+  // challenge. Это секунды. Без локального флага юзер успевал кликнуть
+  // дважды.
+  const [solvingCaptcha, setSolvingCaptcha] = useState(false)
   const captchaContainerRef = useRef<HTMLDivElement | null>(null)
   const widgetIdRef = useRef<string | number | null>(null)
 
@@ -62,7 +67,9 @@ export function BooksyConnectDialog({
   const updateInterval = useUpdateBooksyInterval(salonId)
   const updateConfig = useUpdateBooksyConfig(salonId)
   const booksySync = useBooksySync(salonId)
-  const isPending = booksyLogin.isPending || updateConfig.isPending || booksySync.isPending
+  // solvingCaptcha покрывает паузу между кликом и началом booksyLogin.mutate.
+  const isPending =
+    solvingCaptcha || booksyLogin.isPending || updateConfig.isPending || booksySync.isPending
 
   useEffect(() => {
     if (!open) {
@@ -71,6 +78,7 @@ export function BooksyConnectDialog({
       setPassword('')
       setInterval(60)
       setCaptchaError(null)
+      setSolvingCaptcha(false)
       setMarksPaymentsInBooksy(null)
       setDeletesVisitsInBooksy(null)
       return
@@ -141,6 +149,10 @@ export function BooksyConnectDialog({
   }
 
   async function handleLoginSubmit() {
+    // Guard от двойного клика: между нажатием и moment'ом когда
+    // booksyLogin.isPending=true, hCaptcha.execute() занимает секунды
+    // (invisible challenge). Без этого юзер успевал кликнуть второй раз.
+    if (solvingCaptcha || booksyLogin.isPending) return
     if (!email.trim() || !password) {
       toast.error(t('integrations.errors.fields_required'))
       return
@@ -149,11 +161,13 @@ export function BooksyConnectDialog({
       toast.error(t('integrations.errors.captcha_not_ready'))
       return
     }
+    setSolvingCaptcha(true)
     let captchaToken: string
     try {
       const res = await window.hcaptcha.execute(widgetIdRef.current, { async: true })
       captchaToken = res.response
     } catch (e) {
+      setSolvingCaptcha(false)
       toast.error(t('integrations.errors.captcha_solve_failed'))
       console.warn('hcaptcha execute failed:', e)
       return
@@ -162,10 +176,12 @@ export function BooksyConnectDialog({
       { email: email.trim(), password, captchaToken },
       {
         onSuccess: () => {
+          setSolvingCaptcha(false)
           updateInterval.mutate(interval)
           setStep('config')
         },
         onError: (err) => {
+          setSolvingCaptcha(false)
           if (err instanceof Error && /^[a-z_]+$/.test(err.message)) {
             toast.error(explainBooksyError(err.message))
           } else {
@@ -192,11 +208,28 @@ export function BooksyConnectDialog({
       {
         onSuccess: () => {
           toast.success(t('integrations.toast_connected', { name: 'Booksy' }))
-          // Триггерим полный sync СРАЗУ (не ждём 2-минутного cron'а) —
-          // чтобы invite-модалка увидела импортированных мастеров.
-          booksySync.mutate(undefined, {
-            onSettled: () => onClose(),
+          // Полный sync (мастера + услуги + клиенты + история визитов)
+          // занимает минуты — НЕ ждём его завершения, иначе диалог «висит»
+          // и юзер не понимает что происходит. Запускаем в фоне с
+          // отдельным toast о прогрессе, диалог закрываем сразу.
+          toast.info(t('integrations.toast_sync_started', { name: 'Booksy' }), {
+            duration: 6000,
           })
+          booksySync.mutate(undefined, {
+            onSuccess: (stats) => {
+              toast.success(
+                t('integrations.toast_synced', {
+                  staff: stats?.staff_synced ?? 0,
+                  services: stats?.services_synced ?? 0,
+                  visits: stats?.visits_synced ?? 0,
+                }),
+              )
+            },
+            onError: (err) => {
+              toast.error(err instanceof Error ? err.message : String(err))
+            },
+          })
+          onClose()
         },
         onError: (err) => {
           toast.error(err instanceof Error ? err.message : String(err))

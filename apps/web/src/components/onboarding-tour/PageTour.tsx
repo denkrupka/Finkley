@@ -10,6 +10,9 @@ import { cn } from '@/lib/utils/cn'
 import { tooltipPosition, useTargetRect, type TourStep } from './tour-internals'
 
 const STORAGE_PREFIX = 'finkley:tour:page:'
+/** Главный OnboardingTour key — должен быть пройден/пропущен ДО любого
+ *  per-page тура. Иначе два overlay'я накладываются (image #15). */
+const MAIN_TOUR_KEY = 'finkley:tour:dismissed'
 
 type Role = 'owner' | 'admin' | 'staff' | 'accountant'
 
@@ -52,6 +55,10 @@ export function PageTour({
       return
     }
     try {
+      // Сначала проверяем главный тур — пока он не пройден, per-page
+      // туры не запускаются автоматически (только через force=true).
+      const mainTourDone = localStorage.getItem(MAIN_TOUR_KEY) === '1'
+      if (!mainTourDone) return
       const dismissed = localStorage.getItem(STORAGE_PREFIX + name) === '1'
       if (!dismissed) setOpen(true)
     } catch {
