@@ -12,6 +12,10 @@ export type ServiceRow = {
   /** Себестоимость одной оказанной услуги в центах. NULL = не задана. */
   cost_cents: number | null
   is_archived: boolean
+  /** Booksy / iCal / другой провайдер если импортировано извне. NULL =
+   *  создано вручную в Finkley. */
+  external_source: string | null
+  external_id: string | null
   // Capacity-planning параметры (миграция 20260513000002)
   staff_count_required: number
   avg_service_hours: number
@@ -53,7 +57,7 @@ export function useServices(salonId: string | undefined) {
       const { data, error } = await supabase
         .from('services')
         .select(
-          'id, salon_id, category_id, name, default_price_cents, default_duration_min, cost_cents, is_archived, staff_count_required, avg_service_hours, staff_work_hours_per_day, staff_work_days_per_month, utilization_pct, avg_check_cents, staff_payout_pct, materials_pct',
+          'id, salon_id, category_id, name, default_price_cents, default_duration_min, cost_cents, is_archived, external_source, external_id, staff_count_required, avg_service_hours, staff_work_hours_per_day, staff_work_days_per_month, utilization_pct, avg_check_cents, staff_payout_pct, materials_pct',
         )
         .eq('salon_id', salonId)
         .eq('is_archived', false)

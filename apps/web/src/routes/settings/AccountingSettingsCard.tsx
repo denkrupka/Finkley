@@ -45,13 +45,7 @@ import {
  * аккаунту email в «Пользователях», портал будет сам слать ему расходы.
  */
 
-const PORTAL_OPTIONS: Array<{ value: string; label: string; integration_provider?: string }> = [
-  { value: 'wfirma', label: 'wFirma', integration_provider: 'wfirma' },
-  { value: 'fakturownia', label: 'Fakturownia', integration_provider: 'fakturownia' },
-  { value: 'infakt', label: 'inFakt', integration_provider: 'infakt' },
-  { value: 'ksef', label: 'KSeF (Krajowy System e-Faktur)', integration_provider: 'ksef' },
-  { value: 'other', label: 'Другой портал (укажу название)' },
-]
+import { ACCOUNTING_PORTAL_OPTIONS as PORTAL_OPTIONS } from '@/lib/integrations/portals'
 
 export function AccountingSettingsCard({ salonId }: { salonId: string }) {
   const { t } = useTranslation()

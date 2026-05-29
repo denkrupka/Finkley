@@ -273,19 +273,17 @@ export function OnboardingPage() {
     let cancelled = false
     async function hydrate() {
       try {
+        const cols =
+          'id, onboarding_state, onboarding_step_id, onboarding_completed_at, opening_hours, address, city, lat, lng, google_place_id, google_place_url'
         const querySalonId = searchParams.get('salon')
         const querySalon = querySalonId
-          ? await supabase
-              .from('salons')
-              .select('id, onboarding_state, onboarding_step_id, onboarding_completed_at')
-              .eq('id', querySalonId)
-              .maybeSingle()
+          ? await supabase.from('salons').select(cols).eq('id', querySalonId).maybeSingle()
           : null
         const myUnfinishedRes = querySalon?.data
           ? null
           : await supabase
               .from('salons')
-              .select('id, onboarding_state, onboarding_step_id, onboarding_completed_at')
+              .select(cols)
               .is('onboarding_completed_at', null)
               .order('created_at', { ascending: false })
               .limit(1)
@@ -295,12 +293,34 @@ export function OnboardingPage() {
           onboarding_state: OnboardingState | null
           onboarding_step_id: string | null
           onboarding_completed_at: string | null
+          opening_hours: OpeningHoursDraft | null
+          address: string | null
+          city: string | null
+          lat: number | null
+          lng: number | null
+          google_place_id: string | null
+          google_place_url: string | null
         } | null
         if (cancelled || !row || row.onboarding_completed_at) return
+        // Booksy импортирует opening_hours и Google Place — подтягиваем
+        // из salons чтобы юзер видел реальный график/адрес, а не дефолтный
+        // 09:00-20:00.
+        const dbExtras: Partial<OnboardingState> = {}
+        if (row.opening_hours) dbExtras.opening_hours = row.opening_hours
+        if (row.address || row.city || row.google_place_id) {
+          dbExtras.address = {
+            address: row.address ?? '',
+            city: row.city ?? '',
+            lat: row.lat != null ? String(row.lat) : '',
+            lng: row.lng != null ? String(row.lng) : '',
+            google_place_id: row.google_place_id,
+            google_place_url: row.google_place_url,
+          }
+        }
         if (row.onboarding_state) {
-          setState({ ...row.onboarding_state, created_salon_id: row.id })
+          setState({ ...row.onboarding_state, ...dbExtras, created_salon_id: row.id })
         } else {
-          setState((prev) => ({ ...prev, created_salon_id: row.id }))
+          setState((prev) => ({ ...prev, ...dbExtras, created_salon_id: row.id }))
         }
         // stepId восстановим после первого render (нужен STEPS массив).
         if (row.onboarding_step_id) {

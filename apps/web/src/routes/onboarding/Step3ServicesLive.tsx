@@ -175,14 +175,26 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
                         'grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px_120px_44px] sm:items-center',
                       )}
                     >
-                      <Input
-                        defaultValue={s.name}
-                        onBlur={(e) => {
-                          if (e.target.value !== s.name)
-                            updateService(s.id, { name: e.target.value })
-                        }}
-                        className="h-9 text-sm"
-                      />
+                      <div className="relative flex items-center">
+                        <Input
+                          defaultValue={s.name}
+                          onBlur={(e) => {
+                            if (e.target.value !== s.name)
+                              updateService(s.id, { name: e.target.value })
+                          }}
+                          className="h-9 text-sm"
+                        />
+                        {s.external_source === 'booksy' ? (
+                          <span
+                            className="bg-brand-teal-soft text-brand-teal-deep absolute right-2 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                            title={t('onboarding.step3.imported_from_booksy', {
+                              defaultValue: 'Импортировано из Booksy',
+                            })}
+                          >
+                            Booksy
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
                         <input
                           type="number"
