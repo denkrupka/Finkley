@@ -257,7 +257,12 @@ export function OnboardingPage() {
   }, [])
 
   // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
-  const STEPS: readonly StepId[] = state.path === 'full' ? STEPS_FULL : STEPS_QUICK
+  // Address-шаг скипаем если на Step "salon" юзер уже выбрал место в Google
+  // Maps — адрес, координаты и google_place_id оттуда подтянулись, ещё раз
+  // показывать форму нет смысла.
+  const STEPS: readonly StepId[] = (state.path === 'full' ? STEPS_FULL : STEPS_QUICK).filter(
+    (s) => !(s === 'address' && state.address.google_place_id),
+  )
   const stepId: StepId = (STEPS[stepIndex] ?? 'path') as StepId
   const isFirst = stepIndex === 0
   const isLast = stepIndex === STEPS.length - 1
@@ -788,30 +793,27 @@ export function OnboardingPage() {
               </span>
               <span className="text-muted-foreground text-xs">{t('onboarding.eta')}</span>
             </div>
-            <div className="flex gap-2">
+            {/* На full ветке 21 шаг — подписи под каждой полоской не помещаются
+                в строку (разъезжаются на 2 строки, последние шаги ловят
+                raw-ключ). Показываем подпись ТОЛЬКО под active шагом, для
+                остальных — компактная полоска без подписи. */}
+            <div className="flex items-center gap-1.5">
               {STEPS.map((s, i) => {
                 const active = i === stepIndex
                 const done = i < stepIndex
                 return (
-                  <div key={s} className="flex-1">
+                  <div key={s} className="flex flex-1 flex-col items-center">
                     <div
                       className={cn(
-                        'mb-2 h-[5px] rounded-full',
+                        'h-[5px] w-full rounded-full',
                         done || active ? 'bg-primary' : 'bg-border',
                       )}
                     />
-                    <div
-                      className={cn(
-                        'text-[11.5px]',
-                        active
-                          ? 'text-brand-navy font-bold'
-                          : done
-                            ? 'text-foreground font-medium'
-                            : 'text-brand-text-faint font-medium',
-                      )}
-                    >
-                      {t(`onboarding.steps.${s}`)}
-                    </div>
+                    {active ? (
+                      <div className="text-brand-navy mt-2 truncate text-[12px] font-bold">
+                        {t(`onboarding.steps.${s}`)}
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
