@@ -4632,7 +4632,9 @@
       "ai_panel_show": "Показать",
       "ai_panel_refresh": "Обновить",
       "open_competitor": "Открыть страницу «{{name}}»",
-      "content_no_social_hint": "Чтобы данные о Контенте подгрузились — добавь у своего салона ссылку на Instagram или Facebook страницу в Settings → Профиль, и подключи OAuth Instagram Business в Settings → Соцсети. Без этого мы не знаем какие страницы анализировать."
+      "content_no_social_hint": "Чтобы данные о Контенте подгрузились — добавь у своего салона ссылку на Instagram или Facebook страницу в Settings → Профиль, и подключи OAuth Instagram Business в Settings → Соцсети. Без этого мы не знаем какие страницы анализировать.",
+      "occupancy_closed_short": "закрыто",
+      "occupancy_cell_summary": "{{days}}/7 дн · {{staff}} {{staffLabel}}"
     }
   },
   "finance": {

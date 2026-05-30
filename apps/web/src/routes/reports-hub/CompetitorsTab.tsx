@@ -1740,7 +1740,7 @@ function OccupancyTable({
           className="text-[11px] text-amber-700"
           title={t('reports_hub.competitors.occupancy_closed_to_public')}
         >
-          {t('reports_hub.competitors.occupancy_closed_short', { defaultValue: 'закрыто' })}
+          {t('reports_hub.competitors.occupancy_closed_short')}
         </span>
       )
     }
@@ -1749,7 +1749,6 @@ function OccupancyTable({
         <span className="num text-foreground text-base font-bold">{cell.free_slots_7d}</span>
         <span className="text-muted-foreground/80 text-[10px]">
           {t('reports_hub.competitors.occupancy_cell_summary', {
-            defaultValue: '{{days}}/7 дн · {{staff}} {{staffLabel}}',
             days: cell.days_covered,
             staff: cell.staff_count,
             staffLabel: t('reports_hub.competitors.col_staff_count').toLowerCase(),
