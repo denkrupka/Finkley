@@ -664,7 +664,6 @@ function DetailView({
                   Math.max(0, total - groupLines[0].paid_amount_cents),
                   currency,
                 ),
-                defaultValue: 'Получено {{paid}} · осталось {{remaining}}',
               })}
             </p>
           ) : null}
