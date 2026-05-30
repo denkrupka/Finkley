@@ -4051,7 +4051,12 @@
     "stripe_cancel": "Подписка отменена. Можешь продолжить подключение интеграций без trial.",
     "toast_backfill_done": "Починено {{patched}} визитов из {{scanned}}",
     "backfill_appt_uids_hint": "Восстановить связь legacy-визитов с Booksy чтобы delete каскадил",
-    "backfill_appt_uids": "Починить legacy связь"
+    "backfill_appt_uids": "Починить legacy связь",
+    "force_history_resync": "Перезагрузить историю",
+    "force_history_resync_hint": "Подтянуть все старые визиты (Booksy /calendar отдаёт только ±60 дней; история берётся из /customers/{id}/bookings)",
+    "confirm_force_history_resync": "Перезагрузить полную историю визитов из Booksy для всех клиентов? Дубликаты не создадутся. Может занять несколько минут — если не успеет за один раз, продолжит при следующем нажатии.",
+    "toast_force_history_done": "История загружена: обработано {{processed}} из {{total}} клиентов, добавлено {{visits}} визитов",
+    "toast_force_history_partial": "Обработано {{processed}} из {{total}} клиентов, добавлено {{visits}} визитов. Нажми ещё раз чтобы продолжить."
   },
   "import": {
     "title": "Импорт визитов из CSV",

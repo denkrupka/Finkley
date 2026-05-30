@@ -25,6 +25,7 @@ import {
   useBackfillBooksyApptUids,
   useClearBooksyVisits,
   useDisconnectIntegration,
+  useForceBooksyHistoryResync,
   useKsefSync,
   useSalonIntegrations,
   useUpdateBooksyInterval,
@@ -359,6 +360,7 @@ function IntegrationCard({
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
   const backfillAppts = useBackfillBooksyApptUids(salonId)
+  const forceHistoryResync = useForceBooksyHistoryResync(salonId)
   const updateInterval = useUpdateBooksyInterval(salonId)
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
@@ -582,6 +584,46 @@ function IntegrationCard({
                   {backfillAppts.isPending
                     ? t('common.loading')
                     : t('integrations.backfill_appt_uids')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm(t('integrations.confirm_force_history_resync'))) return
+                    forceHistoryResync.mutate(undefined, {
+                      onSuccess: (stats) => {
+                        const processed = stats.clients_processed ?? 0
+                        const total = stats.clients_total ?? 0
+                        const visits = stats.history_visits_synced ?? 0
+                        if (stats.finished) {
+                          toast.success(
+                            t('integrations.toast_force_history_done', {
+                              processed,
+                              total,
+                              visits,
+                            }),
+                          )
+                        } else {
+                          toast.info(
+                            t('integrations.toast_force_history_partial', {
+                              processed,
+                              total,
+                              visits,
+                            }),
+                            { duration: 8000 },
+                          )
+                        }
+                      },
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : String(err)),
+                    })
+                  }}
+                  disabled={forceHistoryResync.isPending}
+                  className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
+                  title={t('integrations.force_history_resync_hint')}
+                >
+                  {forceHistoryResync.isPending
+                    ? t('common.loading')
+                    : t('integrations.force_history_resync')}
                 </button>
               </>
             ) : null}

@@ -2927,6 +2927,185 @@ async function runSyncForSalon(
   return { ok: true, stats }
 }
 
+/**
+ * Force resync historical bookings для ВСЕХ существующих клиентов салона.
+ *
+ * Booksy /calendar endpoint глубже ~60 дней истории не отдаёт, поэтому
+ * единственный источник старых визитов — /customers/{id}/bookings?state=inactive.
+ * Стандартный clients-tier sync вызывает `backfillCustomerHistory` только
+ * для НОВЫХ клиентов (gated by `isNew || !existing.external_snapshot`),
+ * чтобы не тяжелить регулярный синк. Этот action снимает gate и проходит
+ * по всем уже импортированным клиентам.
+ *
+ * Идемпотентно: `insertHistoricalBooking` использует
+ * `onConflict: 'salon_id,source,external_id'` + `ignoreDuplicates: true`,
+ * поэтому повторный запуск НЕ создаст дубликатов визитов.
+ *
+ * Walltime-aware: лимит 50s (Supabase edge ~150s wall), при привышении —
+ * сохраняем resume-индекс в meta.history_resume_idx и завершаемся; следующий
+ * запуск продолжит с того же места. Reset clients_resume_page=1 сразу,
+ * чтобы при следующем регулярном sync обновился snapshot.
+ */
+async function handleForceResyncHistory(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+
+  const { data: integration } = await admin
+    .from('salon_integrations')
+    .select('credentials, config, meta')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .eq('status', 'connected')
+    .maybeSingle()
+  if (!integration) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+
+  const creds = integration.credentials as { access_token: string; business_id: number }
+  const config = (integration.config as BooksyConfig | null) ?? {}
+  const meta = (integration.meta as Record<string, unknown> | null) ?? {}
+
+  // Сразу сбрасываем clients_resume_page чтобы следующий регулярный sync
+  // прошёл по всем клиентам с первой страницы (актуализирует snapshot).
+  await admin
+    .from('salon_integrations')
+    .update({ meta: { ...meta, clients_resume_page: 1 } })
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+
+  // Caches для resolve booksy_id → uuid
+  const caches = await buildResolveCaches(admin, salonId)
+  const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
+
+  // Маппинг payment_method → cash_register_id (та же логика что в syncClients)
+  const cashRegisterByMethod: Record<string, string> = {}
+  const { data: pmRows } = await admin
+    .from('payment_methods')
+    .select('code, cash_register_id, is_archived')
+    .eq('salon_id', salonId)
+  for (const r of (pmRows ?? []) as Array<{
+    code?: string
+    cash_register_id?: string | null
+    is_archived?: boolean
+  }>) {
+    if (r.is_archived) continue
+    if (r.code && r.cash_register_id) cashRegisterByMethod[r.code] = r.cash_register_id
+  }
+  if (Object.keys(cashRegisterByMethod).length === 0) {
+    const { data: salonForMapping } = await admin
+      .from('salons')
+      .select('financial_settings')
+      .eq('id', salonId)
+      .maybeSingle()
+    type FinCashItem = {
+      id?: string
+      archived?: boolean
+      payment_method_mapping?: string | null
+    }
+    const finSettings =
+      (salonForMapping?.financial_settings as {
+        cash_registers?: { items?: FinCashItem[] }
+      } | null) ?? null
+    for (const item of finSettings?.cash_registers?.items ?? []) {
+      if (item.archived) continue
+      if (item.payment_method_mapping && item.id) {
+        cashRegisterByMethod[item.payment_method_mapping] = item.id
+      }
+    }
+  }
+
+  // Берём всех клиентов салона импортированных из Booksy. Сортируем по id
+  // для стабильного порядка между запусками — `history_resume_idx` тогда
+  // имеет смысл как «номер клиента в этом упорядоченном списке».
+  const { data: clientsRaw } = await admin
+    .from('clients')
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'booksy')
+    .not('external_id', 'is', null)
+    .order('id', { ascending: true })
+
+  const clients = (clientsRaw ?? []).filter(
+    (c): c is { id: string; external_id: string } => !!c.external_id,
+  )
+  const totalClients = clients.length
+
+  const resumeIdxRaw = Number(meta.history_resume_idx ?? 0)
+  const startIdx =
+    Number.isFinite(resumeIdxRaw) && resumeIdxRaw >= 0 && resumeIdxRaw < totalClients
+      ? resumeIdxRaw
+      : 0
+
+  const startTs = Date.now()
+  const BUDGET_MS = 50_000
+
+  let processed = 0
+  let historyVisitsAdded = 0
+  let lastProcessedIdx = startIdx - 1
+
+  for (let i = startIdx; i < totalClients; i++) {
+    if (Date.now() - startTs > BUDGET_MS) break
+    const c = clients[i]
+    const customerExtId = Number.parseInt(c.external_id, 10)
+    if (!Number.isFinite(customerExtId)) {
+      lastProcessedIdx = i
+      continue
+    }
+    const added = await backfillCustomerHistory(
+      admin,
+      salonId,
+      creds.access_token,
+      creds.business_id,
+      customerExtId,
+      c.id,
+      caches,
+      existingVisitsExt,
+      config,
+      cashRegisterByMethod,
+    )
+    historyVisitsAdded += added
+    processed++
+    lastProcessedIdx = i
+  }
+
+  // Resume-state: если дошли до конца — сбрасываем, иначе сохраняем
+  // индекс СЛЕДУЮЩЕГО к обработке клиента.
+  const finished = lastProcessedIdx >= totalClients - 1
+  const nextResumeIdx = finished ? 0 : lastProcessedIdx + 1
+  const { data: freshInteg } = await admin
+    .from('salon_integrations')
+    .select('meta')
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+    .maybeSingle()
+  const freshMeta = (freshInteg?.meta as Record<string, unknown> | null) ?? {}
+  await admin
+    .from('salon_integrations')
+    .update({
+      meta: {
+        ...freshMeta,
+        history_resume_idx: nextResumeIdx,
+        history_last_run_at: new Date().toISOString(),
+      },
+    })
+    .eq('salon_id', salonId)
+    .eq('provider', 'booksy')
+
+  return jsonResponse({
+    ok: true,
+    stats: {
+      clients_total: totalClients,
+      clients_processed: processed,
+      history_visits_synced: historyVisitsAdded,
+      finished,
+      resume_idx: nextResumeIdx,
+    },
+  })
+}
+
 async function handleSync(
   admin: SupabaseClient,
   userId: string,
@@ -3136,6 +3315,8 @@ Deno.serve(
         return handleLoginWithToken(admin, userId, body.salon_id, body.access_token)
       case 'sync':
         return handleSync(admin, userId, body.salon_id, body.day, body.tiers)
+      case 'force_resync_history':
+        return handleForceResyncHistory(admin, userId, body.salon_id)
       case 'clear_visits':
         return handleClearVisits(admin, userId, body.salon_id)
       case 'backfill_appt_uids':

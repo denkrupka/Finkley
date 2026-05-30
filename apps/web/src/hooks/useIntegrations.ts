@@ -323,6 +323,55 @@ export function useClearBooksyVisits(salonId: string | undefined) {
 }
 
 /**
+ * Force-resync исторических визитов для ВСЕХ booksy-клиентов салона.
+ *
+ * Booksy /calendar отдаёт максимум ±60 дней истории — старые визиты
+ * приходят только через /customers/{id}/bookings?state=inactive. Регулярный
+ * sync дёргает этот endpoint только для НОВЫХ клиентов; уже импортированные
+ * остаются без истории. Этот action проходит по всем клиентам салона и
+ * подгружает их историю заново.
+ *
+ * Walltime-aware: edge function режется по 50s, недообработанные клиенты
+ * сохраняются в `meta.history_resume_idx` и подхватятся при следующем
+ * нажатии кнопки. UI отображает `finished` флаг чтобы юзер знал когда
+ * закончилось.
+ *
+ * Идемпотентно: `insertHistoricalBooking` использует ON CONFLICT DO NOTHING
+ * через `onConflict: 'salon_id,source,external_id'` + `ignoreDuplicates: true`.
+ */
+export function useForceBooksyHistoryResync(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('booksy-proxy', {
+        body: { action: 'force_resync_history', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as {
+        ok?: boolean
+        error?: string
+        message?: string
+        stats?: {
+          clients_total?: number
+          clients_processed?: number
+          history_visits_synced?: number
+          finished?: boolean
+          resume_idx?: number
+        }
+      }
+      if (!json.ok) throw new Error(json.message ?? json.error ?? 'force_resync_failed')
+      return json.stats ?? {}
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+      qc.invalidateQueries({ queryKey: ['payouts', salonId] })
+    },
+  })
+}
+
+/**
  * Одноразовый backfill external_reservation_id для legacy визитов,
  * импортированных до фикса сохранения appointment_uid. Без этого
  * delete визита в портале не каскадит в Booksy.
