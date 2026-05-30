@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Medal } from 'lucide-react'
+import { AlertCircle, Medal } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -236,40 +236,42 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
         {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* T85 — без horizontal-scroll. Padding/font сжаты, (n/m) суффиксы
+          переведены в подстрочный font-[10px] чтобы не съедать ширину. */}
+      <div>
+        <table className="w-full text-xs">
           <thead>
-            <tr className="text-muted-foreground border-border border-b text-left text-xs">
-              <th className="py-2 pr-3 font-semibold">{t('staff.performance.col_master')}</th>
-              <th className="py-2 pr-3 text-right font-semibold">
+            <tr className="text-muted-foreground border-border border-b text-left text-[10px] uppercase tracking-wider">
+              <th className="py-2 pr-2 font-semibold">{t('staff.performance.col_master')}</th>
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_visits')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_visits_revenue')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_retail_revenue')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_tips')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_revenue')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_share')}
               </th>
-              <th className="py-2 pr-3 text-right font-semibold">
+              <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_clients')}
               </th>
               <th
-                className="py-2 pr-3 text-right font-semibold"
+                className="py-2 pr-2 text-right font-semibold"
                 title={t('staff.performance.col_retention_new_hint')}
               >
                 {t('staff.performance.col_retention_new')}
               </th>
               <th
-                className="py-2 pr-3 text-right font-semibold"
+                className="py-2 pr-2 text-right font-semibold"
                 title={t('staff.performance.col_retention_regular_hint')}
               >
                 {t('staff.performance.col_retention_regular')}
@@ -296,7 +298,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                 i === 0 ? 'text-yellow-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'
               return (
                 <tr key={s.id} className="border-border border-b last:border-b-0">
-                  <td className="py-2.5 pr-3">
+                  <td className="py-2 pr-2">
                     <span className="flex items-center gap-2">
                       {isTop3 ? (
                         <Medal
@@ -304,6 +306,20 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                           strokeWidth={2}
                           aria-label={`top-${i + 1}`}
                         />
+                      ) : flagAttention ? (
+                        // T85 — «ВНИМАНИЕ»-badge справа от имени съедал ширину
+                        // таблицы. Теперь — компактный значок ! слева, на
+                        // месте медали (для мастеров без визитов в окне).
+                        <span
+                          className="inline-flex shrink-0"
+                          title={t('staff.performance.flag_attention')}
+                        >
+                          <AlertCircle
+                            className="size-4 text-amber-600"
+                            strokeWidth={2.2}
+                            aria-label={t('staff.performance.flag_attention')}
+                          />
+                        </span>
                       ) : (
                         <span className="w-4 shrink-0" />
                       )}
@@ -323,36 +339,31 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                         </span>
                       )}
                       <span className="text-foreground font-semibold">{s.full_name}</span>
-                      {flagAttention ? (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-800">
-                          {t('staff.performance.flag_attention')}
-                        </span>
-                      ) : null}
                     </span>
                   </td>
-                  <td className="num py-2.5 pr-3 text-right">{visits}</td>
-                  <td className="num text-foreground py-2.5 pr-3 text-right">
+                  <td className="num py-2 pr-2 text-right">{visits}</td>
+                  <td className="num text-foreground py-2 pr-2 text-right">
                     {st.visitsRevenueCents > 0
                       ? formatCurrency(st.visitsRevenueCents, currency)
                       : '—'}
                   </td>
-                  <td className="num text-foreground py-2.5 pr-3 text-right">
+                  <td className="num text-foreground py-2 pr-2 text-right">
                     {st.retailRevenueCents > 0
                       ? formatCurrency(st.retailRevenueCents, currency)
                       : '—'}
                   </td>
-                  <td className="num text-brand-gold-deep py-2.5 pr-3 text-right">
+                  <td className="num text-brand-gold-deep py-2 pr-2 text-right">
                     {st.tipsCents > 0 ? formatCurrency(st.tipsCents, currency) : '—'}
                   </td>
-                  <td className="num py-2.5 pr-3 text-right font-bold">
+                  <td className="num py-2 pr-2 text-right font-bold">
                     {formatCurrency(rev, currency)}
                   </td>
-                  <td className="num text-muted-foreground py-2.5 pr-3 text-right">
+                  <td className="num text-muted-foreground py-2 pr-2 text-right">
                     {share.toFixed(0)}%
                   </td>
-                  <td className="num text-muted-foreground py-2.5 pr-3 text-right">{clients}</td>
+                  <td className="num text-muted-foreground py-2 pr-2 text-right">{clients}</td>
                   <td
-                    className="num py-2.5 pr-3 text-right"
+                    className="num py-2 pr-2 text-right"
                     title={t('staff.performance.col_retention_new_title', {
                       returned: st.newClientsReturned,
                       total: st.newClients,
@@ -378,7 +389,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                     )}
                   </td>
                   <td
-                    className="num py-2.5 pr-3 text-right"
+                    className="num py-2 pr-2 text-right"
                     title={t('staff.performance.col_retention_regular_title', {
                       active: st.regularClientsActive,
                       total: st.regularClients,
