@@ -136,12 +136,17 @@ export function ClientFormModal({
     }
     // Стандартные подсказки на случай пустого салона.
     if (set.size === 0) {
-      ;['Instagram', 'Booksy', 'Google Maps', 'Рекомендация', 'Реклама', 'Прохожий'].forEach((s) =>
-        set.add(s),
-      )
+      ;[
+        'Instagram',
+        'Booksy',
+        'Google Maps',
+        t('clients.form.source_suggestion.referral', { defaultValue: 'Рекомендация' }),
+        t('clients.form.source_suggestion.ad', { defaultValue: 'Реклама' }),
+        t('clients.form.source_suggestion.walk_in', { defaultValue: 'Прохожий' }),
+      ].forEach((s) => set.add(s))
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'))
-  }, [existingClients])
+  }, [existingClients, t])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

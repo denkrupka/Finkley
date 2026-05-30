@@ -70,8 +70,21 @@ export function PnlChartsSection({ salonId, currency }: { salonId: string; curre
   const { data: categories = [] } = useExpenseCategories(salonId)
 
   const monthNames = useMemo(
-    () => ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
-    [],
+    () => [
+      t('common.month_abbr.jan', { defaultValue: 'Янв' }),
+      t('common.month_abbr.feb', { defaultValue: 'Фев' }),
+      t('common.month_abbr.mar', { defaultValue: 'Мар' }),
+      t('common.month_abbr.apr', { defaultValue: 'Апр' }),
+      t('common.month_abbr.may', { defaultValue: 'Май' }),
+      t('common.month_abbr.jun', { defaultValue: 'Июн' }),
+      t('common.month_abbr.jul', { defaultValue: 'Июл' }),
+      t('common.month_abbr.aug', { defaultValue: 'Авг' }),
+      t('common.month_abbr.sep', { defaultValue: 'Сен' }),
+      t('common.month_abbr.oct', { defaultValue: 'Окт' }),
+      t('common.month_abbr.nov', { defaultValue: 'Ноя' }),
+      t('common.month_abbr.dec', { defaultValue: 'Дек' }),
+    ],
+    [t],
   )
 
   // Chart 1: revenue + profit per month

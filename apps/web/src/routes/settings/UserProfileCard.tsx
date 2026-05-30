@@ -165,7 +165,9 @@ export function UserProfileCard() {
             )}
             {t('settings.user_profile.upload_avatar', { defaultValue: 'Загрузить аватар' })}
           </Button>
-          <p className="text-muted-foreground text-[11px]">PNG / JPG / WEBP, до 5 МБ</p>
+          <p className="text-muted-foreground text-[11px]">
+            {t('settings.user_profile.avatar_hint', { defaultValue: 'PNG / JPG / WEBP, до 5 МБ' })}
+          </p>
         </div>
       </div>
 
@@ -179,7 +181,9 @@ export function UserProfileCard() {
             id="user-name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="Иван Иванов"
+            placeholder={t('settings.user_profile.name_placeholder', {
+              defaultValue: 'Иван Иванов',
+            })}
           />
         </div>
 

@@ -471,7 +471,9 @@ export function AdminMediaPage() {
                         .filter(Boolean),
                     }))
                   }
-                  placeholder="финансы, KPI, маржа"
+                  placeholder={t('admin.media.fields.tags_placeholder', {
+                    defaultValue: 'финансы, KPI, маржа',
+                  })}
                   className="mt-1 h-10"
                 />
               </div>
@@ -490,7 +492,9 @@ export function AdminMediaPage() {
               <Input
                 value={targetKeyword}
                 onChange={(e) => setTargetKeyword(e.target.value)}
-                placeholder="например: учёт салона красоты"
+                placeholder={t('admin.media.fields.target_keyword_placeholder', {
+                  defaultValue: 'например: учёт салона красоты',
+                })}
                 className="h-9"
               />
             </div>
@@ -619,7 +623,9 @@ export function AdminMediaPage() {
                             .filter(Boolean),
                         }))
                       }
-                      placeholder="управленческий учёт, салон красоты"
+                      placeholder={t('admin.media.fields.keywords_placeholder', {
+                        defaultValue: 'управленческий учёт, салон красоты',
+                      })}
                       className="mt-1 h-10"
                     />
                   </div>

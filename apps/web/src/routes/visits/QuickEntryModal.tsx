@@ -577,11 +577,18 @@ export function QuickEntryModal({
             p_type: 'manual_adjustment',
             p_quantity: -validQty,
             p_cost_cents: null,
-            p_notes: `Доп. продажа в визите`,
+            p_notes: t('visits.quick_entry.inventory_note', {
+              defaultValue: 'Доп. продажа в визите',
+            }),
           })
           if (invErr) {
             console.warn('inventory_apply_tx failed', invErr)
-            toast.error(`Склад: ${invErr.message}`)
+            toast.error(
+              t('visits.quick_entry.stock_error', {
+                defaultValue: 'Склад: {{error}}',
+                error: invErr.message,
+              }),
+            )
           }
         }
       }

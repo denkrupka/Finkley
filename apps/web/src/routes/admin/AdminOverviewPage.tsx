@@ -15,6 +15,20 @@ import {
 import { useAdminOverview } from '@/hooks/useAdmin'
 
 /** "YYYY-MM" → "май" (русское короткое название месяца). */
+const MONTH_KEYS = [
+  'common.month_short.jan',
+  'common.month_short.feb',
+  'common.month_short.mar',
+  'common.month_short.apr',
+  'common.month_short.may',
+  'common.month_short.jun',
+  'common.month_short.jul',
+  'common.month_short.aug',
+  'common.month_short.sep',
+  'common.month_short.oct',
+  'common.month_short.nov',
+  'common.month_short.dec',
+] as const
 const MONTH_RU = [
   'янв',
   'фев',
@@ -29,23 +43,28 @@ const MONTH_RU = [
   'ноя',
   'дек',
 ]
-function monthLabel(key: string): string {
-  const [, m] = key.split('-')
-  const idx = Number(m) - 1
-  return MONTH_RU[idx] ?? key
-}
 
 export function AdminOverviewPage() {
   const { t } = useTranslation()
   const { data, isLoading, error } = useAdminOverview()
 
+  function monthLabel(key: string): string {
+    const [, m] = key.split('-')
+    const idx = Number(m) - 1
+    const tKey = MONTH_KEYS[idx]
+    if (!tKey) return key
+    return t(tKey, { defaultValue: MONTH_RU[idx] ?? key })
+  }
+
   const salonChartData = useMemo(
     () => (data?.charts.salons_by_month ?? []).map((p) => ({ ...p, label: monthLabel(p.month) })),
-    [data],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, t],
   )
   const userChartData = useMemo(
     () => (data?.charts.users_by_month ?? []).map((p) => ({ ...p, label: monthLabel(p.month) })),
-    [data],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, t],
   )
   if (isLoading) {
     return (
@@ -58,7 +77,9 @@ export function AdminOverviewPage() {
     return (
       <div className="p-8">
         <p className="text-destructive text-sm">
-          {error instanceof Error ? error.message : 'load_failed'}
+          {error instanceof Error
+            ? error.message
+            : t('admin.overview.load_failed', { defaultValue: 'Не удалось загрузить данные' })}
         </p>
       </div>
     )

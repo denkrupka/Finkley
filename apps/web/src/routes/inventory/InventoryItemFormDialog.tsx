@@ -187,7 +187,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 id="inv-unit"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                placeholder="шт"
+                placeholder={t('inventory.form.unit_placeholder', { defaultValue: 'шт' })}
                 list="inv-unit-suggest"
               />
               <datalist id="inv-unit-suggest">

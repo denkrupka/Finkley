@@ -134,8 +134,14 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
       const client = clients.find((c) => c.id === v.client_id)
       const article =
         v.kind === 'retail'
-          ? `Продажа · ${v.service_name_snapshot ?? '—'}`
-          : `Услуга · ${v.service_name_snapshot ?? '—'}`
+          ? t('finance.cashflow.article_retail', {
+              defaultValue: 'Продажа · {{name}}',
+              name: v.service_name_snapshot ?? '—',
+            })
+          : t('finance.cashflow.article_service', {
+              defaultValue: 'Услуга · {{name}}',
+              name: v.service_name_snapshot ?? '—',
+            })
       pushTx(day, {
         id: v.id,
         day,
@@ -158,7 +164,11 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         kind: 'inflow',
         source: 'other_income',
         amountCents: effectiveReceivedFromOtherIncome(oi),
-        article: `Прочий доход · ${cat}${sub}`,
+        article: t('finance.cashflow.article_other_income', {
+          defaultValue: 'Прочий доход · {{cat}}{{sub}}',
+          cat,
+          sub,
+        }),
         counterparty: oi.payer_name ?? null,
         paymentMethod: (oi.payment_method as PaymentMethod) ?? null,
         comment: oi.comment ?? null,
@@ -174,14 +184,18 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         kind: 'outflow',
         source: 'expense',
         amountCents: e.amount_cents,
-        article: `Расход · ${cat}${sub}`,
+        article: t('finance.cashflow.article_expense', {
+          defaultValue: 'Расход · {{cat}}{{sub}}',
+          cat,
+          sub,
+        }),
         counterparty: e.contractor_name ?? null,
         paymentMethod: (e.payment_method as PaymentMethod) ?? null,
         comment: e.comment ?? null,
       })
     }
     return grouped
-  }, [visits, otherIncomes, expenses, staff, clients, expenseCategories, incomeCategories])
+  }, [visits, otherIncomes, expenses, staff, clients, expenseCategories, incomeCategories, t])
 
   function navigateToEntity(tx: Tx) {
     // Клик по строке ДДС → открыть карточку конкретной записи, а не список.

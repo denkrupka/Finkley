@@ -142,13 +142,38 @@ function tgMessageToMsg(m: TgMessage): TgMessageAdapted {
 
 const CHANNEL_META: Record<
   MessengerChannel,
-  { label: string; color: string; icon: typeof MessageCircle }
+  { label: string; labelKey: string; color: string; icon: typeof MessageCircle }
 > = {
-  telegram: { label: 'Telegram', color: '#229ED9', icon: Send },
-  whatsapp: { label: 'WhatsApp', color: '#25D366', icon: Phone },
-  instagram: { label: 'Instagram', color: '#E4405F', icon: Instagram },
-  facebook: { label: 'Facebook', color: '#1877F2', icon: Facebook },
-  internal: { label: 'Внутренний', color: '#6B7280', icon: MessageCircle },
+  telegram: {
+    label: 'Telegram',
+    labelKey: 'messenger.channel.telegram',
+    color: '#229ED9',
+    icon: Send,
+  },
+  whatsapp: {
+    label: 'WhatsApp',
+    labelKey: 'messenger.channel.whatsapp',
+    color: '#25D366',
+    icon: Phone,
+  },
+  instagram: {
+    label: 'Instagram',
+    labelKey: 'messenger.channel.instagram',
+    color: '#E4405F',
+    icon: Instagram,
+  },
+  facebook: {
+    label: 'Facebook',
+    labelKey: 'messenger.channel.facebook',
+    color: '#1877F2',
+    icon: Facebook,
+  },
+  internal: {
+    label: 'Внутренний',
+    labelKey: 'messenger.channel.internal',
+    color: '#6B7280',
+    icon: MessageCircle,
+  },
 }
 
 export function MessengerPage() {
@@ -326,7 +351,7 @@ export function MessengerPage() {
                 return (
                   <IconChip
                     key={ch}
-                    label={meta.label}
+                    label={t(meta.labelKey, { defaultValue: meta.label })}
                     active={activeChannel === ch}
                     color={meta.color}
                     onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
@@ -408,7 +433,9 @@ export function MessengerPage() {
                         )}
                       </div>
                       <p className="text-muted-foreground text-[10px] sm:text-[11px]">
-                        {CHANNEL_META[selected.channel].label}
+                        {t(CHANNEL_META[selected.channel].labelKey, {
+                          defaultValue: CHANNEL_META[selected.channel].label,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -754,6 +781,7 @@ function MessageBody({
   message: MessengerMessage & { _isTg?: boolean; media_pending?: boolean }
   onImageClick?: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   useEffect(() => {
     if (!message.media_path) {
@@ -814,7 +842,7 @@ function MessageBody({
       ) : null}
       {/* Lazy placeholder для медиа без media_path */}
       {isLoadingMedia && message._isTg ? (
-        <span className="text-xs italic opacity-70">{mediaLabel(message.media_kind!)} …</span>
+        <span className="text-xs italic opacity-70">{mediaLabel(message.media_kind!, t)} …</span>
       ) : null}
       {/* Text / caption */}
       {message.text ? <p className="whitespace-pre-wrap break-words">{message.text}</p> : null}
@@ -829,10 +857,10 @@ function MessageBody({
             rel="noopener noreferrer"
             className="text-xs italic underline opacity-90"
           >
-            {mediaLabel(message.media_kind)}
+            {mediaLabel(message.media_kind, t)}
           </a>
         ) : (
-          <span className="text-xs italic opacity-80">{mediaLabel(message.media_kind)}</span>
+          <span className="text-xs italic opacity-80">{mediaLabel(message.media_kind, t)}</span>
         )
       ) : null}
     </>
@@ -915,18 +943,21 @@ function ReactionsBar({
   )
 }
 
-function mediaLabel(kind: string): string {
+function mediaLabel(
+  kind: string,
+  t: (k: string, opts?: Record<string, unknown>) => string,
+): string {
   switch (kind) {
     case 'image':
-      return '📷 Изображение'
+      return t('messenger.media.image', { defaultValue: '📷 Изображение' })
     case 'video':
-      return '🎥 Видео'
+      return t('messenger.media.video', { defaultValue: '🎥 Видео' })
     case 'audio':
-      return '🎙 Аудио'
+      return t('messenger.media.audio', { defaultValue: '🎙 Аудио' })
     case 'file':
-      return '📎 Файл'
+      return t('messenger.media.file', { defaultValue: '📎 Файл' })
     case 'sticker':
-      return '🎭 Стикер'
+      return t('messenger.media.sticker', { defaultValue: '🎭 Стикер' })
     default:
       return kind
   }
@@ -942,6 +973,7 @@ function MessengerLightbox({
   openId: string | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const idx = openId ? images.findIndex((m) => m.id === openId) : -1
   const [currentIdx, setCurrentIdx] = useState<number>(idx)
   const [imgUrl, setImgUrl] = useState<string | null>(null)
@@ -1027,8 +1059,8 @@ function MessengerLightbox({
             type="button"
             onClick={handleDownload}
             className="grid size-9 place-items-center rounded-full transition-colors hover:bg-white/15"
-            title="Скачать"
-            aria-label="Download"
+            title={t('common.download', { defaultValue: 'Скачать' })}
+            aria-label={t('common.download', { defaultValue: 'Скачать' })}
           >
             <Download className="size-5" strokeWidth={1.8} />
           </button>
@@ -1036,8 +1068,8 @@ function MessengerLightbox({
             type="button"
             onClick={onClose}
             className="grid size-9 place-items-center rounded-full transition-colors hover:bg-white/15"
-            title="Закрыть"
-            aria-label="Close"
+            title={t('common.close', { defaultValue: 'Закрыть' })}
+            aria-label={t('common.close', { defaultValue: 'Закрыть' })}
           >
             <X className="size-5" strokeWidth={1.8} />
           </button>

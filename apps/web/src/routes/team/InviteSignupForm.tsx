@@ -188,7 +188,9 @@ export function InviteSignupForm({ onComplete }: { onComplete: () => void }) {
             )}
             {t('invite_signup.upload_avatar', { defaultValue: 'Аватар' })}
           </Button>
-          <p className="text-muted-foreground mt-1 text-[11px]">PNG / JPG / WEBP, до 5 МБ</p>
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            {t('invite_signup.avatar_hint', { defaultValue: 'PNG / JPG / WEBP, до 5 МБ' })}
+          </p>
         </div>
       </div>
 

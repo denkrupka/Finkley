@@ -201,7 +201,7 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
                         type="number"
                         value={newDuration}
                         onChange={(e) => setNewDuration(Number(e.target.value))}
-                        placeholder="мин"
+                        placeholder={t('onboarding.services.duration_unit')}
                         className="num"
                       />
                       <button

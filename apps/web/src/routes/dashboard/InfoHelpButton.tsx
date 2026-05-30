@@ -1,5 +1,6 @@
 import { HelpCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils/cn'
 
@@ -26,6 +27,7 @@ export function InfoHelpButton({
    *  right-3 top-3 в parent с position:relative). */
   className?: string
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -53,7 +55,7 @@ export function InfoHelpButton({
           e.stopPropagation()
           setOpen((v) => !v)
         }}
-        aria-label="Подсказка"
+        aria-label={t('common.info_help.aria', { defaultValue: 'Подсказка' })}
         className={cn(
           'text-muted-foreground hover:text-foreground hover:bg-muted/40 inline-flex size-5 items-center justify-center rounded-full transition-colors',
           open && 'bg-muted/60 text-foreground',
@@ -70,12 +72,12 @@ export function InfoHelpButton({
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-foreground text-[12px] font-bold uppercase tracking-wider">
-              Что это
+              {t('common.info_help.title', { defaultValue: 'Что это' })}
             </p>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Закрыть"
+              aria-label={t('common.close', { defaultValue: 'Закрыть' })}
               className="text-muted-foreground hover:text-foreground -mr-1 -mt-1"
             >
               <X className="size-3.5" strokeWidth={2} />
