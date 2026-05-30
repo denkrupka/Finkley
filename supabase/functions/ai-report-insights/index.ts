@@ -41,31 +41,39 @@ type Insight = {
  */
 function systemForLocale(locale: 'ru' | 'pl' | 'en'): string {
   const langInstruction = {
-    ru: 'На русском, кратко, без воды.',
-    pl: 'Po polsku, zwięźle, bez lania wody.',
-    en: 'In English, concise, no fluff.',
+    ru: 'Отвечай ИСКЛЮЧИТЕЛЬНО на русском.',
+    pl: 'Odpowiadaj WYŁĄCZNIE po polsku.',
+    en: 'Reply ONLY in English.',
   }[locale]
   const ownerVoice = {
     ru: 'от первого лица владельца («Помоги мне ...»)',
     pl: 'w pierwszej osobie właściciela („Pomóż mi ...")',
     en: 'in the first person of the owner ("Help me ...")',
   }[locale]
-  return `You are a financial consultant for the Finkley beauty salon. ${langInstruction}
+  return `You are a senior financial consultant for beauty salons with 8+ years of hands-on experience advising salon owners in Poland and the EU. You've personally turned around dozens of underperforming salons by reading their numbers, spotting leaks, and giving the owner ONE concrete action they could do this week. You speak like an experienced operator — not like a textbook. ${langInstruction}
 
-Response format — STRICTLY JSON:
+=== GROUNDING (CRITICAL) ===
+You analyze ONLY the real numbers in the payload below. NEVER invent services, masters, clients, or amounts that aren't in the data. If the payload is empty or has too few data points to draw a conclusion — say it honestly in the insight body: «Недостаточно данных за этот период — попробуйте расширить диапазон или добавить визитов/расходов за последние 30 дней». No fabricated stats. No industry-average benchmarks unless they're explicitly in the data.
+
+=== ANTI-WATER (CRITICAL) ===
+BANNED phrases (do NOT use, ever): «возможно», «попробуйте», «в среднем по отрасли», «обычно», «как правило», «рассмотрите», «стоило бы подумать», «может быть полезно», «вероятно», «как известно». These are filler. Each insight must contain at least ONE concrete number from the payload (amount, %, count, name) and ONE concrete action with a deadline («на этой неделе», «до пятницы», «в течение 3 дней»).
+
+=== TONE ===
+You're a confident senior consultant, not a chatbot. Be direct. Name names. Quote amounts. If something is bad — say it's bad. If something is great — say it's great. Don't hedge.
+
+=== OUTPUT FORMAT — STRICTLY JSON ===
 {
   "insights": [
     {
-      "title": "<headline, 1 phrase up to 80 chars>",
-      "body": "<1-3 sentences with a concrete recommendation>",
-      "action_prompt": "<question or request to the assistant that elaborates on the topic>"
+      "title": "<headline with concrete data, up to 80 chars, e.g. «Маникюр приносит 47% выручки — но мастер Анна перегружена»>",
+      "body": "<2-3 sentences. Open with the concrete number/name. Then the diagnosis. Close with ONE specific action and deadline. Use markdown: **bold** for key numbers and names. Start with relevant emoji: 📊 для выручки/визитов, ⚠️ для риска/просадки, ✅ для роста/успеха, 💰 для денег, 👥 для клиентов, ✂️ для услуг, 🎯 для рекомендации.>",
+      "action_prompt": "<question to the AI assistant, ${ownerVoice}, that drills into the specific data point — e.g. «Помоги мне разобраться, почему мастер Анна перегружена в маникюре и как перераспределить нагрузку»>"
     }
   ]
 }
 
-JSON only, no markdown, no explanations around it.
-Return 3-5 insights. Each body — an action, not a description.
-action_prompt must be ${ownerVoice}.`
+JSON only — no markdown wrapper, no explanations around it.
+Return 3-5 insights, ranked by business impact (most impactful first).`
 }
 
 function normalizeLocale(input: unknown): 'ru' | 'pl' | 'en' {
@@ -105,29 +113,35 @@ async function claudeJson(system: string, prompt: string): Promise<{ insights: I
 // Промпты — на английском с языком ответа в SYSTEM. Так Claude стабильно
 // держит требуемую локаль и одну версию prompt-логики на все языки.
 function promptForServices(payload: unknown): string {
-  return `Salon services data for the selected period (JSON):
+  return `=== REAL SALON SERVICES DATA (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-Analyze by service groups (manicure / brows / haircuts / other):
-1. Top-3 most sold services by NUMBER of visits.
-2. Top-3 most PROFITABLE services by MARGIN (price - cost).
-3. Which service to advertise (growing demand or high margin).
-4. Where the gaps are — what brings little money and has no demand.
+Analyze ONLY these services with these exact names and numbers. Do NOT invent services.
 
-Each insight = short concrete recommendation for the owner.`
+Look for:
+1. **Top revenue earner** — name the specific service, its revenue, its % of total. Action: how to defend/scale it.
+2. **Top by margin** (price minus cost if cost data is present) — name service + concrete margin number. Action: where to upsell.
+3. **Growing demand signal** — service with rising visit count. Action: increase availability/price/promotion.
+4. **Dead weight** — service with low revenue AND low visits. Action: discontinue or rework — give a specific deadline.
+
+Each insight MUST name the specific service from the data and quote its exact number. If only one service exists in payload — say so honestly and recommend adding more variety. If payload.services is empty — return one insight: «Недостаточно данных по услугам за этот период».`
 }
 
 function promptForClients(payload: unknown): string {
-  return `Salon clients data for the selected period (JSON):
+  return `=== REAL SALON CLIENTS DATA (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-Client analytics:
-1. Acquisition channels (analyze sources/referrals if available).
-2. Structure: regulars (3+ visits), new without visits, lapsed (>60 days).
-3. Whom to target with a mailing campaign, with what offer.
-4. Favorite services among clients — promos to suggest based on their interests.
+Analyze ONLY these clients with their actual visit history and revenue. Do NOT invent clients or made-up segments.
 
-Each insight = specific client segment + what to offer them.`
+Look for:
+1. **Lost VIP** — name a specific client who used to spend big and stopped coming. Quote their total revenue and days since last visit. Action: personal message with a concrete offer this week.
+2. **Acquisition channel that works** — if data shows referral sources, name the best-performing one with its conversion %. Action: double down on it.
+3. **Loyal regulars at risk** — clients with 3+ visits whose frequency is dropping. Name 2-3 of them. Action: how to keep them.
+4. **New-but-not-returning** — count clients who came once and didn't come back in 30+ days. Action: a re-engagement message with a specific hook.
+
+Each insight MUST name a specific client (or count) and quote real numbers. If payload.clients is empty — return one insight: «Недостаточно данных по клиентам — нужно минимум 10 визитов за период чтобы делать выводы».`
 }
 
 function promptForServiceMatch(payload: unknown): string {
@@ -168,93 +182,94 @@ different treatments just because the words look similar.`
 }
 
 function promptForCompetitorsPrices(payload: unknown): string {
-  return `Salon competitor pricing data (JSON):
+  return `=== REAL PRICING DATA: OUR SALON vs COMPETITORS (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-You are advising the salon owner on PRICING strategy versus competitors.
-The payload contains: our services with prices + matched competitor variants
-with min/max/avg competitor prices and % difference.
+Analyze ONLY these services with these exact prices. Do NOT invent prices or competitors.
 
-Analyze:
-1. Услуги где мы ЗАВЫШЕНЫ — где конкуренты значимо дешевле и можем терять клиентов на цене.
-2. Услуги где мы ЗАНИЖЕНЫ — где можно поднять цену без потери конкурентоспособности.
-3. Услуги без матча — где мы единственные / где конкуренты делают то чего нет у нас.
-4. Pricing-стратегия: позиционирование (премиум / средний / эконом) и где якорь.
+Look for:
+1. **OVERPRICED service** — name our service where our price is significantly higher than competitor avg. Quote both numbers and the % gap. Action: lower to specific amount OR justify with premium positioning (concrete proof).
+2. **UNDERPRICED service** — name our service where competitors charge meaningfully more. Quote both numbers. Action: raise to specific amount by specific date.
+3. **Unique service** — service we offer that no competitor has. Action: how to market it as USP.
+4. **Pricing strategy gap** — if our prices are scattered (some premium, some bargain), name the inconsistency. Action: pick one positioning.
 
-Each insight = specific service or segment + concrete price action (e.g. «поднять Маникюр гибрид с 120 до 140 zł — конкуренты в среднем берут 150 zł»).`
+Each insight MUST quote actual zł amounts from the data (e.g. «поднять Маникюр гибрид с **120 zł** до **140 zł** до конца недели — у 3 из 5 конкурентов средняя цена **150 zł**»). If payload has fewer than 3 competitors or fewer than 5 matched services — say: «Недостаточно данных для уверенного сравнения цен — добавьте больше конкурентов в /competitors».`
 }
 
 function promptForCompetitorsContent(payload: unknown): string {
-  return `Salon competitor social media content data (JSON):
+  return `=== REAL SOCIAL MEDIA DATA: OUR SALON vs COMPETITORS (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-Compare our salon's content presence to competitors. Payload has posts count,
-followers, following, posts_per_month for own salon and each competitor.
+Analyze ONLY these accounts with their actual follower/posts numbers. Do NOT invent stats.
 
-Analyze:
-1. Где мы отстаём по охвату (followers) и что делать.
-2. Частота публикаций vs конкуренты — нужно ли поднимать или мы и так в норме.
-3. Перекосы: больше подписок чем подписчиков (плохой сигнал) и наоборот.
-4. Конкурент-эталон по соцсетям — что у них работает.
+Look for:
+1. **Followers gap** — name the competitor with the most followers vs us. Quote both numbers and the gap. Action: concrete content tactic to close it (e.g. «постить **3 reels в неделю** — у @competitor так и **+850 подписчиков за месяц**»).
+2. **Posting frequency mismatch** — if our posts_per_month is significantly different from competitor avg, flag it. Action: specific target (e.g. «поднять с 4 до 12 постов в месяц до конца месяца»).
+3. **Bad signal** — if we follow more than we have followers (или сильный перекос following/followers), flag it as «выглядит как фейк». Action: отписаться от X аккаунтов.
+4. **Benchmark account** — name the competitor with the best engagement-per-follower ratio. Action: что повторить (тип контента, частота, время постинга).
 
-Each insight = specific metric or competitor + concrete content action.`
+Each insight MUST name the specific competitor handle and quote real follower/post counts. If payload has < 3 competitors or no social data for own salon — say: «Недостаточно данных по соцсетям — подключите Instagram в /settings/integrations».`
 }
 
 function promptForCompetitorsOccupancy(payload: unknown): string {
-  return `Salon competitor availability/occupancy data for the next 7 days (JSON):
+  return `=== REAL OCCUPANCY DATA: 7-DAY FREE SLOTS PER COMPETITOR (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-You are advising the salon owner on COMPETITION FOR CLIENT TIME.
-Payload contains per-competitor per-service:
-  - free_slots_7d: how many bookable slots competitor has free in the next 7 days
-  - days_with_slots: how many days (0..7) have at least one free slot
-  - staff_count: how many masters perform this service
+Field meanings (read carefully):
+  - free_slots_7d: bookable slots competitor has free in next 7 days
+  - days_with_slots: days (0..7) with at least one free slot
+  - staff_count: masters performing this service
   - duration_min: service duration
 
-Interpretation:
-  - Many free slots + many days_with_slots = competitor is UNDERLOADED → we can attract
-    their clients with timing convenience message
-  - Few free slots = competitor is BOOKED solid → they're the leader, lessons to learn,
-    OR clients spill over to us when they can't get a slot there
-  - 0 days_with_slots → competitor likely closed booking or fully booked → opportunity
+Decision rules:
+  - Many free slots + 5-7 days_with_slots = UNDERLOADED competitor → we can poach their clients on convenience
+  - Few free slots + 0-2 days_with_slots = BOOKED competitor → either learn from them OR catch their overflow
+  - 0 days_with_slots = closed booking or fully booked → opportunity for us right now
 
-Analyze:
-1. Где у нас преимущество — где конкуренты загружены и клиенты выбирают нас.
-2. Где они доступнее нас — что они делают (больше мастеров? выходные?) и что предпринять.
-3. Где спрос явно превышает предложение в районе — какую услугу нам усилить.
-4. Сегмент клиентов кому продавать «у нас всегда есть слот» как УТП.
+Analyze ONLY these competitors with these exact numbers. Do NOT invent.
 
-Each insight = specific competitor or service + concrete action.`
+Look for:
+1. **OUR WIN** — service where competitors are booked solid AND we have slots. Name competitor + service + free_slots count. Action: marketing message «у нас есть слот на этой неделе» on Instagram by specific date.
+2. **OUR LOSS** — service where competitors have more days_with_slots than us. Name competitor + concrete diagnosis (более 1 мастер? больше часов?). Action: specific operational change.
+3. **HIGH-DEMAND SERVICE** — service where ALL competitors have < 2 days_with_slots → market is hot. Action: raise our price OR add a master in that service.
+4. **OUR USP** — service where we have free_slots_7d > 10 and competitors avg < 5 → flag «always available» as positioning.
+
+Each insight MUST quote specific competitor name + specific service + actual slot numbers. If payload has no occupancy data or fewer than 2 competitors with valid slot data — say: «Недостаточно данных по загрузке — Booksy не сгенерил расписание для большинства конкурентов».`
 }
 
 function promptForCompetitorsRating(payload: unknown): string {
-  return `Salon competitor ratings data (JSON):
+  return `=== REAL RATINGS DATA: BOOKSY + GOOGLE (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-Compare our salon's Booksy + Google ratings to competitors. Payload has rating
-and review count per source for own salon and each competitor.
+Analyze ONLY these rating values and review counts. Do NOT invent ratings.
 
-Analyze:
-1. Где мы ниже среднего по округе — приоритет на улучшение.
-2. Где мы превосходим — наш козырь, использовать в маркетинге.
-3. Соотношение Booksy vs Google — где платформа недополучает отзывов.
-4. Конкуренты с подозрительно высокой ratings — учиться или сомневаться.
+Look for:
+1. **BELOW AREA AVERAGE** — source (Booksy/Google) where our rating is lower than competitor median. Quote our rating, the median, and the gap (e.g. «**4.3** против медианы **4.7**»). Action: specific fix this month (например «попросить **5** текущих лояльных клиентов оставить отзыв на Google — поднимет с **4.3** до **4.5**»).
+2. **OUR EDGE** — source where we beat all competitors. Quote numbers. Action: use it in Instagram bio / website hero text.
+3. **PLATFORM IMBALANCE** — if Booksy review count is 10x more than Google (or vice versa), flag it. Action: SMS-template to ask the next 10 happy clients to leave a Google review.
+4. **SUSPICIOUS COMPETITOR** — competitor with 5.0 rating and < 20 reviews → likely fake/bought reviews. Note: «не равняемся, продолжаем органику».
 
-Each insight = source/metric + concrete action (e.g. «попросить 5 текущих клиентов оставить Google отзыв — поднимем с 4.6 до 4.7»).`
+Each insight MUST quote actual rating values and review counts. If we have < 5 reviews on a platform — say: «**3 отзыва** — статистически не значимо, нужно минимум **20** для уверенных выводов».`
 }
 
 function promptForStaff(payload: unknown): string {
-  return `Salon masters data for the selected period (JSON):
+  return `=== REAL SALON STAFF DATA (JSON) ===
 ${JSON.stringify(payload, null, 2)}
+=== END DATA ===
 
-Master analytics:
-1. Who earned how much money and served how many clients.
-2. Master utilization relative to their schedule (if data available).
-3. Each master's share of total salon revenue.
-4. Top-masters — recommendations on motivation (bonus, students, rate raise).
-5. Underperformers — how to work with them (training, redistribute clients, talk).
+Analyze ONLY these masters with their actual revenue and visit counts. Do NOT invent masters.
 
-Each insight = specific master or group + action.`
+Look for:
+1. **Top earner** — name the master, their revenue, their % of total salon revenue. Action: concrete retention move (bonus amount, rate raise %, student to train).
+2. **Underperformer at risk** — master with < 50% of top earner's revenue. Name them, quote both numbers. Action: training, redistribute clients, or honest conversation — pick one with a deadline.
+3. **Utilization gap** — if schedule data is present, name the master whose actual visits / scheduled hours is lowest. Action: how to fill the gap.
+4. **Revenue concentration risk** — if 1 master generates > 40% of revenue, flag it as a single-point-of-failure. Action: what to do if they leave.
+
+Each insight MUST name the specific master from the data and quote their real revenue. If payload.staff has only 1 master — say it honestly: «Один мастер — рисков перегрузки и зависимости много, нужен второй до конца квартала». If empty — return: «Недостаточно данных по мастерам».`
 }
 
 Deno.serve(async (req: Request) => {
