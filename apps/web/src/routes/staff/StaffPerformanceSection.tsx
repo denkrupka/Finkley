@@ -101,6 +101,33 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     },
   })
 
+  // T85/T86 — для расчёта Оттока на клиенте: per client_id → last_visit_in_salon
+  // (любой мастер) И per (staff_id × client_id) → last_visit_at_master.
+  // Если last_at_master == last_in_salon → клиент после этого мастера в салон
+  // вообще не вернулся (классический отток).
+  const lastInSalonByClient = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of allTimeVisits) {
+      if (!v.client_id) continue
+      const t = new Date(v.visit_at).getTime()
+      const cur = m.get(v.client_id)
+      if (!cur || t > cur) m.set(v.client_id, t)
+    }
+    return m
+  }, [allTimeVisits])
+
+  const lastAtMasterByPair = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of allTimeVisits) {
+      if (!v.staff_id || !v.client_id) continue
+      const key = `${v.staff_id}::${v.client_id}`
+      const t = new Date(v.visit_at).getTime()
+      const cur = m.get(key)
+      if (!cur || t > cur) m.set(key, t)
+    }
+    return m
+  }, [allTimeVisits])
+
   // Per (staff_id × client_id): first_at + total_count за ВСЁ время.
   // Используется для split «новый клиент мастера» vs «постоянный».
   const firstVisitMap = useMemo(() => {
@@ -203,6 +230,50 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
       regularClientsActive,
       regularRetentionPct,
     }
+  }
+
+  /**
+   * T85/T86 — клиентский расчёт Оттока и Скоринга (fallback, если RPC
+   * staff_performance_advanced не отдаёт значения — например, не задеплоена
+   * новая миграция).
+   *
+   * Отток (%) = доля клиентов мастера, которые ПОСЛЕ визита у него больше
+   * никогда не возвращались в салон (ни к нему, ни к другому мастеру).
+   * Формально: count(clients где last_at_master == last_in_salon) / total.
+   *
+   * Скоринг = (Возврат_новых × Удержание_постоянных) / max(Отток, 0.01).
+   * Высокое значение → мастер растит салон (новые возвращаются, постоянные
+   * не разбегаются, после него клиент идёт дальше к другим мастерам).
+   */
+  function churnFor(staffId: string): { churn_pct: number | null; total: number } {
+    // Все клиенты которые хоть раз были у этого мастера за ВСЁ время.
+    const clientsAtMaster = new Set<string>()
+    for (const v of allTimeVisits) {
+      if (v.staff_id === staffId && v.client_id) clientsAtMaster.add(v.client_id)
+    }
+    if (clientsAtMaster.size === 0) return { churn_pct: null, total: 0 }
+    let churned = 0
+    for (const cid of clientsAtMaster) {
+      const lastAtMaster = lastAtMasterByPair.get(`${staffId}::${cid}`) ?? 0
+      const lastInSalon = lastInSalonByClient.get(cid) ?? 0
+      // last_in_salon должен быть >= last_at_master по определению (master ⊆ salon).
+      // Если они равны — клиент после визита у этого мастера в салон не вернулся.
+      if (lastAtMaster > 0 && lastInSalon > 0 && lastAtMaster === lastInSalon) churned += 1
+    }
+    return { churn_pct: (churned / clientsAtMaster.size) * 100, total: clientsAtMaster.size }
+  }
+
+  function scoringFor(
+    newRetentionPct: number | null,
+    regularRetentionPct: number | null,
+    churn_pct: number | null,
+  ): number | null {
+    if (newRetentionPct === null || regularRetentionPct === null || churn_pct === null) return null
+    // Доли (0..1), а не %, чтобы итоговое значение ~0..5 совпадало с порогами UI.
+    const newR = newRetentionPct / 100
+    const regR = regularRetentionPct / 100
+    const ch = Math.max(churn_pct / 100, 0.01) // защита от деления на 0
+    return (newR * regR) / ch
   }
 
   const activeStaff = staff.filter((s) => s.is_active)
@@ -446,51 +517,69 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                       </span>
                     )}
                   </td>
-                  {/* T85 — Отток + Скоринг из RPC. */}
-                  <td className="num py-2 pr-2 text-right">
-                    {(() => {
-                      const ext = advancedByStaff.get(s.id)
-                      if (!ext || Number.isNaN(ext.churn_pct)) {
-                        return <span className="text-muted-foreground">—</span>
-                      }
-                      return (
-                        <span
-                          className={cn(
-                            'font-bold',
-                            ext.churn_pct < 20
-                              ? 'text-brand-sage-deep'
-                              : ext.churn_pct <= 40
-                                ? 'text-brand-gold-deep'
-                                : 'text-destructive',
-                          )}
+                  {/* T85/T86 — Отток + Скоринг. Сначала пробуем server-side
+                      RPC (точнее, учитывает window-фильтры); fallback —
+                      клиентский расчёт по той же формуле. */}
+                  {(() => {
+                    const ext = advancedByStaff.get(s.id)
+                    const rpcChurn =
+                      ext && !Number.isNaN(ext.churn_pct) && ext.churn_pct > 0
+                        ? ext.churn_pct
+                        : null
+                    const rpcScoring =
+                      ext && !Number.isNaN(ext.scoring) && ext.scoring > 0 ? ext.scoring : null
+                    const local = churnFor(s.id)
+                    const churnPct = rpcChurn ?? local.churn_pct
+                    const scoring =
+                      rpcScoring ?? scoringFor(st.newRetentionPct, st.regularRetentionPct, churnPct)
+                    return (
+                      <>
+                        <td
+                          className="num py-2 pr-2 text-right"
+                          title={
+                            churnPct !== null && local.total > 0
+                              ? `${Math.round((churnPct / 100) * local.total)}/${local.total} клиентов`
+                              : undefined
+                          }
                         >
-                          {ext.churn_pct.toFixed(0)}%
-                        </span>
-                      )
-                    })()}
-                  </td>
-                  <td className="num py-2 pr-2 text-right">
-                    {(() => {
-                      const ext = advancedByStaff.get(s.id)
-                      if (!ext || Number.isNaN(ext.scoring)) {
-                        return <span className="text-muted-foreground">—</span>
-                      }
-                      return (
-                        <span
-                          className={cn(
-                            'font-bold',
-                            ext.scoring > 1.5
-                              ? 'text-brand-sage-deep'
-                              : ext.scoring >= 0.5
-                                ? 'text-foreground'
-                                : 'text-destructive',
+                          {churnPct === null ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span
+                              className={cn(
+                                'font-bold',
+                                churnPct < 20
+                                  ? 'text-brand-sage-deep'
+                                  : churnPct <= 40
+                                    ? 'text-brand-gold-deep'
+                                    : 'text-destructive',
+                              )}
+                            >
+                              {churnPct.toFixed(0)}%
+                            </span>
                           )}
-                        >
-                          {ext.scoring.toFixed(1)}
-                        </span>
-                      )
-                    })()}
-                  </td>
+                        </td>
+                        <td className="num py-2 pr-2 text-right">
+                          {scoring === null ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span
+                              className={cn(
+                                'font-bold',
+                                scoring > 1.5
+                                  ? 'text-brand-sage-deep'
+                                  : scoring >= 0.5
+                                    ? 'text-foreground'
+                                    : 'text-destructive',
+                              )}
+                            >
+                              {scoring.toFixed(1)}
+                            </span>
+                          )}
+                        </td>
+                      </>
+                    )
+                  })()}
                 </tr>
               )
             })}
