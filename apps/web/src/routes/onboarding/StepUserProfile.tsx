@@ -117,7 +117,7 @@ export function StepUserProfile({ value, onChange }: Props) {
               id="onb-first"
               value={value.first_name}
               onChange={(e) => onChange({ first_name: e.target.value })}
-              placeholder={t('onboarding.profile.first_name_placeholder', { defaultValue: 'Анна' })}
+              placeholder={t('onboarding.profile.first_name_placeholder')}
               autoComplete="given-name"
               autoFocus
             />
@@ -127,9 +127,7 @@ export function StepUserProfile({ value, onChange }: Props) {
               id="onb-last"
               value={value.last_name}
               onChange={(e) => onChange({ last_name: e.target.value })}
-              placeholder={t('onboarding.profile.last_name_placeholder', {
-                defaultValue: 'Ковальская',
-              })}
+              placeholder={t('onboarding.profile.last_name_placeholder')}
               autoComplete="family-name"
             />
           </Field>

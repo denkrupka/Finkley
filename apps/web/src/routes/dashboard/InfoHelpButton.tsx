@@ -55,7 +55,7 @@ export function InfoHelpButton({
           e.stopPropagation()
           setOpen((v) => !v)
         }}
-        aria-label={t('common.info_help.aria', { defaultValue: 'Подсказка' })}
+        aria-label={t('common.info_help.aria')}
         className={cn(
           'text-muted-foreground hover:text-foreground hover:bg-muted/40 inline-flex size-5 items-center justify-center rounded-full transition-colors',
           open && 'bg-muted/60 text-foreground',
@@ -72,12 +72,12 @@ export function InfoHelpButton({
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-foreground text-[12px] font-bold uppercase tracking-wider">
-              {t('common.info_help.title', { defaultValue: 'Что это' })}
+              {t('common.info_help.title')}
             </p>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label={t('common.close', { defaultValue: 'Закрыть' })}
+              aria-label={t('common.close')}
               className="text-muted-foreground hover:text-foreground -mr-1 -mt-1"
             >
               <X className="size-3.5" strokeWidth={2} />

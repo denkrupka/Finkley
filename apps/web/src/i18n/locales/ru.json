@@ -600,7 +600,11 @@
     "no_results": "Ничего не найдено",
     "copied": "Скопировано",
     "back_home": "Вернуться на главную",
-    "confirm_delete": "Удалить?"
+    "confirm_delete": "Удалить?",
+    "info_help": {
+      "aria": "Подсказка",
+      "title": "Что это"
+    }
   },
   "auth": {
     "or": "или",
@@ -1053,7 +1057,9 @@
       "avatar_change": "Заменить",
       "avatar_remove": "Убрать",
       "avatar_hint": "PNG / JPG / WEBP, до 5 МБ",
-      "avatar_too_large": "Макс. 5 МБ"
+      "avatar_too_large": "Макс. 5 МБ",
+      "first_name_placeholder": "Анна",
+      "last_name_placeholder": "Ковальская"
     },
     "ai_summary": {
       "title": "Общий анализ от AI",
