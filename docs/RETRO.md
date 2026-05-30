@@ -5,6 +5,58 @@
 
 ---
 
+## Batch 10 — UX-аудит 30+ скриншотов + AI-помощник tool-use + лендинг · 30 мая 2026 (ночь)
+
+**Релиз:** 7 коммитов в `main`, все запушены и автодеплоились (Deploy Web, Deploy Supabase, CI — все зелёные). Сессия одной ночи, владелец прислал ~30 скриншотов с фидбеком и ушёл спать с задачей «доделать всё».
+
+### Что сделано (33 тикета)
+
+**UX-фиксы по скриншотам:**
+
+- T40 phone uniqueness в profiles: миграция partial unique index + RPC check_phone_taken + debounced UI в StepTelegramPhone
+- T41 inviter name в email-приглашениях: profiles.full_name приоритет, а не email
+- T42 подпись «Пригласить мастера в команду» над кнопками Email/SMS
+- T43 master settings dialog (StaffEditSheet) с avatar upload, доступ через клик на карточку мастера в онбординге
+- T44 native confirm() заменён на shadcn Dialog с AlertTriangle при удалении мастера
+- T45 фин. структура подписи cash/fixed/variable/taxes (онбординг + settings)
+- T50 InfoHelpButton collision-avoid: popover автоматически переключает сторону при overflow
+- T51 dark mode: жёлтые кнопки (Pro план, Забрать бонус, Сообщить о баге) с dark overrides
+- T52 «Подключить банк» в BankingTransactionsTable: фикс anchor — был без префикса /salon/
+- T53/T54 FAB скрыт на /ai-helper, /visits, /income; VisitsCalendarView auto-fit ширина под N мастеров
+- T55 онбординг аватары: immediate upload в storage при крапе (без зависимости от submit) — критичный фикс
+- T58 CashDetailsModal: компактные карточки 2/3/4 col, без скролла
+- T59 CashTransferModal: жёлтый блок «Корректировки» → Popover «?» на плитке
+- T60/T61 KPI Cash: «Детали» под суммой; «синхронно» → 0,00 PLN
+
+**Большие фичи (через подагентов):**
+
+- T46 AI-разборы в онбординге получают реальный контекст БД: staff/services/visits aggregates за 30/60/90d, GROUNDING RULES в prompt запрещают «0 услуг», ровно 4 карточки на каждом шаге
+- T47 Локальные туры: общий TourStage shared рендерер + data-tour anchors на Dashboard/Expenses/Finance/Inventory/Warehouse — все туры теперь со spotlight + anchored tooltip
+- T48 Booksy initial sync дробится на tiers (catalog+visits сначала, clients fire-and-forget) чтобы не упираться в edge function 150s walltime
+- T49 AI-помощник с tool-use: 5 server-side RPC (create_visit/expense/client/service/transfer_cash), таблица ai_tool_calls для аудита, undo-кнопки на inline tool-cards, динамические подсказки из реальных проблем салона
+- T57 Mobile-аудит: useIsMobile hook, sticky DialogFooter, CashDetailsModal/BankingTransactionsTable/Step4Expenses/VisitsCalendarView адаптированы под 375px
+- T62 Эффективность мастеров: миграция staff_churn_scoring с RPC возвращающим churn_pct + scoring; UI с пороговыми цветами
+- T63 Лендинг: UX-аудит применён — убран жаргон (P&L → «отчёт о прибыли», PSD2 → «автоподключение к банку», и т.д.), сокращены фичи 15→6+табы, новый hero, placeholder-отзывы, бургер-меню на мобиле
+
+### Что не сделано (отложено)
+
+- T39 Banking REDIRECT_URI_NOT_ALLOWED — инфраструктурная задача, нужен доступ владельца к Enable Banking dashboard (добавить https://finkley.app/banking/callback в whitelist)
+- T31/T32 Step3ServicesLive debounced save + ErrorBoundary вокруг OnboardingPage — deferred, низкий приоритет
+- T56 Полный i18n-аудит каждой буквы — частично сделан агентом (Dashboard/Knowledge/Media/Reports + 108 новых ключей), остальное — отдельный спринт
+
+### Уроки
+
+- **Прокладка через подагентов = сложные задачи параллельно.** 5 background-агентов работали одновременно: AI breakdowns, Booksy sync, AI tool-use, i18n, mobile, tours, churn. Без них одна нити пришлось бы день. С ними — 1 ночь. Конфликты файлов случались (mobile-агент перезаписал моё T54 в SalonLayout, который я потом восстановил), но это меньшее зло.
+- **`pnpm i18n:sync` не дружит с многострочными defaultValue.** Когда default — это конкатенация строк через `+`, скрипт оставляет повисший `, { +` и срывает синтаксис. Починили 9 мест в sections.tsx через regex-replace. На будущее — defaultValue должен быть в одну строку или через template literal.
+- **Husky pre-commit с lint-staged stash'ит non-staged изменения.** Если параллельный агент в это время правит файл — stash спрятывает его правки. Это путает обоих. Урок: для длинных сессий лучше staged'ить файлы до запуска проверок.
+- **Прод-доступ через WebFetch — отличный smoke check.** После push можно проверить hero-заголовок и название в meta, не открывая браузер. Заняло 10 секунд, дало уверенность что деплой не сломал.
+
+### Auto-pacing /loop
+
+Юзер ушёл спать и попросил «доделать всё». Использовали ScheduleWakeup в /loop dynamic mode: 4-5 минут между tick'ами, проверяя CI, smoke prod, статусы агентов. Дешевле непрерывного polling, держит cache warm.
+
+---
+
 ## Batch 9 — Live-mode онбординга, resume, deploy-pipeline fix · 29 мая 2026 (вечер)
 
 **Релиз:** ~15 коммитов в `main`, все запушены и автодеплоились через
