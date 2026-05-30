@@ -2330,6 +2330,16 @@
       "compare_prev": "Сравни этот месяц с прошлым",
       "what_to_improve": "Что можно улучшить, чтобы поднять выручку?"
     },
+    "quick_actions": {
+      "add_visit": "Добавить визит",
+      "add_expense": "Внести расход",
+      "transfer_cash": "Перевод между кассами",
+      "close_payroll": "Закрыть зарплатный период",
+      "prompt_add_visit": "Хочу добавить визит",
+      "prompt_add_expense": "Хочу внести расход",
+      "prompt_transfer_cash": "Хочу сделать перевод между кассами",
+      "prompt_close_payroll": "Хочу закрыть зарплатный период"
+    },
     "tools": {
       "create_visit": "Создан визит",
       "create_expense": "Создан расход",

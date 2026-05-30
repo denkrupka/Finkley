@@ -98,6 +98,9 @@ export function AIAssistantPage() {
 
   const messages = data?.messages ?? []
   const isEmpty = !isLoading && messages.length === 0
+  // Скрываем пресеты ПОСЛЕ первого сообщения юзера, чтобы чат был чище.
+  const hasUserMessage = messages.some((m) => m.role === 'user')
+  const showQuickActions = !isLoading && !hasUserMessage && !sendMsg.isPending
 
   return (
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-8">
@@ -172,6 +175,8 @@ export function AIAssistantPage() {
           )}
         </div>
 
+        {showQuickActions ? <QuickActions onPick={(prompt) => send(prompt)} /> : null}
+
         <form
           className="border-border flex items-end gap-2 border-t bg-white px-3 py-3 sm:px-4"
           onSubmit={(e) => {
@@ -202,6 +207,61 @@ export function AIAssistantPage() {
             )}
           </Button>
         </form>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Быстрые пресеты-подсказки над input chat. Клик отправляет готовый prompt,
+ * который AI понимает и зовёт соответствующий tool с уточнениями параметров.
+ * На мобиле — horizontal scroll, на десктопе — grid-cols-4.
+ * Видны только пока юзер не отправил первое сообщение (см. showQuickActions).
+ */
+function QuickActions({ onPick }: { onPick: (prompt: string) => void }) {
+  const { t } = useTranslation()
+  const items: { key: string; emoji: string; label: string; prompt: string }[] = [
+    {
+      key: 'add_visit',
+      emoji: '💰',
+      label: t('ai.quick_actions.add_visit'),
+      prompt: t('ai.quick_actions.prompt_add_visit'),
+    },
+    {
+      key: 'add_expense',
+      emoji: '📉',
+      label: t('ai.quick_actions.add_expense'),
+      prompt: t('ai.quick_actions.prompt_add_expense'),
+    },
+    {
+      key: 'transfer_cash',
+      emoji: '🔁',
+      label: t('ai.quick_actions.transfer_cash'),
+      prompt: t('ai.quick_actions.prompt_transfer_cash'),
+    },
+    {
+      key: 'close_payroll',
+      emoji: '📋',
+      label: t('ai.quick_actions.close_payroll'),
+      prompt: t('ai.quick_actions.prompt_close_payroll'),
+    },
+  ]
+  return (
+    <div className="border-border border-t bg-white px-3 py-2.5 sm:px-4">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-2 sm:overflow-visible sm:px-0">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onPick(item.prompt)}
+            className="border-border bg-card hover:border-secondary hover:bg-secondary/5 flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors sm:shrink sm:justify-center sm:py-2"
+          >
+            <span aria-hidden>{item.emoji}</span>
+            <span className="whitespace-nowrap sm:whitespace-normal sm:text-center">
+              {item.label}
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   )

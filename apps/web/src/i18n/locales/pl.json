@@ -1472,6 +1472,16 @@
       "compare_prev": "Porównaj ten miesiąc z poprzednim",
       "what_to_improve": "Co mogę poprawić, żeby zwiększyć przychód?"
     },
+    "quick_actions": {
+      "add_visit": "Dodaj wizytę",
+      "add_expense": "Dodaj wydatek",
+      "transfer_cash": "Przelew między kasami",
+      "close_payroll": "Zamknij okres płacowy",
+      "prompt_add_visit": "Chcę dodać wizytę",
+      "prompt_add_expense": "Chcę dodać wydatek",
+      "prompt_transfer_cash": "Chcę zrobić przelew między kasami",
+      "prompt_close_payroll": "Chcę zamknąć okres płacowy"
+    },
     "tools": {
       "create_visit": "Utworzono wizytę",
       "create_expense": "Utworzono wydatek",

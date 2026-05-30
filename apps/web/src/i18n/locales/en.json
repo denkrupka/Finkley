@@ -2362,6 +2362,16 @@
       "compare_prev": "Compare this month with last month",
       "what_to_improve": "What can I improve to grow revenue?"
     },
+    "quick_actions": {
+      "add_visit": "Add a visit",
+      "add_expense": "Add an expense",
+      "transfer_cash": "Cash transfer",
+      "close_payroll": "Close payroll period",
+      "prompt_add_visit": "I want to add a visit",
+      "prompt_add_expense": "I want to add an expense",
+      "prompt_transfer_cash": "I want to transfer cash between registers",
+      "prompt_close_payroll": "I want to close the payroll period"
+    },
     "tools": {
       "create_visit": "Visit created",
       "create_expense": "Expense created",
