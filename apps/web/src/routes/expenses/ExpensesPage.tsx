@@ -422,11 +422,7 @@ export function ExpensesPage({
       {embedded ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
-            {isPickerMode
-              ? t('expenses.picker_hint', {
-                  defaultValue: 'Кликни по расходу чтобы связать с банковской транзакцией',
-                })
-              : null}
+            {isPickerMode ? t('expenses.picker_hint') : null}
           </p>
           <div className="flex items-center gap-2">
             <label className="text-muted-foreground inline-flex cursor-pointer select-none items-center gap-1.5 text-xs">
@@ -436,7 +432,7 @@ export function ExpensesPage({
                 onChange={(e) => setShowLinked(e.target.checked)}
                 className="size-3.5 cursor-pointer"
               />
-              {t('expenses.picker_show_linked', { defaultValue: 'Показать связанные' })}
+              {t('expenses.picker_show_linked')}
             </label>
             <PeriodPickerPopover value={period} onChange={setPeriod} />
           </div>
@@ -449,7 +445,7 @@ export function ExpensesPage({
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
               {tab === 'pending'
-                ? t('expenses.tabs.subtitle_pending', { defaultValue: 'Запланировано к оплате:' })
+                ? t('expenses.tabs.subtitle_pending')
                 : t('expenses.subtitle_total')}{' '}
               <span
                 className={cn(
@@ -499,7 +495,7 @@ export function ExpensesPage({
           )}
         >
           <CheckCircle2 className="size-4" strokeWidth={1.8} />
-          {t('expenses.tabs.paid', { defaultValue: 'Оплачено' })}
+          {t('expenses.tabs.paid')}
           <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
             {expenses.length}
           </span>
@@ -515,7 +511,7 @@ export function ExpensesPage({
           )}
         >
           <CalendarClock className="size-4" strokeWidth={1.8} />
-          {t('expenses.tabs.pending', { defaultValue: 'Не оплачено' })}
+          {t('expenses.tabs.pending')}
           <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
             {pendingCount}
           </span>
@@ -533,7 +529,7 @@ export function ExpensesPage({
             )}
           >
             <Landmark className="size-4" strokeWidth={1.8} />
-            {t('expenses.tabs.banking', { defaultValue: 'Банкинг' })}
+            {t('expenses.tabs.banking')}
             {unlinkedBankCount > 0 ? (
               <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
                 {unlinkedBankCount}
@@ -602,9 +598,7 @@ export function ExpensesPage({
             <div className="border-border flex items-baseline justify-between gap-2 border-b px-5 py-4">
               <h2 className="text-brand-navy text-base font-bold tracking-tight">
                 {tab === 'pending'
-                  ? t('expenses.tabs.list_title_pending', {
-                      defaultValue: 'Запланированные платежи',
-                    })
+                  ? t('expenses.tabs.list_title_pending')
                   : t('expenses.list_title')}
               </h2>
               <div className="flex items-center gap-2">
@@ -613,10 +607,7 @@ export function ExpensesPage({
                     {exportMode && exportSelectedIds.size > 0 ? (
                       <Button variant="primary" size="sm" onClick={() => setExportDialogOpen(true)}>
                         <Landmark className="size-3.5" strokeWidth={2} />
-                        {t('banking.export.action_export', {
-                          defaultValue: 'Экспорт ({{n}})',
-                          n: exportSelectedIds.size,
-                        })}
+                        {t('banking.export.action_export', { n: exportSelectedIds.size })}
                       </Button>
                     ) : null}
                     <Button
@@ -629,8 +620,8 @@ export function ExpensesPage({
                     >
                       <Landmark className="size-3.5" strokeWidth={2} />
                       {exportMode
-                        ? t('banking.export.cancel_select', { defaultValue: 'Отмена' })
-                        : t('banking.export.start_select', { defaultValue: 'Экспорт в банк' })}
+                        ? t('banking.export.cancel_select')
+                        : t('banking.export.start_select')}
                     </Button>
                   </>
                 ) : null}
@@ -686,9 +677,7 @@ export function ExpensesPage({
               ) : pendingPayments.length === 0 && partiallyPaidExpenses.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <p className="text-muted-foreground text-sm">
-                    {t('expenses.tabs.empty_pending', {
-                      defaultValue: 'В этом периоде нет запланированных платежей',
-                    })}
+                    {t('expenses.tabs.empty_pending')}
                   </p>
                 </div>
               ) : (
@@ -696,9 +685,7 @@ export function ExpensesPage({
                   {partiallyPaidExpenses.length > 0 ? (
                     <div className="border-border border-b">
                       <div className="bg-amber-50/60 px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                        {t('expenses.partial_section_title', {
-                          defaultValue: 'Частично оплаченные · осталось',
-                        })}{' '}
+                        {t('expenses.partial_section_title')}{' '}
                         <span className="num tabular-nums">
                           {formatCurrency(partialRemainingTotal, currency)}
                         </span>
@@ -734,12 +721,10 @@ export function ExpensesPage({
                                   {isLinked(e) ? (
                                     <span
                                       className="text-brand-teal-deep bg-brand-teal-soft inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
-                                      title={t('expenses.linked_to_bank_tooltip', {
-                                        defaultValue: 'Привязан к банковской транзакции',
-                                      })}
+                                      title={t('expenses.linked_to_bank_tooltip')}
                                     >
                                       <Landmark className="size-2.5" strokeWidth={2.4} />
-                                      {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+                                      {t('expenses.bank_badge')}
                                     </span>
                                   ) : null}
                                 </span>
@@ -774,10 +759,7 @@ export function ExpensesPage({
                             className="size-4 cursor-pointer"
                           />
                           <span className="text-muted-foreground font-semibold">
-                            {t('banking.export.select_all', {
-                              defaultValue: 'Выбрать все ({{n}})',
-                              n: pendingPayments.length,
-                            })}
+                            {t('banking.export.select_all', { n: pendingPayments.length })}
                           </span>
                         </li>
                       ) : null}
@@ -841,14 +823,10 @@ export function ExpensesPage({
                                   )}
                                 >
                                   {overdue
-                                    ? t('expenses.tabs.badge_overdue', {
-                                        defaultValue: 'просрочен',
-                                      })
+                                    ? t('expenses.tabs.badge_overdue')
                                     : today
-                                      ? t('expenses.tabs.badge_today', { defaultValue: 'сегодня' })
-                                      : t('expenses.tabs.badge_pending', {
-                                          defaultValue: 'запланирован',
-                                        })}
+                                      ? t('expenses.tabs.badge_today')
+                                      : t('expenses.tabs.badge_pending')}
                                 </span>
                               </span>
                               <span className="text-brand-text-faint mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -885,7 +863,7 @@ export function ExpensesPage({
                                   className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                                 >
                                   <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                                  {t('expenses.tabs.btn_pay', { defaultValue: 'Оплатить' })}
+                                  {t('expenses.tabs.btn_pay')}
                                 </button>
                                 <button
                                   type="button"
@@ -1003,12 +981,10 @@ export function ExpensesPage({
                           {isLinked(e) ? (
                             <span
                               className="text-brand-teal-deep bg-brand-teal-soft inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
-                              title={t('expenses.linked_to_bank_tooltip', {
-                                defaultValue: 'Привязан к банковской транзакции',
-                              })}
+                              title={t('expenses.linked_to_bank_tooltip')}
                             >
                               <Landmark className="size-2.5" strokeWidth={2.4} />
-                              {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+                              {t('expenses.bank_badge')}
                             </span>
                           ) : null}
                           {needsReviewExpenseIds?.has(e.id) ? (
@@ -1272,17 +1248,13 @@ export function ExpensesPage({
               <div className="border-border bg-card shadow-finsm rounded-lg border p-5">
                 <h2 className="text-brand-navy mb-4 text-base font-bold tracking-tight">
                   {tab === 'pending'
-                    ? t('expenses.tabs.structure_title_pending', {
-                        defaultValue: 'Структура запланированных',
-                      })
+                    ? t('expenses.tabs.structure_title_pending')
                     : t('expenses.structure_title')}
                 </h2>
                 {sideStructure.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {tab === 'pending'
-                      ? t('expenses.tabs.structure_empty_pending', {
-                          defaultValue: 'Нет запланированных платежей в этом периоде',
-                        })
+                      ? t('expenses.tabs.structure_empty_pending')
                       : t('expenses.structure_empty')}
                   </p>
                 ) : (

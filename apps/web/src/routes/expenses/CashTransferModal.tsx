@@ -200,16 +200,9 @@ export function CashTransferModal({ open, onClose, salonId, initialFrom = null }
               <Info className="mt-0.5 size-4 shrink-0 text-amber-700" strokeWidth={2} />
               <div className="text-xs leading-relaxed text-amber-900">
                 <p className="mb-1 font-bold uppercase tracking-wider">
-                  {t('cash_transfer.adjustments_info_title', {
-                    defaultValue: 'Касса «Корректировки»',
-                  })}
+                  {t('cash_transfer.adjustments_info_title')}
                 </p>
-                <p>
-                  {t('cash_transfer.adjustments_info_body', {
-                    defaultValue:
-                      'Служит для выравнивания баланса при несхождении плана с фактом. Например: клиент дал деньги, а сдачу-мелочь не забрал — переведите излишек в «Корректировки». Или наоборот: не было мелочи на сдачу и дали чуть больше клиенту — компенсируйте перемещением из «Корректировок». На эту кассу деньги поступают и убывают только перемещением средств.',
-                  })}
-                </p>
+                <p>{t('cash_transfer.adjustments_info_body')}</p>
               </div>
             </div>
           </div>

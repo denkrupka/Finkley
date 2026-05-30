@@ -604,11 +604,7 @@ export function ExpenseFormModal({
         type: 'manual',
         message: 'expenses.errors.payment_required',
       })
-      toast.error(
-        t('expenses.errors.payment_required', {
-          defaultValue: 'Укажи чем оплачено — касса или способ оплаты обязателен',
-        }),
-      )
+      toast.error(t('expenses.errors.payment_required'))
       return
     }
     // Частичная оплата: paid_amount_cents = введённое значение; null если
@@ -1296,11 +1292,7 @@ export function ExpenseFormModal({
                 control={form.control}
                 render={({ field }) => (
                   <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs">
-                      {t('expenses.form.payroll_kind_v2', {
-                        defaultValue: 'Расчёт',
-                      })}
-                    </Label>
+                    <Label className="text-xs">{t('expenses.form.payroll_kind_v2')}</Label>
                     <div className="grid grid-cols-2 gap-2">
                       {(['advance', 'final'] as const).map((kind) => {
                         const active = field.value === kind
@@ -1327,7 +1319,7 @@ export function ExpenseFormModal({
               {/* T116 — Премия (отдельной строкой, сохраняется в premium_cents). */}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="exp-premium" className="text-xs">
-                  {t('expenses.form.payroll_premium', { defaultValue: 'Премия (сверху)' })}
+                  {t('expenses.form.payroll_premium')}
                 </Label>
                 <div className="border-input bg-card flex h-10 items-center gap-2 rounded-md border px-3">
                   <span className="num text-muted-foreground text-base font-semibold">+</span>
@@ -1344,10 +1336,7 @@ export function ExpenseFormModal({
                   <span className="num text-muted-foreground text-xs">{currencySymbol}</span>
                 </div>
                 <p className="text-muted-foreground text-[11px]">
-                  {t('expenses.form.payroll_premium_hint', {
-                    defaultValue:
-                      'Бонус сверх базового payout. Будет видна в Отчёты → Зарплаты колонкой «Премия».',
-                  })}
+                  {t('expenses.form.payroll_premium_hint')}
                 </p>
               </div>
 
@@ -1370,7 +1359,7 @@ export function ExpenseFormModal({
               {payrollBreakdown ? (
                 <div className="border-brand-teal-deep/30 bg-card rounded-md border border-dashed p-2.5">
                   <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-                    {t('expenses.form.payroll_breakdown', { defaultValue: 'Разбивка' })}
+                    {t('expenses.form.payroll_breakdown')}
                   </p>
                   <p className="text-foreground mt-0.5 text-xs">{payrollBreakdown}</p>
                 </div>
@@ -1433,17 +1422,13 @@ export function ExpenseFormModal({
                       className="border-brand-border accent-brand-navy size-4 cursor-pointer rounded"
                     />
                     <span className="text-foreground text-sm font-semibold">
-                      {t('expenses.form.partial_payment_label', {
-                        defaultValue: 'Частичная оплата',
-                      })}
+                      {t('expenses.form.partial_payment_label')}
                     </span>
                   </label>
                   {partialField.value ? (
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="exp-paid-amount" className="text-xs">
-                        {t('expenses.form.paid_amount_label', {
-                          defaultValue: 'Оплачено сейчас',
-                        })}
+                        {t('expenses.form.paid_amount_label')}
                       </Label>
                       <div className="border-border bg-card flex h-10 items-center gap-2 rounded-md border px-3">
                         <span className="num text-muted-foreground text-base font-bold">
@@ -1461,10 +1446,7 @@ export function ExpenseFormModal({
                         />
                       </div>
                       <p className="text-muted-foreground text-[11px]">
-                        {t('expenses.form.partial_payment_hint', {
-                          defaultValue:
-                            'Сумма выше — полная сумма по документу. Оставшаяся часть появится во вкладке «Не оплачено» как остаток.',
-                        })}
+                        {t('expenses.form.partial_payment_hint')}
                       </p>
                     </div>
                   ) : null}
@@ -1716,11 +1698,9 @@ function ExpenseBankLinkSection({
         <div className="flex items-center justify-between gap-2">
           <span className="text-foreground inline-flex items-center gap-1.5 text-sm font-semibold">
             <span className="text-brand-teal-deep bg-brand-teal-soft inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">
-              {t('expenses.bank_badge', { defaultValue: 'Банк' })}
+              {t('expenses.bank_badge')}
             </span>
-            {t('banking.reverse_link.linked_label', {
-              defaultValue: 'Привязан к банковской транзакции',
-            })}
+            {t('banking.reverse_link.linked_label')}
           </span>
           <button
             type="button"
@@ -1733,18 +1713,14 @@ function ExpenseBankLinkSection({
       ) : (
         <div className="flex items-center justify-between gap-2">
           <span className="text-muted-foreground text-xs">
-            {t('banking.reverse_link.not_linked_hint', {
-              defaultValue: 'Расход не привязан к банковской транзакции.',
-            })}
+            {t('banking.reverse_link.not_linked_hint')}
           </span>
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
             className="bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold"
           >
-            {t('banking.reverse_link.button', {
-              defaultValue: 'Привязать к банку',
-            })}
+            {t('banking.reverse_link.button')}
           </button>
         </div>
       )}
@@ -1801,7 +1777,6 @@ function InstallmentsList({
     <div className="border-border flex flex-col gap-2 rounded-md border bg-amber-50/40 p-3">
       <p className="text-foreground text-xs font-bold uppercase tracking-wider">
         {t('expenses.form.installments_title', {
-          defaultValue: 'История оплат · оплачено {{paid}} {{symbol}}, осталось {{remaining}}',
           paid: (paidSum / 100).toFixed(2),
           symbol: currencySymbol,
           remaining: (remaining / 100).toFixed(2),
@@ -1825,22 +1800,13 @@ function InstallmentsList({
             </span>
             <span className="text-muted-foreground/80 truncate text-[11px]">
               {it.bank_transaction_id
-                ? t('expenses.form.installment_via_bank', { defaultValue: 'Банк' })
-                : (it.payment_method ??
-                  it.comment ??
-                  t('expenses.form.installment_unknown', { defaultValue: '—' }))}
+                ? t('expenses.form.installment_via_bank')
+                : (it.payment_method ?? it.comment ?? t('expenses.form.installment_unknown'))}
             </span>
             <button
               type="button"
               onClick={() => {
-                if (
-                  !confirm(
-                    t('expenses.form.installment_confirm_delete', {
-                      defaultValue: 'Удалить эту запись об оплате? Сумма откатится в «остаток».',
-                    }),
-                  )
-                )
-                  return
+                if (!confirm(t('expenses.form.installment_confirm_delete'))) return
                 remove.mutate({ id: it.id, expense_id: expenseId })
               }}
               className="text-muted-foreground hover:text-destructive text-xs"
@@ -1902,25 +1868,19 @@ function PayrollAutoFillButton({
         }> | null
       )?.find((r) => r.staff_id === staffId)
       if (!row) {
-        toast.info(
-          t('expenses.form.payroll_no_visits', {
-            defaultValue: 'Нет визитов мастера за выбранный период',
-          }),
-        )
+        toast.info(t('expenses.form.payroll_no_visits'))
         onPick(0, '')
         return
       }
       const payout = Number(row.payout_cents)
       const breakdown = t('expenses.form.payroll_breakdown_template', {
-        defaultValue:
-          'Визитов: {{count}} · Выручка: {{rev}} · Чаевые: {{tips}} → Payout: {{payout}}',
         count: Number(row.visit_count),
         rev: formatCurrencyShort(Number(row.revenue_cents), currency, locale),
         tips: formatCurrencyShort(Number(row.tips_cents), currency, locale),
         payout: formatCurrencyShort(payout, currency, locale),
       })
       onPick(payout, breakdown)
-      toast.success(t('expenses.form.payroll_filled', { defaultValue: 'Сумма посчитана' }))
+      toast.success(t('expenses.form.payroll_filled'))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -1938,7 +1898,7 @@ function PayrollAutoFillButton({
       className="self-start"
     >
       {busy ? <Loader2 className="size-3.5 animate-spin" strokeWidth={2} /> : null}
-      {t('expenses.form.payroll_autofill', { defaultValue: 'Авто-расчёт суммы' })}
+      {t('expenses.form.payroll_autofill')}
     </Button>
   )
 }

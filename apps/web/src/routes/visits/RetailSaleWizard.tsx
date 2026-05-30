@@ -316,7 +316,7 @@ export function RetailSaleWizard({
             p_type: 'manual_adjustment',
             p_quantity: -l.quantity,
             p_cost_cents: null,
-            p_notes: `${t('retail_wizard.inventory_note', { defaultValue: 'Розничная продажа' })}${docNote ? ' ' + docNote : ''}`,
+            p_notes: `${t('retail_wizard.inventory_note')}${docNote ? ' ' + docNote : ''}`,
           })
           if (invErr) {
             console.warn('inventory_apply_tx failed', invErr)

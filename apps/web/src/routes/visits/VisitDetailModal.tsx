@@ -1035,14 +1035,12 @@ function ChargeView({
         ) : null}
 
         <Label className="text-muted-foreground mt-5 block text-[11px] font-bold uppercase tracking-wider">
-          {t('visits.charge.payment_method', { defaultValue: 'Метод оплаты' })}
+          {t('visits.charge.payment_method')}
         </Label>
         <div className="mt-2 flex flex-wrap gap-2">
           {paymentMethods.length === 0 ? (
             <p className="text-muted-foreground text-xs">
-              {t('visits.charge.payment_method_empty', {
-                defaultValue: 'Нет настроенных методов оплаты',
-              })}
+              {t('visits.charge.payment_method_empty')}
             </p>
           ) : (
             paymentMethods.map((m) => {

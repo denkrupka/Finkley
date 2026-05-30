@@ -27,14 +27,12 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const APP_ID = Deno.env.get('ENABLE_BANKING_APP_ID') ?? ''
 const PRIVATE_KEY = Deno.env.get('ENABLE_BANKING_PRIVATE_KEY') ?? ''
 // URL должен ТОЧНО совпадать с redirect_url'ом, зарегистрированным в Enable
-// Banking dashboard (EB сверяет с whitelist). В дашборде EB сейчас стоит
-// https://finkley.app/banking/callback (без /app/) — bridge в public/404.html
-// перехватывает этот путь и переводит на SPA /app/banking/callback с
-// сохранением query (?code=...&state=...). Когда EB одобрят замену на
-// /app/banking/callback (полный URL) — выставить ENABLE_BANKING_REDIRECT_URL
-// в Supabase secrets и поменять fallback тут.
+// Banking dashboard (EB сверяет с whitelist). 2026-05-30 владелец
+// подтвердил что в дашборде EB прописан https://finkley.app/app/banking/callback
+// (полный URL с /app/) — поэтому fallback теперь совпадает с whitelist.
+// ENABLE_BANKING_REDIRECT_URL остаётся override'ом для staging/dev.
 const REDIRECT_URL =
-  Deno.env.get('ENABLE_BANKING_REDIRECT_URL') ?? 'https://finkley.app/banking/callback'
+  Deno.env.get('ENABLE_BANKING_REDIRECT_URL') ?? 'https://finkley.app/app/banking/callback'
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -46,13 +46,10 @@ export function CommissionsPin({ salonId, currency, expenses, onOpenSource }: Pr
           </span>
           <div>
             <p className="text-foreground text-sm font-bold">
-              {t('expenses.commissions.pin_title', { defaultValue: 'Комиссии' })}
+              {t('expenses.commissions.pin_title')}
             </p>
             <p className="text-muted-foreground text-[11px]">
-              {t('expenses.commissions.pin_subtitle', {
-                defaultValue: 'Авто-расходы по методам с комиссией · {{count}} tx',
-                count: commissions.length,
-              })}
+              {t('expenses.commissions.pin_subtitle', { count: commissions.length })}
             </p>
           </div>
         </div>

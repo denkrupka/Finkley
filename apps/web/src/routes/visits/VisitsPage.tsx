@@ -529,7 +529,7 @@ function SingleVisitRow({
                     defaultValue: 'Получено {{paid}} из {{total}} · осталось {{remaining}}',
                   })}
                 >
-                  {t('income.partial_badge', { defaultValue: 'Частично' })}
+                  {t('income.partial_badge')}
                 </span>
               )
             })()

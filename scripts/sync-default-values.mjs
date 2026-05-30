@@ -29,6 +29,8 @@ const PATHS = [
   'apps/web/src/routes/knowledge',
   'apps/web/src/routes/media',
   'apps/web/src/routes/reports-hub',
+  'apps/web/src/routes/visits',
+  'apps/web/src/routes/expenses',
   'apps/web/src/components/onboarding-tour',
 ]
 

@@ -577,18 +577,11 @@ export function QuickEntryModal({
             p_type: 'manual_adjustment',
             p_quantity: -validQty,
             p_cost_cents: null,
-            p_notes: t('visits.quick_entry.inventory_note', {
-              defaultValue: 'Доп. продажа в визите',
-            }),
+            p_notes: t('visits.quick_entry.inventory_note'),
           })
           if (invErr) {
             console.warn('inventory_apply_tx failed', invErr)
-            toast.error(
-              t('visits.quick_entry.stock_error', {
-                defaultValue: 'Склад: {{error}}',
-                error: invErr.message,
-              }),
-            )
+            toast.error(t('visits.quick_entry.stock_error', { error: invErr.message }))
           }
         }
       }
@@ -864,7 +857,7 @@ export function QuickEntryModal({
                           type="button"
                           onClick={() => moveLine(l.uid, -1)}
                           disabled={lineIdx === 0}
-                          aria-label={t('visits.form.move_up', { defaultValue: 'Вверх' })}
+                          aria-label={t('visits.form.move_up')}
                           className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md disabled:cursor-not-allowed disabled:opacity-30"
                         >
                           <ArrowUp className="size-3.5" strokeWidth={1.8} />
@@ -873,7 +866,7 @@ export function QuickEntryModal({
                           type="button"
                           onClick={() => moveLine(l.uid, 1)}
                           disabled={lineIdx === lines.length - 1}
-                          aria-label={t('visits.form.move_down', { defaultValue: 'Вниз' })}
+                          aria-label={t('visits.form.move_down')}
                           className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md disabled:cursor-not-allowed disabled:opacity-30"
                         >
                           <ArrowDown className="size-3.5" strokeWidth={1.8} />

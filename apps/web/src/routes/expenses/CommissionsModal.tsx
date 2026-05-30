@@ -131,50 +131,30 @@ export function CommissionsModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="w-[min(960px,96vw)] max-w-none">
         <DialogHeader>
-          <DialogTitle>
-            {t('expenses.commissions.title', { defaultValue: 'Комиссии за период' })}
-          </DialogTitle>
+          <DialogTitle>{t('expenses.commissions.title')}</DialogTitle>
           <DialogDescription>
-            {t('expenses.commissions.subtitle', {
-              defaultValue:
-                'Автоматически списанные комиссии по методам оплаты. Клик по строке открывает исходный визит или доход.',
-            })}
+            {t('expenses.commissions.subtitle')}
             {' · '}
-            {t('expenses.commissions.total', {
-              defaultValue: 'Итого {{total}}',
-              total: formatCurrency(total, currency),
-            })}
+            {t('expenses.commissions.total', { total: formatCurrency(total, currency) })}
           </DialogDescription>
         </DialogHeader>
 
         {expenses.length === 0 ? (
           <p className="text-muted-foreground py-6 text-center text-sm">
-            {t('expenses.commissions.empty', {
-              defaultValue: 'За выбранный период комиссий нет.',
-            })}
+            {t('expenses.commissions.empty')}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-muted-foreground border-border border-b text-left text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="py-2">
-                    {t('expenses.commissions.col_date', { defaultValue: 'Дата' })}
-                  </th>
-                  <th className="py-2">
-                    {t('expenses.commissions.col_kind', { defaultValue: 'Тип' })}
-                  </th>
-                  <th className="py-2">
-                    {t('expenses.commissions.col_title', { defaultValue: 'Название' })}
-                  </th>
-                  <th className="py-2">
-                    {t('expenses.commissions.col_method', { defaultValue: 'Метод' })}
-                  </th>
+                  <th className="py-2">{t('expenses.commissions.col_date')}</th>
+                  <th className="py-2">{t('expenses.commissions.col_kind')}</th>
+                  <th className="py-2">{t('expenses.commissions.col_title')}</th>
+                  <th className="py-2">{t('expenses.commissions.col_method')}</th>
+                  <th className="num py-2 text-right">{t('expenses.commissions.col_tx')}</th>
                   <th className="num py-2 text-right">
-                    {t('expenses.commissions.col_tx', { defaultValue: 'Сумма tx' })}
-                  </th>
-                  <th className="num py-2 text-right">
-                    {t('expenses.commissions.col_commission', { defaultValue: 'Комиссия' })}
+                    {t('expenses.commissions.col_commission')}
                   </th>
                 </tr>
               </thead>
@@ -184,8 +164,8 @@ export function CommissionsModal({
                   const src = sourcesQuery.data?.get(key)
                   const kindLabel =
                     e.commission_source_table === 'visits'
-                      ? t('expenses.commissions.kind_visit', { defaultValue: 'Визит' })
-                      : t('expenses.commissions.kind_income', { defaultValue: 'Доход' })
+                      ? t('expenses.commissions.kind_visit')
+                      : t('expenses.commissions.kind_income')
                   return (
                     <tr
                       key={e.id}

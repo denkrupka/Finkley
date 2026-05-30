@@ -113,7 +113,7 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill, block }
       staffIdExternal: stfExternal,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
-      title: title || t('visits.reservation.default_title', { defaultValue: 'Резерв времени' }),
+      title: title || t('visits.reservation.default_title'),
     })
     if (reservationId) {
       await supabase
