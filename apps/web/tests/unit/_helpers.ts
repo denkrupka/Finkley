@@ -43,12 +43,27 @@ export async function bootstrap(prefix: string): Promise<Ctx> {
   const admin = makeClient(SUPABASE_SERVICE, `${prefix}-admin`)
   const ts = Date.now()
   const email = `${prefix}-${ts}@finkley.test`
-  const { data: created, error: e1 } = await admin.auth.admin.createUser({
-    email,
-    password: 'TestPass123!',
-    email_confirm: true,
-  })
-  if (e1 || !created.user) throw e1 ?? new Error('user not created')
+  // T78 — retry с exponential backoff + jitter для «Database error creating
+  // new user» (Supabase auth rate-limit, периодически бьёт integration tests).
+  let created: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['data'] | null = null
+  let e1: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['error'] | null = null
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await admin.auth.admin.createUser({
+      email,
+      password: 'TestPass123!',
+      email_confirm: true,
+    })
+    created = res.data
+    e1 = res.error
+    if (!e1 && created?.user) break
+    const msg = e1?.message ?? ''
+    // Retry только на rate-limit / DB-creation; не на conflict (409 duplicate).
+    if (!/database error|rate.?limit|too many/i.test(msg)) break
+    // Backoff: 500, 1000, 2000, 4000ms + jitter
+    const delayMs = 500 * 2 ** attempt + Math.random() * 250
+    await new Promise((r) => setTimeout(r, delayMs))
+  }
+  if (e1 || !created?.user) throw e1 ?? new Error('user not created')
 
   const userClient = makeClient(SUPABASE_ANON, `${prefix}-user`)
   await userClient.auth.signInWithPassword({ email, password: 'TestPass123!' })
