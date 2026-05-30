@@ -228,7 +228,7 @@ function App() {
       />
       <Route
         path="/onboarding"
-        element={<RequireAuth>{lazyRoute(<OnboardingPage />)}</RequireAuth>}
+        element={<RequireAuth>{lazyRoute(<OnboardingPage />, 'Онбординг')}</RequireAuth>}
       />
 
       {/* Super-admin (корневой, не привязан к salon) */}

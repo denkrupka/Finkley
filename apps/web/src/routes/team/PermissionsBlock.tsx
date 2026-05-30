@@ -35,79 +35,119 @@ type PermissionCategory = {
 }
 
 const CATEGORIES: PermissionCategory[] = [
-  { key: 'dashboard', label: 'Главная', items: [] },
+  { key: 'dashboard', label: 'team.perm_cat_dashboard', items: [] },
   {
     key: 'income',
-    label: 'Доходы',
+    label: 'team.perm_cat_income',
     items: [
-      { key: 'visits', label: 'Визиты' },
-      { key: 'sales', label: 'Продажи' },
-      { key: 'other', label: 'Прочие доходы' },
-      { key: 'banking', label: 'Банкинг' },
+      { key: 'visits', label: 'team.perm_item_income_visits' },
+      { key: 'sales', label: 'team.perm_item_income_sales' },
+      { key: 'other', label: 'team.perm_item_income_other' },
+      { key: 'banking', label: 'team.perm_item_income_banking' },
     ],
   },
   {
     key: 'expenses',
-    label: 'Расходы',
+    label: 'team.perm_cat_expenses',
     items: [
-      { key: 'paid', label: 'Оплачено' },
-      { key: 'pending', label: 'Не оплачено' },
-      { key: 'banking', label: 'Банкинг' },
+      { key: 'paid', label: 'team.perm_item_expenses_paid' },
+      { key: 'pending', label: 'team.perm_item_expenses_pending' },
+      { key: 'banking', label: 'team.perm_item_expenses_banking' },
     ],
   },
   {
     key: 'reports',
-    label: 'Отчёты',
+    label: 'team.perm_cat_reports',
     items: [
-      { key: 'pnl', label: 'Прибыль/убытки' },
-      { key: 'staff', label: 'Сотрудники' },
-      { key: 'clients', label: 'Клиенты' },
+      { key: 'pnl', label: 'team.perm_item_reports_pnl' },
+      { key: 'staff', label: 'team.perm_item_reports_staff' },
+      { key: 'clients', label: 'team.perm_item_reports_clients' },
     ],
   },
   {
     key: 'finance',
-    label: 'Финансы',
+    label: 'team.perm_cat_finance',
     items: [
-      { key: 'pnl', label: 'P&L' },
-      { key: 'report', label: 'Отчёт по прибыли' },
-      { key: 'payments', label: 'Платежи' },
-      { key: 'budgets', label: 'Бюджеты' },
-      { key: 'cash', label: 'Касса' },
-      { key: 'transfers', label: 'Перестановка средств' },
+      { key: 'pnl', label: 'team.perm_item_finance_pnl' },
+      { key: 'report', label: 'team.perm_item_finance_report' },
+      { key: 'payments', label: 'team.perm_item_finance_payments' },
+      { key: 'budgets', label: 'team.perm_item_finance_budgets' },
+      { key: 'cash', label: 'team.perm_item_finance_cash' },
+      { key: 'transfers', label: 'team.perm_item_finance_transfers' },
     ],
   },
   {
     key: 'inventory',
-    label: 'Склад',
+    label: 'team.perm_cat_inventory',
     items: [
-      { key: 'items', label: 'Материалы' },
-      { key: 'analytics', label: 'Аналитика' },
+      { key: 'items', label: 'team.perm_item_inventory_items' },
+      { key: 'analytics', label: 'team.perm_item_inventory_analytics' },
     ],
   },
   {
     key: 'marketing',
-    label: 'Маркетинг',
+    label: 'team.perm_cat_marketing',
     items: [
-      { key: 'content', label: 'Контент' },
-      { key: 'competitors', label: 'Конкуренты' },
-      { key: 'reviews', label: 'Отзывы' },
+      { key: 'content', label: 'team.perm_item_marketing_content' },
+      { key: 'competitors', label: 'team.perm_item_marketing_competitors' },
+      { key: 'reviews', label: 'team.perm_item_marketing_reviews' },
     ],
   },
-  { key: 'messenger', label: 'Мессенджер', items: [] },
-  { key: 'ai', label: 'AI-помощник', items: [] },
+  { key: 'messenger', label: 'team.perm_cat_messenger', items: [] },
+  { key: 'ai', label: 'team.perm_cat_ai', items: [] },
   {
     key: 'settings',
-    label: 'Настройки',
+    label: 'team.perm_cat_settings',
     items: [
-      { key: 'profile_user', label: 'Профиль пользователя' },
-      { key: 'profile_salon', label: 'Профиль салона' },
-      { key: 'users', label: 'Пользователи' },
-      { key: 'schedule', label: 'График' },
-      { key: 'integrations', label: 'Интеграции' },
-      { key: 'help', label: 'Помощь' },
+      { key: 'profile_user', label: 'team.perm_item_settings_profile_user' },
+      { key: 'profile_salon', label: 'team.perm_item_settings_profile_salon' },
+      { key: 'users', label: 'team.perm_item_settings_users' },
+      { key: 'schedule', label: 'team.perm_item_settings_schedule' },
+      { key: 'integrations', label: 'team.perm_item_settings_integrations' },
+      { key: 'help', label: 'team.perm_item_settings_help' },
     ],
   },
 ]
+
+const CATEGORY_DEFAULTS: Record<string, string> = {
+  'team.perm_cat_dashboard': 'Главная',
+  'team.perm_cat_income': 'Доходы',
+  'team.perm_item_income_visits': 'Визиты',
+  'team.perm_item_income_sales': 'Продажи',
+  'team.perm_item_income_other': 'Прочие доходы',
+  'team.perm_item_income_banking': 'Банкинг',
+  'team.perm_cat_expenses': 'Расходы',
+  'team.perm_item_expenses_paid': 'Оплачено',
+  'team.perm_item_expenses_pending': 'Не оплачено',
+  'team.perm_item_expenses_banking': 'Банкинг',
+  'team.perm_cat_reports': 'Отчёты',
+  'team.perm_item_reports_pnl': 'Прибыль/убытки',
+  'team.perm_item_reports_staff': 'Сотрудники',
+  'team.perm_item_reports_clients': 'Клиенты',
+  'team.perm_cat_finance': 'Финансы',
+  'team.perm_item_finance_pnl': 'P&L',
+  'team.perm_item_finance_report': 'Отчёт по прибыли',
+  'team.perm_item_finance_payments': 'Платежи',
+  'team.perm_item_finance_budgets': 'Бюджеты',
+  'team.perm_item_finance_cash': 'Касса',
+  'team.perm_item_finance_transfers': 'Перестановка средств',
+  'team.perm_cat_inventory': 'Склад',
+  'team.perm_item_inventory_items': 'Материалы',
+  'team.perm_item_inventory_analytics': 'Аналитика',
+  'team.perm_cat_marketing': 'Маркетинг',
+  'team.perm_item_marketing_content': 'Контент',
+  'team.perm_item_marketing_competitors': 'Конкуренты',
+  'team.perm_item_marketing_reviews': 'Отзывы',
+  'team.perm_cat_messenger': 'Мессенджер',
+  'team.perm_cat_ai': 'AI-помощник',
+  'team.perm_cat_settings': 'Настройки',
+  'team.perm_item_settings_profile_user': 'Профиль пользователя',
+  'team.perm_item_settings_profile_salon': 'Профиль салона',
+  'team.perm_item_settings_users': 'Пользователи',
+  'team.perm_item_settings_schedule': 'График',
+  'team.perm_item_settings_integrations': 'Интеграции',
+  'team.perm_item_settings_help': 'Помощь',
+}
 
 function presetForRole(role: SalonRole): Record<string, Permission> {
   if (role === 'admin') {
@@ -285,7 +325,7 @@ export function PermissionsBlock({
                     ) : (
                       <span className="size-3" />
                     )}
-                    {cat.label}
+                    {t(cat.label, { defaultValue: CATEGORY_DEFAULTS[cat.label] ?? cat.label })}
                   </span>
                   <label
                     className="flex cursor-pointer items-center justify-center"
@@ -330,7 +370,9 @@ export function PermissionsBlock({
                           key={it.key}
                           className="grid grid-cols-[1fr_80px_80px] items-center gap-2 px-3 py-1.5"
                         >
-                          <span className="text-muted-foreground pl-5 text-xs">{it.label}</span>
+                          <span className="text-muted-foreground pl-5 text-xs">
+                            {t(it.label, { defaultValue: CATEGORY_DEFAULTS[it.label] ?? it.label })}
+                          </span>
                           <label className="flex items-center justify-center">
                             <input
                               type="checkbox"

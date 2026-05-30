@@ -127,6 +127,23 @@ export function BankingCallbackPage() {
                 {done.error}
               </p>
             ) : null}
+            {/* T39 — типичная ошибка whitelist: даём юзеру понятную
+                инструкцию + контакт владельца, а не сырую строку. */}
+            {done.error && /redirect_uri_not_allowed|invalid_redirect_uri/i.test(done.error) ? (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2 text-left text-xs leading-snug text-amber-900">
+                <p className="font-bold">
+                  {t('banking.callback.whitelist_title', {
+                    defaultValue: 'Подключение временно недоступно',
+                  })}
+                </p>
+                <p className="mt-1">
+                  {t('banking.callback.whitelist_body', {
+                    defaultValue:
+                      'Это техническая проблема на нашей стороне — мы уже знаем и работаем над фиксом. Попробуй позже или напиши в поддержку: support@finkley.app.',
+                  })}
+                </p>
+              </div>
+            ) : null}
             <Button asChild className="mt-6" size="lg" variant="outline">
               <Link to={backHref}>{t('banking.callback.back_to_integrations')}</Link>
             </Button>

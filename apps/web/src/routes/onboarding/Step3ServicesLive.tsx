@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Check, ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -174,69 +174,12 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
               {open ? (
                 <div className="flex flex-col gap-1 p-2">
                   {group.items.map((s) => (
-                    <div
+                    <ServiceRowDebounced
                       key={s.id}
-                      className={cn(
-                        'grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px_120px_44px] sm:items-center',
-                      )}
-                    >
-                      <div className="relative flex items-center">
-                        <Input
-                          defaultValue={s.name}
-                          onBlur={(e) => {
-                            if (e.target.value !== s.name)
-                              updateService(s.id, { name: e.target.value })
-                          }}
-                          className="h-9 text-sm"
-                        />
-                        {s.external_source === 'booksy' ? (
-                          <span
-                            className="bg-brand-teal-soft text-brand-teal-deep absolute right-2 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
-                            title={t('onboarding.step3.imported_from_booksy')}
-                          >
-                            Booksy
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
-                        <input
-                          type="number"
-                          min="0"
-                          defaultValue={Math.round(s.default_price_cents / 100)}
-                          onBlur={(e) => {
-                            const v = Math.max(0, Number(e.target.value)) * 100
-                            if (v !== s.default_price_cents)
-                              updateService(s.id, { default_price_cents: v })
-                          }}
-                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
-                        />
-                        <span className="text-muted-foreground text-xs">PLN</span>
-                      </div>
-                      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
-                        <input
-                          type="number"
-                          min="0"
-                          defaultValue={s.default_duration_min ?? 60}
-                          onBlur={(e) => {
-                            const v = Math.max(0, Number(e.target.value)) || null
-                            if (v !== s.default_duration_min)
-                              updateService(s.id, { default_duration_min: v })
-                          }}
-                          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
-                        />
-                        <span className="text-muted-foreground text-xs">
-                          {t('onboarding.services.duration_unit')}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeService(s.id)}
-                        className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md border"
-                        aria-label="remove"
-                      >
-                        <Trash2 className="size-4" strokeWidth={1.7} />
-                      </button>
-                    </div>
+                      service={s}
+                      onUpdate={updateService}
+                      onRemove={removeService}
+                    />
                   ))}
 
                   {adding === group.catId ? (
@@ -286,6 +229,154 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * T31 — Debounced auto-save вместо onBlur. Раньше юзер должен был кликнуть
+ * вне поля чтобы сохранить — на мобиле и при tabIndex это часто терялось.
+ * Сейчас: меняешь поле → через 800ms idle → save + visual feedback (спиннер
+ * → галочка). Сравнение идёт с серверным значением чтобы не дёргать БД
+ * на «возврат к исходному» (юзер набрал и стёр).
+ */
+function ServiceRowDebounced({
+  service,
+  onUpdate,
+  onRemove,
+}: {
+  service: ServiceRow
+  onUpdate: (id: string, patch: Partial<ServiceRow>) => Promise<void>
+  onRemove: (id: string) => void
+}) {
+  const { t } = useTranslation()
+  const [name, setName] = useState(service.name)
+  const [priceStr, setPriceStr] = useState(String(Math.round(service.default_price_cents / 100)))
+  const [durationStr, setDurationStr] = useState(String(service.default_duration_min ?? 60))
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  // Серверное значение — то, что в БД сейчас. Обновляется при успешном save
+  // и при внешнем обновлении props (после invalidate). Сравнение с ним —
+  // источник истины для debounce-эффекта.
+  const lastSyncedRef = useRef({
+    name: service.name,
+    priceCents: service.default_price_cents,
+    durationMin: service.default_duration_min ?? 60,
+  })
+
+  // Если props пришли свежие (например, после Booksy sync), и юзер не успел
+  // ввести что-то своё — обновляем локальное значение.
+  useEffect(() => {
+    if (name === lastSyncedRef.current.name && service.name !== lastSyncedRef.current.name) {
+      setName(service.name)
+    }
+    lastSyncedRef.current = {
+      name: service.name,
+      priceCents: service.default_price_cents,
+      durationMin: service.default_duration_min ?? 60,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service.id, service.name, service.default_price_cents, service.default_duration_min])
+
+  // Debounced save 800ms после последнего keystroke. Мерж в один patch для
+  // одного PATCH-запроса. Если ничего не изменилось vs сервер — пропускаем.
+  useEffect(() => {
+    const cleanName = name.trim()
+    const priceCents = Math.max(0, Number(priceStr.replace(',', '.')) || 0) * 100
+    const durationMin = Math.max(0, Number(durationStr) || 0) || null
+
+    const synced = lastSyncedRef.current
+    const dirty =
+      cleanName !== synced.name ||
+      Math.round(priceCents) !== synced.priceCents ||
+      durationMin !== synced.durationMin
+    if (!dirty) return
+    if (!cleanName) return // не сохраняем пустое имя
+
+    const handle = window.setTimeout(async () => {
+      setSaving(true)
+      try {
+        await onUpdate(service.id, {
+          name: cleanName,
+          default_price_cents: Math.round(priceCents),
+          default_duration_min: durationMin,
+        })
+        lastSyncedRef.current = {
+          name: cleanName,
+          priceCents: Math.round(priceCents),
+          durationMin: durationMin ?? 60,
+        }
+        setSavedAt(Date.now())
+      } finally {
+        setSaving(false)
+      }
+    }, 800)
+    return () => window.clearTimeout(handle)
+  }, [name, priceStr, durationStr, service.id, onUpdate])
+
+  // Прячем галочку через 1.5s после сохранения.
+  useEffect(() => {
+    if (!savedAt) return
+    const handle = window.setTimeout(() => setSavedAt(null), 1500)
+    return () => window.clearTimeout(handle)
+  }, [savedAt])
+
+  return (
+    <div
+      className={cn('grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px_120px_44px] sm:items-center')}
+    >
+      <div className="relative flex items-center">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="h-9 pr-16 text-sm"
+        />
+        <div className="pointer-events-none absolute right-2 flex items-center gap-1">
+          {saving ? (
+            <Loader2 className="text-muted-foreground size-3.5 animate-spin" strokeWidth={2} />
+          ) : savedAt ? (
+            <Check className="size-3.5 text-emerald-600" strokeWidth={2.4} />
+          ) : null}
+          {service.external_source === 'booksy' ? (
+            <span
+              className="bg-brand-teal-soft text-brand-teal-deep rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+              title={t('onboarding.step3.imported_from_booksy')}
+            >
+              Booksy
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
+        <input
+          type="number"
+          min="0"
+          value={priceStr}
+          onChange={(e) => setPriceStr(e.target.value)}
+          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+        />
+        <span className="text-muted-foreground text-xs">PLN</span>
+      </div>
+      <div className="border-input bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
+        <input
+          type="number"
+          min="0"
+          value={durationStr}
+          onChange={(e) => setDurationStr(e.target.value)}
+          className="num text-foreground w-full bg-transparent text-right text-sm font-semibold outline-none"
+        />
+        <span className="text-muted-foreground text-xs">
+          {t('onboarding.services.duration_unit')}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => onRemove(service.id)}
+        className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md border"
+        aria-label="remove"
+      >
+        <Trash2 className="size-4" strokeWidth={1.7} />
+      </button>
     </div>
   )
 }
