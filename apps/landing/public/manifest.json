@@ -1,0 +1,27 @@
+{
+  "name": "Finkley — финансы салона",
+  "short_name": "Finkley",
+  "description": "Учёт денег для салонов красоты. Видишь прибыль, а не только записи клиентов.",
+  "start_url": "/app/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF7",
+  "theme_color": "#1A1A2E",
+  "lang": "ru",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

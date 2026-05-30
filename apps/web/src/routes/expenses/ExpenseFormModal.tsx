@@ -919,7 +919,10 @@ export function ExpenseFormModal({
           Image #133: ещё уплотнил — сократил form gap до 2, paddings до
           pt-2/pb-1, и пакую парные поля в 2-колоночный grid (дата+категория,
           контрагент+номер документа), чтобы вся форма умещалась без скролла. */}
-      <DialogContent className="sm:!w-[820px] sm:!max-w-[820px]">
+      {/* Tablet/laptop audit (2026-05-30): на 768px (iPad portrait) фикс
+          820px шире viewport. Зажимаем min(820px, calc(100vw - 2rem)) — на
+          iPad portrait модалка займёт ~752px, на ноуте 1280+ — 820. */}
+      <DialogContent className="sm:!w-[min(820px,calc(100vw-2rem))] sm:!max-w-[820px]">
         <DialogHeader>
           <DialogTitle>
             {mode === 'planned-paying'

@@ -669,8 +669,10 @@ function ServiceDetailModal({
     <Dialog open={!!service} onOpenChange={(v) => !v && onClose()}>
       {/* Image #117: расширили модалку до 720px и навесили min-w-0 на 3-col
           гриды — теперь длинные ru-лейблы («Себестоимость (PLN)», «% мастера
-          (%)») умещаются без обрезки правой колонки и кнопки Сохранить. */}
-      <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
+          (%)») умещаются без обрезки правой колонки и кнопки Сохранить.
+          Tablet/laptop audit (2026-05-30): зажимаем 720 ≤ viewport-2rem чтобы
+          на iPad portrait (768px) модалка не теряла внешние отступы. */}
+      <DialogContent className="sm:!w-[min(720px,calc(100vw-2rem))] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>{t('services_page.detail.title')}</DialogTitle>
           <DialogDescription>

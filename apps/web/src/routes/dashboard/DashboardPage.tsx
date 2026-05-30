@@ -338,8 +338,11 @@ export function DashboardPage() {
         currency={currency}
       />
 
-      {/* Блок 2 — Клиенты + Мастера */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {/* Блок 2 — Клиенты + Мастера. Tablet/laptop audit (2026-05-30):
+          на 768+ (iPad portrait и шире) включаем 2 колонки — секции узкие
+          и хорошо лезут рядом. До 1024 было 1 колонка → пустое место справа
+          в landscape. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <ClientsSection
           currency={currency}
           visitsCount={visitsCount}
@@ -369,8 +372,8 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* Блок 3 — Расходы + Финансы */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {/* Блок 3 — Расходы + Финансы. См. комментарий выше. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <ExpensesSection
           currency={currency}
           totalCents={expenseCents}

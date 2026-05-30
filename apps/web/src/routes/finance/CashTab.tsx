@@ -1108,7 +1108,9 @@ function ShiftDetailDrawer({
 
   return (
     <Dialog open={!!shift} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:!w-[720px] sm:!max-w-[720px]">
+      {/* Tablet/laptop audit (2026-05-30): зажимаем 720 ≤ viewport-2rem чтобы
+          на iPad portrait (768px) модалка не теряла внешние отступы. */}
+      <DialogContent className="sm:!w-[min(720px,calc(100vw-2rem))] sm:!max-w-[720px]">
         <DialogHeader>
           <DialogTitle>
             {t('finance.cash.detail_title', {

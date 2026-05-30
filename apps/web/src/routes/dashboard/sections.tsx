@@ -168,8 +168,14 @@ export type KpiCardsProps = {
 }
 
 export function KpiCardsRow(p: KpiCardsProps) {
+  // Tablet/laptop audit (2026-05-30): на 768-1023 (iPad portrait/landscape,
+  // маленький ноут) `sm:grid-cols-2 lg:grid-cols-5` оставлял 2 колонки до
+  // 1024, а на 1024 разом 5. С учётом sidebar (232px) на 1024 это даёт
+  // ~150px на карточку — KPI-числа `text-2xl` ломаются на 2 строки.
+  // Промежуточный `md:grid-cols-3` (3 в ряд на 768-1023) и `xl:grid-cols-5`
+  // (5 в ряд только на 1280+) даёт читаемые карточки во всех диапазонах.
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
       <RevenueCard {...p} />
       <ProfitCard {...p} />
       <OccupancyCard {...p} />
@@ -883,7 +889,7 @@ export function MarketingSection(p: MarketingSectionProps) {
       title={t('dashboard.sections.marketing.title')}
       tooltip={t('dashboard.sections.marketing.tooltip')}
     >
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Левая колонка: источники + CAC */}
         <div>
           <div className="text-muted-foreground mb-2 text-[11px] font-semibold uppercase tracking-wider">

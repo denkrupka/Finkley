@@ -7,18 +7,86 @@ interface Props {
   description?: string
   /** Активный пункт топ-меню для подсветки */
   active?: 'home' | 'features' | 'pricing' | 'media' | 'privacy' | 'terms'
+  /** Тип Open Graph — обычно website, для статей блога — article */
+  ogType?: 'website' | 'article'
+  /** Кастомное og:image (абсолютный URL или путь от корня) */
+  image?: string
 }
 
 const {
   title,
   description = 'Finkley — учёт денег для салонов красоты. Видишь свою прибыль, а не только записи клиентов.',
   active = 'home',
+  ogType = 'website',
+  image,
 } = Astro.props
 
 // Дефолтный язык на статике — RU. Клиентский JS на DOMContentLoaded
 // меняет тексты в [data-i18n="key"] если в localStorage другой выбор.
 const t = dict.ru
 const APP_URL = '/app/'
+
+// Canonical URL для каждой страницы. Astro.site задан в astro.config.mjs
+// (https://finkley.app). Astro.url.pathname — текущий путь.
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const canonicalUrl = new URL(Astro.url.pathname, SITE_ORIGIN).toString()
+const ogImageUrl = new URL(image ?? '/og-image.svg', SITE_ORIGIN).toString()
+
+// hreflang alternates. EN/PL пока живут как client-side switcher
+// (см. dict.ts) — оба URL пока совпадают с RU. Когда сделаем SSR-маршруты
+// /en/, /pl/ — обновить здесь.
+const HREFLANGS = [
+  { hreflang: 'ru', href: canonicalUrl },
+  { hreflang: 'en', href: canonicalUrl },
+  { hreflang: 'pl', href: canonicalUrl },
+  { hreflang: 'x-default', href: canonicalUrl },
+]
+
+// JSON-LD: SoftwareApplication. €15/мес после 14-дневного trial.
+// applicationCategory: FinanceApplication — Google понимает это как
+// финансовый софт. offers.price = 15 EUR / month (recurring subscription).
+const softwareLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Finkley',
+  description: 'Учёт денег и аналитика для салонов красоты: визиты, расходы, зарплаты, прибыль, AI-подсказки.',
+  applicationCategory: 'FinanceApplication',
+  applicationSubCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: SITE_ORIGIN,
+  inLanguage: ['ru', 'en', 'pl'],
+  offers: {
+    '@type': 'Offer',
+    price: '15.00',
+    priceCurrency: 'EUR',
+    priceSpecification: {
+      '@type': 'UnitPriceSpecification',
+      price: '15.00',
+      priceCurrency: 'EUR',
+      billingDuration: 'P1M',
+      billingIncrement: 1,
+      unitText: 'month',
+    },
+    availability: 'https://schema.org/InStock',
+    eligibleRegion: ['PL', 'EU'],
+  },
+  provider: {
+    '@type': 'Organization',
+    name: 'Finkley',
+    url: SITE_ORIGIN,
+  },
+}
+
+// JSON-LD: Organization (для sitelinks и knowledge graph).
+const organizationLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Finkley',
+  url: SITE_ORIGIN,
+  logo: new URL('/logo.svg', SITE_ORIGIN).toString(),
+  email: 'info@finkley.app',
+  description: 'Финансы и операционка для салонов красоты.',
+}
 ---
 
 <!DOCTYPE html>
@@ -27,23 +95,40 @@ const APP_URL = '/app/'
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#1A1A2E" />
+    <meta name="application-name" content="Finkley" />
+    <meta name="apple-mobile-web-app-title" content="Finkley" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://finkley.app/" />
-    <meta property="og:image" content="https://finkley.app/og-image.svg" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Finkley — финансы салона" />
     <meta property="og:locale" content="ru_RU" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale:alternate" content="pl_PL" />
     <meta property="og:site_name" content="Finkley" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content="https://finkley.app/og-image.svg" />
-    <link rel="canonical" href="https://finkley.app/" />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content="Finkley — финансы салона" />
+    <link rel="canonical" href={canonicalUrl} />
+    {HREFLANGS.map((l) => <link rel="alternate" hreflang={l.hreflang} href={l.href} />)}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <link
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(organizationLd)} />
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-brand-bg font-display text-brand-text antialiased">

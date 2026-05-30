@@ -2,4 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /app/
 
-Sitemap: https://finkley.app/sitemap.xml
+# sitemap-index.xml генерируется @astrojs/sitemap при билде.
+Sitemap: https://finkley.app/sitemap-index.xml
