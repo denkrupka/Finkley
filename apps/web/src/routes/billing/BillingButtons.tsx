@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -41,8 +42,34 @@ export function BillingButtons({
   const { t } = useTranslation()
   const [pending, setPending] = useState(false)
 
+  // T82 — Stripe не настроен (нет VITE_STRIPE_PUBLISHABLE_KEY в build env).
+  // Сами edge functions упадут на отсутствие STRIPE_SECRET_KEY, но мы
+  // показываем UX banner заранее чтобы юзер не натыкался на сырую ошибку.
+  const stripeAvailable = !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+
   const hasActive =
     subscription && (subscription.status === 'active' || subscription.status === 'trialing')
+
+  if (!stripeAvailable) {
+    return (
+      <div className="flex max-w-md items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs leading-snug text-amber-900">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
+        <div>
+          <p className="font-bold">
+            {t('billing.unavailable_title', {
+              defaultValue: 'Платежи временно недоступны',
+            })}
+          </p>
+          <p className="mt-0.5">
+            {t('billing.unavailable_body', {
+              defaultValue:
+                'Это техническая проблема на нашей стороне. Напиши в поддержку: support@finkley.app — подключим тебя вручную.',
+            })}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   async function startCheckout() {
     setPending(true)
