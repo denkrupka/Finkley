@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { periodToRange, type PeriodValue } from '@/components/ui/period-picker-utils'
 import { useSalon } from '@/hooks/useSalons'
+import { useStaffPerformanceAdvanced } from '@/hooks/useStaffPerformance'
 import { useVisits } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -69,6 +70,17 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     return { start: start.toISOString(), end: end.toISOString() }
   }, [periodRange, lookbackDays])
   const { data: visits = [], isLoading } = useVisits(salonId, range)
+
+  // T85 — Отток + Скоринг считаются server-side в RPC staff_performance_advanced.
+  // Подтягиваем за тот же период, мерджим по staff_id.
+  const { data: advancedRows = [] } = useStaffPerformanceAdvanced(salonId, range.start, range.end)
+  const advancedByStaff = useMemo(() => {
+    const m = new Map<string, { churn_pct: number; scoring: number }>()
+    for (const r of advancedRows) {
+      m.set(r.staff_id, { churn_pct: Number(r.churn_pct), scoring: Number(r.scoring) })
+    }
+    return m
+  }, [advancedRows])
 
   // Полная история визитов салона — нужна чтобы определить «новый/постоянный
   // клиент мастера». Lite-выборка (3 колонки), для маленьких салонов это
@@ -276,6 +288,24 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
               >
                 {t('staff.performance.col_retention_regular')}
               </th>
+              {/* T85 — Отток + Скоринг (server-side, RPC) */}
+              <th
+                className="py-2 pr-2 text-right font-semibold"
+                title={t('reports_hub.staff.col_churn_tooltip', {
+                  defaultValue:
+                    '% клиентов мастера, которые после визита у него больше не вернулись в салон',
+                })}
+              >
+                {t('reports_hub.staff.col_churn', { defaultValue: 'Отток' })}
+              </th>
+              <th
+                className="py-2 pr-2 text-right font-semibold"
+                title={t('reports_hub.staff.col_scoring_tooltip', {
+                  defaultValue: '(Возврат × Удержание) / Отток. Чем выше — тем лучше.',
+                })}
+              >
+                {t('reports_hub.staff.col_scoring', { defaultValue: 'Скоринг' })}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -415,6 +445,51 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                         </span>
                       </span>
                     )}
+                  </td>
+                  {/* T85 — Отток + Скоринг из RPC. */}
+                  <td className="num py-2 pr-2 text-right">
+                    {(() => {
+                      const ext = advancedByStaff.get(s.id)
+                      if (!ext || Number.isNaN(ext.churn_pct)) {
+                        return <span className="text-muted-foreground">—</span>
+                      }
+                      return (
+                        <span
+                          className={cn(
+                            'font-bold',
+                            ext.churn_pct < 20
+                              ? 'text-brand-sage-deep'
+                              : ext.churn_pct <= 40
+                                ? 'text-brand-gold-deep'
+                                : 'text-destructive',
+                          )}
+                        >
+                          {ext.churn_pct.toFixed(0)}%
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  <td className="num py-2 pr-2 text-right">
+                    {(() => {
+                      const ext = advancedByStaff.get(s.id)
+                      if (!ext || Number.isNaN(ext.scoring)) {
+                        return <span className="text-muted-foreground">—</span>
+                      }
+                      return (
+                        <span
+                          className={cn(
+                            'font-bold',
+                            ext.scoring > 1.5
+                              ? 'text-brand-sage-deep'
+                              : ext.scoring >= 0.5
+                                ? 'text-foreground'
+                                : 'text-destructive',
+                          )}
+                        >
+                          {ext.scoring.toFixed(1)}
+                        </span>
+                      )
+                    })()}
                   </td>
                 </tr>
               )
