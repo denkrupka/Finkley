@@ -61,7 +61,12 @@
     "add": "Dodaj",
     "archive": "Archiwum",
     "restore": "Przywróć",
-    "back_home": "Powrót do strony głównej"
+    "back_home": "Powrót do strony głównej",
+    "confirm_delete": "Usunąć?",
+    "info_help": {
+      "aria": "Podpowiedź",
+      "title": "Co to jest"
+    }
   },
   "auth": {
     "or": "lub",
@@ -275,7 +280,8 @@
       "add_in_category": "Dodaj usługę do tej kategorii",
       "add_category": "Nowa kategoria",
       "no_category": "Bez kategorii",
-      "empty_hint": "Na razie pusto. Po loginie do Booksy usługi pojawią się w 2-5 minut. Możesz dodać ręcznie."
+      "empty_hint": "Na razie pusto. Po loginie do Booksy usługi pojawią się w 2-5 minut. Możesz dodać ręcznie.",
+      "imported_from_booksy": "Zaimportowane z Booksy"
     },
     "step4": {
       "title": "Kategorie wydatków",
@@ -513,7 +519,9 @@
       "avatar_change": "Zmień",
       "avatar_remove": "Usuń",
       "avatar_hint": "PNG / JPG / WEBP, do 5 MB",
-      "avatar_too_large": "Maks. 5 MB"
+      "avatar_too_large": "Maks. 5 MB",
+      "first_name_placeholder": "Anna",
+      "last_name_placeholder": "Kowalska"
     },
     "ai_summary": {
       "title": "Ogólna analiza AI",
@@ -569,6 +577,15 @@
       "messenger_body": "Rozmawiaj z klientami w jednym oknie — podłącz wszystkie kanały, żadnych zgubionych wiadomości.",
       "ai_title": "AI wyjaśnia zmiany",
       "ai_body": "Zysk spadł lub wzrósł — system napisze dlaczego, bez skomplikowanych raportów i pytań do księgowego."
+    },
+    "expenses": {
+      "cash_kind": {
+        "cash": "gotówka",
+        "non_cash": "przelew"
+      }
+    },
+    "services": {
+      "duration_unit": "min"
     }
   },
   "nav": {
@@ -594,7 +611,8 @@
     "messenger": "Komunikator",
     "report_bug": "Zgłoś bug",
     "collapse_sidebar": "Zwiń menu",
-    "expand_sidebar": "Rozwiń menu"
+    "expand_sidebar": "Rozwiń menu",
+    "messenger_unread": "Nieprzeczytane wiadomości: {{count}}"
   },
   "services_page": {
     "title": "Usługi salonu",
@@ -949,7 +967,35 @@
     "subtitle": "Wewnętrzne procedury, przepisy, listy kontrolne i szablony komunikacji z klientem dla zespołu salonu. Każda rola widzi to, co jest jej potrzebne. Pojawi się w etapie 5.",
     "coming_soon": "Wkrótce · etap 5",
     "subtitle_v2": "Best practices dla salonów kosmetycznych: personel, klienci, finanse, harmonogram, operacje. Uzupełniaj i dostosuj do swojego salonu.",
-    "starter_note": "Treść początkowa. W przyszłej iteracji dodamy możliwość edytowania i dodawania własnych artykułów wprost w aplikacji (wymagana tabela salon_kb_articles)."
+    "starter_note": "Treść początkowa. W przyszłej iteracji dodamy możliwość edytowania i dodawania własnych artykułów wprost w aplikacji (wymagana tabela salon_kb_articles).",
+    "toast": {
+      "title_required": "Wpisz tytuł",
+      "saved": "Zapisano",
+      "deleted": "Usunięto",
+      "article_created": "Artykuł utworzony"
+    },
+    "confirm": {
+      "delete_article": "Usunąć artykuł?"
+    },
+    "add_article": "Dodaj artykuł",
+    "form": {
+      "title_label": "Tytuł",
+      "title_placeholder": "Np.: Jak radzić sobie z NO-SHOW",
+      "body_label": "Treść",
+      "body_placeholder": "Używaj nowych linii, by oddzielać akapity. „- \" na początku — lista.",
+      "create": "Utwórz",
+      "cancel": "Anuluj",
+      "save": "Zapisz"
+    },
+    "empty_section": "W tej sekcji nie ma jeszcze artykułów.",
+    "actions": {
+      "edit": "Edytuj",
+      "delete": "Usuń"
+    },
+    "footer": {
+      "editable_hint": "Treść startową można edytować i rozbudowywać pod swój salon.",
+      "readonly_hint": "Tylko właściciel/administrator może edytować artykuły."
+    }
   },
   "salon_switcher": {
     "title": "Przełącz salon",
@@ -995,7 +1041,11 @@
       "plan": "Plan (z naszych zapisów)",
       "expected_incoming": "Oczekiwany wpływ: {{amount}}",
       "discrepancy": "Różnica: bank pokazuje o {{amount}} więcej",
-      "not_linked": "Kasa nie jest połączona z kontem bankowym. Połącz w /settings → Integracje → Bankowość, aby zobaczyć stan faktyczny."
+      "not_linked": "Kasa nie jest połączona z kontem bankowym. Połącz w /settings → Integracje → Bankowość, aby zobaczyć stan faktyczny.",
+      "unlinked_with_bank": "Bank jest podłączony, ale ta kasa nie jest jeszcze powiązana z konkretnym rachunkiem — dlatego nie widać stanu faktycznego.",
+      "unlinked_no_bank": "Podłącz bank przez Enable Banking i przypisz do tej kasy — zobaczysz rzeczywiste saldo automatycznie.",
+      "link_now": "Powiąż teraz",
+      "connect_bank": "Podłącz bank"
     },
     "benchmarks": {
       "title": "Ty vs średnia w branży",
@@ -1090,6 +1140,115 @@
       "day_aria": "{{date}}, {{count}} wizyt",
       "no_client": "Bez klienta",
       "more": "i jeszcze {{count}}…"
+    },
+    "collapsible": {
+      "low_stock": "Kończą się materiały",
+      "insights": "AI-asystent widzi"
+    },
+    "heatmap": {
+      "title": "Obłożenie według dni i godzin (30 dni)",
+      "empty": "Brak wizyt w ciągu ostatnich 30 dni"
+    },
+    "sections": {
+      "revenue": {
+        "tooltip": "Przychód za bieżący miesiąc.\\n\\n",
+        "label": "Przychód",
+        "to_breakeven": "Do progu rentowności"
+      },
+      "common": {
+        "prev_month": "Poprz. miesiąc",
+        "to_prev_month": "do poprz. mies.",
+        "no_data": "Brak danych"
+      },
+      "profit": {
+        "tooltip": "Zysk za bieżący miesiąc = Przychód − Wydatki.\\n\\n",
+        "label": "Zysk",
+        "forecast": "Prognoza"
+      },
+      "tone": {
+        "good": "Dobrze",
+        "below_norm": "Poniżej normy",
+        "low": "Nisko"
+      },
+      "occupancy": {
+        "tooltip": "Obłożenie pracowników za miesiąc.\\n\\n",
+        "label": "Obłożenie"
+      },
+      "retention": {
+        "tooltip": "Powracalność klientów za miesiąc.\\n\\n",
+        "label": "Powracalność klientów",
+        "inflow": "napływ",
+        "outflow": "odpływ"
+      },
+      "cash": {
+        "tooltip": "Pieniądze na kontach teraz (nie za miesiąc — a bieżący stan kas i kont).\\n\\n",
+        "label": "Pieniądze na kontach",
+        "details": "Szczegóły →",
+        "expected": "Oczekiwane",
+        "in_sync": "zsynchronizowane"
+      },
+      "clients": {
+        "title": "Klienci",
+        "tooltip": "Metryki klientów za bieżący miesiąc.\\n\\n",
+        "visits_in_month": "Wizyt w miesiącu",
+        "new_clients": "Nowych klientów",
+        "regular_clients": "Stałych klientów",
+        "avg_check": "Średni rachunek",
+        "online_bookings": "Rezerwacji online",
+        "sources_heading": "Źródła rezerwacji"
+      },
+      "masters": {
+        "title": "Pracownicy",
+        "tooltip": "Metryki zespołu za bieżący miesiąc.\\n\\n",
+        "active_label": "Aktywnych pracowników",
+        "avg_load": "Śr. obłożenie",
+        "plan_pct": "plan {{pct}}%",
+        "top_revenue_heading": "Top według przychodu",
+        "avg_rating": "Śr. ocena",
+        "reviews_count": "Opinii w miesiącu"
+      },
+      "expenses": {
+        "title": "Wydatki",
+        "tooltip": "Wydatki za bieżący miesiąc.\\n\\n",
+        "total_in_month": "Razem w miesiącu",
+        "overshoot": "Przekroczenie +{{pct}}%",
+        "plan_overshoot": "+{{pct}}% do planu",
+        "within_plan": "W ramach planu",
+        "empty": "Brak wydatków w okresie"
+      },
+      "finances": {
+        "title": "Finanse",
+        "tooltip": "Obraz finansowy za bieżący miesiąc.\\n\\n",
+        "revenue": "Przychód",
+        "profit": "Zysk",
+        "margin": "marża {{pct}}%",
+        "revenue_dynamics": "Dynamika przychodu",
+        "no_visits": "Brak wizyt w okresie"
+      },
+      "operations": {
+        "title": "Rezerwacje i operacje",
+        "today_appointments": "Wizyt na dziś",
+        "waitlist": "Lista oczekujących",
+        "no_queue": "brak kolejki",
+        "needs_reaction": "wymagają reakcji",
+        "materials_stock": "Stan materiałów",
+        "stock_normal": "norma",
+        "stock_low": "niski",
+        "stock_critical": "krytyczny",
+        "free_slots": "Wolnych terminów",
+        "of_total_slots": "z {{total}} slotów"
+      },
+      "marketing": {
+        "title": "Marketing",
+        "tooltip": "Segmentacja marketingowa bazy klientów.\\n\\n",
+        "sources_heading": "Źródła klientów",
+        "rfm_heading": "Baza klientów — RFM",
+        "no_rfm_data": "Brak danych do segmentacji",
+        "total_in_base": "W całej bazie",
+        "clients_count": "{{count}} klientów",
+        "active_le_90": "Aktywni (≤90 dni)",
+        "needs_reactivation": "Do reaktywacji"
+      }
     }
   },
   "invite_signup": {
@@ -1312,7 +1471,18 @@
       "top_master": "Który specjalista przynosi największy przychód?",
       "compare_prev": "Porównaj ten miesiąc z poprzednim",
       "what_to_improve": "Co mogę poprawić, żeby zwiększyć przychód?"
-    }
+    },
+    "tools": {
+      "create_visit": "Utworzono wizytę",
+      "create_expense": "Utworzono wydatek",
+      "create_client": "Utworzono klienta",
+      "create_service": "Utworzono usługę",
+      "transfer_cash": "Przelew między kasami"
+    },
+    "undo": "Cofnij",
+    "tool_undone": "Operacja cofnięta",
+    "tool_status_undone": "cofnięto",
+    "tool_error_generic": "Nie udało się wykonać operacji"
   },
   "visits": {
     "title": "Wizyty",
@@ -1436,7 +1606,8 @@
       "doc_invoice": "Faktura",
       "doc_invoice_hint": "Dla firm z danymi VAT.",
       "doc_skip": "Pomiń",
-      "doc_skip_hint": "Bez wystawienia dokumentu."
+      "doc_skip_hint": "Bez wystawienia dokumentu.",
+      "payment_method_empty": "Brak skonfigurowanych metod płatności"
     },
     "form": {
       "title_new": "Nowa wizyta",
@@ -1480,7 +1651,9 @@
       "service_empty_link": "Dodaj usługę →",
       "amount_auto_hint": "Obliczane automatycznie z wybranych usług.",
       "duration_default": "domyślnie",
-      "show_receipt": "Potwierdzenie"
+      "show_receipt": "Potwierdzenie",
+      "move_up": "W górę",
+      "move_down": "W dół"
     },
     "toast_added": "Wizyta dodana",
     "toast_deleted": "Wizyta usunięta",
@@ -1580,7 +1753,8 @@
       "subtitle": "Zablokuj przedział w grafiku mistrza — np. na techniczną przerwę lub sprawę osobistą.",
       "reason_label": "Powód (opcjonalnie)",
       "reason_placeholder": "Np. szkolenie, przerwa, sprawa osobista",
-      "toast_updated": "Rezerwacja zaktualizowana"
+      "toast_updated": "Rezerwacja zaktualizowana",
+      "default_title": "Rezerwacja czasu"
     },
     "free_slots": {
       "title": "Wolne okienka",
@@ -1658,6 +1832,10 @@
       "case5_situation": "Nie wiem, kiedy będę mogła przyjść",
       "case5_reply": "Oczywiście! Tylko uprzedzę — **{{master}}** zwykle ma zapełniony grafik na 2 tygodnie naprzód, zwłaszcza piątki. Zatrzymam wstępnie **{{date}}** — jeśli się nie uda, napisz dzień wcześniej, przesuniemy.",
       "other_master_fallback": "inny mistrz"
+    },
+    "quick_entry": {
+      "inventory_note": "Dodatkowa sprzedaż przy wizycie",
+      "stock_error": "Magazyn: {{error}}"
     }
   },
   "clients": {
@@ -1767,7 +1945,8 @@
       "prospect": "Bez wizyt"
     },
     "birthday_today": "Dziś!",
-    "birthday_in": "Urodziny za {{count}} dni"
+    "birthday_in": "Urodziny za {{count}} dni",
+    "period_clear": "Wyczyść okres"
   },
   "billing": {
     "checkout_button": "Wykup subskrypcję",
@@ -2248,7 +2427,8 @@
         "investments": "Działalność inwestycyjna",
         "financing": "Działalność finansowa",
         "cash": "Kasy",
-        "balance": "Bilans"
+        "balance": "Bilans",
+        "payment_methods": "Metody płatności"
       }
     },
     "segmentation": {
@@ -2414,7 +2594,9 @@
       "group": {
         "summary": "Podsumowania",
         "payments": "Płatności i faktury",
-        "business": "Wydarzenia w salonie"
+        "business": "Wydarzenia w salonie",
+        "inventory": "Magazyn",
+        "messaging": "Wiadomości od klientów"
       },
       "type": {
         "weekly_digest": "Tygodniowy raport (poniedziałek rano)",
@@ -2426,7 +2608,8 @@
         "payment_overdue": "Przeterminowana płatność — codziennie aż do uregulowania",
         "low_inventory": "Niskie stany magazynowe",
         "booksy_new_visits": "Nowe wizyty zaimportowane z Booksy",
-        "calendar_conflicts": "Konflikty w kalendarzu (podwójne rezerwacje)"
+        "calendar_conflicts": "Konflikty w kalendarzu (podwójne rezerwacje)",
+        "messenger_new_message": "Nowa wiadomość w komunikatorze (WhatsApp / Instagram / Facebook / Telegram)"
       }
     },
     "daily_digest": {
@@ -2593,6 +2776,11 @@
     "budget": {
       "title": "Przekroczony budżet „{{name}}”",
       "body": "W tym miesiącu już {{pct}}% limitu."
+    },
+    "messenger": {
+      "body_no_preview_one": "{{count}} nieprzeczytana w {{channel}}",
+      "body_no_preview_few": "{{count}} nieprzeczytane w {{channel}}",
+      "body_no_preview_many": "{{count}} nieprzeczytanych w {{channel}}"
     }
   },
   "notif": {
@@ -2947,7 +3135,17 @@
       "oauth_success": "{{name}} połączony ({{account}})",
       "oauth_error": "Błąd połączenia: {{reason}}",
       "coming_soon": "Połączenie komunikatorów — wkrótce. Wysyła powiadomienia w Telegramie do właściciela + pojawi się w /messenger."
-    }
+    },
+    "stripe_success": "Subskrypcja aktywowana. Kontynuujemy podłączanie integracji.",
+    "stripe_cancel": "Subskrypcja anulowana. Możesz kontynuować podłączanie integracji bez okresu próbnego.",
+    "toast_backfill_done": "Naprawiono {{patched}} wizyt z {{scanned}}",
+    "backfill_appt_uids_hint": "Przywróć powiązanie starych wizyt z Booksy, żeby usuwanie kaskadowało się",
+    "backfill_appt_uids": "Napraw stare powiązanie",
+    "force_history_resync": "Przeładuj historię",
+    "force_history_resync_hint": "Pobierz wszystkie stare wizyty (Booksy /calendar zwraca tylko ±60 dni; historia pochodzi z /customers/{id}/bookings)",
+    "confirm_force_history_resync": "Przeładować pełną historię wizyt z Booksy dla wszystkich klientów? Duplikaty nie zostaną utworzone. Może zająć kilka minut — jeśli nie ukończy się za jednym razem, kliknij ponownie, aby kontynuować.",
+    "toast_force_history_done": "Historia załadowana: przetworzono {{processed}} z {{total}} klientów, dodano {{visits}} wizyt",
+    "toast_force_history_partial": "Przetworzono {{processed}} z {{total}} klientów, dodano {{visits}} wizyt. Kliknij ponownie, aby kontynuować."
   },
   "import": {
     "title": "Import wizyt z CSV",
@@ -3000,7 +3198,8 @@
     "tabs": {
       "visits": "Wizyty",
       "sales": "Sprzedaż",
-      "other": "Pozostałe przychody"
+      "other": "Pozostałe przychody",
+      "banking": "Bankowość"
     },
     "sales_placeholder": "Sprzedaż towarów — rozszerzona sekcja w przygotowaniu. Na razie sprzedaż detaliczna jest rejestrowana jako wizyta typu „retail”; filtr pojawi się tu w kolejnym sprincie.",
     "sales": {
@@ -3108,7 +3307,11 @@
         "col_tipped": "Wizyt z napiwkami",
         "col_avg": "Średnio",
         "col_share": "Udział w przychodzie"
-      }
+      },
+      "col_churn": "Odpływ",
+      "col_churn_tooltip": "% klientów pracownika, dla których ostatnia wizyta u niego = ostatnia wizyta w salonie w ogóle, i minęło więcej niż okno retention (domyślnie 60 dni). Niski % — pracownik utrzymuje klientów w salonie.",
+      "col_scoring": "Scoring",
+      "col_scoring_tooltip": "Jednolita ocena efektywności: (udział klientów powracających × udział utrzymania stałych) / max(odpływ, 1%). Wyżej = lepiej; >1,5 dobrze, 0,5-1,5 średnio, <0,5 słabo."
     },
     "services": {
       "title": "Przychód wg usług",
@@ -3415,7 +3618,9 @@
       "ai_panel_show": "Pokaż",
       "ai_panel_refresh": "Odśwież",
       "open_competitor": "Otwórz stronę «{{name}}»",
-      "content_no_social_hint": "Aby dane Treści się załadowały — dodaj URL strony Instagram lub Facebook salonu w Settings → Profil, i podłącz OAuth Instagram Business w Settings → Sieci społecznościowe. Inaczej nie wiemy które strony analizować."
+      "content_no_social_hint": "Aby dane Treści się załadowały — dodaj URL strony Instagram lub Facebook salonu w Settings → Profil, i podłącz OAuth Instagram Business w Settings → Sieci społecznościowe. Inaczej nie wiemy które strony analizować.",
+      "occupancy_closed_short": "zamknięte",
+      "occupancy_cell_summary": "{{days}}/7 dni · {{staff}} {{staffLabel}}"
     }
   },
   "finance": {
@@ -3674,7 +3879,8 @@
       "drill_plan": "Plan",
       "drill_fact": "Fakt",
       "drill_diff": "Δ",
-      "expenses_other": "Pozostałe kategorie"
+      "expenses_other": "Pozostałe kategorie",
+      "adjustments": "Korekty"
     }
   },
   "reports": {
@@ -3726,6 +3932,10 @@
       "fri": "Pt",
       "sat": "Sob",
       "sun": "Nd"
+    },
+    "competitors": {
+      "open_reviews": "Otwórz opinie",
+      "per_month_suffix": "mies."
     }
   },
   "payouts": {
@@ -3906,7 +4116,19 @@
     "created_by_short": "wprowadził {{name}}",
     "tabs": {
       "expenses": "Wydatki",
-      "inflows": "Wpływy"
+      "inflows": "Wpływy",
+      "subtitle_pending": "Zaplanowane do zapłaty:",
+      "paid": "Opłacone",
+      "pending": "Nieopłacone",
+      "banking": "Bankowość",
+      "list_title_pending": "Zaplanowane płatności",
+      "empty_pending": "Brak zaplanowanych płatności w tym okresie",
+      "badge_overdue": "po terminie",
+      "badge_today": "dzisiaj",
+      "badge_pending": "zaplanowane",
+      "btn_pay": "Opłać",
+      "structure_title_pending": "Struktura zaplanowanych",
+      "structure_empty_pending": "Brak zaplanowanych płatności w tym okresie"
     },
     "inflows": {
       "list_title": "Wpływy z banku",
@@ -3918,7 +4140,25 @@
     "filters": {
       "all_categories": "Wszystkie pozycje",
       "all_accounts": "Wszystkie konta"
-    }
+    },
+    "commissions": {
+      "title": "Prowizje za okres",
+      "subtitle": "Automatycznie naliczone prowizje od metod płatności. Kliknięcie w wiersz otwiera źródłową wizytę lub przychód.",
+      "total": "Razem {{total}}",
+      "empty": "W wybranym okresie brak prowizji.",
+      "col_date": "Data",
+      "col_kind": "Typ",
+      "col_title": "Nazwa",
+      "col_method": "Metoda",
+      "col_tx": "Kwota tx",
+      "col_commission": "Prowizja",
+      "kind_visit": "Wizyta",
+      "kind_income": "Przychód",
+      "pin_title": "Prowizje",
+      "pin_subtitle": "Auto-wydatki od metod z prowizją · {{count}} tx"
+    },
+    "picker_show_linked": "Pokaż powiązane",
+    "partial_section_title": "Częściowo opłacone · pozostało"
   },
   "payment_methods": {
     "cash": "Gotówka",
@@ -4420,6 +4660,20 @@
         "empty_text": "Wprowadź tekst wiadomości",
         "no_recipients": "Wybierz co najmniej jeden czat"
       }
+    },
+    "open": "Otwórz",
+    "unknown_sender": "Nieznany klient",
+    "media_image": "📷 Zdjęcie",
+    "media_video": "🎥 Wideo",
+    "media_audio": "🎙 Wiadomość głosowa",
+    "media_file": "📎 Plik",
+    "media_sticker": "🎭 Naklejka",
+    "channel": {
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "facebook": "Facebook Messenger",
+      "internal": "Czat wewnętrzny"
     }
   },
   "audit": {
@@ -4598,7 +4852,10 @@
     "reverse_link": {
       "title": "Powiąż z transakcją bankową",
       "search_placeholder": "Szukaj po kontrahencie, opisie lub kwocie…",
-      "empty": "Brak niepowiązanych transakcji w ±90 dni. Albo wszystkie powiązane, albo zsynchronizuj świeże przez „Synchronizuj”."
+      "empty": "Brak niepowiązanych transakcji w ±90 dni. Albo wszystkie powiązane, albo zsynchronizuj świeże przez „Synchronizuj”.",
+      "linked_label": "Powiązane z transakcją bankową",
+      "not_linked_hint": "Wydatek nie jest powiązany z transakcją bankową.",
+      "button": "Powiąż z bankiem"
     },
     "linked_to_bank": "Potwierdzone wyciągiem bankowym",
     "not_linked_hint": "Nie powiązane z wyciągiem bankowym",
@@ -4934,7 +5191,8 @@
     "step4_skip_hint": "Bez wystawienia dokumentu.",
     "complete": "Zakończ sprzedaż",
     "toast_done": "Sprzedaż zakończona: {{count}} pozycji",
-    "toast_stock_warning": "Nie udało się odpisać '{{name}}' z magazynu: {{error}}"
+    "toast_stock_warning": "Nie udało się odpisać '{{name}}' z magazynu: {{error}}",
+    "inventory_note": "Sprzedaż detaliczna"
   },
   "reports_insights": {
     "title": "AI wnioski z raportu",
@@ -5016,7 +5274,9 @@
     "detail_reversal_of": "Odwrócenie wpisu",
     "action_save": "Zapisz",
     "action_delete": "Usuń",
-    "toast_updated": "Przelew zaktualizowany"
+    "toast_updated": "Przelew zaktualizowany",
+    "adjustments_info_title": "Kasa „Korekty\"",
+    "adjustments_info_body": "Służy do wyrównywania salda, gdy plan rozjeżdża się z faktycznym stanem. Na przykład: klient dał pieniądze, a reszty nie wziął — przelej nadwyżkę do „Korekt\". Lub odwrotnie: nie było drobnych na resztę i dałeś klientowi trochę więcej — zrekompensuj przelewem z „Korekt\". Na tę kasę pieniądze trafiają i ubywają wyłącznie przez przelewy między kasami."
   },
   "review": {
     "expired": "Link wygasł",
@@ -5038,5 +5298,20 @@
     "title": "Przytnij obraz",
     "hint": "Przeciągnij, aby wyrównać. Kółko myszy — powiększenie.",
     "apply": "Zapisz"
+  },
+  "media": {
+    "article": {
+      "loading": "Ładowanie…",
+      "not_found": "Artykuł nie został znaleziony",
+      "all_articles_link": "← Wszystkie artykuły bloga",
+      "all_articles_link_short": "Wszystkie artykuły"
+    },
+    "list": {
+      "title": "Blog Finkley",
+      "intro": "Zarządzanie, marża, marketing i operacje salonu beauty — bez lania wody, z konkretnymi liczbami.",
+      "loading": "Ładowanie…",
+      "empty": "Nie ma jeszcze artykułów.",
+      "read_cta": "Czytaj"
+    }
   }
 }
