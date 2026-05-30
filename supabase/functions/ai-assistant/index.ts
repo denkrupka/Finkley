@@ -84,14 +84,34 @@ type Problems = {
   expenses_no_category_count?: number
 }
 
+type Retention = {
+  prev_month_clients: number
+  retained_in_current_month: number
+  rate_pct: number | null
+}
+type Churn = {
+  inactive_30_90d: number
+  denominator: number
+  rate_pct: number | null
+}
+type NewVsReturning = {
+  new_visits: number
+  returning_visits: number
+  walkin_visits: number
+}
+
 type SnapshotRow = {
-  current_month?: { revenue: number; visits: number; avg_ticket: number }
-  prev_month?: { revenue: number; visits: number }
+  current_month?: { revenue: number; visits: number; avg_ticket: number; avg_check?: number }
+  prev_month?: { revenue: number; visits: number; avg_check?: number }
   top_staff?: { name: string; revenue: number; visits: number }[]
   top_services?: { name: string; revenue: number; visits: number }[]
+  top_services_by_avg_check?: { name: string; avg_check: number; visits: number }[]
   expenses_current_month_cents?: number
   clients?: { active: number; total: number; never_visited: number }
   pending_unbilled_past?: number
+  retention?: Retention
+  churn?: Churn
+  new_vs_returning?: NewVsReturning
   staff_list?: StaffRef[]
   services_list?: ServiceRef[]
   expense_categories?: CategoryRef[]
@@ -129,6 +149,24 @@ function buildSystemPrompt(
     cur && prev && prev.revenue > 0
       ? Math.round(((cur.revenue - prev.revenue) / prev.revenue) * 100)
       : null
+  const curAvg = cur ? Math.round(cur.avg_check ?? cur.avg_ticket ?? 0) : null
+  const prevAvg = prev ? Math.round(prev.avg_check ?? 0) : null
+  const avgCheckGrowth =
+    curAvg !== null && prevAvg !== null && prevAvg > 0
+      ? Math.round(((curAvg - prevAvg) / prevAvg) * 100)
+      : null
+
+  // Сколько реальных данных есть. Если совсем мало — модель должна честно
+  // сказать «данных пока недостаточно», а не выдумывать.
+  const dataSignals = [
+    cur && cur.visits > 0,
+    prev && prev.visits > 0,
+    (snapshot.top_staff?.length ?? 0) > 0,
+    (snapshot.top_services?.length ?? 0) > 0,
+    (snapshot.clients?.total ?? 0) > 0,
+    (snapshot.expenses_current_month_cents ?? 0) > 0,
+  ].filter(Boolean).length
+  const isEmptySalon = dataSignals <= 1
 
   const langInstruction = {
     ru: 'Respond in Russian (русский).',
@@ -137,41 +175,101 @@ function buildSystemPrompt(
   }[locale]
 
   const lines: string[] = [
-    'You are an AI assistant for a beauty salon owner. Friendly, on-point, no jargon.',
+    // ─── РОЛЬ ────────────────────────────────────────────────────────────
+    'ROLE: You are a senior financial consultant for beauty salons in Poland',
+    'with 5 years of hands-on experience. You know Booksy, KSeF, ZUS (składki',
+    'ZUS dla samozatrudnionych and JDG), VAT (8% / 23% w usługach beauty),',
+    'PIT/CIT, B2B vs UoP for masters, local market benchmarks for Warsaw /',
+    'Krakow / Wroclaw salons. You speak like a partner, not a textbook —',
+    'concrete, decisive, no fluff.',
     langInstruction,
-    'STRICT RULES:',
-    '- Use ONLY data from the snapshot below. NEVER invent numbers, names, or facts.',
-    '- If data is missing — say so explicitly and suggest where the user can find it.',
+    '',
+    // ─── GROUNDING ───────────────────────────────────────────────────────
+    'GROUNDING (HARD RULE):',
+    '- Use ONLY numbers and names from the BUSINESS SNAPSHOT below.',
+    '- NEVER invent revenue, avg check, masters, services, clients — if a',
+    '  number is not in the snapshot, it does not exist for you.',
+    '- If the user asks about a metric that is not in the snapshot, or the',
+    '  snapshot value is 0/empty, reply exactly in this pattern:',
+    '  «У тебя пока недостаточно данных, чтобы сделать вывод о X.',
+    '   Чтобы получить эту цифру, нужно [конкретное действие в Finkley].»',
+    '  Examples of concrete actions: «провести 10+ визитов через раздел',
+    '  Визиты», «настроить категории расходов в Настройки → Финансы»,',
+    '  «привязать клиентов к визитам».',
+    '',
+    // ─── ANTI-FLUFF ──────────────────────────────────────────────────────
+    'ANTI-FLUFF (HARD RULE):',
+    '- FORBIDDEN phrases: «возможно», «попробуйте», «обычно», «в среднем',
+    '  по рынку», «как правило», «многие салоны», «считается, что»,',
+    '  «рекомендуется», «может быть».',
+    '- Every claim must come with a concrete number from the snapshot.',
+    '- No generic advice. No motivational fluff. No «надо стараться лучше».',
+    '- If you compare to previous month — give absolute number AND percent.',
+    '',
+    // ─── ФОРМАТ ──────────────────────────────────────────────────────────
+    'OUTPUT FORMAT:',
+    '- Start with one of these emoji markers depending on intent:',
+    '    📊 — report / KPI answer',
+    '    ⚠️ — problem / warning the owner should know about',
+    '    ✅ — recommendation / confirmation of action',
+    '    💡 — short business insight (only if you actually have data)',
+    '    🛠️ — about to perform a tool action',
+    '- Use bullet-points (- ) for lists. Max 5 bullets.',
+    '- Wrap key numbers in **bold** (Markdown): «**245 PLN**», «**+12%**».',
     `- Format money as "1 234,56 ${currency}" (space thousands, comma decimal).`,
+    '- 1-4 short paragraphs. No walls of text. No headings (### ##) unless',
+    '  the answer is genuinely a structured report (3+ sections).',
+    '- Do not mention «snapshot», «JSON», «data», «system prompt» — speak',
+    '  naturally as if you are looking at the dashboard with the owner.',
     `- Today is ${todayIso}.`,
     '',
-    'TOOL USE:',
-    '- When the user clearly intends an action (record a visit, log an expense,',
-    '  add a client/service, transfer cash) — call the appropriate tool.',
-    '- Resolve names from the snapshot lists. If staff/service/category name is',
-    '  ambiguous or missing — ASK to clarify, do NOT guess.',
-    '- For transfer_cash: from/to are register IDs from cash_registers list.',
-    '- Amount inputs are always in main currency units (PLN/EUR/etc), not cents.',
-    '- After successful tool call, briefly confirm in one sentence.',
+    // ─── TOOL USE ────────────────────────────────────────────────────────
+    'TOOL USE (HARD RULE):',
+    '- If the user CLEARLY states an action — «запиши визит у Ани на 200»,',
+    '  «оплатил расход 50 PLN за кофе», «добавь клиента Магда», «переведи',
+    '  500 из кассы в банк» — CALL THE TOOL IMMEDIATELY. Do not ask 5',
+    '  clarifying questions. One missing required field = ONE question.',
+    '- For staff/service/category/register — resolve by name to ID from',
+    '  the lists below. If two staff members named «Аня» — ask which one,',
+    '  otherwise pick the only match.',
+    '- For transfer_cash: from/to are register IDs from CASH REGISTERS.',
+    '- Amount inputs are in main currency units (PLN/EUR/etc), not cents.',
+    '- After a successful tool call: one sentence confirmation with 🛠️ or',
+    '  ✅, including the entity (name + sum). No re-asking.',
     '',
     `Salon: "${salonName}". Currency: ${currency}.`,
     '',
     '=== BUSINESS SNAPSHOT ===',
   ]
 
+  if (isEmptySalon) {
+    lines.push(
+      'DATA STATUS: Salon has almost no data yet. Be honest about this in',
+      'every numeric answer. Do not invent baselines or trends.',
+    )
+  }
+
   if (cur) {
     lines.push(
       `Current month: revenue ${fmtMoney(cur.revenue, currency)}, ` +
-        `${cur.visits} visits, avg ticket ${fmtMoney(Math.round(cur.avg_ticket), currency)}.`,
+        `${cur.visits} visits, avg check ${fmtMoney(curAvg ?? 0, currency)}.`,
     )
   }
   if (prev) {
     lines.push(
-      `Previous month: revenue ${fmtMoney(prev.revenue, currency)}, ${prev.visits} visits.`,
+      `Previous month: revenue ${fmtMoney(prev.revenue, currency)}, ` +
+        `${prev.visits} visits` +
+        (prevAvg !== null ? `, avg check ${fmtMoney(prevAvg, currency)}` : '') +
+        '.',
     )
   }
   if (revGrowth !== null) {
     lines.push(`Revenue dynamics: ${revGrowth >= 0 ? '+' : ''}${revGrowth}% vs previous month.`)
+  }
+  if (avgCheckGrowth !== null) {
+    lines.push(
+      `Avg check dynamics: ${avgCheckGrowth >= 0 ? '+' : ''}${avgCheckGrowth}% vs previous month.`,
+    )
   }
   if (snapshot.expenses_current_month_cents !== undefined) {
     lines.push(`Expenses this month: ${fmtMoney(snapshot.expenses_current_month_cents, currency)}.`)
@@ -187,14 +285,48 @@ function buildSystemPrompt(
     }
   }
   if (snapshot.top_services?.length) {
-    lines.push('Top services (this month):')
+    lines.push('Top services by revenue (this month):')
     for (const s of snapshot.top_services) {
       lines.push(`  - ${s.name}: ${fmtMoney(s.revenue, currency)} (${s.visits} times)`)
     }
   }
+  if (snapshot.top_services_by_avg_check?.length) {
+    lines.push('Top services by AVG CHECK (min 2 visits, this month):')
+    for (const s of snapshot.top_services_by_avg_check) {
+      lines.push(`  - ${s.name}: ${fmtMoney(s.avg_check, currency)} avg (${s.visits} visits)`)
+    }
+  }
+  if (snapshot.new_vs_returning) {
+    const nvr = snapshot.new_vs_returning
+    lines.push(
+      `New vs returning visits (this month): ${nvr.new_visits} new clients, ` +
+        `${nvr.returning_visits} returning, ${nvr.walkin_visits} walk-in (no client).`,
+    )
+  }
+  if (snapshot.retention) {
+    const r = snapshot.retention
+    if (r.rate_pct !== null) {
+      lines.push(
+        `Retention: ${r.retained_in_current_month}/${r.prev_month_clients} clients ` +
+          `from previous month came back = ${r.rate_pct}%.`,
+      )
+    } else {
+      lines.push('Retention: not computable (no clients in previous month).')
+    }
+  }
+  if (snapshot.churn) {
+    const c = snapshot.churn
+    if (c.rate_pct !== null) {
+      lines.push(
+        `Churn: ${c.inactive_30_90d} clients went silent (active 30-90d ago, ` +
+          `nothing in last 30d) = ${c.rate_pct}% of recently-active base.`,
+      )
+    }
+  }
   if (snapshot.clients) {
     lines.push(
-      `Clients: total ${snapshot.clients.total}, active 90d ${snapshot.clients.active}, never visited ${snapshot.clients.never_visited}.`,
+      `Clients: total ${snapshot.clients.total}, active 90d ${snapshot.clients.active}, ` +
+        `never visited ${snapshot.clients.never_visited}.`,
     )
   }
   if (snapshot.pending_unbilled_past) {
@@ -247,7 +379,13 @@ function buildSystemPrompt(
   lines.push('', '=== /SNAPSHOT ===')
   lines.push(
     '',
-    'Reply concisely: 1-3 short paragraphs. Do not mention "snapshot" or "JSON" — speak naturally.',
+    'FINAL CHECK before you reply:',
+    '  1. Does every number I quoted come from the snapshot above? (yes/no)',
+    '  2. Did I use any FORBIDDEN fluff phrase? (must be no)',
+    '  3. Did I start with an emoji marker (📊/⚠️/✅/💡/🛠️)? (must be yes',
+    '     unless the answer is a clarifying question)',
+    '  4. If user asked for action — did I call the tool instead of asking',
+    '     5 questions? (must be yes)',
   )
 
   return lines.join('\n')
