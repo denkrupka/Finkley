@@ -437,7 +437,7 @@ function CashOnHandCard(p: KpiCardsProps) {
           <button
             type="button"
             onClick={p.onCashDetailsClick}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted/40 -mr-1 -mt-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline-offset-2 hover:underline"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/40 -mt-0.5 mr-7 rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline-offset-2 hover:underline"
           >
             {t('dashboard.sections.cash.details')}
           </button>
@@ -458,7 +458,9 @@ function CashOnHandCard(p: KpiCardsProps) {
                 +{formatCurrency(p.expectedIncomingCents, p.currency)}
               </span>
             ) : (
-              <span className="text-emerald-700">{t('dashboard.sections.cash.in_sync')}</span>
+              // Если поступлений не ожидается — показываем «0», не «синхронно»
+              // (юзеру важна явная сумма).
+              <span className="text-muted-foreground">{formatCurrency(0, p.currency)}</span>
             )
           }
         />

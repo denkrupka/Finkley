@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 
 import { periodToRange, type PeriodValue } from '@/components/ui/period-picker-utils'
 import { useSalon } from '@/hooks/useSalons'
-import { useStaffPerformanceAdvanced } from '@/hooks/useStaffPerformance'
 import { useVisits } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
@@ -49,6 +48,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
   const { t } = useTranslation()
   const { data: salon } = useSalon(salonId)
   const salonWindow = salon?.retention_window_days ?? 60
+  const salonChurnWindow = salon?.churn_window_days ?? 90
 
   // Если период задан — используем его как окно для всех мастеров (общая
   // фильтрация). Иначе fallback на retention_window_days мастеров/салона.
@@ -70,17 +70,6 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     return { start: start.toISOString(), end: end.toISOString() }
   }, [periodRange, lookbackDays])
   const { data: visits = [], isLoading } = useVisits(salonId, range)
-
-  // T85 — Отток + Скоринг считаются server-side в RPC staff_performance_advanced.
-  // Подтягиваем за тот же период, мерджим по staff_id.
-  const { data: advancedRows = [] } = useStaffPerformanceAdvanced(salonId, range.start, range.end)
-  const advancedByStaff = useMemo(() => {
-    const m = new Map<string, { churn_pct: number; scoring: number }>()
-    for (const r of advancedRows) {
-      m.set(r.staff_id, { churn_pct: Number(r.churn_pct), scoring: Number(r.scoring) })
-    }
-    return m
-  }, [advancedRows])
 
   // Полная история визитов салона — нужна чтобы определить «новый/постоянный
   // клиент мастера». Lite-выборка (3 колонки), для маленьких салонов это
@@ -112,18 +101,6 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
       const t = new Date(v.visit_at).getTime()
       const cur = m.get(v.client_id)
       if (!cur || t > cur) m.set(v.client_id, t)
-    }
-    return m
-  }, [allTimeVisits])
-
-  const lastAtMasterByPair = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const v of allTimeVisits) {
-      if (!v.staff_id || !v.client_id) continue
-      const key = `${v.staff_id}::${v.client_id}`
-      const t = new Date(v.visit_at).getTime()
-      const cur = m.get(key)
-      if (!cur || t > cur) m.set(key, t)
     }
     return m
   }, [allTimeVisits])
@@ -233,32 +210,31 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
   }
 
   /**
-   * T85/T86 — клиентский расчёт Оттока и Скоринга (fallback, если RPC
-   * staff_performance_advanced не отдаёт значения — например, не задеплоена
-   * новая миграция).
+   * T85/T86 + бэйджи 31.05 (несоответствие 100%/100% retention + 60% churn у
+   * Alina). Раньше отток считался «после визита у мастера клиент в салон не
+   * возвращался» — независимо от давности, поэтому свежие клиенты тоже
+   * считались «оттоком» (последний визит и был у этого мастера).
    *
-   * Отток (%) = доля клиентов мастера, которые ПОСЛЕ визита у него больше
-   * никогда не возвращались в салон (ни к нему, ни к другому мастеру).
-   * Формально: count(clients где last_at_master == last_in_salon) / total.
+   * Новая логика: клиент в оттоке, если его последний визит в салон был
+   * раньше, чем `churn_window_days` дней назад (по умолчанию 90). Этот
+   * показатель согласован с retention в периоде: если все клиенты мастера
+   * были недавно (в окне), churn = 0.
    *
-   * Скоринг = (Возврат_новых × Удержание_постоянных) / max(Отток, 0.01).
-   * Высокое значение → мастер растит салон (новые возвращаются, постоянные
-   * не разбегаются, после него клиент идёт дальше к другим мастерам).
+   * Скоринг — мультипликативный 0..1: newR × regR × (1 − ch). При 100%/100%
+   * retention и 0% churn → 1.0, при 0/0/100% → 0.0. Нет деления — пороги
+   * стабильные и согласованные с retention-цветами.
    */
   function churnFor(staffId: string): { churn_pct: number | null; total: number } {
-    // Все клиенты которые хоть раз были у этого мастера за ВСЁ время.
     const clientsAtMaster = new Set<string>()
     for (const v of allTimeVisits) {
       if (v.staff_id === staffId && v.client_id) clientsAtMaster.add(v.client_id)
     }
     if (clientsAtMaster.size === 0) return { churn_pct: null, total: 0 }
+    const churnedBefore = Date.now() - salonChurnWindow * 24 * 60 * 60 * 1000
     let churned = 0
     for (const cid of clientsAtMaster) {
-      const lastAtMaster = lastAtMasterByPair.get(`${staffId}::${cid}`) ?? 0
       const lastInSalon = lastInSalonByClient.get(cid) ?? 0
-      // last_in_salon должен быть >= last_at_master по определению (master ⊆ salon).
-      // Если они равны — клиент после визита у этого мастера в салон не вернулся.
-      if (lastAtMaster > 0 && lastInSalon > 0 && lastAtMaster === lastInSalon) churned += 1
+      if (lastInSalon > 0 && lastInSalon < churnedBefore) churned += 1
     }
     return { churn_pct: (churned / clientsAtMaster.size) * 100, total: clientsAtMaster.size }
   }
@@ -269,11 +245,10 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     churn_pct: number | null,
   ): number | null {
     if (newRetentionPct === null || regularRetentionPct === null || churn_pct === null) return null
-    // Доли (0..1), а не %, чтобы итоговое значение ~0..5 совпадало с порогами UI.
     const newR = newRetentionPct / 100
     const regR = regularRetentionPct / 100
-    const ch = Math.max(churn_pct / 100, 0.01) // защита от деления на 0
-    return (newR * regR) / ch
+    const ch = Math.min(Math.max(churn_pct / 100, 0), 1)
+    return newR * regR * (1 - ch)
   }
 
   const activeStaff = staff.filter((s) => s.is_active)
@@ -517,21 +492,16 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                       </span>
                     )}
                   </td>
-                  {/* T85/T86 — Отток + Скоринг. Сначала пробуем server-side
-                      RPC (точнее, учитывает window-фильтры); fallback —
-                      клиентский расчёт по той же формуле. */}
+                  {/* Отток + Скоринг — client-side. RPC хранит старую формулу
+                      (churn = last_in_salon == last_at_master, scoring через
+                      деление), которая давала несогласованные с retention
+                      значения (100/100% retention + 60% churn у мастера, чьи
+                      клиенты ещё ходят). До обновления RPC всегда считаем
+                      на клиенте по `salonChurnWindow`. */}
                   {(() => {
-                    const ext = advancedByStaff.get(s.id)
-                    const rpcChurn =
-                      ext && !Number.isNaN(ext.churn_pct) && ext.churn_pct > 0
-                        ? ext.churn_pct
-                        : null
-                    const rpcScoring =
-                      ext && !Number.isNaN(ext.scoring) && ext.scoring > 0 ? ext.scoring : null
                     const local = churnFor(s.id)
-                    const churnPct = rpcChurn ?? local.churn_pct
-                    const scoring =
-                      rpcScoring ?? scoringFor(st.newRetentionPct, st.regularRetentionPct, churnPct)
+                    const churnPct = local.churn_pct
+                    const scoring = scoringFor(st.newRetentionPct, st.regularRetentionPct, churnPct)
                     return (
                       <>
                         <td
@@ -566,14 +536,14 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                             <span
                               className={cn(
                                 'font-bold',
-                                scoring > 1.5
+                                scoring >= 0.6
                                   ? 'text-brand-sage-deep'
-                                  : scoring >= 0.5
+                                  : scoring >= 0.3
                                     ? 'text-foreground'
                                     : 'text-destructive',
                               )}
                             >
-                              {scoring.toFixed(1)}
+                              {scoring.toFixed(2)}
                             </span>
                           )}
                         </td>

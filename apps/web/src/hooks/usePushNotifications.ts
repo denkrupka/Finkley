@@ -1,5 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
 
@@ -25,35 +24,27 @@ export function usePushPermission(): {
   isSubscribed: boolean
   loading: boolean
 } {
-  const [state, setState] = useState<PushPermissionState>('default')
-  const [isSubscribed, setIsSubscribed] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let mounted = true
-    async function check() {
+  // React Query вместо локального useState — useSubscribePush invalidate'ит
+  // `['push-permission']`, чтобы карточка PushNotificationsCard сразу же
+  // исчезла после успешной подписки (без перезагрузки страницы).
+  const { data, isLoading } = useQuery({
+    queryKey: ['push-permission'],
+    queryFn: async (): Promise<{ state: PushPermissionState; isSubscribed: boolean }> => {
       if (
         typeof window === 'undefined' ||
         !('serviceWorker' in navigator) ||
         !('PushManager' in window) ||
         !('Notification' in window)
       ) {
-        if (mounted) {
-          setState('unsupported')
-          setLoading(false)
-        }
-        return
+        return { state: 'unsupported', isSubscribed: false }
       }
-      const perm = Notification.permission as PushPermissionState
-      if (mounted) setState(perm)
+      const state = Notification.permission as PushPermissionState
       try {
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
-        if (mounted) setIsSubscribed(!!sub)
         // Idempotent sync: если в браузере есть подписка — сразу же шлём её
         // в БД (upsert по endpoint). Это лечит рассинхрон когда подписка
         // удалена с сервера, но Service Worker всё ещё её помнит.
-        // send-push.subscribe — upsert, ничего не сломается если уже есть.
         if (sub) {
           const json = sub.toJSON() as {
             endpoint: string
@@ -71,19 +62,19 @@ export function usePushPermission(): {
             })
           }
         }
+        return { state, isSubscribed: !!sub }
       } catch {
-        // ignore
-      } finally {
-        if (mounted) setLoading(false)
+        return { state, isSubscribed: false }
       }
-    }
-    void check()
-    return () => {
-      mounted = false
-    }
-  }, [])
+    },
+    staleTime: 60_000,
+  })
 
-  return { state, isSubscribed, loading }
+  return {
+    state: data?.state ?? 'default',
+    isSubscribed: data?.isSubscribed ?? false,
+    loading: isLoading,
+  }
 }
 
 /** Subscribe текущий браузер в push. Сохраняет на бэке через edge function. */

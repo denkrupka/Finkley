@@ -69,13 +69,13 @@ export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuCl
           <span className="from-brand-gold grid size-5 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[10px] font-extrabold leading-none text-white">
             ★
           </span>
-          <span className="text-brand-navy text-[11px] font-bold">{t('plan.pro_label')}</span>
+          <span className="text-brand-navy-ink text-[11px] font-bold">{t('plan.pro_label')}</span>
         </Link>
 
         {/* Avatar — clickable → /settings (профиль). */}
         <Link
           to={`/${salonId}/settings`}
-          className="text-brand-navy grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#E8C4B8] to-[#D4A599] text-xs font-bold transition-shadow hover:shadow-sm"
+          className="text-brand-navy-ink grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#E8C4B8] to-[#D4A599] text-xs font-bold transition-shadow hover:shadow-sm"
           aria-label={t('common.profile_aria')}
           title={ownerInitials}
         >

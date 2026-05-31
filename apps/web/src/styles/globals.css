@@ -65,6 +65,10 @@
     --brand-gold: 41 51% 54%;
     --brand-text-faint: 0 0% 60%;
     --brand-border-strong: 48 9% 84%;
+    /* «navy-ink» — фиксированный тёмный navy для текста на пастельных/жёлтых
+       фонах (Plan badge, Referral button, avatar gradient). В отличие от
+       --brand-navy, не зеркалится в dark, поэтому остаётся читаемым. */
+    --brand-navy-ink: 240 28% 14%;
   }
 
   /* Dark mode — активируется классом `dark` на <html>. ThemeProvider
@@ -123,6 +127,10 @@
     --brand-gold: 41 60% 60%;
     --brand-text-faint: 0 0% 50%;
     --brand-border-strong: 240 15% 32%;
+    /* navy-ink остаётся фиксированно тёмным — пастельные/жёлтые фоны кнопок
+       (ReferralButton, Plan badge) не меняются в dark, поэтому текст на них
+       должен быть всегда тёмным. */
+    --brand-navy-ink: 240 28% 14%;
   }
 }
 

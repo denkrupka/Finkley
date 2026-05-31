@@ -1088,7 +1088,7 @@ function ParamsSection({
               {watchedItems.map((name) => (
                 <span
                   key={name}
-                  className="bg-brand-sage-deep inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-white"
+                  className="bg-brand-sage-deep dark:bg-brand-sage inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-white"
                 >
                   {name}
                   <button

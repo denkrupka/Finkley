@@ -89,35 +89,53 @@ export function useClients(
     queryKey: [...clientsKeys(salonId), 'list', { search, sort }],
     queryFn: async () => {
       if (!salonId) return []
-      // Серверный поиск через ilike: при наборе текста запросом тянем
-      // только релевантные строки (limit 300), не нагружая фронт фильтрацией
-      // 5000 строк на каждый keystroke. Без search — берём всё (до 5000),
-      // нужно для списков типа export/печать.
-      let q = supabase.from('clients').select('*').eq('salon_id', salonId).is('deleted_at', null)
+      // Для поиска — серверный ilike с limit(300), без пагинации.
       if (search) {
+        let q = supabase.from('clients').select('*').eq('salon_id', salonId).is('deleted_at', null)
         const escaped = search.replace(/[%_]/g, (m) => `\\${m}`)
-        // Phone поиск — нормализуем pattern (digits only) и фильтруем через ilike.
         const phonePattern = normalizeSearchPhone(search)
         const orFilter =
           phonePattern.length >= 2
             ? `name.ilike.%${escaped}%,email.ilike.%${escaped}%,phone.ilike.%${phonePattern}%`
             : `name.ilike.%${escaped}%,email.ilike.%${escaped}%`
         q = q.or(orFilter).limit(300)
-      } else {
-        q = q.limit(5000)
+        if (sort === 'name') q = q.order('name', { ascending: true })
+        else if (sort === 'revenue') q = q.order('total_revenue_cents', { ascending: false })
+        else
+          q = q
+            .order('last_visit_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+        const { data, error } = await q
+        if (error) throw error
+        return (data ?? []) as ClientRow[]
       }
 
-      // Сортировка применяется на сервере, чтобы LIMIT срабатывал по нужной оси.
-      if (sort === 'name') q = q.order('name', { ascending: true })
-      else if (sort === 'revenue') q = q.order('total_revenue_cents', { ascending: false })
-      else
-        q = q
-          .order('last_visit_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false })
-
-      const { data, error } = await q
-      if (error) throw error
-      return (data ?? []) as ClientRow[]
+      // Без поиска — тянем все строки страницами. PostgREST max_rows=1000
+      // обрезает любой `.limit(>1000)`; единственный честный путь добрать
+      // все строки — пагинация через `.range(from, to)`.
+      const PAGE = 1000
+      const HARD_CAP = 50_000 // sanity-limit на случай runaway-цикла
+      const all: ClientRow[] = []
+      for (let from = 0; from < HARD_CAP; from += PAGE) {
+        let q = supabase
+          .from('clients')
+          .select('*')
+          .eq('salon_id', salonId)
+          .is('deleted_at', null)
+          .range(from, from + PAGE - 1)
+        if (sort === 'name') q = q.order('name', { ascending: true })
+        else if (sort === 'revenue') q = q.order('total_revenue_cents', { ascending: false })
+        else
+          q = q
+            .order('last_visit_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+        const { data, error } = await q
+        if (error) throw error
+        const chunk = (data ?? []) as ClientRow[]
+        all.push(...chunk)
+        if (chunk.length < PAGE) break
+      }
+      return all
     },
     enabled: !!salonId,
     staleTime: 30_000,

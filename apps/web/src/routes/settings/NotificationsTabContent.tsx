@@ -1,21 +1,14 @@
-import { ChevronDown, ChevronRight, Mail } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button'
 import { useMyProfile } from '@/hooks/useMyProfile'
 import { usePersistedCollapse } from '@/routes/dashboard/useCollapsedState'
 import {
   useUpdateNotificationPref,
-  type DigestChannel,
   type NotificationTypeKey,
   type SalonRow,
 } from '@/hooks/useSalons'
-import type {
-  SendDigestResponse,
-  useSendDailyDigest,
-  useSendWeeklyDigest,
-} from '@/hooks/useWeeklyDigest'
 
 import { PushNotificationsCard } from './PushNotificationsCard'
 
@@ -81,15 +74,7 @@ const CHANNEL_LABEL: Record<Channel, string> = {
   sms: 'SMS',
 }
 
-export function NotificationsTabContent({
-  salon,
-  sendDigest,
-  sendDailyDigest,
-}: {
-  salon: SalonRow
-  sendDigest: ReturnType<typeof useSendWeeklyDigest>
-  sendDailyDigest: ReturnType<typeof useSendDailyDigest>
-}) {
+export function NotificationsTabContent({ salon }: { salon: SalonRow }) {
   const { t } = useTranslation()
   const updatePref = useUpdateNotificationPref(salon.id)
   const { data: profile } = useMyProfile()
@@ -97,18 +82,15 @@ export function NotificationsTabContent({
   const telegramLinked = !!profile?.telegram_id
   const phoneLinked = !!profile?.phone
 
-  /** Включен ли канал для конкретного типа. Дефолты:
-   *  - email = true
-   *  - telegram = true если привязан
-   *  - push = true (если юзер подписался — service worker сам решит)
-   *  - sms = false (биллится — opt-in осознанный) */
+  /** Включен ли канал для конкретного типа. У нового салона все каналы
+   *  выключены по умолчанию — юзер сам включает то, что хочет получать.
+   *  (Раньше email/push/telegram включались автоматически; владелец
+   *  попросил «всё off по умолчанию» 31.05). */
   function isChannelEnabled(key: NotificationTypeKey, ch: Channel): boolean {
     if (prefs[key] === false) return false
     const channelKey = `${key}.${ch}`
     if (channelKey in prefs) return prefs[channelKey] === true
-    if (ch === 'email') return true
-    if (ch === 'telegram') return telegramLinked
-    if (ch === 'push') return true
+    void telegramLinked
     return false
   }
   function toggleChannel(key: NotificationTypeKey, ch: Channel, next: boolean) {
@@ -209,98 +191,7 @@ export function NotificationsTabContent({
           ))}
         </div>
       </section>
-
-      {/* «Отправить сейчас» — две компактные строки внизу. Каналы дайджестов
-          управляются только из матрицы выше — здесь только кнопка и
-          описание что попадёт в письмо/сообщение. */}
-      <SendNowCard
-        title={t('settings.digest.title')}
-        subtitle={t('settings.digest.subtitle')}
-        anyChannelOn={
-          isChannelEnabled('weekly_digest', 'push') ||
-          isChannelEnabled('weekly_digest', 'email') ||
-          isChannelEnabled('weekly_digest', 'telegram') ||
-          isChannelEnabled('weekly_digest', 'sms')
-        }
-        buttonLabel={sendDigest.isPending ? t('common.loading') : t('settings.digest.button')}
-        pending={sendDigest.isPending}
-        onSend={() =>
-          sendDigest.mutate(undefined, {
-            onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'weekly')),
-            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-          })
-        }
-      />
-      <SendNowCard
-        title={t('settings.daily_digest.title')}
-        subtitle={t('settings.daily_digest.subtitle')}
-        anyChannelOn={
-          isChannelEnabled('daily_digest', 'push') ||
-          isChannelEnabled('daily_digest', 'email') ||
-          isChannelEnabled('daily_digest', 'telegram') ||
-          isChannelEnabled('daily_digest', 'sms')
-        }
-        buttonLabel={
-          sendDailyDigest.isPending ? t('common.loading') : t('settings.daily_digest.button')
-        }
-        pending={sendDailyDigest.isPending}
-        onSend={() =>
-          sendDailyDigest.mutate(undefined, {
-            onSuccess: (data) => toast.success(digestSentToastText(t, salon, data, 'daily')),
-            onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-          })
-        }
-      />
     </div>
-  )
-}
-
-/** Компактная карточка «Отправить сейчас» для дайджеста.
- *  Каналы не выбираются здесь — они в матрице наверху. Если все каналы
- *  для этого дайджеста выключены — кнопка disabled с подсказкой. */
-function SendNowCard({
-  title,
-  subtitle,
-  anyChannelOn,
-  buttonLabel,
-  pending,
-  onSend,
-}: {
-  title: string
-  subtitle: string
-  anyChannelOn: boolean
-  buttonLabel: string
-  pending: boolean
-  onSend: () => void
-}) {
-  const { t } = useTranslation()
-  return (
-    <section className="border-border bg-card shadow-finsm rounded-lg border p-4 sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-brand-navy text-base font-bold tracking-tight">{title}</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">{subtitle}</p>
-          {!anyChannelOn ? (
-            <p className="text-muted-foreground mt-1.5 text-xs">
-              {t('settings.digest.no_channels_hint', {
-                defaultValue:
-                  'Сейчас не выбран ни один канал в матрице выше — поэтому отправлять некуда.',
-              })}
-            </p>
-          ) : null}
-        </div>
-        <Button
-          variant="outline"
-          size="md"
-          onClick={onSend}
-          disabled={pending || !anyChannelOn}
-          className="shrink-0"
-        >
-          <Mail className="size-4" strokeWidth={1.7} />
-          {buttonLabel}
-        </Button>
-      </div>
-    </section>
   )
 }
 
@@ -347,26 +238,4 @@ const DEFAULT_TYPE_LABELS: Record<NotificationTypeKey, string> = {
   calendar_conflicts: 'Конфликты в календаре (двойная бронь)',
   messenger_new_message:
     'Новое сообщение в мессенджере (WhatsApp / Instagram / Facebook / Telegram)',
-}
-
-function digestSentToastText(
-  t: (k: string, opts?: Record<string, unknown>) => string,
-  salon: { weekly_digest_channels?: DigestChannel[]; daily_digest_channels?: DigestChannel[] },
-  data: SendDigestResponse | undefined,
-  kind: 'weekly' | 'daily',
-): string {
-  const via = data?.via ?? []
-  const selectedRaw = kind === 'weekly' ? salon.weekly_digest_channels : salon.daily_digest_channels
-  const selected: DigestChannel[] = selectedRaw ?? ['email']
-  const parts: string[] = []
-  if (via.includes('email')) {
-    parts.push(t('settings.digest.toast_sent_email', { email: data?.sent_to ?? '' }))
-  }
-  if (via.includes('telegram')) {
-    parts.push(t('settings.digest.toast_sent_telegram'))
-  }
-  if (selected.includes('telegram') && !via.includes('telegram')) {
-    parts.push(t('settings.digest.toast_telegram_skipped'))
-  }
-  return parts.length > 0 ? parts.join('. ') : t('settings.digest.toast_no_channel')
 }

@@ -144,7 +144,7 @@ const organizationLd = {
           <span class="text-base font-bold tracking-tight text-brand-navy">Finkley</span>
         </a>
 
-        <nav class="hidden items-center gap-7 md:flex">
+        <nav class="hidden items-center gap-7 lg:flex">
           <a
             href="/"
             class={`text-sm font-medium ${active === 'home' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
@@ -173,7 +173,7 @@ const organizationLd = {
           <button
             type="button"
             id="mobile-menu-btn"
-            class="inline-flex size-10 items-center justify-center rounded-md border border-brand-border bg-white text-brand-navy md:hidden"
+            class="inline-flex size-10 items-center justify-center rounded-md border border-brand-border bg-white text-brand-navy lg:hidden"
             aria-label="Menu"
             aria-expanded="false"
             aria-controls="mobile-menu"
@@ -218,7 +218,7 @@ const organizationLd = {
           </div>
           <a
             href={APP_URL + 'login'}
-            class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text md:inline"
+            class="hidden text-sm font-semibold text-brand-text-muted hover:text-brand-text lg:inline"
             data-i18n="nav.login"
           >
             {t['nav.login']}
@@ -234,7 +234,7 @@ const organizationLd = {
       </div>
 
       <!-- Mobile menu (collapsible) -->
-      <div id="mobile-menu" class="hidden border-t border-brand-border bg-white md:hidden">
+      <div id="mobile-menu" class="hidden border-t border-brand-border bg-white lg:hidden">
         <nav class="mx-auto flex max-w-7xl flex-col px-4 py-3 text-base font-medium">
           <a
             href="/"

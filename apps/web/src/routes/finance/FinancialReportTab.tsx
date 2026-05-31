@@ -1,12 +1,14 @@
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { format, startOfMonth } from 'date-fns'
 import {
   BarChart3,
   ChevronDown,
   ChevronRight,
+  Download,
   FileSpreadsheet,
+  FileText,
   Maximize2,
   Minimize2,
-  Printer,
   Wallet,
 } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
@@ -564,7 +566,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
   const yearTotal = (vals: number[]) => vals.reduce((s, v) => s + v, 0)
 
-  function exportCsv() {
+  /** Один источник истины для табличного экспорта. CSV/XLSX используют
+   *  одинаковую структуру (delimiter ; — Excel правильно открывает локалью
+   *  ru/pl). XLSX-mime говорит Excel'у открыть файл сразу как книгу. */
+  function buildTableCsv(): string {
     const headers = [
       t('finance.report.col_row'),
       t('finance.report.col_total'),
@@ -579,20 +584,38 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         cells.map((c) => (typeof c === 'number' ? (c / 100).toFixed(2) : `"${c}"`)).join(';'),
       )
     }
-    const csv = '﻿' + lines.join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    return '﻿' + lines.join('\n')
+  }
+  function downloadBlob(data: string, mime: string, ext: string) {
+    const blob = new Blob([data], { type: mime })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     const firstCol = monthCols[0]
     const lastCol = monthCols[monthCols.length - 1]
-    const fname =
+    a.download =
       firstCol && lastCol
-        ? `financial-report-${firstCol.key}_${lastCol.key}.csv`
-        : `financial-report.csv`
-    a.download = fname
+        ? `financial-report-${firstCol.key}_${lastCol.key}.${ext}`
+        : `financial-report.${ext}`
     a.click()
     URL.revokeObjectURL(url)
+  }
+  function exportCsv() {
+    downloadBlob(buildTableCsv(), 'text/csv;charset=utf-8', 'csv')
+  }
+  function exportXlsx() {
+    // Тот же CSV-формат, но MIME Excel — Office корректно открывает файл как
+    // книгу. Не тащим xlsx-lib (≈800KB) ради того же результата.
+    downloadBlob(
+      buildTableCsv(),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xlsx',
+    )
+  }
+  function exportPdf() {
+    // PDF в браузере = «Печать → Сохранить как PDF» (CSS @media print
+    // настроен в globals.css так, что app-chrome скрывается).
+    window.print()
   }
 
   const visibleMainRows = rows.filter(
@@ -610,17 +633,59 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       {/* ===== TOP TOOLBAR ===== */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold tracking-tight text-slate-900">
+          <h2 className="text-brand-navy text-lg font-bold tracking-tight">
             {t('finance.report.title')}
           </h2>
-          <p className="mt-1 text-sm text-slate-500">{t('finance.report.subtitle')}</p>
+          <p className="text-muted-foreground mt-1 text-sm">{t('finance.report.subtitle')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          {/* bug 2783fa9e — универсальный PeriodPickerPopover (как везде).
-              Таблица адаптируется под выбранный период автоматически: 1 месяц
-              = 1 колонка + Итого, год = 12 колонок, range = столько колонок,
-              сколько месяцев в диапазоне. */}
+        <div className="flex flex-nowrap items-center gap-2 print:hidden">
+          {/* Скачать ▾ — Excel (xlsx) / CSV / PDF. */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button variant="outline" size="md">
+                <Download className="size-4" strokeWidth={1.8} />
+                {t('finance.report.download', { defaultValue: 'Скачать' })}
+                <ChevronDown className="size-3.5" strokeWidth={2} />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="start"
+                sideOffset={6}
+                className="border-border bg-popover text-popover-foreground shadow-finmd z-50 min-w-[180px] overflow-hidden rounded-md border"
+              >
+                <DropdownMenu.Item
+                  onSelect={() => exportXlsx()}
+                  className="hover:bg-muted focus:bg-muted flex cursor-pointer items-center gap-2 px-3 py-2 text-sm outline-none"
+                >
+                  <FileSpreadsheet
+                    className="size-4 text-emerald-600 dark:text-emerald-300"
+                    strokeWidth={1.8}
+                  />
+                  {t('finance.report.download_xlsx', { defaultValue: 'Excel (xlsx)' })}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onSelect={() => exportCsv()}
+                  className="hover:bg-muted focus:bg-muted flex cursor-pointer items-center gap-2 px-3 py-2 text-sm outline-none"
+                >
+                  <FileText className="size-4 text-sky-600 dark:text-sky-300" strokeWidth={1.8} />
+                  {t('finance.report.download_csv', { defaultValue: 'CSV' })}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onSelect={() => exportPdf()}
+                  className="hover:bg-muted focus:bg-muted flex cursor-pointer items-center gap-2 px-3 py-2 text-sm outline-none"
+                >
+                  <FileText className="size-4 text-rose-600 dark:text-rose-300" strokeWidth={1.8} />
+                  {t('finance.report.download_pdf', { defaultValue: 'PDF' })}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+
+          {/* Период (PeriodPickerPopover) */}
           <PeriodPickerPopover value={period} onChange={setPeriod} />
+
+          {/* На весь экран — самой правой */}
           <Button
             variant="outline"
             size="icon"
@@ -642,14 +707,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
               <Maximize2 className="size-4" strokeWidth={1.8} />
             )}
           </Button>
-          <Button variant="outline" size="md" onClick={exportCsv}>
-            <FileSpreadsheet className="size-4" strokeWidth={1.8} />
-            {t('finance.report.export_csv')}
-          </Button>
-          <Button variant="outline" size="md" onClick={() => window.print()}>
-            <Printer className="size-4" strokeWidth={1.8} />
-            {t('finance.report.print')}
-          </Button>
         </div>
       </header>
 
@@ -659,7 +716,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
           этого же контейнера. max-h ограничивает высоту чтобы скролл был
           внутри карточки, а не страницы (иначе sticky не работал бы как
           надо). При печати ограничения снимаются. */}
-      <div className="shadow-finmd overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="border-border bg-card shadow-finmd overflow-hidden rounded-xl border">
         <div
           className={`overflow-auto print:max-h-none print:overflow-visible ${
             fullscreen ? 'max-h-[calc(100vh-130px)]' : 'max-h-[calc(100vh-220px)]'
@@ -850,11 +907,13 @@ function BlockSection({
   children: React.ReactNode
 }) {
   return (
-    <section className="min-w-max border-t border-slate-200 first:border-t-0">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-slate-50">
+    <section className="border-border min-w-max border-t first:border-t-0">
+      <header className="border-border bg-muted/40 sticky top-0 z-40 border-b">
         <div className="sticky left-0 inline-flex items-center gap-2.5 px-4 py-2.5">
-          <span className="rounded-md bg-slate-900 p-1.5 text-amber-300">{icon}</span>
-          <h3 className="text-sm font-semibold tracking-tight text-slate-800">{title}</h3>
+          <span className="rounded-md bg-slate-900 p-1.5 text-amber-300 dark:bg-slate-800 dark:text-amber-200">
+            {icon}
+          </span>
+          <h3 className="text-foreground text-sm font-semibold tracking-tight">{title}</h3>
         </div>
       </header>
       {children}
@@ -920,13 +979,13 @@ function CashRegistersTable({
     >
       <SharedColGroup monthCols={monthCols} />
       <thead>
-        <tr className="bg-slate-100 text-slate-600">
-          <th className="sticky left-0 top-[44px] z-40 border-b border-r border-slate-200 bg-slate-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+        <tr className="bg-muted/60 text-muted-foreground">
+          <th className="border-border bg-muted/60 sticky left-0 top-[44px] z-40 border-b border-r px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
             {t('finance.report.end_balance_by_register')}
           </th>
           <th
             colSpan={2}
-            className="sticky top-[44px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider"
+            className="border-border bg-muted/40 sticky top-[44px] z-30 border-b border-l px-2 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_start')}
           </th>
@@ -934,8 +993,10 @@ function CashRegistersTable({
             <th
               key={c.key}
               colSpan={2}
-              className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                idx === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
+              className={`border-border sticky top-[44px] z-30 border-b border-l px-2 py-2.5 text-right text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                idx === currentMonthIdx
+                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200'
+                  : 'bg-muted/60'
               }`}
             >
               {format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', {
@@ -948,17 +1009,17 @@ function CashRegistersTable({
       <tbody>
         {registers.map((reg, idx) => {
           const monthlyBalances = monthlyRegBalances.get(reg.id) ?? []
-          const zebraBg = idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
+          const zebraBg = idx % 2 === 1 ? 'bg-muted/20' : 'bg-card'
           return (
-            <tr key={reg.id} className={`border-t border-slate-100 ${zebraBg}`}>
+            <tr key={reg.id} className={`border-border/60 border-t ${zebraBg}`}>
               <td
-                className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 font-medium text-slate-800 ${zebraBg}`}
+                className={`border-border text-foreground sticky left-0 z-20 border-r px-3 py-2 font-medium ${zebraBg}`}
               >
                 {reg.label || '—'}
               </td>
               <td
                 colSpan={2}
-                className="num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold text-slate-600"
+                className="num border-border bg-muted/30 text-muted-foreground border-l px-2 py-2 text-right font-semibold"
               >
                 {formatNumberSafe(reg.amount_cents ?? 0, currency)}
               </td>
@@ -966,8 +1027,8 @@ function CashRegistersTable({
                 <td
                   key={c.key}
                   colSpan={2}
-                  className={`num border-l border-slate-100 px-2 py-2 text-right text-slate-700 ${
-                    mi === currentMonthIdx ? 'bg-amber-50' : ''
+                  className={`num border-border/60 text-foreground/80 border-l px-2 py-2 text-right ${
+                    mi === currentMonthIdx ? 'bg-amber-50 dark:bg-amber-500/10' : ''
                   }`}
                 >
                   {formatNumberSafe(monthlyBalances[mi] ?? 0, currency)}
@@ -1014,16 +1075,16 @@ function ReportTable({
         {/* Row 1 — Параметр (rowSpan=2) + месяцы (colSpan=2). Sticky top=44px
             (под title bar блока). Все sticky-ячейки имеют непрозрачный bg,
             чтобы скроллящиеся под них цифры не просвечивали. */}
-        <tr className="text-slate-600">
+        <tr className="text-muted-foreground">
           <th
             rowSpan={2}
-            className="sticky left-0 top-[44px] z-40 border-b border-r border-slate-200 bg-slate-100 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
+            className="border-border bg-muted/60 sticky left-0 top-[44px] z-40 border-b border-r px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_row')}
           </th>
           <th
             colSpan={2}
-            className="sticky top-[44px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
+            className="border-border bg-muted/40 sticky top-[44px] z-30 border-b border-l px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider"
           >
             {t('finance.report.col_total')}
           </th>
@@ -1031,8 +1092,10 @@ function ReportTable({
             <th
               key={c.key}
               colSpan={2}
-              className={`sticky top-[44px] z-30 border-b border-l border-slate-200 px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
-                mi === currentMonthIdx ? 'bg-amber-100 text-amber-900' : 'bg-slate-100'
+              className={`border-border sticky top-[44px] z-30 border-b border-l px-2 py-2 text-center text-[10px] font-semibold uppercase capitalize tracking-wider ${
+                mi === currentMonthIdx
+                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200'
+                  : 'bg-muted/60'
               }`}
             >
               {format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', {
@@ -1042,25 +1105,29 @@ function ReportTable({
           ))}
         </tr>
         {/* Row 2 — План|Факт sub-headers. Sticky top=72px (44px + ~28px row1). */}
-        <tr className="text-slate-500">
-          <th className="sticky top-[72px] z-30 border-b border-l border-slate-200 bg-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase">
+        <tr className="text-muted-foreground/80">
+          <th className="border-border bg-muted/40 sticky top-[72px] z-30 border-b border-l px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_plan')}
           </th>
-          <th className="sticky top-[72px] z-30 border-b border-slate-200 bg-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase">
+          <th className="border-border bg-muted/40 sticky top-[72px] z-30 border-b px-2 py-1 text-right text-[9px] font-medium uppercase">
             {t('finance.report.col_fact')}
           </th>
           {monthCols.map((c, mi) => (
             <Fragment key={c.key}>
               <th
-                className={`sticky top-[72px] z-30 border-b border-l border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  mi === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
+                className={`border-border sticky top-[72px] z-30 border-b border-l px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                  mi === currentMonthIdx
+                    ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+                    : 'bg-muted/30'
                 }`}
               >
                 {t('finance.report.col_plan')}
               </th>
               <th
-                className={`sticky top-[72px] z-30 border-b border-slate-200 px-2 py-1 text-right text-[9px] font-medium uppercase ${
-                  mi === currentMonthIdx ? 'bg-amber-50 text-amber-800' : 'bg-slate-50'
+                className={`border-border sticky top-[72px] z-30 border-b px-2 py-1 text-right text-[9px] font-medium uppercase ${
+                  mi === currentMonthIdx
+                    ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+                    : 'bg-muted/30'
                 }`}
               >
                 {t('finance.report.col_fact')}
@@ -1075,21 +1142,21 @@ function ReportTable({
           const isCollapsed = hasGroup && collapsed.has(row.groupKey!)
           const groupBg = groupRowBg(row.color, row.bold)
           const accentBorder = row.bold ? accentLeftBorder(row.color) : ''
-          // Чётные строки (не-bold) — slate-50 как лёгкая «зебра». bold-строки
+          // Чётные строки (не-bold) — лёгкая «зебра» на muted/20. bold-строки
           // секций имеют свой groupBg. Все backgrounds непрозрачные — иначе
           // через sticky-колонку label просвечивают скроллящиеся цифры.
-          const zebra = !row.bold && idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
+          const zebra = !row.bold && idx % 2 === 1 ? 'bg-muted/20' : 'bg-card'
           const rowBg = groupBg || zebra
           return (
             <tr
               key={`${row.label}-${idx}`}
-              className={`group border-t border-slate-100 transition-colors hover:bg-slate-50 ${rowBg} ${
+              className={`border-border/60 hover:bg-muted/40 group border-t transition-colors ${rowBg} ${
                 hasGroup ? 'cursor-pointer' : ''
               }`}
               onClick={hasGroup ? () => onToggle(row.groupKey!) : undefined}
             >
               <td
-                className={`sticky left-0 z-20 border-r border-slate-200 px-3 py-2 text-slate-800 ${
+                className={`border-border text-foreground sticky left-0 z-20 border-r px-3 py-2 ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${rowBg} ${accentBorder}`}
                 style={{ paddingLeft: 12 + (row.indent ?? 0) * 16 }}
@@ -1098,17 +1165,17 @@ function ReportTable({
                   {hasGroup ? (
                     isCollapsed ? (
                       <ChevronRight
-                        className="size-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-slate-700"
+                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
                         strokeWidth={2.2}
                       />
                     ) : (
                       <ChevronDown
-                        className="size-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-slate-700"
+                        className="text-muted-foreground group-hover:text-foreground size-3.5 shrink-0 transition-colors"
                         strokeWidth={2.2}
                       />
                     )
                   ) : null}
-                  <span className={row.bold ? 'text-slate-800' : 'text-slate-600'}>
+                  <span className={row.bold ? 'text-foreground' : 'text-muted-foreground'}>
                     {row.label}
                   </span>
                 </span>
@@ -1116,10 +1183,10 @@ function ReportTable({
               {/* Итого План | Факт. bug c2a57e1b — клик по ячейкам открывает
                   drill-down модалку (если row.bold — это группа/parent row). */}
               <td
-                className={`num border-l border-slate-200 bg-slate-50 px-2 py-2 text-right ${
+                className={`num border-border bg-muted/30 border-l px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${colorClass(row.color)} ${
-                  onDrillDown ? 'cursor-pointer hover:bg-slate-200' : ''
+                  onDrillDown ? 'hover:bg-muted/60 cursor-pointer' : ''
                 }`}
                 onClick={onDrillDown ? () => onDrillDown(row) : undefined}
                 title={onDrillDown ? t('finance.report.click_for_details') : undefined}
@@ -1127,10 +1194,10 @@ function ReportTable({
                 {formatPF(yearTotal(row.values), currency)}
               </td>
               <td
-                className={`num bg-slate-50 px-2 py-2 text-right ${
+                className={`num bg-muted/30 px-2 py-2 text-right ${
                   row.bold ? 'font-bold' : 'font-medium'
                 } ${colorClass(row.color)} ${
-                  onDrillDown ? 'cursor-pointer hover:bg-slate-200' : ''
+                  onDrillDown ? 'hover:bg-muted/60 cursor-pointer' : ''
                 }`}
                 onClick={onDrillDown ? () => onDrillDown(row) : undefined}
                 title={onDrillDown ? t('finance.report.click_for_details') : undefined}
@@ -1143,9 +1210,9 @@ function ReportTable({
                 return (
                   <Fragment key={mi}>
                     <td
-                      className={`num border-l border-slate-100 px-2 py-2 text-right ${
+                      className={`num border-border/60 border-l px-2 py-2 text-right ${
                         row.bold ? 'font-semibold' : ''
-                      } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-amber-50' : ''}`}
+                      } ${colorClass(row.color, 'plan')} ${isCurrent ? 'bg-amber-50 dark:bg-amber-500/10' : ''}`}
                     >
                       {formatPF(plan, currency)}
                     </td>
@@ -1153,7 +1220,7 @@ function ReportTable({
                       className={`num px-2 py-2 text-right ${row.bold ? 'font-semibold' : ''} ${colorClass(
                         row.color,
                         'fact',
-                      )} ${isCurrent ? 'bg-amber-50' : ''}`}
+                      )} ${isCurrent ? 'bg-amber-50 dark:bg-amber-500/10' : ''}`}
                     >
                       {formatPF(fact, currency)}
                     </td>
@@ -1215,17 +1282,17 @@ function formatPF(v: number, currency: string): string {
  */
 function colorClass(color: RowColor | undefined, kind?: 'plan' | 'fact'): string {
   if (kind === 'plan') {
-    if (color === 'destructive') return 'text-rose-500/80'
-    if (color === 'sage') return 'text-emerald-600/80'
-    if (color === 'teal') return 'text-amber-600/80'
-    if (color === 'navy') return 'text-slate-600/80'
-    return 'text-slate-400'
+    if (color === 'destructive') return 'text-rose-500/80 dark:text-rose-300/80'
+    if (color === 'sage') return 'text-emerald-600/80 dark:text-emerald-300/80'
+    if (color === 'teal') return 'text-amber-600/80 dark:text-amber-300/80'
+    if (color === 'navy') return 'text-foreground/70'
+    return 'text-muted-foreground/80'
   }
-  if (color === 'destructive') return 'text-rose-600'
-  if (color === 'sage') return 'text-emerald-700'
-  if (color === 'teal') return 'text-amber-700'
-  if (color === 'navy') return 'text-slate-800'
-  return 'text-slate-700'
+  if (color === 'destructive') return 'text-rose-600 dark:text-rose-300'
+  if (color === 'sage') return 'text-emerald-700 dark:text-emerald-300'
+  if (color === 'teal') return 'text-amber-700 dark:text-amber-300'
+  if (color === 'navy') return 'text-foreground'
+  return 'text-foreground/90'
 }
 
 /**
@@ -1235,7 +1302,7 @@ function colorClass(color: RowColor | undefined, kind?: 'plan' | 'fact'): string
  */
 function groupRowBg(_color: RowColor | undefined, bold: boolean | undefined): string {
   if (!bold) return ''
-  return 'bg-slate-50'
+  return 'bg-muted/40'
 }
 
 /** Цветной акцент слева у bold-строк (как «полоска категории»). */
@@ -1243,7 +1310,7 @@ function accentLeftBorder(color: RowColor | undefined): string {
   if (color === 'sage') return 'border-l-[3px] border-l-emerald-500'
   if (color === 'destructive') return 'border-l-[3px] border-l-rose-400'
   if (color === 'teal') return 'border-l-[3px] border-l-amber-400'
-  if (color === 'navy') return 'border-l-[3px] border-l-slate-700'
+  if (color === 'navy') return 'border-l-[3px] border-l-slate-700 dark:border-l-slate-300'
   return ''
 }
 

@@ -79,6 +79,7 @@ export function SalonLayout() {
     path.endsWith('/messenger') ||
     path.endsWith('/finance') ||
     path.endsWith('/reports') ||
+    path.endsWith('/ai') ||
     path.includes('/settings')
   const { user } = useAuth()
   const { data: salons, isLoading } = useMySalons()
@@ -206,12 +207,15 @@ export function SalonLayout() {
         />
       </div>
 
-      {/* Sidebar mobile в Drawer */}
+      {/* Sidebar mobile в Drawer. Dialog.Content получает явный bg/ширину,
+          чтобы тёмная тема не превращала drawer в чёрный экран (Sidebar
+          внутри имеет bg-card, но без подложки Dialog.Content рендерил пустой
+          контейнер до того как Sidebar успевал прорисовать содержимое). */}
       <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden" />
           <Dialog.Content
-            className="fixed inset-y-0 left-0 z-50 lg:hidden"
+            className="bg-card fixed inset-y-0 left-0 z-50 w-[260px] max-w-[80vw] focus:outline-none lg:hidden"
             aria-describedby={undefined}
           >
             <Dialog.Title className="sr-only">{t('nav.drawer_title')}</Dialog.Title>

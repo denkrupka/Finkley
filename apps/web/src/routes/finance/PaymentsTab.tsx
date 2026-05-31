@@ -54,10 +54,13 @@ function classifyPayment(p: ScheduledPaymentRow, todayStr: string): PaymentTone 
 }
 
 const TONE_CHIP: Record<PaymentTone, string> = {
-  overdue: 'bg-rose-100 text-rose-800 border-rose-200',
-  today: 'bg-amber-100 text-amber-900 border-amber-200',
-  pending: 'bg-sky-100 text-sky-800 border-sky-200',
-  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200 line-through opacity-70',
+  overdue:
+    'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:border-rose-500/30',
+  today:
+    'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-500/30',
+  pending:
+    'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:border-sky-500/30',
+  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200 line-through opacity-70 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/25',
 }
 
 const TONE_DOT: Record<PaymentTone, string> = {
@@ -85,32 +88,40 @@ function MetricCard({
   tone: 'red' | 'amber' | 'blue' | 'sage'
 }) {
   const accent: Record<typeof tone, { stripe: string; text: string; iconBg: string }> = {
-    red: { stripe: 'bg-rose-400', text: 'text-rose-600', iconBg: 'bg-rose-50 text-rose-500' },
+    red: {
+      stripe: 'bg-rose-400',
+      text: 'text-rose-600 dark:text-rose-300',
+      iconBg: 'bg-rose-50 text-rose-500 dark:bg-rose-500/15 dark:text-rose-300',
+    },
     amber: {
       stripe: 'bg-amber-400',
-      text: 'text-amber-700',
-      iconBg: 'bg-amber-50 text-amber-600',
+      text: 'text-amber-700 dark:text-amber-300',
+      iconBg: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
     },
-    blue: { stripe: 'bg-sky-500', text: 'text-sky-700', iconBg: 'bg-sky-50 text-sky-600' },
+    blue: {
+      stripe: 'bg-sky-500',
+      text: 'text-sky-700 dark:text-sky-300',
+      iconBg: 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
+    },
     sage: {
       stripe: 'bg-emerald-500',
-      text: 'text-emerald-700',
-      iconBg: 'bg-emerald-50 text-emerald-600',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      iconBg: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
     },
   }
   const a = accent[tone]
   return (
-    <div className="shadow-finsm flex overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="border-border bg-card shadow-finsm flex overflow-hidden rounded-xl border">
       <div className={`w-1 shrink-0 ${a.stripe}`} />
       <div className="flex-1 p-3">
         <div className="flex items-center gap-2">
           <span className={`rounded-md p-1.5 ${a.iconBg}`}>{icon}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
             {label}
           </span>
         </div>
         <div className={`num mt-2 text-lg font-bold leading-tight ${a.text}`}>{value}</div>
-        <p className="mt-1 text-[10px] text-slate-500">{hint}</p>
+        <p className="text-muted-foreground mt-1 text-[10px]">{hint}</p>
       </div>
     </div>
   )
@@ -315,18 +326,21 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
             setMonthCursor(startOfMonth(d))
             setSelectedDate(d)
           }}
-          className="shadow-finsm mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-left transition-colors hover:bg-rose-100"
+          className="shadow-finsm mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-left transition-colors hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
         >
           <span className="flex items-center gap-2.5">
-            <AlertTriangle className="size-4 shrink-0 text-rose-600" strokeWidth={2} />
-            <span className="text-sm font-semibold text-rose-800">
+            <AlertTriangle
+              className="size-4 shrink-0 text-rose-600 dark:text-rose-300"
+              strokeWidth={2}
+            />
+            <span className="text-sm font-semibold text-rose-800 dark:text-rose-200">
               {t('finance.payments.banner_overdue', {
                 count: overdue.length,
                 amount: formatCurrency(totalOverdue, currency),
               })}
             </span>
           </span>
-          <span className="text-xs font-semibold text-rose-700 underline-offset-2 hover:underline">
+          <span className="text-xs font-semibold text-rose-700 underline-offset-2 hover:underline dark:text-rose-300">
             {t('finance.payments.banner_show')} →
           </span>
         </button>
@@ -337,7 +351,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
         {/* CALENDAR */}
         <section className="border-border bg-card shadow-finsm overflow-hidden rounded-xl border">
           {/* Header: ‹ Май 2026 › + Сегодня + сводка по месяцу */}
-          <header className="border-border flex flex-col gap-2 border-b bg-gradient-to-r from-slate-50 to-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <header className="border-border bg-muted/30 flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -382,13 +396,13 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
           </header>
 
           {/* Weekday header (Пн..Вс) */}
-          <div className="border-border grid grid-cols-7 border-b bg-slate-50/60">
+          <div className="border-border bg-muted/30 grid grid-cols-7 border-b">
             {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((w, i) => (
               <div
                 key={w}
                 className={cn(
                   'py-2 text-center text-[10px] font-bold uppercase tracking-wider',
-                  i >= 5 ? 'text-slate-400' : 'text-slate-500',
+                  i >= 5 ? 'text-muted-foreground/70' : 'text-muted-foreground',
                 )}
               >
                 {w}
@@ -415,9 +429,9 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
 
         {/* SIDE PANEL: detail of selected day */}
         <aside className="border-border bg-card shadow-finsm flex flex-col overflow-hidden rounded-xl border">
-          <header className="border-border flex items-center justify-between border-b bg-gradient-to-r from-slate-50 to-white px-4 py-3">
+          <header className="border-border bg-muted/30 flex items-center justify-between border-b px-4 py-3">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                 {isSameDay(selectedDate, now)
                   ? t('finance.payments.day_today')
                   : t('finance.payments.day_label')}
@@ -502,12 +516,12 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
                             className={cn(
                               'mt-1 text-[11px] font-semibold',
                               tone === 'overdue'
-                                ? 'text-rose-600'
+                                ? 'text-rose-600 dark:text-rose-300'
                                 : tone === 'today'
-                                  ? 'text-amber-700'
+                                  ? 'text-amber-700 dark:text-amber-300'
                                   : tone === 'paid'
-                                    ? 'text-emerald-700'
-                                    : 'text-sky-700',
+                                    ? 'text-emerald-700 dark:text-emerald-300'
+                                    : 'text-sky-700 dark:text-sky-300',
                             )}
                           >
                             {tone === 'paid'
@@ -537,7 +551,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
                           <button
                             type="button"
                             onClick={() => handlePay(p)}
-                            className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
                           >
                             <CheckCircle2 className="size-3.5" strokeWidth={2} />
                             {t('finance.payments.mark_paid')}
@@ -561,8 +575,8 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
           </div>
 
           {/* Legend */}
-          <footer className="border-border bg-slate-50/60 px-4 py-2.5">
-            <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <footer className="border-border bg-muted/30 px-4 py-2.5">
+            <p className="text-muted-foreground mb-1.5 text-[9px] font-bold uppercase tracking-wider">
               {t('finance.payments.legend')}
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
@@ -594,7 +608,7 @@ export function PaymentsTab({ salonId }: { salonId: string }) {
 
 function LegendItem({ dot, label }: { dot: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 text-slate-600">
+    <span className="text-muted-foreground inline-flex items-center gap-1">
       <span className={cn('size-1.5 rounded-full', dot)} aria-hidden />
       {label}
     </span>
@@ -647,9 +661,9 @@ function MonthGrid({
             onClick={() => onSelectDate(d)}
             className={cn(
               'border-border group relative flex min-h-[88px] flex-col gap-1 border-b border-r p-1.5 text-left transition-colors sm:min-h-[110px]',
-              !inMonth && 'bg-slate-50/50 text-slate-400',
-              inMonth && weekend && 'bg-slate-50/40',
-              inMonth && !weekend && 'bg-white',
+              !inMonth && 'bg-muted/20 text-muted-foreground/60',
+              inMonth && weekend && 'bg-muted/10',
+              inMonth && !weekend && 'bg-card',
               'hover:bg-brand-teal-soft/20',
               isSelected && 'ring-brand-teal z-10 ring-2 ring-inset',
             )}
@@ -660,13 +674,13 @@ function MonthGrid({
                   'num inline-flex size-6 items-center justify-center text-xs font-bold tabular-nums',
                   isToday && 'text-brand-teal-deep bg-brand-teal-soft/60 rounded-full',
                   !isToday && inMonth && 'text-foreground',
-                  !inMonth && 'text-slate-400',
+                  !inMonth && 'text-muted-foreground/60',
                 )}
               >
                 {d.getDate()}
               </span>
               {list.length > 0 ? (
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-muted-foreground/70 text-[9px] font-bold uppercase tracking-wider">
                   {list.length}
                 </span>
               ) : null}
@@ -709,7 +723,7 @@ function MonthGrid({
                 )
               })}
               {extra > 0 ? (
-                <span className="text-muted-foreground inline-block rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] font-semibold leading-tight">
+                <span className="text-muted-foreground border-border bg-muted/40 inline-block rounded border px-1 py-0.5 text-[10px] font-semibold leading-tight">
                   +{extra}
                 </span>
               ) : null}

@@ -363,6 +363,46 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
         .eq('external_id', r.external_id)
         .is('reply_text', null)
     }
+    // Backfill body на Google-отзывах: в старом коде в БД мог попасть
+    // переведённый `text.text` вместо оригинального `originalText.text`.
+    // Сейчас reviews-sync читает originalText приоритетом, и для дубликатов
+    // обновляем body если свежий payload отличается от того что в БД (значит
+    // там лежит legacy-перевод — заменяем на оригинал).
+    const duplicateBodies = inserts.filter(
+      (r) =>
+        r.source === 'google' &&
+        taken.has(`${r.source}::${r.external_id}`) &&
+        (r as { body?: string | null }).body,
+    )
+    if (duplicateBodies.length > 0) {
+      const { data: existingBodies } = await admin
+        .from('reviews')
+        .select('external_id, body')
+        .eq('salon_id', salon.id)
+        .eq('source', 'google')
+        .in(
+          'external_id',
+          duplicateBodies.map((r) => r.external_id),
+        )
+      const bodyByExt = new Map(
+        ((existingBodies ?? []) as Array<{ external_id: string; body: string | null }>).map((r) => [
+          r.external_id,
+          r.body,
+        ]),
+      )
+      for (const r of duplicateBodies) {
+        const fresh = (r as { body?: string | null }).body ?? null
+        const stored = bodyByExt.get(r.external_id) ?? null
+        if (fresh && stored !== fresh) {
+          await admin
+            .from('reviews')
+            .update({ body: fresh })
+            .eq('salon_id', salon.id)
+            .eq('source', 'google')
+            .eq('external_id', r.external_id)
+        }
+      }
+    }
   }
 
   return {

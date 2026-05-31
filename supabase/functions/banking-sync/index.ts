@@ -247,6 +247,7 @@ async function syncConnection(
   let txTotal = 0
   let txNew = 0
   let expensesCreated = 0
+  let pendingCount = 0
 
   // Range: при первом синке тащим conn.history_days назад. При следующих —
   // от last_synced_at − 7 дней (overlap для свежесозданных booked транзакций).
@@ -289,6 +290,7 @@ async function syncConnection(
       continue
     }
     txTotal += txs.length
+    pendingCount += txs.filter((t) => t.status === 'PDNG').length
 
     const { newCount, expCount } = await persistTransactions(admin, {
       accountId: acc.id as string,
@@ -303,7 +305,11 @@ async function syncConnection(
 
   await admin
     .from('bank_connections')
-    .update({ last_synced_at: new Date().toISOString(), last_error: null })
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_error: null,
+      pending_today_count: pendingCount,
+    })
     .eq('id', connectionId)
 
   return {
@@ -311,6 +317,7 @@ async function syncConnection(
     accounts_synced: accounts?.length ?? 0,
     tx_total: txTotal,
     tx_new: txNew,
+    pending: pendingCount,
     expenses_created: expensesCreated,
   }
 }

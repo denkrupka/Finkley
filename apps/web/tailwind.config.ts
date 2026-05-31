@@ -67,6 +67,7 @@ const config: Config = {
             DEFAULT: 'hsl(var(--brand-navy))',
             soft: 'hsl(var(--brand-navy-soft))',
             deep: 'hsl(var(--brand-navy-deep))',
+            ink: 'hsl(var(--brand-navy-ink))',
           },
           teal: {
             DEFAULT: 'hsl(var(--brand-teal))',

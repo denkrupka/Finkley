@@ -41,7 +41,6 @@ import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalo
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
-import { useSendDailyDigest, useSendWeeklyDigest } from '@/hooks/useWeeklyDigest'
 import { Link } from 'react-router-dom'
 
 import { HelpFAQ } from '@/routes/help/HelpFAQ'
@@ -120,8 +119,6 @@ export function SettingsPage() {
   const remove = useDeleteSalon()
   const syncCompetitors = useSyncCompetitors(salonId)
   const { data: subscription } = useSubscription(salonId)
-  const sendDigest = useSendWeeklyDigest(salonId)
-  const sendDailyDigest = useSendDailyDigest(salonId)
   const toggleBenchmarks = useToggleBenchmarksOptIn(salonId)
 
   const [name, setName] = useState('')
@@ -842,13 +839,7 @@ export function SettingsPage() {
 
       {activeTab === 'schedule' && <ScheduleTab />}
 
-      {activeTab === 'notifications' && (
-        <NotificationsTabContent
-          salon={salon}
-          sendDigest={sendDigest}
-          sendDailyDigest={sendDailyDigest}
-        />
-      )}
+      {activeTab === 'notifications' && <NotificationsTabContent salon={salon} />}
 
       {activeTab === 'api' && (
         <>

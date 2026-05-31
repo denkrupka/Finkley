@@ -298,6 +298,21 @@ export function BankingSection({ salonId }: Props) {
                         {t('banking.last_error')}: {c.last_error}
                       </span>
                     ) : null}
+                    {(c as { pending_today_count?: number }).pending_today_count ? (
+                      <span
+                        className="text-amber-700 dark:text-amber-300"
+                        title={t('banking.pending_hint', {
+                          defaultValue:
+                            'Свежие транзакции в pending у банка. Появятся через 1–24 часа когда банк их зафиксирует (booked).',
+                        })}
+                      >
+                        {t('banking.pending', {
+                          count: (c as { pending_today_count?: number }).pending_today_count,
+                          defaultValue:
+                            'В ожидании банка: {{count}} (появятся после booking 1–24 часа)',
+                        })}
+                      </span>
+                    ) : null}
                   </div>
 
                   {c.status === 'connected' ? (

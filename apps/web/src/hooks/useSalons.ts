@@ -180,10 +180,34 @@ export function useUpdateNotificationPref(salonId: string | undefined) {
       const cached = qc.getQueryData<SalonRow | null>(['salons', 'one', salonId])
       const current = cached?.notification_prefs ?? {}
       const next = { ...current, ...patch }
-      const { error } = await supabase
-        .from('salons')
-        .update({ notification_prefs: next })
-        .eq('id', salonId)
+
+      // Зеркалим выбор каналов для weekly_digest / daily_digest в legacy
+      // массивы `weekly_digest_channels` / `daily_digest_channels` — их
+      // читают Edge Function'ы `send-weekly-digest` / `send-daily-digest`,
+      // когда cron триггерит рассылку. Без зеркала чекбоксы матрицы не
+      // влияли бы на расписание.
+      const update: {
+        notification_prefs: Record<string, boolean>
+        weekly_digest_channels?: DigestChannel[]
+        daily_digest_channels?: DigestChannel[]
+      } = { notification_prefs: next }
+
+      function mirror(
+        kind: 'weekly_digest' | 'daily_digest',
+        legacy: 'weekly_digest_channels' | 'daily_digest_channels',
+      ) {
+        const touched = Object.keys(patch).some((k) => k.startsWith(`${kind}.`))
+        if (!touched) return
+        const chans: DigestChannel[] = []
+        // Все каналы — opt-in (фронт также не включает их «по умолчанию»).
+        if (next[`${kind}.email`] === true) chans.push('email')
+        if (next[`${kind}.telegram`] === true) chans.push('telegram')
+        update[legacy] = chans
+      }
+      mirror('weekly_digest', 'weekly_digest_channels')
+      mirror('daily_digest', 'daily_digest_channels')
+
+      const { error } = await supabase.from('salons').update(update).eq('id', salonId)
       if (error) throw error
       return next
     },

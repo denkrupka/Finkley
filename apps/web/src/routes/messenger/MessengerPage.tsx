@@ -45,6 +45,7 @@ import {
   useConversations,
   useLinkConversationClient,
   useMarkConversationRead,
+  useMessengerIntegrations,
   useMessengerRealtime,
   useSendMessage,
   uploadMessengerMedia,
@@ -72,6 +73,19 @@ import {
 import { useTgSessions } from '@/hooks/useTgUserbot'
 import { ClientFormModal } from '@/routes/clients/ClientFormModal'
 import { cn } from '@/lib/utils/cn'
+
+/**
+ * Нормализует display_name conversation'а. Если фон-сервис не смог достать
+ * имя/username из Meta/IG Graph (приватный профиль, нет prompts permission),
+ * webhook сохраняет дефолт `User XXXXXX`. На UI показываем понятный fallback
+ * вместо технического id.
+ */
+function displayNameOrFallback(conv: { display_name?: string | null }, fallback: string): string {
+  const name = (conv.display_name ?? '').trim()
+  if (!name) return fallback
+  if (/^User\s+[A-Za-z0-9]+$/.test(name)) return fallback
+  return name
+}
 
 /** Адаптер TgDialog → MessengerConversation для переиспользования UI-компонентов. */
 function tgDialogToConv(d: TgDialog, avatarUrl: string | null): MessengerConversation {
@@ -198,6 +212,18 @@ export function MessengerPage() {
   const { data: tgDialogs = [] } = useTgDialogs(salonId)
   const { data: tgSessions = [] } = useTgSessions(salonId)
   const activeTgSession = tgSessions.find((s) => s.status === 'active') ?? null
+  // Каналы которые реально подключены в интеграциях — фильтр-pill'ы
+  // мессенджера должны показывать только их (запрос юзера 31.05).
+  const { data: messengerIntegrations = [] } = useMessengerIntegrations(salonId)
+  const connectedChannels = useMemo<Set<MessengerChannel>>(() => {
+    const set = new Set<MessengerChannel>()
+    for (const it of messengerIntegrations) {
+      if (it.status === 'connected') set.add(it.channel)
+    }
+    // Telegram User-Bot (userbot) — отдельный от messenger_integrations канал.
+    if (activeTgSession) set.add('telegram')
+    return set
+  }, [messengerIntegrations, activeTgSession])
 
   // Аватарки TG-диалогов (batch signed URLs)
   const avatarPaths = useMemo(() => tgDialogs.map((d) => d.photo_path), [tgDialogs])
@@ -345,22 +371,24 @@ export function MessengerPage() {
               >
                 <MessageCircle className="size-3.5" strokeWidth={2} />
               </IconChip>
-              {(['telegram', 'whatsapp', 'instagram', 'facebook'] as const).map((ch) => {
-                const meta = CHANNEL_META[ch]
-                const Icon = meta.icon
-                return (
-                  <IconChip
-                    key={ch}
-                    label={t(meta.labelKey, { defaultValue: meta.label })}
-                    active={activeChannel === ch}
-                    color={meta.color}
-                    onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
-                    iconOnly
-                  >
-                    <Icon className="size-3.5" strokeWidth={2} />
-                  </IconChip>
-                )
-              })}
+              {(['telegram', 'whatsapp', 'instagram', 'facebook'] as const)
+                .filter((ch) => connectedChannels.has(ch))
+                .map((ch) => {
+                  const meta = CHANNEL_META[ch]
+                  const Icon = meta.icon
+                  return (
+                    <IconChip
+                      key={ch}
+                      label={t(meta.labelKey, { defaultValue: meta.label })}
+                      active={activeChannel === ch}
+                      color={meta.color}
+                      onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
+                      iconOnly
+                    >
+                      <Icon className="size-3.5" strokeWidth={2} />
+                    </IconChip>
+                  )
+                })}
             </div>
           </div>
 
@@ -408,7 +436,7 @@ export function MessengerPage() {
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
                         <p className="text-foreground truncate text-sm font-semibold">
-                          {selected.display_name || t('messenger.unnamed')}
+                          {displayNameOrFallback(selected, t('messenger.unnamed'))}
                         </p>
                         {selected.client_id ? (
                           <span
@@ -734,6 +762,7 @@ function ConversationRow({
   active: boolean
   onSelect: () => void
 }) {
+  const { t } = useTranslation()
   const time = formatDistanceToNowStrict(new Date(conversation.last_message_at), {
     addSuffix: false,
     locale: getDateLocale(),
@@ -754,7 +783,7 @@ function ConversationRow({
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
             <span className="text-foreground truncate text-sm font-semibold">
-              {conversation.display_name || '—'}
+              {displayNameOrFallback(conversation, t('messenger.unnamed'))}
             </span>
             <span className="text-muted-foreground shrink-0 text-[10px]">{time}</span>
           </span>
@@ -819,15 +848,28 @@ function MessageBody({
           <span className="text-xs italic opacity-70">📷 …</span>
         )
       ) : null}
-      {/* Video — inline player */}
+      {/* Video — inline player. `playsInline` нужен для iOS Safari (без него
+          встроенный плеер уходит в fullscreen и не показывает preview).
+          Если кодек/контейнер не поддерживается браузером (IG иногда
+          присылает .mov H.265), показываем кнопку «Открыть» как fallback. */}
       {message.media_path && message.media_kind === 'video' ? (
         mediaUrl ? (
           <video
             src={mediaUrl}
             controls
+            playsInline
             preload="metadata"
             className="mb-1 max-h-72 w-auto max-w-full rounded-md bg-black"
-          />
+          >
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs italic underline opacity-90"
+            >
+              {t('messenger.media.video_open', { defaultValue: '🎥 Открыть видео' })}
+            </a>
+          </video>
         ) : (
           <span className="text-xs italic opacity-70">🎥 …</span>
         )
@@ -1550,7 +1592,9 @@ function BulkBroadcastDialog({
                     className="size-4"
                   />
                   <ChannelIcon channel={c.channel} size={14} />
-                  <span className="flex-1 truncate">{c.display_name}</span>
+                  <span className="flex-1 truncate">
+                    {displayNameOrFallback(c, t('messenger.unnamed'))}
+                  </span>
                 </label>
               </li>
             ))}

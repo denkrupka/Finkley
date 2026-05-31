@@ -70,13 +70,15 @@ export function ReferralButton({ variant = 'topbar' }: { variant?: 'topbar' | 's
         />
         {isSidebar ? (
           <span className="flex flex-col items-start leading-tight">
-            <span className="text-brand-navy text-[12px] font-bold">{t('referral.bonus_cta')}</span>
-            <span className="text-brand-navy/70 text-[10px] font-medium">
+            <span className="text-brand-navy-ink text-[12px] font-bold">
+              {t('referral.bonus_cta')}
+            </span>
+            <span className="text-brand-navy-ink/70 text-[10px] font-medium">
               {t('referral.bonus_hint')}
             </span>
           </span>
         ) : (
-          <span className="text-brand-navy hidden text-[11px] font-bold sm:inline">
+          <span className="text-brand-navy-ink hidden text-[11px] font-bold sm:inline">
             {t('referral.button')}
           </span>
         )}

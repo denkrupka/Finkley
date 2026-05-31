@@ -59,7 +59,7 @@ export function ReportsHubPage() {
   if (!salonId) return null
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
+    <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden px-5 py-7 sm:px-8 lg:pb-12">
       {/* Image #61: header «Аналитика по справочникам...» убран — он дублировал
           навигацию и занимал лишнее место. Активный таб уже самодокументируется. */}
       <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />

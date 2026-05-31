@@ -178,7 +178,7 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
           onClick={() => setBugOpen(true)}
           title={collapsed ? t('nav.report_bug') : undefined}
           className={cn(
-            'inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-amber-500/15 text-[12px] font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200',
+            'inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-amber-500/15 text-[12px] font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30',
             collapsed ? 'w-9 px-0' : 'px-2',
           )}
         >

@@ -162,11 +162,18 @@ export function useLinkBankAccountToRegister(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { accountId: string; cashRegisterId: string | null }) => {
-      const { error } = await supabase
+      // .select() возвращает обновлённую строку. Если RLS отфильтрует UPDATE
+      // до 0 строк, data будет пустым — это надо считать ошибкой, иначе
+      // фронт показывает успех при незаметно проваленном сохранении.
+      const { data, error } = await supabase
         .from('bank_accounts')
         .update({ cash_register_id: input.cashRegisterId })
         .eq('id', input.accountId)
+        .select('id')
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error('no_rows_updated — проверь права доступа к счёту')
+      }
       return input
     },
     onSuccess: () => {

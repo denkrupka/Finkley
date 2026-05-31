@@ -66,7 +66,7 @@ export function AdminLayout() {
   return (
     <div className="bg-background flex min-h-screen flex-col">
       {/* Header — узкая полоска чтобы отличить от салонских страниц */}
-      <header className="border-border bg-brand-navy flex items-center justify-between border-b px-5 py-3 text-white sm:px-8">
+      <header className="border-border bg-brand-navy dark:bg-brand-navy-soft flex items-center justify-between border-b px-5 py-3 text-white sm:px-8">
         <div className="flex items-center gap-3">
           <ShieldCheck className="size-5" strokeWidth={1.8} />
           <div>

@@ -49,14 +49,14 @@ export function AiInsightsPanel({ kind, payload }: { kind: InsightKind; payload:
   // не уходит, токены не тратятся.
   if (!revealed) {
     return (
-      <section className="border-brand-yellow-deep/40 bg-brand-yellow/30 mb-5 flex flex-col items-center justify-between gap-3 rounded-lg border p-4 sm:flex-row">
+      <section className="border-brand-yellow-deep/40 bg-brand-yellow/30 mb-5 flex flex-col items-center justify-between gap-3 rounded-lg border p-4 sm:flex-row dark:border-amber-500/30 dark:bg-amber-500/10">
         <div className="flex min-w-0 items-center gap-3">
           <span className="bg-brand-yellow-deep/20 text-brand-navy grid size-9 shrink-0 place-items-center rounded-full">
             <Sparkles className="size-4" strokeWidth={1.8} />
           </span>
           <div className="min-w-0">
             <h3 className="text-brand-navy text-sm font-bold">{t('reports_insights.title')}</h3>
-            <p className="text-brand-navy/70 text-[11px]">
+            <p className="text-brand-navy/80 dark:text-foreground/80 text-[11px]">
               {t('reports_insights.reveal_subtitle')}
             </p>
           </div>
@@ -75,20 +75,22 @@ export function AiInsightsPanel({ kind, payload }: { kind: InsightKind; payload:
   }
 
   return (
-    <section className="border-brand-yellow-deep/40 bg-brand-yellow/30 mb-5 rounded-lg border p-4">
+    <section className="border-brand-yellow-deep/40 bg-brand-yellow/30 mb-5 rounded-lg border p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
       <header className="mb-3 flex items-center gap-2">
         <span className="bg-brand-yellow-deep/20 text-brand-navy grid size-7 shrink-0 place-items-center rounded-full">
           <Sparkles className="size-4" strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-brand-navy text-sm font-bold">{t('reports_insights.title')}</h3>
-          <p className="text-brand-navy/70 text-[11px]">{t('reports_insights.subtitle')}</p>
+          <p className="text-brand-navy/80 dark:text-foreground/80 text-[11px]">
+            {t('reports_insights.subtitle')}
+          </p>
         </div>
         {!isLoading && insights.length > 0 ? (
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-brand-navy/70 hover:text-brand-navy text-[11px] underline-offset-2 hover:underline"
+            className="text-brand-navy/80 hover:text-brand-navy dark:text-foreground/80 dark:hover:text-foreground text-[11px] underline-offset-2 hover:underline"
           >
             {t('reports_insights.refresh')}
           </button>
@@ -96,7 +98,7 @@ export function AiInsightsPanel({ kind, payload }: { kind: InsightKind; payload:
       </header>
 
       {isLoading ? (
-        <div className="text-brand-navy/70 flex items-center gap-2 text-xs">
+        <div className="text-brand-navy/80 dark:text-foreground/80 flex items-center gap-2 text-xs">
           <Loader2 className="size-4 animate-spin" strokeWidth={2} />
           {t('reports_insights.loading')}
         </div>
@@ -115,7 +117,9 @@ export function AiInsightsPanel({ kind, payload }: { kind: InsightKind; payload:
           </button>
         </div>
       ) : insights.length === 0 ? (
-        <p className="text-brand-navy/70 text-xs">{t('reports_insights.empty')}</p>
+        <p className="text-brand-navy/80 dark:text-foreground/80 text-xs">
+          {t('reports_insights.empty')}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {insights.map((ins, idx) => (

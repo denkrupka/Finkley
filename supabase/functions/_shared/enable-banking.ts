@@ -308,7 +308,12 @@ export async function listTransactions(
     const qs = new URLSearchParams()
     qs.set('date_from', range.dateFrom)
     if (range.dateTo) qs.set('date_to', range.dateTo)
-    qs.set('strategy', 'default')
+    // strategy='all' включает booked + pending (PDNG). Дальше banking-sync
+    // фильтрует BOOK для записи в bank_transactions, а pending'и считает —
+    // чтобы UI мог показать «N транзакций ещё не подтверждены банком».
+    // Раньше было 'default' (только booked), из-за чего юзер не видел даже
+    // намёка на свежее поступление, и думал что синк сломан.
+    qs.set('strategy', 'all')
     if (continuation) qs.set('continuation_key', continuation)
     const data = await ebFetch<{
       transactions: EbTransaction[]
