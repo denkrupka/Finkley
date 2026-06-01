@@ -23,6 +23,10 @@ export type OtherIncomeRow = {
   /** Image #51: сумма уже полученного (для частичных поступлений).
    *  NULL = полностью получено. См. income_payment_installments. */
   paid_amount_cents: number | null
+  /** VAT-разбивка (миграция 20260602000001). NULL → P&L fallback на gross. */
+  amount_net_cents: number | null
+  vat_rate_pct: number | null
+  vat_skipped: boolean | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -205,6 +209,9 @@ export type UpdateOtherIncomeInput = {
   payment_method?: PaymentMethod | null
   cash_register_id?: string | null
   comment?: string | null
+  amount_net_cents?: number | null
+  vat_rate_pct?: number | null
+  vat_skipped?: boolean | null
 }
 
 export function useUpdateOtherIncome(salonId: string | undefined) {

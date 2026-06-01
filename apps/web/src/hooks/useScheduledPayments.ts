@@ -20,6 +20,12 @@ export type ScheduledPaymentRow = {
   bank_account_iban: string | null
   /** FK на counterparty — для cross-fill IBAN. NULL для legacy записей. */
   counterparty_id: string | null
+  /** VAT-разбивка (миграция 20260602000001). KSeF-импорт писал сюда из FA(2)
+   *  P_13_x/P_14_x. P&L FinancialReportTab использует через
+   *  vatBreakdownFor для строки «НДС к оплате». */
+  amount_net_cents: number | null
+  vat_rate_pct: number | null
+  vat_skipped: boolean | null
   created_at: string
   updated_at: string
   deleted_at: string | null

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
 import {
   useDeleteOtherIncome,
   useOtherIncomeCategories,
@@ -29,10 +30,13 @@ import {
   type OtherIncomeRow,
 } from '@/hooks/useOtherIncomes'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { useSalon } from '@/hooks/useSalons'
 import type { PaymentMethod } from '@/hooks/useVisits'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
+import { VatBreakdownInput } from '@/components/ui/VatBreakdownInput'
 import { LinkOtherIncomeToBankDialog } from '@/routes/banking/LinkOtherIncomeToBankDialog'
 
 type Props = {
@@ -57,6 +61,9 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
   const { data: categories = [] } = useOtherIncomeCategories(salonId)
   const { data: paymentMethods = [] } = usePaymentMethods(salonId)
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  const { data: salonData } = useSalon(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
+  const country = salonData?.country_code ?? 'PL'
   const isBankLinked = income ? (bankLinked?.otherIncomeIds.has(income.id) ?? false) : false
 
   const [categoryId, setCategoryId] = useState<string>('')
@@ -67,6 +74,10 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
   const [incomeAt, setIncomeAt] = useState<string>('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [unlinking, setUnlinking] = useState(false)
+  // VAT-state — синхронизирован с amount (брутто).
+  const [netCents, setNetCents] = useState(0)
+  const [grossCents, setGrossCents] = useState(0)
+  const [ratePct, setRatePct] = useState<number>(() => defaultVatRate(country))
 
   useEffect(() => {
     if (open && income) {
@@ -76,14 +87,24 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
       setCashRegisterId(income.cash_register_id ?? '')
       setComment(income.comment ?? '')
       setIncomeAt(income.income_at)
+      // VAT prefill: используем сохранённые поля если есть, иначе recompute
+      // по дефолтной ставке.
+      const rate = income.vat_rate_pct ?? defaultVatRate(country)
+      const gross = income.amount_cents
+      const net = income.amount_net_cents ?? computeNet(gross, rate)
+      setRatePct(rate)
+      setGrossCents(gross)
+      setNetCents(net)
     }
-  }, [open, income])
+  }, [open, income, country])
 
   if (!income) return null
 
   function handleSave() {
     if (!income) return
-    const cents = Math.round(Number(amount.replace(',', '.')) * 100)
+    // При isVatPayer берём gross из VAT-state (juzer редактировал через
+    // breakdown), иначе из text input.
+    const cents = isVatPayer ? grossCents : Math.round(Number(amount.replace(',', '.')) * 100)
     if (!Number.isFinite(cents) || cents <= 0) {
       toast.error(t('income.other_form.errors.amount_positive'))
       return
@@ -97,6 +118,16 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
         cash_register_id: cashRegisterId || null,
         comment: comment.trim() || null,
         income_at: incomeAt,
+        // VAT-разбивка пишется только когда фирма плательщик. Иначе оставляем
+        // существующие значения нетронутыми (могут быть null если запись
+        // создана до включения vat_payer).
+        ...(isVatPayer
+          ? {
+              amount_net_cents: netCents,
+              vat_rate_pct: ratePct,
+              vat_skipped: income.vat_skipped ?? false,
+            }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -176,14 +207,35 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="oi-edit-amount">
-              {t('income.other_form.amount')} ({currency})
+              {isVatPayer
+                ? t('income.other_form.amount_gross', {
+                    currency,
+                    defaultValue: 'Сумма (брутто, {{currency}})',
+                  })
+                : `${t('income.other_form.amount')} (${currency})`}
             </Label>
-            <Input
-              id="oi-edit-amount"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            {isVatPayer ? (
+              <VatBreakdownInput
+                netCents={netCents}
+                ratePct={ratePct}
+                grossCents={grossCents}
+                onChange={(next) => {
+                  setNetCents(next.netCents)
+                  setRatePct(next.ratePct)
+                  setGrossCents(next.grossCents)
+                  setAmount((next.grossCents / 100).toFixed(2))
+                }}
+                countryCode={country}
+                currency={currency}
+              />
+            ) : (
+              <Input
+                id="oi-edit-amount"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            )}
             {/* Image #51: если доход частично получен — разбивка под полем. */}
             {income?.paid_amount_cents != null ? (
               <p className="num text-[11px] font-semibold text-amber-700">
