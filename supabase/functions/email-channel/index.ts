@@ -354,6 +354,10 @@ Deno.serve(async (req: Request) => {
     subject?: string
     text_body?: string
     html_body?: string
+    /** Когда send вызывается из messenger-send (route='email-branch'),
+     *  messenger-send уже сам делает insert в messenger_messages. Чтобы
+     *  не было дубля, передаём skip_log: true. */
+    skip_log?: boolean
   } | null
   if (!body?.action || !body.salon_id) return jsonResponse({ error: 'bad_request' }, 400)
 
@@ -498,7 +502,9 @@ Deno.serve(async (req: Request) => {
           body.text_body,
           body.html_body,
         )
-        await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
+        if (!body.skip_log) {
+          await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
+        }
         return jsonResponse({ ok: true, via: 'gmail_oauth' })
       } catch (e) {
         // Если OAuth не сработал, пробуем SMTP fallback
@@ -510,7 +516,9 @@ Deno.serve(async (req: Request) => {
     if (allCreds.smtp) {
       try {
         await sendEmail(allCreds.smtp, body.to, body.subject, body.text_body, body.html_body)
-        await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
+        if (!body.skip_log) {
+          await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
+        }
         return jsonResponse({ ok: true, via: 'smtp' })
       } catch (e) {
         return jsonResponse({ ok: false, error: (e as Error).message }, 500)

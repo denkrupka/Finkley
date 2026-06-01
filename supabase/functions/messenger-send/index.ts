@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   // Получаем conversation + integration
   const { data: convo, error: cErr } = await admin
     .from('messenger_conversations')
-    .select('id, salon_id, channel, external_user_id')
+    .select('id, salon_id, channel, external_user_id, display_name, last_message_preview')
     .eq('id', body.conversation_id)
     .eq('salon_id', body.salon_id)
     .maybeSingle()
@@ -241,6 +241,44 @@ Deno.serve(async (req) => {
         lastId = await sendOne({ type: 'text', text: { body: body.text } })
       }
       externalMessageId = lastId
+    } catch (e) {
+      deliveryError = e instanceof Error ? e.message : String(e)
+    }
+  } else if (convo.channel === 'email') {
+    // Email reply через email-channel send. skip_log=true чтобы email-channel
+    // не дублировал messenger_messages.insert (мы сами делаем ниже).
+    try {
+      // Subject: «Re: <last_message_preview>» если есть, иначе общий topic
+      // из conversation.display_name. Гарантируем что не пусто.
+      const subject = convo.last_message_preview
+        ? `Re: ${convo.last_message_preview}`.slice(0, 200)
+        : `Сообщение от ${convo.display_name || 'Finkley'}`
+      const supaUrl = Deno.env.get('SUPABASE_URL') ?? ''
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      const r = await fetch(`${supaUrl}/functions/v1/email-channel`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          action: 'send',
+          salon_id: body.salon_id,
+          to: convo.external_user_id,
+          subject,
+          text_body: body.text ?? '',
+          skip_log: true,
+        }),
+      })
+      const j = (await r.json()) as { ok?: boolean; via?: string; error?: string }
+      if (!r.ok || !j.ok) {
+        deliveryError = j.error ?? `email_send_failed (HTTP ${r.status})`
+      } else {
+        // У email нет внешнего message_id (Gmail API возвращает id, но мы
+        // его не достаём — для дедупа outgoing'a не нужно, мы их не poll'им
+        // через -from:me filter).
+        externalMessageId = `email_out_${Date.now()}`
+      }
     } catch (e) {
       deliveryError = e instanceof Error ? e.message : String(e)
     }
