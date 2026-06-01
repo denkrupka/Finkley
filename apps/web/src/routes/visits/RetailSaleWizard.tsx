@@ -277,6 +277,16 @@ export function RetailSaleWizard({
         0,
       )
 
+      // VAT-логика юзера #47:
+      // - !isVatPayer → нетто=брутто, ставка=0, vat_skipped=false
+      // - documentType='skip' & isVatPayer → нетто=брутто, vat_skipped=true
+      //   (деньги приняли, фискаль не выбит, P&L vatBreakdownFor исключит из VAT)
+      // - documentType='receipt'|'invoice' & isVatPayer → нетто=net(брутто,rate),
+      //   vat_skipped=false. Ставка по дефолту страны.
+      const docSkipped = documentType === 'skip'
+      const vatRate = isVatPayer && !docSkipped ? defaultVatRate(country) : 0
+      const vatSkippedFlag = isVatPayer && docSkipped
+
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i]!
         const lineGross = l.quantity * l.unitPriceCents
@@ -285,9 +295,9 @@ export function RetailSaleWizard({
             ? Math.round((extraDiscountCents * (lineGross - l.lineDiscountCents)) / baseTotalCents)
             : 0
         const finalAmount = Math.max(0, lineGross - l.lineDiscountCents - shareOfExtra)
+        const amountNet = isVatPayer && !docSkipped ? computeNet(finalAmount, vatRate) : finalAmount
 
         if (l.kind === 'other_income') {
-          // Прочий доход — пишем в other_incomes, а не в visits.
           await createOtherIncome.mutateAsync({
             salon_id: salonId,
             income_at: new Date().toISOString().slice(0, 10),
@@ -296,6 +306,9 @@ export function RetailSaleWizard({
             payment_method: paymentMethod,
             cash_register_id: cashRegisterId || null,
             comment: [l.name, lineNotes].filter(Boolean).join(' · ') || null,
+            amount_net_cents: amountNet,
+            vat_rate_pct: vatRate,
+            vat_skipped: vatSkippedFlag,
           })
           continue
         }
@@ -312,12 +325,14 @@ export function RetailSaleWizard({
           discount_cents: l.lineDiscountCents + shareOfExtra,
           payment_method: paymentMethod,
           cash_register_id: cashRegisterId || null,
-          // Для финотчёта (разбивка «Продажи» по категориям склада).
           inventory_item_id: l.inventoryItemId,
           comment: lineNotes || null,
           kind: 'retail',
           status: 'paid',
           group_key: lines.length > 1 ? groupKey : null,
+          amount_net_cents: amountNet,
+          vat_rate_pct: vatRate,
+          vat_skipped: vatSkippedFlag,
         })
 
         // Списание со склада: только для inventory-позиций.

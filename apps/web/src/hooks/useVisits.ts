@@ -119,6 +119,15 @@ export type CreateVisitInput = {
   cash_register_id?: string | null
   /** Для retail-визитов — товар со склада (категория попадает в финотчёт). */
   inventory_item_id?: string | null
+  /** VAT-нетто (миграция 20260602000001). NULL → fallback на amount_cents
+   *  в P&L (через vatBreakdownFor). UI плательщика VAT всегда заполняет. */
+  amount_net_cents?: number | null
+  /** Ставка НДС % (0/5/8/23 для PL). NULL = не задано. */
+  vat_rate_pct?: number | null
+  /** True если документ пропущен (documentType='skip' в RetailSaleWizard
+   *  или явная галочка в QuickEntry). vatBreakdownFor исключает такие
+   *  суммы из расчёта НДС к оплате — деньги приняли, фискаль не выбит. */
+  vat_skipped?: boolean | null
 }
 
 export function useCreateVisit(salonId: string | undefined) {

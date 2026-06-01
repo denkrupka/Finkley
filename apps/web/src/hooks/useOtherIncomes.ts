@@ -169,6 +169,14 @@ export type CreateOtherIncomeInput = {
   payment_method: PaymentMethod | null
   cash_register_id?: string | null
   comment: string | null
+  /** VAT-нетто (миграция 20260602000001). NULL → fallback на amount_cents
+   *  в P&L. */
+  amount_net_cents?: number | null
+  /** Ставка НДС % (0/5/8/23 для PL). */
+  vat_rate_pct?: number | null
+  /** True если документ пропущен — деньги приняли, фискаль не выбит.
+   *  P&L через vatBreakdownFor исключает из VAT-расчёта. */
+  vat_skipped?: boolean | null
 }
 
 export function useCreateOtherIncome(salonId: string | undefined) {

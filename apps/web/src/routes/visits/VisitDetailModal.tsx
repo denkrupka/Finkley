@@ -29,8 +29,11 @@ import { useBankLinkedIncomeIds } from '@/hooks/useBanking'
 import { useClients } from '@/hooks/useClients'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 import {
   useCreateVisit,
   useDeleteVisit,
@@ -256,6 +259,7 @@ export function VisitDetailModal({
           />
         ) : view === 'document' ? (
           <DocumentView
+            salonId={salonId}
             groupLines={groupLines}
             onDone={() => {
               toast.success(t('visits.charge.toast_paid'))
@@ -1258,26 +1262,50 @@ function ObjectionsScriptView({
 // =============================================================================
 
 function DocumentView({
+  salonId,
   groupLines,
   onDone,
   t,
 }: {
+  salonId: string
   groupLines: VisitRow[]
   onDone: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const [busy, setBusy] = useState(false)
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salonData } = useSalon(salonId)
+  const country = salonData?.country_code ?? 'PL'
 
   async function pick(kind: 'receipt' | 'invoice' | 'skip') {
     setBusy(true)
     try {
-      if (kind !== 'skip') {
-        const docTag = kind === 'receipt' ? '[Чек]' : '[Фактура]'
-        for (const v of groupLines) {
+      // VAT-логика юзера #47 при выборе документа:
+      // - !isVatPayer → не трогаем VAT-поля (P&L fallback на amount_cents)
+      // - skip & isVatPayer → vat_skipped=true, нетто=брутто, ставка=0
+      //   (деньги приняли, фискаль не выбит — vatBreakdownFor исключит из VAT)
+      // - receipt/invoice & isVatPayer → нетто=net(брутто,defaultRate),
+      //   vat_skipped=false. Ставка по дефолту страны.
+      const docSkipped = kind === 'skip'
+      const vatRate = isVatPayer && !docSkipped ? defaultVatRate(country) : 0
+      const vatSkippedFlag = isVatPayer && docSkipped
+      const docTag = kind === 'receipt' ? '[Чек]' : kind === 'invoice' ? '[Фактура]' : null
+
+      for (const v of groupLines) {
+        const patch: Record<string, unknown> = {}
+        if (docTag) {
           const existing = v.comment ?? ''
-          if (existing.includes(docTag)) continue
-          const next = existing ? `${existing} ${docTag}` : docTag
-          await supabase.from('visits').update({ comment: next }).eq('id', v.id)
+          if (!existing.includes(docTag)) {
+            patch.comment = existing ? `${existing} ${docTag}` : docTag
+          }
+        }
+        if (isVatPayer) {
+          patch.amount_net_cents = docSkipped ? v.amount_cents : computeNet(v.amount_cents, vatRate)
+          patch.vat_rate_pct = vatRate
+          patch.vat_skipped = vatSkippedFlag
+        }
+        if (Object.keys(patch).length > 0) {
+          await supabase.from('visits').update(patch).eq('id', v.id)
         }
       }
       onDone()
