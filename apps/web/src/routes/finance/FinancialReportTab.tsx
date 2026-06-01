@@ -40,7 +40,7 @@ import {
 } from '@/hooks/useOtherIncomes'
 import { useIsVatPayer } from '@/hooks/useIsVatPayer'
 import { useSalon } from '@/hooks/useSalons'
-import { computeNet, computeVatPayable } from '@/lib/utils/vat'
+import { computeNet } from '@/lib/utils/vat'
 import { useScheduledPayments } from '@/hooks/useScheduledPayments'
 import { effectiveReceivedFromVisit, useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -564,33 +564,6 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       ...r,
       parentGroupKey: 'financing',
     })),
-
-    // НДС к оплате — только когда фирма плательщик VAT. Считается как
-    // ΣНДС_доходов − ΣНДС_расходов. positive → расход (надо платить в
-    // бюджет), negative → переплата для следующего месяца.
-    ...(isVatPayer
-      ? [
-          (() => {
-            const vatRow = monthly.vatIncome.map((vIn, i) => {
-              const { vatPayableCents } = computeVatPayable({
-                vatOnIncomeCents: vIn,
-                vatOnExpenseCents: monthly.vatExpense[i] ?? 0,
-              })
-              // В P&L отрицательная позиция = расход (платим в бюджет),
-              // положительная = доход (переплата к зачёту).
-              return -vatPayableCents
-            })
-            return {
-              label: t('finance.report.vat_payable', { defaultValue: 'НДС к оплате' }) as string,
-              values: vatRow,
-              factValues: vatRow,
-              bold: true,
-              color: 'destructive' as RowColor,
-              parentGroupKey: 'expenses',
-            }
-          })(),
-        ]
-      : []),
 
     // T6 — строка «Корректировки» (баланс системной кассы Корректировки
     // на конец каждого месяца). Не складывается с Сальдо за период —
