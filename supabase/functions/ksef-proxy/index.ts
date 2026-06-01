@@ -236,12 +236,12 @@ async function syncKsefToFinkley(
 ): Promise<SyncStats> {
   const stats: SyncStats = { expenses_synced: 0, expenses_skipped: 0 }
 
-  // Окно: с last_sync_at или 60 дней назад. КСеФ ограничивает range Query —
-  // не больше 60 дней за один Query/Sync, поэтому это безопасно.
-  const since = (() => {
-    const d = lastSyncAt ? new Date(lastSyncAt) : new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
-    return d.toISOString().slice(0, 10)
-  })()
+  // Окно: ВСЕГДА 60 дней назад (КСеФ ограничивает range), независимо от
+  // last_sync_at. Дедуп идёт по ksef_id — мы не делаем дубликатов.
+  // Юзер 01.06 жаловался: «не импортирует за май» — last_sync_at был на
+  // позднюю дату, окно стало слишком узким → 0 новых.
+  void lastSyncAt
+  const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const today = new Date().toISOString().slice(0, 10)
 
   // Open session
@@ -281,12 +281,10 @@ async function syncKsefToFinkley(
     if (meta?.ksef_id) importedSet.add(meta.ksef_id)
   }
 
-  let fallbackCategoryId: string | null = null
-  const ensureFallback = async (): Promise<string | null> => {
-    if (fallbackCategoryId) return fallbackCategoryId
-    fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
-    return fallbackCategoryId
-  }
+  // ensureFallback убран по запросу 01.06 — категорию «Импорт КСеФ»
+  // больше не создаём. Категория = null если нет точного маппинга, юзер
+  // укажет вручную в UI.
+  void getOrCreateImportCategory
   const categoryCache = new Map<string, string | null>()
 
   try {
@@ -302,9 +300,15 @@ async function syncKsefToFinkley(
         invoiceNumber: inv.invoiceNumber,
         sellerNip: inv.sellerNip,
         sellerName: inv.sellerName,
+        sellerAddress: null as string | null,
         buyerNip: inv.buyerNip,
         description: null as string | null,
+        items: [] as string[],
         sellerIban: null as string | null,
+        paymentMethod: null as 'cash' | 'card' | 'transfer' | null,
+        paymentDeadline: null as string | null,
+        paidAt: null as string | null,
+        isPaid: false,
       }
       let xmlPath: string | null = null
       const xmlRes = await getInvoiceXml(accessToken, inv.ksefReferenceNumber)
@@ -317,9 +321,15 @@ async function syncKsefToFinkley(
             invoiceNumber: parsed.invoiceNumber ?? detail.invoiceNumber,
             sellerNip: parsed.sellerNip ?? detail.sellerNip,
             sellerName: parsed.sellerName ?? detail.sellerName,
+            sellerAddress: parsed.sellerAddress,
             buyerNip: parsed.buyerNip ?? detail.buyerNip,
             description: parsed.description,
+            items: parsed.items,
             sellerIban: parsed.sellerIban,
+            paymentMethod: parsed.paymentMethod,
+            paymentDeadline: parsed.paymentDeadline,
+            paidAt: parsed.paidAt,
+            isPaid: parsed.isPaid,
           }
         }
         xmlPath = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
@@ -332,9 +342,12 @@ async function syncKsefToFinkley(
 
       const expenseAt = (detail.issueDate || inv.issueDate || since).slice(0, 10)
       const vendor = detail.sellerName ?? '—'
-      const description = detail.description ?? detail.invoiceNumber
+      // Описание = items joined (если позиций несколько) или единичное P_7.
+      const description =
+        detail.items.length > 0 ? detail.items.join(', ') : (detail.description ?? '')
 
-      // Маппинг категории
+      // (3) Категорию НЕ создаём «Импорт КСеФ» — юзер сам выберет в UI.
+      // Маппим только если есть точное совпадение с системной категорией.
       const mapped = mapKsefToFinkleyCategory({
         description: detail.description,
         sellerName: detail.sellerName,
@@ -345,16 +358,85 @@ async function syncKsefToFinkley(
         categoryId = await findSystemCategoryId(admin, salonId, mapped, categoryCache)
         if (categoryId) categoryMapped = mapped
       }
-      if (!categoryId) categoryId = await ensureFallback()
+      // НЕ вызываем ensureFallback — оставляем null, юзер укажет вручную.
 
+      // (7) Counterparty: lookup по NIP, иначе создаём.
+      let counterpartyId: string | null = null
+      if (detail.sellerNip) {
+        const cleanNip = detail.sellerNip.replace(/[\s-]/g, '')
+        const { data: existingCp } = await admin
+          .from('counterparties')
+          .select('id')
+          .eq('salon_id', salonId)
+          .eq('nip', cleanNip)
+          .is('archived_at', null)
+          .maybeSingle()
+        if (existingCp) {
+          counterpartyId = (existingCp as { id: string }).id
+        } else if (vendor !== '—') {
+          const { data: createdCp } = await admin
+            .from('counterparties')
+            .insert({
+              salon_id: salonId,
+              name: vendor,
+              nip: cleanNip,
+              address: detail.sellerAddress,
+            })
+            .select('id')
+            .single()
+          counterpartyId = (createdCp as { id: string } | null)?.id ?? null
+        }
+      }
+
+      // (2) Статус оплаты:
+      //   isPaid=true  → expense.status=paid
+      //   isPaid=false → создать scheduled_payment (pending) с due_date,
+      //                  expense НЕ создаём.
+      if (!detail.isPaid) {
+        const dueDate = detail.paymentDeadline ?? expenseAt
+        const { error: spErr } = await admin.from('scheduled_payments').insert({
+          salon_id: salonId,
+          category_id: categoryId,
+          due_date: dueDate,
+          amount_cents: Math.round(detail.totalGross * 100),
+          vendor_name: vendor,
+          invoice_number: detail.invoiceNumber,
+          comment: description.slice(0, 500) || null,
+          source: 'ksef',
+          external_id: inv.ksefReferenceNumber,
+        })
+        if (spErr) {
+          if (spErr.code === '23505') {
+            stats.expenses_skipped++
+            continue
+          }
+          console.warn(
+            `ksef scheduled_payment insert failed for ${inv.ksefReferenceNumber}: ${spErr.message}`,
+          )
+          stats.expenses_skipped++
+          continue
+        }
+        stats.expenses_synced++
+        continue
+      }
+
+      // Оплаченная фактура — INSERT в expenses.
       const { error } = await admin.from('expenses').insert({
         salon_id: salonId,
         category_id: categoryId,
         expense_at: expenseAt,
         amount_cents: Math.round(detail.totalGross * 100),
-        payment_method: 'transfer',
-        comment: description,
+        // (4) payment_method из XML; если не определён — оставляем transfer
+        // как «банковский перевод» (default для оплаченных фактур).
+        payment_method: detail.paymentMethod ?? 'transfer',
+        paid_at: detail.paidAt ? new Date(detail.paidAt).toISOString() : null,
+        // (6) Description (а не comment) — items.join(', ')
+        description: description.slice(0, 500) || null,
+        comment: null,
         contractor_name: vendor,
+        counterparty_id: counterpartyId,
+        // (5) document_number = invoice_number из KSeF
+        document_number: detail.invoiceNumber ?? null,
         invoice_number: detail.invoiceNumber,
         source: 'ksef',
         external_id: inv.ksefReferenceNumber,

@@ -830,11 +830,12 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Image #87: одиночные визиты → QuickEntry в edit-mode;
-                            // multi-line группы (group_key != null) → старая
-                            // VisitDetailModal с list+charge (там удобнее).
-                            if (v.group_key) setEditingVisit(v)
-                            else setQuickEditVisit(v)
+                            // По запросу owner'а 01.06 — клик ВСЕГДА открывает
+                            // «Редактировать визит» (QuickEntryModal в edit-mode).
+                            // Старая модалка с табами «Wizyta/Informacje» удалена
+                            // из flow; ChargeView остаётся доступной только через
+                            // кнопку «Рассчитать» внутри QuickEntryModal.
+                            setQuickEditVisit(v)
                           }}
                           className={cn(
                             'group absolute inset-x-1 z-[5] cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md active:cursor-grabbing',

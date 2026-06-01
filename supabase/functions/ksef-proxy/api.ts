@@ -545,10 +545,23 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   invoiceNumber: string | null
   sellerNip: string | null
   sellerName: string | null
+  /** Адрес продавца — для создания counterparty. */
+  sellerAddress: string | null
   buyerNip: string | null
+  /** Описание сводно — для legacy callers (P_7). */
   description: string | null
+  /** Список позиций (P_7 каждой строки) — для UI «через запятую». */
+  items: string[]
   /** IBAN счёта продавца (NrRBPL/NrRB в FA(2)/FA(1)). Для bulk-перевода. */
   sellerIban: string | null
+  /** Форма оплаты: 1=gotówka, 2=karta, 3=przelew, 4=czek, 5=weksel, 6=kompensata. */
+  paymentMethod: 'cash' | 'card' | 'transfer' | null
+  /** Срок оплаты (TerminPlatnosci). YYYY-MM-DD. */
+  paymentDeadline: string | null
+  /** Дата оплаты (DataZaplaty) — если уже оплачена. YYYY-MM-DD. */
+  paidAt: string | null
+  /** Полностью оплачено? Проверяется по DataZaplaty / Zaplacono. */
+  isPaid: boolean
 } | null {
   const xml = new TextDecoder('utf-8').decode(xmlBytes)
   if (!xml.includes('<Faktura') && !xml.includes(':Faktura')) return null
@@ -557,6 +570,14 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     const m = xml.match(re)
     return m ? m[1].trim() : null
   }
+  const grabAll = (re: RegExp): string[] => {
+    const out: string[] = []
+    let m: RegExpExecArray | null
+    const r = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
+    while ((m = r.exec(xml)) !== null) out.push(m[1].trim())
+    return out
+  }
+
   const grossStr = grab(/<P_15[^>]*>([^<]+)<\/P_15>/)
   const issueDate = grab(/<P_1[^>]*>([^<]+)<\/P_1>/)
   const invoiceNumber = grab(/<P_2[^>]*>([^<]+)<\/P_2>/)
@@ -564,17 +585,48 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   const buyer = xml.match(/<Podmiot2>[\s\S]*?<\/Podmiot2>/)?.[0] ?? ''
   const sellerNip = seller.match(/<NIP[^>]*>([^<]+)<\/NIP>/)?.[1] ?? null
   const sellerName = seller.match(/<Nazwa[^>]*>([^<]+)<\/Nazwa>/)?.[1] ?? null
+  // Адрес продавца — собираем компоненты (улица, дом, город, индекс).
+  const sellerAddressParts: string[] = []
+  for (const tag of ['Ulica', 'NrDomu', 'NrLokalu', 'KodPocztowy', 'Miejscowosc']) {
+    const m = seller.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))
+    if (m) sellerAddressParts.push(m[1].trim())
+  }
+  const sellerAddress = sellerAddressParts.length > 0 ? sellerAddressParts.join(', ') : null
   const buyerNip = buyer.match(/<NIP[^>]*>([^<]+)<\/NIP>/)?.[1] ?? null
   const description = grab(/<P_7[^>]*>([^<]+)<\/P_7>/)
 
-  // KSeF FA(2): счета продавца в <Platnosc><RachunekBankowy><NrRB>...</NrRB>
-  // или для PL — <NrRBPL>. Берём первый встретившийся. Если фактура содержит
-  // несколько счетов (например, EUR + PLN) — первый обычно главный.
+  // Позиции (line items) — каждая <FaWiersz> содержит <P_7>. Собираем все.
+  const lineItems: string[] = []
+  const wierszRe = /<FaWiersz>[\s\S]*?<\/FaWiersz>/g
+  let wm: RegExpExecArray | null
+  while ((wm = wierszRe.exec(xml)) !== null) {
+    const name = wm[0].match(/<P_7[^>]*>([^<]+)<\/P_7>/)?.[1]?.trim()
+    if (name) lineItems.push(name)
+  }
+  const items = lineItems.length > 0 ? lineItems : description ? [description] : []
+
+  // KSeF FA(2): счета продавца. NrRBPL для PL, NrRB как fallback.
   const ibanMatch =
     xml.match(/<NrRBPL[^>]*>([^<]+)<\/NrRBPL>/)?.[1] ??
     xml.match(/<NrRB[^>]*>([^<]+)<\/NrRB>/)?.[1] ??
     null
   const sellerIban = ibanMatch ? ibanMatch.trim().replace(/\s+/g, '') : null
+
+  // FormaPlatnosci: KSeF код 1..6. Маппим в наш payment_method.
+  const formaCode = grab(/<FormaPlatnosci[^>]*>([^<]+)<\/FormaPlatnosci>/)
+  let paymentMethod: 'cash' | 'card' | 'transfer' | null = null
+  if (formaCode === '1') paymentMethod = 'cash'
+  else if (formaCode === '2') paymentMethod = 'card'
+  else if (formaCode === '3' || formaCode === '6') paymentMethod = 'transfer'
+
+  const paymentDeadline = grab(/<TerminPlatnosci[^>]*>([^<]+)<\/TerminPlatnosci>/)
+  // KSeF: <Zaplacono>1</Zaplacono> или наличие <DataZaplaty>YYYY-MM-DD</DataZaplaty>
+  // ⇒ фактура оплачена.
+  const paidAt = grab(/<DataZaplaty[^>]*>([^<]+)<\/DataZaplaty>/)
+  const zaplacono = grab(/<Zaplacono[^>]*>([^<]+)<\/Zaplacono>/)
+  const isPaid = !!paidAt || zaplacono === '1' || zaplacono?.toLowerCase() === 'true'
+
+  void grabAll // используется только если в будущем нужны множественные tags
 
   const gross = grossStr ? parseFloat(grossStr) : null
 
@@ -584,8 +636,14 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     invoiceNumber,
     sellerNip,
     sellerName,
+    sellerAddress,
     buyerNip,
     description,
+    items,
     sellerIban,
+    paymentMethod,
+    paymentDeadline: paymentDeadline ? paymentDeadline.slice(0, 10) : null,
+    paidAt: paidAt ? paidAt.slice(0, 10) : null,
+    isPaid,
   }
 }
