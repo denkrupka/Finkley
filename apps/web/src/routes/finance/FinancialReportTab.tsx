@@ -141,7 +141,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     const toNet = (
       grossCents: number,
       ratePct: number | null | undefined,
-      vatSkipped?: boolean,
+      vatSkipped?: boolean | null,
     ): { net: number; vat: number } => {
       if (!isVatPayer || vatSkipped || ratePct == null || ratePct === 0) {
         return { net: grossCents, vat: 0 }
@@ -156,12 +156,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       const m = getIdx(new Date(v.visit_at))
       if (m < 0) continue
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
-      const vAny = v as typeof v & { vat_rate_pct?: number | null; vat_skipped?: boolean }
-      const { net: planNet, vat: planVat } = toNet(planAmt, vAny.vat_rate_pct, vAny.vat_skipped)
+      const { net: planNet, vat: planVat } = toNet(planAmt, v.vat_rate_pct, v.vat_skipped)
       plan[m]!.visitsRevenue += planNet
       if (v.status === 'paid') {
         const factGross = effectiveReceivedFromVisit(v)
-        const { net: factNet, vat: factVat } = toNet(factGross, vAny.vat_rate_pct, vAny.vat_skipped)
+        const { net: factNet, vat: factVat } = toNet(factGross, v.vat_rate_pct, v.vat_skipped)
         fact[m]!.visitsRevenue += factNet
         vatIncome[m]! += factVat
         void planVat
@@ -171,12 +170,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       const m = getIdx(new Date(v.visit_at))
       if (m < 0) continue
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
-      const vAny = v as typeof v & { vat_rate_pct?: number | null; vat_skipped?: boolean }
-      const { net: planNet } = toNet(planAmt, vAny.vat_rate_pct, vAny.vat_skipped)
+      const { net: planNet } = toNet(planAmt, v.vat_rate_pct, v.vat_skipped)
       plan[m]!.retailRevenue += planNet
       if (v.status === 'paid') {
         const factGross = effectiveReceivedFromVisit(v)
-        const { net: factNet, vat: factVat } = toNet(factGross, vAny.vat_rate_pct, vAny.vat_skipped)
+        const { net: factNet, vat: factVat } = toNet(factGross, v.vat_rate_pct, v.vat_skipped)
         fact[m]!.retailRevenue += factNet
         vatIncome[m]! += factVat
       }
@@ -184,11 +182,10 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     for (const oi of otherIncomes) {
       const m = getIdx(new Date(oi.income_at))
       if (m < 0) continue
-      const oiAny = oi as typeof oi & { vat_rate_pct?: number | null; vat_skipped?: boolean }
-      const { net: planNet } = toNet(oi.amount_cents, oiAny.vat_rate_pct, oiAny.vat_skipped)
+      const { net: planNet } = toNet(oi.amount_cents, oi.vat_rate_pct, oi.vat_skipped)
       plan[m]!.otherIncome += planNet
       const factGross = effectiveReceivedFromOtherIncome(oi)
-      const { net: factNet, vat: factVat } = toNet(factGross, oiAny.vat_rate_pct, oiAny.vat_skipped)
+      const { net: factNet, vat: factVat } = toNet(factGross, oi.vat_rate_pct, oi.vat_skipped)
       fact[m]!.otherIncome += factNet
       vatIncome[m]! += factVat
     }
@@ -204,8 +201,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       if (sp.status === 'paid') continue
       const m = getIdx(new Date(sp.due_date))
       if (m < 0) continue
-      const spAny = sp as typeof sp & { vat_rate_pct?: number | null }
-      const { net } = toNet(sp.amount_cents, spAny.vat_rate_pct)
+      const { net } = toNet(sp.amount_cents, sp.vat_rate_pct)
       plan[m]!.expensesTotal += net
     }
     const monthlyBudgetCents = sumFixedCents(settings) + sumTaxesCents(settings)
