@@ -295,31 +295,55 @@ async function sendViaGmailApi(
   textBody: string,
   htmlBody?: string,
 ): Promise<void> {
-  // Строим MIME-сообщение. Если есть HTML — multipart/alternative, иначе plain.
+  // RFC 2047 encoded-word — нужно для header'ов с non-ASCII (кириллица,
+  // польские буквы). Без этого onet.pl/mail.ru фильтруют как malformed.
+  // =?UTF-8?B?<base64>?=
+  const encodeHeader = (s: string): string => {
+    // ASCII → возвращаем как есть для читаемости
+    // eslint-disable-next-line no-control-regex
+    if (/^[\x00-\x7F]*$/.test(s)) return s
+    const utf8 = unescape(encodeURIComponent(s))
+    const b64 = btoa(utf8)
+    return `=?UTF-8?B?${b64}?=`
+  }
+  // Build MIME body. Content-Transfer-Encoding: base64 для UTF-8 — гарантирует
+  // что long UTF-8 chars не сломают строки и не попадут под flagging.
+  const encodeBody = (s: string): string => {
+    const utf8 = unescape(encodeURIComponent(s))
+    return (
+      btoa(utf8)
+        .match(/.{1,76}/g)
+        ?.join('\r\n') ?? ''
+    )
+  }
+  const subjectEnc = encodeHeader(subject)
   const boundary = `finkley-${crypto.randomUUID()}`
   let mime: string
   if (htmlBody) {
     mime =
       `From: ${fromEmail}\r\n` +
       `To: ${to}\r\n` +
-      `Subject: ${subject}\r\n` +
+      `Subject: ${subjectEnc}\r\n` +
       `MIME-Version: 1.0\r\n` +
       `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
       `--${boundary}\r\n` +
-      `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
-      `${textBody}\r\n\r\n` +
+      `Content-Type: text/plain; charset="UTF-8"\r\n` +
+      `Content-Transfer-Encoding: base64\r\n\r\n` +
+      `${encodeBody(textBody)}\r\n\r\n` +
       `--${boundary}\r\n` +
-      `Content-Type: text/html; charset="UTF-8"\r\n\r\n` +
-      `${htmlBody}\r\n\r\n` +
+      `Content-Type: text/html; charset="UTF-8"\r\n` +
+      `Content-Transfer-Encoding: base64\r\n\r\n` +
+      `${encodeBody(htmlBody)}\r\n\r\n` +
       `--${boundary}--`
   } else {
     mime =
       `From: ${fromEmail}\r\n` +
       `To: ${to}\r\n` +
-      `Subject: ${subject}\r\n` +
+      `Subject: ${subjectEnc}\r\n` +
       `MIME-Version: 1.0\r\n` +
-      `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
-      `${textBody}`
+      `Content-Type: text/plain; charset="UTF-8"\r\n` +
+      `Content-Transfer-Encoding: base64\r\n\r\n` +
+      `${encodeBody(textBody)}`
   }
   // base64url encode без padding
   const raw = btoa(unescape(encodeURIComponent(mime)))
