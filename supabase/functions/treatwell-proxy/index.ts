@@ -69,9 +69,14 @@ function deepFindNumberField(obj: unknown, name: string): number | undefined {
 }
 
 async function login(loginField: string, password: string): Promise<AuthOk> {
-  // Treatwell принимает обе формы — `{email, password}` и `{username, password}`
-  // (зависит от endpoint версии). Пробуем обе.
+  // Treatwell API teraz wymaga `{user, password, isPersistentLogin}` (monolit
+  // wahanda backend). Старые `{email/username}` отвергаются с
+  // 'Cannot build AuthenticationInput, some of required attributes are not set
+  // [user, isPersistentLogin]'. Пробуем новый формат первым, fallback на
+  // старые для legacy endpoints.
   const bodies = [
+    JSON.stringify({ user: loginField, password, isPersistentLogin: true }),
+    JSON.stringify({ user: loginField, password, isPersistentLogin: false }),
     JSON.stringify({ email: loginField, password }),
     JSON.stringify({ username: loginField, password }),
   ]

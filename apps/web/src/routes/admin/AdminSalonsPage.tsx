@@ -66,14 +66,19 @@ export function AdminSalonsPage() {
           p_salon_id: salon.id,
         })
         if (rpcErr) throw rpcErr
-        toast.success(
-          t('admin.salons.toast.helpdesk_granted', {
-            defaultValue: 'Доступ HelpDesk выдан. Переходим в кабинет.',
-          }),
+        // Помечаем session что мы в HelpDesk-режиме — баннер сверху
+        // покажет «режим HelpDesk» + кнопку «Назад в админку».
+        sessionStorage.setItem(
+          'finkley:helpdesk-mode',
+          JSON.stringify({ salon_id: salon.id, salon_name: salon.name ?? '' }),
         )
         navigate(`/salon/${salon.id}`)
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : String(e))
+        const msg =
+          e && typeof e === 'object' && 'message' in e
+            ? String((e as { message: string }).message)
+            : String(e)
+        toast.error(msg)
       }
       return
     }
@@ -294,7 +299,7 @@ function SalonRow({
                 icon={LifeBuoy}
                 onSelect={() => onAction('helpdesk', salon)}
                 label={t('admin.salons.action_helpdesk', {
-                  defaultValue: 'HelpDesk (войти как помощник)',
+                  defaultValue: 'HelpDesk',
                 })}
               />
               <DropdownMenu.Separator className="bg-border mx-1 my-1 h-px" />

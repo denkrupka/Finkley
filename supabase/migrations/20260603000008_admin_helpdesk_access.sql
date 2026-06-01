@@ -28,12 +28,14 @@ begin
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
 
-  -- Проверка app_role super_admin (profiles.app_role)
-  select app_role into v_caller_role
-    from public.profiles where user_id = v_caller;
-  if v_caller_role is null or v_caller_role <> 'super_admin' then
+  -- Проверка super_admin через app_admins.is_super
+  if not exists (
+    select 1 from public.app_admins
+    where user_id = v_caller and is_super = true
+  ) then
     raise exception 'forbidden: super_admin only' using errcode = '42501';
   end if;
+  v_caller_role := 'super_admin'; -- legacy var, unused below
 
   if not exists (select 1 from public.salons where id = p_salon_id) then
     raise exception 'salon_not_found' using errcode = '42704';
