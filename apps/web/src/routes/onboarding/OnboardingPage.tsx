@@ -710,6 +710,41 @@ export function OnboardingPage() {
     }
 
     rememberLastSalon(newSalonId)
+
+    // Early-import: дёргаем sync для подключённых ботных провайдеров,
+    // не дожидаясь окончания. Когда юзер дойдёт до AI-summary (~30s
+    // позднее), данные в БД уже будут — AI учтёт реальные visits/clients,
+    // а не нули. Live-режим уже это делал внутри *ConnectDialog'ов, но
+    // non-live offline flow (collect credentials в state.pending_credentials)
+    // нет — здесь добиваем.
+    const pending = state.pending_credentials ?? {}
+    const earlySyncCalls: Array<Promise<unknown>> = []
+    if (pending.booksy && Object.keys(pending.booksy).length > 0) {
+      earlySyncCalls.push(
+        supabase.functions.invoke('booksy-proxy', {
+          body: { action: 'sync', salon_id: newSalonId },
+        }),
+      )
+    }
+    if (pending.treatwell && Object.keys(pending.treatwell).length > 0) {
+      earlySyncCalls.push(
+        supabase.functions.invoke('treatwell-proxy', {
+          body: { action: 'sync', salon_id: newSalonId, days: 30 },
+        }),
+      )
+    }
+    if (pending.wfirma && Object.keys(pending.wfirma).length > 0) {
+      earlySyncCalls.push(
+        supabase.functions.invoke('wfirma-proxy', {
+          body: { action: 'sync', salon_id: newSalonId },
+        }),
+      )
+    }
+    // fire-and-forget — не блокируем submit
+    if (earlySyncCalls.length > 0) {
+      Promise.allSettled(earlySyncCalls).catch(() => {})
+    }
+
     // Кэш `useMySalons` не знает о только что созданном салоне.
     // invalidateQueries сам по себе не блокирующий — SalonLayout мог бы
     // отрендериться раньше и редиректнуть «нет салона» → /. Поэтому

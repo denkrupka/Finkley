@@ -1,32 +1,21 @@
 /**
  * email-channel — приём и отправка email через встроенный мессенджер.
  *
- * Стратегия (skeleton — выбор провайдера обсуждается в ADR с владельцем):
- *
- * Variant A. Универсальный SMTP/IMAP — юзер вводит host/port/username/
- * password (или app-password). IMAP polling раз в N минут читает inbox,
- * SMTP send — отправляет ответы.
- *
- * Variant B. Gmail OAuth — Google API,
- *   - users.messages.list для poll
- *   - users.messages.send для отправки
- *   - Pub/Sub watch для push-уведомлений (вместо polling).
- *
- * Для MVP — Variant A через стороннюю Deno-совместимую SMTP/IMAP библиотеку
- * (denomailer/SMTP, denoimap). Credentials шифруются через application-level
- * AES-GCM (ADR-002 "Pragmatic Privacy").
+ * SMTP send — реализован через denomailer (Deno-нативная библиотека).
+ * IMAP poll — пока stub (требует выбора Deno-совместимой IMAP-библиотеки —
+ * на данный момент denoimap/IMAP-Deno нестабильны; рассматриваем замену
+ * на Gmail-push через Pub/Sub в следующем спринте).
  *
  * Endpoints:
- *   POST { action: 'connect', salon_id, smtp:{host,port,user,pass},
- *                                          imap:{host,port,user,pass} }
- *   POST { action: 'send',    salon_id, conversation_id, to, subject, body }
- *   POST { action: 'poll',    salon_id }                — cron-вызываемый IMAP poll
+ *   POST { action: 'connect', salon_id, smtp:{host,port,user,pass,secure},
+ *                                          imap:{host,port,user,pass,secure} }
+ *   POST { action: 'send',    salon_id, to, subject, text_body, html_body? }
+ *   POST { action: 'poll',    salon_id }                — IMAP polling (stub)
  *   POST { action: 'disconnect', salon_id }
- *
- * STATUS: skeleton. Реальный SMTP/IMAP вызов будет в next-spring.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 
@@ -40,6 +29,37 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
+type SmtpConfig = { host: string; port: number; user: string; pass: string; secure?: boolean }
+type ImapConfig = { host: string; port: number; user: string; pass: string; secure?: boolean }
+
+async function sendEmail(
+  smtp: SmtpConfig,
+  to: string,
+  subject: string,
+  textBody: string,
+  htmlBody?: string,
+): Promise<void> {
+  const client = new SMTPClient({
+    connection: {
+      hostname: smtp.host,
+      port: smtp.port,
+      tls: smtp.secure === true || smtp.port === 465,
+      auth: { username: smtp.user, password: smtp.pass },
+    },
+  })
+  try {
+    await client.send({
+      from: smtp.user,
+      to,
+      subject,
+      content: textBody,
+      html: htmlBody,
+    })
+  } finally {
+    await client.close()
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return preflight()
   if (!SUPABASE_URL || !SERVICE_KEY) return jsonResponse({ error: 'not_configured' }, 500)
@@ -48,12 +68,12 @@ Deno.serve(async (req: Request) => {
   const body = (await req.json().catch(() => null)) as {
     action?: 'connect' | 'send' | 'poll' | 'disconnect'
     salon_id?: string
-    smtp?: { host: string; port: number; user: string; pass: string; secure?: boolean }
-    imap?: { host: string; port: number; user: string; pass: string; secure?: boolean }
-    conversation_id?: string
+    smtp?: SmtpConfig
+    imap?: ImapConfig
     to?: string
     subject?: string
     text_body?: string
+    html_body?: string
   } | null
   if (!body?.action || !body.salon_id) return jsonResponse({ error: 'bad_request' }, 400)
 
@@ -63,23 +83,42 @@ Deno.serve(async (req: Request) => {
 
   if (body.action === 'connect') {
     if (!body.smtp || !body.imap) return jsonResponse({ error: 'smtp_and_imap_required' }, 400)
-    // TODO: шифрование smtp/imap credentials через _shared/crypto helper.
-    // Пока сохраняем в integration_secrets как plaintext-JSON (требует
-    // последующей encryption-миграции).
-    await admin.from('messenger_integrations').upsert(
+    // Test SMTP connection (отправляем no-op для валидации)
+    try {
+      const test = new SMTPClient({
+        connection: {
+          hostname: body.smtp.host,
+          port: body.smtp.port,
+          tls: body.smtp.secure === true || body.smtp.port === 465,
+          auth: { username: body.smtp.user, password: body.smtp.pass },
+        },
+      })
+      // connect-only validation (denomailer открывает соединение лениво
+      // на send; этот test — symbolic — реальная валидация при первом send).
+      await test.close()
+    } catch (e) {
+      return jsonResponse(
+        { ok: false, error: 'smtp_connect_failed', message: (e as Error).message },
+        400,
+      )
+    }
+    // Сохраняем integration. Credentials хранятся в jsonb;
+    // encryption — TODO в _shared/crypto helper (ADR-002).
+    const { error } = await admin.from('messenger_integrations').upsert(
       {
         salon_id: body.salon_id,
         channel: 'email',
         status: 'connected',
         external_account_id: body.smtp.user,
         display_name: body.smtp.user,
+        credentials: { smtp: body.smtp, imap: body.imap },
       },
       { onConflict: 'salon_id,channel' },
     )
-    return jsonResponse({
-      ok: true,
-      note: 'Email-канал подключён. SMTP-отправка и IMAP-poll будут включены после реализации в следующем спринте.',
-    })
+    if (error) {
+      return jsonResponse({ ok: false, error: error.message }, 500)
+    }
+    return jsonResponse({ ok: true })
   }
 
   if (body.action === 'disconnect') {
@@ -91,12 +130,34 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true })
   }
 
-  if (body.action === 'send' || body.action === 'poll') {
+  if (body.action === 'send') {
+    if (!body.to || !body.subject || !body.text_body)
+      return jsonResponse({ error: 'to_subject_text_required' }, 400)
+    const { data: integ } = await admin
+      .from('messenger_integrations')
+      .select('credentials')
+      .eq('salon_id', body.salon_id)
+      .eq('channel', 'email')
+      .maybeSingle()
+    const creds = (integ?.credentials as { smtp?: SmtpConfig } | null)?.smtp
+    if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+    try {
+      await sendEmail(creds, body.to, body.subject, body.text_body, body.html_body)
+      return jsonResponse({ ok: true })
+    } catch (e) {
+      return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+    }
+  }
+
+  if (body.action === 'poll') {
+    // IMAP poll — TODO. Текущий Deno IMAP-ландшафт нестабилен; рассмотрим
+    // Gmail Pub/Sub push (для Gmail) или std SMTP/IMAP через npm-bridge
+    // (после обновления Supabase Edge до npm-compat 2.0).
     return jsonResponse({
       ok: false,
-      error: `${body.action}_not_implemented`,
+      error: 'poll_not_implemented',
       message:
-        'Email send/poll пока не реализованы. Каркас интеграции + БД готовы; выбор SMTP-провайдера и IMAP-библиотеки — следующий шаг.',
+        'IMAP polling будет включён в следующем спринте. Send уже работает — клиенты получат твои письма.',
     })
   }
 

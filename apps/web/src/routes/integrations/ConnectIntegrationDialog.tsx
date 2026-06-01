@@ -122,6 +122,33 @@ export function ConnectIntegrationDialog({
           toast.success(
             res.note ?? t('integrations.toast_connected', { name: provider?.name ?? '' }),
           )
+          // Auto-sync сразу после connect (только для treatwell — Fresha
+          // Data Connector pull пока не реализован).
+          if (provider?.id === 'treatwell') {
+            toast.info(
+              t('integrations.toast_sync_started', { name: provider?.name ?? 'Treatwell' }),
+            )
+            const syncRes = await supabase.functions.invoke('treatwell-proxy', {
+              body: { action: 'sync', salon_id: salonId, days: 30 },
+            })
+            if (syncRes.error) {
+              toast.error(syncRes.error.message ?? String(syncRes.error))
+            } else {
+              const s = syncRes.data as {
+                ok?: boolean
+                stats?: { staff: number; services: number; clients: number; visits: number }
+              }
+              if (s.ok && s.stats) {
+                toast.success(
+                  t('integrations.toast_synced', {
+                    staff: s.stats.staff,
+                    services: s.stats.services,
+                    visits: s.stats.visits,
+                  }),
+                )
+              }
+            }
+          }
           onClose()
         })()
         return

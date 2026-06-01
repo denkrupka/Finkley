@@ -507,6 +507,34 @@ export function useWfirmaConnectWithCredentials(salonId: string | undefined) {
   })
 }
 
+/** Sync Treatwell → Finkley (staff/services/clients/visits). */
+export function useTreatwellSync(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('treatwell-proxy', {
+        body: { action: 'sync', salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as {
+        ok?: boolean
+        error?: string
+        stats?: { staff: number; services: number; clients: number; visits: number }
+      }
+      if (!json.ok) throw new Error(json.error ?? 'sync_failed')
+      return json.stats!
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+      qc.invalidateQueries({ queryKey: ['services', salonId] })
+      qc.invalidateQueries({ queryKey: ['clients', salonId] })
+      qc.invalidateQueries({ queryKey: ['visits', salonId] })
+    },
+  })
+}
+
 /** Sync wFirma → Finkley (тянет purchase invoices в expenses). */
 export function useWfirmaSync(salonId: string | undefined) {
   const qc = useQueryClient()
