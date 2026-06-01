@@ -27,6 +27,10 @@ import {
   useUpdateInventoryItem,
   type InventoryItemRow,
 } from '@/hooks/useInventory'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useSalon } from '@/hooks/useSalons'
+import { VatBreakdownInput } from '@/components/ui/VatBreakdownInput'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 
 type Props = {
   open: boolean
@@ -43,7 +47,15 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
   const create = useCreateInventoryItem(salonId)
   const update = useUpdateInventoryItem(salonId)
   const { data: categoryOptions = [] } = useInventoryCategories(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salon } = useSalon(salonId)
+  const country = salon?.country_code ?? 'PL'
   const isEdit = !!item
+
+  // VAT state — синхронизирован с costPerUnit (брутто).
+  const [costNetCents, setCostNetCents] = useState(0)
+  const [costGrossCents, setCostGrossCents] = useState(0)
+  const [costRatePct, setCostRatePct] = useState<number>(() => defaultVatRate(country))
 
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('шт')
@@ -72,6 +84,18 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       setStock(String(item.current_stock))
       setMinStock(String(item.min_stock))
       setCostPerUnit(String(item.cost_per_unit_cents / 100))
+      // VAT prefill: используем cost_net_cents+cost_vat_rate_pct если есть,
+      // иначе считаем нетто из брутто по дефолтной ставке.
+      const iAny = item as InventoryItemRow & {
+        cost_net_cents?: number | null
+        cost_vat_rate_pct?: number | null
+      }
+      const rate = iAny.cost_vat_rate_pct ?? defaultVatRate(country)
+      const gross = item.cost_per_unit_cents
+      const net = iAny.cost_net_cents ?? computeNet(gross, rate)
+      setCostRatePct(rate)
+      setCostGrossCents(gross)
+      setCostNetCents(net)
       setSupplier(item.supplier ?? '')
       setNotes(item.notes ?? '')
     } else {
@@ -118,7 +142,15 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       cost_per_unit_cents: Math.round(costNum * 100),
       supplier: supplier.trim() || null,
       notes: notes.trim() || null,
-    }
+      // VAT-разбивка: пишем только когда фирма плательщик. Иначе оставляем
+      // null чтобы старая логика «брутто=net» сохранилась.
+      ...(isVatPayer
+        ? {
+            cost_net_cents: costNetCents,
+            cost_vat_rate_pct: costRatePct,
+          }
+        : {}),
+    } as Parameters<typeof create.mutate>[0]
 
     if (isEdit && item) {
       update.mutate(
@@ -150,7 +182,7 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="w-[min(960px,96vw)] max-w-none">
+      <DialogContent className="max-h-[92vh] w-[min(1100px,96vw)] max-w-none overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? t('inventory.form.title_edit') : t('inventory.form.title_new')}
@@ -337,15 +369,31 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
               <Label htmlFor="inv-cost">
                 {t('inventory.form.cost_label', { currency: currencySymbol })}
               </Label>
-              <Input
-                id="inv-cost"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min="0"
-                value={costPerUnit}
-                onChange={(e) => setCostPerUnit(e.target.value)}
-              />
+              {isVatPayer ? (
+                <VatBreakdownInput
+                  netCents={costNetCents}
+                  ratePct={costRatePct}
+                  grossCents={costGrossCents}
+                  onChange={(next) => {
+                    setCostNetCents(next.netCents)
+                    setCostRatePct(next.ratePct)
+                    setCostGrossCents(next.grossCents)
+                    setCostPerUnit(String(next.grossCents / 100))
+                  }}
+                  countryCode={country}
+                  currency={currency}
+                />
+              ) : (
+                <Input
+                  id="inv-cost"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={costPerUnit}
+                  onChange={(e) => setCostPerUnit(e.target.value)}
+                />
+              )}
             </div>
           </div>
 

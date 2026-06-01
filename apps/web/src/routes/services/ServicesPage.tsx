@@ -67,6 +67,7 @@ export function ServicesPage() {
   const { data: salon } = useSalon(salonId)
   const { data: services = [] } = useServices(salonId)
   const { data: categories = [] } = useServiceCategories(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
 
   const [openDetail, setOpenDetail] = useState<ServiceRow | null>(null)
   const [openNew, setOpenNew] = useState(false)
@@ -164,7 +165,21 @@ export function ServicesPage() {
                   <th className="px-4 py-3">{t('services_page.cols.name')}</th>
                   <th className="px-4 py-3">{t('services_page.cols.category')}</th>
                   <th className="px-4 py-3 text-right">{t('services_page.cols.duration')}</th>
-                  <th className="px-4 py-3 text-right">{t('services_page.cols.price')}</th>
+                  {isVatPayer ? (
+                    <>
+                      <th className="px-4 py-3 text-right">
+                        {t('services_page.cols.net', { defaultValue: 'Нетто' })}
+                      </th>
+                      <th className="px-4 py-3 text-right">
+                        {t('services_page.cols.vat', { defaultValue: 'НДС' })}
+                      </th>
+                    </>
+                  ) : null}
+                  <th className="px-4 py-3 text-right">
+                    {isVatPayer
+                      ? t('services_page.cols.gross', { defaultValue: 'Брутто' })
+                      : t('services_page.cols.price')}
+                  </th>
                   <th className="px-4 py-3 text-right">{t('services_page.cols.cost')}</th>
                   <th className="px-4 py-3 text-right">{t('services_page.cols.margin')}</th>
                   <th className="px-4 py-3 text-right">{t('services_page.cols.workstations')}</th>
@@ -200,6 +215,26 @@ export function ServicesPage() {
                           ? `${s.default_duration_min} ${t('common.min')}`
                           : '—'}
                       </td>
+                      {isVatPayer
+                        ? (() => {
+                            const sAny = s as ServiceRow & {
+                              price_net_cents?: number | null
+                              vat_rate_pct?: number | null
+                            }
+                            const net = sAny.price_net_cents ?? s.default_price_cents
+                            const rate = sAny.vat_rate_pct ?? 0
+                            return (
+                              <>
+                                <td className="num text-muted-foreground px-4 py-3 text-right">
+                                  {formatCurrency(net, currency)}
+                                </td>
+                                <td className="num text-muted-foreground px-4 py-3 text-right">
+                                  {rate > 0 ? `${rate.toFixed(0)}%` : '0%'}
+                                </td>
+                              </>
+                            )
+                          })()
+                        : null}
                       <td className="num text-foreground px-4 py-3 text-right font-bold">
                         {formatCurrency(s.default_price_cents, currency)}
                       </td>
