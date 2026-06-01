@@ -28,18 +28,16 @@ const CLIENT_SECRET = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? ''
 const REDIRECT_URI = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') ?? ''
 const APP_BASE_URL = Deno.env.get('APP_BASE_URL') ?? 'https://finkley.app'
 
-function htmlRedirect(url: string, message: string): Response {
-  // Возвращаем минимальный HTML с meta-refresh — браузер уже на нашем
-  // domain после Google redirect, нужно красиво перекинуть назад в SPA.
-  const safeUrl = url.replace(/"/g, '&quot;')
-  const safeMsg = message.replace(/</g, '&lt;')
-  return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Finkley</title>` +
-      `<meta http-equiv="refresh" content="0;url=${safeUrl}">` +
-      `<style>body{font-family:sans-serif;text-align:center;padding:40px;color:#333}</style>` +
-      `</head><body><p>${safeMsg}</p><p><a href="${safeUrl}">Назад в Finkley</a></p></body></html>`,
-    { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-  )
+function htmlRedirect(url: string, _message: string): Response {
+  // HTTP 302 Location — чистый redirect без HTML body. Браузер сразу
+  // перейдёт на target URL, никакого rendering / charset-проблем.
+  // Раньше использовался HTML с meta-refresh, но Supabase gateway
+  // иногда перезаписывает Content-Type и Chrome показывал raw HTML +
+  // ломал кириллицу в abrakadabra.
+  return new Response(null, {
+    status: 302,
+    headers: { Location: url },
+  })
 }
 
 Deno.serve(async (req: Request) => {
