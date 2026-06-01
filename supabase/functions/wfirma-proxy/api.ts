@@ -181,7 +181,11 @@ export async function wfirmaExpenseGet(
  */
 export type PushExpenseInput = {
   expenseAt: string // YYYY-MM-DD
-  amount: number // decimal в исходной валюте (например 123.45)
+  amount: number // decimal брутто в исходной валюте (например 123.45)
+  /** Нетто-сумма; если null/undefined — wFirma посчитает сама от total по ставке. */
+  netAmount?: number | null
+  /** Ставка VAT % (23/8/5/0). Если null — wFirma использует default 23%. */
+  vatRatePct?: number | null
   currency: string // 'PLN' | 'EUR' | ...
   vendor: string
   vendorNip?: string | null
@@ -196,8 +200,13 @@ export async function wfirmaExpenseAdd(
   const isInvoice = !!input.vendorNip && /^\d{10}$/.test(input.vendorNip.replace(/\D/g, ''))
   const expenseType = isInvoice ? 'invoice' : 'bill'
 
-  // wFirma payload — упрощённый, без VAT-разбивки (для MVP).
-  // Это покрывает большинство кейсов «пустой расход за услуги/товары».
+  // wFirma payload. Если в Finkley задана VAT-разбивка (netto/vat_rate_pct)
+  // — передаём отдельными полями чтобы wFirma не угадывала ставку 23% по
+  // умолчанию (важно для медуслуг 8%, vat-exempt 0%, реверс-чарж).
+  const hasVat = input.netAmount != null && input.vatRatePct != null
+  const vatRate = input.vatRatePct ?? 23
+  const netto = input.netAmount ?? input.amount / (1 + vatRate / 100)
+  const vatAmount = Math.max(0, input.amount - netto)
   const payload = {
     api: {
       expenses: {
@@ -209,6 +218,13 @@ export async function wfirmaExpenseAdd(
           paid_date: input.expenseAt,
           currency: input.currency,
           total: input.amount.toFixed(2),
+          ...(hasVat
+            ? {
+                netto: netto.toFixed(2),
+                vat: vatAmount.toFixed(2),
+                vat_rate: String(vatRate),
+              }
+            : {}),
           contractor_detail: isInvoice
             ? {
                 name: input.vendor,

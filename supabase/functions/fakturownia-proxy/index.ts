@@ -475,7 +475,7 @@ async function handlePushExpense(
   const { data: ex } = await admin
     .from('expenses')
     .select(
-      'id, expense_at, amount_cents, contractor_name, comment, metadata, source, external_id, receipt_url',
+      'id, expense_at, amount_cents, amount_net_cents, vat_rate_pct, contractor_name, invoice_number, comment, metadata, source, external_id, receipt_url',
     )
     .eq('id', expenseId)
     .eq('salon_id', salonId)
@@ -509,9 +509,14 @@ async function handlePushExpense(
   const pushRes = await fakturowniaCreateExpense(creds, {
     expenseAt: ex.expense_at,
     amount: ex.amount_cents / 100,
+    // Если в Finkley vat_rate_pct задан (KSeF-импорт, manual VAT-разбивка),
+    // отправляем в Fakturownia tax-rate явно. Иначе portal default = 23%.
+    vatRatePct: ex.vat_rate_pct ?? null,
     currency,
     vendor: ex.contractor_name || 'Bez nazwy',
+    vendorNip: typeof meta.vendor_nip === 'string' ? (meta.vendor_nip as string) : null,
     description: ex.comment,
+    invoiceNumber: ex.invoice_number,
   })
   if (!pushRes.ok) {
     return jsonResponse(

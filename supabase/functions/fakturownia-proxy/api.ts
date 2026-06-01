@@ -174,6 +174,9 @@ export async function fakturowniaGetExpensePdf(
 export type FakturowniaPushInput = {
   expenseAt: string // yyyy-mm-dd
   amount: number // brutto
+  /** Ставка VAT % — 23/8/5/0. По умолчанию 23 если не задано. Передаётся в
+   *  positions[0].tax. Fakturownia сам считает netto и tax_amount. */
+  vatRatePct?: number | null
   currency: string
   vendor: string
   vendorNip: string | null
@@ -207,7 +210,9 @@ export async function fakturowniaCreateExpense(
         positions: [
           {
             name: input.description ?? input.vendor,
-            tax: 23,
+            // tax — динамическая ставка из Finkley vat_rate_pct. По умолчанию
+            // 23%, но для медуслуг/книг/vat-exempt передаём явно.
+            tax: input.vatRatePct ?? 23,
             total_price_gross: input.amount.toFixed(2),
             quantity: 1,
           },

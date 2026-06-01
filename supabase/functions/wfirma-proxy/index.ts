@@ -629,7 +629,7 @@ async function handlePushExpense(
   const { data: ex } = await admin
     .from('expenses')
     .select(
-      'id, expense_at, amount_cents, contractor_name, invoice_number, comment, metadata, source, external_id, receipt_url',
+      'id, expense_at, amount_cents, amount_net_cents, vat_rate_pct, contractor_name, invoice_number, comment, metadata, source, external_id, receipt_url',
     )
     .eq('id', expenseId)
     .eq('salon_id', salonId)
@@ -682,6 +682,10 @@ async function handlePushExpense(
   const input: PushExpenseInput = {
     expenseAt: ex.expense_at,
     amount: ex.amount_cents / 100,
+    // VAT-разбивка из Finkley → wFirma не угадывает ставку (важно для
+    // 8% медуслуг, 5% книг/еды, 0% vat-exempt и реверс-чарж).
+    netAmount: ex.amount_net_cents != null ? ex.amount_net_cents / 100 : null,
+    vatRatePct: ex.vat_rate_pct ?? null,
     currency,
     vendor: ex.contractor_name || 'Bez nazwy',
     vendorNip: typeof meta.vendor_nip === 'string' ? meta.vendor_nip : null,
