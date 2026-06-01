@@ -159,6 +159,42 @@ Deno.serve(async (req: Request) => {
     { onConflict: 'salon_id,channel' },
   )
 
+  // Gmail watch — подписываем юзера на Pub/Sub push notifications.
+  // Без этого сообщения тянутся только через cron poll каждые 2 мин (лаг).
+  // С watch — Google публикует уведомление в Pub/Sub сразу, наш webhook
+  // получает его и подтягивает <1 сек.
+  // GMAIL_PUBSUB_TOPIC формата 'projects/<gcp-project>/topics/<topic-name>'.
+  const pubsubTopic = Deno.env.get('GMAIL_PUBSUB_TOPIC') ?? ''
+  if (pubsubTopic) {
+    try {
+      const watchRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/watch', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          labelIds: ['INBOX'],
+          labelFilterAction: 'include',
+          topicName: pubsubTopic,
+        }),
+      })
+      if (watchRes.ok) {
+        const watchJson = (await watchRes.json()) as { historyId?: string; expiration?: string }
+        if (watchJson.historyId) {
+          oauthCreds.history_id = watchJson.historyId
+          oauthCreds.watch_expiration = watchJson.expiration ?? null
+        }
+      } else {
+        const errText = await watchRes.text()
+        console.warn(`gmail watch failed (${watchRes.status}): ${errText.slice(0, 200)}`)
+        // Не блокируем connect — poll fallback всё равно работает
+      }
+    } catch (e) {
+      console.warn('gmail watch exception:', (e as Error).message)
+    }
+  }
+
   if (upsertErr) {
     console.error('save integration failed:', upsertErr.message)
     return htmlRedirect(

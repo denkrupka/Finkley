@@ -458,6 +458,57 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true, url })
   }
 
+  if (body.action === 'renew_watch') {
+    // Gmail watch валиден 7 дней. Этот endpoint дёргается cron'ом каждые
+    // 6 дней (с запасом) чтобы продлить watch и обновить history_id.
+    const { data: integ } = await admin
+      .from('messenger_integrations')
+      .select('credentials')
+      .eq('salon_id', body.salon_id)
+      .eq('channel', 'email')
+      .maybeSingle()
+    const allCreds = (integ?.credentials ?? {}) as { oauth?: Record<string, unknown> }
+    if (!allCreds.oauth?.access_token) {
+      return jsonResponse({ ok: false, error: 'no_oauth' }, 200)
+    }
+    const pubsubTopic = Deno.env.get('GMAIL_PUBSUB_TOPIC') ?? ''
+    if (!pubsubTopic) return jsonResponse({ ok: false, error: 'pubsub_not_configured' }, 200)
+    let accessToken = allCreds.oauth.access_token as string
+    const expiresAt = new Date(allCreds.oauth.expires_at as string).getTime()
+    if (Date.now() > expiresAt - 60_000 && allCreds.oauth.refresh_token) {
+      const refreshed = await refreshGoogleToken(allCreds.oauth.refresh_token as string)
+      if (refreshed) accessToken = refreshed.access_token
+    }
+    const watchRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/watch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        labelIds: ['INBOX'],
+        labelFilterAction: 'include',
+        topicName: pubsubTopic,
+      }),
+    })
+    if (!watchRes.ok) {
+      return jsonResponse({ ok: false, error: `watch_failed_${watchRes.status}` }, 200)
+    }
+    const watchJson = (await watchRes.json()) as { historyId?: string; expiration?: string }
+    await admin
+      .from('messenger_integrations')
+      .update({
+        credentials: {
+          ...allCreds,
+          oauth: {
+            ...allCreds.oauth,
+            history_id: watchJson.historyId ?? allCreds.oauth.history_id,
+            watch_expiration: watchJson.expiration ?? null,
+          },
+        },
+      })
+      .eq('salon_id', body.salon_id)
+      .eq('channel', 'email')
+    return jsonResponse({ ok: true, expiration: watchJson.expiration })
+  }
+
   if (body.action === 'disconnect') {
     await admin
       .from('messenger_integrations')

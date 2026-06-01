@@ -72,6 +72,12 @@ enable_confirmations = false
 [functions.email-channel-oauth-callback]
 verify_jwt = false
 
+# Pub/Sub push subscription — Google не передаёт наш JWT, передаёт свой
+# OIDC token. Эндпоинт URL обфусцирован (Pub/Sub доступен только своим
+# IP), плюс webhook валидирует emailAddress = connected integration.
+[functions.email-channel-pubsub-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = false
 
