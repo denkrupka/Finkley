@@ -63,6 +63,66 @@ async function sendEmail(
 }
 
 /**
+ * Логирует исходящее письмо в messenger_messages/conversations чтобы оно
+ * появилось в UI мессенджера рядом с входящими. Без этого юзер шлёт
+ * письмо через Finkley, оно уходит в Gmail Sent, но в Finkley-мессенджере
+ * не видно — собственный диалог с клиентом обрывается.
+ *
+ * Upsert conversation per to-address (как для входящих по from-address).
+ * direction='out', text = subject + body (markdown bold).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function logOutgoingMessage(
+  admin: any,
+  salonId: string,
+  to: string,
+  subject: string,
+  textBody: string,
+): Promise<void> {
+  const toAddr = to.toLowerCase().trim()
+  // Conversation по to-address
+  const { data: existing } = await admin
+    .from('messenger_conversations')
+    .select('id')
+    .eq('salon_id', salonId)
+    .eq('channel', 'email')
+    .eq('external_user_id', toAddr)
+    .maybeSingle()
+  let convId: string | null = null
+  if (existing) {
+    convId = (existing as { id: string }).id
+    await admin
+      .from('messenger_conversations')
+      .update({
+        last_message_at: new Date().toISOString(),
+        last_message_preview: subject.slice(0, 200),
+      })
+      .eq('id', convId)
+  } else {
+    const { data: created } = await admin
+      .from('messenger_conversations')
+      .insert({
+        salon_id: salonId,
+        channel: 'email',
+        external_user_id: toAddr,
+        display_name: toAddr,
+        last_message_at: new Date().toISOString(),
+        last_message_preview: subject.slice(0, 200),
+      })
+      .select('id')
+      .single()
+    if (created) convId = (created as { id: string }).id
+  }
+  if (!convId) return
+  await admin.from('messenger_messages').insert({
+    conversation_id: convId,
+    direction: 'out',
+    text: subject ? `**${subject}**\n\n${textBody}` : textBody,
+    created_at: new Date().toISOString(),
+  })
+}
+
+/**
  * Refresh Google OAuth access_token через refresh_token. Используется в
  * action='send' когда access_token истёк (или истечёт в ближайшую минуту).
  */
@@ -305,6 +365,7 @@ Deno.serve(async (req: Request) => {
           body.text_body,
           body.html_body,
         )
+        await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
         return jsonResponse({ ok: true, via: 'gmail_oauth' })
       } catch (e) {
         // Если OAuth не сработал, пробуем SMTP fallback
@@ -316,6 +377,7 @@ Deno.serve(async (req: Request) => {
     if (allCreds.smtp) {
       try {
         await sendEmail(allCreds.smtp, body.to, body.subject, body.text_body, body.html_body)
+        await logOutgoingMessage(admin, body.salon_id, body.to, body.subject, body.text_body)
         return jsonResponse({ ok: true, via: 'smtp' })
       } catch (e) {
         return jsonResponse({ ok: false, error: (e as Error).message }, 500)
