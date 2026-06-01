@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { supabase } from '@/lib/supabase/client'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 import type { OnboardingIntegration } from './OnboardingPage'
 
@@ -117,7 +118,9 @@ export function StepAiSummary({
         <>
           {summary.data?.overview ? (
             <div className="border-brand-teal-deep/40 bg-brand-teal-soft/20 rounded-xl border-2 p-4">
-              <p className="text-foreground text-sm leading-relaxed">{summary.data.overview}</p>
+              <p className="text-foreground text-sm leading-relaxed">
+                {renderMarkdownInline(summary.data.overview)}
+              </p>
             </div>
           ) : null}
 
@@ -150,9 +153,11 @@ function AdviceCard({ advice }: { advice: AiAdvice }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={`size-2 shrink-0 rounded-full ${dot}`} aria-hidden />
-          <p className="text-foreground text-sm font-bold">{advice.title}</p>
+          <p className="text-foreground text-sm font-bold">{renderMarkdownInline(advice.title)}</p>
         </div>
-        <p className="text-muted-foreground mt-0.5 text-xs leading-snug">{advice.body}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+          {renderMarkdownInline(advice.body)}
+        </p>
       </div>
     </div>
   )

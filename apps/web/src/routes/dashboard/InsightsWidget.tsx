@@ -8,6 +8,7 @@ import { useDismissInsight, useInsights, type InsightRow } from '@/hooks/useInsi
 import { useQueryClient } from '@tanstack/react-query'
 import { interpretInsightsResult, type InsightsResult } from '@/lib/insights-result'
 import { supabase } from '@/lib/supabase/client'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 import type { LocalInsight } from './dashboard-aggregates'
 
@@ -126,8 +127,10 @@ function LocalInsightCard({ insight }: { insight: LocalInsight }) {
     <div className="border-border bg-card flex items-start gap-3 rounded-md border p-3">
       <Icon className={`mt-0.5 size-4 shrink-0 ${colorClass}`} strokeWidth={2} />
       <div className="min-w-0 flex-1">
-        <p className="text-brand-navy text-sm font-bold">{insight.title}</p>
-        <p className="text-foreground/80 mt-0.5 text-xs leading-snug">{insight.body}</p>
+        <p className="text-brand-navy text-sm font-bold">{renderMarkdownInline(insight.title)}</p>
+        <p className="text-foreground/80 mt-0.5 text-xs leading-snug">
+          {renderMarkdownInline(insight.body)}
+        </p>
       </div>
     </div>
   )
@@ -156,8 +159,10 @@ function InsightCard({
     <div className="border-border bg-card flex items-start gap-3 rounded-md border p-3">
       <Icon className={`mt-0.5 size-4 shrink-0 ${colorClass}`} strokeWidth={2} />
       <div className="min-w-0 flex-1">
-        <p className="text-brand-navy text-sm font-bold">{insight.title}</p>
-        <p className="text-foreground/80 mt-0.5 text-xs leading-snug">{insight.body}</p>
+        <p className="text-brand-navy text-sm font-bold">{renderMarkdownInline(insight.title)}</p>
+        <p className="text-foreground/80 mt-0.5 text-xs leading-snug">
+          {renderMarkdownInline(insight.body)}
+        </p>
       </div>
       <button
         type="button"

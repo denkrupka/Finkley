@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 
 import { useMarkInAppRead, useNotifications, type NotificationItem } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils/cn'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 /**
  * Колокольчик-уведомления в TopBar. Бейдж = unreadCount, дропдаун со
@@ -141,9 +142,9 @@ function NotificationRow({
             isUnreadInApp ? 'font-bold' : 'font-semibold',
           )}
         >
-          {n.title}
+          {renderMarkdownInline(n.title)}
         </p>
-        <p className="text-muted-foreground line-clamp-2 text-xs">{n.body}</p>
+        <p className="text-muted-foreground line-clamp-2 text-xs">{renderMarkdownInline(n.body)}</p>
       </div>
     </>
   )

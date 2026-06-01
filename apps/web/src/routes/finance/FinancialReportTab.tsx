@@ -603,14 +603,43 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   function exportCsv() {
     downloadBlob(buildTableCsv(), 'text/csv;charset=utf-8', 'csv')
   }
+  /** Реальный xlsx-совместимый файл через Excel 2003 XML (SpreadsheetML).
+   *  Excel/LibreOffice открывают его как полноценную книгу — без warning'а
+   *  «file format doesn't match extension», который был при CSV-с-MIME.
+   *  Не тащим xlsx-lib (≈800KB) и не пишем ZIP — используем XML, который
+   *  Office понимает с 2003. */
+  function buildSpreadsheetMlXml(): string {
+    const headers = [
+      t('finance.report.col_row'),
+      t('finance.report.col_total'),
+      ...monthCols.map((c) =>
+        format(startOfMonth(new Date(c.year, c.monthIdx, 1)), 'MM/yy', { locale: getDateLocale() }),
+      ),
+    ]
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    const cellStr = (s: string) => `<Cell><Data ss:Type="String">${esc(s)}</Data></Cell>`
+    const cellNum = (n: number) =>
+      `<Cell><Data ss:Type="Number">${(n / 100).toFixed(2)}</Data></Cell>`
+    const rowsXml: string[] = []
+    rowsXml.push('<Row>' + headers.map(cellStr).join('') + '</Row>')
+    for (const row of [...rows, ...balanceRows]) {
+      const cells = [cellStr(row.label), cellNum(yearTotal(row.values)), ...row.values.map(cellNum)]
+      rowsXml.push('<Row>' + cells.join('') + '</Row>')
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Report">
+    <Table>
+      ${rowsXml.join('\n      ')}
+    </Table>
+  </Worksheet>
+</Workbook>`
+  }
   function exportXlsx() {
-    // Тот же CSV-формат, но MIME Excel — Office корректно открывает файл как
-    // книгу. Не тащим xlsx-lib (≈800KB) ради того же результата.
-    downloadBlob(
-      buildTableCsv(),
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'xlsx',
-    )
+    downloadBlob(buildSpreadsheetMlXml(), 'application/vnd.ms-excel', 'xls')
   }
   function exportPdf() {
     // PDF в браузере = «Печать → Сохранить как PDF» (CSS @media print
@@ -662,7 +691,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
                     className="size-4 text-emerald-600 dark:text-emerald-300"
                     strokeWidth={1.8}
                   />
-                  {t('finance.report.download_xlsx', { defaultValue: 'Excel (xlsx)' })}
+                  {t('finance.report.download_xlsx', { defaultValue: 'Excel' })}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={() => exportCsv()}

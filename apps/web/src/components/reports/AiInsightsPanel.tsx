@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useReportInsights, type InsightKind } from '@/hooks/useReportInsights'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 const AI_PROMPT_KEY = 'finkley:ai-prefill-prompt'
 
@@ -132,8 +133,12 @@ export function AiInsightsPanel({ kind, payload }: { kind: InsightKind; payload:
                 strokeWidth={1.8}
               />
               <div className="min-w-0 flex-1">
-                <p className="text-foreground text-sm font-bold">{ins.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{ins.body}</p>
+                <p className="text-foreground text-sm font-bold">
+                  {renderMarkdownInline(ins.title)}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  {renderMarkdownInline(ins.body)}
+                </p>
               </div>
               <Button
                 size="sm"

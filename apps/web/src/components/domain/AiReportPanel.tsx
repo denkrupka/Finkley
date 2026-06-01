@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 /**
  * Collapsed AI-вывод по отчёту в стиле AiInsightsPanel — жёлтая плашка
@@ -76,8 +77,12 @@ export function AiReportPanel({
           <ul className="mt-3 space-y-2.5">
             {insights.map((it, i) => (
               <li key={i} className="border-border bg-card rounded-md border p-3">
-                <p className="text-foreground text-xs font-bold">{it.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{it.body}</p>
+                <p className="text-foreground text-xs font-bold">
+                  {renderMarkdownInline(it.title)}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  {renderMarkdownInline(it.body)}
+                </p>
               </li>
             ))}
           </ul>

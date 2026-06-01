@@ -85,22 +85,23 @@ Deno.serve(async (req: Request) => {
 
   if (body.action === 'connect') {
     if (!body.smtp || !body.imap) return jsonResponse({ error: 'smtp_and_imap_required' }, 400)
-    // Test SMTP connection (отправляем no-op для валидации)
+    // Реальная IMAP-валидация: подключаемся и сразу logout. Проверяет
+    // что host/port доступны и password корректный. denomailer SMTP
+    // открывает соединение лениво на send — реальная SMTP-валидация
+    // случается при первом send.
     try {
-      const test = new SMTPClient({
-        connection: {
-          hostname: body.smtp.host,
-          port: body.smtp.port,
-          tls: body.smtp.secure === true || body.smtp.port === 465,
-          auth: { username: body.smtp.user, password: body.smtp.pass },
-        },
+      const test = new ImapFlow({
+        host: body.imap.host,
+        port: body.imap.port,
+        secure: body.imap.secure !== false,
+        auth: { user: body.imap.user, pass: body.imap.pass },
+        logger: false,
       })
-      // connect-only validation (denomailer открывает соединение лениво
-      // на send; этот test — symbolic — реальная валидация при первом send).
-      await test.close()
+      await test.connect()
+      await test.logout()
     } catch (e) {
       return jsonResponse(
-        { ok: false, error: 'smtp_connect_failed', message: (e as Error).message },
+        { ok: false, error: 'imap_connect_failed', message: (e as Error).message },
         400,
       )
     }

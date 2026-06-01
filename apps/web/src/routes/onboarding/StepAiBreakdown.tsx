@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 
 export type AiBreakdownTopic = 'services' | 'staff' | 'clients' | 'reviews'
 
@@ -298,9 +299,13 @@ function BreakdownCard({
         <div className={cn('grid size-10 shrink-0 place-items-center rounded-lg', iconBg)}>
           <Icon className="size-5" strokeWidth={2} />
         </div>
-        <p className="text-foreground mt-1 text-sm font-bold leading-snug">{title}</p>
+        <p className="text-foreground mt-1 text-sm font-bold leading-snug">
+          {renderMarkdownInline(title)}
+        </p>
       </div>
-      <p className="text-muted-foreground text-[12.5px] leading-snug">{body}</p>
+      <p className="text-muted-foreground text-[12.5px] leading-snug">
+        {renderMarkdownInline(body)}
+      </p>
       {chip ? (
         <span
           className={cn(
