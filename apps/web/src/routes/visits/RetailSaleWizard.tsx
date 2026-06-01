@@ -172,8 +172,7 @@ export function RetailSaleWizard({
     // ПРОДАЖНАЯ цена (брутто): sale_price_cents если задана, иначе
     // fallback на cost_per_unit_cents. Юзер 02.06 сказал «в продажах
     // показывай цену Брутто» — это unitPriceCents здесь.
-    const iAny = item as typeof item & { sale_price_cents?: number | null }
-    const unitPriceCents = iAny.sale_price_cents ?? item.cost_per_unit_cents ?? 0
+    const unitPriceCents = item.sale_price_cents ?? item.cost_per_unit_cents ?? 0
     setLines((prev) => [
       ...prev,
       {

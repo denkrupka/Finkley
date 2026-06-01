@@ -17,6 +17,15 @@ export type InventoryItemRow = {
   notes: string | null
   created_at: string
   updated_at: string
+  /** VAT-разбивка закупочной цены (миграция 20260602000001). */
+  cost_net_cents: number | null
+  cost_vat_rate_pct: number | null
+  /** Продажная цена брутто (миграция 20260602000003) — fallback на
+   *  cost_per_unit_cents если null. RetailSaleWizard использует. */
+  sale_price_cents: number | null
+  /** VAT-разбивка продажной цены. */
+  sale_net_cents: number | null
+  sale_vat_rate_pct: number | null
 }
 
 export type ServiceMaterialRow = {
@@ -50,7 +59,7 @@ export type InventoryTransactionRow = {
 }
 
 const ITEM_FIELDS =
-  'id, salon_id, name, unit, sku, category, current_stock, min_stock, cost_per_unit_cents, supplier, is_archived, notes, created_at, updated_at'
+  'id, salon_id, name, unit, sku, category, current_stock, min_stock, cost_per_unit_cents, supplier, is_archived, notes, created_at, updated_at, cost_net_cents, cost_vat_rate_pct, sale_price_cents, sale_net_cents, sale_vat_rate_pct'
 
 // =============================================================================
 // Queries
@@ -180,6 +189,11 @@ export function useCreateInventoryItem(salonId: string | undefined) {
       cost_per_unit_cents?: number
       supplier?: string | null
       notes?: string | null
+      cost_net_cents?: number | null
+      cost_vat_rate_pct?: number | null
+      sale_price_cents?: number | null
+      sale_net_cents?: number | null
+      sale_vat_rate_pct?: number | null
     }) => {
       if (!salonId) throw new Error('no_salon')
       const { data, error } = await supabase
@@ -195,6 +209,11 @@ export function useCreateInventoryItem(salonId: string | undefined) {
           cost_per_unit_cents: input.cost_per_unit_cents ?? 0,
           supplier: input.supplier?.trim() || null,
           notes: input.notes?.trim() || null,
+          cost_net_cents: input.cost_net_cents ?? null,
+          cost_vat_rate_pct: input.cost_vat_rate_pct ?? null,
+          sale_price_cents: input.sale_price_cents ?? null,
+          sale_net_cents: input.sale_net_cents ?? null,
+          sale_vat_rate_pct: input.sale_vat_rate_pct ?? null,
         })
         .select(ITEM_FIELDS)
         .single()
@@ -219,6 +238,11 @@ export function useUpdateInventoryItem(salonId: string | undefined) {
       supplier?: string | null
       notes?: string | null
       is_archived?: boolean
+      cost_net_cents?: number | null
+      cost_vat_rate_pct?: number | null
+      sale_price_cents?: number | null
+      sale_net_cents?: number | null
+      sale_vat_rate_pct?: number | null
     }) => {
       const { id, ...patch } = input
       const { error } = await supabase.from('inventory_items').update(patch).eq('id', id)

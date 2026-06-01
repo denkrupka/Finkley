@@ -57,6 +57,13 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
   const [costGrossCents, setCostGrossCents] = useState(0)
   const [costRatePct, setCostRatePct] = useState<number>(() => defaultVatRate(country))
 
+  // Продажная цена (брутто) — отдельно от закупочной. RetailSaleWizard
+  // использует sale_price_cents; fallback на cost_per_unit_cents если null.
+  const [saleNetCents, setSaleNetCents] = useState(0)
+  const [saleGrossCents, setSaleGrossCents] = useState(0)
+  const [saleRatePct, setSaleRatePct] = useState<number>(() => defaultVatRate(country))
+  const [salePrice, setSalePrice] = useState('0') // for non-VAT input
+
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('шт')
   const [sku, setSku] = useState('')
@@ -96,6 +103,16 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       setCostRatePct(rate)
       setCostGrossCents(gross)
       setCostNetCents(net)
+      // Sale-price prefill: если sale_price_cents задан — берём его, иначе
+      // fallback на cost (как RetailSaleWizard). Для VAT — sale_net_cents
+      // или recompute от gross+defaultRate.
+      const saleGross = item.sale_price_cents ?? item.cost_per_unit_cents
+      const saleRate = item.sale_vat_rate_pct ?? defaultVatRate(country)
+      const saleNet = item.sale_net_cents ?? computeNet(saleGross, saleRate)
+      setSaleRatePct(saleRate)
+      setSaleGrossCents(saleGross)
+      setSaleNetCents(saleNet)
+      setSalePrice(String(saleGross / 100))
       setSupplier(item.supplier ?? '')
       setNotes(item.notes ?? '')
     } else {
@@ -106,6 +123,10 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       setStock('0')
       setMinStock('0')
       setCostPerUnit('0')
+      setSaleNetCents(0)
+      setSaleGrossCents(0)
+      setSaleRatePct(defaultVatRate(country))
+      setSalePrice('0')
       setSupplier('')
       setNotes('')
     }
@@ -133,6 +154,9 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       return
     }
 
+    const saleGrossOut = isVatPayer
+      ? saleGrossCents
+      : Math.round(Number(salePrice.replace(',', '.')) * 100)
     const payload = {
       name: name.trim(),
       unit: unit.trim(),
@@ -142,12 +166,17 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
       cost_per_unit_cents: Math.round(costNum * 100),
       supplier: supplier.trim() || null,
       notes: notes.trim() || null,
+      // Продажная цена — отдельная колонка. NULL разрешён → fallback на
+      // cost_per_unit_cents в RetailSaleWizard.
+      sale_price_cents: saleGrossOut > 0 ? saleGrossOut : null,
       // VAT-разбивка: пишем только когда фирма плательщик. Иначе оставляем
       // null чтобы старая логика «брутто=net» сохранилась.
       ...(isVatPayer
         ? {
             cost_net_cents: costNetCents,
             cost_vat_rate_pct: costRatePct,
+            sale_net_cents: saleNetCents > 0 ? saleNetCents : null,
+            sale_vat_rate_pct: saleRatePct,
           }
         : {}),
     } as Parameters<typeof create.mutate>[0]
@@ -395,6 +424,50 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
                 />
               )}
             </div>
+          </div>
+
+          {/* Цена продажи — отдельный ряд под закупочной. Юзер 02.06 чётко
+              сказал: «при продаже всегда брутто, но в карточке хочу видеть
+              нетто/НДС/брутто». RetailSaleWizard теперь будет брать именно
+              эту цену (sale_price_cents), а не cost. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="inv-sale-price">
+              {t('inventory.form.sale_price_label', {
+                currency: currencySymbol,
+                defaultValue: 'Цена продажи ({{currency}})',
+              })}
+            </Label>
+            {isVatPayer ? (
+              <VatBreakdownInput
+                netCents={saleNetCents}
+                ratePct={saleRatePct}
+                grossCents={saleGrossCents}
+                onChange={(next) => {
+                  setSaleNetCents(next.netCents)
+                  setSaleRatePct(next.ratePct)
+                  setSaleGrossCents(next.grossCents)
+                  setSalePrice(String(next.grossCents / 100))
+                }}
+                countryCode={country}
+                currency={currency}
+              />
+            ) : (
+              <Input
+                id="inv-sale-price"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min="0"
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
+              />
+            )}
+            <p className="text-muted-foreground text-[11px]">
+              {t('inventory.form.sale_price_hint', {
+                defaultValue:
+                  'По умолчанию = закупочной. RetailSaleWizard подставит эту цену при добавлении товара в продажу.',
+              })}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
