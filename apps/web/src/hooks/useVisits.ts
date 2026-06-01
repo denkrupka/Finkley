@@ -36,6 +36,10 @@ export type VisitRow = {
   /** Image #51: сумма уже полученного по визиту (для частичных поступлений).
    *  NULL = полностью получено. См. income_payment_installments + trigger. */
   paid_amount_cents: number | null
+  /** VAT-разбивка (миграция 20260602000001). NULL → P&L fallback на gross. */
+  amount_net_cents: number | null
+  vat_rate_pct: number | null
+  vat_skipped: boolean | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -171,6 +175,9 @@ export function useCreateVisit(salonId: string | undefined) {
         cash_register_id: input.cash_register_id ?? null,
         inventory_item_id: input.inventory_item_id ?? null,
         paid_amount_cents: null,
+        amount_net_cents: input.amount_net_cents ?? null,
+        vat_rate_pct: input.vat_rate_pct ?? null,
+        vat_skipped: input.vat_skipped ?? null,
         created_by: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -221,6 +228,11 @@ export type UpdateVisitInput = {
    *  «+ услугу» к одиночному визиту: устанавливаем group_key на текущем и
    *  даём тот же на новом — UI начинает рендерить их как группу. */
   group_key?: string | null
+  /** VAT-разбивка. Пересчитываются при изменении amount_cents в edit-flow,
+   *  иначе P&L получает устаревший нетто. */
+  amount_net_cents?: number | null
+  vat_rate_pct?: number | null
+  vat_skipped?: boolean | null
 }
 
 export function useUpdateVisit(salonId: string | undefined) {

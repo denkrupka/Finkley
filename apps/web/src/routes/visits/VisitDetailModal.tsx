@@ -365,6 +365,11 @@ function DetailView({
   const [bankUnlinking, setBankUnlinking] = useState(false)
   const qc = useQueryClient()
   const { data: bankLinked } = useBankLinkedIncomeIds(salonId)
+  // VAT-context — нужен в LineEditor для пересчёта нетто при изменении
+  // amount_cents. Если не пересчитывать → P&L получит старый нетто.
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salonRow } = useSalon(salonId)
+  const country = salonRow?.country_code ?? 'PL'
   // Bank-секция — только для одиночного оплаченного визита. Группы (retail-
   // wizard'ы из 2+ позиций) оставляем как есть: одна общая оплата может быть
   // привязана к любому из них, и UI с per-line кнопками был бы шумным.
@@ -504,8 +509,38 @@ function DetailView({
                         visit={v}
                         currency={currency}
                         paymentMethods={paymentMethods}
+                        isVatPayer={isVatPayer}
+                        country={country}
                         onSave={(patch) => {
-                          onPatchLine(v.id, patch)
+                          // VAT-синхрон: при изменении amount_cents
+                          // пересчитываем нетто по текущей ставке (либо
+                          // дефолтной если ставка не была задана). Без этого
+                          // P&L считает VAT с устаревшего нетто.
+                          let merged = patch
+                          if (
+                            patch.amount_cents != null &&
+                            isVatPayer &&
+                            !(v.vat_skipped ?? false)
+                          ) {
+                            const rate = v.vat_rate_pct ?? defaultVatRate(country)
+                            merged = {
+                              ...patch,
+                              amount_net_cents: computeNet(patch.amount_cents, rate),
+                              vat_rate_pct: rate,
+                            }
+                          } else if (
+                            patch.amount_cents != null &&
+                            isVatPayer &&
+                            (v.vat_skipped ?? false)
+                          ) {
+                            // Документ был пропущен → нетто = брутто.
+                            merged = {
+                              ...patch,
+                              amount_net_cents: patch.amount_cents,
+                              vat_rate_pct: 0,
+                            }
+                          }
+                          onPatchLine(v.id, merged)
                           onEdit(null)
                         }}
                         onCancel={() => onEdit(null)}
@@ -712,6 +747,11 @@ function LineEditor({
   visit: VisitRow
   currency: string
   paymentMethods: Array<{ code: PaymentMethod; label: string }>
+  /** VAT-флаги — приходят сверху чтобы wrapper'у в DetailView было ясно
+   *  как пересчитать нетто. Сам LineEditor их пока не использует для UI
+   *  (хранит только text inputs), но прокинуты для будущего breakdown. */
+  isVatPayer: boolean
+  country: string
   onSave: (patch: Partial<VisitRow>) => void
   onCancel: () => void
   t: (k: string) => string
