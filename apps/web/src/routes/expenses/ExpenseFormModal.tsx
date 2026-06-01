@@ -439,6 +439,18 @@ export function ExpenseFormModal({
   const watchedCategoryId = form.watch('category_id')
   const watchedCategory = categories.find((c) => c.id === watchedCategoryId)
   const isPayrollCategory = !!watchedCategory?.is_payroll
+  // Налоги/ZUS — не VAT-able в PL. Детектим по имени категории.
+  const isNonVatCategory = (() => {
+    const n = (watchedCategory?.name ?? '').toLowerCase().trim()
+    return (
+      n === 'налоги' ||
+      n === 'taxes' ||
+      n === 'podatki' ||
+      n === 'zus' ||
+      n.startsWith('взносы на работ') || // 'Взносы на работников (ZUS)'
+      n.startsWith('składki zus')
+    )
+  })()
 
   // Cross-fill: при выборе counterparty с сохранённым IBAN — авто-заполнить
   // поле IBAN в форме, если оно пустое. Если у юзера уже что-то введено
@@ -679,7 +691,9 @@ export function ExpenseFormModal({
         amount_cents: amountCents,
         // VAT — записываем только когда фирма плательщик (миграция
         // 20260602000001 добавила колонки в scheduled_payments).
-        ...(isVatPayer ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct } : {}),
+        ...(isVatPayer && !isPayrollCategory && !isNonVatCategory
+          ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct }
+          : {}),
         vendor_name: values.description.trim() || null,
         invoice_number: values.document_number.trim() || null,
         category_id: values.category_id || null,
@@ -787,7 +801,9 @@ export function ExpenseFormModal({
         counterparty_id: values.counterparty_id || null,
         amount_cents: amountCents,
         // VAT — пишем только когда фирма плательщик (миграция 20260602000001).
-        ...(isVatPayer ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct } : {}),
+        ...(isVatPayer && !isPayrollCategory && !isNonVatCategory
+          ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct }
+          : {}),
         paid_amount_cents: partialPaid,
         payment_method: values.payment_method || null,
         document_number: values.document_number.trim() || null,
@@ -1402,7 +1418,12 @@ export function ExpenseFormModal({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-amount">{t('expenses.form.amount_label')}</Label>
-            {isVatPayer ? (
+            {/* Для зарплат/налогов/ZUS — НЕ показываем разбивку Нетто/НДС/Брутто.
+                Эти категории не VAT-able по PL-законодательству. Юзер 02.06:
+                «Сумму ТОЛЬКО ПРИ ЗАРПЛАТАХ, НАЛОГАХ и ZUS показывай без нетто
+                и НДС — только СУММА и всё». Детектим по category name (Налоги/
+                ZUS) и is_payroll флагу. */}
+            {isVatPayer && !isPayrollCategory && !isNonVatCategory ? (
               <VatBreakdownInput
                 netCents={vatNetCents}
                 ratePct={vatRatePct}

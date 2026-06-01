@@ -166,14 +166,15 @@ async function handleConnectWithLogin(
         companies: flowRes.companies,
       })
     }
-    return jsonResponse(
-      {
-        ok: false,
-        error: flowRes.reason,
-        details: 'details' in flowRes ? (flowRes.details ?? null) : null,
-      },
-      400,
-    )
+    // Возвращаем 200 чтобы клиент мог парсить { ok:false, error, details }.
+    // Supabase functions.invoke() при non-2xx бросает generic 'Edge Function
+    // returned non-2xx' — конкретный reason теряется. С 200 юзер видит
+    // 'wfirma_login_failed' или 'wfirma_form_changed: <details>' и понимает.
+    return jsonResponse({
+      ok: false,
+      error: flowRes.reason,
+      details: 'details' in flowRes ? (flowRes.details ?? null) : null,
+    })
   }
 
   // Валидируем пару + получаем company nip через api2
