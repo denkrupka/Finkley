@@ -316,6 +316,12 @@ async function sendViaGmailApi(
     return b64.match(/.{1,76}/g)?.join('\r\n') ?? ''
   }
   const subjectEnc = encodeHeader(subject)
+  // Plain UTF-8 8bit body. Без base64 — некоторые receivers (onet.pl)
+  // показывали MIME headers + base64 как raw в body когда мы делали
+  // base64 inner-body. 8bit = «body это raw UTF-8 bytes» — поддерживается
+  // всеми современными mail servers. Long UTF-8 не ломается потому что
+  // SMTP servers либо поддерживают 8BITMIME extension, либо конвертят в
+  // quoted-printable при transit.
   const boundary = `finkley-${crypto.randomUUID()}`
   let mime: string
   if (htmlBody) {
@@ -327,12 +333,12 @@ async function sendViaGmailApi(
       `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
       `--${boundary}\r\n` +
       `Content-Type: text/plain; charset="UTF-8"\r\n` +
-      `Content-Transfer-Encoding: base64\r\n\r\n` +
-      `${encodeBody(textBody)}\r\n\r\n` +
+      `Content-Transfer-Encoding: 8bit\r\n\r\n` +
+      `${textBody}\r\n\r\n` +
       `--${boundary}\r\n` +
       `Content-Type: text/html; charset="UTF-8"\r\n` +
-      `Content-Transfer-Encoding: base64\r\n\r\n` +
-      `${encodeBody(htmlBody)}\r\n\r\n` +
+      `Content-Transfer-Encoding: 8bit\r\n\r\n` +
+      `${htmlBody}\r\n\r\n` +
       `--${boundary}--`
   } else {
     mime =
@@ -341,9 +347,10 @@ async function sendViaGmailApi(
       `Subject: ${subjectEnc}\r\n` +
       `MIME-Version: 1.0\r\n` +
       `Content-Type: text/plain; charset="UTF-8"\r\n` +
-      `Content-Transfer-Encoding: base64\r\n\r\n` +
-      `${encodeBody(textBody)}`
+      `Content-Transfer-Encoding: 8bit\r\n\r\n` +
+      `${textBody}`
   }
+  void encodeBody // оставлен на случай возврата к base64
   // base64url encode без padding
   const raw = strToB64(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
