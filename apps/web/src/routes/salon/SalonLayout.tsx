@@ -28,6 +28,7 @@ import { rememberLastSalon } from '@/routes/RootRedirect'
 import { SubscriptionBanner } from '@/routes/billing/SubscriptionBanner'
 import { BottomNav } from './BottomNav'
 import { FAB } from './FAB'
+import { HelpDeskBanner } from './HelpDeskBanner'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -198,6 +199,10 @@ export function SalonLayout() {
 
   return (
     <div className="bg-background min-h-screen">
+      {/* HelpDesk-баннер — показывается только если super-admin зашёл через
+          AdminSalonsPage → action 'helpdesk'. Использует sessionStorage флаг. */}
+      <HelpDeskBanner />
+
       {/* Sidebar desktop — fixed, всегда видна при прокрутке (любой высоты страницы). */}
       <div className="fixed inset-y-0 left-0 z-30 hidden lg:block">
         <Sidebar
