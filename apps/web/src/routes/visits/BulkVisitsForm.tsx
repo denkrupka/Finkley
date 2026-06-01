@@ -12,9 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { useCreateVisit, type PaymentMethod } from '@/hooks/useVisits'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 
 type Row = {
   id: string
@@ -50,6 +53,9 @@ export function BulkVisitsForm({
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
   const createVisit = useCreateVisit(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salonRow } = useSalon(salonId)
+  const country = salonRow?.country_code ?? 'PL'
 
   const today = new Date().toISOString().slice(0, 10)
   const [date, setDate] = useState(today)
@@ -90,9 +96,15 @@ export function BulkVisitsForm({
     setSubmitting(true)
     let inserted = 0
     let failed = 0
+    // VAT defaults для bulk: при isVatPayer записываем нетто из брутто по
+    // дефолтной ставке страны. Сервис может иметь свою ставку — берём её
+    // если задана. Без этого P&L не вычитает VAT из строки «НДС к оплате».
     for (const r of validRows) {
       const amountCents = Math.round(Number(r.amount.replace(',', '.')) * 100)
       const service = services.find((s) => s.id === r.service_id)
+      const sAny = service as (typeof service & { vat_rate_pct?: number | null }) | undefined
+      const rate = isVatPayer ? (sAny?.vat_rate_pct ?? defaultVatRate(country)) : 0
+      const amountNet = isVatPayer ? computeNet(amountCents, rate) : amountCents
       try {
         await createVisit.mutateAsync({
           salon_id: salonId,
@@ -102,6 +114,13 @@ export function BulkVisitsForm({
           visit_at: `${date}T12:00:00Z`,
           amount_cents: amountCents,
           payment_method: r.payment_method,
+          ...(isVatPayer
+            ? {
+                amount_net_cents: amountNet,
+                vat_rate_pct: rate,
+                vat_skipped: false,
+              }
+            : {}),
         })
         inserted++
       } catch {
