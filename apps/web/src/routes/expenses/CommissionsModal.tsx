@@ -185,7 +185,33 @@ export function CommissionsModal({
                           : '—'}
                       </td>
                       <td className="num py-2 text-right text-xs">
-                        {src ? formatCurrency(src.txAmountCents, currency) : '—'}
+                        {(() => {
+                          // Если есть источник (visit/income) — берём его сумму
+                          if (src && src.txAmountCents > 0) {
+                            return formatCurrency(src.txAmountCents, currency)
+                          }
+                          // Источник удалён, но мы можем восстановить сумму tx
+                          // как commission / commission_pct (если payment_method
+                          // знает свой процент комиссии).
+                          const pm = e.payment_method
+                            ? paymentMethods.find((p) => p.code === e.payment_method)
+                            : null
+                          const rate = pm?.commission_pct ?? 0
+                          const commission = effectivePaidCents(e)
+                          if (rate > 0 && commission > 0) {
+                            const tx = Math.round((commission * 100) / rate)
+                            return (
+                              <span
+                                title={t('expenses.commissions.tx_estimated', {
+                                  defaultValue: 'Оценка по ставке',
+                                })}
+                              >
+                                ≈ {formatCurrency(tx, currency)}
+                              </span>
+                            )
+                          }
+                          return '—'
+                        })()}
                       </td>
                       <td className="num text-destructive py-2 text-right text-xs font-semibold">
                         {formatCurrency(effectivePaidCents(e), currency)}
