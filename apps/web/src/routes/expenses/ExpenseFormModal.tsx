@@ -39,6 +39,10 @@ import {
   type ExpenseRow,
   type PayrollKind,
 } from '@/hooks/useExpenses'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useSalon } from '@/hooks/useSalons'
+import { VatBreakdownInput } from '@/components/ui/VatBreakdownInput'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 import { useStaff } from '@/hooks/useStaff'
 import {
   pickActiveAccountingProvider,
@@ -297,6 +301,13 @@ export function ExpenseFormModal({
   prefillFromBankTx,
   existingPayment,
 }: Props) {
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salonData } = useSalon(salonId)
+  const country = salonData?.country_code ?? 'PL'
+  // VAT state — синхронизирован с form.amount (брутто).
+  const [vatNetCents, setVatNetCents] = useState(0)
+  const [vatGrossCents, setVatGrossCents] = useState(0)
+  const [vatRatePct, setVatRatePct] = useState<number>(() => defaultVatRate(country))
   const { t } = useTranslation()
   const isEdit = !!expense
   const qc = useQueryClient()
@@ -456,6 +467,18 @@ export function ExpenseFormModal({
     setPaid(true)
 
     if (expense) {
+      // VAT prefill: используем amount_net_cents+vat_rate_pct если есть,
+      // иначе считаем нетто из брутто по дефолтной ставке.
+      const expAny = expense as typeof expense & {
+        amount_net_cents?: number | null
+        vat_rate_pct?: number | null
+      }
+      const rate = expAny.vat_rate_pct ?? defaultVatRate(country)
+      const gross = expense.amount_cents ?? 0
+      const net = expAny.amount_net_cents ?? computeNet(gross, rate)
+      setVatRatePct(rate)
+      setVatGrossCents(gross)
+      setVatNetCents(net)
       const isPartial =
         expense.paid_amount_cents != null && expense.paid_amount_cents < expense.amount_cents
       form.reset({
@@ -654,6 +677,9 @@ export function ExpenseFormModal({
         salon_id: salonId,
         due_date: values.expense_at,
         amount_cents: amountCents,
+        // VAT — записываем только когда фирма плательщик (миграция
+        // 20260602000001 добавила колонки в scheduled_payments).
+        ...(isVatPayer ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct } : {}),
         vendor_name: values.description.trim() || null,
         invoice_number: values.document_number.trim() || null,
         category_id: values.category_id || null,
@@ -661,7 +687,7 @@ export function ExpenseFormModal({
         bank_account_iban: formIban || null,
         comment: values.comment || null,
         source: 'manual',
-      })
+      } as Parameters<typeof supabase.from>[0] extends never ? never : Record<string, unknown>)
       if (error) {
         toast.error(t('expenses.toast_error'), { description: error.message })
         return
@@ -760,6 +786,8 @@ export function ExpenseFormModal({
         category_id: values.category_id || null,
         counterparty_id: values.counterparty_id || null,
         amount_cents: amountCents,
+        // VAT — пишем только когда фирма плательщик (миграция 20260602000001).
+        ...(isVatPayer ? { amount_net_cents: vatNetCents, vat_rate_pct: vatRatePct } : {}),
         paid_amount_cents: partialPaid,
         payment_method: values.payment_method || null,
         document_number: values.document_number.trim() || null,
@@ -770,7 +798,7 @@ export function ExpenseFormModal({
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         bank_account_iban: formIban || null,
         ...payrollFields,
-      },
+      } as Parameters<typeof createExpense.mutate>[0],
       {
         onSuccess: async (created) => {
           // Banking-flow: если создавали из транзакции, линкуем сразу
@@ -1372,20 +1400,40 @@ export function ExpenseFormModal({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="exp-amount">{t('expenses.form.amount_label')}</Label>
-            <div className="border-brand-yellow-deep bg-brand-yellow flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
-              <span className="num text-brand-navy text-2xl font-bold">{currencySymbol}</span>
-              <input
-                id="exp-amount"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min="0"
-                placeholder="0"
-                {...form.register('amount')}
-                className="num text-brand-navy placeholder:text-brand-navy/30 h-full flex-1 bg-transparent text-2xl font-bold tracking-tight outline-none"
-                data-testid="exp-amount"
+            {isVatPayer ? (
+              <VatBreakdownInput
+                netCents={vatNetCents}
+                ratePct={vatRatePct}
+                grossCents={vatGrossCents}
+                onChange={(next) => {
+                  setVatNetCents(next.netCents)
+                  setVatRatePct(next.ratePct)
+                  setVatGrossCents(next.grossCents)
+                  // Синхронизируем form.amount (брутто) для save/validation.
+                  form.setValue('amount', (next.grossCents / 100).toFixed(2), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }}
+                countryCode={country}
+                currency={currency}
               />
-            </div>
+            ) : (
+              <div className="border-brand-yellow-deep bg-brand-yellow flex h-12 items-center gap-2 rounded-md border-[1.5px] px-3.5">
+                <span className="num text-brand-navy text-2xl font-bold">{currencySymbol}</span>
+                <input
+                  id="exp-amount"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  placeholder="0"
+                  {...form.register('amount')}
+                  className="num text-brand-navy placeholder:text-brand-navy/30 h-full flex-1 bg-transparent text-2xl font-bold tracking-tight outline-none"
+                  data-testid="exp-amount"
+                />
+              </div>
+            )}
             {form.formState.errors.amount ? (
               <p className="text-destructive text-xs font-medium" role="alert">
                 {t(form.formState.errors.amount.message ?? '')}

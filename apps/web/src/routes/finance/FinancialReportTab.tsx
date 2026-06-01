@@ -38,7 +38,9 @@ import {
   useOtherIncomeCategories,
   useOtherIncomes,
 } from '@/hooks/useOtherIncomes'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
 import { useSalon } from '@/hooks/useSalons'
+import { computeNet, computeVatPayable } from '@/lib/utils/vat'
 import { useScheduledPayments } from '@/hooks/useScheduledPayments'
 import { effectiveReceivedFromVisit, useVisits } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -61,6 +63,11 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   const { data: salon } = useSalon(salonId)
   const currency = salon?.currency ?? 'PLN'
   const { data: settings = DEFAULT_FINANCIAL_SETTINGS } = useFinancialSettings(salonId)
+  // Если фирма — плательщик VAT, P&L считается в НЕТТО (по запросу юзера).
+  // НДС-баланс месяца (income_vat − expense_vat) идёт отдельной строкой
+  // «НДС к оплате» в расходы (positive = долг, negative = переплата для
+  // следующего месяца).
+  const isVatPayer = useIsVatPayer(salonId)
 
   // bug 2783fa9e — выбор периода (универсальный PeriodPickerPopover вместо
   // year-select). Таблица адаптируется под набор месяцев в диапазоне: 1 месяц
@@ -120,54 +127,94 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       }))
     const plan = make()
     const fact = make()
+    // VAT tracking: суммы НДС с доходов и расходов отдельно для подсчёта
+    // НДС к оплате (computeVatPayable) когда isVatPayer=true.
+    const vatIncome = Array.from({ length: colCount }, () => 0)
+    const vatExpense = Array.from({ length: colCount }, () => 0)
+
+    /**
+     * Возвращает нетто-эквивалент брутто-суммы для конкретной строки.
+     * Если строка имеет vat_rate_pct, считаем нетто из брутто по этой
+     * ставке. Если rate=null или isVatPayer=false → брутто как есть.
+     * Также возвращает vat_cents для накопления в income/expense VAT.
+     */
+    const toNet = (
+      grossCents: number,
+      ratePct: number | null | undefined,
+      vatSkipped?: boolean,
+    ): { net: number; vat: number } => {
+      if (!isVatPayer || vatSkipped || ratePct == null || ratePct === 0) {
+        return { net: grossCents, vat: 0 }
+      }
+      const net = computeNet(grossCents, ratePct)
+      return { net, vat: Math.max(0, grossCents - net) }
+    }
+
     const getIdx = (d: Date): number =>
       monthColIndex.get(`${d.getFullYear()}-${d.getMonth()}`) ?? -1
     for (const v of visits) {
       const m = getIdx(new Date(v.visit_at))
       if (m < 0) continue
-      // Plan = полная сумма (что должно прийти), Fact = effective (учёт
-      // частичных поступлений через paid_amount_cents).
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
-      plan[m]!.visitsRevenue += planAmt
-      if (v.status === 'paid') fact[m]!.visitsRevenue += effectiveReceivedFromVisit(v)
+      const vAny = v as typeof v & { vat_rate_pct?: number | null; vat_skipped?: boolean }
+      const { net: planNet, vat: planVat } = toNet(planAmt, vAny.vat_rate_pct, vAny.vat_skipped)
+      plan[m]!.visitsRevenue += planNet
+      if (v.status === 'paid') {
+        const factGross = effectiveReceivedFromVisit(v)
+        const { net: factNet, vat: factVat } = toNet(factGross, vAny.vat_rate_pct, vAny.vat_skipped)
+        fact[m]!.visitsRevenue += factNet
+        vatIncome[m]! += factVat
+        void planVat
+      }
     }
     for (const v of retailSales) {
       const m = getIdx(new Date(v.visit_at))
       if (m < 0) continue
       const planAmt = v.amount_cents - v.discount_cents + v.tip_cents
-      plan[m]!.retailRevenue += planAmt
-      if (v.status === 'paid') fact[m]!.retailRevenue += effectiveReceivedFromVisit(v)
+      const vAny = v as typeof v & { vat_rate_pct?: number | null; vat_skipped?: boolean }
+      const { net: planNet } = toNet(planAmt, vAny.vat_rate_pct, vAny.vat_skipped)
+      plan[m]!.retailRevenue += planNet
+      if (v.status === 'paid') {
+        const factGross = effectiveReceivedFromVisit(v)
+        const { net: factNet, vat: factVat } = toNet(factGross, vAny.vat_rate_pct, vAny.vat_skipped)
+        fact[m]!.retailRevenue += factNet
+        vatIncome[m]! += factVat
+      }
     }
     for (const oi of otherIncomes) {
       const m = getIdx(new Date(oi.income_at))
       if (m < 0) continue
-      plan[m]!.otherIncome += oi.amount_cents
-      fact[m]!.otherIncome += effectiveReceivedFromOtherIncome(oi)
+      const oiAny = oi as typeof oi & { vat_rate_pct?: number | null; vat_skipped?: boolean }
+      const { net: planNet } = toNet(oi.amount_cents, oiAny.vat_rate_pct, oiAny.vat_skipped)
+      plan[m]!.otherIncome += planNet
+      const factGross = effectiveReceivedFromOtherIncome(oi)
+      const { net: factNet, vat: factVat } = toNet(factGross, oiAny.vat_rate_pct, oiAny.vat_skipped)
+      fact[m]!.otherIncome += factNet
+      vatIncome[m]! += factVat
     }
     for (const e of expenses) {
       const m = getIdx(new Date(e.expense_at))
       if (m < 0) continue
-      // bug e007ea97/7a84bd6f — fact-колонка считается из реестра расходов
-      // (e.amount_cents). Plan на этой строке НЕ инкрементируем: для plan
-      // используются scheduled_payments (запланированные) + items из
-      // settings.fixed/variable/taxes (см. ниже buildFixedRows и т.д.).
-      fact[m]!.expensesTotal += e.amount_cents
+      const eAny = e as typeof e & { vat_rate_pct?: number | null }
+      const { net, vat } = toNet(e.amount_cents, eAny.vat_rate_pct)
+      fact[m]!.expensesTotal += net
+      vatExpense[m]! += vat
     }
     for (const sp of scheduledPayments) {
-      if (sp.status === 'paid') continue // уже учтено через paid_expense_id
+      if (sp.status === 'paid') continue
       const m = getIdx(new Date(sp.due_date))
       if (m < 0) continue
-      plan[m]!.expensesTotal += sp.amount_cents
+      const spAny = sp as typeof sp & { vat_rate_pct?: number | null }
+      const { net } = toNet(sp.amount_cents, spAny.vat_rate_pct)
+      plan[m]!.expensesTotal += net
     }
-    // bug c19e8ab6 — план должен также включать постоянные статьи бюджета
-    // (settings.fixed/variable/taxes) — это «ожидаемые ежемесячные расходы».
     const monthlyBudgetCents = sumFixedCents(settings) + sumTaxesCents(settings)
     if (monthlyBudgetCents > 0) {
       for (let m = 0; m < colCount; m++) {
         plan[m]!.expensesTotal += monthlyBudgetCents
       }
     }
-    return { plan, fact }
+    return { plan, fact, vatIncome, vatExpense }
   }, [
     visits,
     retailSales,
@@ -177,6 +224,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     settings,
     colCount,
     monthColIndex,
+    isVatPayer,
   ])
 
   const factByLabel = useMemo<Map<string, number[]>>(() => {
@@ -521,6 +569,33 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       ...r,
       parentGroupKey: 'financing',
     })),
+
+    // НДС к оплате — только когда фирма плательщик VAT. Считается как
+    // ΣНДС_доходов − ΣНДС_расходов. positive → расход (надо платить в
+    // бюджет), negative → переплата для следующего месяца.
+    ...(isVatPayer
+      ? [
+          (() => {
+            const vatRow = monthly.vatIncome.map((vIn, i) => {
+              const { vatPayableCents } = computeVatPayable({
+                vatOnIncomeCents: vIn,
+                vatOnExpenseCents: monthly.vatExpense[i] ?? 0,
+              })
+              // В P&L отрицательная позиция = расход (платим в бюджет),
+              // положительная = доход (переплата к зачёту).
+              return -vatPayableCents
+            })
+            return {
+              label: t('finance.report.vat_payable', { defaultValue: 'НДС к оплате' }) as string,
+              values: vatRow,
+              factValues: vatRow,
+              bold: true,
+              color: 'destructive' as RowColor,
+              parentGroupKey: 'expenses',
+            }
+          })(),
+        ]
+      : []),
 
     // T6 — строка «Корректировки» (баланс системной кассы Корректировки
     // на конец каждого месяца). Не складывается с Сальдо за период —
