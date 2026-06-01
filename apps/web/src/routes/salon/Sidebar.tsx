@@ -8,7 +8,7 @@ import { ReferralButton } from '@/components/ui/ReferralButton'
 import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
 import { useUnreadMessengerCount } from '@/hooks/useMessenger'
 import { usePermissions } from '@/hooks/usePermissions'
-import { useUnreadNegativeReviewsCount } from '@/hooks/useReviews'
+import { useUnreadReviewsBySource } from '@/hooks/useReviews'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
 
@@ -34,7 +34,11 @@ type Props = {
 export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollapsed }: Props) {
   const { t } = useTranslation()
   const [bugOpen, setBugOpen] = useState(false)
-  const { data: unreadNegative = 0 } = useUnreadNegativeReviewsCount(salonId)
+  // Раньше показывали только негативные внешние отзывы. Юзер 02.06: «при
+  // новом отзыве показывай тег на левой панели в Отчёты». То есть ВСЕ
+  // непрочитанные (internal + external, любой rating).
+  const { data: unreadReviewsBySource } = useUnreadReviewsBySource(salonId)
+  const unreadNegative = unreadReviewsBySource?.total ?? 0
   const { data: unreadMessenger = 0 } = useUnreadMessengerCount(salonId)
   // T35 — фильтр nav-пунктов по permissions матрице. Главная и Настройки
   // всегда видны (минимально нужны юзеру даже с самыми ограниченными правами).

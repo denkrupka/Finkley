@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
 import {
   ChevronLeft,
   ChevronRight,
@@ -424,6 +425,13 @@ function ReviewRow({
   compact?: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  // Контекстные данные для internal-отзыва — пришли через JOIN из useReviews.
+  const isInternal = review.source === 'internal'
+  const clientName = review.client?.name ?? null
+  const staffName = review.staff?.full_name ?? null
+  const visit = review.visit ?? null
+  const visitDate = visit?.visit_at ? new Date(visit.visit_at) : null
   return (
     <div
       className={cn(
@@ -452,7 +460,11 @@ function ReviewRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-foreground text-sm font-semibold">
-              {review.author_name ?? t('reports_hub.reviews.anonymous')}
+              {/* Для internal — приоритет на реальное имя клиента из портала.
+                  Если client.name пуст — fallback на author_name отзыва. */}
+              {(isInternal && clientName) ||
+                review.author_name ||
+                t('reports_hub.reviews.anonymous')}
             </p>
             <p className="text-muted-foreground text-[10px]">
               {format(parseISO(review.posted_at), 'd MMM yyyy', { locale: getDateLocale() })}
@@ -465,6 +477,33 @@ function ReviewRow({
               {t('reports_hub.reviews.no_text')}
             </p>
           )}
+          {/* Internal — контекстный блок: визит, услуга, дата/время, мастер.
+              Только если есть связь с visit (visit_id NOT NULL). */}
+          {isInternal && visit ? (
+            <div className="border-border/60 bg-muted/30 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2 text-[11px]">
+              {visit.service_name_snapshot ? (
+                <span className="text-foreground font-semibold">{visit.service_name_snapshot}</span>
+              ) : null}
+              {staffName ? (
+                <span className="text-muted-foreground">
+                  · {t('reports_hub.reviews.context_staff', { defaultValue: 'мастер' })}{' '}
+                  <span className="text-foreground font-semibold">{staffName}</span>
+                </span>
+              ) : null}
+              {visitDate ? (
+                <span className="text-muted-foreground num">
+                  · {format(visitDate, 'd MMM yyyy, HH:mm', { locale: getDateLocale() })}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setVisitModalOpen(true)}
+                className="text-brand-teal-deep hover:text-brand-teal ml-auto inline-flex items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+              >
+                {t('reports_hub.reviews.open_visit', { defaultValue: 'Открыть визит →' })}
+              </button>
+            </div>
+          ) : null}
         </div>
         {!review.read_at ? (
           <button
@@ -477,6 +516,15 @@ function ReviewRow({
           </button>
         ) : null}
       </div>
+      {/* VisitDetailModal — открывает связанный визит по клику «Открыть визит» */}
+      {visitModalOpen && visit ? (
+        <VisitDetailModal
+          visit={{ id: visit.id } as Parameters<typeof VisitDetailModal>[0]['visit']}
+          salonId={salonId}
+          currency="PLN"
+          onClose={() => setVisitModalOpen(false)}
+        />
+      ) : null}
       <div className="pl-12">
         <ReviewAiPanel
           salonId={salonId}

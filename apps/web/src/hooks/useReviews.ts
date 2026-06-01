@@ -24,6 +24,14 @@ export type ReviewRow = {
   reply_text: string | null
   reply_author: string | null
   reply_posted_at: string | null
+  /** Контекст из связанных таблиц (только internal-отзывы, у внешних null). */
+  client?: { id: string; name: string | null } | null
+  staff?: { id: string; full_name: string | null } | null
+  visit?: {
+    id: string
+    visit_at: string
+    service_name_snapshot: string | null
+  } | null
 }
 
 export function useReviews(salonId: string | undefined) {
@@ -31,14 +39,31 @@ export function useReviews(salonId: string | undefined) {
     queryKey: ['reviews', salonId],
     queryFn: async () => {
       if (!salonId) return []
+      // JOIN clients/staff/visits — для internal отзывов нужны имя клиента,
+      // мастера, услуга, дата/время. PostgREST embed: select=...,fk(cols)
       const { data, error } = await supabase
         .from('reviews')
-        .select('*')
+        .select(
+          '*, client:clients(id, name), staff:staff(id, full_name), visit:visits(id, visit_at, service_name_snapshot)',
+        )
         .eq('salon_id', salonId)
         .order('posted_at', { ascending: false })
         .limit(500)
       if (error) throw error
-      return (data ?? []) as ReviewRow[]
+      // PostgREST embed может вернуть массив для single-FK — нормализуем в объект.
+      const rows = (data ?? []) as Array<
+        ReviewRow & {
+          client: ReviewRow['client'] | ReviewRow['client'][]
+          staff: ReviewRow['staff'] | ReviewRow['staff'][]
+          visit: ReviewRow['visit'] | ReviewRow['visit'][]
+        }
+      >
+      return rows.map((r) => ({
+        ...r,
+        client: Array.isArray(r.client) ? (r.client[0] ?? null) : r.client,
+        staff: Array.isArray(r.staff) ? (r.staff[0] ?? null) : r.staff,
+        visit: Array.isArray(r.visit) ? (r.visit[0] ?? null) : r.visit,
+      })) as ReviewRow[]
     },
     enabled: !!salonId,
     staleTime: 60_000,
@@ -47,11 +72,7 @@ export function useReviews(salonId: string | undefined) {
 
 /**
  * Кол-во непрочитанных НЕГАТИВНЫХ внешних отзывов (Booksy/Google rating < 5,
- * read_at IS NULL). Используется sidebar-badge на пункте «Отчёты» — юзер
- * сразу видит сколько новых негативных отзывов ждут реакции.
- *
- * Считается через PostgREST count=exact + head=true — payload не возвращается,
- * только count в headers, поэтому дёшево.
+ * read_at IS NULL). Legacy hook — оставлен для backwards-compat.
  */
 export function useUnreadNegativeReviewsCount(salonId: string | undefined) {
   return useQuery<number>({
@@ -70,6 +91,41 @@ export function useUnreadNegativeReviewsCount(salonId: string | undefined) {
     },
     enabled: !!salonId,
     staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Counts непрочитанных отзывов разделённые по source (internal vs external).
+ * Используется для badges на:
+ *   - Sidebar «Отчёты» (total = internal + external)
+ *   - Tab «Отзывы» внутри Reports (total)
+ *   - Sub-tab «Внутренние» (internal) / «С Booksy и Google» (external)
+ *
+ * Запрос один — SELECT с group by source через PostgREST не работает, поэтому
+ * тянем все непрочитанные id + source, считаем на клиенте.
+ */
+export function useUnreadReviewsBySource(salonId: string | undefined) {
+  return useQuery<{ internal: number; external: number; total: number }>({
+    queryKey: ['reviews-unread-by-source', salonId],
+    queryFn: async () => {
+      if (!salonId) return { internal: 0, external: 0, total: 0 }
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('id, source')
+        .eq('salon_id', salonId)
+        .is('read_at', null)
+      if (error) throw error
+      let internal = 0
+      let external = 0
+      for (const r of (data ?? []) as Array<{ source: string }>) {
+        if (r.source === 'internal') internal++
+        else external++
+      }
+      return { internal, external, total: internal + external }
+    },
+    enabled: !!salonId,
+    staleTime: 30_000,
     refetchOnWindowFocus: true,
   })
 }

@@ -3982,6 +3982,10 @@
       "history_pending": "Ожидание",
       "history_failed": "Не удалось",
       "history_refunded": "Возврат",
+      "history_bonus": "Бонус",
+      "history_promo": "Промо",
+      "history_trial": "Триал",
+      "history_admin_grant": "Зачислено вручную",
       "info_footer": "1 SMS = 1 сообщение длиной до 160 символов GSM-7 / 70 UTF-16. Длинные сообщения списываются как несколько SMS.",
       "toast_stripe_success": "Оплата прошла — баланс пополнится в течение нескольких секунд.",
       "toast_stripe_cancel": "Оплата отменена."
