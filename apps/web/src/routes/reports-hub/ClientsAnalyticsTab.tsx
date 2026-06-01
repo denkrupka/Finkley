@@ -716,10 +716,14 @@ function SegmentPill({
   onClick: () => void
 }) {
   const toneClass: Record<PillTone, string> = {
-    navy: 'border-brand-navy/40 data-[active=true]:bg-brand-navy data-[active=true]:text-white',
+    // navy: в dark mode --brand-navy зеркалится в почти-белый (так задумано
+    // для texts на тёмном фоне). На pill это даёт белое-на-белом — поэтому
+    // active-фон явно навешиваем через `--brand-navy-soft` (тёмно-синий в
+    // dark, остаётся navy в light).
+    navy: 'border-brand-navy/40 data-[active=true]:bg-brand-navy dark:data-[active=true]:bg-brand-navy-soft data-[active=true]:text-white',
     sage: 'border-brand-sage/40 data-[active=true]:bg-brand-sage data-[active=true]:text-white',
     amber:
-      'border-amber-400/60 data-[active=true]:bg-amber-500 data-[active=true]:text-white text-amber-900',
+      'border-amber-400/60 data-[active=true]:bg-amber-500 data-[active=true]:text-white text-amber-900 dark:text-amber-300',
     teal: 'border-brand-teal/40 data-[active=true]:bg-brand-teal data-[active=true]:text-white',
     red: 'border-destructive/40 data-[active=true]:bg-destructive data-[active=true]:text-white text-destructive',
   }

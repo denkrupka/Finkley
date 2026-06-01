@@ -103,7 +103,7 @@ export function AIAssistantPage() {
   const showQuickActions = !isLoading && !hasUserMessage && !sendMsg.isPending
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-8">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-5 py-7 sm:px-8 lg:pb-8">
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
@@ -178,7 +178,7 @@ export function AIAssistantPage() {
         {showQuickActions ? <QuickActions onPick={(prompt) => send(prompt)} /> : null}
 
         <form
-          className="border-border flex items-end gap-2 border-t bg-white px-3 py-3 sm:px-4"
+          className="border-border bg-card flex items-end gap-2 border-t px-3 py-3 sm:px-4"
           onSubmit={(e) => {
             e.preventDefault()
             send(input)

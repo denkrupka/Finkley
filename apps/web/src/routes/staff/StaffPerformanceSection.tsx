@@ -210,21 +210,54 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
   }
 
   /**
-   * T85/T86 + бэйджи 31.05 (несоответствие 100%/100% retention + 60% churn у
-   * Alina). Раньше отток считался «после визита у мастера клиент в салон не
-   * возвращался» — независимо от давности, поэтому свежие клиенты тоже
-   * считались «оттоком» (последний визит и был у этого мастера).
+   * Period-aware churn (запрос юзера 01.06):
+   *   «Из клиентов которые были у мастера в ОКНЕ-ПРЕДШЕСТВЕННИКЕ той же
+   *    длины, что и текущий период, сколько НЕ пришли в текущем периоде?»
    *
-   * Новая логика: клиент в оттоке, если его последний визит в салон был
-   * раньше, чем `churn_window_days` дней назад (по умолчанию 90). Этот
-   * показатель согласован с retention в периоде: если все клиенты мастера
-   * были недавно (в окне), churn = 0.
+   * Пример. Период = «Май 2026» (31 день).
+   *   prevWindow = «Апрель 2026» (31 день).
+   *   prevClients = клиенты мастера в апреле.
+   *   currentInSalon = клиенты любого мастера салона в мае.
+   *   churned = prevClients ∖ currentInSalon → % = churned / prevClients.
    *
-   * Скоринг — мультипликативный 0..1: newR × regR × (1 − ch). При 100%/100%
-   * retention и 0% churn → 1.0, при 0/0/100% → 0.0. Нет деления — пороги
-   * стабильные и согласованные с retention-цветами.
+   * Если периода нет (старый flow) — fallback на «давно не были»:
+   * last_in_salon < (today − churn_window_days). Если периода нет И у
+   * мастера 0 клиентов когда-либо — `null` (показываем «—»).
+   *
+   * Скоринг — newR × regR × (1 − ch), 0..1.
    */
   function churnFor(staffId: string): { churn_pct: number | null; total: number } {
+    if (periodRange) {
+      const periodStartMs = periodRange.start.getTime()
+      const periodEndMs = periodRange.end.getTime()
+      const periodLenMs = periodEndMs - periodStartMs
+      const prevStartMs = periodStartMs - periodLenMs
+      const prevEndMs = periodStartMs
+
+      const prevClientsAtMaster = new Set<string>()
+      const currentInSalon = new Set<string>()
+      for (const v of allTimeVisits) {
+        if (!v.client_id) continue
+        const t = new Date(v.visit_at).getTime()
+        if (t >= prevStartMs && t < prevEndMs && v.staff_id === staffId) {
+          prevClientsAtMaster.add(v.client_id)
+        }
+        if (t >= periodStartMs && t <= periodEndMs) {
+          currentInSalon.add(v.client_id)
+        }
+      }
+      if (prevClientsAtMaster.size === 0) return { churn_pct: null, total: 0 }
+      let churned = 0
+      for (const cid of prevClientsAtMaster) {
+        if (!currentInSalon.has(cid)) churned += 1
+      }
+      return {
+        churn_pct: (churned / prevClientsAtMaster.size) * 100,
+        total: prevClientsAtMaster.size,
+      }
+    }
+
+    // Fallback (нет periodRange): классическое «давно не были».
     const clientsAtMaster = new Set<string>()
     for (const v of allTimeVisits) {
       if (v.staff_id === staffId && v.client_id) clientsAtMaster.add(v.client_id)

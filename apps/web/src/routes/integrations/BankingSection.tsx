@@ -101,14 +101,37 @@ export function BankingSection({ salonId }: Props) {
       onSuccess: (res) => {
         if (res.error) {
           toast.error(t('banking.toast_sync_failed'), { description: res.error })
-        } else {
-          toast.success(t('banking.toast_synced'), {
-            description: t('banking.toast_synced_detail', {
-              tx: res.tx_new,
-              expenses: res.expenses_created,
-            }),
-          })
+          return
         }
+        const pending = res.pending ?? 0
+        // Если новых транзакций 0 — это **не успех**, а индикация что банк
+        // ещё не зафиксировал свежие. Юзер 01.06 жаловался: тост говорит
+        // «Завершена», но новых нет → было непонятно что банк лагает.
+        if (res.tx_new === 0 && pending === 0) {
+          toast.info(
+            t('banking.toast_no_new_tx', {
+              defaultValue:
+                'Новых транзакций нет. Банк ещё не передал свежие — обычно 1–24 часа после операции.',
+            }),
+          )
+          return
+        }
+        if (res.tx_new === 0 && pending > 0) {
+          toast.warning(
+            t('banking.toast_only_pending', {
+              defaultValue:
+                'Banking вернул {{n}} в ожидании банка (PDNG). Появятся как booked после фиксации.',
+              n: pending,
+            }),
+          )
+          return
+        }
+        toast.success(t('banking.toast_synced'), {
+          description: t('banking.toast_synced_detail', {
+            tx: res.tx_new,
+            expenses: res.expenses_created,
+          }),
+        })
       },
       onError: (err) => {
         toast.error(t('banking.toast_sync_failed'), {

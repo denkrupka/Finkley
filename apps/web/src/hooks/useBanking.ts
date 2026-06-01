@@ -741,6 +741,7 @@ export function useBankSyncNow(salonId: string | undefined) {
         accounts_synced: number
         tx_total: number
         tx_new: number
+        pending?: number
         expenses_created: number
         error?: string
       }

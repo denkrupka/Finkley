@@ -52,56 +52,109 @@ function extractCookies(setCookieHeader: string): string {
     .join('; ')
 }
 
-async function login(loginField: string, password: string): Promise<AuthOk> {
-  const r = await fetch(`${TREATWELL_BASE}/api/authentication.json`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json',
-      'x-requested-with': 'XMLHttpRequest',
-      origin: TREATWELL_BASE,
-      referer: `${TREATWELL_BASE}/login`,
-      'user-agent': UA,
-    },
-    body: JSON.stringify({ email: loginField, password }),
-  })
-  const txt = await r.text()
-  if (!r.ok) {
-    throw new Error(`treatwell auth ${r.status}: ${txt.slice(0, 200)}`)
-  }
-  const setCookies = r.headers.get('set-cookie') ?? ''
-  const cookies = extractCookies(setCookies)
-  if (!cookies) throw new Error('treatwell auth: no session cookie')
-
-  // Получаем venueId из extranet-settings (auth response часто пустой).
-  const settings = await fetch(`${TREATWELL_BASE}/api/extranet-settings.json`, {
-    headers: { accept: 'application/json', cookie: cookies, 'user-agent': UA },
-  })
-  let venueId = ''
-  let supplierId: string | undefined
-  if (settings.ok) {
-    const data = (await settings.json().catch(() => ({}))) as {
-      account?: { venueId?: number; supplierId?: number }
-      venueId?: number
-      venues?: Array<{ id: number }>
+/** Рекурсивный поиск числового поля по имени в произвольном JSON-объекте. */
+function deepFindNumberField(obj: unknown, name: string): number | undefined {
+  if (!obj || typeof obj !== 'object') return undefined
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (k === name && (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v)))) {
+      return Number(v)
     }
-    venueId = String(data.account?.venueId ?? data.venueId ?? data.venues?.[0]?.id ?? '')
-    if (data.account?.supplierId) supplierId = String(data.account.supplierId)
+    if (v && typeof v === 'object') {
+      const found = deepFindNumberField(v, name)
+      if (found !== undefined) return found
+    }
   }
-  // Fallback из auth-response (если venueId был там).
+  return undefined
+}
+
+async function login(loginField: string, password: string): Promise<AuthOk> {
+  // Treatwell принимает обе формы — `{email, password}` и `{username, password}`
+  // (зависит от endpoint версии). Пробуем обе.
+  const bodies = [
+    JSON.stringify({ email: loginField, password }),
+    JSON.stringify({ username: loginField, password }),
+  ]
+  let lastStatus = 0
+  let lastText = ''
+  let cookies = ''
+  let txt = ''
+  for (const body of bodies) {
+    const r = await fetch(`${TREATWELL_BASE}/api/authentication.json`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        'x-requested-with': 'XMLHttpRequest',
+        origin: TREATWELL_BASE,
+        referer: `${TREATWELL_BASE}/login`,
+        'user-agent': UA,
+      },
+      body,
+    })
+    txt = await r.text()
+    lastStatus = r.status
+    lastText = txt
+    const setCookies = r.headers.get('set-cookie') ?? ''
+    const c = extractCookies(setCookies)
+    if (r.ok && c) {
+      cookies = c
+      break
+    }
+  }
+  if (!cookies) {
+    throw new Error(
+      `treatwell_login_failed: HTTP ${lastStatus}${lastText ? ': ' + lastText.slice(0, 300) : ''}. Проверь email/пароль или 2FA.`,
+    )
+  }
+
+  // Получаем venueId — пробуем несколько endpoints. HAR показал что body
+  // у extranet-settings часто пустой/без venueId, поэтому добавляем
+  // fallback'и + рекурсивный поиск.
+  let venueId = ''
+  const tryEndpoints = [
+    '/api/extranet-settings.json',
+    '/api/role-permissions.json',
+    '/api/treatments.json',
+  ]
+  const fetched: Array<{ path: string; body: unknown }> = []
+  for (const path of tryEndpoints) {
+    try {
+      const res = await fetch(`${TREATWELL_BASE}${path}`, {
+        headers: { accept: 'application/json', cookie: cookies, 'user-agent': UA },
+      })
+      if (!res.ok) continue
+      const data = await res.json().catch(() => null)
+      if (!data) continue
+      fetched.push({ path, body: data })
+      const id = deepFindNumberField(data, 'venueId') ?? deepFindNumberField(data, 'venue_id')
+      if (id) {
+        venueId = String(id)
+        break
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  // Auth-response тоже проверяем
   if (!venueId) {
     try {
-      const authJson = JSON.parse(txt) as {
-        user?: { venueId?: number | string }
-        venueId?: number | string
-      }
-      venueId = String(authJson.user?.venueId ?? authJson.venueId ?? '')
+      const authJson = JSON.parse(txt)
+      const id =
+        deepFindNumberField(authJson, 'venueId') ?? deepFindNumberField(authJson, 'venue_id')
+      if (id) venueId = String(id)
     } catch {
       /* ignore */
     }
   }
-  if (!venueId) throw new Error('treatwell: no venueId after login')
-  return { sessionCookies: cookies, venueId, supplierId }
+  if (!venueId) {
+    const diag = fetched
+      .map((f) => `${f.path}: ${JSON.stringify(f.body).slice(0, 200)}`)
+      .join(' | ')
+    throw new Error(
+      `treatwell_no_venueid: не удалось извлечь venueId из API. Диагностика: ${diag.slice(0, 500)}`,
+    )
+  }
+  return { sessionCookies: cookies, venueId }
 }
 
 async function api<T>(cookies: string, path: string): Promise<T> {
@@ -435,7 +488,11 @@ Deno.serve(async (req: Request) => {
       })
     }
   } catch (e) {
-    return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+    // Возвращаем 200 + ok:false + читаемое сообщение, иначе invoke-клиент
+    // получает generic «non-2xx status code» и юзер не видит причины.
+    const msg = (e as Error).message ?? 'unknown_error'
+    console.error('treatwell-proxy error:', msg, (e as Error).stack)
+    return jsonResponse({ ok: false, error: msg }, 200)
   }
 
   return jsonResponse({ error: 'unknown_action' }, 400)

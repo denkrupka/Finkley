@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { renderMarkdownInline } from '@/lib/utils/render-markdown-inline'
 import {
   type BulkContent,
   type ReviewAiResponse,
@@ -273,13 +274,15 @@ function BulkRender({ c, cached }: { c: BulkContent; cached: boolean }) {
   return (
     <div>
       <CachedBadge cached={cached} />
-      <Section title={t('reports_hub.reviews.ai.b.overview')}>{c.overview}</Section>
+      <Section title={t('reports_hub.reviews.ai.b.overview')}>
+        {renderMarkdownInline(c.overview)}
+      </Section>
       {c.patterns?.length ? (
         <Section title={t('reports_hub.reviews.ai.b.patterns')}>
           <ul className="space-y-1.5">
             {c.patterns.map((p, i) => (
               <li key={i}>
-                <b>{p.title}:</b> {p.description}
+                <b>{renderMarkdownInline(p.title)}:</b> {renderMarkdownInline(p.description)}
               </li>
             ))}
           </ul>
