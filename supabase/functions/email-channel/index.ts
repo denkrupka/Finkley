@@ -62,6 +62,91 @@ async function sendEmail(
   }
 }
 
+/**
+ * Refresh Google OAuth access_token через refresh_token. Используется в
+ * action='send' когда access_token истёк (или истечёт в ближайшую минуту).
+ */
+async function refreshGoogleToken(
+  refreshToken: string,
+): Promise<{ access_token: string; expires_in: number } | null> {
+  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? ''
+  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? ''
+  if (!clientId || !clientSecret) return null
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+    }).toString(),
+  })
+  if (!res.ok) {
+    console.error('refresh token failed:', await res.text())
+    return null
+  }
+  return (await res.json()) as { access_token: string; expires_in: number }
+}
+
+/**
+ * Send email via Gmail REST API (users.messages.send). raw — RFC 822
+ * message в base64url. Лучше чем SMTP для Gmail (нет spam-маркировки,
+ * authenticated). Юзер видит письмо в своих «Отправленных».
+ */
+async function sendViaGmailApi(
+  accessToken: string,
+  fromEmail: string,
+  to: string,
+  subject: string,
+  textBody: string,
+  htmlBody?: string,
+): Promise<void> {
+  // Строим MIME-сообщение. Если есть HTML — multipart/alternative, иначе plain.
+  const boundary = `finkley-${crypto.randomUUID()}`
+  let mime: string
+  if (htmlBody) {
+    mime =
+      `From: ${fromEmail}\r\n` +
+      `To: ${to}\r\n` +
+      `Subject: ${subject}\r\n` +
+      `MIME-Version: 1.0\r\n` +
+      `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
+      `${textBody}\r\n\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: text/html; charset="UTF-8"\r\n\r\n` +
+      `${htmlBody}\r\n\r\n` +
+      `--${boundary}--`
+  } else {
+    mime =
+      `From: ${fromEmail}\r\n` +
+      `To: ${to}\r\n` +
+      `Subject: ${subject}\r\n` +
+      `MIME-Version: 1.0\r\n` +
+      `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
+      `${textBody}`
+  }
+  // base64url encode без padding
+  const raw = btoa(unescape(encodeURIComponent(mime)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ raw }),
+  })
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`gmail_api_send_failed: ${res.status} ${errText.slice(0, 200)}`)
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return preflight()
   if (!SUPABASE_URL || !SERVICE_KEY) return jsonResponse({ error: 'not_configured' }, 500)
@@ -174,14 +259,69 @@ Deno.serve(async (req: Request) => {
       .eq('salon_id', body.salon_id)
       .eq('channel', 'email')
       .maybeSingle()
-    const creds = (integ?.credentials as { smtp?: SmtpConfig } | null)?.smtp
-    if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
-    try {
-      await sendEmail(creds, body.to, body.subject, body.text_body, body.html_body)
-      return jsonResponse({ ok: true })
-    } catch (e) {
-      return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+    const allCreds = (integ?.credentials ?? {}) as {
+      smtp?: SmtpConfig
+      oauth?: {
+        access_token: string
+        refresh_token?: string
+        expires_at: string
+        email?: string | null
+      }
     }
+    // Приоритет: OAuth → SMTP. OAuth даёт лучший delivery (Gmail не маркит
+    // спамом), не требует app-password. SMTP fallback для не-Gmail или
+    // пока юзер не подключил OAuth.
+    if (allCreds.oauth?.access_token) {
+      try {
+        let accessToken = allCreds.oauth.access_token
+        // Auto-refresh если токен истёк (или истечёт в ближайшую минуту)
+        const expiresAt = new Date(allCreds.oauth.expires_at).getTime()
+        if (Date.now() > expiresAt - 60_000 && allCreds.oauth.refresh_token) {
+          const refreshed = await refreshGoogleToken(allCreds.oauth.refresh_token)
+          if (refreshed) {
+            accessToken = refreshed.access_token
+            await admin
+              .from('messenger_integrations')
+              .update({
+                credentials: {
+                  ...allCreds,
+                  oauth: {
+                    ...allCreds.oauth,
+                    access_token: refreshed.access_token,
+                    expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+                  },
+                },
+              })
+              .eq('salon_id', body.salon_id)
+              .eq('channel', 'email')
+          }
+        }
+        const fromEmail = allCreds.oauth.email ?? 'me'
+        await sendViaGmailApi(
+          accessToken,
+          fromEmail,
+          body.to,
+          body.subject,
+          body.text_body,
+          body.html_body,
+        )
+        return jsonResponse({ ok: true, via: 'gmail_oauth' })
+      } catch (e) {
+        // Если OAuth не сработал, пробуем SMTP fallback
+        if (!allCreds.smtp) {
+          return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+        }
+      }
+    }
+    if (allCreds.smtp) {
+      try {
+        await sendEmail(allCreds.smtp, body.to, body.subject, body.text_body, body.html_body)
+        return jsonResponse({ ok: true, via: 'smtp' })
+      } catch (e) {
+        return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+      }
+    }
+    return jsonResponse({ ok: false, error: 'not_connected' }, 404)
   }
 
   if (body.action === 'poll') {
