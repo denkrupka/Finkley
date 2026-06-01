@@ -65,6 +65,13 @@ enable_confirmations = false
 [functions]
 # Edge functions — Deno runtime. Деплой через GitHub Actions (см. .github/workflows/deploy-supabase.yml)
 
+# email-channel-oauth-callback — принимает GET-редирект от Google после
+# OAuth consent. Google не передаёт JWT, поэтому verify_jwt=false.
+# Сама функция читает state=<salon_id> из query — security гарантирован
+# тем что code valid только для нашего client_id/secret.
+[functions.email-channel-oauth-callback]
+verify_jwt = false
+
 [analytics]
 enabled = false
 
