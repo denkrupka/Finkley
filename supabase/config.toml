@@ -78,6 +78,11 @@ verify_jwt = false
 [functions.email-channel-pubsub-webhook]
 verify_jwt = false
 
+# Telegram webhook — Telegram не передаёт JWT. Security гарантируется
+# secret_token в URL path (см. setWebhook параметр secret_token).
+[functions.telegram-user-bot]
+verify_jwt = false
+
 [analytics]
 enabled = false
 
