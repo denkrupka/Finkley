@@ -10,6 +10,7 @@ import {
   Facebook,
   Image as ImageIcon,
   Instagram,
+  Mail,
   MessageCircle,
   Mic,
   Paperclip,
@@ -181,6 +182,12 @@ const CHANNEL_META: Record<
     labelKey: 'messenger.channel.facebook',
     color: '#1877F2',
     icon: Facebook,
+  },
+  email: {
+    label: 'Email',
+    labelKey: 'messenger.channel.email',
+    color: '#0F4C5C',
+    icon: Mail,
   },
   internal: {
     label: 'Внутренний',
@@ -371,7 +378,7 @@ export function MessengerPage() {
               >
                 <MessageCircle className="size-3.5" strokeWidth={2} />
               </IconChip>
-              {(['telegram', 'whatsapp', 'instagram', 'facebook'] as const)
+              {(['telegram', 'whatsapp', 'instagram', 'facebook', 'email'] as const)
                 .filter((ch) => connectedChannels.has(ch))
                 .map((ch) => {
                   const meta = CHANNEL_META[ch]

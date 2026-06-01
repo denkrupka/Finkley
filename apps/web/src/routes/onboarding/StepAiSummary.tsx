@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Brain, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { supabase } from '@/lib/supabase/client'
@@ -50,8 +51,20 @@ export function StepAiSummary({
 }) {
   const { t, i18n } = useTranslation()
 
+  // Grace-период перед запуском AI: если salonId есть, ждём 15с чтобы
+  // фоновые sync'и Booksy/Versum/Wfirma успели импортировать visits/clients/
+  // services. Без этого AI получает 0 данных и отвечает по counters, а не
+  // по реальным цифрам — запрос юзера 01.06.
+  const [grace, setGrace] = useState<boolean>(() => Boolean(salonId))
+  useEffect(() => {
+    if (!salonId) return
+    const id = setTimeout(() => setGrace(false), 15_000)
+    return () => clearTimeout(id)
+  }, [salonId])
+
   const summary = useQuery({
     queryKey: ['onboarding-ai-summary', salonId ?? null],
+    enabled: !grace,
     queryFn: async (): Promise<AiSummary> => {
       const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
         body: {

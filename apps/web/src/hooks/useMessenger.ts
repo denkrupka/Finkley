@@ -66,7 +66,13 @@ export function useMessengerRealtime(salonId: string | undefined) {
   }, [salonId, qc])
 }
 
-export type MessengerChannel = 'telegram' | 'whatsapp' | 'instagram' | 'facebook' | 'internal'
+export type MessengerChannel =
+  | 'telegram'
+  | 'whatsapp'
+  | 'instagram'
+  | 'facebook'
+  | 'email'
+  | 'internal'
 
 export type MessengerConversation = {
   id: string

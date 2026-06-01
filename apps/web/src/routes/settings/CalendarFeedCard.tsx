@@ -1,4 +1,4 @@
-import { Calendar, Copy, Loader2, RotateCcw } from 'lucide-react'
+import { Calendar, Copy, ExternalLink, Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -55,6 +55,38 @@ export function CalendarFeedCard() {
                 <Copy className="size-4" strokeWidth={1.8} />
                 {t('settings.calendar.copy')}
               </Button>
+            </div>
+            {/* One-click attach: открывает diff. внешние календари с URL
+                feed'а. Google: `?cid=` URL-encoded; iCloud/Apple: префикс
+                `webcal://` принимают как авто-subscribe. Outlook аналогично. */}
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(url)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold"
+              >
+                <ExternalLink className="size-3.5" strokeWidth={1.8} />
+                {t('settings.calendar.open_google', { defaultValue: 'Открыть в Google Calendar' })}
+              </a>
+              <a
+                href={url.replace(/^https?:\/\//, 'webcal://')}
+                className="border-border hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold"
+              >
+                <ExternalLink className="size-3.5" strokeWidth={1.8} />
+                {t('settings.calendar.open_apple', {
+                  defaultValue: 'Открыть в iCloud / Apple Calendar',
+                })}
+              </a>
+              <a
+                href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=Finkley`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold"
+              >
+                <ExternalLink className="size-3.5" strokeWidth={1.8} />
+                {t('settings.calendar.open_outlook', { defaultValue: 'Открыть в Outlook' })}
+              </a>
             </div>
             <p className="text-muted-foreground text-xs">{t('settings.calendar.how_to')}</p>
             <button

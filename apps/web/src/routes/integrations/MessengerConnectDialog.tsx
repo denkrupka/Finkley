@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { useConnectMessenger, useStartOAuth, type MessengerChannel } from '@/hooks/useMessenger'
 
 const META: Record<
-  Exclude<MessengerChannel, 'internal'>,
+  Exclude<MessengerChannel, 'internal' | 'email'>,
   { name: string; icon: typeof Send; color: string }
 > = {
   telegram: { name: 'Telegram', icon: Send, color: '#229ED9' },
@@ -28,7 +28,7 @@ const META: Record<
 
 type Props = {
   open: boolean
-  channel: Exclude<MessengerChannel, 'internal'> | null
+  channel: Exclude<MessengerChannel, 'internal' | 'email'> | null
   salonId: string
   onClose: () => void
 }
