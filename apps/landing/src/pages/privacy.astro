@@ -4,7 +4,7 @@ import Layout from '../layouts/Layout.astro'
 // ⚠ TEMPLATE для review юристом: проставить актуальный NIP и адрес JDG.
 // См. docs/legal/PRIVACY_POLICY_RU.md (источник в /docs/) и docs/06_SECURITY_PRIVACY.md.
 
-const UPDATED = '8 мая 2026'
+const UPDATED = '1 июня 2026'
 ---
 
 <Layout
@@ -28,13 +28,13 @@ const UPDATED = '8 мая 2026'
       <section>
         <h2 class="text-2xl font-bold tracking-tight text-brand-navy">1. Кто мы</h2>
         <p class="mt-3">
-          Finkley — продукт ИП Denis Krupka (Jednoosobowa Działalność Gospodarcza, Polska),
-          NIP <strong>[заполняется до публичного запуска]</strong>,
-          адрес <strong>[заполняется до публичного запуска]</strong>.
+          Finkley — продукт компании <strong>MaxMaster Sp. z o.o.</strong>,
+          NIP <strong>7811994452</strong>,
+          адрес <strong>ul. Juliusza Słowackiego 55/1, 60-521 Poznań, Polska</strong>.
           Контакт по вопросам приватности —
-          <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">privacy@finkley.app</a>,
+          <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>,
           по общим вопросам —
-          <a href="mailto:support@finkley.app" class="text-brand-teal underline">support@finkley.app</a>.
+          <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>.
         </p>
       </section>
 
@@ -44,7 +44,7 @@ const UPDATED = '8 мая 2026'
           <li>Регистрация: email, пароль (хешированный), имя</li>
           <li>Профиль салона: имя, страна, валюта, тип, опционально логотип</li>
           <li>Рабочие данные: визиты, расходы, мастера, клиенты салона (которых ты вводишь сама)</li>
-          <li>Интеграции: токены Booksy/wFirma — зашифрованы, доступ только с серверного ключа</li>
+          <li>Интеграции: токены Booksy / wFirma / Fakturownia / inFakt / Gmail (OAuth) — зашифрованы, доступ только с серверного ключа</li>
           <li>Технические: IP, user agent, временные метки запросов (для безопасности)</li>
         </ul>
       </section>
@@ -108,7 +108,7 @@ const UPDATED = '8 мая 2026'
           <li><strong>Портабельность</strong> — экспорт в CSV/JSON</li>
           <li>
             <strong>Ограничение / возражение</strong> — email на
-            <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">privacy@finkley.app</a>
+            <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>
           </li>
           <li>
             <strong>Автоматизированные решения</strong> — не применимо. AI-инсайты (стадия 4) —
@@ -121,7 +121,81 @@ const UPDATED = '8 мая 2026'
       </section>
 
       <section>
-        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">8. Cookies</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">8. Google Workspace / Gmail API</h2>
+        <p class="mt-3">
+          Опционально ты можешь подключить Gmail аккаунт салона к Finkley через Google OAuth 2.0,
+          чтобы вести переписку с клиентами внутри встроенного мессенджера Finkley.
+          Подключение полностью добровольное и в любой момент отключается.
+        </p>
+        <h3 class="mt-4 text-lg font-semibold text-brand-navy">Какие scope'ы мы запрашиваем</h3>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>
+            <code class="rounded bg-brand-cream px-1 py-0.5 text-sm">gmail.send</code> —
+            отправлять письма от имени подключённого аккаунта в ответ клиентам прямо из
+            интерфейса Finkley.
+          </li>
+          <li>
+            <code class="rounded bg-brand-cream px-1 py-0.5 text-sm">gmail.readonly</code> —
+            читать входящие письма INBOX, чтобы показывать их как диалоги в мессенджере
+            Finkley. Доступ только на чтение, мы не редактируем и не удаляем твою почту.
+          </li>
+        </ul>
+        <h3 class="mt-4 text-lg font-semibold text-brand-navy">Что мы делаем с данными Gmail</h3>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>
+            <strong>Хранение токенов.</strong> Access / refresh токены OAuth хранятся в
+            messenger_integrations.credentials в зашифрованном виде (AES-256-GCM, ключ только
+            у сервера Edge Functions). Сам пароль Google-аккаунта мы никогда не видим.
+          </li>
+          <li>
+            <strong>Содержимое писем.</strong> Метаданные входящих (From, Subject, дата, snippet
+            до 200 символов) сохраняются в messenger_messages для отображения списка диалогов.
+            Полное тело писем не загружается в нашу БД — отображается через snippet от Gmail API.
+          </li>
+          <li>
+            <strong>Push-уведомления.</strong> Если разрешишь — Gmail публикует уведомления
+            об изменениях в Google Cloud Pub/Sub, оттуда наш webhook вызывает Gmail history.list
+            и подтягивает новые сообщения. Сами данные через Pub/Sub не передаются — только
+            triggers.
+          </li>
+          <li>
+            <strong>Ограниченное использование (Google Limited Use).</strong>
+            Использование данных Gmail API соответствует требованиям
+            <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use"
+               class="text-brand-teal underline" target="_blank" rel="noopener">
+              Google API Services User Data Policy (Limited Use)
+            </a>. Мы не передаём Gmail-данные третьим лицам, не используем их для рекламы,
+            не используем для AI-моделей, не разрешаем людям читать их (кроме случаев когда
+            ты сама явно дала согласие на support или это требует закон).
+          </li>
+          <li>
+            <strong>Доступ персонала.</strong> Доступ к чужим Gmail-данным имеют только
+            автоматизированные процессы Finkley. Сотрудник может получить read-доступ только
+            при твоём явном письменном согласии для решения support-инцидента.
+          </li>
+        </ul>
+        <h3 class="mt-4 text-lg font-semibold text-brand-navy">Как отключить и удалить</h3>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>
+            <strong>Отозвать у Google.</strong>
+            <a href="https://myaccount.google.com/permissions" class="text-brand-teal underline" target="_blank" rel="noopener">
+              myaccount.google.com/permissions
+            </a> → Finkley → Remove access. Сразу прерывает все наши права.
+          </li>
+          <li>
+            <strong>Отключить в Finkley.</strong> Settings → Интеграции → Email → «Отключить».
+            Удаляет наши токены и прекращает синхронизацию.
+          </li>
+          <li>
+            <strong>Удалить сохранённые сообщения.</strong> Settings → Интеграции → Email →
+            «Удалить историю переписки» — стирает messenger_conversations и messenger_messages
+            канала email.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Cookies</h2>
         <p class="mt-3">
           В стадии 1 — только функциональные cookies для авторизации (Supabase auth state).
           Маркетинговых cookies нет — поэтому cookie banner не нужен. Аналитика через Plausible
@@ -130,7 +204,7 @@ const UPDATED = '8 мая 2026'
       </section>
 
       <section>
-        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Изменения политики</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">10. Изменения политики</h2>
         <p class="mt-3">
           О существенных изменениях уведомим по email за 14 дней до вступления в силу. Текущая
           версия всегда на этой странице.
@@ -138,8 +212,7 @@ const UPDATED = '8 мая 2026'
       </section>
 
       <p class="border-t border-brand-border pt-6 text-sm italic text-brand-text-muted">
-        Этот документ — текущая версия. Перед публичным запуском NIP и юр. адрес ИП
-        будут проставлены, документ пройдёт review польским юристом.
+        MaxMaster Sp. z o.o., NIP 7811994452, ul. Juliusza Słowackiego 55/1, 60-521 Poznań, Polska.
       </p>
     </div>
   </article>

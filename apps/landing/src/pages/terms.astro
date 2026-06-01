@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro'
 
-const UPDATED = '6 мая 2026'
+const UPDATED = '1 июня 2026'
 ---
 
 <Layout title="Terms of Service — Finkley" description="Условия использования сервиса." active="terms">
@@ -41,7 +41,7 @@ const UPDATED = '6 мая 2026'
           <li><strong>Оплата:</strong> Через Stripe, карты Visa / Mastercard</li>
           <li>
             <strong>Возврат:</strong> В первые 14 дней оплаченной подписки — по запросу,
-            support@finkley.app
+            info@finkley.app
           </li>
           <li><strong>Отмена:</strong> В один клик в Настройках. До конца оплаченного периода аккаунт работает</li>
         </ul>
@@ -104,25 +104,55 @@ const UPDATED = '6 мая 2026'
       </section>
 
       <section>
-        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Юрисдикция</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">9. Подключение Gmail (Google API)</h2>
+        <p class="mt-3">
+          Если подключаешь Gmail-аккаунт для встроенного email-мессенджера, действуют
+          дополнительные условия использования Google API:
+        </p>
+        <ul class="mt-3 list-disc space-y-2 pl-6">
+          <li>
+            Запрашиваемые scope'ы — <code class="rounded bg-brand-cream px-1 py-0.5 text-sm">gmail.send</code>
+            и <code class="rounded bg-brand-cream px-1 py-0.5 text-sm">gmail.readonly</code>.
+            Описание использования — в Политике приватности, секция 8.
+          </li>
+          <li>
+            Использование данных Gmail API соответствует
+            <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use" class="text-brand-teal underline" target="_blank" rel="noopener">Google API Services User Data Policy (Limited Use)</a>:
+            мы не передаём данные третьим лицам, не используем для рекламы и не обучаем AI-модели на них.
+          </li>
+          <li>
+            Подключение в любой момент отключается через
+            <a href="https://myaccount.google.com/permissions" class="text-brand-teal underline" target="_blank" rel="noopener">myaccount.google.com/permissions</a>
+            или Settings → Интеграции → Email в Finkley.
+          </li>
+          <li>
+            При отключении токены немедленно удаляются. История переписки сохраняется до явного
+            запроса на удаление в Settings → Интеграции → Email.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">10. Юрисдикция</h2>
         <p class="mt-3">
           Применяется право Республики Польша. Споры решаются в компетентном суде по месту
-          регистрации ИП Denis Krupka, если иное не предусмотрено законом о защите
+          регистрации MaxMaster Sp. z o.o. (Poznań), если иное не предусмотрено законом о защите
           потребителей (Ustawa o prawach konsumenta).
         </p>
       </section>
 
       <section>
-        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">10. Контакты</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-brand-navy">11. Контакты и реквизиты</h2>
         <p class="mt-3">
-          Вопросы и поддержка — <a href="mailto:support@finkley.app" class="text-brand-teal underline">support@finkley.app</a>.
-          По приватности и GDPR — <a href="mailto:privacy@finkley.app" class="text-brand-teal underline">privacy@finkley.app</a>.
+          <strong>MaxMaster Sp. z o.o.</strong><br />
+          NIP: 7811994452<br />
+          ul. Juliusza Słowackiego 55/1, 60-521 Poznań, Polska<br />
+          Email: <a href="mailto:info@finkley.app" class="text-brand-teal underline">info@finkley.app</a>
         </p>
       </section>
 
       <p class="border-t border-brand-border pt-6 text-sm italic text-brand-text-muted">
-        Этот документ — текущая версия. Перед публичным запуском пройдёт review
-        через юридическую проверку перед публичным запуском.
+        MaxMaster Sp. z o.o., NIP 7811994452, ul. Juliusza Słowackiego 55/1, 60-521 Poznań, Polska.
       </p>
     </div>
   </article>
