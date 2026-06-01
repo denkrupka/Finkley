@@ -794,89 +794,143 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
                         })()
                       : null}
 
-                    {/* Карточки визитов */}
-                    {staffVisits.map((v) => {
-                      const visitDate = parseISO(v.visit_at)
-                      const startMin = minutesFromMidnight(visitDate)
-                      const dur = durationFor(v)
-                      if (startMin + dur < HOUR_START * 60 || startMin >= HOUR_END * 60) {
-                        // Полностью за пределами окна — не рисуем
-                        return null
+                    {/* Карточки визитов. Overlap layout: пересекающиеся визиты
+                        одного мастера раскладываются по лейнам side-by-side
+                        (как в Booksy), вместо наезжающего overlap. Алгоритм:
+                        sort by start, greedy lane assignment. */}
+                    {(() => {
+                      type LaneVisit = (typeof staffVisits)[number] & {
+                        _lane: number
+                        _lanesUsed: number
                       }
-                      const top = pxTopForMinutes(Math.max(startMin, HOUR_START * 60))
-                      const visibleStart = Math.max(startMin, HOUR_START * 60)
-                      const visibleEnd = Math.min(startMin + dur, HOUR_END * 60)
-                      const height = Math.max(20, (visibleEnd - visibleStart) * PX_PER_MIN)
-                      const svc = v.service_id ? serviceById.get(v.service_id) : null
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          draggable
-                          onDragStart={(e) => {
-                            // Не запускаем DnD на отменённых визитах.
-                            if (v.status === 'cancelled') {
-                              e.preventDefault()
-                              return
-                            }
-                            e.dataTransfer.effectAllowed = 'move'
-                            // Тянем сам id, остальное держим в state.
-                            e.dataTransfer.setData('text/finkley-visit-id', v.id)
-                            setDraggingVisit(v)
-                          }}
-                          onDragEnd={() => {
-                            setDraggingVisit(null)
-                            setDragHover(null)
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // По запросу owner'а 01.06 — клик ВСЕГДА открывает
-                            // «Редактировать визит» (QuickEntryModal в edit-mode).
-                            // Старая модалка с табами «Wizyta/Informacje» удалена
-                            // из flow; ChargeView остаётся доступной только через
-                            // кнопку «Рассчитать» внутри QuickEntryModal.
-                            setQuickEditVisit(v)
-                          }}
-                          className={cn(
-                            'group absolute inset-x-1 z-[5] cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md active:cursor-grabbing',
-                            v.status === 'cancelled' && 'opacity-50',
-                            draggingVisit?.id === v.id && 'ring-primary opacity-50 ring-2',
-                          )}
-                          style={{
-                            top,
-                            height,
-                            background: palette.bg,
-                            borderLeftColor: palette.accent,
-                          }}
-                          title={`${format(visitDate, 'HH:mm')} · ${
-                            (v.client_id && clientById.get(v.client_id)?.name) ??
-                            t('visits.calendar.walk_in')
-                          }`}
-                        >
-                          {/* $-индикатор оплаченного визита (правый верхний угол) */}
-                          {v.status === 'paid' ? (
-                            <CheckCircle2
-                              className="text-brand-sage-deep absolute right-1 top-1 size-3.5"
-                              strokeWidth={2.4}
-                              aria-label={t('visits.status_paid')}
-                            />
-                          ) : null}
-                          <p className="num text-foreground/80 truncate text-[11px] font-semibold leading-tight">
-                            {format(visitDate, 'HH:mm', { locale: getDateLocale() })} –{' '}
-                            {format(new Date(visitDate.getTime() + dur * 60000), 'HH:mm', {
-                              locale: getDateLocale(),
-                            })}
-                          </p>
-                          <p className="text-foreground truncate text-xs font-semibold">
-                            {(v.client_id && clientById.get(v.client_id)?.name) ??
-                              t('visits.calendar.walk_in')}
-                          </p>
-                          <p className="text-muted-foreground truncate text-[11px]">
-                            {svc?.name ?? v.service_name_snapshot ?? '—'}
-                          </p>
-                        </button>
-                      )
-                    })}
+                      const sorted = [...staffVisits]
+                        .map((v) => {
+                          const d = parseISO(v.visit_at).getTime()
+                          const dur = durationFor(v) * 60_000
+                          return { v, start: d, end: d + dur }
+                        })
+                        .sort((a, b) => a.start - b.start)
+                      // Lane assignment + группировка пересекающихся
+                      const laneEndAt: number[] = []
+                      const groups: LaneVisit[][] = []
+                      let currentGroup: LaneVisit[] = []
+                      let groupMaxEnd = -Infinity
+                      for (const item of sorted) {
+                        if (item.start >= groupMaxEnd) {
+                          // Новая группа (нет пересечений с предыдущими)
+                          if (currentGroup.length > 0) {
+                            const max = Math.max(...currentGroup.map((c) => c._lane)) + 1
+                            for (const cg of currentGroup) cg._lanesUsed = max
+                            groups.push(currentGroup)
+                          }
+                          currentGroup = []
+                          laneEndAt.length = 0
+                          groupMaxEnd = -Infinity
+                        }
+                        let lane = laneEndAt.findIndex((e) => e <= item.start)
+                        if (lane === -1) lane = laneEndAt.length
+                        laneEndAt[lane] = item.end
+                        groupMaxEnd = Math.max(groupMaxEnd, item.end)
+                        currentGroup.push({ ...item.v, _lane: lane, _lanesUsed: 1 })
+                      }
+                      if (currentGroup.length > 0) {
+                        const max = Math.max(...currentGroup.map((c) => c._lane)) + 1
+                        for (const cg of currentGroup) cg._lanesUsed = max
+                        groups.push(currentGroup)
+                      }
+                      const allWithLane = groups.flat()
+                      return allWithLane.map((v) => {
+                        const visitDate = parseISO(v.visit_at)
+                        const startMin = minutesFromMidnight(visitDate)
+                        const dur = durationFor(v)
+                        if (startMin + dur < HOUR_START * 60 || startMin >= HOUR_END * 60) {
+                          // Полностью за пределами окна — не рисуем
+                          return null
+                        }
+                        const top = pxTopForMinutes(Math.max(startMin, HOUR_START * 60))
+                        const visibleStart = Math.max(startMin, HOUR_START * 60)
+                        const visibleEnd = Math.min(startMin + dur, HOUR_END * 60)
+                        const height = Math.max(20, (visibleEnd - visibleStart) * PX_PER_MIN)
+                        const svc = v.service_id ? serviceById.get(v.service_id) : null
+                        // Lane → width/left в %. Если только один визит в группе
+                        // — занимаем полную ширину как раньше.
+                        const lanesUsed = Math.max(1, v._lanesUsed)
+                        const laneIdx = v._lane
+                        const widthPct = 100 / lanesUsed
+                        const leftPct = laneIdx * widthPct
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            draggable
+                            onDragStart={(e) => {
+                              // Не запускаем DnD на отменённых визитах.
+                              if (v.status === 'cancelled') {
+                                e.preventDefault()
+                                return
+                              }
+                              e.dataTransfer.effectAllowed = 'move'
+                              // Тянем сам id, остальное держим в state.
+                              e.dataTransfer.setData('text/finkley-visit-id', v.id)
+                              setDraggingVisit(v)
+                            }}
+                            onDragEnd={() => {
+                              setDraggingVisit(null)
+                              setDragHover(null)
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // По запросу owner'а 01.06 — клик ВСЕГДА открывает
+                              // «Редактировать визит» (QuickEntryModal в edit-mode).
+                              // Старая модалка с табами «Wizyta/Informacje» удалена
+                              // из flow; ChargeView остаётся доступной только через
+                              // кнопку «Рассчитать» внутри QuickEntryModal.
+                              setQuickEditVisit(v)
+                            }}
+                            className={cn(
+                              'group absolute z-[5] cursor-grab overflow-hidden rounded-md border-l-4 px-2 py-1 text-left transition-all hover:z-10 hover:shadow-md active:cursor-grabbing',
+                              v.status === 'cancelled' && 'opacity-50',
+                              draggingVisit?.id === v.id && 'ring-primary opacity-50 ring-2',
+                            )}
+                            style={{
+                              top,
+                              height,
+                              // Lane layout: side-by-side когда визиты пересекаются
+                              left: `calc(${leftPct}% + 4px)`,
+                              width: `calc(${widthPct}% - 8px)`,
+                              background: palette.bg,
+                              borderLeftColor: palette.accent,
+                            }}
+                            title={`${format(visitDate, 'HH:mm')} · ${
+                              (v.client_id && clientById.get(v.client_id)?.name) ??
+                              t('visits.calendar.walk_in')
+                            }`}
+                          >
+                            {/* $-индикатор оплаченного визита (правый верхний угол) */}
+                            {v.status === 'paid' ? (
+                              <CheckCircle2
+                                className="text-brand-sage-deep absolute right-1 top-1 size-3.5"
+                                strokeWidth={2.4}
+                                aria-label={t('visits.status_paid')}
+                              />
+                            ) : null}
+                            <p className="num text-foreground/80 truncate text-[11px] font-semibold leading-tight">
+                              {format(visitDate, 'HH:mm', { locale: getDateLocale() })} –{' '}
+                              {format(new Date(visitDate.getTime() + dur * 60000), 'HH:mm', {
+                                locale: getDateLocale(),
+                              })}
+                            </p>
+                            <p className="text-foreground truncate text-xs font-semibold">
+                              {(v.client_id && clientById.get(v.client_id)?.name) ??
+                                t('visits.calendar.walk_in')}
+                            </p>
+                            <p className="text-muted-foreground truncate text-[11px]">
+                              {svc?.name ?? v.service_name_snapshot ?? '—'}
+                            </p>
+                          </button>
+                        )
+                      })
+                    })()}
 
                     {/* Staff-blocks (резервы и отсутствия) — отрисовка поверх
                         ячеек со штриховкой. По клику — удаляются. */}
