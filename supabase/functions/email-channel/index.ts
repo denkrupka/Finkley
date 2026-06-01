@@ -99,7 +99,7 @@ async function logOutgoingMessage(
         .from('messenger_conversations')
         .update({
           last_message_at: new Date().toISOString(),
-          last_message_preview: subject.slice(0, 200),
+          last_message_preview: cleanSubjectForPreview(subject),
         })
         .eq('id', convId)
     } else {
@@ -111,7 +111,7 @@ async function logOutgoingMessage(
           external_user_id: toAddr,
           display_name: toAddr,
           last_message_at: new Date().toISOString(),
-          last_message_preview: subject.slice(0, 200),
+          last_message_preview: cleanSubjectForPreview(subject),
         })
         .select('id')
         .single()
@@ -134,6 +134,19 @@ async function logOutgoingMessage(
   } catch (e) {
     console.warn('logOutgoing failed:', (e as Error).message)
   }
+}
+
+/**
+ * Очищает subject от markdown + newlines + accumulated Re: префиксов.
+ * Subject должен быть single-line plain text без накопленной истории.
+ */
+function cleanSubjectForPreview(raw: string | null | undefined): string {
+  if (!raw) return ''
+  return raw
+    .replace(/\*\*/g, '')
+    .replace(/[\r\n][\s\S]*$/, '')
+    .trim()
+    .slice(0, 150)
 }
 
 /**
@@ -218,7 +231,7 @@ async function pollViaGmailApi(
         .update({
           display_name: fromName,
           last_message_at: createdAt,
-          last_message_preview: subject.slice(0, 200),
+          last_message_preview: cleanSubjectForPreview(subject),
         })
         .eq('id', convId)
     } else {
@@ -230,7 +243,7 @@ async function pollViaGmailApi(
           external_user_id: fromAddr,
           display_name: fromName,
           last_message_at: createdAt,
-          last_message_preview: subject.slice(0, 200),
+          last_message_preview: cleanSubjectForPreview(subject),
         })
         .select('id')
         .single()

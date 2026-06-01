@@ -248,11 +248,22 @@ Deno.serve(async (req) => {
     // Email reply через email-channel send. skip_log=true чтобы email-channel
     // не дублировал messenger_messages.insert (мы сами делаем ниже).
     try {
-      // Subject: «Re: <last_message_preview>» если есть, иначе общий topic
-      // из conversation.display_name. Гарантируем что не пусто.
-      const subject = convo.last_message_preview
-        ? `Re: ${convo.last_message_preview}`.slice(0, 200)
-        : `Сообщение от ${convo.display_name || 'Finkley'}`
+      // Subject build: clean от accumulated мусора.
+      // 1) убрать markdown ** (наша внутренняя bold-разметка)
+      // 2) обрезать на первом newline (subject должен быть single-line)
+      // 3) убрать ВСЕ накопленные `Re: ` префиксы (заменим одним)
+      // 4) truncate 100 chars
+      const cleanReplySubject = (preview: string | null | undefined): string => {
+        if (!preview) return `Сообщение от ${convo.display_name || 'Finkley'}`
+        let s = preview
+          .replace(/\*\*/g, '')
+          .replace(/[\r\n][\s\S]*$/, '')
+          .trim()
+        while (/^Re:\s*/i.test(s)) s = s.replace(/^Re:\s*/i, '')
+        s = s.slice(0, 100).trim()
+        return s ? `Re: ${s}` : `Сообщение от ${convo.display_name || 'Finkley'}`
+      }
+      const subject = cleanReplySubject(convo.last_message_preview)
       const supaUrl = Deno.env.get('SUPABASE_URL') ?? ''
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       const r = await fetch(`${supaUrl}/functions/v1/email-channel`, {
