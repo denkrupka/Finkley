@@ -295,26 +295,25 @@ async function sendViaGmailApi(
   textBody: string,
   htmlBody?: string,
 ): Promise<void> {
-  // RFC 2047 encoded-word — нужно для header'ов с non-ASCII (кириллица,
-  // польские буквы). Без этого onet.pl/mail.ru фильтруют как malformed.
-  // =?UTF-8?B?<base64>?=
+  // UTF-8 → base64. unescape(encodeURIComponent()) — legacy browser hack
+  // который в Deno ломает кириллицу (даёт мусор). Используем TextEncoder
+  // → bytes → base64 — это работает гарантированно.
+  const bytesToB64 = (bytes: Uint8Array): string => {
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
+    return btoa(binary)
+  }
+  const strToB64 = (s: string): string => bytesToB64(new TextEncoder().encode(s))
+  // RFC 2047 encoded-word для non-ASCII headers (cyrillic/польские).
   const encodeHeader = (s: string): string => {
-    // ASCII → возвращаем как есть для читаемости
     // eslint-disable-next-line no-control-regex
     if (/^[\x00-\x7F]*$/.test(s)) return s
-    const utf8 = unescape(encodeURIComponent(s))
-    const b64 = btoa(utf8)
-    return `=?UTF-8?B?${b64}?=`
+    return `=?UTF-8?B?${strToB64(s)}?=`
   }
-  // Build MIME body. Content-Transfer-Encoding: base64 для UTF-8 — гарантирует
-  // что long UTF-8 chars не сломают строки и не попадут под flagging.
+  // base64 body — гарантирует что UTF-8 chars не порвут line wrapping.
   const encodeBody = (s: string): string => {
-    const utf8 = unescape(encodeURIComponent(s))
-    return (
-      btoa(utf8)
-        .match(/.{1,76}/g)
-        ?.join('\r\n') ?? ''
-    )
+    const b64 = strToB64(s)
+    return b64.match(/.{1,76}/g)?.join('\r\n') ?? ''
   }
   const subjectEnc = encodeHeader(subject)
   const boundary = `finkley-${crypto.randomUUID()}`
@@ -346,10 +345,7 @@ async function sendViaGmailApi(
       `${encodeBody(textBody)}`
   }
   // base64url encode без padding
-  const raw = btoa(unescape(encodeURIComponent(mime)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+  const raw = strToB64(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: {
