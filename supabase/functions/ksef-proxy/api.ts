@@ -562,6 +562,10 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   paidAt: string | null
   /** Полностью оплачено? Проверяется по DataZaplaty / Zaplacono. */
   isPaid: boolean
+  /** Преобладающая ставка VAT (%) из P_13_x/P_14_x. NULL если не извлечена. */
+  vatRatePct: number | null
+  /** Сумма нетто (PLN) по всем ставкам. NULL если не извлечена. */
+  totalNet: number | null
 } | null {
   const xml = new TextDecoder('utf-8').decode(xmlBytes)
   if (!xml.includes('<Faktura') && !xml.includes(':Faktura')) return null
@@ -612,6 +616,51 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     null
   const sellerIban = ibanMatch ? ibanMatch.trim().replace(/\s+/g, '') : null
 
+  // VAT-извлечение. KSeF FA(2) хранит суммы по ставкам в P_13_x/P_14_x:
+  //   P_13_1 — суммарная netто по ставке podstawowa (23%)
+  //   P_14_1 — суммарный VAT по ставке podstawowa
+  //   P_13_2 — netто по obniżona1 (8%), P_14_2 — VAT
+  //   P_13_3 — netто по obniżona2 (5%), P_14_3 — VAT
+  //   P_13_6 — netто по zwolnione/0%
+  // Если в фактуре одна ставка — берём её. Если несколько — преобладающую
+  // по netto (для UI это всё равно один rate в expense.vat_rate_pct).
+  const rateMap: Record<string, number> = {
+    P_13_1: 23,
+    P_13_2: 8,
+    P_13_3: 5,
+    P_13_4: 0,
+    P_13_6: 0,
+  }
+  let dominantNet = 0
+  let dominantRate: number | null = null
+  let totalNet = 0
+  for (const [tag, rate] of Object.entries(rateMap)) {
+    const m = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))
+    if (!m) continue
+    const v = parseFloat(m[1].trim())
+    if (!isFinite(v) || v <= 0) continue
+    totalNet += v
+    if (v > dominantNet) {
+      dominantNet = v
+      dominantRate = rate
+    }
+  }
+  // Fallback: если P_13_x не нашлись, считаем effective rate от total.
+  if (dominantRate === null && grossStr) {
+    const gross = parseFloat(grossStr)
+    if (isFinite(gross) && gross > 0) {
+      // Эвристика: пробуем стандартные ставки, ищем целочисленное net
+      for (const r of [23, 8, 5, 0]) {
+        const candidate = gross / (1 + r / 100)
+        if (Math.abs(candidate - Math.round(candidate * 100) / 100) < 0.01) {
+          dominantRate = r
+          totalNet = Math.round(candidate * 100) / 100
+          break
+        }
+      }
+    }
+  }
+
   // FormaPlatnosci: KSeF код 1..6. Маппим в наш payment_method.
   const formaCode = grab(/<FormaPlatnosci[^>]*>([^<]+)<\/FormaPlatnosci>/)
   let paymentMethod: 'cash' | 'card' | 'transfer' | null = null
@@ -645,5 +694,7 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     paymentDeadline: paymentDeadline ? paymentDeadline.slice(0, 10) : null,
     paidAt: paidAt ? paidAt.slice(0, 10) : null,
     isPaid,
+    vatRatePct: dominantRate,
+    totalNet: totalNet > 0 ? totalNet : null,
   }
 }

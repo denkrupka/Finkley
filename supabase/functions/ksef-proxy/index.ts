@@ -309,6 +309,8 @@ async function syncKsefToFinkley(
         paymentDeadline: null as string | null,
         paidAt: null as string | null,
         isPaid: false,
+        vatRatePct: null as number | null,
+        totalNet: null as number | null,
       }
       let xmlPath: string | null = null
       const xmlRes = await getInvoiceXml(accessToken, inv.ksefReferenceNumber)
@@ -330,6 +332,8 @@ async function syncKsefToFinkley(
             paymentDeadline: parsed.paymentDeadline,
             paidAt: parsed.paidAt,
             isPaid: parsed.isPaid,
+            vatRatePct: parsed.vatRatePct,
+            totalNet: parsed.totalNet,
           }
         }
         xmlPath = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
@@ -399,6 +403,11 @@ async function syncKsefToFinkley(
           category_id: categoryId,
           due_date: dueDate,
           amount_cents: Math.round(detail.totalGross * 100),
+          // VAT: amount_net_cents + vat_rate_pct (миграция 20260602000001).
+          // Если KSeF не вернул ставку — оставляем null (treated as «без VAT
+          // разбивки» вне зависимости от is_vat_payer флага салона).
+          amount_net_cents: detail.totalNet != null ? Math.round(detail.totalNet * 100) : null,
+          vat_rate_pct: detail.vatRatePct,
           vendor_name: vendor,
           invoice_number: detail.invoiceNumber,
           comment: description.slice(0, 500) || null,
@@ -426,6 +435,11 @@ async function syncKsefToFinkley(
         category_id: categoryId,
         expense_at: expenseAt,
         amount_cents: Math.round(detail.totalGross * 100),
+        // VAT: записываем нетто и ставку из KSeF (миграция 20260602000001).
+        // Если не извлеклись (старые KSeF без P_13_x) — null, тогда old-style
+        // «брутто=net» сохраняется в P&L.
+        amount_net_cents: detail.totalNet != null ? Math.round(detail.totalNet * 100) : null,
+        vat_rate_pct: detail.vatRatePct,
         // (4) payment_method из XML; если не определён — оставляем transfer
         // как «банковский перевод» (default для оплаченных фактур).
         payment_method: detail.paymentMethod ?? 'transfer',
