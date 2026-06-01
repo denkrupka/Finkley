@@ -711,38 +711,56 @@ export function OnboardingPage() {
 
     rememberLastSalon(newSalonId)
 
-    // Early-import: дёргаем sync для подключённых ботных провайдеров,
-    // не дожидаясь окончания. Когда юзер дойдёт до AI-summary (~30s
-    // позднее), данные в БД уже будут — AI учтёт реальные visits/clients,
-    // а не нули. Live-режим уже это делал внутри *ConnectDialog'ов, но
-    // non-live offline flow (collect credentials в state.pending_credentials)
-    // нет — здесь добиваем.
+    // Early-import: connect → sync для провайдеров где есть credentials.
+    // Раньше тут было просто `action:'sync'`, но sync читает credentials из
+    // БД — а в БД они ещё не сохранены (transit только в localStorage).
+    // Поэтому fire-and-forget connect (создаёт salon_integrations) сразу,
+    // а sync уже cron подхватит (treatwell — каждые 5 мин, booksy — 2 мин).
+    // Booksy с captcha не получится автоматизировать — там нужен interactive
+    // login через BooksyConnectDialog (пропускаем).
     const pending = state.pending_credentials ?? {}
-    const earlySyncCalls: Array<Promise<unknown>> = []
-    if (pending.booksy && Object.keys(pending.booksy).length > 0) {
-      earlySyncCalls.push(
-        supabase.functions.invoke('booksy-proxy', {
-          body: { action: 'sync', salon_id: newSalonId },
-        }),
+    const earlyCalls: Array<Promise<unknown>> = []
+    if (pending.treatwell?.login && pending.treatwell?.password) {
+      earlyCalls.push(
+        supabase.functions
+          .invoke('treatwell-proxy', {
+            body: {
+              action: 'connect',
+              salon_id: newSalonId,
+              login: pending.treatwell.login,
+              password: pending.treatwell.password,
+            },
+          })
+          .then(() =>
+            // После connect — сразу sync (30 дней visits + полные
+            // staff/services/clients).
+            supabase.functions.invoke('treatwell-proxy', {
+              body: { action: 'sync', salon_id: newSalonId, days: 30 },
+            }),
+          ),
       )
     }
-    if (pending.treatwell && Object.keys(pending.treatwell).length > 0) {
-      earlySyncCalls.push(
-        supabase.functions.invoke('treatwell-proxy', {
-          body: { action: 'sync', salon_id: newSalonId, days: 30 },
-        }),
-      )
-    }
-    if (pending.wfirma && Object.keys(pending.wfirma).length > 0) {
-      earlySyncCalls.push(
-        supabase.functions.invoke('wfirma-proxy', {
-          body: { action: 'sync', salon_id: newSalonId },
-        }),
+    if (pending.wfirma?.email && pending.wfirma?.password) {
+      earlyCalls.push(
+        supabase.functions
+          .invoke('wfirma-proxy', {
+            body: {
+              action: 'connect_with_login',
+              salon_id: newSalonId,
+              email: pending.wfirma.email,
+              password: pending.wfirma.password,
+            },
+          })
+          .then(() =>
+            supabase.functions.invoke('wfirma-proxy', {
+              body: { action: 'sync', salon_id: newSalonId },
+            }),
+          ),
       )
     }
     // fire-and-forget — не блокируем submit
-    if (earlySyncCalls.length > 0) {
-      Promise.allSettled(earlySyncCalls).catch(() => {})
+    if (earlyCalls.length > 0) {
+      Promise.allSettled(earlyCalls).catch(() => {})
     }
 
     // Кэш `useMySalons` не знает о только что созданном салоне.
