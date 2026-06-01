@@ -12,7 +12,10 @@ import {
   YAxis,
 } from 'recharts'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { useAdminOverview } from '@/hooks/useAdmin'
+import { supabase } from '@/lib/supabase/client'
 
 /** "YYYY-MM" → "май" (русское короткое название месяца). */
 const MONTH_KEYS = [
@@ -193,7 +196,73 @@ export function AdminOverviewPage() {
             бесполезна (она не отражает рост платформы и путает с
             продакт-метриками; удалено по запросу владельца). */}
       </section>
+
+      <TelegramWebhookStatus />
     </div>
+  )
+}
+
+function TelegramWebhookStatus() {
+  const { t } = useTranslation()
+  type Status = {
+    ok: boolean
+    healthy?: boolean
+    webhook_url?: string | null
+    pending_updates?: number
+    last_error?: string | null
+    diagnosis?: string
+    error?: string
+  }
+  const { data, refetch, isFetching } = useQuery<Status>({
+    queryKey: ['telegram-webhook-status'],
+    queryFn: async () => {
+      const { data: d, error } = await supabase.functions.invoke('telegram-webhook-status', {
+        body: {},
+      })
+      if (error) throw error
+      return d as Status
+    },
+    staleTime: 60_000,
+  })
+  if (!data) return null
+  const tone = data.healthy ? 'sage' : 'red'
+  return (
+    <section className="border-border bg-card shadow-finsm rounded-lg border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-brand-navy text-base font-bold">
+            {t('admin.tg_webhook.title', { defaultValue: 'Telegram-бот webhook' })}
+          </h2>
+          <p
+            className={`mt-1 text-sm ${
+              tone === 'sage' ? 'text-brand-sage-deep' : 'text-destructive'
+            }`}
+          >
+            {data.diagnosis ?? data.error}
+          </p>
+          {data.webhook_url ? (
+            <p className="text-muted-foreground num mt-1 truncate text-xs">{data.webhook_url}</p>
+          ) : null}
+          {data.pending_updates != null ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t('admin.tg_webhook.pending', { defaultValue: 'Pending updates' })}:{' '}
+              {data.pending_updates}
+            </p>
+          ) : null}
+          {data.last_error ? (
+            <p className="text-destructive mt-1 text-xs">⚠ {data.last_error}</p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-secondary text-xs font-semibold hover:underline"
+        >
+          {isFetching ? '...' : '⟳'}
+        </button>
+      </div>
+    </section>
   )
 }
 

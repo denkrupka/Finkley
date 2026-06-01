@@ -30,6 +30,7 @@ import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase/client'
 import { getDateLocale } from '@/lib/utils/format-date'
 import {
   Dialog,
@@ -445,6 +446,46 @@ export function MessengerPage() {
                         <p className="text-foreground truncate text-sm font-semibold">
                           {displayNameOrFallback(selected, t('messenger.unnamed'))}
                         </p>
+                        {/^User\s+[A-Za-z0-9]+$/.test((selected.display_name ?? '').trim()) &&
+                        (selected.channel === 'instagram' || selected.channel === 'facebook') &&
+                        salonId ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { data, error } = await supabase.functions.invoke(
+                                'messenger-refresh-conversation',
+                                {
+                                  body: { salon_id: salonId, conversation_id: selected.id },
+                                },
+                              )
+                              if (error) {
+                                toast.error(error.message ?? String(error))
+                                return
+                              }
+                              const res = data as {
+                                ok?: boolean
+                                error?: string
+                                display_name?: string | null
+                              } | null
+                              if (res?.ok && res.display_name) {
+                                toast.success(`✓ ${res.display_name}`)
+                              } else {
+                                toast.warning(
+                                  res?.error ??
+                                    t('messenger.refresh_no_data', {
+                                      defaultValue: 'Профиль приватный или token истёк',
+                                    }),
+                                )
+                              }
+                            }}
+                            className="text-secondary hover:bg-muted/40 border-secondary/30 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
+                            title={t('messenger.refresh_name_tooltip', {
+                              defaultValue: 'Подтянуть имя из профиля',
+                            })}
+                          >
+                            ⟳ {t('messenger.refresh_name', { defaultValue: 'имя' })}
+                          </button>
+                        ) : null}
                         {selected.client_id ? (
                           <span
                             className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700"

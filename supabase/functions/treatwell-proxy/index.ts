@@ -340,12 +340,28 @@ Deno.serve(async (req: Request) => {
     login?: string
     password?: string
     days?: number
+    token?: string
   } | null
   if (!body?.action || !body.salon_id) return jsonResponse({ error: 'bad_request' }, 400)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  // Cron-token валидация: если есть token — атомарно помечаем used.
+  if (body.token) {
+    const { data: trigger, error: tokenErr } = await admin
+      .from('treatwell_sync_triggers')
+      .update({ used_at: new Date().toISOString() })
+      .eq('token', body.token)
+      .is('used_at', null)
+      .gte('expires_at', new Date().toISOString())
+      .select('salon_id')
+      .single()
+    if (tokenErr || !trigger || trigger.salon_id !== body.salon_id) {
+      return jsonResponse({ error: 'invalid_or_used_token' }, 401)
+    }
+  }
 
   try {
     if (body.action === 'connect') {

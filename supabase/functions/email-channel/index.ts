@@ -16,6 +16,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
+import { ImapFlow } from 'npm:imapflow@1.0.157'
+import { simpleParser } from 'npm:mailparser@3.6.5'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
 
@@ -150,15 +152,115 @@ Deno.serve(async (req: Request) => {
   }
 
   if (body.action === 'poll') {
-    // IMAP poll — TODO. Текущий Deno IMAP-ландшафт нестабилен; рассмотрим
-    // Gmail Pub/Sub push (для Gmail) или std SMTP/IMAP через npm-bridge
-    // (после обновления Supabase Edge до npm-compat 2.0).
-    return jsonResponse({
-      ok: false,
-      error: 'poll_not_implemented',
-      message:
-        'IMAP polling будет включён в следующем спринте. Send уже работает — клиенты получат твои письма.',
-    })
+    const { data: integ } = await admin
+      .from('messenger_integrations')
+      .select('id, credentials, last_synced_at')
+      .eq('salon_id', body.salon_id)
+      .eq('channel', 'email')
+      .maybeSingle()
+    const creds = (integ?.credentials as { imap?: ImapConfig } | null)?.imap
+    if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+    const since = integ?.last_synced_at
+      ? new Date(integ.last_synced_at as string)
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    let imported = 0
+    let lastError: string | null = null
+    try {
+      const client = new ImapFlow({
+        host: creds.host,
+        port: creds.port,
+        secure: creds.secure !== false,
+        auth: { user: creds.user, pass: creds.pass },
+        logger: false,
+      })
+      await client.connect()
+      const lock = await client.getMailboxLock('INBOX')
+      try {
+        // Берём непрочитанные начиная с last_synced_at
+        const seq = await client.search({ since, seen: false }, { uid: true })
+        for (const uid of seq ?? []) {
+          const msg = await client.fetchOne(
+            String(uid),
+            {
+              source: true,
+              envelope: true,
+              internalDate: true,
+            },
+            { uid: true },
+          )
+          if (!msg?.source) continue
+          const parsed = await simpleParser(msg.source as Buffer)
+          const fromAddr =
+            parsed.from?.value?.[0]?.address?.toLowerCase() ?? msg.envelope?.from?.[0]?.address
+          const fromName =
+            parsed.from?.value?.[0]?.name?.trim() ||
+            msg.envelope?.from?.[0]?.name?.trim() ||
+            fromAddr ||
+            'unknown'
+          if (!fromAddr) continue
+
+          // upsert conversation per from-address
+          const { data: existing } = await admin
+            .from('messenger_conversations')
+            .select('id')
+            .eq('salon_id', body.salon_id)
+            .eq('channel', 'email')
+            .eq('external_user_id', fromAddr)
+            .maybeSingle()
+          let convId: string
+          if (existing) {
+            convId = (existing as { id: string }).id
+            await admin
+              .from('messenger_conversations')
+              .update({
+                display_name: fromName,
+                last_message_at: msg.internalDate ?? new Date().toISOString(),
+                last_message_preview: (parsed.subject ?? '').slice(0, 200),
+              })
+              .eq('id', convId)
+          } else {
+            const { data: created } = await admin
+              .from('messenger_conversations')
+              .insert({
+                salon_id: body.salon_id,
+                channel: 'email',
+                external_user_id: fromAddr,
+                display_name: fromName,
+                last_message_at: msg.internalDate ?? new Date().toISOString(),
+                last_message_preview: (parsed.subject ?? '').slice(0, 200),
+              })
+              .select('id')
+              .single()
+            if (!created) continue
+            convId = (created as { id: string }).id
+          }
+          const text = (parsed.text ?? parsed.html ?? '').toString().slice(0, 10_000)
+          await admin.from('messenger_messages').insert({
+            conversation_id: convId,
+            direction: 'in',
+            text: parsed.subject ? `**${parsed.subject}**\n\n${text}` : text,
+            external_id: parsed.messageId ?? `imap_${uid}`,
+            created_at: msg.internalDate ?? new Date().toISOString(),
+          })
+          imported++
+        }
+      } finally {
+        lock.release()
+        await client.logout()
+      }
+    } catch (e) {
+      lastError = (e as Error).message
+    }
+    await admin
+      .from('messenger_integrations')
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_error: lastError,
+      })
+      .eq('salon_id', body.salon_id)
+      .eq('channel', 'email')
+    if (lastError) return jsonResponse({ ok: false, error: lastError, imported }, 500)
+    return jsonResponse({ ok: true, imported })
   }
 
   return jsonResponse({ error: 'unknown_action' }, 400)
