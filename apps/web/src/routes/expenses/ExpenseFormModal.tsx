@@ -1083,8 +1083,10 @@ export function ExpenseFormModal({
                 }
                 setReceiptFile(file)
                 setOcrNips({ buyer_nip: null, vendor_nip: null })
-                // Auto-OCR только для картинок (PDF не парсим — мало кейсов)
-                if (file && file.type.startsWith('image/')) {
+                // Auto-OCR для картинок И PDF — KSeF-фактуры и счета от
+                // подрядчиков почти всегда PDF. Anthropic API natively
+                // принимает оба формата (image/* + application/pdf).
+                if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
                   ocr.mutate(file, {
                     onSuccess: (parsed) => {
                       // Предзаполняем поля: только если они пусты или дефолтные.

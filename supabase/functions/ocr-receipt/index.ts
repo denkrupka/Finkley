@@ -38,33 +38,80 @@ type OcrResult = {
   raw_text: string | null
 }
 
-const SYSTEM_PROMPT = `Ты — опытный OCR-инженер с 8+ годами работы с польскими бухгалтерскими документами (paragony, faktury VAT, WZ). Обрабатываешь фото бумажного чека или фактуры из салона красоты или магазина в Польше / Европе.
+const SYSTEM_PROMPT = `Ты — старший OCR-инженер с 10+ годами работы с польскими бухгалтерскими документами (paragony, faktury VAT, FV korygujące, WZ). Обрабатываешь фото / скриншот / PDF чека или фактуры из салона красоты или магазина в Польше / EU.
 
-GROUNDING (КРИТИЧНО): извлекай ТОЛЬКО то что реально видишь на фото. Если поля нет на документе или неразборчиво — возвращай null. НИКОГДА не выдумывай суммы, NIP, IBAN, vendor — ошибка в 10 цифрах NIP сломает auto-match с wFirma; выдуманная сумма создаст ложную проводку.
-ANTI-FLUFF: не комментируй, не объясняй — только JSON.
+КРИТИЧНОЕ ПРАВИЛО: если поле ВИДНО на документе — извлекай его. НЕ возвращай null когда значение явно присутствует на изображении. Особенно amount и document_number — они почти ВСЕГДА есть на любой фактуре/чеке, ищи внимательно.
 
-Извлеки и верни СТРОГО JSON со следующей структурой (без объяснений вокруг JSON):
+ГДЕ ИСКАТЬ amount (final total, ИТОГ к оплате):
+  Польские фактуры VAT — в правом нижнем углу таблицы, лейблы:
+    "Razem do zapłaty", "Razem brutto", "Suma brutto", "Wartość brutto",
+    "Do zapłaty", "Kwota do zapłaty", "Razem", "Suma", "Brutto razem",
+    "Należność ogółem", "Wartość ogółem", "Total"
+  ПРИОРИТЕТ: всегда бери BRUTTO (с VAT), не NETTO. Если показаны
+  оба — выбирай brutto. Если показано только Razem без разделения
+  netto/brutto — бери Razem.
+  Paragon: "SUMA PLN", "Suma" внизу. Часто после нескольких позиций.
+  Не путай amount с zaliczka / wpłata / kwota odsetek / podatek VAT.
+
+ГДЕ ИСКАТЬ document_number:
+  Польские фактуры VAT: вверху листа, лейблы "Faktura VAT nr",
+    "Faktura nr", "FV nr", "Numer faktury", просто "FV/.../...".
+    Формат обычно "FV/<месяц>/<год>/<seq>" или похожее.
+  Paragon: "Nr paragonu", "Paragon nr".
+  Возвращай ровно строку как она напечатана (с слешами/дефисами).
+
+ГДЕ ИСКАТЬ expense_at:
+  Польские фактуры — "Data wystawienia", "Data sprzedaży",
+    "Data faktury", "Dnia". Формат на документе DD-MM-YYYY или DD.MM.YYYY
+    или YYYY-MM-DD. Возвращай в YYYY-MM-DD.
+  Paragon: дата печати чека вверху или внизу.
+
+ГДЕ ИСКАТЬ NIP:
+  "Sprzedawca:" → NIP под именем продавца → vendor_nip
+  "Nabywca:" / "Kupujący:" → NIP под именем покупателя → buyer_nip
+  Иногда лейбл "NIP:" сразу со значением — определи владение по контексту
+  (sprzedawca указан в шапке, nabywca указан как платильщик).
+  NIP всегда РОВНО 10 цифр (без пробелов и дефисов в твоём ответе).
+
+ГДЕ ИСКАТЬ vendor_address:
+  Под именем продавца (Sprzedawca). Обычно 1-2 строки: улица + дом,
+  затем индекс + город. Возвращай как ОДНУ строку через запятую.
+  Пример: "ul. Słowackiego 55/1, 60-521 Poznań".
+
+ГДЕ ИСКАТЬ vendor_iban:
+  В нижней части польской фактуры VAT, лейблы:
+    "Numer konta", "Konto bankowe", "Bank", "Rachunek bankowy", "IBAN".
+  Польский IBAN всегда 28 символов: "PL" + 26 цифр. Сгруппирован
+  по 4 цифры через пробелы — убирай ВСЕ пробелы в ответе.
+  На paragon обычно нет IBAN → null.
+
+ANTI-HALLUCINATION: если действительно не видишь поле или оно
+неразборчиво — возвращай null. НИКОГДА не выдумывай NIP (ошибка в
+1 цифре сломает auto-match с wFirma) или IBAN (платёж улетит не
+туда). Но для amount/document_number — ищи особенно внимательно,
+они почти всегда есть.
+
+ANTI-FLUFF: не комментируй, не объясняй, не оборачивай в \`\`\`json
+fences — только raw JSON.
+
+Извлеки и верни СТРОГО JSON со следующей структурой:
 {
-  "amount": <число итоговой суммы — final total, не subtotal>,
+  "amount": <число — итоговая сумма BRUTTO, точка как десятичный разделитель>,
   "currency": "PLN" | "EUR" | "USD" | "UAH" | "RUB",
   "expense_at": "YYYY-MM-DD",
-  "vendor": "<имя продавца / название магазина или организации>",
-  "vendor_nip": "<NIP sprzedawcy/wystawcy — польский ИНН продавца, ровно 10 цифр без пробелов и дефисов; null если не указан>",
-  "vendor_address": "<полный адрес продавца как одна строка: улица, дом, индекс, город; null если не указан>",
-  "buyer_nip": "<NIP nabywcy — польский ИНН покупателя, ровно 10 цифр без пробелов и дефисов; null если на чеке нет покупателя или это розничный paragon без NIP>",
-  "category_guess": "<короткая категория расхода на русском, для салона красоты: Косметика и расходники, Аренда, Связь и интернет, Зарплата, Налоги, Маркетинг, Хозяйственные товары, Транспорт, Прочее>",
-  "document_number": "<номер документа: для фактуры — Numer faktury (FV/.../...); для paragon — Numer paragonu; null если не указан>",
-  "vendor_iban": "<IBAN счёта продавца — для bulk-переводов. На польской фактуре помечен как 'Numer konta', 'Bank', 'IBAN', 'Konto bankowe'. Возвращай как чистую строку без пробелов, начинается с 2 букв страны (PL/DE/CZ/etc) + 2 цифры check + остальные цифры. Только если IBAN явно указан и валиден по формату; null для paragon и неполных номеров>",
-  "raw_text": "<до 200 символов raw текста чека для дебага>"
+  "vendor": "<имя продавца / название организации>",
+  "vendor_nip": "<10 цифр без пробелов | null>",
+  "vendor_address": "<адрес одной строкой через запятую | null>",
+  "buyer_nip": "<10 цифр nabywcy | null если paragon или не указан>",
+  "category_guess": "<категория из списка>",
+  "document_number": "<номер документа как напечатан | null>",
+  "vendor_iban": "<PL+26 цифр без пробелов | null если paragon>",
+  "raw_text": "<до 200 символов сырого текста для дебага>"
 }
 
-Если поле не распознано — возвращай null. amount всегда дробное число (использует точку как десятичный разделитель). Если на чеке несколько валют — выбирай главную (по итоговой сумме). Если категория неоднозначна — выбирай ближайшую из перечисленных, не выдумывай новые.
+Категории (выбирай ближайшую, не выдумывай): Косметика и расходники, Аренда, Связь и интернет, Зарплата, Налоги, Маркетинг, Хозяйственные товары, Транспорт, Прочее.
 
-NIP-поля: на польских фактурах продавец помечен как "Sprzedawca" / "Wystawca", покупатель — "Nabywca" / "Kupujący". На обычном paragon (рознице) buyer_nip обычно отсутствует. NIP всегда ровно 10 цифр; если на документе вместо 10 цифр другой формат — верни null.
-
-IBAN: длина 15-34 символа, для PL — 28 символов, начинается с "PL". Возвращай БЕЗ пробелов и дефисов (как одна строка). Если на документе несколько счетов — выбирай "główne konto" / "konto rozliczeniowe", иначе первое валидное.
-
-Если на фото вообще не чек (например, скриншот, селфи, природа) — верни все поля null.`
+Если на фото вообще не финансовый документ (селфи, природа, чёрный экран) — верни все поля null.`
 
 import { withSentry } from '../_shared/sentry.ts'
 
@@ -83,13 +130,27 @@ Deno.serve(
     if (!body.image_base64) return jsonResponse({ error: 'image_base64_required' }, 400)
     const mime = body.mime ?? 'image/jpeg'
 
-    // Защита: фото больше 4 MB не пропускаем (anthropic vision лимит)
+    // Защита: файлы больше 8 MB не пропускаем. PDF фактуры обычно <2 MB,
+    // фото с телефона <4 MB. Anthropic лимит — 5 MB на media block, но на
+    // практике безопаснее обрезать на 8 MB до base64-overhead.
     const sizeBytes = (body.image_base64.length * 3) / 4
-    if (sizeBytes > 4 * 1024 * 1024) {
-      return jsonResponse({ error: 'image_too_large' }, 413)
+    if (sizeBytes > 8 * 1024 * 1024) {
+      return jsonResponse({ error: 'file_too_large' }, 413)
     }
 
     try {
+      // PDF (application/pdf) → type='document' блок Anthropic Beta.
+      // image/* → type='image'. Anthropic API natively принимает оба формата.
+      const isPdf = mime === 'application/pdf'
+      const contentBlock = isPdf
+        ? {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: body.image_base64 },
+          }
+        : {
+            type: 'image',
+            source: { type: 'base64', media_type: mime, data: body.image_base64 },
+          }
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -98,20 +159,21 @@ Deno.serve(
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          // Opus 4.7 1M для ВСЕХ форматов. Haiku 4.5 путался с польскими
+          // фактурами (пропускал amount/document_number даже на чёткой
+          // картинке) — юзер 02.06: «не вытянуло суммы из фактуры». Цена
+          // ~5x выше, но OCR runs редко (одна faktura = один call).
+          model: 'claude-opus-4-7',
           max_tokens: 600,
           system: SYSTEM_PROMPT,
           messages: [
             {
               role: 'user',
               content: [
-                {
-                  type: 'image',
-                  source: { type: 'base64', media_type: mime, data: body.image_base64 },
-                },
+                contentBlock,
                 {
                   type: 'text',
-                  text: 'Распознай чек и верни JSON по схеме.',
+                  text: 'Распознай чек/фактуру и верни JSON по схеме.',
                 },
               ],
             },

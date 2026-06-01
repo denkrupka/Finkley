@@ -47,9 +47,10 @@ async function fileToBase64(file: File): Promise<string> {
 export function useOcrReceipt() {
   return useMutation<OcrParsedReceipt, Error, File>({
     mutationFn: async (file) => {
-      // Защита от слишком больших файлов (Anthropic vision лимит 4 MB после base64)
-      if (file.size > 3 * 1024 * 1024) {
-        throw new Error('image_too_large')
+      // Защита от слишком больших файлов. PDF фактуры обычно <2MB, фото <4MB.
+      // Edge function в свою очередь rejects >8MB после base64-decode.
+      if (file.size > 6 * 1024 * 1024) {
+        throw new Error('file_too_large')
       }
       const image_base64 = await fileToBase64(file)
       const { data, error } = await supabase.functions.invoke('ocr-receipt', {
