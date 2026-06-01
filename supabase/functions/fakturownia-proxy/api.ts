@@ -28,6 +28,10 @@ export type FakturowniaExpense = {
   expense_date: string | null // yyyy-mm-dd (issue_date)
   payment_date: string | null
   amount: number | null // brutto
+  /** price_net — нетто из Fakturownia, для VAT-расчёта. */
+  amount_net: number | null
+  /** price_tax — сумма НДС, для расчёта ставки = tax/net*100. */
+  amount_tax: number | null
   currency: string | null
   buyer_name: string | null // фактически = nasza firma (sprzedawca в income=yes; в income=no — то наоборот, sprzedawca = поставщик)
   seller_name: string | null
@@ -119,6 +123,18 @@ export async function fakturowniaListExpenses(
         typeof r.price_gross === 'string'
           ? parseFloat(r.price_gross)
           : ((r.price_gross as number) ?? null),
+      amount_net:
+        typeof r.price_net === 'string'
+          ? parseFloat(r.price_net)
+          : typeof r.price_net === 'number'
+            ? r.price_net
+            : null,
+      amount_tax:
+        typeof r.price_tax === 'string'
+          ? parseFloat(r.price_tax)
+          : typeof r.price_tax === 'number'
+            ? r.price_tax
+            : null,
       currency: typeof r.currency === 'string' ? r.currency.toUpperCase() : 'PLN',
       // В income=no: «продавец» с точки зрения Fakturownia — это поставщик
       // (sprzedawca в фактуре закупа). «Buyer» — наша фирма.

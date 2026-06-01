@@ -63,6 +63,9 @@ export type ExpenseRow = {
   /** Частичная оплата: сколько фактически оплачено. NULL = полностью оплачено
    *  (legacy default). 0..amount_cents = частичная. См. миграцию 20260525150000. */
   paid_amount_cents: number | null
+  /** VAT-разбивка (миграция 20260602000001). NULL → P&L fallback на gross. */
+  amount_net_cents: number | null
+  vat_rate_pct: number | null
   // ↑ для расчёта суммарных итогов (total за период, breakdown по категориям)
   //   используем effectivePaidCents() — для частичных оплат берём paid_amount_cents.
   /** Источник авто-расхода комиссии (T14): для расходов с source='auto_commission'.
@@ -231,6 +234,9 @@ export type CreateExpenseInput = {
   premium_cents?: number
   /** IBAN получателя — для расходов оплаченных переводом. */
   bank_account_iban?: string | null
+  /** VAT-разбивка (миграция 20260602000001). */
+  amount_net_cents?: number | null
+  vat_rate_pct?: number | null
 }
 
 export function useCreateExpense(salonId: string | undefined) {

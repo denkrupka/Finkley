@@ -24,6 +24,10 @@ export type InfaktExpense = {
   expenseDate: string | null
   paymentDate: string | null
   amount: number | null
+  /** net_price из inFakt (cents → разделено на 100 при парсинге). */
+  amountNet: number | null
+  /** tax_price (сумма НДС в złotych). */
+  amountTax: number | null
   currency: string
   vendorName: string | null
   vendorNip: string | null
@@ -98,6 +102,18 @@ export async function infaktListExpenses(
           ? r.gross_price / 100
           : typeof r.gross_price === 'string'
             ? parseFloat(r.gross_price) / 100
+            : null,
+      amountNet:
+        typeof r.net_price === 'number'
+          ? r.net_price / 100
+          : typeof r.net_price === 'string'
+            ? parseFloat(r.net_price) / 100
+            : null,
+      amountTax:
+        typeof r.tax_price === 'number'
+          ? r.tax_price / 100
+          : typeof r.tax_price === 'string'
+            ? parseFloat(r.tax_price) / 100
             : null,
       currency: typeof r.currency === 'string' ? r.currency.toUpperCase() : 'PLN',
       vendorName: typeof r.seller_name === 'string' ? r.seller_name : null,

@@ -278,11 +278,27 @@ async function syncFakturowniaToFinkley(
       // Best-effort: PDF фактуры → Storage receipts
       const receiptPath = await uploadFakturowniaPdf(admin, creds, salonId, externalId)
 
+      // VAT из Fakturownia: price_net + price_tax. Если оба заданы — считаем
+      // ставку tax/net*100. Если только net — fallback на (gross-net)/net*100.
+      // Если оба null (vat_exempt) — оставляем null.
+      const grossCents = Math.round((ex.amount ?? 0) * 100)
+      let netCents: number | null = null
+      let vatRatePct: number | null = null
+      if (ex.amount_net != null && ex.amount_net > 0) {
+        netCents = Math.round(ex.amount_net * 100)
+        if (ex.amount_tax != null && ex.amount_tax > 0) {
+          vatRatePct = Math.round((ex.amount_tax / ex.amount_net) * 100)
+        } else if (grossCents > netCents) {
+          vatRatePct = Math.round(((grossCents - netCents) / netCents) * 100)
+        }
+      }
       const { error } = await admin.from('expenses').insert({
         salon_id: salonId,
         category_id: categoryId,
         expense_at: expenseAt,
-        amount_cents: Math.round((ex.amount ?? 0) * 100),
+        amount_cents: grossCents,
+        amount_net_cents: netCents,
+        vat_rate_pct: vatRatePct,
         payment_method: 'transfer',
         comment: description,
         contractor_name: vendor,
@@ -316,7 +332,9 @@ async function syncFakturowniaToFinkley(
         const { error: pmtErr } = await admin.from('scheduled_payments').insert({
           salon_id: salonId,
           due_date: dueDate,
-          amount_cents: Math.round((ex.amount ?? 0) * 100),
+          amount_cents: grossCents,
+          amount_net_cents: netCents,
+          vat_rate_pct: vatRatePct,
           vendor_name: vendor,
           invoice_number: ex.number,
           category_id: categoryId,

@@ -330,10 +330,37 @@ async function uploadWfirmaPdf(
   return path
 }
 
-function plnFromExpense(e: WfirmaExpense): { amountCents: number; currency: string } | null {
+function plnFromExpense(e: WfirmaExpense): {
+  amountCents: number
+  netCents: number | null
+  vatRatePct: number | null
+  currency: string
+} | null {
   const total = parseFloat(e.total ?? '0')
   if (!isFinite(total) || total <= 0) return null
-  return { amountCents: Math.round(total * 100), currency: (e.currency || 'PLN').toUpperCase() }
+  const amountCents = Math.round(total * 100)
+  // wFirma возвращает netto/vat как строки в детализированном expense.
+  // Если оба заданы — считаем ставку из них (round до целого процента).
+  // Иначе оставляем null — клиент будет fallback'ать на defaultVatRate.
+  let netCents: number | null = null
+  let vatRatePct: number | null = null
+  const netto = parseFloat(e.netto ?? '')
+  const vat = parseFloat(e.vat ?? '')
+  if (isFinite(netto) && netto > 0) {
+    netCents = Math.round(netto * 100)
+    if (isFinite(vat) && vat > 0) {
+      vatRatePct = Math.round((vat / netto) * 100)
+    } else if (amountCents > netCents) {
+      // только нетто известно, vat = total-netto
+      vatRatePct = Math.round(((amountCents - netCents) / netCents) * 100)
+    }
+  }
+  return {
+    amountCents,
+    netCents,
+    vatRatePct,
+    currency: (e.currency || 'PLN').toUpperCase(),
+  }
 }
 
 async function syncWfirmaToFinkley(
@@ -425,6 +452,10 @@ async function syncWfirmaToFinkley(
       category_id: categoryId,
       expense_at: expenseAt,
       amount_cents: money.amountCents,
+      // VAT-разбивка из wFirma netto/vat-полей. Если не заданы (vat_exempt
+      // или bill без detail) — null, P&L клиента fallback на amount_cents.
+      amount_net_cents: money.netCents,
+      vat_rate_pct: money.vatRatePct,
       payment_method: 'transfer',
       comment: description,
       contractor_name: vendor,
@@ -458,6 +489,8 @@ async function syncWfirmaToFinkley(
         salon_id: salonId,
         due_date: dueDate,
         amount_cents: money.amountCents,
+        amount_net_cents: money.netCents,
+        vat_rate_pct: money.vatRatePct,
         vendor_name: vendor,
         invoice_number: detail.number ?? null,
         category_id: categoryId,

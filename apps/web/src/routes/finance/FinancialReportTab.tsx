@@ -192,8 +192,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
     for (const e of expenses) {
       const m = getIdx(new Date(e.expense_at))
       if (m < 0) continue
-      const eAny = e as typeof e & { vat_rate_pct?: number | null }
-      const { net, vat } = toNet(e.amount_cents, eAny.vat_rate_pct)
+      const { net, vat } = toNet(e.amount_cents, e.vat_rate_pct)
       fact[m]!.expensesTotal += net
       vatExpense[m]! += vat
     }

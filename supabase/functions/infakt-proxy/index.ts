@@ -250,11 +250,27 @@ async function syncToFinkley(
 
       const receiptPath = await uploadInfaktPdf(admin, creds, salonId, ex.id)
 
+      // VAT из inFakt: net_price + tax_price. Если оба есть — считаем
+      // ставку tax/net*100. Иначе fallback на gross-net.
+      const grossCents = Math.round(ex.amount * 100)
+      let netCents: number | null = null
+      let vatRatePct: number | null = null
+      if (ex.amountNet != null && ex.amountNet > 0) {
+        netCents = Math.round(ex.amountNet * 100)
+        if (ex.amountTax != null && ex.amountTax > 0) {
+          vatRatePct = Math.round((ex.amountTax / ex.amountNet) * 100)
+        } else if (grossCents > netCents) {
+          vatRatePct = Math.round(((grossCents - netCents) / netCents) * 100)
+        }
+      }
+
       const { error } = await admin.from('expenses').insert({
         salon_id: salonId,
         category_id: categoryId,
         expense_at: expenseAt,
-        amount_cents: Math.round(ex.amount * 100),
+        amount_cents: grossCents,
+        amount_net_cents: netCents,
+        vat_rate_pct: vatRatePct,
         payment_method: 'transfer',
         comment: ex.description,
         contractor_name: vendor,
