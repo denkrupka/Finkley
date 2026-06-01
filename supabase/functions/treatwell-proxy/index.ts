@@ -25,6 +25,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { loadVatContext, vatFieldsForVisit } from '../_shared/vat.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -334,6 +335,7 @@ async function syncVisits(
   const staffMap = new Map((staffRows ?? []).map((r) => [r.external_id, r.id]))
   const serviceMap = new Map((serviceRows ?? []).map((r) => [r.external_id, r.id]))
   const clientMap = new Map((clientRows ?? []).map((r) => [r.external_id, r.id]))
+  const vatCtx = await loadVatContext(admin, salonId)
 
   let total = 0
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -352,6 +354,7 @@ async function syncVisits(
       .map((a) => {
         const priceCents = Math.round((a.price?.amount ?? a.priceAmount ?? 0) * 100)
         const status = a.status === 'CANCELLED' ? 'cancelled' : 'paid'
+        const vatFields = vatFieldsForVisit(vatCtx, priceCents)
         return {
           salon_id: salonId,
           external_source: 'treatwell',
@@ -366,6 +369,7 @@ async function syncVisits(
           paid_amount_cents: status === 'paid' ? priceCents : 0,
           status,
           kind: 'visit',
+          ...(vatFields.vat_rate_pct != null ? vatFields : {}),
         }
       })
       .filter((r) => r.amount_cents > 0 || r.client_id || r.staff_id)

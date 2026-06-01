@@ -39,6 +39,7 @@ import { recordSyncResult } from '../_shared/notify.ts'
 import { withSentry } from '../_shared/sentry.ts'
 import { dispatchNotification } from '../_shared/notify.ts'
 import { sendPushToUser } from '../_shared/web-push.ts'
+import { loadVatContext, vatFieldsForVisit } from '../_shared/vat.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -959,6 +960,7 @@ async function syncClients(
   // Caches для resolve booksy_id → uuid (staff/service)
   const caches = await buildResolveCaches(admin, salonId)
   const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
+  const vatCtx = await loadVatContext(admin, salonId)
 
   // Маппинг payment_method → cash_register_id для historic backfill.
   // Primary источник — таблица payment_methods (T12). Fallback — legacy
@@ -1134,6 +1136,7 @@ async function syncClients(
           existingVisitsExt,
           config,
           cashRegisterByMethod,
+          vatCtx,
         )
         stats.history_visits_synced = (stats.history_visits_synced ?? 0) + historyAdded
         // Помечаем что бэкфилл сделан
@@ -1186,7 +1189,8 @@ async function backfillCustomerHistory(
   caches: ResolveCaches,
   existingExt: Set<string>,
   config: BooksyConfig,
-  cashRegisterByMethod?: Record<string, string>,
+  cashRegisterByMethod: Record<string, string> | undefined,
+  vatCtx: { isVatPayer: boolean; country: string },
 ): Promise<number> {
   let added = 0
   let page = 1
@@ -1215,6 +1219,7 @@ async function backfillCustomerHistory(
         existingExt,
         config,
         cashRegisterByMethod,
+        vatCtx,
       )
       // extra_bookings и combo_children — sub-services того же appointment
       for (const eb of b.extra_bookings ?? []) {
@@ -1227,6 +1232,7 @@ async function backfillCustomerHistory(
           existingExt,
           config,
           cashRegisterByMethod,
+          vatCtx,
         )
       }
     }
@@ -1245,7 +1251,8 @@ async function insertHistoricalBooking(
   caches: ResolveCaches,
   existingExt: Set<string>,
   config: BooksyConfig,
-  cashRegisterByMethod?: Record<string, string>,
+  cashRegisterByMethod: Record<string, string> | undefined,
+  vatCtx: { isVatPayer: boolean; country: string },
 ): Promise<number> {
   const externalId = `subbk:${b.id}`
   if (existingExt.has(externalId)) return 0
@@ -1292,6 +1299,7 @@ async function insertHistoricalBooking(
   // получался разнотык с Booksy (Manicure 2h vs 1h в портале).
   const durationMin = computeDurationMin(b.booked_from, b.booked_till)
 
+  const vatFields = vatFieldsForVisit(vatCtx, amountCents)
   const { error } = await admin.from('visits').upsert(
     {
       salon_id: salonId,
@@ -1312,6 +1320,7 @@ async function insertHistoricalBooking(
       external_reservation_id: b.appointment_uid ? String(b.appointment_uid) : null,
       group_key: null,
       comment: null,
+      ...(vatFields.vat_rate_pct != null ? vatFields : {}),
     },
     { onConflict: 'salon_id,source,external_id', ignoreDuplicates: true },
   )
@@ -1541,6 +1550,7 @@ async function syncVisits(
   const caches = await buildResolveCaches(admin, salonId)
   const existingByExt = await loadExistingVisits(admin, salonId)
   const existingExt = new Set(existingByExt.keys())
+  const vatCtx = await loadVatContext(admin, salonId)
   stats.visits_synced = stats.visits_synced ?? 0
 
   // Маппинг payment_method → cash_register_id. T12 — primary берётся из
@@ -1902,6 +1912,7 @@ async function syncVisits(
             stats.visits_synced! += 1
           }
         } else {
+          const vatFields = vatFieldsForVisit(vatCtx, amountCents)
           const { error } = await admin.from('visits').insert({
             salon_id: salonId,
             staff_id: staffId,
@@ -1921,6 +1932,7 @@ async function syncVisits(
             external_reservation_id: String(apptUid),
             group_key: groupKey,
             comment: null,
+            ...(vatFields.vat_rate_pct != null ? vatFields : {}),
           })
           if (!error) {
             existingExt.add(externalId)
@@ -2979,6 +2991,7 @@ async function handleForceResyncHistory(
   // Caches для resolve booksy_id → uuid
   const caches = await buildResolveCaches(admin, salonId)
   const existingVisitsExt = new Set((await loadExistingVisits(admin, salonId)).keys())
+  const vatCtx = await loadVatContext(admin, salonId)
 
   // Маппинг payment_method → cash_register_id (та же логика что в syncClients)
   const cashRegisterByMethod: Record<string, string> = {}
@@ -3065,6 +3078,7 @@ async function handleForceResyncHistory(
       existingVisitsExt,
       config,
       cashRegisterByMethod,
+      vatCtx,
     )
     historyVisitsAdded += added
     processed++
