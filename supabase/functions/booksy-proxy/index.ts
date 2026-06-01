@@ -1147,11 +1147,12 @@ async function syncClients(
       }
     }
 
-    if (resp.customers.length < perPage) {
-      finishedAllPages = true
-      break
-    }
-    if (resp.page * resp.per_page >= resp.count) {
+    // Раньше выходили также если customers.length < perPage — но Booksy
+    // иногда возвращает 99 на странице (rate-limit / batching quirk),
+    // и sync преждевременно считал что закончил → resume reset, юзер
+    // видит ~1.6к из 2.5к реальных клиентов. Доверяем только resp.count.
+    const expectedTotal = Number(resp.count ?? 0)
+    if (expectedTotal > 0 && resp.page * resp.per_page >= expectedTotal) {
       finishedAllPages = true
       break
     }

@@ -3,14 +3,18 @@ import {
   AlertTriangle,
   Ban,
   CalendarClock,
+  LifeBuoy,
   MessageSquarePlus,
   MoreVertical,
   Trash2,
   UserPlus,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
+import { supabase } from '@/lib/supabase/client'
 
 import { UserCardModal } from '@/components/admin/UserCardModal'
 import { Button } from '@/components/ui/button'
@@ -32,7 +36,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { SALON_TYPES } from '@/routes/onboarding/onboarding-defaults'
 
-type ModalKind = 'block' | 'addUser' | 'extendDemo' | 'delete' | 'smsGrant' | null
+type ModalKind = 'block' | 'addUser' | 'extendDemo' | 'delete' | 'smsGrant' | 'helpdesk' | null
 
 const STATUS_TONE: Record<string, string> = {
   green: 'bg-emerald-100 text-emerald-700',
@@ -44,6 +48,7 @@ const STATUS_TONE: Record<string, string> = {
 
 export function AdminSalonsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { data, isLoading, error } = useAdminSalons()
   const { data: usersData } = useAdminUsers()
   const [modal, setModal] = useState<{ kind: ModalKind; salon: AdminSalonRow | null }>({
@@ -52,7 +57,26 @@ export function AdminSalonsPage() {
   })
   const [openUserCard, setOpenUserCard] = useState<AdminUserRow | null>(null)
 
-  function open(kind: NonNullable<ModalKind>, salon: AdminSalonRow) {
+  async function open(kind: NonNullable<ModalKind>, salon: AdminSalonRow) {
+    if (kind === 'helpdesk') {
+      // HelpDesk: super-admin RPC добавляет нас как admin в salon_members
+      // → redirect в кабинет владельца с полным доступом.
+      try {
+        const { error: rpcErr } = await supabase.rpc('admin_helpdesk_access', {
+          p_salon_id: salon.id,
+        })
+        if (rpcErr) throw rpcErr
+        toast.success(
+          t('admin.salons.toast.helpdesk_granted', {
+            defaultValue: 'Доступ HelpDesk выдан. Переходим в кабинет.',
+          }),
+        )
+        navigate(`/salon/${salon.id}`)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : String(e))
+      }
+      return
+    }
     setModal({ kind, salon })
   }
   function close() {
@@ -266,6 +290,14 @@ function SalonRow({
               sideOffset={4}
               className="border-border bg-card shadow-finmd z-50 w-56 rounded-md border p-1 text-sm"
             >
+              <DropdownItem
+                icon={LifeBuoy}
+                onSelect={() => onAction('helpdesk', salon)}
+                label={t('admin.salons.action_helpdesk', {
+                  defaultValue: 'HelpDesk (войти как помощник)',
+                })}
+              />
+              <DropdownMenu.Separator className="bg-border mx-1 my-1 h-px" />
               <DropdownItem
                 icon={UserPlus}
                 onSelect={() => onAction('addUser', salon)}
