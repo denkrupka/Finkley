@@ -248,22 +248,16 @@ Deno.serve(async (req) => {
     // Email reply через email-channel send. skip_log=true чтобы email-channel
     // не дублировал messenger_messages.insert (мы сами делаем ниже).
     try {
-      // Subject build: clean от accumulated мусора.
-      // 1) убрать markdown ** (наша внутренняя bold-разметка)
-      // 2) обрезать на первом newline (subject должен быть single-line)
-      // 3) убрать ВСЕ накопленные `Re: ` префиксы (заменим одним)
-      // 4) truncate 100 chars
-      const cleanReplySubject = (preview: string | null | undefined): string => {
-        if (!preview) return `Сообщение от ${convo.display_name || 'Finkley'}`
-        let s = preview
-          .replace(/\*\*/g, '')
-          .replace(/[\r\n][\s\S]*$/, '')
-          .trim()
-        while (/^Re:\s*/i.test(s)) s = s.replace(/^Re:\s*/i, '')
-        s = s.slice(0, 100).trim()
-        return s ? `Re: ${s}` : `Сообщение от ${convo.display_name || 'Finkley'}`
-      }
-      const subject = cleanReplySubject(convo.last_message_preview)
+      // Subject build: упрощённый.
+      // - убираем ** и newlines простым replace (без сложного regex)
+      // - сразу truncate 100 chars (без многократного re strip)
+      let prev = (convo.last_message_preview ?? '').split('**').join('')
+      const nlIdx = prev.search(/[\r\n]/)
+      if (nlIdx >= 0) prev = prev.slice(0, nlIdx)
+      prev = prev.trim().slice(0, 100)
+      // strip leading 'Re:' если есть — добавим свой ОДИН раз
+      while (prev.toLowerCase().startsWith('re:')) prev = prev.slice(3).trim()
+      const subject = prev ? `Re: ${prev}` : `Сообщение от ${convo.display_name || 'Finkley'}`
       const supaUrl = Deno.env.get('SUPABASE_URL') ?? ''
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       const r = await fetch(`${supaUrl}/functions/v1/email-channel`, {
