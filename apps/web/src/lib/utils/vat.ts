@@ -86,3 +86,49 @@ export function computeNet(grossCents: number, ratePct: number): number {
 export function computeVatAmount(netCents: number, grossCents: number): number {
   return Math.max(0, grossCents - netCents)
 }
+
+/**
+ * Семантика «расчёта VAT для одной транзакции» с учётом флагов:
+ *   isVatPayer=false → нетто=брутто, vat=0 (не плательщик)
+ *   vatSkipped=true  → нетто=брутто, vat=0 (фактически без документа)
+ *   ratePct=null     → нетто=брутто, vat=0 (старая запись без разбивки)
+ *
+ * Возвращает {netCents, vatCents}. grossCents всегда = amount_cents строки.
+ */
+export function vatBreakdownFor(args: {
+  grossCents: number
+  netCents: number | null | undefined
+  ratePct: number | null | undefined
+  isVatPayer: boolean
+  vatSkipped?: boolean
+}): { netCents: number; vatCents: number; ratePct: number } {
+  if (!args.isVatPayer || args.vatSkipped || args.ratePct == null) {
+    return { netCents: args.grossCents, vatCents: 0, ratePct: 0 }
+  }
+  const net = args.netCents ?? computeNet(args.grossCents, args.ratePct)
+  return {
+    netCents: net,
+    vatCents: Math.max(0, args.grossCents - net),
+    ratePct: args.ratePct,
+  }
+}
+
+/**
+ * Итоговый VAT-баланс за период:
+ *   vatOnIncome  — НДС со всех доходов (визиты + продажи + прочие доходы)
+ *   vatOnExpense — НДС со всех расходов (фактуры/чеки + auto-commissions)
+ *   vatPayable   — vatOnIncome − vatOnExpense
+ *
+ * Если vatPayable > 0 → надо заплатить в гос-бюджет (категория «Налоги»).
+ * Если vatPayable < 0 → переплата, переносится на следующий месяц.
+ */
+export function computeVatPayable(args: { vatOnIncomeCents: number; vatOnExpenseCents: number }): {
+  vatPayableCents: number
+  isOverpayment: boolean
+} {
+  const diff = args.vatOnIncomeCents - args.vatOnExpenseCents
+  return {
+    vatPayableCents: diff,
+    isOverpayment: diff < 0,
+  }
+}
