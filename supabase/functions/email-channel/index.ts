@@ -79,47 +79,171 @@ async function logOutgoingMessage(
   subject: string,
   textBody: string,
 ): Promise<void> {
-  const toAddr = to.toLowerCase().trim()
-  // Conversation по to-address
-  const { data: existing } = await admin
-    .from('messenger_conversations')
-    .select('id')
-    .eq('salon_id', salonId)
-    .eq('channel', 'email')
-    .eq('external_user_id', toAddr)
-    .maybeSingle()
-  let convId: string | null = null
-  if (existing) {
-    convId = (existing as { id: string }).id
-    await admin
+  // try-catch — если БД insert упал (RLS / constraint / network), Gmail send
+  // уже сделан, нет смысла отменять весь запрос. Просто warn в логах
+  // чтобы можно было найти причину позже.
+  try {
+    const toAddr = to.toLowerCase().trim()
+    // Conversation по to-address (как poll-branch для входящих по from-address)
+    const { data: existing } = await admin
       .from('messenger_conversations')
-      .update({
-        last_message_at: new Date().toISOString(),
-        last_message_preview: subject.slice(0, 200),
-      })
-      .eq('id', convId)
-  } else {
-    const { data: created } = await admin
-      .from('messenger_conversations')
-      .insert({
-        salon_id: salonId,
-        channel: 'email',
-        external_user_id: toAddr,
-        display_name: toAddr,
-        last_message_at: new Date().toISOString(),
-        last_message_preview: subject.slice(0, 200),
-      })
       .select('id')
-      .single()
-    if (created) convId = (created as { id: string }).id
+      .eq('salon_id', salonId)
+      .eq('channel', 'email')
+      .eq('external_user_id', toAddr)
+      .maybeSingle()
+    let convId: string | null = null
+    if (existing) {
+      convId = (existing as { id: string }).id
+      await admin
+        .from('messenger_conversations')
+        .update({
+          last_message_at: new Date().toISOString(),
+          last_message_preview: subject.slice(0, 200),
+        })
+        .eq('id', convId)
+    } else {
+      const { data: created, error: convErr } = await admin
+        .from('messenger_conversations')
+        .insert({
+          salon_id: salonId,
+          channel: 'email',
+          external_user_id: toAddr,
+          display_name: toAddr,
+          last_message_at: new Date().toISOString(),
+          last_message_preview: subject.slice(0, 200),
+        })
+        .select('id')
+        .single()
+      if (convErr) {
+        console.warn('logOutgoing conv insert failed:', convErr.message)
+        return
+      }
+      if (created) convId = (created as { id: string }).id
+    }
+    if (!convId) return
+    const { error: msgErr } = await admin.from('messenger_messages').insert({
+      conversation_id: convId,
+      salon_id: salonId, // NOT NULL — без этого insert падает
+      direction: 'out',
+      text: subject ? `**${subject}**\n\n${textBody}` : textBody,
+    })
+    if (msgErr) {
+      console.warn('logOutgoing msg insert failed:', msgErr.message)
+    }
+  } catch (e) {
+    console.warn('logOutgoing failed:', (e as Error).message)
   }
-  if (!convId) return
-  await admin.from('messenger_messages').insert({
-    conversation_id: convId,
-    direction: 'out',
-    text: subject ? `**${subject}**\n\n${textBody}` : textBody,
-    created_at: new Date().toISOString(),
+}
+
+/**
+ * Pull новые входящие через Gmail REST API. Используется в action='poll'
+ * когда у юзера OAuth (нет IMAP credentials). Тянет сообщения новее
+ * sinceUnix (last_synced_at), парсит From/Subject/snippet, upsert'ит
+ * conversation + insert message. Идемпотентно: external_message_id =
+ * gmail message id, повторный poll того же письма не создаст дубликат
+ * (uniq index в messenger_messages).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function pollViaGmailApi(
+  admin: any,
+  salonId: string,
+  accessToken: string,
+  sinceUnix: number,
+): Promise<number> {
+  // 1) list message ids
+  const listUrl =
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?` +
+    `q=${encodeURIComponent(`after:${sinceUnix} -from:me`)}` +
+    `&maxResults=25`
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   })
+  if (!listRes.ok) {
+    throw new Error(`gmail_list_failed: ${listRes.status} ${await listRes.text()}`)
+  }
+  const listJson = (await listRes.json()) as { messages?: Array<{ id: string }> }
+  const ids = listJson.messages ?? []
+  let imported = 0
+  // 2) для каждого id — get full
+  for (const m of ids) {
+    const msgRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata` +
+        `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!msgRes.ok) continue
+    const msg = (await msgRes.json()) as {
+      id: string
+      snippet?: string
+      payload?: { headers?: Array<{ name: string; value: string }> }
+      internalDate?: string
+    }
+    const hdr = (name: string): string =>
+      msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
+    const fromHeader = hdr('From')
+    const subject = hdr('Subject')
+    const snippet = msg.snippet ?? ''
+    // From header формата 'Name <email@x.com>' или 'email@x.com'
+    const emailMatch = fromHeader.match(/<([^>]+)>/) ?? fromHeader.match(/([^\s<>]+@[^\s<>]+)/)
+    const fromAddr = (emailMatch?.[1] ?? fromHeader).toLowerCase().trim()
+    if (!fromAddr || !fromAddr.includes('@')) continue
+    const fromName = fromHeader.match(/^([^<]+?)\s*</)?.[1]?.trim() || fromAddr.split('@')[0]
+    const createdAt = msg.internalDate
+      ? new Date(Number(msg.internalDate)).toISOString()
+      : new Date().toISOString()
+
+    // upsert conversation
+    const { data: existing } = await admin
+      .from('messenger_conversations')
+      .select('id')
+      .eq('salon_id', salonId)
+      .eq('channel', 'email')
+      .eq('external_user_id', fromAddr)
+      .maybeSingle()
+    let convId: string | null = null
+    if (existing) {
+      convId = (existing as { id: string }).id
+      await admin
+        .from('messenger_conversations')
+        .update({
+          display_name: fromName,
+          last_message_at: createdAt,
+          last_message_preview: subject.slice(0, 200),
+        })
+        .eq('id', convId)
+    } else {
+      const { data: created } = await admin
+        .from('messenger_conversations')
+        .insert({
+          salon_id: salonId,
+          channel: 'email',
+          external_user_id: fromAddr,
+          display_name: fromName,
+          last_message_at: createdAt,
+          last_message_preview: subject.slice(0, 200),
+        })
+        .select('id')
+        .single()
+      if (created) convId = (created as { id: string }).id
+    }
+    if (!convId) continue
+    const { error: insErr } = await admin.from('messenger_messages').insert({
+      conversation_id: convId,
+      salon_id: salonId,
+      direction: 'in',
+      text: subject ? `**${subject}**\n\n${snippet}` : snippet,
+      external_message_id: m.id,
+      created_at: createdAt,
+    })
+    // Игнорируем UNIQUE_VIOLATION (23505) — это повтор poll'а того же письма
+    if (insErr && insErr.code !== '23505') {
+      console.warn('gmail poll msg insert failed:', insErr.message)
+      continue
+    }
+    if (!insErr) imported++
+  }
+  return imported
 }
 
 /**
@@ -393,7 +517,60 @@ Deno.serve(async (req: Request) => {
       .eq('salon_id', body.salon_id)
       .eq('channel', 'email')
       .maybeSingle()
-    const creds = (integ?.credentials as { imap?: ImapConfig } | null)?.imap
+    const allCreds = (integ?.credentials ?? {}) as {
+      imap?: ImapConfig
+      oauth?: {
+        access_token: string
+        refresh_token?: string
+        expires_at: string
+        email?: string | null
+      }
+    }
+    // OAuth-путь — через Gmail API messages.list. Приоритет над IMAP.
+    if (allCreds.oauth?.access_token) {
+      try {
+        let accessToken = allCreds.oauth.access_token
+        const expiresAt = new Date(allCreds.oauth.expires_at).getTime()
+        if (Date.now() > expiresAt - 60_000 && allCreds.oauth.refresh_token) {
+          const refreshed = await refreshGoogleToken(allCreds.oauth.refresh_token)
+          if (refreshed) {
+            accessToken = refreshed.access_token
+            await admin
+              .from('messenger_integrations')
+              .update({
+                credentials: {
+                  ...allCreds,
+                  oauth: {
+                    ...allCreds.oauth,
+                    access_token: refreshed.access_token,
+                    expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+                  },
+                },
+              })
+              .eq('salon_id', body.salon_id)
+              .eq('channel', 'email')
+          }
+        }
+        const sinceTs = integ?.last_synced_at
+          ? Math.floor(new Date(integ.last_synced_at as string).getTime() / 1000)
+          : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+        const imported = await pollViaGmailApi(admin, body.salon_id, accessToken, sinceTs)
+        await admin
+          .from('messenger_integrations')
+          .update({ last_synced_at: new Date().toISOString(), last_error: null })
+          .eq('salon_id', body.salon_id)
+          .eq('channel', 'email')
+        return jsonResponse({ ok: true, imported, via: 'gmail_oauth' })
+      } catch (e) {
+        await admin
+          .from('messenger_integrations')
+          .update({ last_error: (e as Error).message })
+          .eq('salon_id', body.salon_id)
+          .eq('channel', 'email')
+        return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+      }
+    }
+    const creds = allCreds.imap
     if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
     const since = integ?.last_synced_at
       ? new Date(integ.last_synced_at as string)
@@ -472,9 +649,10 @@ Deno.serve(async (req: Request) => {
           const text = (parsed.text ?? parsed.html ?? '').toString().slice(0, 10_000)
           await admin.from('messenger_messages').insert({
             conversation_id: convId,
+            salon_id: body.salon_id, // NOT NULL — без него insert падал silent
             direction: 'in',
             text: parsed.subject ? `**${parsed.subject}**\n\n${text}` : text,
-            external_id: parsed.messageId ?? `imap_${uid}`,
+            external_message_id: parsed.messageId ?? `imap_${uid}`,
             created_at: msg.internalDate ?? new Date().toISOString(),
           })
           imported++
