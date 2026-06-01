@@ -390,7 +390,31 @@ export function MessengerPage() {
                       label={t(meta.labelKey, { defaultValue: meta.label })}
                       active={activeChannel === ch}
                       color={meta.color}
-                      onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
+                      onClick={async () => {
+                        setActiveChannel(activeChannel === ch ? null : ch)
+                        // Email — кнопка дополнительно триггерит принудительный
+                        // pull новых писем через Gmail API / IMAP. Cron каждые
+                        // 2 минуты тоже работает, но юзер ожидает что клик =
+                        // «получи всё прямо сейчас».
+                        if (ch === 'email') {
+                          try {
+                            const { data } = await supabase.functions.invoke('email-channel', {
+                              body: { action: 'poll', salon_id: salonId },
+                            })
+                            const res = data as { ok?: boolean; imported?: number } | null
+                            if (res?.ok && (res.imported ?? 0) > 0) {
+                              toast.success(
+                                t('messenger.email_synced', {
+                                  count: res.imported,
+                                  defaultValue: `Получено новых писем: ${res.imported}`,
+                                }),
+                              )
+                            }
+                          } catch {
+                            // silent — UI не должен падать если синхра не удалась
+                          }
+                        }
+                      }}
                       iconOnly
                     >
                       <Icon className="size-3.5" strokeWidth={2} />

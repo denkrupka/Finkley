@@ -151,11 +151,20 @@ async function pollViaGmailApi(
   accessToken: string,
   sinceUnix: number,
 ): Promise<number> {
-  // 1) list message ids
+  // Окно: динамически от sinceUnix. Если первый poll (sinceUnix > 7д назад)
+  // — берём newer_than:7d (gmail-syntax, проверенный). Иначе — окно от
+  // last_synced_at до сейчас (`after:<unix>` принимается Gmail API). На
+  // повторном poll'е могут быть overlap'ы но external_message_id uniq
+  // ловит дубли. maxResults=100 чтобы не терять при всплесках.
+  const ageHours = (Date.now() / 1000 - sinceUnix) / 3600
+  const query =
+    ageHours > 168
+      ? 'newer_than:7d -from:me' // первый poll — берём 7 дней максимум
+      : `after:${sinceUnix} -from:me`
   const listUrl =
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?` +
-    `q=${encodeURIComponent(`after:${sinceUnix} -from:me`)}` +
-    `&maxResults=25`
+    `q=${encodeURIComponent(query)}` +
+    `&maxResults=100`
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
