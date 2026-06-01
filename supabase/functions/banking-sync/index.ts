@@ -375,23 +375,21 @@ async function persistTransactions(
     return { newCount: 0, expCount: 0 }
   }
 
-  // Только booked транзакции пишем (PDNG/pending часто меняют сумму/исчезают).
+  // Делим транзакции на booked (BOOK/BOOKED/unknown) и pending (PDNG).
+  // PDNG сохраняем со status='pending' (см. миграцию 20260601000003) —
+  // юзер хочет видеть свежие транзакции, а не ждать 1–24 часа booking.
+  // При следующем sync PDNG → BOOK upsert через UNIQUE (account_id,external_id)
+  // апдейтит status='booked' и финальную сумму. expense из pending НЕ
+  // создаём (сумма может поменяться).
   const booked = ctx.txs.filter((t) => !t.status || t.status === 'BOOK' || t.status === 'BOOKED')
-  const pendingCount = ctx.txs.length - booked.length
-  if (pendingCount > 0) {
-    console.log(
-      `[banking-sync] salon=${ctx.salonId} skipped_pending=${pendingCount} (status != BOOK/BOOKED)`,
-    )
+  const pending = ctx.txs.filter((t) => t.status === 'PDNG')
+  if (pending.length > 0) {
+    console.log(`[banking-sync] salon=${ctx.salonId} pending=${pending.length} (saved as PDNG)`)
   }
 
-  // Сначала — INSERT bank_transactions с onConflict ignore (через upsert)
-  const txRows = booked.map((t) => {
+  const mapRow = (t: EbTransaction, status: 'booked' | 'pending') => {
     const { amountCents, type } = parseAmount(t)
     const description = transactionDescription(t)
-    // Если EB не вернул counterparty явно — пытаемся извлечь имя продавца
-    // из description regex'ом. POS-транзакции PL (ROSSMANN, LIDL OSTROWSKA,
-    // KFC POZNAN STATOIL) обычно начинаются с имени магазина в верхнем
-    // регистре, дальше место/код/дата.
     const explicit = counterpartyName(t)?.slice(0, 200) ?? null
     const fromDescription = explicit ? null : extractCounterpartyFromDescription(description)
     return {
@@ -403,22 +401,46 @@ async function persistTransactions(
       description: description.slice(0, 500) || null,
       counterparty: explicit ?? fromDescription,
       executed_at: new Date(transactionDate(t)).toISOString(),
+      status,
       raw: t as unknown as Record<string, unknown>,
     }
-  })
+  }
 
-  // upsert с ignoreDuplicates — не возвращает существующие. Поэтому делаем
-  // в два шага: select сначала чтобы узнать какие external_id уже есть,
-  // потом insert новых.
+  const txRows = booked.map((t) => mapRow(t, 'booked'))
+  const pendingRows = pending.map((t) => mapRow(t, 'pending'))
+
+  // Pending — upsert с обновлением status/amount (при PDNG→PDNG значения
+  // могут чуть меняться, при PDNG→BOOK будет следующий sync). Делаем
+  // отдельным запросом перед booked.
+  if (pendingRows.length > 0) {
+    await admin
+      .from('bank_transactions')
+      .upsert(pendingRows, { onConflict: 'account_id,external_id', ignoreDuplicates: false })
+  }
+
+  // Booked — двухшаговый процесс: select existing → insert новых. Не
+  // апдейтим существующие booked (auto-expense уже создан, не пере-создаём).
   const { data: existingRows } = await admin
     .from('bank_transactions')
-    .select('id, external_id')
+    .select('id, external_id, status')
     .eq('account_id', ctx.accountId)
     .in(
       'external_id',
       txRows.map((r) => r.external_id),
     )
   const existingIds = new Set((existingRows ?? []).map((r) => r.external_id))
+  // PDNG → BOOK переход: для existing pending апдейтим status на booked
+  // (auto-expense будет создан ниже в expense-create блоке).
+  const pendingToBookedIds = (existingRows ?? [])
+    .filter((r) => r.status === 'pending')
+    .map((r) => r.external_id)
+  if (pendingToBookedIds.length > 0) {
+    await admin
+      .from('bank_transactions')
+      .update({ status: 'booked' })
+      .eq('account_id', ctx.accountId)
+      .in('external_id', pendingToBookedIds)
+  }
   const newRows = txRows.filter((r) => !existingIds.has(r.external_id))
   console.log(
     `[banking-sync] salon=${ctx.salonId} booked=${booked.length} duplicates=${existingIds.size} to_insert=${newRows.length}`,

@@ -89,6 +89,13 @@ export function CalendarFeedCard() {
               </a>
             </div>
             <p className="text-muted-foreground text-xs">{t('settings.calendar.how_to')}</p>
+            <p className="text-muted-foreground border-border bg-muted/30 mt-1 rounded-md border p-2 text-[11px]">
+              ℹ&nbsp;
+              {t('settings.calendar.subscribe_only_note', {
+                defaultValue:
+                  'Это read-only подписка: визиты подгрузятся в твой календарь, но изменения в Google/Apple не пишутся обратно. Двусторонняя синхронизация (OAuth Google Calendar / CalDAV iCloud) — в roadmap.',
+              })}
+            </p>
             <button
               type="button"
               onClick={() => {

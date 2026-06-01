@@ -187,7 +187,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'coming_soon',
+    status: 'available',
   },
   {
     id: 'treatwell',
@@ -206,7 +206,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'coming_soon',
+    status: 'available',
   },
   {
     id: 'yclients',

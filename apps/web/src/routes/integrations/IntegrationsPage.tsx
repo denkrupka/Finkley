@@ -6,6 +6,7 @@ import {
   Instagram,
   Loader2,
   Lock,
+  Mail,
   Phone,
   RefreshCw,
   Send,
@@ -47,6 +48,7 @@ import { SmsSection } from './SmsSection'
 import { BooksyConnectDialog } from './BooksyConnectDialog'
 import { BooksyStaffInviteModal } from './BooksyStaffInviteModal'
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
+import { EmailConnectDialog } from './EmailConnectDialog'
 import { MessengerConnectDialog } from './MessengerConnectDialog'
 import { TelegramUserbotConnectDialog } from './TelegramUserbotConnectDialog'
 import { useTgLogout, useTgSessions } from '@/hooks/useTgUserbot'
@@ -709,6 +711,9 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
     { id: 'instagram', name: 'Instagram Direct', icon: Instagram, color: '#E4405F' },
     { id: 'facebook', name: 'Facebook Messenger', icon: Facebook, color: '#1877F2' },
   ] as const
+  const [emailOpen, setEmailOpen] = useState(false)
+  const emailInteg = integrations.find((i) => i.channel === 'email')
+  const emailConnected = !!emailInteg && emailInteg.status !== 'disconnected'
 
   return (
     <>
@@ -862,6 +867,54 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
             ) : null}
           </div>
         </div>
+
+        {/* Email — SMTP + IMAP. Подключение через EmailConnectDialog. */}
+        <div
+          className={[
+            'border-border bg-card shadow-finsm flex flex-col gap-3 rounded-lg border p-5',
+            emailConnected ? 'border-brand-sage/40' : '',
+          ].join(' ')}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className="grid size-10 shrink-0 place-items-center rounded-md"
+              style={{ background: '#0F4C5C', color: 'white' }}
+            >
+              <Mail className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-foreground text-base font-bold">
+                  {t('integrations.email.card_title', { defaultValue: 'Email' })}
+                </h3>
+                {emailConnected ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    <Check className="size-3" strokeWidth={2.5} />
+                    {t('integrations.status.connected')}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                {emailInteg?.display_name ??
+                  t('integrations.email.card_subtitle', {
+                    defaultValue:
+                      'Подключи SMTP + IMAP — письма от клиентов попадут в общий мессенджер.',
+                  })}
+              </p>
+            </div>
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setEmailOpen(true)}
+              className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+            >
+              {emailConnected
+                ? t('integrations.messengers.reconnect')
+                : t('integrations.messengers.connect')}
+            </button>
+          </div>
+        </div>
       </div>
 
       <MessengerConnectDialog
@@ -875,6 +928,7 @@ function MessengerConnectorsSection({ salonId }: { salonId: string }) {
         salonId={salonId}
         onClose={() => setTgUserbotOpen(false)}
       />
+      <EmailConnectDialog open={emailOpen} salonId={salonId} onClose={() => setEmailOpen(false)} />
     </>
   )
 }

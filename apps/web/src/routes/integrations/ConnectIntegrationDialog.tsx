@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAccountingConnect } from '@/hooks/useIntegrations'
 import { consumeOnboardingCredentials } from '@/lib/onboarding-credentials'
+import { supabase } from '@/lib/supabase/client'
 
 import type { IntegrationDef, IntegrationProvider } from './integrations-config'
 
@@ -88,7 +89,43 @@ export function ConnectIntegrationDialog({
       return
     }
     if (!accountingId) {
-      // Coming-soon провайдеры — тут только stub
+      // Treatwell / Fresha: дёргаем соответствующий proxy. Sync будет
+      // включён после реализации в следующем спринте; connect сохраняет
+      // venue_id и помечает интеграцию connected — юзер видит зелёный
+      // badge и понимает что credentials приняты.
+      const proxyMap: Record<string, string> = {
+        treatwell: 'treatwell-proxy',
+        fresha: 'fresha-proxy',
+      }
+      const proxy = provider ? proxyMap[provider.id] : undefined
+      if (proxy && salonId) {
+        ;(async () => {
+          const { data, error } = await supabase.functions.invoke(proxy, {
+            body: {
+              action: 'connect',
+              salon_id: salonId,
+              login: values.login,
+              password: values.password,
+              account_id: values.account_id,
+              access_key: values.access_key,
+            },
+          })
+          if (error) {
+            toast.error(error.message ?? String(error))
+            return
+          }
+          const res = data as { ok?: boolean; error?: string; note?: string } | null
+          if (!res?.ok) {
+            toast.error(res?.error ?? 'connect_failed')
+            return
+          }
+          toast.success(
+            res.note ?? t('integrations.toast_connected', { name: provider?.name ?? '' }),
+          )
+          onClose()
+        })()
+        return
+      }
       toast.success(t('integrations.toast_saved_stub'))
       onClose()
       return

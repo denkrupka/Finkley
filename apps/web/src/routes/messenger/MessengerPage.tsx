@@ -810,6 +810,38 @@ function ConversationRow({
   )
 }
 
+function VideoWithFallback({
+  mediaUrl,
+  fallbackLabel,
+}: {
+  mediaUrl: string
+  fallbackLabel: string
+}) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return (
+      <a
+        href={mediaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="border-border bg-card mb-1 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold underline-offset-2 hover:underline"
+      >
+        {fallbackLabel}
+      </a>
+    )
+  }
+  return (
+    <video
+      src={mediaUrl}
+      controls
+      playsInline
+      preload="metadata"
+      onError={() => setFailed(true)}
+      className="mb-1 max-h-72 w-auto max-w-full rounded-md bg-black"
+    />
+  )
+}
+
 function MessageBody({
   message,
   onImageClick,
@@ -858,25 +890,15 @@ function MessageBody({
       {/* Video — inline player. `playsInline` нужен для iOS Safari (без него
           встроенный плеер уходит в fullscreen и не показывает preview).
           Если кодек/контейнер не поддерживается браузером (IG иногда
-          присылает .mov H.265), показываем кнопку «Открыть» как fallback. */}
+          присылает .mov H.265), onError показывает fallback link. */}
       {message.media_path && message.media_kind === 'video' ? (
         mediaUrl ? (
-          <video
-            src={mediaUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="mb-1 max-h-72 w-auto max-w-full rounded-md bg-black"
-          >
-            <a
-              href={mediaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs italic underline opacity-90"
-            >
-              {t('messenger.media.video_open', { defaultValue: '🎥 Открыть видео' })}
-            </a>
-          </video>
+          <VideoWithFallback
+            mediaUrl={mediaUrl}
+            fallbackLabel={t('messenger.media.video_open', {
+              defaultValue: '🎥 Открыть видео в новой вкладке',
+            })}
+          />
         ) : (
           <span className="text-xs italic opacity-70">🎥 …</span>
         )

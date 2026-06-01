@@ -523,6 +523,17 @@ function TransactionRow({
       <td className="text-foreground px-4 py-2.5 text-sm font-medium">
         <div className="flex items-center gap-1.5">
           <span className="truncate">{counterparty}</span>
+          {tx.status === 'pending' ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
+              title={t('banking.transactions.pending_tooltip', {
+                defaultValue:
+                  'В ожидании банка (PDNG). Сумма может ещё измениться; попадёт в Расходы/Доходы после фиксации.',
+              })}
+            >
+              {t('banking.transactions.pending_badge', { defaultValue: 'В ожидании' })}
+            </span>
+          ) : null}
           {tx.needs_review ? (
             <span title={t('banking.transactions.needs_review_tooltip')}>
               <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />

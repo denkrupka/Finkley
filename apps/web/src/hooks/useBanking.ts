@@ -70,6 +70,9 @@ export type BankTransactionRow = {
   linked_visit_id: string | null
   linked_other_income_id: string | null
   needs_review: boolean
+  /** 'booked' — финальная (банк зафиксировал), 'pending' — PDNG из EB API,
+   *  показывается с значком «в ожидании банка». */
+  status: 'booked' | 'pending'
 }
 
 export type BankInflowRow = BankTransactionRow & {
@@ -202,7 +205,7 @@ export function useBankInflows(
         .from('bank_transactions')
         .select(
           `id, account_id, external_id, type, amount_cents, currency, description,
-           counterparty, executed_at, expense_id,
+           counterparty, executed_at, expense_id, status,
            bank_accounts!inner (
              iban,
              bank_connections!inner (
@@ -217,9 +220,6 @@ export function useBankInflows(
         .order('executed_at', { ascending: false })
         .limit(500)
       if (error) throw error
-      // Supabase возвращает nested foreign-table'ы как массивы (даже когда
-      // отношение по факту 1:1), потому что выводит type из postgresql FK.
-      // Берём первый элемент.
       type Joined = BankTransactionRow & {
         bank_accounts?: Array<{
           iban: string | null
@@ -246,6 +246,7 @@ export function useBankInflows(
           linked_visit_id: r.linked_visit_id,
           linked_other_income_id: r.linked_other_income_id,
           needs_review: r.needs_review,
+          status: r.status ?? 'booked',
           bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
           account_iban: account?.iban ?? null,
         }
@@ -273,7 +274,7 @@ export function useBankOutflows(
         .select(
           `id, account_id, external_id, type, amount_cents, currency, description,
            counterparty, executed_at, expense_id, linked_visit_id, linked_other_income_id,
-           needs_review,
+           needs_review, status,
            bank_accounts!inner (
              iban,
              bank_connections!inner (
@@ -314,6 +315,7 @@ export function useBankOutflows(
           linked_visit_id: r.linked_visit_id,
           linked_other_income_id: r.linked_other_income_id,
           needs_review: r.needs_review,
+          status: r.status ?? 'booked',
           bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
           account_iban: account?.iban ?? null,
         }
