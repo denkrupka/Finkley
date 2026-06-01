@@ -54,7 +54,7 @@ import { cn } from '@/lib/utils/cn'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import type { PaymentMethod, VisitRow } from '@/hooks/useVisits'
 import type { OtherIncomeRow } from '@/hooks/useOtherIncomes'
-import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 import { OtherIncomeEditModal } from '@/routes/income/OtherIncomeEditModal'
 import {
   pickActiveAccountingProvider,
@@ -1314,12 +1314,15 @@ export function ExpensesPage({
         existingPayment={editingPayment}
       />
 
-      {/* T31 — модалки источника комиссии: визит или прочий доход. */}
-      <VisitDetailModal
-        visit={commissionVisit}
-        onClose={() => setCommissionVisit(null)}
+      {/* T31 — модалки источника комиссии: визит или прочий доход.
+          По запросу owner'а 01.06 старая VisitDetailModal с табами удалена;
+          клик ВСЕГДА открывает QuickEntryModal в edit-mode. */}
+      <QuickEntryModal
+        open={!!commissionVisit}
+        onOpenChange={(o) => !o && setCommissionVisit(null)}
         salonId={salonId!}
         currency={currency}
+        editVisit={commissionVisit}
       />
       <OtherIncomeEditModal
         open={!!commissionIncome}

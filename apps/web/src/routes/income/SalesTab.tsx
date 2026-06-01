@@ -51,7 +51,7 @@ import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatVisitDate } from '@/lib/utils/format-date'
 import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 import { RetailSaleWizard } from '@/routes/visits/RetailSaleWizard'
-import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+// VisitDetailModal удалён 01.06 — везде используем QuickEntryModal в edit-mode.
 
 /**
  * Таб «Продажи» под /income. Показывает товарные продажи (visits с kind=retail)
@@ -539,12 +539,12 @@ export function SalesTab({
         </DialogContent>
       </Dialog>
 
-      <VisitDetailModal
-        visit={editingSale}
-        onClose={() => setEditingSale(null)}
+      <QuickEntryModal
+        open={!!editingSale}
+        onOpenChange={(o) => !o && setEditingSale(null)}
         salonId={salonId}
         currency={currency}
-        onBackFromCharge={(v) => setQuickEditVisit(v)}
+        editVisit={editingSale}
       />
 
       <QuickEntryModal

@@ -25,7 +25,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
 import { useSalon } from '@/hooks/useSalons'
+import { VatBreakdownInput } from '@/components/ui/VatBreakdownInput'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 import {
   useBulkSetServiceCost,
   useCreateService,
@@ -561,10 +564,17 @@ function ServiceDetailModal({
   const { t } = useTranslation()
   const update = useUpdateService(salonId)
   const createCategory = useCreateServiceCategory(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salon } = useSalon(salonId)
+  const country = salon?.country_code ?? 'PL'
 
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
   const [priceStr, setPriceStr] = useState('')
+  // VAT state — синхронизирован с priceStr (грубо = брутто).
+  const [vatNetCents, setVatNetCents] = useState(0)
+  const [vatGrossCents, setVatGrossCents] = useState(0)
+  const [vatRatePct, setVatRatePct] = useState<number>(() => defaultVatRate(country))
   const [costStr, setCostStr] = useState('')
   const [durationStr, setDurationStr] = useState('')
   const [workstations, setWorkstations] = useState(1)
@@ -581,6 +591,18 @@ function ServiceDetailModal({
     setName(service.name)
     setCategoryId(service.category_id ?? '__none__')
     setPriceStr((service.default_price_cents / 100).toString())
+    // VAT prefill: используем price_net_cents+vat_rate_pct если есть,
+    // иначе считаем нетто из брутто по дефолтной ставке страны.
+    const svcAny = service as ServiceRow & {
+      price_net_cents?: number | null
+      vat_rate_pct?: number | null
+    }
+    const rate = svcAny.vat_rate_pct ?? defaultVatRate(country)
+    const gross = service.default_price_cents
+    const net = svcAny.price_net_cents ?? computeNet(gross, rate)
+    setVatRatePct(rate)
+    setVatGrossCents(gross)
+    setVatNetCents(net)
     setCostStr(service.cost_cents == null ? '' : (service.cost_cents / 100).toString())
     setDurationStr(service.default_duration_min == null ? '' : String(service.default_duration_min))
     setWorkstations(service.staff_count_required ?? 1)
@@ -588,6 +610,7 @@ function ServiceDetailModal({
     setStaffPctStr(service.staff_payout_pct > 0 ? String(service.staff_payout_pct) : '')
     setAddingCategory(false)
     setNewCategoryName('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- country стабилен от салона
   }, [service])
 
   function submitNewCategory() {
@@ -639,7 +662,15 @@ function ServiceDetailModal({
         staff_count_required: Math.max(1, Math.round(workstations)),
         materials_pct: materials,
         staff_payout_pct: staffPct,
-      },
+        // VAT — записываем только когда фирма плательщик. Иначе оставляем
+        // null чтобы старая логика «брутто=net» сохранилась.
+        ...(isVatPayer
+          ? {
+              price_net_cents: vatNetCents,
+              vat_rate_pct: vatRatePct,
+            }
+          : {}),
+      } as Parameters<typeof update.mutate>[0],
       {
         onSuccess: () => {
           toast.success(t('services_page.toast_updated'))
@@ -751,41 +782,92 @@ function ServiceDetailModal({
               </div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="svc-price">
-                {t('services_page.cols.price')} ({currency})
-              </Label>
-              <Input
-                id="svc-price"
-                inputMode="decimal"
-                value={priceStr}
-                onChange={(e) => setPriceStr(e.target.value)}
-              />
+          {isVatPayer ? (
+            <>
+              {/* VAT-плательщик: три поля Нетто/НДС/Брутто с двусторонним
+                  пересчётом. Брутто синхронизируется с priceStr для сохранения. */}
+              <div>
+                <Label className="text-[10.5px] uppercase tracking-wider">
+                  {t('services_page.cols.price')} ({currency})
+                </Label>
+                <div className="mt-1">
+                  <VatBreakdownInput
+                    netCents={vatNetCents}
+                    ratePct={vatRatePct}
+                    grossCents={vatGrossCents}
+                    onChange={(next) => {
+                      setVatNetCents(next.netCents)
+                      setVatRatePct(next.ratePct)
+                      setVatGrossCents(next.grossCents)
+                      setPriceStr((next.grossCents / 100).toString())
+                    }}
+                    countryCode={country}
+                    currency={currency}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="svc-cost">
+                    {t('services_page.cols.cost')} ({currency})
+                  </Label>
+                  <Input
+                    id="svc-cost"
+                    inputMode="decimal"
+                    value={costStr}
+                    onChange={(e) => setCostStr(e.target.value)}
+                    placeholder="—"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="svc-dur">{t('services_page.cols.duration')}</Label>
+                  <Input
+                    id="svc-dur"
+                    inputMode="numeric"
+                    value={durationStr}
+                    onChange={(e) => setDurationStr(e.target.value)}
+                    placeholder={t('common.min')}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="svc-price">
+                  {t('services_page.cols.price')} ({currency})
+                </Label>
+                <Input
+                  id="svc-price"
+                  inputMode="decimal"
+                  value={priceStr}
+                  onChange={(e) => setPriceStr(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="svc-cost">
+                  {t('services_page.cols.cost')} ({currency})
+                </Label>
+                <Input
+                  id="svc-cost"
+                  inputMode="decimal"
+                  value={costStr}
+                  onChange={(e) => setCostStr(e.target.value)}
+                  placeholder="—"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="svc-dur">{t('services_page.cols.duration')}</Label>
+                <Input
+                  id="svc-dur"
+                  inputMode="numeric"
+                  value={durationStr}
+                  onChange={(e) => setDurationStr(e.target.value)}
+                  placeholder={t('common.min')}
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="svc-cost">
-                {t('services_page.cols.cost')} ({currency})
-              </Label>
-              <Input
-                id="svc-cost"
-                inputMode="decimal"
-                value={costStr}
-                onChange={(e) => setCostStr(e.target.value)}
-                placeholder="—"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="svc-dur">{t('services_page.cols.duration')}</Label>
-              <Input
-                id="svc-dur"
-                inputMode="numeric"
-                value={durationStr}
-                onChange={(e) => setDurationStr(e.target.value)}
-                placeholder={t('common.min')}
-              />
-            </div>
-          </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="svc-ws">{t('services_page.cols.workstations')}</Label>

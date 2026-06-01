@@ -13,7 +13,7 @@ import { getDateLocale } from '@/lib/utils/format-date'
 import { useSalon } from '@/hooks/useSalons'
 import { useVisits, type VisitRow } from '@/hooks/useVisits'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
 
 /**
  * Модалка детализации визитов конкретного мастера за период.
@@ -162,11 +162,12 @@ export function StaffVisitsModal({
         </DialogContent>
       </Dialog>
 
-      <VisitDetailModal
-        visit={editingVisit}
+      <QuickEntryModal
+        open={!!editingVisit}
+        onOpenChange={(o) => !o && setEditingVisit(null)}
         salonId={salonId}
         currency={currency}
-        onClose={() => setEditingVisit(null)}
+        editVisit={editingVisit}
       />
     </>
   )

@@ -168,11 +168,10 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
   // и не имеют времени визита по смыслу — их в календарь рисовать не надо.
   const { data: visits = [] } = useVisits(salonId, range, { kind: 'visit' })
 
-  const [editingVisit, setEditingVisit] = useState<VisitRow | null>(null)
-  // Image #87: для одиночных визитов (group_key=null) клик открывает не
-  // VisitDetailModal, а QuickEntryModal в edit-mode. quickEditVisit держит
-  // активный визит. После «Рассчитать» → setChargeVisit вместо edit, что
-  // переоткроет VisitDetailModal в charge-view.
+  // Клик по визиту → QuickEntryModal в edit-mode (запрос owner'а 01.06).
+  // chargeVisit держит визит когда юзер нажал «Рассчитать» — открывает
+  // VisitDetailModal в ChargeView (только модалка расчёта, без табов
+  // «Wizyta/Informacje» которые удалены).
   const [quickEditVisit, setQuickEditVisit] = useState<VisitRow | null>(null)
   const [chargeVisit, setChargeVisit] = useState<VisitRow | null>(null)
   // Клик/drag по подслоту → popover с действиями (Новый визит / Резерв времени).
@@ -1019,17 +1018,16 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         </div>
       )}
 
+      {/* VisitDetailModal используется ТОЛЬКО как ChargeView (после кнопки
+          «Рассчитать» в QuickEntryModal). Табы «Wizyta/Informacje» в нём
+          скрыты через initialView='charge'. */}
       <VisitDetailModal
-        visit={editingVisit ?? chargeVisit}
-        onClose={() => {
-          setEditingVisit(null)
-          setChargeVisit(null)
-        }}
+        visit={chargeVisit}
+        onClose={() => setChargeVisit(null)}
         salonId={salonId}
         currency={salon?.currency ?? 'PLN'}
-        initialView={chargeVisit ? 'charge' : undefined}
+        initialView="charge"
         onBackFromCharge={(v) => {
-          setEditingVisit(null)
           setChargeVisit(null)
           setQuickEditVisit(v)
         }}

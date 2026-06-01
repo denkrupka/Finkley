@@ -36,7 +36,8 @@ import { effectiveReceivedFromVisit, useVisits, type VisitRow } from '@/hooks/us
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
-import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+// VisitDetailModal удалён 01.06 по запросу owner'а; используем QuickEntryModal
+// в edit-mode для всех клик-flows.
 import type { ExpenseRow } from '@/hooks/useExpenses'
 
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'online' | 'mixed' | null
@@ -532,22 +533,22 @@ export function CashFlowTab({ salonId }: { salonId: string }) {
         }}
       />
 
-      <VisitDetailModal
-        visit={openSaleDetail}
-        onClose={() => setOpenSaleDetail(null)}
+      <QuickEntryModal
+        open={!!openSaleDetail}
+        onOpenChange={(o) => !o && setOpenSaleDetail(null)}
         salonId={salonId}
         currency={currency}
-        initialView="charge"
-        onBackFromCharge={(v) => setEditingVisit(v)}
+        editVisit={openSaleDetail}
       />
 
-      {/* Клик по визиту в ДДС (Финансы → ДДС) — открываем ту же модалку
-          что и в календаре, с default view (табы + действия). */}
-      <VisitDetailModal
-        visit={openVisitDetail}
-        onClose={() => setOpenVisitDetail(null)}
+      {/* Клик по визиту в ДДС → QuickEntryModal в edit-mode (раньше была
+          двух-табовая VisitDetailModal — удалена 01.06 по запросу owner'а). */}
+      <QuickEntryModal
+        open={!!openVisitDetail}
+        onOpenChange={(o) => !o && setOpenVisitDetail(null)}
         salonId={salonId}
         currency={currency}
+        editVisit={openVisitDetail}
       />
 
       <ExpenseFormModal
