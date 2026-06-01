@@ -22,6 +22,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useInventoryItems, type InventoryItemRow } from '@/hooks/useInventory'
+import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useSalon } from '@/hooks/useSalons'
+import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 import {
   useCreateOtherIncome,
   useCreateOtherIncomeCategory,
@@ -82,6 +85,9 @@ export function RetailSaleWizard({
   const { hasOpenShift } = useRequireCashShift(salonId)
   const { data: inventory = [] } = useInventoryItems(salonId, { includeArchived: false })
   const { data: otherCategories = [] } = useOtherIncomeCategories(salonId)
+  const isVatPayer = useIsVatPayer(salonId)
+  const { data: salonData } = useSalon(salonId)
+  const country = salonData?.country_code ?? 'PL'
 
   // ── State ──────────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
@@ -163,6 +169,11 @@ export function RetailSaleWizard({
       )
       return
     }
+    // ПРОДАЖНАЯ цена (брутто): sale_price_cents если задана, иначе
+    // fallback на cost_per_unit_cents. Юзер 02.06 сказал «в продажах
+    // показывай цену Брутто» — это unitPriceCents здесь.
+    const iAny = item as typeof item & { sale_price_cents?: number | null }
+    const unitPriceCents = iAny.sale_price_cents ?? item.cost_per_unit_cents ?? 0
     setLines((prev) => [
       ...prev,
       {
@@ -175,7 +186,7 @@ export function RetailSaleWizard({
         manufacturer: item.supplier ?? null,
         unit: item.unit,
         quantity: 1,
-        unitPriceCents: item.cost_per_unit_cents || 0,
+        unitPriceCents,
         lineDiscountCents: 0,
       },
     ])
@@ -372,6 +383,8 @@ export function RetailSaleWizard({
             grandTotalCents={linesTotalCents - extraDiscountCents}
             linesTotalCents={linesTotalCents}
             currency={currency}
+            isVatPayer={isVatPayer}
+            country={country}
             extraDiscount={extraDiscount}
             onExtraDiscountChange={setExtraDiscount}
             extraDiscountMode={extraDiscountMode}
@@ -1002,6 +1015,8 @@ function Step3({
   grandTotalCents,
   linesTotalCents,
   currency,
+  isVatPayer,
+  country,
   extraDiscount,
   onExtraDiscountChange,
   extraDiscountMode,
@@ -1015,6 +1030,8 @@ function Step3({
   grandTotalCents: number
   linesTotalCents: number
   currency: string
+  isVatPayer: boolean
+  country: string
   extraDiscount: string
   onExtraDiscountChange: (v: string) => void
   extraDiscountMode: 'amount' | 'percent'
@@ -1028,15 +1045,40 @@ function Step3({
 }) {
   const { t } = useTranslation()
 
+  // VAT-разбивка итога брутто. Юзер 02.06: при плательщике VAT показывай
+  // нетто / НДС / брутто. Дефолтная ставка страны салона. На retail-уровне
+  // считаем по среднему — товары могут иметь разные ставки, но в итоговой
+  // продаже один НДС на всё (как чек на фискалке).
+  const defaultRate = defaultVatRate(country)
+  const netCents = isVatPayer ? computeNet(grandTotalCents, defaultRate) : grandTotalCents
+  const vatCents = isVatPayer ? Math.max(0, grandTotalCents - netCents) : 0
+
   return (
     <div className="flex flex-col gap-4 py-4">
       <div className="border-brand-yellow-deep bg-brand-yellow rounded-md border-[1.5px] p-4">
         <p className="text-brand-navy text-[11px] font-semibold uppercase tracking-wider">
-          {t('retail_wizard.step3_total')}
+          {isVatPayer
+            ? t('retail_wizard.step3_total_gross', { defaultValue: 'Итого (брутто)' })
+            : t('retail_wizard.step3_total')}
         </p>
         <p className="num text-brand-navy mt-1 text-3xl font-bold tracking-tight">
           {formatCurrency(grandTotalCents, currency)}
         </p>
+        {isVatPayer ? (
+          <div className="text-brand-navy/80 num mt-2 grid grid-cols-2 gap-1 text-[11px]">
+            <span>
+              {t('retail_wizard.step3_total_net', { defaultValue: 'Нетто' })}:{' '}
+              <span className="font-semibold">{formatCurrency(netCents, currency)}</span>
+            </span>
+            <span className="text-right">
+              {t('retail_wizard.step3_total_vat', {
+                defaultValue: 'НДС {{rate}}%',
+                rate: defaultRate,
+              })}
+              : <span className="font-semibold">{formatCurrency(vatCents, currency)}</span>
+            </span>
+          </div>
+        ) : null}
         {grandTotalCents !== linesTotalCents ? (
           <p className="text-brand-navy/70 mt-1 text-xs">
             {t('retail_wizard.step3_subtotal')}:{' '}
