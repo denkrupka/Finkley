@@ -117,19 +117,20 @@ Deno.serve(
     const prefs = salon.notification_prefs ?? {}
 
     // ────────────────────────────────────────────────────────────────────
-    // Дефолты по каналу (если ключ не задан в prefs):
-    //   email — true, telegram — true (если привязан), sms — false.
-    // Master-disable: prefs[type] === false → все каналы выключены.
+    // ВСЕ каналы по умолчанию OFF — юзер сам кликает галки для включения.
+    // Раньше defaults были ON (email/push/telegram) — это противоречило
+    // UI которое показывало все галки empty, и юзер получал уведомления
+    // «без видимой настройки». Владелец 31.05 / 02.06: «все галки сняты
+    // — а приходят всё равно». Consistent с UI defaults (isChannelEnabled
+    // в NotificationsTabContent.tsx возвращает false при отсутствии ключа).
     // ────────────────────────────────────────────────────────────────────
     function isChannelEnabled(ch: Channel): boolean {
       if (prefs[type as string] === false) return false
       const key = `${type}.${ch}`
       if (key in prefs) return prefs[key] === true
-      // Дефолты по каналу:
-      if (ch === 'email') return true
-      if (ch === 'telegram') return !!telegramId
-      if (ch === 'push') return true // push by default ON если юзер подписался
-      return false // sms — по умолчанию off
+      // Telegram — должен быть привязан в любом случае. Прочие каналы — false.
+      if (ch === 'telegram') return false // даже если telegramId есть — ждём явного opt-in
+      return false
     }
 
     const ctx = {

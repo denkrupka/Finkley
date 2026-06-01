@@ -2020,13 +2020,17 @@ async function notifyBooksyNewVisits(
       .join('\n')
     const more = newVisits.length > 5 ? `\n…ещё ${newVisits.length - 5}` : ''
     const ownerId = (ownerRow as { user_id: string }).user_id
-    // Push (отдельная ветка от per-channel prefs).
-    await sendPushToUser(admin, ownerId, {
-      title: `Новые визиты из Booksy (${newVisits.length})`,
-      body: `${lines}${more}`,
-      url: `/app/${salonId}/visits`,
-      tag: 'booksy-new-visits',
-    })
+    // Push: только если юзер явно включил (prefs['booksy_new_visits.push']=true).
+    // Раньше шёл безусловно — игнорировал prefs (комментарий «отдельная ветка»),
+    // но это противоречило ожиданию владельца «галки сняты — push не приходит».
+    if (prefs['booksy_new_visits.push'] === true) {
+      await sendPushToUser(admin, ownerId, {
+        title: `Новые визиты из Booksy (${newVisits.length})`,
+        body: `${lines}${more}`,
+        url: `/app/${salonId}/visits`,
+        tag: 'booksy-new-visits',
+      })
+    }
     // T39 — email/Telegram/SMS через единый dispatcher.
     await dispatchNotification({
       salonId,
