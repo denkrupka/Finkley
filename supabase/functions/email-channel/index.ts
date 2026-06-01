@@ -124,6 +124,38 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true })
   }
 
+  if (body.action === 'oauth_start') {
+    // Gmail OAuth flow. Требует Client ID + Secret в Google Cloud Console
+    // и scope review (~1-2 нед production-доступ). До завершения setup'а
+    // возвращаем not_configured — UI EmailConnectDialog показывает юзеру
+    // дружественный toast «используй SMTP/IMAP с app-password».
+    //
+    // Когда credentials появятся в env (GOOGLE_OAUTH_CLIENT_ID +
+    // GOOGLE_OAUTH_REDIRECT_URI):
+    //   const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    //     `client_id=${CLIENT_ID}` +
+    //     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+    //     `&response_type=code&scope=${SCOPES}` +
+    //     `&state=${salonId}&access_type=offline&prompt=consent`
+    //   return jsonResponse({ ok: true, url })
+    const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
+    const redirectUri = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI')
+    if (!clientId || !redirectUri) {
+      return jsonResponse({ ok: false, error: 'oauth_not_configured' })
+    }
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.readonly',
+    ].join(' ')
+    const url =
+      `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code&scope=${encodeURIComponent(scopes)}` +
+      `&state=${encodeURIComponent(body.salon_id)}&access_type=offline&prompt=consent`
+    return jsonResponse({ ok: true, url })
+  }
+
   if (body.action === 'disconnect') {
     await admin
       .from('messenger_integrations')
