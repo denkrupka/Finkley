@@ -344,6 +344,33 @@ export function OnboardingPage() {
     return () => window.clearTimeout(timer)
   }, [state, stepIndex, hydrated])
 
+  // Tracking events: для admin Tracking → Онбординг analytics. Пишем
+  // 'enter' при попадании на шаг, 'complete' при completion (onboarding
+  // финиш = последний шаг). Идемпотентно — RPC агрегирует через
+  // max(case action=enter then 1).
+  useEffect(() => {
+    if (!hydrated || !state.created_salon_id) return
+    const stepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
+      stepIndex
+    ]
+    if (!stepId) return
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return
+      void supabase
+        .from('tracking_events')
+        .insert({
+          user_id: data.user.id,
+          salon_id: state.created_salon_id,
+          event_type: 'onboarding_step',
+          path: stepId,
+          metadata: { action: 'enter', path: state.path },
+        })
+        .then(({ error }) => {
+          if (error) console.warn('tracking_events insert failed:', error.message)
+        })
+    })
+  }, [stepIndex, hydrated, state.path, state.created_salon_id])
+
   // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
   // Address-шаг скипаем если на Step "salon" юзер уже выбрал место в Google
   // Maps — адрес, координаты и google_place_id оттуда подтянулись, ещё раз
@@ -817,6 +844,21 @@ export function OnboardingPage() {
 
     // T199 — credentials + prompt уже сохранены в один localStorage entry
     // выше (saveOnboardingTransit), перед Stripe redirect. Не дублируем.
+
+    // Tracking: финальный шаг complete event для admin Tracking analytics.
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return
+      const finalStepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
+        stepIndex
+      ]
+      void supabase.from('tracking_events').insert({
+        user_id: data.user.id,
+        salon_id: newSalonId,
+        event_type: 'onboarding_step',
+        path: finalStepId ?? 'submit',
+        metadata: { action: 'complete', path: state.path },
+      })
+    })
 
     // Если юзер выбрал интеграции — отправляем сразу на settings/integrations,
     // чтобы он подключил их (там полноценные OAuth-флоу). Иначе — на dashboard.
