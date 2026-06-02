@@ -203,12 +203,17 @@ function StatsTab({ filters }: { filters: Filters }) {
       return (data ?? []) as Array<{
         user_id: string
         user_email: string
+        first_name: string
+        last_name: string
+        salon_names: string[]
         total_events: number
         unique_pages: number
         last_seen_at: string
       }>
     },
   })
+
+  const [drillUser, setDrillUser] = useState<{ user_id: string; label: string } | null>(null)
 
   if (isLoading) return <p className="text-muted-foreground text-sm">Загружаю...</p>
   if (!overview)
@@ -360,46 +365,167 @@ function StatsTab({ filters }: { filters: Filters }) {
         <div className="border-border bg-card shadow-finsm overflow-hidden rounded-lg border">
           <div className="border-border/40 border-b px-4 py-3">
             <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
-              Топ-{topUsers.length} самых активных юзеров
+              Топ-{topUsers.length} самых активных юзеров — клик по строке → разбивка по страницам
             </p>
           </div>
           <table className="w-full text-sm">
             <thead className="border-border bg-muted/30 border-b">
               <tr className="text-muted-foreground text-left text-[10px] font-bold uppercase tracking-wider">
                 <th className="px-4 py-2.5">#</th>
+                <th className="px-4 py-2.5">Имя</th>
                 <th className="px-4 py-2.5">Email</th>
+                <th className="px-4 py-2.5">Салон</th>
                 <th className="num px-4 py-2.5 text-right">Событий</th>
                 <th className="num px-4 py-2.5 text-right">Страниц</th>
                 <th className="num px-4 py-2.5 text-right">Последнее</th>
               </tr>
             </thead>
             <tbody className="divide-border/40 divide-y">
-              {topUsers.map((u, i) => (
-                <tr key={u.user_id}>
-                  <td className="text-muted-foreground num px-4 py-3 text-xs">{i + 1}</td>
-                  <td className="text-foreground truncate px-4 py-3 text-xs font-semibold">
-                    {u.user_email}
-                  </td>
-                  <td className="num text-foreground px-4 py-3 text-right text-xs font-bold">
-                    {Number(u.total_events).toLocaleString('ru-RU')}
-                  </td>
-                  <td className="num text-muted-foreground px-4 py-3 text-right text-xs">
-                    {u.unique_pages}
-                  </td>
-                  <td className="num text-muted-foreground px-4 py-3 text-right text-[10px]">
-                    {new Date(u.last_seen_at).toLocaleString('ru-RU', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                </tr>
-              ))}
+              {topUsers.map((u, i) => {
+                const fullName = `${u.first_name} ${u.last_name}`.trim() || '—'
+                const salons =
+                  u.salon_names && u.salon_names.length > 0 ? u.salon_names.join(', ') : '—'
+                return (
+                  <tr
+                    key={u.user_id}
+                    className="hover:bg-muted/40 cursor-pointer"
+                    onClick={() =>
+                      setDrillUser({
+                        user_id: u.user_id,
+                        label: fullName !== '—' ? fullName : u.user_email,
+                      })
+                    }
+                  >
+                    <td className="text-muted-foreground num px-4 py-3 text-xs">{i + 1}</td>
+                    <td className="text-foreground truncate px-4 py-3 text-xs font-semibold">
+                      {fullName}
+                    </td>
+                    <td className="text-muted-foreground truncate px-4 py-3 text-xs">
+                      {u.user_email}
+                    </td>
+                    <td className="text-foreground truncate px-4 py-3 text-xs">{salons}</td>
+                    <td className="num text-foreground px-4 py-3 text-right text-xs font-bold">
+                      {Number(u.total_events).toLocaleString('ru-RU')}
+                    </td>
+                    <td className="num text-muted-foreground px-4 py-3 text-right text-xs">
+                      {u.unique_pages}
+                    </td>
+                    <td className="num text-muted-foreground px-4 py-3 text-right text-[10px]">
+                      {new Date(u.last_seen_at).toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       ) : null}
+
+      {drillUser ? (
+        <UserPagesDrillModal
+          userId={drillUser.user_id}
+          label={drillUser.label}
+          filters={filters}
+          onClose={() => setDrillUser(null)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function UserPagesDrillModal({
+  userId,
+  label,
+  filters,
+  onClose,
+}: {
+  userId: string
+  label: string
+  filters: Filters
+  onClose: () => void
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-tracking-user-pages', userId, filters],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_tracking_user_pages', {
+        p_user_id: userId,
+        p_date_from: filters.dateFrom,
+        p_date_to: filters.dateTo,
+        p_salon_id: filters.salonId,
+      })
+      if (error) throw error
+      return (data ?? []) as Array<{ path: string; clicks: number; last_seen_at: string }>
+    },
+  })
+  const total = (data ?? []).reduce((s, r) => s + Number(r.clicks), 0)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card shadow-finmd flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-brand-navy text-lg font-bold">{label}</h3>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Куда кликал · всего событий: {total}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground rounded-md p-1 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm">Загружаю...</p>
+        ) : !data || data.length === 0 ? (
+          <p className="text-muted-foreground text-sm">Нет событий за выбранный период.</p>
+        ) : (
+          <div className="overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="border-border bg-muted/30 sticky top-0 border-b">
+                <tr className="text-muted-foreground text-left text-[10px] font-bold uppercase tracking-wider">
+                  <th className="px-3 py-2">Страница</th>
+                  <th className="num px-3 py-2 text-right">Кликов</th>
+                  <th className="num px-3 py-2 text-right">Последнее</th>
+                </tr>
+              </thead>
+              <tbody className="divide-border/40 divide-y">
+                {data.map((r) => (
+                  <tr key={r.path}>
+                    <td className="text-foreground truncate px-3 py-2 font-mono text-xs">
+                      {r.path}
+                    </td>
+                    <td className="num text-foreground px-3 py-2 text-right text-xs font-bold">
+                      {r.clicks}
+                    </td>
+                    <td className="num text-muted-foreground px-3 py-2 text-right text-[10px]">
+                      {new Date(r.last_seen_at).toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
