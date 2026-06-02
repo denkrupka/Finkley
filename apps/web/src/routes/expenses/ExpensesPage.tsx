@@ -141,6 +141,11 @@ export function ExpensesPage({
   const [showLinked, setShowLinked] = useState(false)
   const categoryFilter = embedded ? localCatFilter : params.get('cat') || ''
   const payFilter = embedded ? localPayFilter : ((params.get('pay') || '') as PaymentMethod | '')
+  // Bug 02.06 (Денис): фильтр по источнику расхода. Активен только если у
+  // салона подключена интеграция KSeF — иначе скрыт (определяется ниже).
+  const sourceFilter = embedded
+    ? ('' as const)
+    : ((params.get('source') || '') as '' | 'ksef' | 'manual')
   // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments)
   // | banking (банковские транзакции для ручной/авто привязки к расходам).
   type ExpenseTab = 'paid' | 'pending' | 'banking'
@@ -258,8 +263,16 @@ export function ExpensesPage({
   const expenses = useMemo(
     // T15 — auto_commission расходы скрываются из общего реестра, они показаны
     // отдельной pin'ной строкой над списком (CommissionsPin → CommissionsModal).
-    () => rawExpenses.filter((e) => e.source !== 'auto_commission' && passesLinkedFilter(e)),
-    [rawExpenses, passesLinkedFilter],
+    () =>
+      rawExpenses.filter((e) => {
+        if (e.source === 'auto_commission') return false
+        if (!passesLinkedFilter(e)) return false
+        // Bug 02.06: фильтр по источнику (KSeF / Вручную).
+        if (sourceFilter === 'ksef' && e.source !== 'ksef') return false
+        if (sourceFilter === 'manual' && e.source === 'ksef') return false
+        return true
+      }),
+    [rawExpenses, passesLinkedFilter, sourceFilter],
   )
   // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
   // категории — на клиенте, чтобы не плодить варианты хука.
@@ -321,6 +334,9 @@ export function ExpensesPage({
   // выбираем первый по приоритету. Можно потом добавить выбор куда пушить
   // в подменю, если будет реальный спрос.
   const activeAccounting = pickActiveAccountingProvider(integrations)
+  // Bug 02.06 (Денис): фильтр по источнику расхода (KSeF / Вручную) показываем
+  // только когда у салона активна интеграция KSeF — иначе он бессмысленный.
+  const ksefActive = integrations.some((i) => i.provider === 'ksef' && i.status === 'connected')
   const accountingPush = useAccountingPushExpense(
     activeAccounting && activeAccounting !== 'wfirma' ? activeAccounting : null,
     salonId,
@@ -578,6 +594,29 @@ export function ExpensesPage({
             ))}
           </SelectContent>
         </Select>
+
+        {/* Bug 02.06 (Денис): фильтр источника — только если активна KSeF интеграция. */}
+        {ksefActive ? (
+          <Select
+            value={sourceFilter || 'all'}
+            onValueChange={(v) => setFilter('source', v === 'all' ? null : v)}
+          >
+            <SelectTrigger className="h-10 w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t('expenses.filters.source_all', { defaultValue: 'Все источники' })}
+              </SelectItem>
+              <SelectItem value="ksef">
+                {t('expenses.filters.source_ksef', { defaultValue: 'КСеФ' })}
+              </SelectItem>
+              <SelectItem value="manual">
+                {t('expenses.filters.source_manual', { defaultValue: 'Вручную' })}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
 
       {/* Image #47: KPI-плитки (Аренда/Зарплата/Материалы/Реклама) и
@@ -985,6 +1024,15 @@ export function ExpensesPage({
                             >
                               <Landmark className="size-2.5" strokeWidth={2.4} />
                               {t('expenses.bank_badge')}
+                            </span>
+                          ) : null}
+                          {/* Bug 02.06: маленький не-примечательный тег источника. */}
+                          {e.source === 'ksef' ? (
+                            <span
+                              className="text-muted-foreground border-border inline-flex shrink-0 items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase"
+                              title="Импортировано из КСеФ"
+                            >
+                              KSeF
                             </span>
                           ) : null}
                           {needsReviewExpenseIds?.has(e.id) ? (
