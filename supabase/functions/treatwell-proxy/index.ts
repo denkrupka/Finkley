@@ -30,6 +30,7 @@ import { loadVatContext, vatFieldsForVisit } from '../_shared/vat.ts'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const TREATWELL_BASE = Deno.env.get('TREATWELL_BASE') ?? 'https://connect.treatwell.de'
+const CAPSOLVER_API_KEY = Deno.env.get('CAPSOLVER_API_KEY') ?? ''
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
@@ -68,6 +69,78 @@ function deepFindNumberField(obj: unknown, name: string): number | undefined {
   return undefined
 }
 
+/**
+ * Решает Cloudflare Turnstile через Capsolver.
+ * Возвращает token (cf-turnstile-response value), который нужно
+ * передать в body логина. null если решить не удалось.
+ *
+ * Capsolver type=AntiTurnstileTaskProxyLess работает для widget-режима
+ * (зелёная капча "Успешно" в браузере). Для JS-challenge (cf_clearance
+ * cookie) нужен AntiCloudflareTask + прокси — это отдельный сценарий.
+ */
+async function solveCloudflareTurnstile(pageUrl: string, siteKey: string): Promise<string | null> {
+  if (!CAPSOLVER_API_KEY) return null
+  try {
+    // Создаём task
+    const createR = await fetch('https://api.capsolver.com/createTask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        clientKey: CAPSOLVER_API_KEY,
+        task: {
+          type: 'AntiTurnstileTaskProxyLess',
+          websiteURL: pageUrl,
+          websiteKey: siteKey,
+        },
+      }),
+    })
+    const createJson = (await createR.json()) as {
+      taskId?: string
+      errorId?: number
+      errorDescription?: string
+    }
+    if (createJson.errorId || !createJson.taskId) {
+      console.error('Capsolver createTask failed', createJson)
+      return null
+    }
+    const taskId = createJson.taskId
+
+    // Polling до 60 секунд (12 × 5s)
+    for (let i = 0; i < 12; i++) {
+      await new Promise((res) => setTimeout(res, 5000))
+      const r = await fetch('https://api.capsolver.com/getTaskResult', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientKey: CAPSOLVER_API_KEY, taskId }),
+      })
+      const j = (await r.json()) as {
+        status?: 'processing' | 'ready'
+        solution?: { token?: string }
+        errorId?: number
+        errorDescription?: string
+      }
+      if (j.errorId) {
+        console.error('Capsolver getTaskResult failed', j)
+        return null
+      }
+      if (j.status === 'ready' && j.solution?.token) return j.solution.token
+    }
+    return null
+  } catch (e) {
+    console.error('Capsolver call exception', e)
+    return null
+  }
+}
+
+/**
+ * Ищет Turnstile sitekey в HTML страницы. Treatwell использует Cloudflare
+ * Turnstile на /login — атрибут `data-sitekey` у div.cf-turnstile.
+ */
+function extractTurnstileSitekey(html: string): string | null {
+  const m = html.match(/data-sitekey\s*=\s*["']([^"']+)["']/i)
+  return m ? m[1] : null
+}
+
 async function login(loginField: string, password: string): Promise<AuthOk> {
   // Treatwell API на 02.06 требует `{user, password, isPersistentLogin}`
   // (monolit wahanda backend). Старые `{email/username}` отвергаются с
@@ -80,16 +153,27 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     throw new Error('treatwell_login_failed: empty credentials')
   }
 
-  // Preflight: GET /login чтобы получить session cookies (csrf).
+  // Preflight: GET /login чтобы получить session cookies (csrf) + html
+  // для извлечения Cloudflare Turnstile sitekey.
   let preflightCookies = ''
+  let turnstileSiteKey: string | null = null
   try {
     const p = await fetch(`${TREATWELL_BASE}/login`, {
       method: 'GET',
       headers: { accept: 'text/html', 'user-agent': UA },
     })
     preflightCookies = extractCookies(p.headers.get('set-cookie') ?? '')
+    const html = await p.text()
+    turnstileSiteKey = extractTurnstileSitekey(html)
   } catch {
     // ignore — попробуем без preflight cookies
+  }
+
+  // Решаем Cloudflare Turnstile через Capsolver если sitekey найден.
+  // Token идёт в body как `cf-turnstile-response` (стандарт Cloudflare).
+  let turnstileToken: string | null = null
+  if (turnstileSiteKey && CAPSOLVER_API_KEY) {
+    turnstileToken = await solveCloudflareTurnstile(`${TREATWELL_BASE}/login`, turnstileSiteKey)
   }
 
   const endpoints = [
@@ -98,21 +182,31 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     '/api/login.json',
     '/extranet-public/api/authentication.json',
   ]
+  // Если решили Turnstile — добавляем токен в body. Treatwell принимает
+  // его как `cf-turnstile-response` (camelCase) и/или `cfTurnstileResponse`.
+  const tsField = turnstileToken
+    ? { 'cf-turnstile-response': turnstileToken, cfTurnstileResponse: turnstileToken }
+    : {}
   const jsonBodies = [
-    JSON.stringify({ user: loginField, password, isPersistentLogin: true }),
-    JSON.stringify({ user: loginField, password, isPersistentLogin: false }),
+    JSON.stringify({ user: loginField, password, isPersistentLogin: true, ...tsField }),
+    JSON.stringify({ user: loginField, password, isPersistentLogin: false, ...tsField }),
     JSON.stringify({
       user: loginField,
       password,
       isPersistentLogin: true,
       email: loginField,
+      ...tsField,
     }),
   ]
-  const formBody = new URLSearchParams({
+  const formBodyParams: Record<string, string> = {
     user: loginField,
     password,
     isPersistentLogin: 'true',
-  }).toString()
+  }
+  if (turnstileToken) {
+    formBodyParams['cf-turnstile-response'] = turnstileToken
+  }
+  const formBody = new URLSearchParams(formBodyParams).toString()
 
   type Attempt = { url: string; body: string; contentType: string }
   const attempts: Attempt[] = []
