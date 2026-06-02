@@ -34,10 +34,12 @@ create index if not exists idx_tracking_events_type_path
 -- RLS: юзер видит только свои события (для самопроверки), super-admin видит всё.
 alter table public.tracking_events enable row level security;
 
+drop policy if exists "tracking_self_select" on public.tracking_events;
 create policy "tracking_self_select" on public.tracking_events
   for select to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "tracking_super_admin_select" on public.tracking_events;
 create policy "tracking_super_admin_select" on public.tracking_events
   for select to authenticated
   using (
@@ -47,6 +49,7 @@ create policy "tracking_super_admin_select" on public.tracking_events
     )
   );
 
+drop policy if exists "tracking_insert_self" on public.tracking_events;
 create policy "tracking_insert_self" on public.tracking_events
   for insert to authenticated
   with check (user_id = auth.uid());
