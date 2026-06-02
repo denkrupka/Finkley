@@ -302,28 +302,48 @@ export async function listTransactions(
   accountId: string,
   range: { dateFrom: string; dateTo?: string },
 ): Promise<EbTransaction[]> {
-  const all: EbTransaction[] = []
-  let continuation: string | null = null
-  for (let page = 0; page < 50; page++) {
-    const qs = new URLSearchParams()
-    qs.set('date_from', range.dateFrom)
-    if (range.dateTo) qs.set('date_to', range.dateTo)
-    // strategy='all' включает booked + pending (PDNG). Дальше banking-sync
-    // фильтрует BOOK для записи в bank_transactions, а pending'и считает —
-    // чтобы UI мог показать «N транзакций ещё не подтверждены банком».
-    // Раньше было 'default' (только booked), из-за чего юзер не видел даже
-    // намёка на свежее поступление, и думал что синк сломан.
-    qs.set('strategy', 'all')
-    if (continuation) qs.set('continuation_key', continuation)
-    const data = await ebFetch<{
-      transactions: EbTransaction[]
-      continuation_key?: string | null
-    }>(cfg, 'GET', `/accounts/${accountId}/transactions?${qs.toString()}`)
-    all.push(...(data.transactions ?? []))
-    if (!data.continuation_key) break
-    continuation = data.continuation_key
+  // Подбор strategy: 'all' (booked + pending) работает не у всех ASPSP.
+  // Bank Millennium (02.06.2026 EB log): GET /transactions?strategy=all →
+  // 422 WRONG_REQUEST_PARAMETERS на каждом запросе.
+  // Алгоритм: пробуем 'all' первым → если первая страница 422, fallback
+  // на 'default' (только booked). Большинство банков поддерживают 'all',
+  // а кто не — даёт хотя бы booked tx.
+  const strategies: Array<'all' | 'default' | undefined> = ['all', 'default', undefined]
+  for (const strategy of strategies) {
+    const all: EbTransaction[] = []
+    let continuation: string | null = null
+    let firstPageFailed = false
+    for (let page = 0; page < 50; page++) {
+      const qs = new URLSearchParams()
+      qs.set('date_from', range.dateFrom)
+      if (range.dateTo) qs.set('date_to', range.dateTo)
+      if (strategy) qs.set('strategy', strategy)
+      if (continuation) qs.set('continuation_key', continuation)
+      try {
+        const data = await ebFetch<{
+          transactions: EbTransaction[]
+          continuation_key?: string | null
+        }>(cfg, 'GET', `/accounts/${accountId}/transactions?${qs.toString()}`)
+        all.push(...(data.transactions ?? []))
+        if (!data.continuation_key) break
+        continuation = data.continuation_key
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        // 422 WRONG_REQUEST_PARAMETERS на первой странице → пробуем
+        // следующий strategy. На N+1 странице — реальная ошибка, прерываем.
+        if (page === 0 && /422|WRONG_REQUEST_PARAMETERS/i.test(msg)) {
+          firstPageFailed = true
+          break
+        }
+        throw e
+      }
+    }
+    if (firstPageFailed) continue
+    return all
   }
-  return all
+  // Все стратегии упали — возвращаем пусто, banking-sync залогит last_error
+  // через outer try в banking-sync/index.ts.
+  return []
 }
 
 /**
