@@ -163,6 +163,14 @@ async function handleConnectWithToken(
 type SyncStats = {
   expenses_synced: number
   expenses_skipped: number
+  /** Краткие причины каждого skip — для debug в UI/логах. */
+  skip_reasons?: string[]
+}
+
+function skipWithReason(stats: SyncStats, reason: string): void {
+  stats.expenses_skipped++
+  if (!stats.skip_reasons) stats.skip_reasons = []
+  if (stats.skip_reasons.length < 50) stats.skip_reasons.push(reason)
 }
 
 async function getOrCreateImportCategory(
@@ -234,7 +242,7 @@ async function syncKsefToFinkley(
   creds: { nip: string; token: string },
   lastSyncAt: string | null,
 ): Promise<SyncStats> {
-  const stats: SyncStats = { expenses_synced: 0, expenses_skipped: 0 }
+  const stats: SyncStats = { expenses_synced: 0, expenses_skipped: 0, skip_reasons: [] }
 
   // Окно: ВСЕГДА 60 дней назад (КСеФ ограничивает range), независимо от
   // last_sync_at. Дедуп идёт по ksef_id — мы не делаем дубликатов.
@@ -290,7 +298,7 @@ async function syncKsefToFinkley(
   try {
     for (const inv of invoices) {
       if (importedSet.has(inv.ksefReferenceNumber)) {
-        stats.expenses_skipped++
+        skipWithReason(stats, `${inv.ksefReferenceNumber}: dup_in_bd`)
         continue
       }
       // Тянем XML фактуры — best-effort. Если упало — берём поля из header
@@ -340,7 +348,7 @@ async function syncKsefToFinkley(
       }
 
       if (!detail.totalGross || detail.totalGross <= 0) {
-        stats.expenses_skipped++
+        skipWithReason(stats, `${inv.ksefReferenceNumber}: no_total_gross`)
         continue
       }
 
@@ -424,13 +432,16 @@ async function syncKsefToFinkley(
         })
         if (spErr) {
           if (spErr.code === '23505') {
-            stats.expenses_skipped++
+            skipWithReason(stats, `${inv.ksefReferenceNumber}: dup_scheduled_payment`)
             continue
           }
           console.warn(
             `ksef scheduled_payment insert failed for ${inv.ksefReferenceNumber}: ${spErr.message}`,
           )
-          stats.expenses_skipped++
+          skipWithReason(
+            stats,
+            `${inv.ksefReferenceNumber}: sp_insert_${spErr.code}: ${(spErr.message || '').slice(0, 80)}`,
+          )
           continue
         }
         stats.expenses_synced++
@@ -478,11 +489,14 @@ async function syncKsefToFinkley(
         // приоритет: бухгалтерская система выигрывает (см. ADR-013 §D), мы
         // просто скипаем.
         if (error.code === '23505') {
-          stats.expenses_skipped++
+          skipWithReason(stats, `${inv.ksefReferenceNumber}: dup_expense_unique`)
           continue
         }
         console.warn(`ksef expense insert failed for ${inv.ksefReferenceNumber}: ${error.message}`)
-        stats.expenses_skipped++
+        skipWithReason(
+          stats,
+          `${inv.ksefReferenceNumber}: exp_insert_${error.code}: ${(error.message || '').slice(0, 80)}`,
+        )
         continue
       }
       stats.expenses_synced++
