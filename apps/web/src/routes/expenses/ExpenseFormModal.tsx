@@ -1389,16 +1389,20 @@ export function ExpenseFormModal({
                 </p>
               </div>
 
-              {/* T116 — Авто-расчёт: подставляем amount из calculate_payouts_for_period
-                  для выбранного мастера+периода. Premium идёт сверху. */}
+              {/* Авто-расчёт: payout + премия − авансы (для final-расчёта).
+                  Юзер 02.06: «неверно разбивку показывает — премию не
+                  учитывает, авансы не учитывает». */}
               <PayrollAutoFillButton
                 salonId={salonId}
                 staffId={form.watch('payroll_staff_id')}
                 periodStart={form.watch('payroll_period_start')}
                 periodEnd={form.watch('payroll_period_end')}
                 currency={currency}
-                onPick={(payoutCents, breakdownText) => {
-                  form.setValue('amount', (payoutCents / 100).toFixed(2), {
+                payrollKind={form.watch('payroll_kind')}
+                premiumStr={form.watch('premium')}
+                expenseIdToExclude={expense?.id ?? null}
+                onPick={(finalCents, breakdownText) => {
+                  form.setValue('amount', (finalCents / 100).toFixed(2), {
                     shouldValidate: true,
                   })
                   setPayrollBreakdown(breakdownText)
@@ -1907,6 +1911,9 @@ function PayrollAutoFillButton({
   periodStart,
   periodEnd,
   currency,
+  payrollKind,
+  premiumStr,
+  expenseIdToExclude,
   onPick,
 }: {
   salonId: string
@@ -1914,7 +1921,10 @@ function PayrollAutoFillButton({
   periodStart: string
   periodEnd: string
   currency: string
-  onPick: (payoutCents: number, breakdown: string) => void
+  payrollKind: 'advance' | 'final' | ''
+  premiumStr: string
+  expenseIdToExclude: string | null
+  onPick: (finalCents: number, breakdown: string) => void
 }) {
   const { t, i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
@@ -1947,13 +1957,56 @@ function PayrollAutoFillButton({
         return
       }
       const payout = Number(row.payout_cents)
-      const breakdown = t('expenses.form.payroll_breakdown_template', {
-        count: Number(row.visit_count),
-        rev: formatCurrencyShort(Number(row.revenue_cents), currency, locale),
-        tips: formatCurrencyShort(Number(row.tips_cents), currency, locale),
-        payout: formatCurrencyShort(payout, currency, locale),
-      })
-      onPick(payout, breakdown)
+      // Премия из form (если задана юзером)
+      const premiumCents = Math.max(
+        0,
+        Math.round(Number((premiumStr || '0').replace(',', '.')) * 100),
+      )
+
+      // Для окончательного расчёта вычитаем уже выплаченные авансы.
+      // Для аванса — не вычитаем (это новая выплата).
+      let advancesCents = 0
+      if (payrollKind === 'final') {
+        let q = supabase
+          .from('expenses')
+          .select('id, amount_cents, paid_amount_cents')
+          .eq('salon_id', salonId)
+          .eq('payroll_staff_id', staffId)
+          .eq('payroll_kind', 'advance')
+          .gte('payroll_period_start', periodStart)
+          .lte('payroll_period_end', periodEnd)
+          .is('deleted_at', null)
+        if (expenseIdToExclude) q = q.neq('id', expenseIdToExclude)
+        const { data: advances } = await q
+        for (const a of advances ?? []) {
+          const ac = a as { amount_cents: number; paid_amount_cents: number | null }
+          advancesCents += ac.paid_amount_cents ?? ac.amount_cents
+        }
+      }
+
+      const finalCents = Math.max(0, payout + premiumCents - advancesCents)
+      const breakdownLines: string[] = [
+        t('expenses.form.payroll_breakdown_template', {
+          count: Number(row.visit_count),
+          rev: formatCurrencyShort(Number(row.revenue_cents), currency, locale),
+          tips: formatCurrencyShort(Number(row.tips_cents), currency, locale),
+          payout: formatCurrencyShort(payout, currency, locale),
+        }) as string,
+      ]
+      if (premiumCents > 0) {
+        breakdownLines.push(
+          `+ ${t('expenses.form.payroll_premium', { defaultValue: 'Премия' })}: ${formatCurrencyShort(premiumCents, currency, locale)}`,
+        )
+      }
+      if (advancesCents > 0) {
+        breakdownLines.push(
+          `− ${t('expenses.form.payroll_advances', { defaultValue: 'Авансы' })}: ${formatCurrencyShort(advancesCents, currency, locale)}`,
+        )
+      }
+      breakdownLines.push(
+        `= ${t('expenses.form.payroll_total', { defaultValue: 'Итого' })}: ${formatCurrencyShort(finalCents, currency, locale)}`,
+      )
+      onPick(finalCents, breakdownLines.join('\n'))
       toast.success(t('expenses.form.payroll_filled'))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
