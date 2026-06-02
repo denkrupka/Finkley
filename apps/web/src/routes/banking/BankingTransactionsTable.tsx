@@ -144,6 +144,8 @@ export function BankingTransactionsTable({
   const qcRoot = useQueryClient()
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
+  // Bug 02.06 (Денис): фильтр по банку — показываем когда подключено >1 банка.
+  const [bankFilter, setBankFilter] = useState<string>('all')
   // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
   const [createOpen, setCreateOpen] = useState(false)
   const [createPrefill, setCreatePrefill] = useState<{
@@ -161,7 +163,7 @@ export function BankingTransactionsTable({
   // showLinked (default false: только unlinked, юзеру важнее необработанные).
   // Учитываем и legacy FK, и splits (bank_tx_splits — multi-link). Без splits
   // tx считалась бы unlinked даже если она связана через splits.
-  const rows =
+  const rowsAfterLinked =
     unlinkedOnly || !showLinked
       ? allRows.filter(
           (tx) =>
@@ -171,6 +173,21 @@ export function BankingTransactionsTable({
             !bankLinkedAll?.linkedTxIds.has(tx.id),
         )
       : allRows
+  // Bug 02.06 (Денис): фильтр по банку. Все подключенные банки выбираются
+  // как 'all'; конкретный bank_name → только tx с этим банком.
+  const rows =
+    bankFilter === 'all'
+      ? rowsAfterLinked
+      : rowsAfterLinked.filter((tx) => (tx.bank_name ?? '') === bankFilter)
+  // Список уникальных банков для Select. Если >1 — показываем фильтр.
+  const uniqueBanks = Array.from(
+    new Set(
+      connections
+        .filter((c) => c.status === 'connected')
+        .map((c) => c.bank_name ?? c.bank_aspsp_name ?? '')
+        .filter(Boolean),
+    ),
+  )
 
   const hasActiveConnection = connections.some((c) => c.status === 'connected')
 
@@ -331,6 +348,23 @@ export function BankingTransactionsTable({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          {/* Bug 02.06: фильтр по банку — только если подключено >1 банка. */}
+          {uniqueBanks.length > 1 ? (
+            <select
+              value={bankFilter}
+              onChange={(e) => setBankFilter(e.target.value)}
+              className="border-border bg-background h-8 rounded-md border px-2 text-xs"
+            >
+              <option value="all">
+                {t('banking.transactions.all_banks', { defaultValue: 'Все банки' })}
+              </option>
+              {uniqueBanks.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {unlinkedOnly ? null : (
             <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
               <input

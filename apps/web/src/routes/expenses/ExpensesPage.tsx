@@ -578,22 +578,26 @@ export function ExpensesPage({
           </SelectContent>
         </Select>
 
-        <Select
-          value={payFilter || 'all'}
-          onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
-        >
-          <SelectTrigger className="h-10 w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
-            {paymentMethods.map((m) => (
-              <SelectItem key={m.id} value={m.code}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Bug 02.06 (Денис): в Banking-табе фильтр счёта не имеет смысла —
+            там уже фильтр по подключенным банкам (внутри BankingTransactionsTable). */}
+        {tab !== 'banking' ? (
+          <Select
+            value={payFilter || 'all'}
+            onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
+          >
+            <SelectTrigger className="h-10 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('expenses.filters.all_accounts')}</SelectItem>
+              {paymentMethods.map((m) => (
+                <SelectItem key={m.id} value={m.code}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
 
         {/* Bug 02.06 (Денис): фильтр источника — только если активна KSeF интеграция. */}
         {ksefActive ? (
