@@ -40,6 +40,7 @@ type SalonRow = {
   google_place_id: string | null
   google_place_url: string | null
   booksy_url: string | null
+  locale: string | null
 }
 
 type ReviewInsert = {
@@ -57,8 +58,17 @@ type ReviewInsert = {
 /**
  * Google Places API v1 — fetch reviews + rating.
  * Возвращает массив normalized отзывов (до 5 — лимит Google).
+ *
+ * Bug 02.06 (Денис): отзывы вытягивались на английском — Google Places
+ * API без `languageCode` дефолтит на 'en' и переводит native-язык
+ * отзывы. Сейчас передаём `languageCode=salonLocale` (по дефолту 'pl'
+ * для PL-проекта). + приоритет `originalText` над `text` ниже остаётся:
+ * если автор писал не на salonLocale — берём оригинал.
  */
-async function syncGooglePlace(placeId: string): Promise<{
+async function syncGooglePlace(
+  placeId: string,
+  salonLocale: string = 'pl',
+): Promise<{
   rating: number | null
   count: number
   reviews: Array<{
@@ -71,7 +81,7 @@ async function syncGooglePlace(placeId: string): Promise<{
   }>
 }> {
   if (!GOOGLE_KEY) return { rating: null, count: 0, reviews: [] }
-  const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`
+  const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=${encodeURIComponent(salonLocale)}`
   const r = await fetch(url, {
     headers: {
       'X-Goog-Api-Key': GOOGLE_KEY,
@@ -269,7 +279,11 @@ async function processSalon(admin: SupabaseClient, salon: SalonRow): Promise<Pro
   // Google
   if (salon.google_place_id) {
     try {
-      const g = await syncGooglePlace(salon.google_place_id)
+      // salon.locale в БД хранится как 'ru'/'pl'/'en'. Для google_place
+      // мы хотим страну-локаль ('pl' для польских салонов). 'ru' UI-локаль
+      // не имеет смысла для гугл-отзывов — fallback на 'pl' для PL-проекта.
+      const googleLocale = salon.locale === 'pl' || salon.locale === 'en' ? salon.locale : 'pl'
+      const g = await syncGooglePlace(salon.google_place_id, googleLocale)
       googleFetched = g.reviews.length
       for (const r of g.reviews) {
         inserts.push({
@@ -464,7 +478,7 @@ Deno.serve(async (req: Request) => {
   if (isCron) {
     const { data: salons } = await admin
       .from('salons')
-      .select('id, name, google_place_id, google_place_url, booksy_url')
+      .select('id, name, google_place_id, google_place_url, booksy_url, locale')
       .or('google_place_id.not.is.null,booksy_url.not.is.null')
     for (const s of (salons ?? []) as SalonRow[]) {
       const res = await processSalon(admin, s)
@@ -474,7 +488,7 @@ Deno.serve(async (req: Request) => {
   } else {
     const { data: salon } = await admin
       .from('salons')
-      .select('id, name, google_place_id, google_place_url, booksy_url')
+      .select('id, name, google_place_id, google_place_url, booksy_url, locale')
       .eq('id', body.salon_id!)
       .maybeSingle()
     if (!salon) return jsonResponse({ error: 'salon_not_found' }, 404)

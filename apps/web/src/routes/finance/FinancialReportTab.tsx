@@ -511,6 +511,26 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       parentGroupKey: 'taxes',
     })),
 
+    // Bug 02.06 (Денис): «Расходы» показывал план -981.54 PLN,
+    // но Переменные/Постоянные/Налоги — пусто. Причина: monthly.plan.
+    // expensesTotal собирает unpaid scheduled_payments, но они нигде
+    // отдельно не разбивались. Теперь — отдельная строка под Расходы.
+    ...(monthly.plan.some((m) => m.expensesTotal > 0)
+      ? [
+          {
+            label: t('finance.report.expenses_scheduled', {
+              defaultValue: 'Запланированные платежи',
+            }),
+            values: monthly.plan.map((m) => -m.expensesTotal),
+            indent: 1,
+            bold: false,
+            color: 'destructive' as RowColor,
+            groupKey: 'expenses_scheduled',
+            parentGroupKey: 'expenses',
+          },
+        ]
+      : []),
+
     // «Прочие категории» — expense_categories из БД, которых нет в
     // settings.fixed/variable/taxes. Bug e007ea97: эти строки рисовались
     // в plan-колонке, fact-колонка оставалась пустой → юзер видел расход
