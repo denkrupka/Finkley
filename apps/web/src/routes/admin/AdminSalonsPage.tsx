@@ -72,7 +72,7 @@ export function AdminSalonsPage() {
           'finkley:helpdesk-mode',
           JSON.stringify({ salon_id: salon.id, salon_name: salon.name ?? '' }),
         )
-        navigate(`/salon/${salon.id}`)
+        navigate(`/${salon.id}/dashboard`)
       } catch (e) {
         const msg =
           e && typeof e === 'object' && 'message' in e

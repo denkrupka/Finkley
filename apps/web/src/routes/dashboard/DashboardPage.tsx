@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths } from 'date-fns'
+import { getDateLocale } from '@/lib/utils/format-date'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
@@ -282,10 +283,17 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
-      {/* T114 — плашка периода в правом верхнем углу. Кликабельная,
-          открывает PeriodPickerPopover (месяц/год/range/recent N дней).
-          Применяется ко всем KPI, секциям и MoM-сравнениям. */}
-      <div className="mb-1 flex items-center justify-end">
+      {/* Bug fae81ea6 (Елена 01.06): заголовок «Главная» + название месяца
+          в одной строке с PeriodPickerPopover. */}
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-foreground text-2xl font-bold">
+            {t('dashboard.title', { defaultValue: 'Главная' })}
+          </h1>
+          <span className="text-muted-foreground text-sm font-semibold capitalize">
+            {format(new Date(range.start), 'LLLL yyyy', { locale: getDateLocale() })}
+          </span>
+        </div>
         <PeriodPickerPopover value={periodValue} onChange={setPeriodValue} />
       </div>
 
@@ -293,10 +301,13 @@ export function DashboardPage() {
 
       <PageTour name="dashboard" steps={DASHBOARD_TOUR_STEPS} force={params.get('tour') === '1'} />
 
-      {/* Сворачиваемые блоки — единственное что осталось с прошлой версии */}
-      <CollapsibleSection id="lowStock" title={t('dashboard.collapsible.low_stock')} defaultOpen>
-        <LowStockWidget salonId={salonId} />
-      </CollapsibleSection>
+      {/* Bug fae81ea6 (Елена 01.06): low_stock collapsible показывался
+          даже когда нет low-stock материалов. Условный рендер по lowStockCount. */}
+      {lowStockCount > 0 ? (
+        <CollapsibleSection id="lowStock" title={t('dashboard.collapsible.low_stock')} defaultOpen>
+          <LowStockWidget salonId={salonId} />
+        </CollapsibleSection>
+      ) : null}
 
       <div data-tour="dashboard-insights">
         <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>

@@ -40,6 +40,12 @@ import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import {
+  currentMonthPeriod,
+  periodToRange,
+  type PeriodValue,
+} from '@/components/ui/period-picker-utils'
 import { getPeriodRange, readCustomFromParams, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -108,6 +114,35 @@ export function VisitsPage({
   // В picker-режиме форсируем list — в календаре пикать визит неудобно
   // (нет фильтров/поиска по сумме, нужны вокруг для матча с банк-tx).
   const view = isPickerMode ? 'list' : params.get('view') === 'list' ? 'list' : 'calendar'
+
+  // Bug 8d858d2b (Елена 01.06): в list-view добавлен period picker
+  // (год / месяц / range). Изменение пишет в URL: period=custom + from/to,
+  // чтобы существующий getPeriodRange/readCustomFromParams подхватил.
+  const periodValue: PeriodValue = (() => {
+    const period = params.get('period')
+    if (period === 'custom' && params.get('from') && params.get('to')) {
+      return { kind: 'range', from: params.get('from')!, to: params.get('to')! }
+    }
+    return currentMonthPeriod()
+  })()
+  function onPeriodChange(next: PeriodValue) {
+    const r = periodToRange(next)
+    const np = new URLSearchParams(params)
+    if (
+      next.kind === 'month' &&
+      next.year === new Date().getUTCFullYear() &&
+      next.month === new Date().getUTCMonth() + 1
+    ) {
+      np.delete('period')
+      np.delete('from')
+      np.delete('to')
+    } else {
+      np.set('period', 'custom')
+      np.set('from', r.start.toISOString().slice(0, 10))
+      np.set('to', r.end.toISOString().slice(0, 10))
+    }
+    setParams(np, { replace: true })
+  }
   // `?kind=retail` фильтрует список до товарных продаж. Может быть задан
   // через URL (старые роуты) или пропсом `forcedKind` (из IncomePage).
   const kindParam = params.get('kind')
@@ -228,6 +263,7 @@ export function VisitsPage({
 
           {/* Filters */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
+            <PeriodPickerPopover value={periodValue} onChange={onPeriodChange} />
             <Select
               value={staffFilter || 'all'}
               onValueChange={(v) => setFilter('staff', v === 'all' ? null : v)}
