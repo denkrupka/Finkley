@@ -135,6 +135,9 @@ const AdminUsersPage = lazyWithRetry(() =>
 const AdminFeedbackPage = lazyWithRetry(() =>
   import('@/routes/admin/AdminFeedbackPage').then((m) => ({ default: m.AdminFeedbackPage })),
 )
+const AdminTrackingPage = lazyWithRetry(() =>
+  import('@/routes/admin/AdminTrackingPage').then((m) => ({ default: m.AdminTrackingPage })),
+)
 const BankingCallbackPage = lazyWithRetry(() =>
   import('@/routes/banking/BankingCallbackPage').then((m) => ({ default: m.BankingCallbackPage })),
 )
@@ -246,6 +249,7 @@ function App() {
         <Route path="users" element={lazyRoute(<AdminUsersPage />)} />
         <Route path="media" element={lazyRoute(<AdminMediaPage />)} />
         <Route path="feedback" element={lazyRoute(<AdminFeedbackPage />)} />
+        <Route path="tracking" element={lazyRoute(<AdminTrackingPage />)} />
       </Route>
 
       {/* Salon-scoped */}

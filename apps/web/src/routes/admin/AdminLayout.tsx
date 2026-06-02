@@ -4,6 +4,7 @@ import {
   FileText,
   LogOut,
   MessageSquare,
+  MousePointerClick,
   ShieldCheck,
   Users,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ export function AdminLayout() {
     { to: 'users', label: 'admin.nav.users', icon: Users },
     { to: 'media', label: 'admin.nav.media', icon: FileText },
     { to: 'feedback', label: 'admin.nav.feedback', icon: MessageSquare },
+    { to: 'tracking', label: 'admin.nav.tracking', icon: MousePointerClick },
   ]
 
   async function handleSignOut() {

@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMessengerNotifications } from '@/hooks/useMessenger'
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
+import { useTrackPageView } from '@/hooks/useTrackPageView'
 import { useMySalons, useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -133,6 +134,10 @@ export function SalonLayout() {
   // портале, показывает toast при любом новом уведомлении (low_inventory,
   // payment_due_*, ai_insights и т.д.). Не зависит от prefs (in-app всегда on).
   useRealtimeNotifications(salonId)
+
+  // Admin tracking — пишет page_view в tracking_events для super-admin
+  // аналитики в /admin/tracking. Insert идёт fire-and-forget с RLS.
+  useTrackPageView()
 
   useEffect(() => {
     if (salonId && salon) rememberLastSalon(salonId)
