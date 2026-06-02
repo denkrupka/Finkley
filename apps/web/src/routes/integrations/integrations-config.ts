@@ -24,6 +24,7 @@ export type IntegrationProvider =
   | 'fresha'
   | 'treatwell'
   | 'yclients'
+  | 'bookon'
   | 'wfirma'
   | 'fakturownia'
   | 'infakt'
@@ -231,6 +232,34 @@ export const INTEGRATIONS: IntegrationDef[] = [
       },
     ],
     status: 'coming_soon',
+  },
+  {
+    // Bug 5059189d (Елена 01.06): запрос добавить BookOn (bookon.binotel.pl)
+    // в /integrations рядом с Booksy. API/OAuth не задокументирован публично,
+    // нужен партнёрский запрос + research. Карточка появляется со статусом
+    // 'in_research' — кнопка connect отключена, но видна в каталоге.
+    id: 'bookon',
+    name: 'BookOn',
+    region: 'PL · UA',
+    category: 'booking',
+    description_key: 'integrations.providers.bookon.description',
+    icon: CalendarCheck,
+    brandColor: '#FF7A00',
+    connectFields: [
+      {
+        key: 'login',
+        label_key: 'integrations.fields.email_or_phone',
+        type: 'email',
+        required: true,
+      },
+      {
+        key: 'password',
+        label_key: 'integrations.fields.password',
+        type: 'password',
+        required: true,
+      },
+    ],
+    status: 'in_research',
   },
 ]
 

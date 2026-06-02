@@ -7,6 +7,7 @@ export type IntegrationProvider =
   | 'fresha'
   | 'treatwell'
   | 'yclients'
+  | 'bookon'
   | 'wfirma'
   | 'fakturownia'
   | 'infakt'
