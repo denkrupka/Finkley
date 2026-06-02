@@ -468,6 +468,21 @@ export function ExpenseFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- form stable
   }, [watchedCounterpartyId, counterparties])
 
+  // Auto-load expense_category из counterparty.default_expense_category_id.
+  // Юзер 02.06: «при выборе counterparty — категория автоматом подтягивается».
+  // Только если поле category_id пустое (не перезатираем выбранное вручную).
+  useEffect(() => {
+    if (!watchedCounterpartyId) return
+    const cp = counterparties.find((c) => c.id === watchedCounterpartyId)
+    const defaultCat = (cp as typeof cp & { default_expense_category_id?: string | null })
+      ?.default_expense_category_id
+    if (!defaultCat) return
+    const currentCat = form.getValues('category_id')
+    if (currentCat) return
+    form.setValue('category_id', defaultCat, { shouldDirty: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form stable
+  }, [watchedCounterpartyId, counterparties])
+
   // При открытии в edit-mode — префиллим форму данными существующего расхода.
   // Для mode='planned-paying' — префиллим из existingPayment (vendor → description,
   // category_id, amount, document_number, comment, expense_at=today). Toggle

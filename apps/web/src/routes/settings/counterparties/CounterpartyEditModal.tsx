@@ -28,6 +28,7 @@ import {
   useUpdateCounterparty,
   type CounterpartyRow,
 } from '@/hooks/useCounterparties'
+import { useExpenseCategories } from '@/hooks/useExpenses'
 import { formatIbanForDisplay } from '@/lib/banking/iban'
 
 type Props = {
@@ -59,6 +60,7 @@ export function CounterpartyEditModal({
   const { t } = useTranslation()
   const isEdit = !!counterparty
   const { data: categories = [] } = useCounterpartyCategories(salonId)
+  const { data: expenseCategories = [] } = useExpenseCategories(salonId)
   const createCp = useCreateCounterparty(salonId)
   const updateCp = useUpdateCounterparty(salonId)
   const createCat = useCreateCounterpartyCategory(salonId)
@@ -67,6 +69,9 @@ export function CounterpartyEditModal({
   const [nip, setNip] = useState('')
   const [address, setAddress] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
+  /** Дефолтная expense_category — автоматически проставится в новый
+   *  расход с этим контрагентом (OCR/KSeF/manual). */
+  const [defaultExpenseCategoryId, setDefaultExpenseCategoryId] = useState<string>('')
   const [notes, setNotes] = useState('')
   const [bankIban, setBankIban] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
@@ -80,6 +85,10 @@ export function CounterpartyEditModal({
       setNip(counterparty.nip ?? '')
       setAddress(counterparty.address ?? '')
       setCategoryId(counterparty.category_id ?? '')
+      setDefaultExpenseCategoryId(
+        (counterparty as typeof counterparty & { default_expense_category_id?: string | null })
+          .default_expense_category_id ?? '',
+      )
       setNotes(counterparty.notes ?? '')
       setBankIban(formatIbanForDisplay(counterparty.bank_account_iban))
     } else {
@@ -87,6 +96,7 @@ export function CounterpartyEditModal({
       setNip(prefill?.nip ?? '')
       setAddress(prefill?.address ?? '')
       setCategoryId('')
+      setDefaultExpenseCategoryId('')
       setNotes('')
       setBankIban(prefill?.iban ? formatIbanForDisplay(prefill.iban) : '')
     }
@@ -152,6 +162,7 @@ export function CounterpartyEditModal({
           category_id: categoryId || null,
           notes: notes.trim() || null,
           bank_account_iban: cleanedIban,
+          default_expense_category_id: defaultExpenseCategoryId || null,
         },
         {
           onSuccess: () => {
@@ -164,6 +175,7 @@ export function CounterpartyEditModal({
               category_id: categoryId || null,
               notes: notes.trim() || null,
               bank_account_iban: cleanedIban,
+              default_expense_category_id: defaultExpenseCategoryId || null,
             })
             onOpenChange(false)
           },
@@ -322,6 +334,49 @@ export function CounterpartyEditModal({
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Дефолтная категория расхода — автоматически проставится в новые
+              expense с этим контрагентом (OCR/KSeF/manual выбор). Юзер 02.06:
+              «при выборе контрагента — категория автоматом подтягивается». */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cp-default-exp-cat">
+              {t('counterparties.default_expense_category_label', {
+                defaultValue: 'Дефолтная категория расхода',
+              })}
+            </Label>
+            <Select
+              value={defaultExpenseCategoryId || '__none__'}
+              onValueChange={(v) => setDefaultExpenseCategoryId(v === '__none__' ? '' : v)}
+            >
+              <SelectTrigger id="cp-default-exp-cat">
+                <SelectValue
+                  placeholder={t('counterparties.default_expense_category_placeholder', {
+                    defaultValue: 'Без дефолта',
+                  })}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  {t('counterparties.default_expense_category_none', {
+                    defaultValue: 'Без дефолта',
+                  })}
+                </SelectItem>
+                {expenseCategories
+                  .filter((c) => !c.is_archived)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-[10px]">
+              {t('counterparties.default_expense_category_hint', {
+                defaultValue:
+                  'При создании расхода с этим контрагентом — категория подставится автоматически.',
+              })}
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

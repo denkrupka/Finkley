@@ -20,6 +20,9 @@ export type CounterpartyRow = {
   notes: string | null
   /** IBAN счёта контрагента — для bulk-экспорта переводов в банк. */
   bank_account_iban: string | null
+  /** Дефолтная expense_category — auto-fill при создании расхода
+   *  с этим контрагентом (OCR/KSeF/manual). */
+  default_expense_category_id: string | null
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -106,6 +109,7 @@ export type CreateCounterpartyInput = {
   category_id?: string | null
   notes?: string | null
   bank_account_iban?: string | null
+  default_expense_category_id?: string | null
 }
 
 export function useCreateCounterparty(salonId: string | undefined) {
@@ -121,6 +125,7 @@ export function useCreateCounterparty(salonId: string | undefined) {
         category_id: input.category_id ?? null,
         notes: input.notes?.trim() || null,
         bank_account_iban: input.bank_account_iban?.replace(/\s+/g, '') || null,
+        default_expense_category_id: input.default_expense_category_id ?? null,
       }
       const { data, error } = await supabase
         .from('counterparties')
