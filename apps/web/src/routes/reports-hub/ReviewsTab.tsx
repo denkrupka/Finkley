@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
+import { supabase as supabaseClient } from '@/lib/supabase/client'
 import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
 import {
   ChevronLeft,
@@ -531,12 +533,11 @@ function ReviewRow({
           </button>
         ) : null}
       </div>
-      {/* VisitDetailModal — открывает связанный визит по клику «Открыть визит» */}
+      {/* VisitDetailModal требует full VisitRow — лениво загружаем по id. */}
       {visitModalOpen && visit ? (
-        <VisitDetailModal
-          visit={{ id: visit.id } as Parameters<typeof VisitDetailModal>[0]['visit']}
+        <LazyVisitModal
+          visitId={visit.id}
           salonId={salonId}
-          currency="PLN"
           onClose={() => setVisitModalOpen(false)}
         />
       ) : null}
@@ -785,3 +786,39 @@ function GoogleGlyph() {
     </svg>
   )
 }
+
+/**
+ * Лениво загружает VisitRow по id и передаёт в VisitDetailModal.
+ * VisitDetailModal требует full VisitRow, но у нас в review только visit.id.
+ */
+function LazyVisitModal({
+  visitId,
+  salonId,
+  onClose,
+}: {
+  visitId: string
+  salonId: string
+  onClose: () => void
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['visit-by-id', visitId],
+    queryFn: async () => {
+      const { data, error } = await supabaseClient
+        .from('visits')
+        .select('*')
+        .eq('id', visitId)
+        .maybeSingle()
+      if (error) throw error
+      return data as VisitRowFull | null
+    },
+    enabled: !!visitId,
+  })
+  if (isLoading) return null
+  if (!data) {
+    onClose()
+    return null
+  }
+  return <VisitDetailModal visit={data} salonId={salonId} currency="PLN" onClose={onClose} />
+}
+
+type VisitRowFull = Parameters<typeof VisitDetailModal>[0]['visit']

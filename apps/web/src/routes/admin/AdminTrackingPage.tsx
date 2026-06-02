@@ -27,12 +27,54 @@ const SUBS: { id: Subtab; label: string; icon: typeof Layers }[] = [
  * через клиентский хук (отдельный PR — пока таблица заполняется
  * системными событиями типа page_view).
  */
+type Filters = {
+  dateFrom: string | null
+  dateTo: string | null
+  userId: string | null
+  salonId: string | null
+}
+
+const PRESETS: { id: string; label: string; days: number | null }[] = [
+  { id: 'today', label: 'Сегодня', days: 1 },
+  { id: '7d', label: '7 дней', days: 7 },
+  { id: '30d', label: '30 дней', days: 30 },
+  { id: '90d', label: '90 дней', days: 90 },
+  { id: 'all', label: 'Всё время', days: null },
+]
+
 export function AdminTrackingPage() {
-  void useTranslation() // зарезервировано для будущей локализации
+  void useTranslation()
   const [sub, setSub] = useState<Subtab>('stats')
+  const [filters, setFilters] = useState<Filters>({
+    dateFrom: null,
+    dateTo: null,
+    userId: null,
+    salonId: null,
+  })
+
+  // Опции для фильтров: список юзеров и салонов
+  const { data: salons = [] } = useQuery({
+    queryKey: ['admin-tracking-salons-list'],
+    queryFn: async () => {
+      const { data } = await supabase.from('salons').select('id, name').order('name').limit(500)
+      return (data ?? []) as Array<{ id: string; name: string }>
+    },
+  })
+
+  function applyPreset(id: string) {
+    const preset = PRESETS.find((p) => p.id === id)
+    if (!preset) return
+    if (preset.days === null) {
+      setFilters((f) => ({ ...f, dateFrom: null, dateTo: null }))
+      return
+    }
+    const from = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000).toISOString()
+    setFilters((f) => ({ ...f, dateFrom: from, dateTo: new Date().toISOString() }))
+  }
 
   return (
     <div className="flex flex-1 flex-col p-5 sm:p-8">
+      {/* Subtabs */}
       <div className="border-border bg-card shadow-finsm mb-4 inline-flex w-fit gap-1 rounded-md border p-1">
         {SUBS.map((s) => {
           const Icon = s.icon
@@ -55,20 +97,53 @@ export function AdminTrackingPage() {
         })}
       </div>
 
-      {sub === 'stats' ? <StatsTab /> : null}
-      {sub === 'portal' ? <PortalTab /> : null}
-      {sub === 'onboarding' ? <OnboardingTab /> : null}
+      {/* Фильтры — period preset + salon select. User filter сложнее (требует
+          users list — оставлен на следующую итерацию). */}
+      <div className="border-border bg-card mb-4 flex flex-wrap items-center gap-2 rounded-md border p-2">
+        <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+          Период:
+        </span>
+        {PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => applyPreset(p.id)}
+            className="border-border hover:bg-muted/40 rounded-md border px-2.5 py-1 text-[11px] font-semibold"
+          >
+            {p.label}
+          </button>
+        ))}
+        <span className="text-muted-foreground ml-auto text-[10px] font-bold uppercase tracking-wider">
+          Салон:
+        </span>
+        <select
+          value={filters.salonId ?? ''}
+          onChange={(e) => setFilters((f) => ({ ...f, salonId: e.target.value || null }))}
+          className="border-border bg-background h-7 rounded-md border px-2 text-xs"
+        >
+          <option value="">Все</option>
+          {salons.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {sub === 'stats' ? <StatsTab filters={filters} /> : null}
+      {sub === 'portal' ? <PortalTab filters={filters} /> : null}
+      {sub === 'onboarding' ? <OnboardingTab filters={filters} /> : null}
     </div>
   )
 }
 
-function StatsTab() {
+function StatsTab({ filters }: { filters: Filters }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-tracking-overview'],
+    queryKey: ['admin-tracking-overview', filters],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_tracking_overview', {
-        p_date_from: null,
-        p_date_to: null,
+        p_date_from: filters.dateFrom,
+        p_date_to: filters.dateTo,
       })
       if (error) throw error
       return (data?.[0] ?? null) as {
@@ -110,15 +185,15 @@ function StatsTab() {
   )
 }
 
-function PortalTab() {
+function PortalTab({ filters }: { filters: Filters }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-tracking-pages'],
+    queryKey: ['admin-tracking-pages', filters],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_tracking_pages_stats', {
-        p_date_from: null,
-        p_date_to: null,
-        p_user_id: null,
-        p_salon_id: null,
+        p_date_from: filters.dateFrom,
+        p_date_to: filters.dateTo,
+        p_user_id: filters.userId,
+        p_salon_id: filters.salonId,
       })
       if (error) throw error
       return (data ?? []) as Array<{
@@ -176,13 +251,13 @@ function PortalTab() {
   )
 }
 
-function OnboardingTab() {
+function OnboardingTab({ filters }: { filters: Filters }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-tracking-onboarding'],
+    queryKey: ['admin-tracking-onboarding', filters],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_tracking_onboarding_funnel', {
-        p_date_from: null,
-        p_date_to: null,
+        p_date_from: filters.dateFrom,
+        p_date_to: filters.dateTo,
       })
       if (error) throw error
       return (data ?? []) as Array<{

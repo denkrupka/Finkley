@@ -365,18 +365,26 @@ async function syncKsefToFinkley(
       // НЕ вызываем ensureFallback — оставляем null, юзер укажет вручную.
 
       // (7) Counterparty: lookup по NIP, иначе создаём.
+      // Юзер 02.06: если контрагент уже есть и у него default_expense_category_id
+      // — подтягиваем эту категорию в expense (приоритет над auto-mapped).
       let counterpartyId: string | null = null
       if (detail.sellerNip) {
         const cleanNip = detail.sellerNip.replace(/[\s-]/g, '')
         const { data: existingCp } = await admin
           .from('counterparties')
-          .select('id')
+          .select('id, default_expense_category_id')
           .eq('salon_id', salonId)
           .eq('nip', cleanNip)
           .is('archived_at', null)
           .maybeSingle()
         if (existingCp) {
-          counterpartyId = (existingCp as { id: string }).id
+          const cp = existingCp as { id: string; default_expense_category_id: string | null }
+          counterpartyId = cp.id
+          // Auto-pull дефолтной категории контрагента (если задана)
+          if (cp.default_expense_category_id) {
+            categoryId = cp.default_expense_category_id
+            categoryMapped = 'counterparty_default'
+          }
         } else if (vendor !== '—') {
           const { data: createdCp } = await admin
             .from('counterparties')
