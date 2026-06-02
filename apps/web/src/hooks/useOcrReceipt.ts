@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase/client'
 
 export type OcrParsedReceipt = {
   amount: number | null
+  amount_net: number | null
+  vat_rate: number | null
+  vat_amount: number | null
   currency: string | null
   expense_at: string | null
   vendor: string | null

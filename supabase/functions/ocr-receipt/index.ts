@@ -24,7 +24,10 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 type OcrResult = {
-  amount: number | null
+  amount: number | null // брутто (gross total)
+  amount_net: number | null // нетто (без VAT)
+  vat_rate: number | null // ставка VAT в % (23/8/5/0)
+  vat_amount: number | null // сумма VAT
   currency: string | null
   expense_at: string | null // YYYY-MM-DD
   vendor: string | null
@@ -97,6 +100,9 @@ fences — только raw JSON.
 Извлеки и верни СТРОГО JSON со следующей структурой:
 {
   "amount": <число — итоговая сумма BRUTTO, точка как десятичный разделитель>,
+  "amount_net": <число — итоговая сумма NETTO (без VAT) | null если только брутто видно>,
+  "vat_rate": <число — ставка VAT в процентах: 23, 8, 5, 0 | null>,
+  "vat_amount": <число — сумма VAT (часть итога которая VAT) | null>,
   "currency": "PLN" | "EUR" | "USD" | "UAH" | "RUB",
   "expense_at": "YYYY-MM-DD",
   "vendor": "<имя продавца / название организации>",
@@ -108,6 +114,20 @@ fences — только raw JSON.
   "vendor_iban": "<PL+26 цифр без пробелов | null если paragon>",
   "raw_text": "<до 200 символов сырого текста для дебага>"
 }
+
+ВАЖНО ПРО VAT:
+  На фактуре VAT есть таблица «Stawka VAT | Netto | VAT | Brutto».
+  Лейблы которые я ищу:
+    Netto / Wartość netto / Razem netto → amount_net
+    VAT / Podatek VAT / Kwota VAT → vat_amount
+    Stawka VAT / VAT% → vat_rate (число, без знака %)
+  Если несколько ставок (mixed-VAT invoice) — бери ИТОГ Razem netto/VAT/Brutto.
+  Если ставка одна (например 23%) — vat_rate = 23.
+  Если документ vat-exempt (zw./np./0%) — vat_rate = 0, vat_amount = 0,
+    amount_net = amount.
+  Если на чеке/paragon суммы VAT нет вообще — null для всех трёх (amount_net,
+    vat_rate, vat_amount), оставляем только amount=брутто.
+  Validation: если все три заданы, то amount_net + vat_amount должно ≈ amount.
 
 Категории (выбирай ближайшую, не выдумывай): Косметика и расходники, Аренда, Связь и интернет, Зарплата, Налоги, Маркетинг, Хозяйственные товары, Транспорт, Прочее.
 

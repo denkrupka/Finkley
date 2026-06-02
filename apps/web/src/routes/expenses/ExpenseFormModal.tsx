@@ -1110,6 +1110,21 @@ export function ExpenseFormModal({
                       if (parsed.amount && !form.getValues('amount')) {
                         form.setValue('amount', String(parsed.amount), { shouldDirty: true })
                       }
+                      // VAT-разбивка из OCR (если фактура была с табличкой
+                      // Netto/VAT/Brutto). Подставляем все 3 поля синхронно
+                      // в VatBreakdownInput state.
+                      if (
+                        isVatPayer &&
+                        parsed.amount != null &&
+                        parsed.amount_net != null &&
+                        parsed.vat_rate != null
+                      ) {
+                        const gross = Math.round(parsed.amount * 100)
+                        const net = Math.round(parsed.amount_net * 100)
+                        setVatGrossCents(gross)
+                        setVatNetCents(net)
+                        setVatRatePct(parsed.vat_rate)
+                      }
                       if (parsed.expense_at) {
                         form.setValue('expense_at', parsed.expense_at, { shouldDirty: true })
                       }
