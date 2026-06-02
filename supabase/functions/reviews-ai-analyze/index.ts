@@ -257,6 +257,8 @@ type ReviewRow = {
   posted_at: string
   service_label?: string | null
   staff_label?: string | null
+  client_label?: string | null
+  visit_at?: string | null
 }
 
 function renderReviewForPrompt(r: ReviewRow): string {
@@ -267,8 +269,10 @@ function renderReviewForPrompt(r: ReviewRow): string {
     `Date: ${r.posted_at}`,
     `Author: ${r.author_name ?? 'Anonymous'}`,
   ]
+  if (r.client_label) lines.push(`Client (real name from CRM): ${r.client_label}`)
   if (r.service_label) lines.push(`Service: ${r.service_label}`)
   if (r.staff_label) lines.push(`Master: ${r.staff_label}`)
+  if (r.visit_at) lines.push(`Visit date/time: ${r.visit_at}`)
   lines.push(`Text: ${r.body ?? '(no text)'}`)
   return lines.join('\n')
 }
@@ -319,7 +323,7 @@ Deno.serve(async (req: Request) => {
     if (!body.review_id) return json({ error: 'review_id_required' }, 400)
     const { data: r } = await admin
       .from('reviews')
-      .select('id, source, rating, body, author_name, posted_at, staff_id, visit_id')
+      .select('id, source, rating, body, author_name, posted_at, staff_id, visit_id, client_id')
       .eq('id', body.review_id)
       .eq('salon_id', body.salon_id)
       .maybeSingle()
@@ -334,13 +338,35 @@ Deno.serve(async (req: Request) => {
         .maybeSingle()
       staffLabel = s?.full_name ?? null
     }
+    let visitAt: string | null = null
+    let clientLabel: string | null = null
     if (r.visit_id) {
       const { data: v } = await admin
-        .from('visit_items')
-        .select('label')
-        .eq('visit_id', r.visit_id)
-        .limit(1)
-      serviceLabel = v?.[0]?.label ?? null
+        .from('visits')
+        .select('visit_at, service_name_snapshot')
+        .eq('id', r.visit_id)
+        .maybeSingle()
+      if (v) {
+        visitAt = (v as { visit_at: string }).visit_at
+        serviceLabel =
+          (v as { service_name_snapshot: string | null }).service_name_snapshot ?? serviceLabel
+      }
+      if (!serviceLabel) {
+        const { data: vi } = await admin
+          .from('visit_items')
+          .select('label')
+          .eq('visit_id', r.visit_id)
+          .limit(1)
+        serviceLabel = vi?.[0]?.label ?? null
+      }
+    }
+    if (r.client_id) {
+      const { data: c } = await admin
+        .from('clients')
+        .select('name')
+        .eq('id', r.client_id)
+        .maybeSingle()
+      clientLabel = (c as { name: string | null } | null)?.name ?? null
     }
     reviews = [
       {
@@ -352,6 +378,8 @@ Deno.serve(async (req: Request) => {
         posted_at: r.posted_at,
         staff_label: staffLabel,
         service_label: serviceLabel,
+        client_label: clientLabel,
+        visit_at: visitAt,
       },
     ]
   } else {
