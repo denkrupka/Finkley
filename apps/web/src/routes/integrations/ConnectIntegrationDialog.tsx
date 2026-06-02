@@ -96,6 +96,7 @@ export function ConnectIntegrationDialog({
       const proxyMap: Record<string, string> = {
         treatwell: 'treatwell-proxy',
         fresha: 'fresha-proxy',
+        bookon: 'bookon-proxy',
       }
       const proxy = provider ? proxyMap[provider.id] : undefined
       if (proxy && salonId) {

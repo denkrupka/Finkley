@@ -69,42 +69,93 @@ function deepFindNumberField(obj: unknown, name: string): number | undefined {
 }
 
 async function login(loginField: string, password: string): Promise<AuthOk> {
-  // Treatwell API teraz wymaga `{user, password, isPersistentLogin}` (monolit
-  // wahanda backend). Старые `{email/username}` отвергаются с
-  // 'Cannot build AuthenticationInput, some of required attributes are not set
-  // [user, isPersistentLogin]'. Пробуем новый формат первым, fallback на
-  // старые для legacy endpoints.
-  const bodies = [
+  // Treatwell API на 02.06 требует `{user, password, isPersistentLogin}`
+  // (monolit wahanda backend). Старые `{email/username}` отвергаются с
+  // 'Cannot build AuthenticationInput, some of required attributes are not set'.
+  //
+  // Иногда падает даже с правильным JSON — возможно endpoint меняется или
+  // нужен preflight GET за CSRF. Пробуем матрицу: 3 endpoints × 4 формата
+  // тела × content-type. Первый успешный → cookies.
+  if (!loginField || !password) {
+    throw new Error('treatwell_login_failed: empty credentials')
+  }
+
+  // Preflight: GET /login чтобы получить session cookies (csrf).
+  let preflightCookies = ''
+  try {
+    const p = await fetch(`${TREATWELL_BASE}/login`, {
+      method: 'GET',
+      headers: { accept: 'text/html', 'user-agent': UA },
+    })
+    preflightCookies = extractCookies(p.headers.get('set-cookie') ?? '')
+  } catch {
+    // ignore — попробуем без preflight cookies
+  }
+
+  const endpoints = [
+    '/api/authentication.json',
+    '/api/v2/authentication.json',
+    '/api/login.json',
+    '/extranet-public/api/authentication.json',
+  ]
+  const jsonBodies = [
     JSON.stringify({ user: loginField, password, isPersistentLogin: true }),
     JSON.stringify({ user: loginField, password, isPersistentLogin: false }),
-    JSON.stringify({ email: loginField, password }),
-    JSON.stringify({ username: loginField, password }),
+    JSON.stringify({
+      user: loginField,
+      password,
+      isPersistentLogin: true,
+      email: loginField,
+    }),
   ]
+  const formBody = new URLSearchParams({
+    user: loginField,
+    password,
+    isPersistentLogin: 'true',
+  }).toString()
+
+  type Attempt = { url: string; body: string; contentType: string }
+  const attempts: Attempt[] = []
+  for (const ep of endpoints) {
+    for (const b of jsonBodies) {
+      attempts.push({ url: TREATWELL_BASE + ep, body: b, contentType: 'application/json' })
+    }
+    attempts.push({
+      url: TREATWELL_BASE + ep,
+      body: formBody,
+      contentType: 'application/x-www-form-urlencoded',
+    })
+  }
+
   let lastStatus = 0
   let lastText = ''
   let cookies = ''
-  let txt = ''
-  for (const body of bodies) {
-    const r = await fetch(`${TREATWELL_BASE}/api/authentication.json`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        'x-requested-with': 'XMLHttpRequest',
-        origin: TREATWELL_BASE,
-        referer: `${TREATWELL_BASE}/login`,
-        'user-agent': UA,
-      },
-      body,
-    })
-    txt = await r.text()
-    lastStatus = r.status
-    lastText = txt
-    const setCookies = r.headers.get('set-cookie') ?? ''
-    const c = extractCookies(setCookies)
-    if (r.ok && c) {
-      cookies = c
-      break
+  for (const a of attempts) {
+    try {
+      const r = await fetch(a.url, {
+        method: 'POST',
+        headers: {
+          'content-type': a.contentType,
+          accept: 'application/json',
+          'x-requested-with': 'XMLHttpRequest',
+          origin: TREATWELL_BASE,
+          referer: `${TREATWELL_BASE}/login`,
+          'user-agent': UA,
+          ...(preflightCookies ? { cookie: preflightCookies } : {}),
+        },
+        body: a.body,
+      })
+      const txt = await r.text()
+      lastStatus = r.status
+      lastText = txt
+      const setCookies = r.headers.get('set-cookie') ?? ''
+      const c = extractCookies(setCookies)
+      if (r.ok && c) {
+        cookies = preflightCookies ? `${preflightCookies}; ${c}` : c
+        break
+      }
+    } catch {
+      // network error — пробуем следующий endpoint
     }
   }
   if (!cookies) {

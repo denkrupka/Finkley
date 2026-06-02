@@ -234,10 +234,12 @@ export const INTEGRATIONS: IntegrationDef[] = [
     status: 'coming_soon',
   },
   {
-    // Bug 5059189d (Елена 01.06): запрос добавить BookOn (bookon.binotel.pl)
-    // в /integrations рядом с Booksy. API/OAuth не задокументирован публично,
-    // нужен партнёрский запрос + research. Карточка появляется со статусом
-    // 'in_research' — кнопка connect отключена, но видна в каталоге.
+    // Bug 5059189d (Елена 01.06): BookOn (bookon.binotel.pl) — booking-
+    // система от Binotel для салонов в PL/UA. Public API не задокументирован
+    // — connect-flow сохраняет credentials в salon_integrations.credentials
+    // (server-side encryption), sync пока возвращает {ok:true, stats:0} до
+    // реализации pull-логики. Когда будет известна структура их API —
+    // расширить bookon-proxy/sync.
     id: 'bookon',
     name: 'BookOn',
     region: 'PL · UA',
@@ -259,7 +261,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'in_research',
+    status: 'available',
   },
 ]
 
