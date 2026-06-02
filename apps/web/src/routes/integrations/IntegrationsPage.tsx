@@ -495,7 +495,12 @@ function IntegrationCard({
           {connection.last_error ? (
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
           ) : null}
-          {provider.id === 'booksy' ? (
+          {/* Авто-синк интервал — теперь для всех поддерживаемых провайдеров
+              (Booksy + KSeF + wFirma + Fakturownia + inFakt + Treatwell).
+              Юзер 02.06: 'делай период для KSeF на выбор клиента — как в букси'. */}
+          {['booksy', 'ksef', 'wfirma', 'fakturownia', 'infakt', 'treatwell'].includes(
+            provider.id,
+          ) ? (
             <div className="border-border mt-2 flex items-center justify-between gap-2 border-t pt-2">
               <label
                 htmlFor={`int-${provider.id}-interval`}
