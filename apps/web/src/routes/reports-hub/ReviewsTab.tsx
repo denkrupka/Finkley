@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { supabase as supabaseClient } from '@/lib/supabase/client'
-import { VisitDetailModal } from '@/routes/visits/VisitDetailModal'
+import { QuickEntryModal } from '@/routes/visits/QuickEntryModal'
+import type { VisitRow } from '@/hooks/useVisits'
 import {
   ChevronLeft,
   ChevronRight,
@@ -788,8 +789,12 @@ function GoogleGlyph() {
 }
 
 /**
- * Лениво загружает VisitRow по id и передаёт в VisitDetailModal.
- * VisitDetailModal требует full VisitRow, но у нас в review только visit.id.
+ * 02.06: юзер потребовал — нигде в портале НЕ показывать старую
+ * VisitDetailModal с табами «Визит/Информация». Из ReviewsTab
+ * клик «Открыть визит →» открывает ту же модалку что в Календаре:
+ * QuickEntryModal в edit-mode (Image #125).
+ *
+ * Лениво грузим VisitRow по id, передаём в QuickEntryModal как `editVisit`.
  */
 function LazyVisitModal({
   visitId,
@@ -809,7 +814,7 @@ function LazyVisitModal({
         .eq('id', visitId)
         .maybeSingle()
       if (error) throw error
-      return data as VisitRowFull | null
+      return data as VisitRow | null
     },
     enabled: !!visitId,
   })
@@ -818,7 +823,15 @@ function LazyVisitModal({
     onClose()
     return null
   }
-  return <VisitDetailModal visit={data} salonId={salonId} currency="PLN" onClose={onClose} />
+  return (
+    <QuickEntryModal
+      open={true}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+      salonId={salonId}
+      currency="PLN"
+      editVisit={data}
+    />
+  )
 }
-
-type VisitRowFull = Parameters<typeof VisitDetailModal>[0]['visit']
