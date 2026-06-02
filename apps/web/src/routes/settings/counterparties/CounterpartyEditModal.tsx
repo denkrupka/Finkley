@@ -192,6 +192,7 @@ export function CounterpartyEditModal({
         category_id: categoryId || null,
         notes: notes.trim() || null,
         bank_account_iban: cleanedIban,
+        default_expense_category_id: defaultExpenseCategoryId || null,
       },
       {
         onSuccess: (cp) => {
