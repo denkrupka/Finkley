@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { format, startOfMonth } from 'date-fns'
+import { eachDayOfInterval, endOfMonth, format, startOfMonth } from 'date-fns'
 import {
   BarChart3,
   ChevronDown,
@@ -47,6 +47,27 @@ import { formatCurrency } from '@/lib/utils/format-currency'
 
 type RowColor = 'navy' | 'sage' | 'destructive' | 'muted' | 'teal'
 
+/**
+ * Bug 1fbad290 (Денис 01.06): расширение для daily drill-down.
+ * Когда period.kind==='month', DrillDownDialog показывает разбивку по
+ * дням этого месяца вместо стандартной по месяцам. Для этого нужна
+ * мета `drillKind` + опционально `drillCategoryId` чтобы Dialog
+ * пересчитал из raw данных. Если drillKind не задан — fallback на
+ * month-mode (как раньше).
+ */
+type DrillKind =
+  | 'revenue_total'
+  | 'visits'
+  | 'retail'
+  | 'other_income'
+  | 'other_income_cat'
+  | 'expenses_total'
+  | 'expense_var'
+  | 'expense_fix'
+  | 'expense_tax'
+  | 'expense_other_cat'
+  | 'expense_scheduled'
+
 type CellRow = {
   label: string
   values: number[]
@@ -56,6 +77,11 @@ type CellRow = {
   color?: RowColor
   groupKey?: string
   parentGroupKey?: string
+  drillKind?: DrillKind
+  /** Для kind=*_cat — id категории (expense_categories.id или other_income_categories.id) */
+  drillCategoryId?: string
+  /** Для kind=expense_var/fix/tax — label из settings.fixed/variable/taxes items */
+  drillSettingsLabel?: string
 }
 
 export function FinancialReportTab({ salonId }: { salonId: string }) {
@@ -424,6 +450,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'sage',
       groupKey: 'revenue',
+      drillKind: 'revenue_total',
     },
     {
       label: t('finance.report.revenue_services'),
@@ -431,6 +458,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       factValues: visitsByMonth,
       indent: 1,
       parentGroupKey: 'revenue',
+      drillKind: 'visits',
     },
     {
       label: t('finance.report.revenue_retail'),
@@ -439,6 +467,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       parentGroupKey: 'revenue',
       groupKey: 'retail',
+      drillKind: 'retail',
     },
     ...Array.from(retailByCategory.entries()).map(([cat, factArr]) => ({
       label: cat,
@@ -454,6 +483,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       indent: 1,
       parentGroupKey: 'revenue',
       groupKey: 'revenue_other',
+      drillKind: 'other_income',
     },
     ...buildOtherIncomeCategoryRows(otherIncomeCats, otherIncomesByCategory, t),
 
@@ -466,6 +496,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       bold: true,
       color: 'destructive',
       groupKey: 'expenses',
+      drillKind: 'expenses_total',
     },
     {
       label: t('finance.report.variable'),
@@ -475,6 +506,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'variable',
       parentGroupKey: 'expenses',
+      drillKind: 'expense_var',
     },
     ...settings.variable.items
       .filter((i) => !i.archived)
@@ -492,6 +524,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'fixed',
       parentGroupKey: 'expenses',
+      drillKind: 'expense_fix',
     },
     ...buildFixedRows(settings, factsForLabel).map((r) => ({
       ...r,
@@ -505,6 +538,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
       color: 'destructive',
       groupKey: 'taxes',
       parentGroupKey: 'expenses',
+      drillKind: 'expense_tax',
     },
     ...buildItemsRows(settings.taxes.items, 2, -1, null, factsForLabel).map((r) => ({
       ...r,
@@ -527,6 +561,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
             color: 'destructive' as RowColor,
             groupKey: 'expenses_scheduled',
             parentGroupKey: 'expenses',
+            drillKind: 'expense_scheduled' as DrillKind,
           },
         ]
       : []),
@@ -856,6 +891,15 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
         row={drillDownRow}
         currency={currency}
         monthCols={monthCols}
+        period={period}
+        range={range}
+        visits={visits}
+        retailSales={retailSales}
+        expenses={expenses}
+        scheduledPayments={scheduledPayments}
+        otherIncomes={otherIncomes}
+        expenseCategories={expenseCategories}
+        settings={settings}
         onClose={() => setDrillDownRow(null)}
         t={t}
       />
@@ -865,22 +909,81 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
 
 // ============================ DrillDownDialog ============================
 
+/**
+ * Bug 1fbad290 (Денис 01.06): когда period.kind === 'month' и у row задан
+ * drillKind, модалка показывает разбивку по ДНЯМ этого месяца вместо
+ * стандартной по месяцам. Считаем из raw данных (visits/retail/expenses/
+ * otherIncomes/scheduled) с тем же matching что в основной таблице.
+ */
+type VisitRowLike = { visit_at: string; status?: string; client_id?: string | null }
+type ExpenseRowLike = {
+  expense_at: string
+  amount_cents: number
+  category_id: string | null
+  vat_rate_pct?: number | null
+}
+type ScheduledRowLike = {
+  due_date: string
+  amount_cents: number
+  status: string
+  vat_rate_pct?: number | null
+}
+type OtherIncomeRowLike = {
+  income_at: string
+  amount_cents: number
+  category_id?: string | null
+  vat_rate_pct?: number | null
+}
+
 function DrillDownDialog({
   row,
   currency,
   monthCols,
+  period,
+  range,
+  visits,
+  retailSales,
+  expenses,
+  scheduledPayments,
+  otherIncomes,
+  expenseCategories,
+  settings,
   onClose,
   t,
 }: {
   row: CellRow | null
   currency: string
   monthCols: MonthCol[]
+  period: PeriodValue
+  range: { start: Date; end: Date }
+  visits: VisitRowLike[]
+  retailSales: VisitRowLike[]
+  expenses: ExpenseRowLike[]
+  scheduledPayments: ScheduledRowLike[]
+  otherIncomes: OtherIncomeRowLike[]
+  expenseCategories: Array<{ id: string; name: string }>
+  settings: FinancialSettings
   onClose: () => void
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   if (!row) return null
-  const planTotal = row.values.reduce((s, v) => s + v, 0)
-  const factTotal = (row.factValues ?? []).reduce((s, v) => s + v, 0)
+  const dayBuckets = computeDayBuckets(row, period, range, {
+    visits,
+    retailSales,
+    expenses,
+    scheduledPayments,
+    otherIncomes,
+    expenseCategories,
+    settings,
+  })
+  const useDayMode = period.kind === 'month' && !!row.drillKind && dayBuckets !== null
+
+  const planTotal = useDayMode
+    ? dayBuckets!.reduce((s, b) => s + b.plan, 0)
+    : row.values.reduce((s, v) => s + v, 0)
+  const factTotal = useDayMode
+    ? dayBuckets!.reduce((s, b) => s + b.fact, 0)
+    : (row.factValues ?? []).reduce((s, v) => s + v, 0)
   const monthNames = monthCols.map((c) =>
     format(new Date(c.year, c.monthIdx, 1), 'LLL yy', { locale: getDateLocale() }),
   )
@@ -897,9 +1000,13 @@ function DrillDownDialog({
           <div>
             <h3 className="text-brand-navy text-lg font-bold">{row.label}</h3>
             <p className="text-muted-foreground mt-1 text-xs">
-              {t('finance.report.drill_subtitle', {
-                defaultValue: 'Разбивка по месяцам — план vs факт',
-              })}
+              {useDayMode
+                ? t('finance.report.drill_subtitle_days', {
+                    defaultValue: 'Разбивка по дням — план vs факт',
+                  })
+                : t('finance.report.drill_subtitle', {
+                    defaultValue: 'Разбивка по месяцам — план vs факт',
+                  })}
             </p>
           </div>
           <button
@@ -928,47 +1035,84 @@ function DrillDownDialog({
             </p>
           </div>
         </div>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-muted-foreground border-border border-b text-left">
-              <th className="py-2">{t('finance.report.drill_month', { defaultValue: 'Месяц' })}</th>
-              <th className="num py-2 text-right">
-                {t('finance.report.drill_plan', { defaultValue: 'План' })}
-              </th>
-              <th className="num py-2 text-right">
-                {t('finance.report.drill_fact', { defaultValue: 'Факт' })}
-              </th>
-              <th className="num py-2 text-right">
-                {t('finance.report.drill_diff', { defaultValue: 'Δ' })}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {row.values.map((plan, i) => {
-              const fact = row.factValues?.[i] ?? 0
-              const diff = fact - plan
-              return (
-                <tr key={i} className="border-border/40 border-b last:border-b-0">
-                  <td className="py-1.5">{monthNames[i]}</td>
-                  <td className="num py-1.5 text-right">
-                    {formatCurrency(Math.abs(plan), currency)}
-                  </td>
-                  <td className="num py-1.5 text-right">
-                    {formatCurrency(Math.abs(fact), currency)}
-                  </td>
-                  <td
-                    className={`num py-1.5 text-right font-semibold ${
-                      diff > 0 ? 'text-brand-sage-deep' : diff < 0 ? 'text-destructive' : ''
-                    }`}
-                  >
-                    {diff > 0 ? '+' : ''}
-                    {formatCurrency(diff, currency)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <p className="text-muted-foreground mb-2 text-[10.5px] uppercase tracking-wider">
+          {useDayMode
+            ? t('finance.report.drill_by_days', { defaultValue: 'Разбивка по дням' })
+            : t('finance.report.drill_by_months', { defaultValue: 'Разбивка по месяцам' })}
+        </p>
+        <div className="max-h-[55vh] overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-card sticky top-0">
+              <tr className="text-muted-foreground border-border border-b text-left">
+                <th className="py-2">
+                  {useDayMode
+                    ? t('finance.report.drill_day', { defaultValue: 'День' })
+                    : t('finance.report.drill_month', { defaultValue: 'Месяц' })}
+                </th>
+                <th className="num py-2 text-right">
+                  {t('finance.report.drill_plan', { defaultValue: 'План' })}
+                </th>
+                <th className="num py-2 text-right">
+                  {t('finance.report.drill_fact', { defaultValue: 'Факт' })}
+                </th>
+                <th className="num py-2 text-right">
+                  {t('finance.report.drill_diff', { defaultValue: 'Δ' })}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {useDayMode
+                ? dayBuckets!.map((b) => {
+                    const diff = b.fact - b.plan
+                    return (
+                      <tr key={b.dateIso} className="border-border/40 border-b last:border-b-0">
+                        <td className="py-1.5">
+                          {format(new Date(b.dateIso), 'd MMM (E)', { locale: getDateLocale() })}
+                        </td>
+                        <td className="num py-1.5 text-right">
+                          {b.plan === 0 ? '—' : formatCurrency(Math.abs(b.plan), currency)}
+                        </td>
+                        <td className="num py-1.5 text-right">
+                          {b.fact === 0 ? '—' : formatCurrency(Math.abs(b.fact), currency)}
+                        </td>
+                        <td
+                          className={`num py-1.5 text-right font-semibold ${
+                            diff > 0 ? 'text-brand-sage-deep' : diff < 0 ? 'text-destructive' : ''
+                          }`}
+                        >
+                          {diff === 0
+                            ? '—'
+                            : (diff > 0 ? '+' : '') + formatCurrency(diff, currency)}
+                        </td>
+                      </tr>
+                    )
+                  })
+                : row.values.map((plan, i) => {
+                    const fact = row.factValues?.[i] ?? 0
+                    const diff = fact - plan
+                    return (
+                      <tr key={i} className="border-border/40 border-b last:border-b-0">
+                        <td className="py-1.5">{monthNames[i]}</td>
+                        <td className="num py-1.5 text-right">
+                          {formatCurrency(Math.abs(plan), currency)}
+                        </td>
+                        <td className="num py-1.5 text-right">
+                          {formatCurrency(Math.abs(fact), currency)}
+                        </td>
+                        <td
+                          className={`num py-1.5 text-right font-semibold ${
+                            diff > 0 ? 'text-brand-sage-deep' : diff < 0 ? 'text-destructive' : ''
+                          }`}
+                        >
+                          {diff > 0 ? '+' : ''}
+                          {formatCurrency(diff, currency)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -1597,4 +1741,136 @@ function buildBalanceRows(
   const roots = byParent.get(null) ?? []
   for (const r of roots) pushNode(r, 0, null)
   return rows
+}
+
+/**
+ * Bug 1fbad290: построение разбивки по дням для DrillDownDialog.
+ * Возвращает массив бакетов { dateIso, plan, fact } для каждого дня
+ * выбранного месяца. plan/fact считаются из raw данных в gross-cents
+ * (без VAT-разбивки — это даёт визуальный тренд, точные числа в
+ * основной таблице net). Returns null если drillKind unknown.
+ */
+function computeDayBuckets(
+  row: CellRow,
+  period: PeriodValue,
+  range: { start: Date; end: Date },
+  data: {
+    visits: VisitRowLike[]
+    retailSales: VisitRowLike[]
+    expenses: ExpenseRowLike[]
+    scheduledPayments: ScheduledRowLike[]
+    otherIncomes: OtherIncomeRowLike[]
+    expenseCategories: Array<{ id: string; name: string }>
+    settings: FinancialSettings
+  },
+): Array<{ dateIso: string; plan: number; fact: number }> | null {
+  if (period.kind !== 'month' || !row.drillKind) return null
+  const kind = row.drillKind
+  const monthStart = startOfMonth(range.start)
+  const monthEnd = endOfMonth(range.start)
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  const buckets = days.map((d) => ({
+    dateIso: d.toISOString(),
+    plan: 0,
+    fact: 0,
+    keyYmd: format(d, 'yyyy-MM-dd'),
+  }))
+  const byYmd = new Map<string, (typeof buckets)[number]>()
+  for (const b of buckets) byYmd.set(b.keyYmd, b)
+  function add(when: string, planDelta: number, factDelta: number) {
+    const k = when.slice(0, 10)
+    const b = byYmd.get(k)
+    if (!b) return
+    b.plan += planDelta
+    b.fact += factDelta
+  }
+  function getGrossAndPaid(
+    v: VisitRowLike & {
+      amount_cents?: number
+      discount_cents?: number
+      tip_cents?: number
+      status?: string
+    },
+  ): { gross: number; paid: number } {
+    const gross = Math.max(0, (v.amount_cents ?? 0) - (v.discount_cents ?? 0)) + (v.tip_cents ?? 0)
+    const paid = v.status === 'paid' ? gross : 0
+    return { gross, paid }
+  }
+
+  if (kind === 'revenue_total' || kind === 'visits') {
+    for (const v of data.visits) {
+      const { gross, paid } = getGrossAndPaid(v as never)
+      add(v.visit_at, gross, paid)
+    }
+  }
+  if (kind === 'revenue_total' || kind === 'retail') {
+    for (const v of data.retailSales) {
+      const { gross, paid } = getGrossAndPaid(v as never)
+      add(v.visit_at, gross, paid)
+    }
+  }
+  if (kind === 'revenue_total' || kind === 'other_income') {
+    for (const oi of data.otherIncomes) {
+      add(oi.income_at, oi.amount_cents, oi.amount_cents)
+    }
+  }
+
+  if (kind === 'expenses_total') {
+    for (const e of data.expenses) {
+      add(e.expense_at, -e.amount_cents, -e.amount_cents)
+    }
+    for (const sp of data.scheduledPayments) {
+      if (sp.status === 'paid') continue
+      add(sp.due_date, -sp.amount_cents, 0)
+    }
+  }
+  if (kind === 'expense_scheduled') {
+    for (const sp of data.scheduledPayments) {
+      if (sp.status === 'paid') continue
+      add(sp.due_date, -sp.amount_cents, 0)
+    }
+  }
+  if (kind === 'expense_var') {
+    // % от выручки. План: распределим равномерно по дням исходя из totals
+    // settings.variable * dailyVisitsGross / monthTotal. Простая аппроксимация.
+    const dailyRev = new Map<string, number>()
+    for (const v of data.visits) {
+      const { gross } = getGrossAndPaid(v as never)
+      const k = v.visit_at.slice(0, 10)
+      dailyRev.set(k, (dailyRev.get(k) ?? 0) + gross)
+    }
+    const pctSum = data.settings.variable.items
+      .filter((i) => !i.archived)
+      .reduce((s, i) => s + (i.pct ?? 0), 0)
+    for (const b of buckets) {
+      const r = dailyRev.get(b.keyYmd) ?? 0
+      b.plan = -Math.round((r * pctSum) / 100)
+    }
+    // fact — реальные expenses с categories, помеченными как variable (не
+    // имеем хорошего маппинга → fact=0; данные есть только в общей плашке).
+  }
+  if (kind === 'expense_fix' || kind === 'expense_tax') {
+    // План фикседов: равномерно по дням месяца.
+    const items = kind === 'expense_fix' ? data.settings.fixed.items : data.settings.taxes.items
+    const monthTotal = items
+      .filter((i) => !i.archived)
+      .reduce((s, i) => s + (i.amount_cents ?? 0), 0)
+    if (monthTotal > 0) {
+      const perDay = Math.round(monthTotal / buckets.length)
+      for (const b of buckets) b.plan = -perDay
+    }
+    // fact: expenses категория label которой совпадает с items label.
+    const itemLabels = new Set(
+      items.filter((i) => !i.archived).map((i) => i.label.toLowerCase().trim()),
+    )
+    const catById = new Map(data.expenseCategories.map((c) => [c.id, c.name.toLowerCase().trim()]))
+    for (const e of data.expenses) {
+      const catName = e.category_id ? catById.get(e.category_id) : null
+      if (catName && itemLabels.has(catName)) {
+        add(e.expense_at, 0, -e.amount_cents)
+      }
+    }
+  }
+
+  return buckets.map((b) => ({ dateIso: b.dateIso, plan: b.plan, fact: b.fact }))
 }
