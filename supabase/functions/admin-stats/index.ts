@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
     if (action === 'feedback_approve') return handleFeedbackApprove(admin, body, user.userId)
     if (action === 'feedback_reject') return handleFeedbackReject(admin, body)
     if (action === 'feedback_status') return handleFeedbackStatus(admin, body)
+    if (action === 'feedback_message') return handleFeedbackMessage(admin, body)
     if (action === 'feedback_attachments') return handleFeedbackAttachments(admin, body)
     if (action === 'user_set_tester') return handleUserSetTester(admin, body)
     if (action === 'user_update_profile') return handleUserUpdateProfile(admin, body)
@@ -1198,6 +1199,19 @@ async function handleFeedbackStatus(
   )
     return jsonResponse({ error: 'invalid_status' }, 400)
   const { error } = await admin.from('bug_reports').update({ status }).eq('id', id)
+  if (error) return jsonResponse({ error: error.message }, 500)
+  return jsonResponse({ ok: true })
+}
+
+async function handleFeedbackMessage(
+  admin: AdminClient,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const id = body.id
+  const message = body.message_text
+  if (typeof id !== 'string') return jsonResponse({ error: 'id_required' }, 400)
+  if (typeof message !== 'string') return jsonResponse({ error: 'message_text_required' }, 400)
+  const { error } = await admin.from('bug_reports').update({ message_text: message }).eq('id', id)
   if (error) return jsonResponse({ error: error.message }, 500)
   return jsonResponse({ ok: true })
 }

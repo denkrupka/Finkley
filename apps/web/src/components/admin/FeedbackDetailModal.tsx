@@ -8,6 +8,7 @@ import {
   FileText,
   Lightbulb,
   Mail,
+  Pencil,
   Phone,
   Send,
   ShieldAlert,
@@ -25,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   useFeedbackApprove,
   useFeedbackAttachments,
+  useFeedbackMessage,
   useFeedbackReject,
   useFeedbackStatus,
   type AdminFeedbackRow,
@@ -55,6 +57,9 @@ export function FeedbackDetailModal({
   const approve = useFeedbackApprove()
   const reject = useFeedbackReject()
   const status = useFeedbackStatus()
+  const updateMessage = useFeedbackMessage()
+  const [editingMessage, setEditingMessage] = useState(false)
+  const [draftMessage, setDraftMessage] = useState(row.message_text ?? '')
 
   const isPendingApproval = row.requires_approval && !row.approved_at
   const KindIcon = row.kind === 'feature' ? Lightbulb : Bug
@@ -234,12 +239,74 @@ export function FeedbackDetailModal({
 
             {/* Описание */}
             <section>
-              <h3 className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-                {t('admin.feedback.detail.message')}
-              </h3>
-              <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
-                {row.message_text || '—'}
-              </p>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <h3 className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">
+                  {t('admin.feedback.detail.message')}
+                </h3>
+                {!editingMessage ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftMessage(row.message_text ?? '')
+                      setEditingMessage(true)
+                    }}
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+                  >
+                    <Pencil className="size-3" strokeWidth={2} />
+                    {t('common.edit', { defaultValue: 'Редактировать' })}
+                  </button>
+                ) : null}
+              </div>
+              {editingMessage ? (
+                <div>
+                  <textarea
+                    value={draftMessage}
+                    onChange={(e) => setDraftMessage(e.target.value)}
+                    rows={5}
+                    className="border-input bg-background focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2"
+                  />
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={updateMessage.isPending}
+                      onClick={() =>
+                        updateMessage.mutate(
+                          { id: row.id, message_text: draftMessage.trim() },
+                          {
+                            onSuccess: () => {
+                              toast.success(
+                                t('admin.feedback.toast.message_updated', {
+                                  defaultValue: 'Описание обновлено',
+                                }),
+                              )
+                              row.message_text = draftMessage.trim()
+                              setEditingMessage(false)
+                            },
+                            onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+                          },
+                        )
+                      }
+                    >
+                      {t('common.save', { defaultValue: 'Сохранить' })}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingMessage(false)
+                        setDraftMessage(row.message_text ?? '')
+                      }}
+                    >
+                      {t('common.cancel', { defaultValue: 'Отмена' })}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                  {row.message_text || '—'}
+                </p>
+              )}
             </section>
 
             {/* AI summary */}

@@ -285,6 +285,15 @@ export function useFeedbackStatus() {
   })
 }
 
+export function useFeedbackMessage() {
+  const invalidate = useInvalidateFeedback()
+  return useMutation({
+    mutationFn: (vars: { id: string; message_text: string }) =>
+      postAdmin<{ ok: true }>('feedback_message', vars),
+    onSuccess: invalidate,
+  })
+}
+
 export function useAdminGrant() {
   const invalidate = useInvalidateUsers()
   return useMutation({
