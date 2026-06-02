@@ -83,15 +83,19 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  // Проверяем что юзер — тестировщик (только они могут слать через этот endpoint).
+  // Юзер 02.06: любой авторизованный пользователь может слать баг.
+  // is_tester=true → source='tester' + requires_approval=false (без модерации).
+  // is_tester=false → source='client' + requires_approval=true (модерация
+  // как из telegram DM bot).
   const { data: profile } = await admin
     .from('profiles')
     .select('id, is_tester, full_name')
     .eq('id', user.userId)
     .maybeSingle()
-  if (!profile || !(profile as { is_tester?: boolean }).is_tester) {
-    return json({ error: 'not_a_tester' }, 403)
+  if (!profile) {
+    return json({ error: 'profile_not_found' }, 404)
   }
+  const isTester = !!(profile as { is_tester?: boolean }).is_tester
 
   let body: {
     description?: string
@@ -125,8 +129,8 @@ Deno.serve(async (req: Request) => {
       attachments: [],
       reported_at: new Date().toISOString(),
       kind: 'bug',
-      source: 'tester',
-      requires_approval: false,
+      source: isTester ? 'tester' : 'client',
+      requires_approval: !isTester,
       status: 'open',
       reporter_user_id: user.userId,
       salon_id: typeof body.salon_id === 'string' && body.salon_id ? body.salon_id : null,
