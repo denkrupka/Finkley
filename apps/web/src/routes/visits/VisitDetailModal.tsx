@@ -848,6 +848,15 @@ function ChargeView({
     const m = paymentMethods.find((x) => x.code === paymentMethodCode)
     return m?.cash_register_id ?? ''
   }, [paymentMethods, paymentMethodCode])
+  // Bug 02.06 (Денис): для payment_method=mixed показываем 2 поля для ввода
+  // суммы налом и картой. Юзер сам разносит total. Сумма должна = grandTotal.
+  const [mixedCashStr, setMixedCashStr] = useState('')
+  const [mixedCardStr, setMixedCardStr] = useState('')
+  const mixedCashCents = Math.max(0, Math.round(Number(mixedCashStr.replace(',', '.')) * 100)) || 0
+  const mixedCardCents = Math.max(0, Math.round(Number(mixedCardStr.replace(',', '.')) * 100)) || 0
+  // Авто-определение касс для нал и карты по payment_methods directory.
+  const cashRegCash = paymentMethods.find((m) => m.code === 'cash')?.cash_register_id ?? null
+  const cashRegCard = paymentMethods.find((m) => m.code === 'card')?.cash_register_id ?? null
   const [busy, setBusy] = useState(false)
 
   // ---- Скидка ----
@@ -887,6 +896,17 @@ function ChargeView({
       toast.error(t('visits.charge.discount_reason_required'))
       return
     }
+    // Bug 02.06: для mixed сумма нал+карта должна = grandTotal.
+    if (paymentMethodCode === 'mixed') {
+      if (mixedCashCents + mixedCardCents !== grandTotal) {
+        toast.error(
+          t('visits.charge.mixed_sum_mismatch', {
+            defaultValue: 'Сумма наличных и карты не равна итогу',
+          }),
+        )
+        return
+      }
+    }
     setBusy(true)
     try {
       // Распределяем tip + discount пропорционально по линиям (если их несколько).
@@ -897,15 +917,31 @@ function ChargeView({
           discountCents > 0 ? Math.round((discountCents * v.amount_cents) / totalGross) : 0
         const lineBase = v.amount_cents - lineDiscount
         const lineTip = tipCents > 0 ? Math.round((tipCents * lineBase) / baseTotalCents) : 0
+        const isMixed = paymentMethodCode === 'mixed'
+        // Распределяем split пропорционально по линии (если визитов несколько).
+        const lineMixedCash = isMixed
+          ? Math.round((mixedCashCents * v.amount_cents) / totalGross)
+          : 0
+        const lineMixedCard = isMixed
+          ? Math.round((mixedCardCents * v.amount_cents) / totalGross)
+          : 0
         const { error } = await supabase
           .from('visits')
           .update({
-            cash_register_id: cashRegisterId || null,
+            cash_register_id: isMixed ? null : cashRegisterId || null,
             payment_method: (paymentMethodCode || null) as PaymentMethod | null,
             tip_cents: lineTip,
             discount_cents: lineDiscount,
             discount_reason: discountCents > 0 ? discountReason.trim() : null,
             status: 'paid',
+            payment_split: isMixed
+              ? {
+                  cash_cents: lineMixedCash,
+                  card_cents: lineMixedCard,
+                  cash_register_cash: cashRegCash,
+                  cash_register_card: cashRegCard,
+                }
+              : null,
           })
           .eq('id', v.id)
         if (error) throw error
@@ -1106,6 +1142,59 @@ function ChargeView({
             })
           )}
         </div>
+
+        {/* Bug 02.06 (Денис): mixed → 2 поля ввода для разнесения по кассам. */}
+        {paymentMethodCode === 'mixed' ? (
+          <div className="border-border bg-muted/30 mt-3 rounded-md border p-3">
+            <p className="text-muted-foreground mb-2 text-[10.5px] font-bold uppercase tracking-wider">
+              {t('visits.charge.mixed_split', { defaultValue: 'Разделение по кассам' })}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="mixed-cash" className="text-xs">
+                  {t('visits.charge.mixed_cash', { defaultValue: 'Наличными' })}
+                </Label>
+                <Input
+                  id="mixed-cash"
+                  type="text"
+                  inputMode="decimal"
+                  value={mixedCashStr}
+                  onChange={(e) => setMixedCashStr(e.target.value)}
+                  placeholder="0,00"
+                  className="num mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="mixed-card" className="text-xs">
+                  {t('visits.charge.mixed_card', { defaultValue: 'Картой' })}
+                </Label>
+                <Input
+                  id="mixed-card"
+                  type="text"
+                  inputMode="decimal"
+                  value={mixedCardStr}
+                  onChange={(e) => setMixedCardStr(e.target.value)}
+                  placeholder="0,00"
+                  className="num mt-1"
+                />
+              </div>
+            </div>
+            <p
+              className={cn(
+                'num mt-2 text-xs',
+                mixedCashCents + mixedCardCents === grandTotal
+                  ? 'text-brand-sage-deep'
+                  : 'text-destructive',
+              )}
+            >
+              {t('visits.charge.mixed_sum_hint', {
+                defaultValue: 'Сумма: {{sum}} / {{total}}',
+                sum: formatCurrency(mixedCashCents + mixedCardCents, currency),
+                total: formatCurrency(grandTotal, currency),
+              })}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <footer className="border-border flex items-center justify-between gap-3 border-t px-5 py-3">
