@@ -11,6 +11,9 @@ export type PageTab<TId extends string> = {
   id: TId
   labelKey: string
   icon: LucideIcon
+  /** Опциональный unread badge — число справа в красном кружке.
+   *  Передавай undefined/0 чтобы не показывать. */
+  badge?: number
 }
 
 export function PageTabsNav<TId extends string>({
@@ -65,6 +68,17 @@ export function PageTabsNav<TId extends string>({
             >
               <Icon className={iconSize} strokeWidth={1.8} />
               {t(tab.labelKey)}
+              {tab.badge && tab.badge > 0 ? (
+                <span
+                  className={`bg-destructive text-destructive-foreground inline-flex items-center justify-center rounded-full ${
+                    size === 'sm'
+                      ? 'min-w-[18px] px-1.5 text-[10px]'
+                      : 'min-w-[20px] px-2 text-[11px]'
+                  } font-bold leading-tight`}
+                >
+                  {tab.badge > 99 ? '99+' : tab.badge}
+                </span>
+              ) : null}
             </button>
           )
         })}

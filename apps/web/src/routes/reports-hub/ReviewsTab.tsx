@@ -30,6 +30,7 @@ import {
   useReviews,
   useReviewsImport,
   useSaveReviewReply,
+  useUnreadReviewsBySource,
 } from '@/hooks/useReviews'
 import { useReviewAiAnalyze } from '@/hooks/useReviewAi'
 import { cn } from '@/lib/utils/cn'
@@ -64,6 +65,7 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
   const [readFilter, setReadFilter] = useState<ReadFilter>('all')
   const [page, setPage] = useState(1)
   const { data: rows = [], isLoading } = useReviews(salonId)
+  const { data: unreadCounts } = useUnreadReviewsBySource(salonId)
   const { data: googleAggregate } = useOwnSalonGoogleRating(salonId)
   const { data: booksyAggregate } = useOwnSalonBooksyRating(salonId)
   const markRead = useMarkReviewRead(salonId)
@@ -161,7 +163,20 @@ export function ReviewsTab({ salonId }: { salonId: string }) {
 
   return (
     <div>
-      <PageTabsNav tabs={SUB_TABS} active={sub} onChange={setSub} t={t} />
+      <PageTabsNav
+        tabs={SUB_TABS.map((tab) => {
+          if (tab.id === 'external' && (unreadCounts?.external ?? 0) > 0) {
+            return { ...tab, badge: unreadCounts!.external }
+          }
+          if (tab.id === 'internal' && (unreadCounts?.internal ?? 0) > 0) {
+            return { ...tab, badge: unreadCounts!.internal }
+          }
+          return tab
+        })}
+        active={sub}
+        onChange={setSub}
+        t={t}
+      />
 
       {/* KPI по источникам — показываем только релевантные подвкладке.
           external → Booksy + Google; internal → только внутренние. */}

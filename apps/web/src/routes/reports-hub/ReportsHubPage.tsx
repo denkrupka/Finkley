@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { useUnreadReviewsBySource } from '@/hooks/useReviews'
 import { PayoutsPage } from '@/routes/payouts/PayoutsPage'
 
 import { ClientsAnalyticsTab } from './ClientsAnalyticsTab'
@@ -56,13 +57,20 @@ export function ReportsHubPage() {
     setParams(next, { replace: true })
   }
 
+  const { data: reviewsUnread } = useUnreadReviewsBySource(salonId)
+  const tabsWithBadges: PageTab<ReportsTab>[] = TABS.map((tab) =>
+    tab.id === 'reviews' && (reviewsUnread?.total ?? 0) > 0
+      ? { ...tab, badge: reviewsUnread!.total }
+      : tab,
+  )
+
   if (!salonId) return null
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden px-5 py-7 sm:px-8 lg:pb-12">
       {/* Image #61: header «Аналитика по справочникам...» убран — он дублировал
           навигацию и занимал лишнее место. Активный таб уже самодокументируется. */}
-      <PageTabsNav tabs={TABS} active={active} onChange={setActive} t={t} />
+      <PageTabsNav tabs={tabsWithBadges} active={active} onChange={setActive} t={t} />
 
       {active === 'services' ? (
         <ServicesAnalyticsTab salonId={salonId} />
