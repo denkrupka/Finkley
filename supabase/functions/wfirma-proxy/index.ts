@@ -145,20 +145,20 @@ async function handleConnectWithLogin(
   password: string,
   selectedCompanyId?: string,
 ): Promise<Response> {
+  // Всегда возвращаем 200 чтобы supabase.functions.invoke() в UI не
+  // съел конкретный error code общим 'Edge Function returned non-2xx'.
   if (!(await ensureMember(admin, userId, salonId))) {
-    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+    return jsonResponse({ ok: false, error: 'forbidden' })
   }
   if (AUTO_LOGIN_DISABLED) {
-    return jsonResponse({ ok: false, error: 'auto_login_disabled' }, 503)
+    return jsonResponse({ ok: false, error: 'auto_login_disabled' })
   }
   if (!WFIRMA_APP_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    return jsonResponse({ ok: false, error: 'function_not_configured' })
   }
 
   const flowRes = await generateApiKeyViaWebFlow(email, password, { selectedCompanyId })
   if (!flowRes.ok) {
-    // В аккаунте >1 фирмы — отдаём список UI'ю, чтобы юзер выбрал. UI
-    // повторно дёргает action с `selected_company_id`.
     if (flowRes.reason === 'choose_company') {
       return jsonResponse({
         ok: false,
@@ -166,10 +166,6 @@ async function handleConnectWithLogin(
         companies: flowRes.companies,
       })
     }
-    // Возвращаем 200 чтобы клиент мог парсить { ok:false, error, details }.
-    // Supabase functions.invoke() при non-2xx бросает generic 'Edge Function
-    // returned non-2xx' — конкретный reason теряется. С 200 юзер видит
-    // 'wfirma_login_failed' или 'wfirma_form_changed: <details>' и понимает.
     return jsonResponse({
       ok: false,
       error: flowRes.reason,
@@ -186,12 +182,12 @@ async function handleConnectWithLogin(
   }
   const find = await wfirmaCompaniesFind(apiCreds)
   if (!find.ok) {
-    return jsonResponse({ ok: false, error: 'wfirma_keygen_failed', details: find.code }, 400)
+    return jsonResponse({ ok: false, error: 'wfirma_keygen_failed', details: find.code })
   }
   const company =
     find.companies.find((c) => String(c.id) === flowRes.data.companyId) ?? find.companies[0]
   if (!company) {
-    return jsonResponse({ ok: false, error: 'wfirma_no_companies' }, 400)
+    return jsonResponse({ ok: false, error: 'wfirma_no_companies' })
   }
 
   await saveCreds(admin, salonId, apiCreds, company.name, company.nip, 'auto_login')
@@ -211,16 +207,16 @@ async function handleConnectWithCredentials(
   companyId: string,
 ): Promise<Response> {
   if (!(await ensureMember(admin, userId, salonId))) {
-    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+    return jsonResponse({ ok: false, error: 'forbidden' })
   }
   if (!WFIRMA_APP_KEY) {
-    return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
+    return jsonResponse({ ok: false, error: 'function_not_configured' })
   }
   if (!/^[a-f0-9]{32}$/.test(accessKey) || !/^[a-f0-9]{32}$/.test(secretKey)) {
-    return jsonResponse({ ok: false, error: 'invalid_keys_format' }, 400)
+    return jsonResponse({ ok: false, error: 'invalid_keys_format' })
   }
   if (!/^\d+$/.test(companyId)) {
-    return jsonResponse({ ok: false, error: 'invalid_company_id' }, 400)
+    return jsonResponse({ ok: false, error: 'invalid_company_id' })
   }
 
   const apiCreds: WfirmaApiCreds = {
@@ -232,13 +228,13 @@ async function handleConnectWithCredentials(
   const find = await wfirmaCompaniesFind(apiCreds)
   if (!find.ok) {
     if (find.code === 'AUTH') {
-      return jsonResponse({ ok: false, error: 'wfirma_invalid_credentials' }, 400)
+      return jsonResponse({ ok: false, error: 'wfirma_invalid_credentials' })
     }
-    return jsonResponse({ ok: false, error: 'wfirma_api_error', details: find.code }, 400)
+    return jsonResponse({ ok: false, error: 'wfirma_api_error', details: find.code })
   }
   const company = find.companies.find((c) => String(c.id) === companyId)
   if (!company) {
-    return jsonResponse({ ok: false, error: 'wfirma_company_id_not_found' }, 400)
+    return jsonResponse({ ok: false, error: 'wfirma_company_id_not_found' })
   }
 
   await saveCreds(admin, salonId, apiCreds, company.name, company.nip, 'manual')
