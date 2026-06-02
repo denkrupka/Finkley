@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  Eye,
   FileText,
   Landmark,
   Loader2,
@@ -76,6 +77,7 @@ import { BankExportDialog } from './BankExportDialog'
 import { CommissionsPin } from './CommissionsPin'
 import { PageTour } from '@/components/onboarding-tour/PageTour'
 import { EXPENSES_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
+import { ExpenseAttachmentsModal } from './ExpenseAttachmentsModal'
 import { ExpenseFormModal } from './ExpenseFormModal'
 
 // Display-имена бухгалтерских порталов для toast/aria-label
@@ -363,6 +365,8 @@ export function ExpensesPage({
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [receiptError, setReceiptError] = useState<string | null>(null)
+  // Bug 02.06 (Денис): глазок-кнопка → ExpenseAttachmentsModal с carousel.
+  const [viewingExpense, setViewingExpense] = useState<ExpenseRow | null>(null)
 
   async function openReceipt(path: string) {
     setReceiptError(null)
@@ -1239,6 +1243,22 @@ export function ExpensesPage({
                               )
                             })()
                           : null}
+                        {/* Bug 02.06 (Денис): глазок-кнопка → carousel viewer
+                            прикреплённых документов / KSeF фактуры. Показываем
+                            только если есть receipt_url (один файл пока — без миграции). */}
+                        {!isPickerMode && e.receipt_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingExpense(e)}
+                            className="text-muted-foreground hover:text-brand-teal-deep grid size-9 place-items-center rounded-md"
+                            aria-label={t('expenses.viewer.open', {
+                              defaultValue: 'Открыть документ',
+                            })}
+                            title={t('expenses.viewer.open', { defaultValue: 'Открыть документ' })}
+                          >
+                            <Eye className="size-4" strokeWidth={1.7} />
+                          </button>
+                        ) : null}
                         {isPickerMode ? null : (
                           <button
                             type="button"
@@ -1390,6 +1410,15 @@ export function ExpensesPage({
         salonId={salonId}
         action="expense"
       />
+
+      {/* Bug 02.06 (Денис): глазок → carousel viewer (image/PDF/KSeF XML). */}
+      {viewingExpense ? (
+        <ExpenseAttachmentsModal
+          expense={viewingExpense}
+          currency={currency}
+          onClose={() => setViewingExpense(null)}
+        />
+      ) : null}
 
       <BankExportDialog
         open={exportDialogOpen}
