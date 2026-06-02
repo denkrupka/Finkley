@@ -130,6 +130,7 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
   let lastStatus = 0
   let lastText = ''
   let cookies = ''
+  let sawNotAuthenticated = false
   for (const a of attempts) {
     try {
       const r = await fetch(a.url, {
@@ -148,6 +149,13 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
       const txt = await r.text()
       lastStatus = r.status
       lastText = txt
+      // Treatwell 200 + body {"result":"NOT_AUTHENTICATED"} — endpoint
+      // работает, формат принят, но credentials отклонены. Запоминаем
+      // флаг чтобы выдать специфичный код ошибки.
+      if (r.ok && /NOT_AUTHENTICATED|invalidCredentials|"errorCode"\s*:/i.test(txt)) {
+        sawNotAuthenticated = true
+        continue
+      }
       const setCookies = r.headers.get('set-cookie') ?? ''
       const c = extractCookies(setCookies)
       if (r.ok && c) {
@@ -159,6 +167,11 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     }
   }
   if (!cookies) {
+    if (sawNotAuthenticated) {
+      // Конкретный код для UI чтобы показать понятное сообщение про
+      // 2FA / captcha / неправильный пароль.
+      throw new Error('treatwell_invalid_credentials')
+    }
     throw new Error(
       `treatwell_login_failed: HTTP ${lastStatus}${lastText ? ': ' + lastText.slice(0, 300) : ''}. Проверь email/пароль или 2FA.`,
     )

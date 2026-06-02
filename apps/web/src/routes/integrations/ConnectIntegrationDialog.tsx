@@ -112,12 +112,23 @@ export function ConnectIntegrationDialog({
             },
           })
           if (error) {
-            toast.error(error.message ?? String(error))
+            const raw = error.message ?? String(error)
+            // Спец-коды proxy → понятные сообщения юзеру.
+            if (raw.includes('treatwell_invalid_credentials')) {
+              toast.error(t('integrations.errors.treatwell_invalid_credentials'))
+            } else {
+              toast.error(raw)
+            }
             return
           }
           const res = data as { ok?: boolean; error?: string; note?: string } | null
           if (!res?.ok) {
-            toast.error(res?.error ?? 'connect_failed')
+            const code = res?.error ?? 'connect_failed'
+            if (code === 'treatwell_invalid_credentials') {
+              toast.error(t('integrations.errors.treatwell_invalid_credentials'))
+            } else {
+              toast.error(code)
+            }
             return
           }
           toast.success(

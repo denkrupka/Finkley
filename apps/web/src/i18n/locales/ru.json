@@ -3839,7 +3839,8 @@
       "fakturownia_api_error": "Ошибка Fakturownia API. Подробности залогированы — попробуй ещё раз через минуту.",
       "infakt_invalid_credentials": "inFakt не принял токен. Убедись что у тебя партнёрский доступ.",
       "infakt_api_error": "Ошибка inFakt API. Попробуй ещё раз через минуту.",
-      "infakt_not_partner_yet": "Интеграция inFakt пока в стадии партнёрской заявки — мы пишем код наперёд, но ключи ещё не выдают."
+      "infakt_not_partner_yet": "Интеграция inFakt пока в стадии партнёрской заявки — мы пишем код наперёд, но ключи ещё не выдают.",
+      "treatwell_invalid_credentials": "Treatwell отклонил эту пару email/пароль. Зайди на pro.treatwell.com в браузере, пройди вход вручную (там может быть captcha или 2FA). После успешного входа попробуй ещё раз."
     },
     "status": {
       "available": "Готово",
