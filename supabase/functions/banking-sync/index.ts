@@ -269,6 +269,17 @@ async function syncConnection(
   if (dateTo.getTime() - dateFrom.getTime() < MIN_WINDOW_MS) {
     dateFrom = new Date(dateTo.getTime() - MIN_WINDOW_MS)
   }
+  // Bug b02625bb (Елена 02.06): при подключении банка тянуть данные минимум
+  // с 1 числа предыдущего месяца (например 2 июня → с 1 мая). Это гарантирует
+  // что юзер увидит весь предыдущий месяц + текущий, для нормальной аналитики.
+  // Применяется только на is_initial (первый sync) — для incremental sync'ов
+  // overlap = 7 дней достаточно.
+  if (isInitial) {
+    const firstOfPrevMonth = new Date(dateTo.getFullYear(), dateTo.getMonth() - 1, 1)
+    if (dateFrom.getTime() > firstOfPrevMonth.getTime()) {
+      dateFrom = firstOfPrevMonth
+    }
+  }
   const effectiveFrom = dateFrom.toISOString().slice(0, 10)
 
   for (const acc of accounts ?? []) {

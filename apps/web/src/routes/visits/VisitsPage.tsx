@@ -200,7 +200,10 @@ export function VisitsPage({
   // effective (учёт частичных поступлений, image #51). Если paid_amount_cents
   // != null и меньше net — берём её, иначе net = amount - discount + tip.
   const totalRevenue = visits.reduce((acc, v) => acc + effectiveReceivedFromVisit(v), 0)
-  const grouped = groupByDay(visits)
+  // Bug 75704be2 (Елена 02.06): "сегодня я вижу 30 число вместо сегодня".
+  // Сортируем дни DESC чтобы новейшая дата (= сегодня) была сверху.
+  const groupedRaw = groupByDay(visits)
+  const grouped = new Map(Array.from(groupedRaw.entries()).sort(([a], [b]) => b.localeCompare(a)))
 
   // Когда VisitsPage встроен в IncomePage (forcedKind задан) — обёрточные
   // отступы и заголовок уже даёт родитель. Actions-кнопки тоже рендерятся

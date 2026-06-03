@@ -1113,6 +1113,30 @@ export function OnboardingPage() {
                 onOcrVisitsAdded={(v) => patch('ocr_visits', v)}
               />
             )}
+            {/* Bug 29796c7f (Елена 02.06): добавить опцию загрузить CSV с визитами. */}
+            {stepId === 'integrations_bookings' && state.created_salon_id ? (
+              <div className="border-border bg-muted/20 mb-4 rounded-lg border p-3">
+                <p className="text-foreground text-sm font-semibold">
+                  {t('onboarding.csv_import.title', {
+                    defaultValue: 'Уже есть CSV с визитами?',
+                  })}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {t('onboarding.csv_import.subtitle', {
+                    defaultValue:
+                      'Импортируй данные из своего файла — поддерживаются экспорты Booksy/Excel.',
+                  })}
+                </p>
+                <a
+                  href={`/${state.created_salon_id}/settings/import`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-teal-deep mt-2 inline-flex text-xs font-semibold hover:underline"
+                >
+                  {t('onboarding.csv_import.link', { defaultValue: 'Открыть импорт →' })}
+                </a>
+              </div>
+            ) : null}
             {stepId === 'integrations_bookings' &&
               (state.created_salon_id ? (
                 <LiveIntegrationCategoryStep
