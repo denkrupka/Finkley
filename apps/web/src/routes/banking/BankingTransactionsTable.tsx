@@ -593,6 +593,15 @@ function TransactionRow({
               <AlertTriangle className="size-3.5 shrink-0 text-amber-600" strokeWidth={2} />
             </span>
           ) : null}
+          {/* Bug 03.06 (Денис): тэг "Личное" для tx помеченных ignore-правилом. */}
+          {tx.is_personal ? (
+            <span
+              className="text-muted-foreground border-border inline-flex shrink-0 items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase"
+              title="Личная трата — в P&L не учитывается. Вручную связать/создать расход — тег пропадёт."
+            >
+              {t('banking.transactions.personal_badge', { defaultValue: 'Личное' })}
+            </span>
+          ) : null}
         </div>
       </td>
       <td

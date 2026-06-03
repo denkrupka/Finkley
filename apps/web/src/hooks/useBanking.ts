@@ -73,6 +73,9 @@ export type BankTransactionRow = {
   /** 'booked' — финальная (банк зафиксировал), 'pending' — PDNG из EB API,
    *  показывается с значком «в ожидании банка». */
   status: 'booked' | 'pending'
+  /** Bug 03.06: tx помечен ignore-правилом из BankRulesDialog (личная трата).
+   *  В P&L не идёт, в UI показывается тег «Личное». */
+  is_personal: boolean
 }
 
 export type BankInflowRow = BankTransactionRow & {
@@ -205,7 +208,7 @@ export function useBankInflows(
         .from('bank_transactions')
         .select(
           `id, account_id, external_id, type, amount_cents, currency, description,
-           counterparty, executed_at, expense_id, status,
+           counterparty, executed_at, expense_id, status, is_personal,
            bank_accounts!inner (
              iban,
              bank_connections!inner (
@@ -247,6 +250,7 @@ export function useBankInflows(
           linked_other_income_id: r.linked_other_income_id,
           needs_review: r.needs_review,
           status: r.status ?? 'booked',
+          is_personal: !!r.is_personal,
           bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
           account_iban: account?.iban ?? null,
         }
@@ -274,7 +278,7 @@ export function useBankOutflows(
         .select(
           `id, account_id, external_id, type, amount_cents, currency, description,
            counterparty, executed_at, expense_id, linked_visit_id, linked_other_income_id,
-           needs_review, status,
+           needs_review, status, is_personal,
            bank_accounts!inner (
              iban,
              bank_connections!inner (
@@ -316,6 +320,7 @@ export function useBankOutflows(
           linked_other_income_id: r.linked_other_income_id,
           needs_review: r.needs_review,
           status: r.status ?? 'booked',
+          is_personal: !!r.is_personal,
           bank_name: conn?.bank_name ?? conn?.bank_aspsp_name ?? null,
           account_iban: account?.iban ?? null,
         }

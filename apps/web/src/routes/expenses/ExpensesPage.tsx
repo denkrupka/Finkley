@@ -1075,6 +1075,15 @@ export function ExpensesPage({
                               KSeF
                             </span>
                           ) : null}
+                          {/* Bug 03.06: BankAI тэг — auto-created из банковской tx по правилу. */}
+                          {e.source === 'bank_ai' ? (
+                            <span
+                              className="text-brand-teal-deep border-brand-teal-soft bg-brand-teal-soft/30 inline-flex shrink-0 items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase"
+                              title="Авто-создано из банковской транзакции по правилу"
+                            >
+                              {t('expenses.bank_ai_badge', { defaultValue: 'BankAI' })}
+                            </span>
+                          ) : null}
                           {needsReviewExpenseIds?.has(e.id) ? (
                             <span title={t('expenses.needs_review_tooltip')}>
                               <AlertTriangle
