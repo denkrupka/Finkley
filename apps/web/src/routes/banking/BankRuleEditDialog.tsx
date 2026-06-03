@@ -185,8 +185,8 @@ export function BankRuleEditDialog({
 
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
           {/* Имя + тоггл */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="min-w-[260px] flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+            <div className="w-full min-w-0 sm:min-w-[260px] sm:flex-1">
               <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                 Имя
               </label>
@@ -256,12 +256,20 @@ export function BankRuleEditDialog({
           </div>
         </div>
 
-        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={save} disabled={create.isPending || update.isPending}>
+        <div className="border-border flex flex-col gap-2 border-t px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              onClick={save}
+              disabled={create.isPending || update.isPending}
+              className="w-full sm:w-auto"
+            >
               Сохранить изменения
             </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="w-full sm:w-auto"
+            >
               Отмена изменений
             </Button>
           </div>
@@ -270,7 +278,7 @@ export function BankRuleEditDialog({
               variant="outline"
               onClick={handleDelete}
               disabled={del.isPending}
-              className="text-destructive hover:bg-destructive/10 border-destructive/30"
+              className="text-destructive hover:bg-destructive/10 border-destructive/30 w-full sm:w-auto"
             >
               Удалить правило
             </Button>
@@ -392,8 +400,8 @@ function ConditionRow({
   }
 
   return (
-    <div className="border-border bg-muted/10 flex flex-wrap items-end gap-2 rounded-md border p-3">
-      <div className="min-w-[140px] flex-1">
+    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="w-full min-w-0 sm:min-w-[140px] sm:flex-1">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Поле
         </label>
@@ -410,7 +418,7 @@ function ConditionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="min-w-[140px] flex-1">
+      <div className="w-full min-w-0 sm:min-w-[140px] sm:flex-1">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Условие
         </label>
@@ -436,7 +444,7 @@ function ConditionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="min-w-[200px] flex-[2]">
+      <div className="w-full min-w-0 sm:min-w-[200px] sm:flex-[2]">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           {isText ? 'Текст' : 'Сумма (PLN)'}
         </label>
@@ -464,7 +472,7 @@ function ConditionRow({
         <button
           type="button"
           onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive grid size-10 place-items-center rounded-md"
+          className="text-muted-foreground hover:text-destructive absolute right-2 top-2 grid size-8 place-items-center rounded-md sm:static sm:size-10"
           aria-label="delete"
         >
           <Trash2 className="size-4" />
@@ -502,8 +510,8 @@ function ActionRow({
   }
 
   return (
-    <div className="border-border bg-muted/10 flex flex-wrap items-end gap-2 rounded-md border p-3">
-      <div className="min-w-[160px] flex-1">
+    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="w-full min-w-0 sm:min-w-[160px] sm:flex-1">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Действие
         </label>
@@ -523,7 +531,7 @@ function ActionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="min-w-[200px] flex-[2]">
+      <div className="w-full min-w-0 sm:min-w-[200px] sm:flex-[2]">
         {action.type === 'set_category' ? (
           <>
             <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
@@ -565,7 +573,7 @@ function ActionRow({
       <button
         type="button"
         onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive grid size-10 place-items-center rounded-md"
+        className="text-muted-foreground hover:text-destructive absolute right-2 top-2 grid size-8 place-items-center rounded-md sm:static sm:size-10"
         aria-label="delete"
       >
         <Trash2 className="size-4" />

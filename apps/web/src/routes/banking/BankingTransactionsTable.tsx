@@ -339,8 +339,8 @@ export function BankingTransactionsTable({
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border">
       {/* Header */}
-      <div className="border-border flex items-center justify-between gap-3 border-b px-5 py-3">
-        <div className="flex items-center gap-2">
+      <div className="border-border flex flex-col gap-2 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2">
           <Landmark className="text-brand-teal-deep size-4" strokeWidth={1.7} />
           <p className="text-brand-navy text-sm font-bold tracking-tight">
             {t('banking.transactions.title')}
@@ -360,7 +360,7 @@ export function BankingTransactionsTable({
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Bug 02.06: фильтр по банку — только если подключено >1 банка. */}
           {uniqueBanks.length > 1 ? (
             <select
