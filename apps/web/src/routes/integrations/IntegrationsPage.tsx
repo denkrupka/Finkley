@@ -396,14 +396,25 @@ function IntegrationCard({
     }
     if (accountingProviderId) {
       accountingSync.mutate(undefined, {
-        onSuccess: (stats) =>
+        onSuccess: (stats) => {
           toast.success(
             t('integrations.toast_synced_expenses', {
               name: provider.name,
               synced: stats.expenses_synced,
               skipped: stats.expenses_skipped,
             }),
-          ),
+          )
+          // Bug проактивный 03.06: если skip_reasons непустой — показываем
+          // отдельный warning-toast с первыми 5 причинами. Юзер видел "10
+          // пропущено" без понимания почему.
+          const reasons = stats.skip_reasons ?? []
+          if (reasons.length > 0) {
+            toast.warning(
+              `Причины skip: ${reasons.slice(0, 5).join('; ')}${reasons.length > 5 ? ` … ещё ${reasons.length - 5}` : ''}`,
+              { duration: 15000 },
+            )
+          }
+        },
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
       })
       return

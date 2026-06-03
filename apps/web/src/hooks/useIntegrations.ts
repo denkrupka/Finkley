@@ -735,10 +735,10 @@ export function useAccountingSync(
       })
       if (error) throw error
       const json = data as AnyResponse & {
-        stats?: { expenses_synced: number; expenses_skipped: number }
+        stats?: { expenses_synced: number; expenses_skipped: number; skip_reasons?: string[] }
       }
       if (!json.ok) throw new Error(json.message ?? json.error ?? 'sync_failed')
-      return json.stats ?? { expenses_synced: 0, expenses_skipped: 0 }
+      return json.stats ?? { expenses_synced: 0, expenses_skipped: 0, skip_reasons: [] }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
