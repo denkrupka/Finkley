@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getReceiptSignedUrl, type ExpenseRow } from '@/hooks/useExpenses'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -101,71 +100,108 @@ export function ExpenseAttachmentsModal({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:!max-w-5xl">
-        <div className="border-border flex items-start justify-between gap-3 border-b px-5 py-3">
-          <div className="min-w-0">
-            <h3 className="text-foreground truncate text-sm font-bold">
+      <DialogContent
+        showClose={false}
+        className="!fixed !left-0 !top-0 !h-[100dvh] !max-h-[100dvh] !w-[100vw] !max-w-[100vw] !translate-x-0 !translate-y-0 !rounded-none !border-0 !bg-neutral-900 !text-neutral-100 sm:!h-[100dvh] sm:!max-h-[100dvh] sm:!w-[100vw] sm:!max-w-[100vw]"
+      >
+        {/* Top bar: имя файла слева, иконки справа (download / external / close).
+            Стиль — как у Google Drive/Gmail attachment viewer (скрин-эталон). */}
+        <div className="flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-bold text-neutral-50 sm:text-lg">
               {expense.contractor_name || expense.description || '—'}
             </h3>
-            <p className="text-muted-foreground mt-0.5 text-xs">
+            <p className="mt-0.5 text-xs text-neutral-400">
               {expense.expense_at}
               {' · '}
               <span className="num font-semibold">
                 {formatCurrency(expense.amount_cents, currency)}
               </span>
               {expense.source === 'ksef' ? (
-                <span className="border-border text-muted-foreground ml-2 inline-flex items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase">
+                <span className="ml-2 inline-flex items-center rounded border border-neutral-700 px-1 py-0.5 text-[9px] font-semibold uppercase text-neutral-300">
                   KSeF
                 </span>
               ) : null}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground rounded-md p-1"
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {url ? (
+              <button
+                type="button"
+                onClick={nativeDownload}
+                className="grid size-9 place-items-center rounded-md text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                aria-label={t('expenses.viewer.download', { defaultValue: 'Скачать' })}
+                title={t('expenses.viewer.download', { defaultValue: 'Скачать' })}
+              >
+                <Download className="size-4" strokeWidth={1.8} />
+              </button>
+            ) : null}
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="grid size-9 place-items-center rounded-md text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                aria-label={t('expenses.viewer.open_external', {
+                  defaultValue: 'Открыть в новой вкладке',
+                })}
+                title={t('expenses.viewer.open_external', {
+                  defaultValue: 'Открыть в новой вкладке',
+                })}
+              >
+                <ExternalLink className="size-4" strokeWidth={1.8} />
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid size-9 place-items-center rounded-md text-neutral-300 hover:bg-neutral-800 hover:text-white"
+              aria-label={t('common.close')}
+              title={t('common.close')}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="max-h-[78vh] min-h-[400px] overflow-auto px-5 py-4">
+        {/* Контент viewer'а — занимает всё оставшееся пространство, скроллится. */}
+        <div className="flex-1 overflow-auto px-4 pb-6 sm:px-8">
           {!path ? (
-            <p className="text-muted-foreground text-center text-sm">
+            <p className="py-20 text-center text-sm text-neutral-400">
               {t('expenses.viewer.no_files', {
                 defaultValue: 'К расходу не прикреплены документы.',
               })}
             </p>
           ) : loading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="text-muted-foreground size-6 animate-spin" />
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="size-6 animate-spin text-neutral-400" />
             </div>
           ) : error ? (
-            <p className="text-destructive text-sm">{error}</p>
+            <p className="py-10 text-center text-sm text-rose-400">{error}</p>
           ) : url && isImage ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex w-full items-center justify-end gap-1">
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex w-full max-w-3xl items-center justify-end gap-1">
                 <button
                   type="button"
                   onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
-                  className="border-border hover:bg-muted/40 grid size-7 place-items-center rounded-md border"
+                  className="grid size-8 place-items-center rounded-md text-neutral-300 hover:bg-neutral-800"
                   aria-label="zoom out"
                 >
-                  <ZoomOut className="size-3.5" />
+                  <ZoomOut className="size-4" />
                 </button>
-                <span className="num text-muted-foreground w-12 text-center text-xs">
+                <span className="num w-12 text-center text-xs text-neutral-400">
                   {Math.round(zoom * 100)}%
                 </span>
                 <button
                   type="button"
                   onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-                  className="border-border hover:bg-muted/40 grid size-7 place-items-center rounded-md border"
+                  className="grid size-8 place-items-center rounded-md text-neutral-300 hover:bg-neutral-800"
                   aria-label="zoom in"
                 >
-                  <ZoomIn className="size-3.5" />
+                  <ZoomIn className="size-4" />
                 </button>
               </div>
-              <div className="border-border w-full overflow-auto rounded-md border">
+              <div className="w-full max-w-5xl overflow-auto rounded-md bg-neutral-950 p-2">
                 <img
                   src={url}
                   alt={expense.contractor_name ?? 'receipt'}
@@ -178,40 +214,26 @@ export function ExpenseAttachmentsModal({
             <iframe
               src={url}
               title="receipt"
-              className="border-border h-[70vh] w-full rounded-md border"
+              className="mx-auto h-[calc(100dvh-100px)] w-full max-w-5xl rounded-md border-0 bg-white"
             />
           ) : isXml && xmlContent ? (
-            <KsefInvoiceViewer xml={xmlContent} currency={currency} />
+            <div className="mx-auto max-w-3xl rounded-md bg-white p-5 text-neutral-900 shadow-xl">
+              <KsefInvoiceViewer xml={xmlContent} currency={currency} />
+            </div>
           ) : url ? (
-            <div className="border-border bg-muted/30 flex flex-col items-center justify-center gap-2 rounded-md border p-6 text-center">
-              <FileText className="text-muted-foreground size-8" strokeWidth={1.4} />
+            <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-md bg-neutral-800 p-6 text-center">
+              <FileText className="size-8 text-neutral-400" strokeWidth={1.4} />
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-teal-deep inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-sky-400 hover:underline"
               >
                 <ExternalLink className="size-3.5" strokeWidth={2} />
                 {t('expenses.viewer.open_external', { defaultValue: 'Открыть в новой вкладке' })}
               </a>
             </div>
           ) : null}
-        </div>
-
-        <div className="border-border flex items-center justify-end gap-2 border-t px-5 py-3">
-          {url ? (
-            <button
-              type="button"
-              onClick={nativeDownload}
-              className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold"
-            >
-              <Download className="size-3.5" strokeWidth={2} />
-              {t('expenses.viewer.download', { defaultValue: 'Скачать' })}
-            </button>
-          ) : null}
-          <Button variant="outline" size="sm" onClick={onClose}>
-            {t('common.close')}
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
