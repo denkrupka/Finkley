@@ -184,10 +184,48 @@ export function useImportVisits(salonId: string | undefined) {
           }
         }
 
-        const staffMatch = rawStaffName ? staffByName.get(rawStaffName.toLowerCase().trim()) : null
-        const serviceMatch = rawServiceName
-          ? serviceByName.get(rawServiceName.toLowerCase().trim())
-          : null
+        // Bug 71f46bd8/28d09ce9 (Елена 02.06): авто-создаём мастера и услуги
+        // если их нет в системе. Юзер сказал "ни один мастер не подтянулся"
+        // потому что имена в CSV отличались от заведённых. Теперь мастера/
+        // услуги создаются на лету и привязываются к визитам.
+        let staffMatch: StaffRow | null = null
+        if (rawStaffName) {
+          const key = rawStaffName.toLowerCase().trim()
+          staffMatch = staffByName.get(key) ?? null
+          if (!staffMatch) {
+            const { data: created, error: cErr } = await supabase
+              .from('staff')
+              .insert({ salon_id: salonId, full_name: rawStaffName, is_active: true })
+              .select('*')
+              .single()
+            if (!cErr && created) {
+              staffMatch = created as StaffRow
+              staffByName.set(key, staffMatch)
+            }
+          }
+        }
+        let serviceMatch: ServiceRow | null = null
+        if (rawServiceName) {
+          const key = rawServiceName.toLowerCase().trim()
+          serviceMatch = serviceByName.get(key) ?? null
+          if (!serviceMatch) {
+            const { data: created, error: sErr } = await supabase
+              .from('services')
+              .insert({
+                salon_id: salonId,
+                name: rawServiceName,
+                price_cents: Math.round(amount * 100),
+                duration_min: 60,
+                is_active: true,
+              })
+              .select('*')
+              .single()
+            if (!sErr && created) {
+              serviceMatch = created as ServiceRow
+              serviceByName.set(key, serviceMatch)
+            }
+          }
+        }
 
         const amountCents = Math.round(amount * 100)
         const externalId = await hashRow([

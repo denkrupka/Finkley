@@ -470,14 +470,41 @@ function DashboardEmpty() {
         {t('dashboard.empty.title')}
       </h2>
       <p className="text-muted-foreground mt-1 text-sm">{t('dashboard.empty.subtitle')}</p>
-      <button
-        type="button"
-        onClick={seedDemo}
-        disabled={pending}
-        className="bg-secondary/10 text-secondary hover:bg-secondary/20 mt-4 rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
-      >
-        {pending ? t('common.loading') : t('dashboard.empty.seed_demo')}
-      </button>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <button
+          type="button"
+          onClick={seedDemo}
+          disabled={pending}
+          className="bg-secondary/10 text-secondary hover:bg-secondary/20 rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+        >
+          {pending ? t('common.loading') : t('dashboard.empty.seed_demo')}
+        </button>
+        {/* Bug 3597e266 (Елена 02.06): ссылки на занесение/импорт реальных данных. */}
+        <a
+          href={`/${salonId}/income?view=calendar`}
+          className="border-border bg-card hover:bg-muted/40 text-foreground rounded-md border px-4 py-2 text-sm font-semibold"
+        >
+          {t('dashboard.empty.add_visit', { defaultValue: '+ Визит' })}
+        </a>
+        <a
+          href={`/${salonId}/expenses`}
+          className="border-border bg-card hover:bg-muted/40 text-foreground rounded-md border px-4 py-2 text-sm font-semibold"
+        >
+          {t('dashboard.empty.add_expense', { defaultValue: '+ Расход' })}
+        </a>
+        <a
+          href={`/${salonId}/settings/integrations`}
+          className="border-border bg-card hover:bg-muted/40 text-foreground rounded-md border px-4 py-2 text-sm font-semibold"
+        >
+          {t('dashboard.empty.connect_integration', { defaultValue: 'Подключить интеграцию' })}
+        </a>
+        <a
+          href={`/${salonId}/settings/import`}
+          className="border-border bg-card hover:bg-muted/40 text-foreground rounded-md border px-4 py-2 text-sm font-semibold"
+        >
+          {t('dashboard.empty.import_csv', { defaultValue: 'Импорт CSV' })}
+        </a>
+      </div>
     </div>
   )
 }
