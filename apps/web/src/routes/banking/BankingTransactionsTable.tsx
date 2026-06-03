@@ -1,4 +1,13 @@
-import { AlertTriangle, Edit3, Landmark, Link2, Link2Off, Loader2, RefreshCcw } from 'lucide-react'
+import {
+  AlertTriangle,
+  Edit3,
+  Landmark,
+  Link2,
+  Link2Off,
+  Loader2,
+  RefreshCcw,
+  Settings,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -24,6 +33,7 @@ import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 import { supabase } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { BankRulesDialog } from './BankRulesDialog'
 import { LinkTransactionDialog } from './LinkTransactionDialog'
 
 type Direction = 'debit' | 'credit'
@@ -146,6 +156,8 @@ export function BankingTransactionsTable({
   const [linkTx, setLinkTx] = useState<BankInflowRow | BankOutflowRow | null>(null)
   // Bug 02.06 (Денис): фильтр по банку — показываем когда подключено >1 банка.
   const [bankFilter, setBankFilter] = useState<string>('all')
+  // Bug 03.06 (Денис): "Параметры" — диалог правил банкинга.
+  const [rulesOpen, setRulesOpen] = useState(false)
   // Создание расхода из транзакции — открывает ExpenseFormModal с prefill.
   const [createOpen, setCreateOpen] = useState(false)
   const [createPrefill, setCreatePrefill] = useState<{
@@ -392,8 +404,16 @@ export function BankingTransactionsTable({
             )}
             {t('banking.transactions.sync_now')}
           </Button>
+          {/* Bug 03.06: кнопка "Параметры" — правила и игнор-лист. */}
+          <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
+            <Settings className="size-3.5" strokeWidth={1.8} />
+            {t('banking.transactions.rules', { defaultValue: 'Параметры' })}
+          </Button>
         </div>
       </div>
+
+      {/* Bug 03.06: правила банкинга — auto-category и игнор-лист. */}
+      <BankRulesDialog salonId={salonId} open={rulesOpen} onClose={() => setRulesOpen(false)} />
 
       {/* Empty / no connections */}
       {!hasActiveConnection ? (
