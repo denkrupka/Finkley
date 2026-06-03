@@ -645,33 +645,58 @@ async function tryAutoMatchOtherIncome(
 }
 
 // =============================================================================
-// Bug 03.06 (Денис): применяем bank_tx_rules к новым debit-tx.
-// Шаг 1: action='ignore' → tx.is_personal=true (тег "Личное" в UI, в P&L
-//        не идёт). Делаем bulk UPDATE через ILIKE.
-// Шаг 2: action='auto_create' → создаём expense (source='bank_ai') для tx
-//        у которых нет дубля по сумме (±1 PLN) и дате (±3 дня) с
-//        существующими expenses (любого source).
+// ADR-031: применяем bank_tx_rules (богатая модель: name + enabled +
+// applies_to + conditions + actions). Pure-matcher в
+// `../_shared/bank-rule-match.ts` — синхронизировано с
+// `apps/web/src/lib/banking/bank-rule-match.ts`.
+//
+// Логика:
+//   1. Загружаем enabled rules для salonId, сортируем по sort_order.
+//   2. Берём unprocessed tx (debit без expense_id + credit; за 90 дней).
+//   3. Для каждой tx находим первое match-правило.
+//   4. Применяем actions:
+//      - 'set_counterparty' → UPDATE bank_transactions.counterparty
+//      - 'ignore'           → is_personal=true; expense НЕ создаём
+//      - 'set_category'     → создаём expense (только для debit) с
+//        дедупом ±3 дня / ±100 cents
 // =============================================================================
+import {
+  findFirstMatch,
+  type RuleAction,
+  type RuleAppliesTo,
+  type RuleCondition,
+  type RuleLike,
+  type RuleTxLike,
+} from '../_shared/bank-rule-match.ts'
+
 type BankTxRuleRow = {
   id: string
-  counterparty_pattern: string
-  action: 'auto_create' | 'ignore'
-  category_id: string | null
+  name: string
+  enabled: boolean
+  applies_to: RuleAppliesTo
+  conditions: RuleCondition[]
+  actions: RuleAction[]
+  sort_order: number
+  created_at: string
 }
 
 async function applyBankTxRules(
   admin: ReturnType<typeof createClient>,
   salonId: string,
 ): Promise<void> {
-  const { data: rules } = await admin
+  const { data: rulesRaw } = await admin
     .from('bank_tx_rules')
-    .select('id, counterparty_pattern, action, category_id')
+    .select('id, name, enabled, applies_to, conditions, actions, sort_order, created_at')
     .eq('salon_id', salonId)
-  const rulesList = (rules ?? []) as BankTxRuleRow[]
+    .eq('enabled', true)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  const rulesList = (rulesRaw ?? []) as BankTxRuleRow[]
   if (rulesList.length === 0) return
 
-  // Все НЕ обработанные debit-tx салона: type='debit', expense_id=null,
-  // is_personal=false. Берём за 90 дней — достаточно для cron-окна.
+  // Все НЕ обработанные tx салона за 90 дней. credit-tx без expense_id
+  // или is_personal — это новые поступления, к ним применимы applies_to=income.
+  // debit-tx с expense_id=null, is_personal=false — новые списания.
   const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
   const { data: txs } = await admin
     .from('bank_transactions')
@@ -679,7 +704,6 @@ async function applyBankTxRules(
       `id, account_id, type, amount_cents, currency, counterparty, description, executed_at,
        bank_accounts!inner ( bank_connections!inner ( salon_id ) )`,
     )
-    .eq('type', 'debit')
     .is('expense_id', null)
     .eq('is_personal', false)
     .gte('executed_at', since)
@@ -687,33 +711,59 @@ async function applyBankTxRules(
     .limit(500)
   if (!txs || txs.length === 0) return
 
-  function matchesRule(
-    tx: { counterparty: string | null; description: string | null },
-    r: BankTxRuleRow,
-  ): boolean {
-    const p = r.counterparty_pattern.toLowerCase().trim()
-    if (!p) return false
-    const fields = [tx.counterparty ?? '', tx.description ?? ''].join(' ').toLowerCase()
-    return fields.includes(p)
-  }
-
-  for (const tx of txs as Array<{
+  type Tx = {
     id: string
+    type: 'credit' | 'debit'
     amount_cents: number
     currency: string
     counterparty: string | null
     description: string | null
     executed_at: string
-  }>) {
-    const matched = rulesList.find((r) => matchesRule(tx, r))
+  }
+
+  for (const tx of txs as Tx[]) {
+    const txLike: RuleTxLike = {
+      type: tx.type,
+      counterparty: tx.counterparty,
+      description: tx.description,
+      amount_cents: tx.amount_cents,
+    }
+    const matched = findFirstMatch(
+      rulesList as RuleLike[] & BankTxRuleRow[],
+      txLike,
+    ) as BankTxRuleRow | null
     if (!matched) continue
 
-    if (matched.action === 'ignore') {
+    // Сначала set_counterparty (может повлиять на дальнейшее отображение,
+    // expense.contractor_name берётся уже после).
+    const newCounterparty = matched.actions.find(
+      (a): a is { type: 'set_counterparty'; counterparty: string } => a.type === 'set_counterparty',
+    )?.counterparty
+    let txCounterparty = tx.counterparty
+    if (newCounterparty) {
+      await admin
+        .from('bank_transactions')
+        .update({ counterparty: newCounterparty })
+        .eq('id', tx.id)
+      txCounterparty = newCounterparty
+    }
+
+    // ignore: помечаем личной, expense НЕ создаём, exit.
+    if (matched.actions.some((a) => a.type === 'ignore')) {
       await admin.from('bank_transactions').update({ is_personal: true }).eq('id', tx.id)
       continue
     }
 
-    // auto_create: проверка дубля. Похожий expense за ±3 дня с amount ±100 cents.
+    // set_category: только для debit. Для credit пока пропускаем
+    // (создание other_income — отдельный кейс, добавим если будет
+    // нужно).
+    const setCategory = matched.actions.find(
+      (a): a is { type: 'set_category'; category_id: string } => a.type === 'set_category',
+    )
+    if (!setCategory) continue
+    if (tx.type !== 'debit') continue
+
+    // Дедуп: похожий expense за ±3 дня с amount ±100 cents.
     const txDate = new Date(tx.executed_at)
     const lo = new Date(txDate.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const hi = new Date(txDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -730,7 +780,6 @@ async function applyBankTxRules(
       .is('deleted_at', null)
       .limit(1)
     if (dupes && dupes.length > 0) {
-      // Дубль есть — линкуем bank_tx к существующему expense.
       await admin
         .from('bank_transactions')
         .update({ expense_id: dupes[0].id, needs_review: true })
@@ -738,20 +787,19 @@ async function applyBankTxRules(
       continue
     }
 
-    // Создаём expense source='bank_ai'.
     const { data: created } = await admin
       .from('expenses')
       .insert({
         salon_id: salonId,
-        category_id: matched.category_id,
+        category_id: setCategory.category_id,
         expense_at: tx.executed_at.slice(0, 10),
         amount_cents: tx.amount_cents,
-        contractor_name: tx.counterparty,
+        contractor_name: txCounterparty,
         description: tx.description,
         source: 'bank_ai',
         bank_transaction_id: tx.id,
         payment_method: 'card',
-        metadata: { rule_id: matched.id },
+        metadata: { rule_id: matched.id, rule_name: matched.name },
       })
       .select('id')
       .single()
