@@ -428,6 +428,16 @@ async function syncKsefToFinkley(
         }
       }
 
+      // Fallback: если ни маппинг по тексту, ни дефолт контрагента не дали
+      // категорию — кладём в системную «БЕЗ КАТЕГОРИИ». Иначе расход выпадает
+      // из pie-chart структуры расходов и P&L (там код пропускает
+      // category_id IS NULL — см. PnlChartsSection.tsx:149). Для владельца
+      // это «исчезновение» 200-500 PLN импортов в месяц.
+      if (!categoryId) {
+        categoryId = await findSystemCategoryId(admin, salonId, 'БЕЗ КАТЕГОРИИ', categoryCache)
+        if (categoryId) categoryMapped = 'uncategorized_fallback'
+      }
+
       // (2) Статус оплаты:
       //   isPaid=true  → expense.status=paid
       //   isPaid=false → создать scheduled_payment (pending) с due_date,

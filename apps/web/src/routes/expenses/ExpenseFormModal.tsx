@@ -1276,10 +1276,14 @@ export function ExpenseFormModal({
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* T34 — системная категория «Комиссии» скрыта (заполняется
-                          автоматически триггером для расходов с commission_pct). */}
+                      {/* T34 + 04.06: системные «Комиссии» и «БЕЗ КАТЕГОРИИ»
+                          скрыты от ручного выбора (комиссии ставит триггер
+                          payment-method, без-категории — ksef-fallback). */}
                       {categories
-                        .filter((c: ExpenseCategoryRow) => !(c.is_system && c.name === 'Комиссии'))
+                        .filter(
+                          (c: ExpenseCategoryRow) =>
+                            !(c.is_system && (c.name === 'Комиссии' || c.name === 'БЕЗ КАТЕГОРИИ')),
+                        )
                         .map((c: ExpenseCategoryRow) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
