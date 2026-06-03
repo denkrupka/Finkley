@@ -262,20 +262,38 @@ export function ExpensesPage({
     categoryId: categoryFilter || null,
     paymentMethod: payFilter || null,
   })
-  const expenses = useMemo(
+  // Bug 03.06 (Денис): универсальный поиск по всем полям расхода.
+  // Объявлен до useMemo чтобы попасть в его deps.
+  const [searchQ, setSearchQ] = useState('')
+  const expenses = useMemo(() => {
     // T15 — auto_commission расходы скрываются из общего реестра, они показаны
     // отдельной pin'ной строкой над списком (CommissionsPin → CommissionsModal).
-    () =>
-      rawExpenses.filter((e) => {
-        if (e.source === 'auto_commission') return false
-        if (!passesLinkedFilter(e)) return false
-        // Bug 02.06: фильтр по источнику (KSeF / Вручную).
-        if (sourceFilter === 'ksef' && e.source !== 'ksef') return false
-        if (sourceFilter === 'manual' && e.source === 'ksef') return false
-        return true
-      }),
-    [rawExpenses, passesLinkedFilter, sourceFilter],
-  )
+    const q = searchQ.trim().toLowerCase()
+    return rawExpenses.filter((e) => {
+      if (e.source === 'auto_commission') return false
+      if (!passesLinkedFilter(e)) return false
+      if (sourceFilter === 'ksef' && e.source !== 'ksef') return false
+      if (sourceFilter === 'manual' && e.source === 'ksef') return false
+      // Bug 03.06 (Денис): поиск по всем полям. Сумма — поддерживаем PLN и
+      // копейки (123 матчится с 12300 cents).
+      if (q) {
+        const amtPln = (e.amount_cents / 100).toFixed(2)
+        const fields = [
+          e.contractor_name,
+          e.description,
+          e.comment,
+          e.document_number,
+          amtPln,
+          String(e.amount_cents),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!fields.includes(q)) return false
+      }
+      return true
+    })
+  }, [rawExpenses, passesLinkedFilter, sourceFilter, searchQ])
   // Запланированные платежи (для таба «Не оплачено»). Фильтрация по периоду и
   // категории — на клиенте, чтобы не плодить варианты хука.
   const { data: allScheduled = [], isLoading: scheduledLoading } = useScheduledPayments(salonId)
@@ -557,6 +575,20 @@ export function ExpensesPage({
             ) : null}
           </button>
         )}
+      </div>
+
+      {/* Bug 03.06 (Денис): универсальный поиск по контрагенту/номеру/сумме/
+          описанию/комменту во всех 3 табах (paid/pending/banking). */}
+      <div className="mb-3 flex items-center gap-2">
+        <input
+          type="search"
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          placeholder={t('expenses.search_placeholder', {
+            defaultValue: 'Поиск по контрагенту, номеру, сумме, описанию, комменту…',
+          })}
+          className="border-border bg-card placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
+        />
       </div>
 
       {/* Filters */}
@@ -1249,7 +1281,12 @@ export function ExpensesPage({
                         {!isPickerMode && e.receipt_url ? (
                           <button
                             type="button"
-                            onClick={() => setViewingExpense(e)}
+                            onClick={(ev) => {
+                              // Bug 03.06 (Денис): глазок открывал ещё и edit-форму
+                              // (click bubbling до строки). stopPropagation отрезает.
+                              ev.stopPropagation()
+                              setViewingExpense(e)
+                            }}
                             className="text-muted-foreground hover:text-brand-teal-deep grid size-9 place-items-center rounded-md"
                             aria-label={t('expenses.viewer.open', {
                               defaultValue: 'Открыть документ',

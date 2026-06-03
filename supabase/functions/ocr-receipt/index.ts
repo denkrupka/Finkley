@@ -38,6 +38,10 @@ type OcrResult = {
   document_number: string | null
   /** IBAN счёта продавца (для bulk-перевода). Извлекаем из фактуры если есть. */
   vendor_iban: string | null
+  /** Bug 03.06 (Денис): AI-генерация краткого описания (2-5 слов) сути фактуры
+   * на основе позиций. Например для "Wykonanie Usług elektrycznych" → "Электромонтажные
+   * работы". Идёт в expense.description (а не название продавца как раньше). */
+  description: string | null
   raw_text: string | null
 }
 
@@ -112,8 +116,21 @@ fences — только raw JSON.
   "category_guess": "<категория из списка>",
   "document_number": "<номер документа как напечатан | null>",
   "vendor_iban": "<PL+26 цифр без пробелов | null если paragon>",
+  "description": "<2-5 слов на русском — суть фактуры/чека на основе позиций; например 'Электромонтажные работы', 'Косметика для салона', 'Аренда помещения', 'Топливо' | null если непонятно>",
   "raw_text": "<до 200 символов сырого текста для дебага>"
 }
+
+ПРАВИЛО для description:
+  Проанализируй позиции (таблица с "Nazwa towaru/usługi" или содержание чека) и
+  сформулируй краткое описание сути расхода на РУССКОМ (2-5 слов).
+  Примеры:
+    - "Wykonanie Usług elektrycznych" → "Электромонтажные работы"
+    - "Strzyżenie + farbowanie" → "Парикмахерские услуги"
+    - "Lakier hybrydowy x3, baza" → "Лак гибрид и материалы"
+    - "Czynsz najmu lokalu marzec" → "Аренда помещения"
+    - "Paliwo PB95 45L" → "Топливо"
+  НИКОГДА не пиши тут название продавца ("MaxMaster Sp. z o.o." — НЕТ).
+  Если позиции отсутствуют или неразборчивы — null.
 
 ВАЖНО ПРО VAT:
   На фактуре VAT есть таблица «Stawka VAT | Netto | VAT | Brutto».

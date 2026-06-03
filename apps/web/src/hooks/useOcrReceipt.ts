@@ -19,6 +19,9 @@ export type OcrParsedReceipt = {
   document_number: string | null
   /** IBAN счёта продавца — для bulk-перевода. Null для paragon-чеков без счёта. */
   vendor_iban: string | null
+  /** AI-краткое описание сути расхода на русском (2-5 слов) на основе позиций фактуры.
+   *  Идёт в expense.description вместо vendor name (bug 03.06 Денис). */
+  description: string | null
   raw_text: string | null
 }
 

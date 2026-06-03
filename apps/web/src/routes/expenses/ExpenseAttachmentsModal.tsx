@@ -1,6 +1,7 @@
-import { Download, ExternalLink, FileText, Loader2, X } from 'lucide-react'
+import { Download, ExternalLink, FileText, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -35,6 +36,32 @@ export function ExpenseAttachmentsModal({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [xmlContent, setXmlContent] = useState<string | null>(null)
+  // Bug 03.06 (Денис): zoom для image + нативный download.
+  const [zoom, setZoom] = useState(1)
+
+  async function nativeDownload() {
+    if (!url) return
+    try {
+      const r = await fetch(url)
+      const blob = await r.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      // Имя файла: контрагент + дата + расширение из path.
+      const ext = path?.split('.').pop()?.split('?')[0] ?? 'bin'
+      const safe = (expense.contractor_name || expense.description || 'doc').replace(
+        /[^\w-]+/g,
+        '_',
+      )
+      a.download = `${safe}-${expense.expense_at}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(blobUrl)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const path = expense.receipt_url
   const isXml = !!path && /\.xml($|\?)/i.test(path)
@@ -74,7 +101,7 @@ export function ExpenseAttachmentsModal({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:!max-w-3xl">
+      <DialogContent className="sm:!max-w-5xl">
         <div className="border-border flex items-start justify-between gap-3 border-b px-5 py-3">
           <div className="min-w-0">
             <h3 className="text-foreground truncate text-sm font-bold">
@@ -102,7 +129,7 @@ export function ExpenseAttachmentsModal({
           </button>
         </div>
 
-        <div className="max-h-[70vh] min-h-[300px] overflow-y-auto px-5 py-4">
+        <div className="max-h-[78vh] min-h-[400px] overflow-auto px-5 py-4">
           {!path ? (
             <p className="text-muted-foreground text-center text-sm">
               {t('expenses.viewer.no_files', {
@@ -116,16 +143,42 @@ export function ExpenseAttachmentsModal({
           ) : error ? (
             <p className="text-destructive text-sm">{error}</p>
           ) : url && isImage ? (
-            <img
-              src={url}
-              alt={expense.contractor_name ?? 'receipt'}
-              className="border-border mx-auto max-h-[60vh] rounded-md border object-contain"
-            />
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex w-full items-center justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+                  className="border-border hover:bg-muted/40 grid size-7 place-items-center rounded-md border"
+                  aria-label="zoom out"
+                >
+                  <ZoomOut className="size-3.5" />
+                </button>
+                <span className="num text-muted-foreground w-12 text-center text-xs">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                  className="border-border hover:bg-muted/40 grid size-7 place-items-center rounded-md border"
+                  aria-label="zoom in"
+                >
+                  <ZoomIn className="size-3.5" />
+                </button>
+              </div>
+              <div className="border-border w-full overflow-auto rounded-md border">
+                <img
+                  src={url}
+                  alt={expense.contractor_name ?? 'receipt'}
+                  style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+                  className="mx-auto block max-w-none transition-transform"
+                />
+              </div>
+            </div>
           ) : url && isPdf ? (
             <iframe
               src={url}
               title="receipt"
-              className="border-border h-[60vh] w-full rounded-md border"
+              className="border-border h-[70vh] w-full rounded-md border"
             />
           ) : isXml && xmlContent ? (
             <KsefInvoiceViewer xml={xmlContent} currency={currency} />
@@ -147,16 +200,14 @@ export function ExpenseAttachmentsModal({
 
         <div className="border-border flex items-center justify-end gap-2 border-t px-5 py-3">
           {url ? (
-            <a
-              href={url}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={nativeDownload}
               className="border-border bg-card hover:bg-muted/40 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold"
             >
               <Download className="size-3.5" strokeWidth={2} />
               {t('expenses.viewer.download', { defaultValue: 'Скачать' })}
-            </a>
+            </button>
           ) : null}
           <Button variant="outline" size="sm" onClick={onClose}>
             {t('common.close')}

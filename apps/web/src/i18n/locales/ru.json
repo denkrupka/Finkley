@@ -4283,7 +4283,8 @@
         "amount_positive": "Сумма должна быть больше нуля"
       }
     },
-    "bank_badge": "Банк",
+    "bank_badge": "BANK",
+    "bank_ai_badge": "BankAI",
     "linked_to_bank_tooltip": "Подтверждено банковской выпиской",
     "needs_review_tooltip": "Авто-привязка низкой уверенности — проверь, тот ли это банковский платёж",
     "partial_badge": "Частично",
@@ -5104,7 +5105,8 @@
     "created_by_short": "внёс {{name}}",
     "partial_remaining": "Осталось {{remaining}}",
     "picker_hint": "Кликни по расходу чтобы связать с банковской транзакцией",
-    "bank_badge": "Банк",
+    "bank_badge": "BANK",
+    "bank_ai_badge": "BankAI",
     "linked_to_bank_tooltip": "Подтверждено банковской выпиской",
     "needs_review_tooltip": "Авто-привязка низкой уверенности — проверь, тот ли это банковский платёж",
     "tabs": {
