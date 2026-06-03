@@ -276,17 +276,34 @@ async function syncKsefToFinkley(
     return stats
   }
 
-  // Bulk-load уже импортированных ksef_id чтобы не делать Invoice/Get для них
-  const { data: alreadyImported } = await admin
-    .from('expenses')
-    .select(`metadata`)
-    .eq('salon_id', salonId)
-    .is('deleted_at', null)
-    .not('metadata->>ksef_id', 'is', null)
+  // Bulk-load уже импортированных ksef_id чтобы не делать Invoice/Get для них.
+  // ВАЖНО: дедуп идёт по ОБЕИМ таблицам — expenses (для оплаченных) и
+  // scheduled_payments (для неоплаченных). Без второй части неоплаченные
+  // фактуры каждый sync натыкались на UNIQUE constraint в scheduled_payments
+  // → skip_reason='dup_scheduled_payment'. Это объясняло «Пропущено 9»
+  // у владельца 04.06: 9 неоплаченных фактур висели в scheduled_payments
+  // и бесконечно пытались вставиться заново на каждом cron-тике.
+  const [{ data: alreadyExpenses }, { data: alreadyScheduled }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select(`metadata`)
+      .eq('salon_id', salonId)
+      .is('deleted_at', null)
+      .not('metadata->>ksef_id', 'is', null),
+    admin
+      .from('scheduled_payments')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'ksef')
+      .not('external_id', 'is', null),
+  ])
   const importedSet = new Set<string>()
-  for (const r of alreadyImported ?? []) {
+  for (const r of alreadyExpenses ?? []) {
     const meta = r.metadata as { ksef_id?: string } | null
     if (meta?.ksef_id) importedSet.add(meta.ksef_id)
+  }
+  for (const r of (alreadyScheduled ?? []) as Array<{ external_id: string | null }>) {
+    if (r.external_id) importedSet.add(r.external_id)
   }
 
   // ensureFallback убран по запросу 01.06 — категорию «Импорт КСеФ»
@@ -298,7 +315,10 @@ async function syncKsefToFinkley(
   try {
     for (const inv of invoices) {
       if (importedSet.has(inv.ksefReferenceNumber)) {
-        skipWithReason(stats, `${inv.ksefReferenceNumber}: dup_in_bd`)
+        // Уже импортирована в expenses/scheduled_payments — это норма,
+        // не считаем как skip. Иначе «Пропущено N» в UI растёт каждый
+        // sync на длину окна 60 дней и пугает владельца. Реальные skip
+        // (no_total_gross, dup_*) остаются как есть — это сигналы.
         continue
       }
       // Тянем XML фактуры — best-effort. Если упало — берём поля из header
@@ -546,7 +566,14 @@ async function runSyncForSalon(
   await recordSyncResult(admin, { salonId, provider: 'ksef', ok: true })
   await admin
     .from('salon_integrations')
-    .update({ status: 'connected', last_sync_stats: stats })
+    .update({
+      status: 'connected',
+      last_sync_stats: stats,
+      // Без этого cron_run_ksef_syncs видел last_sync_at старым и
+      // запускал sync каждые 2 минуты (cron-интервал), а не раз в
+      // sync_interval_minutes как ожидалось. См. фикс 04.06.
+      last_sync_at: new Date().toISOString(),
+    })
     .eq('salon_id', salonId)
     .eq('provider', 'ksef')
 
