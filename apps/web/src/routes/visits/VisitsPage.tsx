@@ -313,6 +313,17 @@ export function VisitsPage({
                 emptyText={t('common.no_results')}
               />
             </div>
+
+            {/* Bug 94d33719 (Елена 02.06): "Всего на сумму: X" + кол-во визитов,
+                подсчёт по реально отображаемому списку (с учётом фильтров). */}
+            <div className="ml-auto flex items-baseline gap-2">
+              <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                {t('visits.list.total_label', { defaultValue: 'Всего' })}:
+              </span>
+              <span className="num text-foreground text-sm font-bold">
+                {visits.length} · {formatCurrency(totalRevenue, currency)}
+              </span>
+            </div>
           </div>
 
           {/* Свободные окна — раскрывающаяся панель над списком визитов */}

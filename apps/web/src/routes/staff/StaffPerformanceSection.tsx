@@ -587,6 +587,56 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
               )
             })}
           </tbody>
+          {/* Bug d385072d (Елена 02.06): строка "Итого" в Reports → Мастера.
+              Суммируем абсолютные показатели; ретеншен/отток/скоринг не
+              складываются — оставляем "—" чтобы не вводить в заблуждение. */}
+          {sortedStaff.length > 0
+            ? (() => {
+                let totalVisitsRev = 0
+                let totalRetailRev = 0
+                let totalTips = 0
+                let totalVisits = 0
+                let totalClients = 0
+                for (const s of sortedStaff) {
+                  const masterWindow = s.retention_window_days ?? salonWindow
+                  const st = statsFor(s.id, masterWindow)
+                  totalVisitsRev += st.visitsRevenueCents
+                  totalRetailRev += st.retailRevenueCents
+                  totalTips += st.tipsCents
+                  totalVisits += st.visitCount
+                  totalClients += st.uniqueClients
+                }
+                return (
+                  <tfoot>
+                    <tr className="border-border bg-muted/20 border-t-2 font-bold">
+                      <td className="text-foreground py-2 pr-2 text-[11px] uppercase tracking-wider">
+                        {t('reports_hub.staff.total', { defaultValue: 'Итого' })}
+                      </td>
+                      <td className="num text-foreground py-2 pr-2 text-right">
+                        {formatCurrency(totalVisitsRev, currency)}
+                      </td>
+                      <td className="num text-foreground py-2 pr-2 text-right">
+                        {formatCurrency(totalRetailRev, currency)}
+                      </td>
+                      <td className="num text-foreground py-2 pr-2 text-right">
+                        {formatCurrency(totalTips, currency)}
+                      </td>
+                      <td className="num text-foreground py-2 pr-2 text-right">
+                        {formatCurrency(totalRevenue, currency)}
+                      </td>
+                      <td className="num text-muted-foreground py-2 pr-2 text-right">100%</td>
+                      <td className="num text-foreground py-2 pr-2 text-right">
+                        {totalVisits} · {totalClients}
+                      </td>
+                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
+                    </tr>
+                  </tfoot>
+                )
+              })()
+            : null}
         </table>
       </div>
       <p className="text-muted-foreground mt-3 text-xs">{t('staff.performance.note')}</p>

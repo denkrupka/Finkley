@@ -82,6 +82,7 @@ export function SalonLayout() {
     path.endsWith('/finance') ||
     path.endsWith('/reports') ||
     path.endsWith('/ai') ||
+    path.endsWith('/staff') ||
     path.includes('/settings')
   const { user } = useAuth()
   const { data: salons, isLoading } = useMySalons()

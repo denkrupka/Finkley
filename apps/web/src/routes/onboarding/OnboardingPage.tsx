@@ -1428,7 +1428,11 @@ export function OnboardingPage() {
               ← {t('common.back')}
             </button>
             <div className="flex items-center gap-5">
-              {!isLast && stepId !== 'salon' ? (
+              {/* Bug ca95d313 (Елена 02.06): убрать "Пропустить" на стартовом
+                  экране (stepIndex===0 - 'path' выбор). Онбординг обязательный,
+                  кнопка вводила в заблуждение. Также прячем на 'salon' (там
+                  имя салона нужно) и на последнем шаге (там submit). */}
+              {!isLast && stepId !== 'salon' && stepIndex > 0 ? (
                 <button
                   type="button"
                   onClick={skip}
