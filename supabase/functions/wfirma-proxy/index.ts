@@ -378,12 +378,21 @@ async function syncWfirmaToFinkley(
 
   if (list.expenses.length === 0) return stats
 
-  // Fallback-категория «Импорт wFirma» создаётся лениво — только если хоть один
-  // expense не сматчился ни на одну системную.
+  // Fallback-категория: единая системная «БЕЗ КАТЕГОРИИ» (см.
+  // миграцию 20260603000018_uncategorized_category). Раньше создавалась
+  // провайдер-специфичная «Импорт wFirma» — мешалось три-четыре
+  // pie-slice'а одного смысла. Старые «Импорт wFirma»-категории не
+  // трогаем, чтобы не ломать существующее представление; новые
+  // импорты идут в единую системную.
   let fallbackCategoryId: string | null = null
   const ensureFallback = async (): Promise<string | null> => {
-    if (fallbackCategoryId) return fallbackCategoryId
-    fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    if (fallbackCategoryId !== null) return fallbackCategoryId
+    fallbackCategoryId = await findSystemCategoryId(admin, salonId, 'БЕЗ КАТЕГОРИИ', categoryCache)
+    // Если миграция ещё не применена (свежий-свежий салон без триггера) —
+    // fall back на старую «Импорт wFirma» категорию.
+    if (!fallbackCategoryId) {
+      fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    }
     return fallbackCategoryId
   }
   const categoryCache = new Map<string, string | null>()

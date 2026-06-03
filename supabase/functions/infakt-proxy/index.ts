@@ -211,12 +211,16 @@ async function syncToFinkley(
   }
 
   let fallbackCategoryId: string | null = null
+  const categoryCache = new Map<string, string | null>()
   const ensureFallback = async (): Promise<string | null> => {
-    if (fallbackCategoryId) return fallbackCategoryId
-    fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    if (fallbackCategoryId !== null) return fallbackCategoryId
+    // Единая системная «БЕЗ КАТЕГОРИИ» (миграция 20260603000018).
+    fallbackCategoryId = await findSystemCategoryId(admin, salonId, 'БЕЗ КАТЕГОРИИ', categoryCache)
+    if (!fallbackCategoryId) {
+      fallbackCategoryId = await getOrCreateImportCategory(admin, salonId)
+    }
     return fallbackCategoryId
   }
-  const categoryCache = new Map<string, string | null>()
 
   let offset = 0
   while (offset < 3000) {

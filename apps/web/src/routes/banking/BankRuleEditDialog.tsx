@@ -108,6 +108,16 @@ export function BankRuleEditDialog({
     )
   }
 
+  // При переключении applies_to на 'income' банковский матчер пропускает
+  // set_category-actions (категории доходов хранятся в other_income_categories,
+  // не expense_categories). Удаляем такие actions молча — иначе юзер видит
+  // лежащую категорию и думает что она применится.
+  useEffect(() => {
+    if (appliesTo === 'income') {
+      setActions((arr) => arr.filter((a) => a.type !== 'set_category'))
+    }
+  }, [appliesTo])
+
   function addAction() {
     if (appliesTo === 'income') {
       setActions((arr) => [...arr, { type: 'set_counterparty', counterparty: '' }])
@@ -248,6 +258,7 @@ export function BankRuleEditDialog({
                 key={idx}
                 action={a}
                 categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+                allowCategoryAction={appliesTo !== 'income'}
                 onChange={(next) => patchAction(idx, next)}
                 onRemove={() => removeAction(idx)}
               />
@@ -491,11 +502,15 @@ const ACTION_TYPE_LABELS_RU: Record<RuleAction['type'], string> = {
 function ActionRow({
   action,
   categories,
+  allowCategoryAction,
   onChange,
   onRemove,
 }: {
   action: RuleAction
   categories: { id: string; name: string }[]
+  /** false для applies_to='income': set_category пропускается матчером
+   *  (категории доходов хранятся отдельно), не предлагаем юзеру. */
+  allowCategoryAction: boolean
   onChange: (next: RuleAction) => void
   onRemove: () => void
 }) {
@@ -508,6 +523,9 @@ function ActionRow({
       onChange({ type: 'ignore' })
     }
   }
+  const availableTypes = allowCategoryAction
+    ? (['set_category', 'set_counterparty', 'ignore'] as const)
+    : (['set_counterparty', 'ignore'] as const)
 
   return (
     <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">
@@ -523,7 +541,7 @@ function ActionRow({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {(['set_category', 'set_counterparty', 'ignore'] as const).map((t) => (
+            {availableTypes.map((t) => (
               <SelectItem key={t} value={t}>
                 {ACTION_TYPE_LABELS_RU[t]}
               </SelectItem>
