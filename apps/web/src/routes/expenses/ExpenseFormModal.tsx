@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -40,7 +41,9 @@ import {
   type PayrollKind,
 } from '@/hooks/useExpenses'
 import { useIsVatPayer } from '@/hooks/useIsVatPayer'
+import { useAccountingSettings } from '@/hooks/useAccountingSettings'
 import { useSalon } from '@/hooks/useSalons'
+import { useSalonIntegrations as useSalonIntegrationsList } from '@/hooks/useIntegrations'
 import { VatBreakdownInput } from '@/components/ui/VatBreakdownInput'
 import { computeNet, defaultVatRate } from '@/lib/utils/vat'
 import { useStaff } from '@/hooks/useStaff'
@@ -303,6 +306,12 @@ export function ExpenseFormModal({
 }: Props) {
   const isVatPayer = useIsVatPayer(salonId)
   const { data: salonData } = useSalon(salonId)
+  // Bug 03.06 (Денис): NIP-проверка nabywcy при OCR-импорте.
+  const { data: accountingSettings } = useAccountingSettings(salonId)
+  const { data: salonIntegrationsList } = useSalonIntegrationsList(salonId)
+  const [nipMismatch, setNipMismatch] = useState<{ buyerNip: string; companyNip: string } | null>(
+    null,
+  )
   const country = salonData?.country_code ?? 'PL'
   // VAT state — синхронизирован с form.amount (брутто).
   const [vatNetCents, setVatNetCents] = useState(0)
@@ -1147,15 +1156,20 @@ export function ExpenseFormModal({
                       if (matchedCat && !form.getValues('category_id')) {
                         form.setValue('category_id', matchedCat, { shouldDirty: true })
                       }
-                      if (parsed.vendor && !form.getValues('comment')) {
-                        form.setValue('comment', parsed.vendor, { shouldDirty: true })
+                      // Bug 03.06 (Денис): описание = AI-generated description
+                      // (суть фактуры, не название продавца), комментарий — ПУСТО.
+                      // parsed.description формируется в OCR backend на основе
+                      // позиций фактуры (например 'Электромонтажные работы').
+                      // Fallback на vendor name только если description отсутствует.
+                      if (!form.getValues('description')) {
+                        const descCandidate = parsed.description ?? parsed.vendor ?? ''
+                        if (descCandidate) {
+                          form.setValue('description', descCandidate.slice(0, 200), {
+                            shouldDirty: true,
+                          })
+                        }
                       }
-                      // Описание (image #94) — auto-fill из vendor если пусто.
-                      if (parsed.vendor && !form.getValues('description')) {
-                        form.setValue('description', parsed.vendor.slice(0, 200), {
-                          shouldDirty: true,
-                        })
-                      }
+                      // Комментарий оставляем пустым — юзер сам заполнит если надо.
                       // Image #93: номер документа из чека.
                       if (parsed.document_number && !form.getValues('document_number')) {
                         form.setValue('document_number', parsed.document_number, {
@@ -1203,6 +1217,15 @@ export function ExpenseFormModal({
                           } as { name: string; nip?: string; address?: string; iban?: string })
                           setCounterpartyModalOpen(true)
                         }
+                      }
+                      // Bug 03.06 (Денис): NIP-проверка nabywcy. Если в
+                      // настройках бухгалтерии указан NIP компании и он не
+                      // совпадает с buyer_nip из фактуры — показываем модалку.
+                      // Если NIP в настройках пуст — пропускаем проверку.
+                      const myNip = (accountingSettings?.nip ?? '').replace(/[^0-9]/g, '')
+                      const buyerNip = (parsed.buyer_nip ?? '').replace(/[^0-9]/g, '')
+                      if (myNip && buyerNip && myNip !== buyerNip) {
+                        setNipMismatch({ buyerNip, companyNip: myNip })
                       }
                       // NIP'ы — для wFirma auto-push (см. ADR-012).
                       // Сами поля юзеру не показываем — это служебная мета.
@@ -1767,6 +1790,73 @@ export function ExpenseFormModal({
         action="expense"
         onShiftOpened={() => void form.handleSubmit(onSubmit)()}
       />
+
+      {/* Bug 03.06 (Денис): NIP-проверка nabywcy не совпадает с компанией. */}
+      <NipMismatchDialog
+        info={nipMismatch}
+        hasAccountingIntegration={
+          !!salonIntegrationsList?.some(
+            (i) =>
+              ['wfirma', 'fakturownia', 'infakt', 'ksef'].includes(i.provider) &&
+              i.status === 'connected',
+          )
+        }
+        onAccept={() => setNipMismatch(null)}
+        onCancel={() => {
+          setNipMismatch(null)
+          // Сбрасываем поля чтобы юзер не сохранил случайно.
+          form.reset()
+          setReceiptFile(null)
+        }}
+      />
+    </Dialog>
+  )
+}
+
+/**
+ * Bug 03.06 (Денис): модалка-предупреждение когда NIP nabywcy из OCR
+ * не совпадает с NIP компании в Настройках → Бухгалтерия.
+ * Сообщает что документ выставлен не на твою компанию + при наличии
+ * подключённой интеграции с бухгалтерией — что в неё авто-передача не пойдёт.
+ */
+function NipMismatchDialog({
+  info,
+  hasAccountingIntegration,
+  onAccept,
+  onCancel,
+}: {
+  info: { buyerNip: string; companyNip: string } | null
+  hasAccountingIntegration: boolean
+  onAccept: () => void
+  onCancel: () => void
+}) {
+  if (!info) return null
+  return (
+    <Dialog open onOpenChange={(v) => !v && onCancel()}>
+      <DialogContent className="sm:!max-w-md">
+        <DialogHeader>
+          <DialogTitle>NIP nabywcy не совпадает</DialogTitle>
+          <DialogDescription>
+            Этот документ выставлен <span className="num font-semibold">NIP {info.buyerNip}</span>,
+            а NIP твоей компании — <span className="num font-semibold">NIP {info.companyNip}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 px-5 py-2 text-sm">
+          <p>Скорее всего фактура выставлена не на твою компанию. Всё равно учесть в расходах?</p>
+          {hasAccountingIntegration ? (
+            <p className="text-muted-foreground rounded-md bg-amber-100/40 px-3 py-2 text-xs dark:bg-amber-500/15">
+              ⚠️ В подключённую бухгалтерию (wFirma/Fakturownia/inFakt/KSeF) этот документ
+              автоматически НЕ передастся — NIP покупателя не совпадает с фирмой.
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter className="px-5 pb-3">
+          <Button variant="outline" onClick={onCancel}>
+            Отмена
+          </Button>
+          <Button onClick={onAccept}>Всё равно учесть</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   )
 }
