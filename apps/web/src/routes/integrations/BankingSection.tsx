@@ -195,8 +195,12 @@ export function BankingSection({ salonId }: Props) {
               new Date(c.valid_until).getTime() - Date.now() < 14 * 24 * 60 * 60 * 1000
             const isError = c.status === 'error'
             const isExpired = c.status === 'expired'
+            const isRevoked = c.status === 'revoked'
             const isPending = c.status === 'pending'
-            const showReconnect = isExpired || isExpiringSoon
+            // Bug проактивный (03.06): Bank Millennium отзывает session раньше
+            // valid_until — connection становится status='revoked'. UI должен
+            // показать Reconnect кнопку для revoked так же как для expired.
+            const showReconnect = isExpired || isRevoked || isExpiringSoon
             return (
               <li
                 key={c.id}
@@ -225,6 +229,13 @@ export function BankingSection({ salonId }: Props) {
                       <span className="bg-destructive/10 text-destructive inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold">
                         <AlertTriangle className="size-3" strokeWidth={2.4} />
                         {t('banking.status_expired')}
+                      </span>
+                    ) : null}
+                    {/* Bug проактивный: revoked badge — банк сам отозвал доступ. */}
+                    {isRevoked ? (
+                      <span className="bg-destructive/10 text-destructive inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold">
+                        <AlertTriangle className="size-3" strokeWidth={2.4} />
+                        {t('banking.status_revoked', { defaultValue: 'Доступ отозван' })}
                       </span>
                     ) : null}
                     {isExpiringSoon && !isExpired ? (
