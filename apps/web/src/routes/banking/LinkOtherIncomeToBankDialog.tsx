@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { useLinkBankTransaction, type BankInflowRow } from '@/hooks/useBanking'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatExpenseDate } from '@/lib/utils/format-date'
+import { formatExpenseDate, toLocalISODate } from '@/lib/utils/format-date'
 
 import { BankingTransactionsTable } from './BankingTransactionsTable'
 
@@ -53,8 +53,8 @@ export function LinkOtherIncomeToBankDialog({
     const end = new Date(d)
     end.setDate(end.getDate() + 90)
     return {
-      start: start.toISOString().slice(0, 10),
-      end: end.toISOString().slice(0, 10),
+      start: toLocalISODate(start),
+      end: toLocalISODate(end),
     }
   }, [otherIncome.income_at])
 

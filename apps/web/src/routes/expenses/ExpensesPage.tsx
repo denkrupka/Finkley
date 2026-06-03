@@ -69,7 +69,7 @@ import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useSalon } from '@/hooks/useSalons'
 import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatExpenseDate } from '@/lib/utils/format-date'
+import { formatExpenseDate, toLocalISODate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useBankLinkedIncomeIds, useBankOutflows } from '@/hooks/useBanking'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
@@ -172,9 +172,12 @@ export function ExpensesPage({
   // потому что у expenses.expense_at колонка типа date, не timestamp.
   const [period, setPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const r = periodToRange(period)
+  // Локальная YYYY-MM-DD (не UTC): иначе в Europe/Warsaw "1 июня 00:00 local"
+  // через toISOString даёт "2026-05-31", и фильтр >= '2026-05-31' тащит
+  // в "Июнь" транзакции от 31 мая. См. toLocalISODate.
   const range = {
-    start: r.start.toISOString().slice(0, 10),
-    end: r.end.toISOString().slice(0, 10),
+    start: toLocalISODate(r.start),
+    end: toLocalISODate(r.end),
   }
 
   function setFilter(key: string, value: string | null) {

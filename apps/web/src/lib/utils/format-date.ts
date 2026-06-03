@@ -50,6 +50,22 @@ export function formatExpenseDate(date: string): string {
 }
 
 /**
+ * Date → 'YYYY-MM-DD' в локальной таймзоне браузера.
+ *
+ * Использовать вместо `d.toISOString().slice(0, 10)` для всех фильтров
+ * периода: month-period даёт `Date(2026-06-01 00:00 Europe/Warsaw)`,
+ * после `.toISOString()` это станет `'2026-05-31T22:00:00Z'` и slice
+ * вернёт `'2026-05-31'` — в фильтр май попадает 1 день. См. фикс
+ * 2026-06-04 (owner bug: «Июнь 2026» показывал транзакции 31.05).
+ */
+export function toLocalISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
  * Группировка ISO-дат по дню для рендеринга в списке.
  */
 export function groupByDay<T extends { visit_at: string }>(items: T[]): Map<string, T[]> {

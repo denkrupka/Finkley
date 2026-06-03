@@ -24,7 +24,7 @@ import {
 } from '@/hooks/useBanking'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
-import { formatExpenseDate } from '@/lib/utils/format-date'
+import { formatExpenseDate, toLocalISODate } from '@/lib/utils/format-date'
 
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories, useOtherIncomes } from '@/hooks/useOtherIncomes'
@@ -90,9 +90,10 @@ export function BankingTransactionsTable({
     start.setDate(start.getDate() - 90)
     const end = new Date(period.end)
     end.setDate(end.getDate() + 90)
+    // Локальная YYYY-MM-DD: иначе TZ-сдвиг расширяет окно ещё на день.
     return {
-      start: start.toISOString().slice(0, 10),
-      end: end.toISOString().slice(0, 10),
+      start: toLocalISODate(start),
+      end: toLocalISODate(end),
     }
   }, [period.start, period.end])
   const { data: expenses = [] } = useExpenses(

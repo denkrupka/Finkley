@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { type OtherIncomeRow } from '@/hooks/useOtherIncomes'
+import { toLocalISODate } from '@/lib/utils/format-date'
 import { useSalon } from '@/hooks/useSalons'
 import { type VisitRow } from '@/hooks/useVisits'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
@@ -84,7 +85,10 @@ export function IncomePage({
   const [bankingPeriod, setBankingPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const bankingRange = useMemo(() => {
     const r = periodToRange(bankingPeriod)
-    return { start: r.start.toISOString().slice(0, 10), end: r.end.toISOString().slice(0, 10) }
+    // Локальная YYYY-MM-DD: иначе в Europe/Warsaw toISOString сдвигает
+    // границу месяца на -2ч и фильтр захватывает последний день
+    // предыдущего месяца. См. toLocalISODate.
+    return { start: toLocalISODate(r.start), end: toLocalISODate(r.end) }
   }, [bankingPeriod])
 
   // Embedded: локальный state вместо URL params чтобы не дёргать history родителя.
