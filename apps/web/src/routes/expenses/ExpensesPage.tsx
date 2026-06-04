@@ -677,6 +677,7 @@ export function ExpensesPage({
           direction="debit"
           period={range}
           currency={currency}
+          searchQ={searchQ}
         />
       ) : (
         <div className={cn('grid grid-cols-1 gap-5', embedded ? '' : 'lg:grid-cols-[2fr_1fr]')}>

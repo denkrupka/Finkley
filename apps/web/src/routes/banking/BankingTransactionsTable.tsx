@@ -51,6 +51,8 @@ type Props = {
   /** Жёсткий фильтр: показывать ТОЛЬКО неpривязанные tx (без переключателя).
    *  Используется в picker-модалках — связывать уже-привязанные не имеет смысла. */
   unlinkedOnly?: boolean
+  /** Поиск (substring case-insensitive по counterparty / description). */
+  searchQ?: string
 }
 
 /**
@@ -69,6 +71,7 @@ export function BankingTransactionsTable({
   currency,
   onPickTransaction,
   unlinkedOnly = false,
+  searchQ = '',
 }: Props) {
   const isPickerMode = !!onPickTransaction
   // Toggle «Показать связанные»: default false (юзеру важнее видеть
@@ -188,10 +191,21 @@ export function BankingTransactionsTable({
       : allRows
   // Bug 02.06 (Денис): фильтр по банку. Все подключенные банки выбираются
   // как 'all'; конкретный bank_name → только tx с этим банком.
-  const rows =
+  const rowsAfterBank =
     bankFilter === 'all'
       ? rowsAfterLinked
       : rowsAfterLinked.filter((tx) => (tx.bank_name ?? '') === bankFilter)
+  // Owner-feedback 04.06: поиск в шапке Расходов/Доходов не фильтровал
+  // банковский таб (search work только в paid/pending). Прокидываем
+  // searchQ в этот компонент и фильтруем counterparty/description.
+  const searchQLower = searchQ.trim().toLowerCase()
+  const rows = searchQLower
+    ? rowsAfterBank.filter((tx) => {
+        const cp = (tx.counterparty ?? '').toLowerCase()
+        const desc = (tx.description ?? '').toLowerCase()
+        return cp.includes(searchQLower) || desc.includes(searchQLower)
+      })
+    : rowsAfterBank
   // Список уникальных банков для Select. Если >1 — показываем фильтр.
   const uniqueBanks = Array.from(
     new Set(
