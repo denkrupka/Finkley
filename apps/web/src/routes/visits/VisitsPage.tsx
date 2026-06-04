@@ -35,6 +35,7 @@ import {
   type VisitKind,
   type VisitRow,
 } from '@/hooks/useVisits'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import { useServices } from '@/hooks/useServices'
@@ -170,6 +171,10 @@ export function VisitsPage({
   const linkedVisitIds = bankLinked?.visitIds ?? null
   const needsReviewVisitIds = bankLinked?.needsReviewVisitIds ?? null
   const deleteVisit = useDeleteVisit(salonId)
+  // Permissions: на income.visits должен быть edit чтобы редактировать
+  // или удалять. Передаём hideActions в VisitRow если view-only.
+  const { can: canPerm } = usePermissions(salonId)
+  const visitsReadOnly = !canPerm('income', 'visits', 'edit')
   // T18 — в режиме «Список» открываем полноценную модалку «Редактировать
   // визит» (QuickEntryModal в edit-mode), как в Календаре. VisitDetailModal
   // (короткая карточка с табами «Визит/Информация») остаётся только для
@@ -392,6 +397,7 @@ export function VisitsPage({
                                   onSuccess: () => toast.success(t('visits.toast_deleted')),
                                 })
                               }}
+                              hideActions={visitsReadOnly}
                               staff={staff}
                               services={services}
                               clients={clients}
@@ -429,7 +435,7 @@ export function VisitsPage({
                             currency={currency}
                             isBankLinked={linkedVisitIds?.has(row.id) ?? false}
                             needsReview={needsReviewVisitIds?.has(row.id) ?? false}
-                            hideActions={isPickerMode}
+                            hideActions={isPickerMode || visitsReadOnly}
                             highlight={highlightVisitId === row.id}
                             multiSelectMode={multiSelectMode}
                             isMultiSelected={selectedVisitIds?.has(row.id) ?? false}
@@ -671,6 +677,7 @@ function GroupRow({
   multiSelectMode = false,
   selectedVisitIds,
   onToggleVisitSelection,
+  hideActions = false,
   t,
 }: {
   group: { key: string; visits: VisitRow[] }
@@ -687,6 +694,7 @@ function GroupRow({
   multiSelectMode?: boolean
   selectedVisitIds?: Set<string>
   onToggleVisitSelection?: (v: VisitRow) => void
+  hideActions?: boolean
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const visits = group.visits
@@ -897,39 +905,43 @@ function GroupRow({
                   </span>
                 )}
                 <span className="flex items-center justify-end gap-0.5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(v)
-                    }}
-                    className={cn(
-                      'grid size-8 place-items-center rounded-md',
-                      v.status === 'pending'
-                        ? 'text-secondary hover:bg-secondary/10'
-                        : 'text-muted-foreground hover:text-secondary',
-                    )}
-                    aria-label={
-                      v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
-                    }
-                  >
-                    {v.status === 'pending' ? (
-                      <Calculator className="size-4" strokeWidth={1.9} />
-                    ) : (
-                      <Pencil className="size-4" strokeWidth={1.7} />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onDelete(v.id)
-                    }}
-                    className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
-                    aria-label="delete"
-                  >
-                    <Trash2 className="size-4" strokeWidth={1.7} />
-                  </button>
+                  {hideActions ? null : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onEdit(v)
+                        }}
+                        className={cn(
+                          'grid size-8 place-items-center rounded-md',
+                          v.status === 'pending'
+                            ? 'text-secondary hover:bg-secondary/10'
+                            : 'text-muted-foreground hover:text-secondary',
+                        )}
+                        aria-label={
+                          v.status === 'pending' ? t('visits.charge_aria') : t('visits.edit_aria')
+                        }
+                      >
+                        {v.status === 'pending' ? (
+                          <Calculator className="size-4" strokeWidth={1.9} />
+                        ) : (
+                          <Pencil className="size-4" strokeWidth={1.7} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(v.id)
+                        }}
+                        className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md"
+                        aria-label="delete"
+                      >
+                        <Trash2 className="size-4" strokeWidth={1.7} />
+                      </button>
+                    </>
+                  )}
                 </span>
               </li>
             )
