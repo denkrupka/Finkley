@@ -458,9 +458,57 @@ async function persistTransactions(
       .eq('account_id', ctx.accountId)
       .in('external_id', pendingToBookedIds)
   }
-  const newRows = txRows.filter((r) => !existingIds.has(r.external_id))
+  const newRowsByExternalId = txRows.filter((r) => !existingIds.has(r.external_id))
+
+  // Fuzzy dedup: банк может вернуть ту же tx с разными external_id
+  // (pending→booked rebuild reference, разные payment-processor чейны,
+  // short vs full counterparty). Скрины владельца 04.06: POSIR vs
+  // POSIR PLYWALNIA RATAJE, LAGAR vs LAGARDERE TRAVEL RETAI, FISH HO
+  // vs FISH HOUSE DURRES ALB — все с точно одинаковой суммой и датой.
+  //
+  // Загружаем existing tx по account_id в окне ±1 день вокруг новых
+  // executed_at, сравниваем (executed_at_date, amount_cents,
+  // counterparty/description substring lowercase). Если матч — скипаем
+  // новую tx.
+  let newRows = newRowsByExternalId
+  if (newRowsByExternalId.length > 0) {
+    const dates = newRowsByExternalId.map((r) => r.executed_at.slice(0, 10)).sort()
+    const minDate = dates[0]
+    const maxDate = dates[dates.length - 1]
+    const { data: nearby } = await admin
+      .from('bank_transactions')
+      .select('executed_at, amount_cents, counterparty, description')
+      .eq('account_id', ctx.accountId)
+      .gte('executed_at', `${minDate}T00:00:00Z`)
+      .lte('executed_at', `${maxDate}T23:59:59Z`)
+    type Nearby = {
+      executed_at: string
+      amount_cents: number
+      counterparty: string | null
+      description: string | null
+    }
+    const nearbyArr = (nearby ?? []) as Nearby[]
+    const isFuzzyDup = (nr: (typeof newRowsByExternalId)[number]): boolean => {
+      const nrDate = nr.executed_at.slice(0, 10)
+      const nrText = (nr.counterparty ?? nr.description ?? '').toLowerCase().trim().slice(0, 30)
+      if (!nrText) return false
+      for (const ex of nearbyArr) {
+        if (ex.executed_at.slice(0, 10) !== nrDate) continue
+        if (ex.amount_cents !== nr.amount_cents) continue
+        const exText = (ex.counterparty ?? ex.description ?? '').toLowerCase().trim().slice(0, 30)
+        if (!exText) continue
+        if (nrText === exText) return true
+        if (nrText.length >= 4 && exText.includes(nrText)) return true
+        if (exText.length >= 4 && nrText.includes(exText)) return true
+      }
+      return false
+    }
+    newRows = newRowsByExternalId.filter((r) => !isFuzzyDup(r))
+  }
+
+  const fuzzyDupCount = newRowsByExternalId.length - newRows.length
   console.log(
-    `[banking-sync] salon=${ctx.salonId} booked=${booked.length} duplicates=${existingIds.size} to_insert=${newRows.length}`,
+    `[banking-sync] salon=${ctx.salonId} booked=${booked.length} duplicates_by_external_id=${existingIds.size} duplicates_fuzzy=${fuzzyDupCount} to_insert=${newRows.length}`,
   )
   if (newRows.length === 0) return { newCount: 0, expCount: 0 }
 
