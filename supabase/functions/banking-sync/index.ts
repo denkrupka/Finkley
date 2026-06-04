@@ -719,6 +719,19 @@ async function applyBankTxRules(
     .limit(500)
   if (!txs || txs.length === 0) return
 
+  // bank_tx_splits = multi-link: tx разнесена на N сущностей через bridge-
+  // таблицу. legacy FK (expense_id / linked_*) при этом NULL — наш фильтр
+  // их не отсек. Если правило применится к split-tx, мы создадим лишний
+  // expense/other_income (дубль) на уже разнесённую tx.
+  const txIds = (txs as Array<{ id: string }>).map((t) => t.id)
+  const { data: splits } = await admin
+    .from('bank_tx_splits')
+    .select('bank_transaction_id')
+    .in('bank_transaction_id', txIds)
+  const splitTxIds = new Set(
+    ((splits ?? []) as Array<{ bank_transaction_id: string }>).map((s) => s.bank_transaction_id),
+  )
+
   type Tx = {
     id: string
     type: 'credit' | 'debit'
@@ -730,6 +743,8 @@ async function applyBankTxRules(
   }
 
   for (const tx of txs as Tx[]) {
+    // Tx уже разнесена через multi-link splits — не трогаем.
+    if (splitTxIds.has(tx.id)) continue
     const txLike: RuleTxLike = {
       type: tx.type,
       counterparty: tx.counterparty,
