@@ -411,6 +411,9 @@ export function ExpenseFormModal({
     buyer_nip: null,
     vendor_nip: null,
   })
+  // Owner 04.06: OCR не нашёл сумму даже после retry. UI hint над полем
+  // суммы чтобы юзер понял что надо ввести вручную.
+  const [ocrAmountMissing, setOcrAmountMissing] = useState(false)
 
   // Активный accounting-портал (приоритет wFirma > Fakturownia > ... — ADR-013).
   // Он получит auto-push после save если у расхода есть чек.
@@ -1133,6 +1136,10 @@ export function ExpenseFormModal({
                       // Юзер редактируемые значения не теряет.
                       if (parsed.amount && !form.getValues('amount')) {
                         form.setValue('amount', String(parsed.amount), { shouldDirty: true })
+                        setOcrAmountMissing(false)
+                      } else if (!parsed.amount || parsed.amount === 0) {
+                        // Owner 04.06: OCR не нашёл сумму даже после retry. UI hint.
+                        setOcrAmountMissing(true)
                       }
                       // VAT-разбивка из OCR (если фактура была с табличкой
                       // Netto/VAT/Brutto). Подставляем все 3 поля синхронно
@@ -1484,6 +1491,11 @@ export function ExpenseFormModal({
                 «Сумму ТОЛЬКО ПРИ ЗАРПЛАТАХ, НАЛОГАХ и ZUS показывай без нетто
                 и НДС — только СУММА и всё». Детектим по category name (Налоги/
                 ZUS) и is_payroll флагу. */}
+            {ocrAmountMissing ? (
+              <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                ⚠ AI не нашёл сумму в документе. Введите вручную ↓
+              </div>
+            ) : null}
             {isVatPayer && !isPayrollCategory && !isNonVatCategory ? (
               <VatBreakdownInput
                 netCents={vatNetCents}
