@@ -98,6 +98,16 @@ ANTI-HALLUCINATION: если действительно не видишь пол
 туда). Но для amount/document_number — ищи особенно внимательно,
 они почти всегда есть.
 
+ОБЯЗАТЕЛЬНО ПРО amount (owner-feedback 04.06: фактура импортирована,
+но amount=0 хотя в документе сумма явно есть):
+  Если поле "Razem do zapłaty" / "Razem brutto" / "Suma" не видно
+  явным итогом — ПОСЧИТАЙ ВРУЧНУЮ из таблицы позиций:
+  amount = Σ (cena_brutto_pozycji) ИЛИ Σ (ilość × cena_jednostkowa_brutto).
+  Если таблица VAT-разбивки в нижнем правом углу содержит "Razem"-строку
+  с колонками Netto + VAT + Brutto — Brutto это твой amount.
+  amount = 0 / null допустим ТОЛЬКО если документ это zaproszenie /
+  uwaga / письмо без денежных полей вообще.
+
 ANTI-FLUFF: не комментируй, не объясняй, не оборачивай в \`\`\`json
 fences — только raw JSON.
 
