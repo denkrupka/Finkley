@@ -397,14 +397,30 @@ async function syncWfirmaToFinkley(
   }
   const categoryCache = new Map<string, string | null>()
 
-  // Bulk-load уже импортированных wFirma id чтобы не бить detail-fetch на каждый
-  const { data: alreadyImported } = await admin
-    .from('expenses')
-    .select('external_id')
-    .eq('salon_id', salonId)
-    .eq('source', 'wfirma')
-    .is('deleted_at', null)
+  // Bulk-load уже импортированных wFirma id чтобы не бить detail-fetch
+  // на каждый. ДЕДУП ИЗ ОБЕИХ ТАБЛИЦ: expenses (для оплаченных) +
+  // scheduled_payments (для неоплаченных). Без второй части неоплаченные
+  // фактуры бесконечно скипались как dup_scheduled_payment (та же
+  // проблема что я фиксил в ksef-proxy).
+  const [{ data: alreadyExpenses }, { data: alreadyScheduled }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'wfirma')
+      .is('deleted_at', null),
+    admin
+      .from('scheduled_payments')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'wfirma')
+      .not('external_id', 'is', null),
+  ])
   const importedSet = new Set<string>()
+  for (const r of (alreadyScheduled ?? []) as Array<{ external_id: string | null }>) {
+    if (r.external_id) importedSet.add(r.external_id)
+  }
+  const alreadyImported = alreadyExpenses
   for (const r of alreadyImported ?? []) {
     if (r.external_id) importedSet.add(r.external_id)
   }

@@ -219,15 +219,29 @@ async function syncFakturowniaToFinkley(
     return d.toISOString().slice(0, 10)
   })()
 
-  // Bulk-load already imported Fakturownia ids
-  const { data: alreadyImported } = await admin
-    .from('expenses')
-    .select('external_id')
-    .eq('salon_id', salonId)
-    .eq('source', 'fakturownia')
-    .is('deleted_at', null)
+  // Bulk-load already imported Fakturownia ids. Dedup из ОБЕИХ таблиц
+  // (expenses + scheduled_payments) — тот же фикс что в ksef-proxy и
+  // wfirma-proxy. Без scheduled_payments неоплаченные фактуры бесконечно
+  // ловили UNIQUE-violation как dup_scheduled_payment.
+  const [{ data: alreadyExpenses }, { data: alreadyScheduled }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'fakturownia')
+      .is('deleted_at', null),
+    admin
+      .from('scheduled_payments')
+      .select('external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'fakturownia')
+      .not('external_id', 'is', null),
+  ])
   const importedSet = new Set<string>()
-  for (const r of alreadyImported ?? []) {
+  for (const r of (alreadyExpenses ?? []) as Array<{ external_id: string | null }>) {
+    if (r.external_id) importedSet.add(r.external_id)
+  }
+  for (const r of (alreadyScheduled ?? []) as Array<{ external_id: string | null }>) {
     if (r.external_id) importedSet.add(r.external_id)
   }
 
