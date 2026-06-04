@@ -253,7 +253,8 @@ async function syncFakturowniaToFinkley(
     for (const ex of list.expenses) {
       const externalId = String(ex.id)
       if (importedSet.has(externalId)) {
-        stats.expenses_skipped++
+        // Уже импортирована — не считаем как skip (см. ksef-proxy фикс
+        // 04.06). Иначе «Пропущено N» растёт каждый sync.
         continue
       }
       if (!ex.amount || ex.amount <= 0) {

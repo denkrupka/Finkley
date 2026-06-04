@@ -411,7 +411,9 @@ async function syncWfirmaToFinkley(
 
   for (const ex of list.expenses) {
     if (importedSet.has(ex.id)) {
-      stats.expenses_skipped++
+      // Уже импортирована — это норма, не считаем как skip. Иначе
+      // «Пропущено N» растёт каждый sync на длину окна и пугает
+      // владельца. Реальные skip-ы (no_amount, dup_in_db) ниже остаются.
       continue
     }
     // Пытаемся вытащить детали (для contractor.nip и ksef_id) — если не
