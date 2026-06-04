@@ -972,36 +972,40 @@ export function ExpensesPage({
                             </span>
                             {exportMode || isPickerMode ? null : (
                               <div className="flex items-center gap-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!hasOpenShift) {
-                                      setGateOpen(true)
-                                      return
-                                    }
-                                    setEditingPayment(p)
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                                >
-                                  <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                                  {t('expenses.tabs.btn_pay')}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!confirm(t('finance.payments.confirm_delete'))) return
-                                    deleteScheduled.mutate(p.id, {
-                                      onSuccess: () =>
-                                        toast.success(t('finance.payments.toast_deleted')),
-                                    })
-                                  }}
-                                  className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
-                                  aria-label="delete"
-                                >
-                                  <Trash2 className="size-4" strokeWidth={1.7} />
-                                </button>
+                                {canEditPending ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (!hasOpenShift) {
+                                          setGateOpen(true)
+                                          return
+                                        }
+                                        setEditingPayment(p)
+                                      }}
+                                      className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                      <CheckCircle2 className="size-3.5" strokeWidth={2} />
+                                      {t('expenses.tabs.btn_pay')}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (!confirm(t('finance.payments.confirm_delete'))) return
+                                        deleteScheduled.mutate(p.id, {
+                                          onSuccess: () =>
+                                            toast.success(t('finance.payments.toast_deleted')),
+                                        })
+                                      }}
+                                      className="text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-md"
+                                      aria-label="delete"
+                                    >
+                                      <Trash2 className="size-4" strokeWidth={1.7} />
+                                    </button>
+                                  </>
+                                ) : null}
                               </div>
                             )}
                           </li>
@@ -1348,7 +1352,7 @@ export function ExpensesPage({
                             <Eye className="size-4" strokeWidth={1.7} />
                           </button>
                         ) : null}
-                        {isPickerMode ? null : (
+                        {isPickerMode || !canEditPaid ? null : (
                           <button
                             type="button"
                             onClick={() => {
