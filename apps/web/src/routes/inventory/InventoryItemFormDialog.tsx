@@ -38,11 +38,20 @@ type Props = {
   salonId: string
   currency: string
   item?: InventoryItemRow | null
+  /** T36 — read-only: скрывает Submit, показывает warning. */
+  readOnly?: boolean
 }
 
 const COMMON_UNITS = ['шт', 'мл', 'г', 'л', 'кг', 'м']
 
-export function InventoryItemFormDialog({ open, onClose, salonId, currency, item }: Props) {
+export function InventoryItemFormDialog({
+  open,
+  onClose,
+  salonId,
+  currency,
+  item,
+  readOnly = false,
+}: Props) {
   const { t } = useTranslation()
   const create = useCreateInventoryItem(salonId)
   const update = useUpdateInventoryItem(salonId)
@@ -493,9 +502,19 @@ export function InventoryItemFormDialog({ open, onClose, salonId, currency, item
         </form>
 
         <DialogFooter>
-          <Button type="button" size="lg" onClick={save} disabled={pending}>
-            {pending ? t('common.loading') : isEdit ? t('common.save') : t('inventory.form.create')}
-          </Button>
+          {readOnly ? (
+            <p className="text-muted-foreground w-full text-center text-xs">
+              ⚠ Просмотр без редактирования. Попроси администратора дать тебе права.
+            </p>
+          ) : (
+            <Button type="button" size="lg" onClick={save} disabled={pending}>
+              {pending
+                ? t('common.loading')
+                : isEdit
+                  ? t('common.save')
+                  : t('inventory.form.create')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

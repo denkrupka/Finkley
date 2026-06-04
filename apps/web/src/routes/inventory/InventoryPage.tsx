@@ -342,6 +342,7 @@ export function InventoryPage() {
         onClose={() => setCreateOpen(false)}
         salonId={salonId}
         currency={currency}
+        readOnly={!canEdit}
       />
 
       <InventoryOcrDialog
