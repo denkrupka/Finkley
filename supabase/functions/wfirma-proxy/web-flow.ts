@@ -180,32 +180,51 @@ export async function generateApiKeyViaWebFlow(
     return { ok: false, reason: 'wfirma_login_failed' }
   }
 
-  // Step 3: GET /user_companies/indexTable — find company_id
-  res = await fetch('https://wfirma.pl/user_companies/indexTable', {
+  // Step 3: GET /start — единый endpoint для всех 3 кейсов (KIKI bot reference,
+  // owner 05.06). Раньше использовали /user_companies/indexTable — он
+  // оказался устаревшим / не возвращал нужный HTML.
+  //
+  // Что встретим на /start после login:
+  //   (а) Single-company аккаунт → HTML с wf_token в data-token / wfToken
+  //       (готовая сессия, не нужен picker)
+  //   (б) Multi-company → редирект на /user_companies/index, в HTML
+  //       будут <a href="/user_companies/login/{id}">…</a> или
+  //       <a href="/user_companies/setActive/{id}">…</a>
+  //   (в) Detect: маркеры "wybranej firmy", "\/user_companies", и т.д.
+  res = await fetch('https://wfirma.pl/start', {
     method: 'GET',
-    headers: {
-      'User-Agent': UA,
-      'X-Requested-With': 'XMLHttpRequest',
-      Cookie: cookieHeader(jar),
-    },
+    redirect: 'follow',
+    headers: { 'User-Agent': UA, Accept: 'text/html', Cookie: cookieHeader(jar) },
   })
   parseSetCookie(res.headers, jar)
-  const companiesHtml = await res.text()
+  const startHtml = await res.text()
 
-  // Каскад regex для парсинга. wFirma периодически меняет HTML/CSS-классы,
-  // поэтому пробуем по убыванию специфичности.
-  const companies = parseCompaniesFromHtml(companiesHtml)
+  // pickerMarker — маркеры что на /start пришла страница выбора фирмы.
+  // Если их нет — может быть single-company (token прямо в HTML). Но без
+  // companyId Step 6 не пройдёт (CompanyContext[company_id] обязателен),
+  // поэтому всё равно парсим companies и в worst case возвращаем ошибку
+  // с понятным маркером (а не молча ломаемся в Step 6).
+  const pickerMarker =
+    startHtml.includes('"here":"\\/user_companies"') ||
+    startHtml.includes('user_companies/index') ||
+    startHtml.includes('wybranej firmy')
+
+  const companies = parseCompaniesFromHtml(startHtml)
   if (companies.length === 0) {
     // Логируем БОЛЬШЕ HTML — wFirma периодически меняют структуру и без
-    // sample невозможно сложить новый regex (owner-feedback 04.06: 2 фирмы
-    // в кабинете, парсер вернул 0). Прокидываем в details чтобы попасть в
-    // edge function logs + UI «прокинь скрин ошибки».
-    const sample = companiesHtml.slice(0, 1500).replace(/\s+/g, ' ')
-    console.warn('wfirma: no companies parsed, html sample:', sample)
+    // sample невозможно сложить новый regex. Owner-feedback 04.06: 2
+    // фирмы в кабинете, парсер вернул 0. Также маркер пикера для дебага.
+    const sample = startHtml.slice(0, 1500).replace(/\s+/g, ' ')
+    console.warn(
+      'wfirma: no companies parsed, picker_marker:',
+      pickerMarker,
+      'html sample:',
+      sample,
+    )
     return {
       ok: false,
       reason: 'wfirma_no_companies',
-      details: `parser_no_match. HTML sample (1500ch): ${sample}`,
+      details: `parser_no_match. picker_marker=${pickerMarker}. HTML sample (1500ch): ${sample}`,
     }
   }
   // Если фирм несколько — UI должен показать селектор. Возвращаем список
@@ -226,17 +245,48 @@ export async function generateApiKeyViaWebFlow(
   const companyId = chosen.id
   const companyName = chosen.name
 
-  // Step 4: GET /user_companies/login/{company_id} — enter company, parse X-Wf-Token
+  // Step 4: GET /user_companies/login/{company_id} — выбор фирмы. KIKI bot
+  // reference: иногда `/login/{id}` не отрабатывает (302 без cookies), тогда
+  // фолбэк на `/setActive/{id}`. Затем GET /start ещё раз — теперь без
+  // пикера, с финальным wf_token.
   res = await fetch(`https://wfirma.pl/user_companies/login/${companyId}`, {
     method: 'GET',
     redirect: 'follow',
     headers: { 'User-Agent': UA, Cookie: cookieHeader(jar) },
   })
   parseSetCookie(res.headers, jar)
-  const enterHtml = await res.text()
-  const wfToken = extractDataToken(enterHtml)
+  let enterHtml = await res.text()
+  let wfToken = extractDataToken(enterHtml)
+
+  // Если /login/{id} не дал token — пробуем /setActive/{id} (alternative endpoint).
   if (!wfToken) {
-    return { ok: false, reason: 'wfirma_form_changed', details: 'no data-token after enter' }
+    res = await fetch(`https://wfirma.pl/user_companies/setActive/${companyId}`, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { 'User-Agent': UA, Cookie: cookieHeader(jar) },
+    })
+    parseSetCookie(res.headers, jar)
+    await res.text()
+  }
+
+  // Step 4b: GET /start ещё раз — финальный recheck, забираем wf_token.
+  if (!wfToken) {
+    res = await fetch('https://wfirma.pl/start', {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { 'User-Agent': UA, Accept: 'text/html', Cookie: cookieHeader(jar) },
+    })
+    parseSetCookie(res.headers, jar)
+    enterHtml = await res.text()
+    wfToken = extractDataToken(enterHtml)
+  }
+
+  if (!wfToken) {
+    return {
+      ok: false,
+      reason: 'wfirma_form_changed',
+      details: 'no data-token after enter+setActive+start',
+    }
   }
 
   // Step 5: GET /api_user_keys/add/ — fetch create-key form, get fresh token
