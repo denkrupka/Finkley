@@ -1029,6 +1029,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         salonId={salonId}
         currency={salon?.currency ?? 'PLN'}
         initialView="charge"
+        readOnly={!can('income', 'visits', 'edit')}
         onBackFromCharge={(v) => {
           setChargeVisit(null)
           setQuickEditVisit(v)

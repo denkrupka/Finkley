@@ -267,6 +267,7 @@ export function VisitsPage({
             onClose={() => setChargeVisit(null)}
             salonId={salonId}
             currency={currency}
+            readOnly={visitsReadOnly}
           />
           {null /* helpers below */}
 

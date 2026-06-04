@@ -73,6 +73,7 @@ export function VisitDetailModal({
   onClose,
   initialView,
   onBackFromCharge,
+  readOnly = false,
 }: {
   visit: VisitRow | null
   salonId: string
@@ -84,10 +85,15 @@ export function VisitDetailModal({
    *  вкладочный UI), а закрывает модалку и передаёт управление родителю.
    *  Родитель обычно открывает QuickEntryModal в edit-режиме для этого визита. */
   onBackFromCharge?: (visit: VisitRow) => void
+  /** T36 — read-only: скрывает «Рассчитать» и edit-actions, оставляет
+   *  просмотр данных визита. */
+  readOnly?: boolean
 }) {
   const { t } = useTranslation()
+  // T36 — при readOnly запрещаем переход в charge/document/next-visit.
+  // initialView='charge' игнорируется, фиксируем view='detail'.
   const [view, setView] = useState<'detail' | 'charge' | 'document' | 'next-visit'>(
-    initialView ?? 'detail',
+    readOnly ? 'detail' : (initialView ?? 'detail'),
   )
   const [gateOpen, setGateOpen] = useState(false)
   const [tab, setTab] = useState<'wizyta' | 'info'>('wizyta')
@@ -229,6 +235,7 @@ export function VisitDetailModal({
               }
             }}
             onChargeClick={() => {
+              if (readOnly) return // T36 — нет прав расчёта
               if (!hasOpenShiftTop) {
                 setGateOpen(true)
                 return
