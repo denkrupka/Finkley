@@ -807,9 +807,12 @@ async function applyBankTxRules(
       continue
     }
 
-    // credit-tx: создаём other_income с категорией из правила.
-    // applies_to=income означает что category_id указывает на
-    // other_income_categories (см. ADR-031 + UI BankRuleEditDialog).
+    // credit-tx + set_category: создаём other_income только если правило
+    // явно income-only (applies_to='income'). Для applies_to='both' UI
+    // показывает expense_categories, и category_id указывает туда — на
+    // other_incomes.category_id (FK на other_income_categories) это
+    // вызвало бы FK violation. Безопасно пропускаем.
+    if (matched.applies_to !== 'income') continue
     const { data: dupesInc } = await admin
       .from('other_incomes')
       .select('id')

@@ -116,19 +116,23 @@ export function BankRuleEditDialog({
   // правила в какую таблицу класть результат.
   const activeCategories = appliesTo === 'income' ? incomeCategoriesData : expenseCategoriesData
 
-  // При переключении applies_to сбрасываем category_id в set_category-
-  // actions: id из другой таблицы не валиден. Юзер заново выбирает.
-  useEffect(() => {
+  // При ЮЗЕРСКОМ переключении applies_to (через пилл-кнопку, не при
+  // hydration существующего правила) — сбрасываем category_id в set_category-
+  // actions: id из другой таблицы не валиден. handleAppliesToChange ниже
+  // вызывает это явно. useEffect для этого НЕ годится: он сработает после
+  // hydration setAppliesTo(rule.applies_to) и затрёт правильные category_id
+  // существующего income-правила первой категорией из activeCategories.
+  function handleAppliesToChange(next: RuleAppliesTo) {
+    if (next === appliesTo) return
+    setAppliesTo(next)
+    const nextCategories = next === 'income' ? incomeCategoriesData : expenseCategoriesData
     setActions((arr) =>
       arr.map((a) => {
         if (a.type !== 'set_category') return a
-        return { type: 'set_category', category_id: activeCategories[0]?.id ?? '' }
+        return { type: 'set_category', category_id: nextCategories[0]?.id ?? '' }
       }),
     )
-    // applies_to — единственный триггер, activeCategories пересчитывается
-    // как side-effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliesTo])
+  }
 
   function addAction() {
     const first = activeCategories[0]
@@ -232,13 +236,16 @@ export function BankRuleEditDialog({
               Правило будет применяться для:
             </p>
             <div className="flex gap-2">
-              <Pill active={appliesTo === 'income'} onClick={() => setAppliesTo('income')}>
+              <Pill active={appliesTo === 'income'} onClick={() => handleAppliesToChange('income')}>
                 Доход
               </Pill>
-              <Pill active={appliesTo === 'expense'} onClick={() => setAppliesTo('expense')}>
+              <Pill
+                active={appliesTo === 'expense'}
+                onClick={() => handleAppliesToChange('expense')}
+              >
                 Расход
               </Pill>
-              <Pill active={appliesTo === 'both'} onClick={() => setAppliesTo('both')}>
+              <Pill active={appliesTo === 'both'} onClick={() => handleAppliesToChange('both')}>
                 Оба
               </Pill>
             </div>
