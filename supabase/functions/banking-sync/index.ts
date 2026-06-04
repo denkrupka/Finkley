@@ -694,9 +694,15 @@ async function applyBankTxRules(
   const rulesList = (rulesRaw ?? []) as BankTxRuleRow[]
   if (rulesList.length === 0) return
 
-  // Все НЕ обработанные tx салона за 90 дней. credit-tx без expense_id
-  // или is_personal — это новые поступления, к ним применимы applies_to=income.
-  // debit-tx с expense_id=null, is_personal=false — новые списания.
+  // Все НЕ обработанные tx салона за 90 дней.
+  //
+  // Фильтры по всем 3 связям (expense_id / linked_visit_id /
+  // linked_other_income_id): если tx уже связана с чем-либо (автоматчер
+  // отработал раньше, либо ручной linking), правила к ней не применяем.
+  // Без фильтра по linked_*-полям мы могли бы попытаться создать
+  // other_income для credit-tx уже связанной с визитом → CHECK constraint
+  // bank_transactions_one_income_link (только одна из {visit,
+  // other_income}) упал бы с 23514.
   const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
   const { data: txs } = await admin
     .from('bank_transactions')
@@ -705,6 +711,8 @@ async function applyBankTxRules(
        bank_accounts!inner ( bank_connections!inner ( salon_id ) )`,
     )
     .is('expense_id', null)
+    .is('linked_visit_id', null)
+    .is('linked_other_income_id', null)
     .eq('is_personal', false)
     .gte('executed_at', since)
     .eq('bank_accounts.bank_connections.salon_id', salonId)
