@@ -1459,6 +1459,7 @@ export function ExpensesPage({
         onOpenChange={setFormOpen}
         salonId={salonId}
         currency={currency}
+        readOnly={tab === 'pending' ? !canEditPending : !canEditPaid}
       />
 
       <ExpenseFormModal
@@ -1467,6 +1468,7 @@ export function ExpensesPage({
         salonId={salonId}
         currency={currency}
         expense={editingExpense}
+        readOnly={!canEditPaid}
       />
 
       {/* Оплата запланированного платежа из таба «Не оплачено» */}
@@ -1477,6 +1479,7 @@ export function ExpensesPage({
         currency={currency}
         mode="planned-paying"
         existingPayment={editingPayment}
+        readOnly={!canEditPending}
       />
 
       {/* T31 — модалки источника комиссии: визит или прочий доход.

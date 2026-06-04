@@ -290,6 +290,10 @@ type Props = {
     description: string
     counterparty_hint: string | null
   } | null
+  /** Read-only mode: скрывает Submit-кнопку и показывает warning
+   *  «Просмотр без редактирования». Передаётся снаружи если у юзера нет
+   *  edit-permission на текущей подкатегории (paid/pending). */
+  readOnly?: boolean
 }
 
 export function ExpenseFormModal({
@@ -303,6 +307,7 @@ export function ExpenseFormModal({
   defaultDate,
   prefillFromBankTx,
   existingPayment,
+  readOnly = false,
 }: Props) {
   const isVatPayer = useIsVatPayer(salonId)
   const { data: salonData } = useSalon(salonId)
@@ -1011,6 +1016,12 @@ export function ExpenseFormModal({
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
+          {readOnly ? (
+            <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              ⚠ <strong>Просмотр без редактирования.</strong> У тебя нет прав изменять расходы.
+              Попроси администратора салона дать тебе доступ в Настройках → Команда.
+            </div>
+          ) : null}
           {/* Переключатель «Оплачено / Не оплачено» — для нового расхода (вкладка
               «Расходы») и нового платежа (календарь). Дефолт paid=true для expense
               и false для planned-new. В planned-paying скрыт (фиксирован paid).
@@ -1763,21 +1774,23 @@ export function ExpenseFormModal({
             видна без скролла к концу формы на iPhone (375-414px). Форма
             длинная (40+ полей) — иначе кнопка теряется. */}
         <DialogFooter sticky>
-          <Button
-            type="button"
-            size="lg"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={createExpense.isPending || uploading}
-            data-testid="exp-submit"
-          >
-            {createExpense.isPending || uploading
-              ? t('common.loading')
-              : mode === 'planned-paying'
-                ? t('expenses.form.submit_pay')
-                : !paid
-                  ? t('expenses.form.submit_planned')
-                  : t('expenses.form.submit')}
-          </Button>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              size="lg"
+              onClick={form.handleSubmit(onSubmit)}
+              disabled={createExpense.isPending || uploading}
+              data-testid="exp-submit"
+            >
+              {createExpense.isPending || uploading
+                ? t('common.loading')
+                : mode === 'planned-paying'
+                  ? t('expenses.form.submit_pay')
+                  : !paid
+                    ? t('expenses.form.submit_planned')
+                    : t('expenses.form.submit')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
 
