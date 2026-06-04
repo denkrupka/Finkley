@@ -45,6 +45,8 @@ type Props = {
   salonId: string
   currency: string
   income: OtherIncomeRow | null
+  /** T36 — read-only mode: скрывает Submit/Delete, показывает warning. */
+  readOnly?: boolean
 }
 
 /**
@@ -53,7 +55,14 @@ type Props = {
  * для прочих доходов своя форма с категорией / суммой / способом оплаты /
  * кассой / датой / комментарием).
  */
-export function OtherIncomeEditModal({ open, onClose, salonId, currency, income }: Props) {
+export function OtherIncomeEditModal({
+  open,
+  onClose,
+  salonId,
+  currency,
+  income,
+  readOnly = false,
+}: Props) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const update = useUpdateOtherIncome(salonId)
@@ -369,22 +378,34 @@ export function OtherIncomeEditModal({ open, onClose, salonId, currency, income 
         />
 
         <DialogFooter className="border-border shrink-0 justify-between border-t px-5 py-3 sm:justify-between">
-          <Button
-            variant="ghost"
-            onClick={handleDelete}
-            disabled={remove.isPending || update.isPending}
-            className="text-destructive hover:text-destructive"
-          >
-            {t('common.delete')}
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={update.isPending}>
-              {t('common.cancel')}
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={update.isPending}>
-              {update.isPending ? <Loader2 className="size-4 animate-spin" /> : t('common.save')}
-            </Button>
-          </div>
+          {readOnly ? (
+            <p className="text-muted-foreground w-full text-center text-xs">
+              ⚠ Просмотр без редактирования. Попроси администратора дать тебе права.
+            </p>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                onClick={handleDelete}
+                disabled={remove.isPending || update.isPending}
+                className="text-destructive hover:text-destructive"
+              >
+                {t('common.delete')}
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} disabled={update.isPending}>
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="primary" onClick={handleSave} disabled={update.isPending}>
+                  {update.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    t('common.save')
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

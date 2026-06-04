@@ -36,6 +36,7 @@ import {
 } from '@/hooks/useOtherIncomes'
 import { OtherIncomeEditModal } from '@/routes/income/OtherIncomeEditModal'
 import { usePaymentMethods } from '@/hooks/usePaymentMethods'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { useStaff } from '@/hooks/useStaff'
 import {
@@ -117,6 +118,7 @@ export function SalesTab({
   const [quickEditVisit, setQuickEditVisit] = useState<VisitRow | null>(null)
   const [editingOther, setEditingOther] = useState<OtherIncomeRow | null>(null)
 
+  const { can } = usePermissions(salonId)
   const { data: sales = [], isLoading } = useVisits(salonId, range, {
     kind: 'retail',
     staffId: staffFilter || null,
@@ -568,6 +570,7 @@ export function SalesTab({
         salonId={salonId}
         currency={currency}
         income={editingOther}
+        readOnly={!can('income', 'other', 'edit')}
       />
 
       <CashGateRequiredDialog
