@@ -40,7 +40,9 @@ type Props = {
  */
 export function EmailConnectDialog({ open, salonId, onClose }: Props) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<'oauth' | 'smtp'>('smtp')
+  // Owner-feedback 04.06: дефолт — Gmail OAuth (юзер один клик
+  // авторизуется). SMTP/IMAP — fallback для не-Gmail или ручной настройки.
+  const [tab, setTab] = useState<'oauth' | 'smtp'>('oauth')
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     smtpHost: 'smtp.gmail.com',
@@ -127,7 +129,13 @@ export function EmailConnectDialog({ open, salonId, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:!max-w-[560px]">
+      {/* Owner-feedback 04.06: на длинной SMTP-форме футер уезжал за viewport.
+          max-h-[90vh] здесь override'ил умолчание Dialog (calc(100dvh-2rem))
+          и был БОЛЬШЕ доступной высоты на ноутах с открытым devtools/панелью
+          задач. Убираю override — пусть Dialog сам ограничит по 100dvh-2rem;
+          расширяю ширину до 720px чтобы 4 SMTP/IMAP инпута в 2 колонки
+          занимали меньше вертикали. */}
+      <DialogContent className="flex flex-col gap-0 p-0 sm:!max-w-[720px]">
         <div className="border-border shrink-0 border-b px-5 py-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
