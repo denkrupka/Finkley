@@ -548,7 +548,8 @@ export function useMarkConversationRead(salonId: string | undefined) {
 }
 
 export function useMessengerIntegrations(salonId: string | undefined) {
-  return useQuery<MessengerIntegration[]>({
+  const qc = useQueryClient()
+  const query = useQuery<MessengerIntegration[]>({
     queryKey: ['messenger-integrations', salonId],
     queryFn: async () => {
       if (!salonId) return []
@@ -564,6 +565,36 @@ export function useMessengerIntegrations(salonId: string | undefined) {
     enabled: !!salonId,
     staleTime: 60_000,
   })
+  // Auto-refresh FB display_name если он плейсхолдер "FB Page 094903"
+  // (старый script записывал last-6 digits ID вместо настоящего имени).
+  // One-shot: после успешного refresh — invalidate.
+  useEffect(() => {
+    if (!salonId || !query.data) return
+    const fb = query.data.find(
+      (i) => i.channel === 'facebook' && /^FB Page \d{4,8}$/.test(i.display_name ?? ''),
+    )
+    if (!fb) return
+    void (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession()
+        const token = sess?.session?.access_token
+        if (!token) return
+        const url =
+          (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '') +
+          `/functions/v1/fb-oauth-callback?action=refresh_display_name&salon_id=${salonId}`
+        const r = await fetch(url, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (r.ok) {
+          qc.invalidateQueries({ queryKey: ['messenger-integrations', salonId] })
+        }
+      } catch {
+        /* noop */
+      }
+    })()
+  }, [salonId, query.data, qc])
+  return query
 }
 
 /** Создаёт internal-conversation для теста UI без подключённых каналов. */

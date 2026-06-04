@@ -22,7 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { encryptSecret } from '../_shared/crypto-aes.ts'
+import { decryptSecret, encryptSecret } from '../_shared/crypto-aes.ts'
 import { signOAuthState, verifyOAuthState } from '../_shared/oauth-state.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -99,6 +99,53 @@ Deno.serve(async (req) => {
     authorize.searchParams.set('state', state)
 
     return jsonResponse({ authorize_url: authorize.toString() })
+  }
+
+  // -------------------------------------------------------------------------
+  // Mode 1b: refresh_display_name
+  // Owner-feedback 04.06: на карточке FB Messenger показывался техн.
+  // плейсхолдер "FB Page 094903" вместо реального имени Page. Этот action
+  // дёргает Graph API через сохранённый page token и обновляет display_name.
+  // -------------------------------------------------------------------------
+  if (action === 'refresh_display_name') {
+    const salonId = url.searchParams.get('salon_id')
+    if (!salonId) return jsonResponse({ error: 'missing_salon_id' }, 400)
+    const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
+    if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
+    const m = await getSalonMembership(SUPABASE_URL, SERVICE_KEY, user.userId, salonId)
+    if (!m || !['owner', 'admin'].includes(m.role)) {
+      return jsonResponse({ error: 'forbidden' }, 403)
+    }
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const { data: integ } = await admin
+      .from('messenger_integrations')
+      .select('credentials, external_account_id')
+      .eq('salon_id', salonId)
+      .eq('channel', 'facebook')
+      .maybeSingle()
+    if (!integ) return jsonResponse({ error: 'not_connected' }, 404)
+    const creds = (integ as { credentials?: { page_access_enc?: string } }).credentials
+    if (!creds?.page_access_enc) return jsonResponse({ error: 'no_page_token' }, 400)
+    try {
+      const pageToken = await decryptSecret(creds.page_access_enc)
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/me?fields=name&access_token=${encodeURIComponent(pageToken)}`,
+      )
+      const json = (await r.json()) as { name?: string; error?: { message: string } }
+      if (!r.ok || !json.name) {
+        return jsonResponse({ error: json.error?.message ?? 'graph_failed' }, 502)
+      }
+      await admin
+        .from('messenger_integrations')
+        .update({ display_name: json.name, updated_at: new Date().toISOString() })
+        .eq('salon_id', salonId)
+        .eq('channel', 'facebook')
+      return jsonResponse({ ok: true, display_name: json.name })
+    } catch (e) {
+      return jsonResponse({ error: (e as Error).message }, 500)
+    }
   }
 
   // -------------------------------------------------------------------------
