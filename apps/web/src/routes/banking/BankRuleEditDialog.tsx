@@ -19,6 +19,7 @@ import {
   type BankTxRule,
 } from '@/hooks/useBankTxRules'
 import { useExpenseCategories } from '@/hooks/useExpenses'
+import { useOtherIncomeCategories } from '@/hooks/useOtherIncomes'
 import {
   BankTxRuleInputSchema,
   ruleNumberFields,
@@ -57,7 +58,8 @@ export function BankRuleEditDialog({
   /** undefined → create-mode, иначе edit-mode. */
   rule: BankTxRule | undefined
 }) {
-  const { data: categories = [] } = useExpenseCategories(salonId)
+  const { data: expenseCategoriesData = [] } = useExpenseCategories(salonId)
+  const { data: incomeCategoriesData = [] } = useOtherIncomeCategories(salonId)
   const create = useCreateBankTxRule(salonId)
   const update = useUpdateBankTxRule(salonId)
   const del = useDeleteBankTxRule(salonId)
@@ -108,27 +110,33 @@ export function BankRuleEditDialog({
     )
   }
 
-  // При переключении applies_to на 'income' банковский матчер пропускает
-  // set_category-actions (категории доходов хранятся в other_income_categories,
-  // не expense_categories). Удаляем такие actions молча — иначе юзер видит
-  // лежащую категорию и думает что она применится.
+  // Активный набор категорий зависит от applies_to. set_category хранит
+  // UUID; для income это id из other_income_categories, для expense —
+  // из expense_categories. Banking-sync edge function знает по applies_to
+  // правила в какую таблицу класть результат.
+  const activeCategories = appliesTo === 'income' ? incomeCategoriesData : expenseCategoriesData
+
+  // При переключении applies_to сбрасываем category_id в set_category-
+  // actions: id из другой таблицы не валиден. Юзер заново выбирает.
   useEffect(() => {
-    if (appliesTo === 'income') {
-      setActions((arr) => arr.filter((a) => a.type !== 'set_category'))
-    }
+    setActions((arr) =>
+      arr.map((a) => {
+        if (a.type !== 'set_category') return a
+        return { type: 'set_category', category_id: activeCategories[0]?.id ?? '' }
+      }),
+    )
+    // applies_to — единственный триггер, activeCategories пересчитывается
+    // как side-effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliesTo])
 
   function addAction() {
-    if (appliesTo === 'income') {
+    const first = activeCategories[0]
+    if (!first) {
       setActions((arr) => [...arr, { type: 'set_counterparty', counterparty: '' }])
-    } else {
-      const first = categories[0]
-      if (!first) {
-        setActions((arr) => [...arr, { type: 'set_counterparty', counterparty: '' }])
-        return
-      }
-      setActions((arr) => [...arr, { type: 'set_category', category_id: first.id }])
+      return
     }
+    setActions((arr) => [...arr, { type: 'set_category', category_id: first.id }])
   }
   function removeAction(idx: number) {
     setActions((arr) => arr.filter((_, i) => i !== idx))
@@ -257,8 +265,11 @@ export function BankRuleEditDialog({
               <ActionRow
                 key={idx}
                 action={a}
-                categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-                allowCategoryAction={appliesTo !== 'income'}
+                categories={activeCategories
+                  .filter(
+                    (c) => !(c.is_system && (c.name === 'Комиссии' || c.name === 'БЕЗ КАТЕГОРИИ')),
+                  )
+                  .map((c) => ({ id: c.id, name: c.name }))}
                 onChange={(next) => patchAction(idx, next)}
                 onRemove={() => removeAction(idx)}
               />
@@ -502,15 +513,11 @@ const ACTION_TYPE_LABELS_RU: Record<RuleAction['type'], string> = {
 function ActionRow({
   action,
   categories,
-  allowCategoryAction,
   onChange,
   onRemove,
 }: {
   action: RuleAction
   categories: { id: string; name: string }[]
-  /** false для applies_to='income': set_category пропускается матчером
-   *  (категории доходов хранятся отдельно), не предлагаем юзеру. */
-  allowCategoryAction: boolean
   onChange: (next: RuleAction) => void
   onRemove: () => void
 }) {
@@ -523,9 +530,7 @@ function ActionRow({
       onChange({ type: 'ignore' })
     }
   }
-  const availableTypes = allowCategoryAction
-    ? (['set_category', 'set_counterparty', 'ignore'] as const)
-    : (['set_counterparty', 'ignore'] as const)
+  const availableTypes = ['set_category', 'set_counterparty', 'ignore'] as const
 
   return (
     <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">

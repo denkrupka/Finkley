@@ -1,10 +1,15 @@
-import { Edit3, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Edit3, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { useBankTxRules, useToggleBankTxRule, type BankTxRule } from '@/hooks/useBankTxRules'
+import {
+  useBankTxRules,
+  useToggleBankTxRule,
+  useUpdateBankTxRule,
+  type BankTxRule,
+} from '@/hooks/useBankTxRules'
 import { formatExpenseDate } from '@/lib/utils/format-date'
 
 import { BankRuleEditDialog } from './BankRuleEditDialog'
@@ -14,6 +19,8 @@ import { BankRuleEditDialog } from './BankRuleEditDialog'
  *
  * Кнопка «Добавить» открывает пустой редактор. Карандаш у строки — редактор
  * с существующим правилом. Тоггл вкл/выкл апдейтит enabled инлайн.
+ * Стрелочки вверх/вниз меняют sort_order — приоритет применения правила
+ * matcher'ом banking-sync. Без DnD — стрелочки работают и на mobile.
  */
 export function BankRulesDialog({
   salonId,
@@ -26,6 +33,7 @@ export function BankRulesDialog({
 }) {
   const { data: rules = [], isLoading } = useBankTxRules(salonId)
   const toggle = useToggleBankTxRule(salonId)
+  const update = useUpdateBankTxRule(salonId)
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState<BankTxRule | undefined>(undefined)
 
@@ -45,6 +53,26 @@ export function BankRulesDialog({
         onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
       },
     )
+  }
+
+  async function move(idx: number, direction: -1 | 1) {
+    const otherIdx = idx + direction
+    if (otherIdx < 0 || otherIdx >= rules.length) return
+    const a = rules[idx]
+    const b = rules[otherIdx]
+    if (!a || !b) return
+    // Если sort_order одинаковый (всё ещё 0 у новых правил) — выставляем
+    // по индексам, чтобы дальнейший swap имел уникальные значения.
+    const aOrder = a.sort_order === b.sort_order ? idx : a.sort_order
+    const bOrder = a.sort_order === b.sort_order ? otherIdx : b.sort_order
+    try {
+      await Promise.all([
+        update.mutateAsync({ id: a.id, patch: { sort_order: bOrder } }),
+        update.mutateAsync({ id: b.id, patch: { sort_order: aOrder } }),
+      ])
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
   }
 
   return (
@@ -81,12 +109,16 @@ export function BankRulesDialog({
                   Пусто. Нажми «Добавить», чтобы создать первое правило.
                 </p>
               ) : (
-                rules.map((r) => (
+                rules.map((r, idx) => (
                   <RuleRow
                     key={r.id}
                     rule={r}
+                    canMoveUp={idx > 0}
+                    canMoveDown={idx < rules.length - 1}
                     onEdit={() => openEdit(r)}
                     onToggle={() => handleToggle(r)}
+                    onMoveUp={() => void move(idx, -1)}
+                    onMoveDown={() => void move(idx, 1)}
                   />
                 ))
               )}
@@ -113,18 +145,43 @@ export function BankRulesDialog({
 
 function RuleRow({
   rule,
+  canMoveUp,
+  canMoveDown,
   onEdit,
   onToggle,
+  onMoveUp,
+  onMoveDown,
 }: {
   rule: BankTxRule
+  canMoveUp: boolean
+  canMoveDown: boolean
   onEdit: () => void
   onToggle: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
 }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5">
-      <span className="text-muted-foreground/60 select-none text-sm" aria-hidden>
-        ≡
-      </span>
+    <div className="flex items-center gap-2 px-3 py-2.5">
+      <div className="flex flex-col">
+        <button
+          type="button"
+          onClick={onMoveUp}
+          disabled={!canMoveUp}
+          className="text-muted-foreground/70 hover:text-foreground disabled:opacity-30"
+          aria-label="вверх"
+        >
+          <ChevronUp className="size-3.5" strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={onMoveDown}
+          disabled={!canMoveDown}
+          className="text-muted-foreground/70 hover:text-foreground disabled:opacity-30"
+          aria-label="вниз"
+        >
+          <ChevronDown className="size-3.5" strokeWidth={2} />
+        </button>
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-foreground truncate text-sm font-semibold">{rule.name}</p>
       </div>

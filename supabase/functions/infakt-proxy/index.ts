@@ -344,7 +344,11 @@ async function runSyncForSalon(
   await recordSyncResult(admin, { salonId, provider: 'infakt', ok: true })
   await admin
     .from('salon_integrations')
-    .update({ status: 'connected', last_sync_stats: stats })
+    .update({
+      status: 'connected',
+      last_sync_stats: stats,
+      last_sync_at: new Date().toISOString(),
+    })
     .eq('salon_id', salonId)
     .eq('provider', 'infakt')
   return { ok: true, stats }

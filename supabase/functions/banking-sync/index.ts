@@ -754,57 +754,96 @@ async function applyBankTxRules(
       continue
     }
 
-    // set_category: только для debit. Для credit пока пропускаем
-    // (создание other_income — отдельный кейс, добавим если будет
-    // нужно).
     const setCategory = matched.actions.find(
       (a): a is { type: 'set_category'; category_id: string } => a.type === 'set_category',
     )
     if (!setCategory) continue
-    if (tx.type !== 'debit') continue
 
-    // Дедуп: похожий expense за ±3 дня с amount ±100 cents.
     const txDate = new Date(tx.executed_at)
     const lo = new Date(txDate.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const hi = new Date(txDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const amtLo = tx.amount_cents - 100
     const amtHi = tx.amount_cents + 100
-    const { data: dupes } = await admin
-      .from('expenses')
+
+    if (tx.type === 'debit') {
+      // Дедуп: похожий expense за ±3 дня с amount ±100 cents.
+      const { data: dupes } = await admin
+        .from('expenses')
+        .select('id')
+        .eq('salon_id', salonId)
+        .gte('expense_at', lo)
+        .lte('expense_at', hi)
+        .gte('amount_cents', amtLo)
+        .lte('amount_cents', amtHi)
+        .is('deleted_at', null)
+        .limit(1)
+      if (dupes && dupes.length > 0) {
+        await admin
+          .from('bank_transactions')
+          .update({ expense_id: dupes[0].id, needs_review: true })
+          .eq('id', tx.id)
+        continue
+      }
+
+      const { data: created } = await admin
+        .from('expenses')
+        .insert({
+          salon_id: salonId,
+          category_id: setCategory.category_id,
+          expense_at: tx.executed_at.slice(0, 10),
+          amount_cents: tx.amount_cents,
+          contractor_name: txCounterparty,
+          description: tx.description,
+          source: 'bank_ai',
+          bank_transaction_id: tx.id,
+          payment_method: 'card',
+          metadata: { rule_id: matched.id, rule_name: matched.name },
+        })
+        .select('id')
+        .single()
+      if (created) {
+        await admin.from('bank_transactions').update({ expense_id: created.id }).eq('id', tx.id)
+      }
+      continue
+    }
+
+    // credit-tx: создаём other_income с категорией из правила.
+    // applies_to=income означает что category_id указывает на
+    // other_income_categories (см. ADR-031 + UI BankRuleEditDialog).
+    const { data: dupesInc } = await admin
+      .from('other_incomes')
       .select('id')
       .eq('salon_id', salonId)
-      .gte('expense_at', lo)
-      .lte('expense_at', hi)
+      .gte('income_at', lo)
+      .lte('income_at', hi)
       .gte('amount_cents', amtLo)
       .lte('amount_cents', amtHi)
-      .is('deleted_at', null)
       .limit(1)
-    if (dupes && dupes.length > 0) {
+    if (dupesInc && dupesInc.length > 0) {
       await admin
         .from('bank_transactions')
-        .update({ expense_id: dupes[0].id, needs_review: true })
+        .update({ linked_other_income_id: dupesInc[0].id, needs_review: true })
         .eq('id', tx.id)
       continue
     }
 
-    const { data: created } = await admin
-      .from('expenses')
+    const { data: createdInc } = await admin
+      .from('other_incomes')
       .insert({
         salon_id: salonId,
         category_id: setCategory.category_id,
-        expense_at: tx.executed_at.slice(0, 10),
+        income_at: tx.executed_at.slice(0, 10),
         amount_cents: tx.amount_cents,
-        contractor_name: txCounterparty,
-        description: tx.description,
-        source: 'bank_ai',
-        bank_transaction_id: tx.id,
-        payment_method: 'card',
-        metadata: { rule_id: matched.id, rule_name: matched.name },
+        comment: [txCounterparty, tx.description].filter(Boolean).join(' · ').slice(0, 500),
+        payment_method: 'transfer',
       })
       .select('id')
       .single()
-    if (created) {
-      await admin.from('bank_transactions').update({ expense_id: created.id }).eq('id', tx.id)
+    if (createdInc) {
+      await admin
+        .from('bank_transactions')
+        .update({ linked_other_income_id: createdInc.id })
+        .eq('id', tx.id)
     }
   }
 }

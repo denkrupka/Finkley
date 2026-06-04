@@ -569,7 +569,14 @@ async function runSyncForSalon(
   await recordSyncResult(admin, { salonId, provider: 'wfirma', ok: true })
   await admin
     .from('salon_integrations')
-    .update({ status: 'connected', last_sync_stats: stats })
+    .update({
+      status: 'connected',
+      last_sync_stats: stats,
+      // Без этого cron видит last_sync_at старым и крутит sync каждые
+      // 2 минуты вместо sync_interval_minutes. Та же проблема была в
+      // ksef-proxy (фикс 04.06).
+      last_sync_at: new Date().toISOString(),
+    })
     .eq('salon_id', salonId)
     .eq('provider', 'wfirma')
 

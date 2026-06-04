@@ -318,6 +318,10 @@ export function CounterpartyEditModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">{t('counterparties.category_none')}</SelectItem>
+                    {/* counterparty_categories — отдельная таблица без
+                        is_system флага; «Комиссии»/«БЕЗ КАТЕГОРИИ» там
+                        не существуют как сущности (это категории расходов,
+                        а не контрагентов), фильтр не нужен. */}
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
