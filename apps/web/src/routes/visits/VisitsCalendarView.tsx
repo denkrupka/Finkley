@@ -25,6 +25,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useClients } from '@/hooks/useClients'
 import { useBooksySyncDay, useSalonIntegrations } from '@/hooks/useIntegrations'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { useServices } from '@/hooks/useServices'
 import { useDeleteStaffBlock, useStaffBlocks, type StaffBlockRow } from '@/hooks/useStaffBlocks'
@@ -91,6 +92,7 @@ function parseHHMM(s: string): number {
 
 export function VisitsCalendarView({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
+  const { can } = usePermissions(salonId)
   // День синхронизирован с URL `?day=YYYY-MM-DD` — это shared state с
   // VisitsActionsBar (кнопка «Синхронизировать»). Если параметра нет —
   // показываем сегодня.
@@ -1121,6 +1123,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         salonId={salonId}
         prefill={reservationPrefill}
         block={editingBlock}
+        readOnly={!can('income', 'visits', 'edit')}
       />
 
       {/* Confirmation после drag-drop переноса визита. Показывает старое

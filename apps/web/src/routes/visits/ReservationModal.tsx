@@ -63,6 +63,8 @@ type Props = {
   prefill: { staffId: string; when: string; endAt?: string } | null
   /** Существующий блок для редактирования/удаления. null при создании. */
   block?: StaffBlockRow | null
+  /** T36 — read-only: скрывает Submit/Delete. */
+  readOnly?: boolean
 }
 
 /**
@@ -75,7 +77,14 @@ type Props = {
  *
  * Поле «Sprzęt» (оборудование) намеренно не моделируется в Finkley.
  */
-export function ReservationModal({ open, onOpenChange, salonId, prefill, block }: Props) {
+export function ReservationModal({
+  open,
+  onOpenChange,
+  salonId,
+  prefill,
+  block,
+  readOnly = false,
+}: Props) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: staff = [] } = useStaff(salonId)
@@ -369,42 +378,50 @@ export function ReservationModal({ open, onOpenChange, salonId, prefill, block }
         </form>
 
         <DialogFooter className="sm:justify-between">
-          {/* В edit-режиме слева — деструктивная кнопка «Удалить»; в create —
-              этот слот пуст, чтобы Сохранить/Отмена остались справа. */}
-          {isEdit ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="lg"
-              onClick={handleDelete}
-              disabled={isPending}
-              className="text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="size-4" strokeWidth={2} />
-              {t('common.delete')}
-            </Button>
+          {readOnly ? (
+            <p className="text-muted-foreground w-full text-center text-xs">
+              ⚠ Просмотр без редактирования. Попроси администратора дать тебе права.
+            </p>
           ) : (
-            <span />
+            <>
+              {/* В edit-режиме слева — деструктивная кнопка «Удалить»; в create —
+                  этот слот пуст, чтобы Сохранить/Отмена остались справа. */}
+              {isEdit ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="lg"
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="size-4" strokeWidth={2} />
+                  {t('common.delete')}
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isPending}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={form.handleSubmit(onSubmit)}
+                  disabled={isPending}
+                >
+                  {isPending ? t('common.loading') : t('common.save')}
+                </Button>
+              </div>
+            </>
           )}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              onClick={form.handleSubmit(onSubmit)}
-              disabled={isPending}
-            >
-              {isPending ? t('common.loading') : t('common.save')}
-            </Button>
-          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
