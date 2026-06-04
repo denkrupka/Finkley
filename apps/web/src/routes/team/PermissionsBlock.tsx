@@ -212,11 +212,8 @@ export function PermissionsBlock({
   onChange?: (next: PermissionsMap) => void
 }) {
   const { t } = useTranslation()
-  // Открыт по умолчанию: блок «Доступы» с пресетами слишком важен, чтобы
-  // его прятать за дополнительным кликом — юзеры не понимают что внутри.
-  const [open, setOpen] = useState(true)
-  // Все категории открыты по умолчанию — пользователь сразу видит все
-  // подразделы, без ещё одного шага «разверни/сверни» на каждой.
+  // Owner-feedback 04.06: блок «Доступы» был accordion-collapse, юзер думал
+  // что его нет вообще. Убираю accordion — секция всегда видна.
   const [openCats, setOpenCats] = useState<Set<string>>(
     () => new Set(CATEGORIES.filter((c) => c.items.length > 0).map((c) => c.key)),
   )
@@ -253,29 +250,17 @@ export function PermissionsBlock({
 
   return (
     <section className="border-border overflow-hidden rounded-md border">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="bg-muted/30 hover:bg-muted/50 flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
-      >
-        <span className="inline-flex items-center gap-2">
-          {open ? (
-            <ChevronDown className="text-muted-foreground size-3.5" strokeWidth={2.2} />
-          ) : (
-            <ChevronRight className="text-muted-foreground size-3.5" strokeWidth={2.2} />
-          )}
-          <span className="text-foreground text-sm font-bold">
-            {t('team.permissions_title', { defaultValue: 'Доступы' })}
-          </span>
+      <div className="bg-muted/30 flex w-full items-center justify-between gap-2 px-3 py-2.5">
+        <span className="text-foreground text-sm font-bold">
+          {t('team.permissions_title', { defaultValue: 'Доступы' })}
         </span>
         <span className="text-muted-foreground text-[11px]">
           {t('team.permissions_subtitle', {
-            defaultValue: 'Преднастроено по роли',
+            defaultValue: 'Преднастроено по роли — можешь скорректировать чекбоксами',
           })}
         </span>
-      </button>
-      <div className={open ? '' : 'hidden'}>
+      </div>
+      <div>
         <div className="border-border bg-muted/10 grid grid-cols-[1fr_80px_80px] gap-2 border-b px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">
           <span className="text-muted-foreground">
             {t('team.perm_col_section', { defaultValue: 'Раздел' })}
