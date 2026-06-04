@@ -203,6 +203,8 @@ export function ExpensesPage({
   const canViewPaid = can('expenses', 'paid')
   const canViewPending = can('expenses', 'pending')
   const canViewBanking = can('expenses', 'banking')
+  const canEditPaid = can('expenses', 'paid', 'edit')
+  const canEditPending = can('expenses', 'pending', 'edit')
   // Если выбранный в URL таб запрещён — fallback на первый разрешённый.
   const tabAllowed =
     (requestedTab === 'paid' && canViewPaid) ||
@@ -522,22 +524,28 @@ export function ExpensesPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PeriodPickerPopover value={period} onChange={setPeriod} />
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => {
-                if (!hasOpenShift) {
-                  setGateOpen(true)
-                  return
-                }
-                setFormOpen(true)
-              }}
-              data-testid="add-expense"
-              data-tour="expense-add"
-            >
-              <Plus className="size-4" strokeWidth={2.4} />
-              {t('expenses.add')}
-            </Button>
+            {/* T36 — кнопка «Добавить» скрыта если на текущем табе только view.
+                Юзер с view-only видит данные но не может ничего добавить. */}
+            {(tab === 'paid' && canEditPaid) ||
+            (tab === 'pending' && canEditPending) ||
+            tab === 'banking' ? (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  if (!hasOpenShift) {
+                    setGateOpen(true)
+                    return
+                  }
+                  setFormOpen(true)
+                }}
+                data-testid="add-expense"
+                data-tour="expense-add"
+              >
+                <Plus className="size-4" strokeWidth={2.4} />
+                {t('expenses.add')}
+              </Button>
+            ) : null}
           </div>
         </div>
       )}
