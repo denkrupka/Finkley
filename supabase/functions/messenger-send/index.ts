@@ -275,9 +275,22 @@ Deno.serve(async (req) => {
           skip_log: true,
         }),
       })
-      const j = (await r.json()) as { ok?: boolean; via?: string; error?: string }
+      // Graceful JSON parse — email-channel может вернуть пустой body
+      // (cold start / 500 без JSON), и JSON.parse тогда throws с
+      // "Unexpected end of JSON input" что пугает юзера (owner-feedback 04.06).
+      let j: { ok?: boolean; via?: string; error?: string } = {}
+      try {
+        const txt = await r.text()
+        if (txt && txt.trim().length > 0) j = JSON.parse(txt)
+      } catch {
+        // non-JSON / partial response — оставляем j пустым
+      }
       if (!r.ok || !j.ok) {
-        deliveryError = j.error ?? `email_send_failed (HTTP ${r.status})`
+        deliveryError =
+          j.error ??
+          (r.status === 500
+            ? 'Email-канал временно недоступен (cold start). Попробуй через 1-2 минуты.'
+            : `email_send_failed (HTTP ${r.status})`)
       } else {
         // У email нет внешнего message_id (Gmail API возвращает id, но мы
         // его не достаём — для дедупа outgoing'a не нужно, мы их не poll'им
