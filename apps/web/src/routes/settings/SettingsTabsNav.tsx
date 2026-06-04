@@ -50,11 +50,15 @@ const TAB_ICONS: Record<SettingsTab, typeof User> = {
 export function SettingsTabsNav({
   active,
   onChange,
+  visibleTabs,
 }: {
   active: SettingsTab
   onChange: (tab: SettingsTab) => void
+  /** T36 — список табов которые юзер может видеть. По умолчанию все. */
+  visibleTabs?: readonly SettingsTab[]
 }) {
   const { t } = useTranslation()
+  const tabs = visibleTabs ?? SETTINGS_TABS
 
   return (
     <div className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-1.5">
@@ -65,7 +69,7 @@ export function SettingsTabsNav({
             если не влезают в одну. Чуть уменьшил padding/gap чтобы при
             умеренной ширине всё-таки одной строкой обходилось. */}
       <nav className="-mx-1.5 flex gap-1 overflow-x-auto px-1.5 sm:flex-wrap sm:overflow-visible">
-        {SETTINGS_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = TAB_ICONS[tab]
           const isActive = active === tab
           return (

@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { uploadSalonLogo, useDeleteSalon, useUpdateSalon } from '@/hooks/useSalonMutations'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToggleBenchmarksOptIn } from '@/hooks/useBenchmarks'
@@ -150,11 +151,31 @@ export function SettingsPage() {
   // активная вкладка читается из ?tab=.
   const isIntegrationsUrl = location.pathname.endsWith('/settings/integrations')
   const tabParam = searchParams.get('tab') as SettingsTab | null
-  const activeTab: SettingsTab = isIntegrationsUrl
+  // T36 — фильтр табов Settings по permissions matrix. profile/team/schedule/
+  // integrations/help мапятся в матрицу; catalogs/notifications/billing/
+  // security/api дополнительных permission-ключей не имеют — показываем всем
+  // у кого есть хоть какой-то settings.* view.
+  const { can } = usePermissions(salonId)
+  const tabPermKey: Partial<Record<SettingsTab, string>> = {
+    profile: 'profile_user',
+    team: 'users',
+    schedule: 'schedule',
+    integrations: 'integrations',
+    help: 'help',
+  }
+  const visibleSettingsTabs = SETTINGS_TABS.filter((t) => {
+    const key = tabPermKey[t]
+    if (!key) return true // unmanaged tabs (catalogs/notifications/...) — открыты
+    return can('settings', key)
+  })
+  const requestedActiveTab: SettingsTab = isIntegrationsUrl
     ? 'integrations'
     : tabParam && (SETTINGS_TABS as readonly string[]).includes(tabParam)
       ? tabParam
       : 'profile'
+  const activeTab: SettingsTab = visibleSettingsTabs.includes(requestedActiveTab)
+    ? requestedActiveTab
+    : (visibleSettingsTabs[0] ?? 'profile')
   function setActiveTab(t: SettingsTab) {
     // Спец-кейс: вкладка интеграций живёт по отдельному URL.
     if (t === 'integrations') {
@@ -324,7 +345,11 @@ export function SettingsPage() {
         <p className="text-muted-foreground mt-1 text-sm">{t('settings.subtitle')}</p>
       </header>
 
-      <SettingsTabsNav active={activeTab} onChange={setActiveTab} />
+      <SettingsTabsNav
+        active={activeTab}
+        onChange={setActiveTab}
+        visibleTabs={visibleSettingsTabs}
+      />
 
       {activeTab === 'profile' && (
         <>
