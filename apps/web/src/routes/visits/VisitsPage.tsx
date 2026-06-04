@@ -271,7 +271,7 @@ export function VisitsPage({
               value={staffFilter || 'all'}
               onValueChange={(v) => setFilter('staff', v === 'all' ? null : v)}
             >
-              <SelectTrigger className="h-10 w-[200px]">
+              <SelectTrigger className="h-10 w-full sm:w-[200px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -288,7 +288,7 @@ export function VisitsPage({
               value={paymentFilter || 'all'}
               onValueChange={(v) => setFilter('pay', v === 'all' ? null : v)}
             >
-              <SelectTrigger className="h-10 w-[180px]">
+              <SelectTrigger className="h-10 w-full sm:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -303,7 +303,7 @@ export function VisitsPage({
 
             {/* Услуги: используем searchable select — у владельца их много,
                 обычный Select требует скроллить. Опция «Все услуги» = пустая. */}
-            <div className="w-[220px]">
+            <div className="w-full sm:w-[220px]">
               <SearchableSelect
                 value={serviceFilter || '__all__'}
                 onChange={(v) => setFilter('service', v === '__all__' ? null : v)}

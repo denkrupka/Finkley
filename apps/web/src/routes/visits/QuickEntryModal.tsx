@@ -878,7 +878,7 @@ export function QuickEntryModal({
                           <SelectTrigger
                             data-testid="qe-line-staff"
                             className={cn(
-                              'h-9 w-[180px] text-sm',
+                              'h-9 min-w-0 flex-1 text-sm sm:w-[180px] sm:flex-none',
                               missingStaff && 'border-destructive',
                             )}
                           >

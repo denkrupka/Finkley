@@ -133,7 +133,11 @@ export function ExportVisitsButton() {
           <span className="hidden sm:inline">{t('visits.export.button')}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[320px] p-4">
+      <PopoverContent
+        align="end"
+        collisionPadding={16}
+        className="w-[min(320px,calc(100vw-2rem))] p-4"
+      >
         <p className="text-foreground mb-3 text-sm font-bold">{t('visits.export.title')}</p>
 
         <div className="mb-4">

@@ -48,7 +48,7 @@ export function MiniMonthCalendar({
   const weekDayLabels: string[] = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
   return (
-    <div className="flex w-[300px] flex-col gap-3">
+    <div className="flex w-[min(300px,calc(100vw-2rem))] flex-col gap-3">
       {/* Header: ‹ Май 2026 › */}
       <div className="flex items-center justify-between gap-2">
         <button
