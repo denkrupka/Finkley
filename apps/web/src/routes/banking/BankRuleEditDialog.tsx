@@ -22,7 +22,6 @@ import { useExpenseCategories } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories } from '@/hooks/useOtherIncomes'
 import {
   BankTxRuleInputSchema,
-  ruleNumberFields,
   ruleNumberOps,
   ruleTextFields,
   ruleTextOps,
@@ -375,9 +374,19 @@ function AddRowButton({ onClick, children }: { onClick: () => void; children: Re
 const FIELD_LABELS_RU: Record<RuleTextField | RuleNumberField, string> = {
   counterparty: 'Контрагент',
   description: 'Комментарий',
-  amount: 'Сумма',
-  amount_abs: '|Сумма|',
+  // amount хранится со знаком (debit/credit), amount_abs — модуль.
+  // В UI показываем только модульный вариант "Сумма" (более интуитивно
+  // для юзера — owner-feedback 04.06: дубль "Сумма / |Сумма|" сбивал).
+  // amount остаётся в schema для backward-compat существующих правил.
+  amount: 'Сумма (со знаком)',
+  amount_abs: 'Сумма',
 }
+
+/**
+ * Поля, видимые в выпадашке "Поле". amount (signed) скрыт — он в
+ * schema/matcher остаётся, но юзер видит только модульную "Сумма".
+ */
+const VISIBLE_FIELDS = [...ruleTextFields, 'amount_abs'] as const
 
 const TEXT_OP_LABELS_RU: Record<RuleTextOp, string> = {
   contains: 'Содержит',
@@ -445,7 +454,7 @@ function ConditionRow({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {[...ruleTextFields, ...ruleNumberFields].map((f) => (
+            {VISIBLE_FIELDS.map((f) => (
               <SelectItem key={f} value={f}>
                 {FIELD_LABELS_RU[f]}
               </SelectItem>
