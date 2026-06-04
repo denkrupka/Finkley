@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useInventoryItems, type InventoryItemRow } from '@/hooks/useInventory'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -33,6 +34,7 @@ export function InventoryPage() {
   const { data: salon } = useSalon(salonId)
   const { data: membership } = useSalonMembership(salonId)
   const canEdit = membership?.role === 'owner' || membership?.role === 'admin'
+  const { can } = usePermissions(salonId)
   const { data: items = [], isLoading } = useInventoryItems(salonId, { includeArchived: false })
 
   const [params, setParams] = useSearchParams()
@@ -137,26 +139,28 @@ export function InventoryPage() {
               { id: 'list', label: 'inventory.tabs.list', icon: Package },
               { id: 'analytics', label: 'inventory.tabs.analytics', icon: BarChart3 },
             ] as const
-          ).map((nav) => {
-            const isActive = tab === nav.id
-            const Icon = nav.icon
-            return (
-              <button
-                key={nav.id}
-                type="button"
-                onClick={() => setTab(nav.id)}
-                className={cn(
-                  'flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
-                )}
-              >
-                <Icon className="size-4" strokeWidth={1.8} />
-                {t(nav.label)}
-              </button>
-            )
-          })}
+          )
+            .filter((nav) => can('inventory', nav.id === 'list' ? 'items' : 'analytics'))
+            .map((nav) => {
+              const isActive = tab === nav.id
+              const Icon = nav.icon
+              return (
+                <button
+                  key={nav.id}
+                  type="button"
+                  onClick={() => setTab(nav.id)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                  )}
+                >
+                  <Icon className="size-4" strokeWidth={1.8} />
+                  {t(nav.label)}
+                </button>
+              )
+            })}
         </nav>
       </div>
 

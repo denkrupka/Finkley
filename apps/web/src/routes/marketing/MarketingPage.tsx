@@ -22,6 +22,7 @@ import {
   type BroadcastKind,
 } from '@/hooks/useBroadcastPrefs'
 import { useSendBroadcastTest } from '@/hooks/useMarketing'
+import { usePermissions } from '@/hooks/usePermissions'
 import { cn } from '@/lib/utils/cn'
 
 import { ComposeBroadcastTab } from './ComposeBroadcastTab'
@@ -58,6 +59,11 @@ export function MarketingPage() {
 
   const prefs = useBroadcastPrefs(salonId)
   const update = useUpdateBroadcastPref(salonId)
+  const { can } = usePermissions(salonId)
+  // T36 — per-tab guard. permissions matrix имеет marketing.content/competitors/
+  // reviews — здесь grouping не совпадает один-к-одному; пропускаем если у
+  // юзера хоть какой-то marketing-view есть.
+  const visibleTabs = MARKETING_TABS.filter(() => can('marketing'))
 
   if (!salonId) return null
 
@@ -79,7 +85,7 @@ export function MarketingPage() {
         <p className="text-muted-foreground mt-1 text-sm">{t('marketing.subtitle')}</p>
       </header>
 
-      <PageTabsNav tabs={MARKETING_TABS} active={active} onChange={setActive} t={t} />
+      <PageTabsNav tabs={visibleTabs} active={active} onChange={setActive} t={t} />
 
       {active === 'compose' ? (
         <div className="mt-4">
