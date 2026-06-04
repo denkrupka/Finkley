@@ -170,11 +170,20 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
   }
 
   // Решаем Cloudflare Turnstile через Capsolver если sitekey найден.
-  // Token идёт в body как `cf-turnstile-response` (стандарт Cloudflare).
   let turnstileToken: string | null = null
   if (turnstileSiteKey && CAPSOLVER_API_KEY) {
     turnstileToken = await solveCloudflareTurnstile(`${TREATWELL_BASE}/login`, turnstileSiteKey)
   }
+  // Детальный лог для дебага invalid_credentials (owner 04.06).
+  console.log('treatwell auth attempt:', {
+    capsolver_configured: !!CAPSOLVER_API_KEY,
+    sitekey_found: !!turnstileSiteKey,
+    sitekey: turnstileSiteKey,
+    turnstile_token_received: !!turnstileToken,
+    turnstile_token_len: turnstileToken?.length ?? 0,
+    has_preflight_cookies: !!preflightCookies,
+    login_field: loginField,
+  })
 
   const endpoints = [
     '/api/authentication.json',
@@ -182,10 +191,16 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     '/api/login.json',
     '/extranet-public/api/authentication.json',
   ]
-  // Если решили Turnstile — добавляем токен в body. Treatwell принимает
-  // его как `cf-turnstile-response` (camelCase) и/или `cfTurnstileResponse`.
+  // Если решили Turnstile — добавляем токен в body под всеми известными
+  // именами (Treatwell мог поменять — пробуем максимум).
   const tsField = turnstileToken
-    ? { 'cf-turnstile-response': turnstileToken, cfTurnstileResponse: turnstileToken }
+    ? {
+        'cf-turnstile-response': turnstileToken,
+        cfTurnstileResponse: turnstileToken,
+        cfTurnstileToken: turnstileToken,
+        turnstileToken: turnstileToken,
+        captchaToken: turnstileToken,
+      }
     : {}
   const jsonBodies = [
     JSON.stringify({ user: loginField, password, isPersistentLogin: true, ...tsField }),
@@ -251,6 +266,14 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
       const txt = await r.text()
       lastStatus = r.status
       lastText = txt
+      // Детальный лог каждого attempt — чтобы понять что Treatwell
+      // возвращает (owner 04.06: credentials точно правильные).
+      console.log('treatwell attempt:', {
+        url: a.url,
+        contentType: a.contentType,
+        status: r.status,
+        textPreview: txt.slice(0, 400),
+      })
       // Treatwell 200 + body {"result":"NOT_AUTHENTICATED"} — endpoint
       // работает, формат принят, но credentials отклонены. Запоминаем
       // флаг чтобы выдать специфичный код ошибки.
