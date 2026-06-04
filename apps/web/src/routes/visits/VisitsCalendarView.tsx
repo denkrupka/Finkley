@@ -1059,7 +1059,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setSubslotMenu(null)} aria-hidden />
           <div
-            className="border-border bg-card shadow-finxl fixed z-50 w-[240px] rounded-lg border p-2"
+            className="border-border bg-card shadow-finxl fixed z-50 w-[min(240px,calc(100vw-1rem))] rounded-lg border p-2"
             style={{
               top: subslotMenu.rect.top,
               left: subslotMenu.rect.left,
