@@ -126,6 +126,14 @@ interface CategoryItem {
   is_system?: boolean
 }
 
+/**
+ * Системные категории, имя которых служит ключом для edge functions
+ * (findSystemCategoryId(name)). Их переименование/архивирование сломает
+ * ksef/wfirma/fakturownia/infakt-proxy fallback + banking-sync auto-commission
+ * trigger. Остальные is_system (Аренда/Зарплата/...) — переименовываемые.
+ */
+const PROTECTED_SYSTEM_NAMES = new Set(['Комиссии', 'БЕЗ КАТЕГОРИИ'])
+
 function CategoryColumn({
   title,
   items,
@@ -181,24 +189,39 @@ function CategoryColumn({
         {items.length === 0 ? (
           <li className="text-muted-foreground text-sm">{t('settings.categories.empty')}</li>
         ) : (
-          items.map((it) => (
-            <li key={it.id} className="flex items-center gap-2">
-              <Input
-                className="h-8"
-                value={drafts[it.id] ?? ''}
-                onChange={(e) => setDrafts((p) => ({ ...p, [it.id]: e.target.value }))}
-                onBlur={() => commitName(it.id)}
-              />
-              <button
-                type="button"
-                onClick={() => archive(it.id, it.is_system)}
-                className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md transition-colors"
-                title={t('settings.categories.archive')}
-              >
-                <Archive className="size-4" strokeWidth={1.8} />
-              </button>
-            </li>
-          ))
+          items.map((it) => {
+            const isProtected = it.is_system && PROTECTED_SYSTEM_NAMES.has(it.name)
+            return (
+              <li key={it.id} className="flex items-center gap-2">
+                <Input
+                  className="h-8"
+                  value={drafts[it.id] ?? ''}
+                  onChange={(e) => setDrafts((p) => ({ ...p, [it.id]: e.target.value }))}
+                  onBlur={() => commitName(it.id)}
+                  readOnly={isProtected}
+                  title={
+                    isProtected
+                      ? 'Системная категория — её имя используется при автоматических импортах и не редактируется.'
+                      : undefined
+                  }
+                />
+                {isProtected ? (
+                  <span className="text-muted-foreground/60 grid size-8 place-items-center">
+                    <Archive className="size-4 opacity-30" strokeWidth={1.8} />
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => archive(it.id, it.is_system)}
+                    className="text-muted-foreground hover:text-destructive grid size-8 place-items-center rounded-md transition-colors"
+                    title={t('settings.categories.archive')}
+                  >
+                    <Archive className="size-4" strokeWidth={1.8} />
+                  </button>
+                )}
+              </li>
+            )
+          })
         )}
       </ul>
 
