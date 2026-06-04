@@ -512,7 +512,9 @@ async function syncKsefToFinkley(
         // (4) payment_method из XML; если не определён — оставляем transfer
         // как «банковский перевод» (default для оплаченных фактур).
         payment_method: detail.paymentMethod ?? 'transfer',
-        paid_at: detail.paidAt ? new Date(detail.paidAt).toISOString() : null,
+        // expenses не имеет колонки paid_at — отметка оплаты идёт через
+        // paid_amount_cents = amount_cents (полностью оплачено).
+        paid_amount_cents: Math.round(detail.totalGross * 100),
         // (6) Description (а не comment) — items.join(', ')
         description: description.slice(0, 500) || null,
         comment: null,
