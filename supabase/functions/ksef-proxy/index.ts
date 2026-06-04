@@ -270,6 +270,20 @@ async function syncKsefToFinkley(
     throw new Error(`ksef_query_${list.code}${list.message ? ':' + list.message : ''}`)
   }
   invoices = list.invoices
+  // Owner 04.06: «новые фактуры не подтягиваются». Логируем кол-во и
+  // диапазон чтобы понять что возвращает KSeF API на проде. В Supabase
+  // Edge Function logs можно увидеть полный список ksef refs.
+  console.log(
+    `[ksef-sync] salon=${salonId} window=${since}..${today} api_returned=${invoices.length} invoices`,
+  )
+  if (invoices.length > 0) {
+    const sample = invoices
+      .slice(0, 20)
+      .map((i) => `${i.ksefReferenceNumber}|${i.issueDate}|${i.totalGross}`)
+    console.log(
+      `[ksef-sync] salon=${salonId} sample(${sample.length}/${invoices.length}): ${sample.join(' ; ')}`,
+    )
+  }
 
   if (invoices.length === 0) {
     await closeSession(accessToken)
@@ -305,6 +319,12 @@ async function syncKsefToFinkley(
   for (const r of (alreadyScheduled ?? []) as Array<{ external_id: string | null }>) {
     if (r.external_id) importedSet.add(r.external_id)
   }
+  // Сколько из api_returned уже в БД (importedSet hit) и сколько новых.
+  const apiInvoiceIds = invoices.map((i) => i.ksefReferenceNumber)
+  const alreadyHit = apiInvoiceIds.filter((id) => importedSet.has(id)).length
+  console.log(
+    `[ksef-sync] salon=${salonId} importedSet=${importedSet.size} api_already_in_db=${alreadyHit} new_to_process=${invoices.length - alreadyHit}`,
+  )
 
   // ensureFallback убран по запросу 01.06 — категорию «Импорт КСеФ»
   // больше не создаём. Категория = null если нет точного маппинга, юзер
