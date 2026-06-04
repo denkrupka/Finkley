@@ -18,8 +18,10 @@ import {
   useUpdateBankTxRule,
   type BankTxRule,
 } from '@/hooks/useBankTxRules'
+import { useCounterparties } from '@/hooks/useCounterparties'
 import { useExpenseCategories } from '@/hooks/useExpenses'
 import { useOtherIncomeCategories } from '@/hooks/useOtherIncomes'
+import { CounterpartyEditModal } from '@/routes/settings/counterparties/CounterpartyEditModal'
 import {
   BankTxRuleInputSchema,
   ruleNumberOps,
@@ -59,9 +61,11 @@ export function BankRuleEditDialog({
 }) {
   const { data: expenseCategoriesData = [] } = useExpenseCategories(salonId)
   const { data: incomeCategoriesData = [] } = useOtherIncomeCategories(salonId)
+  const { data: counterpartiesData = [] } = useCounterparties(salonId)
   const create = useCreateBankTxRule(salonId)
   const update = useUpdateBankTxRule(salonId)
   const del = useDeleteBankTxRule(salonId)
+  const [cpModalOpen, setCpModalOpen] = useState(false)
 
   const [name, setName] = useState('')
   const [enabled, setEnabled] = useState(true)
@@ -282,6 +286,8 @@ export function BankRuleEditDialog({
                     (c) => !(c.is_system && (c.name === 'Комиссии' || c.name === 'БЕЗ КАТЕГОРИИ')),
                   )
                   .map((c) => ({ id: c.id, name: c.name }))}
+                counterparties={counterpartiesData.map((cp) => ({ id: cp.id, name: cp.name }))}
+                onAddCounterparty={() => setCpModalOpen(true)}
                 onChange={(next) => patchAction(idx, next)}
                 onRemove={() => removeAction(idx)}
               />
@@ -319,6 +325,12 @@ export function BankRuleEditDialog({
           ) : null}
         </div>
       </DialogContent>
+      <CounterpartyEditModal
+        open={cpModalOpen}
+        onOpenChange={setCpModalOpen}
+        salonId={salonId}
+        counterparty={null}
+      />
     </Dialog>
   )
 }
@@ -535,11 +547,15 @@ const ACTION_TYPE_LABELS_RU: Record<RuleAction['type'], string> = {
 function ActionRow({
   action,
   categories,
+  counterparties,
+  onAddCounterparty,
   onChange,
   onRemove,
 }: {
   action: RuleAction
   categories: { id: string; name: string }[]
+  counterparties: { id: string; name: string }[]
+  onAddCounterparty: () => void
   onChange: (next: RuleAction) => void
   onRemove: () => void
 }) {
@@ -603,11 +619,41 @@ function ActionRow({
             <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
               Имя контрагента
             </label>
-            <Input
-              value={action.counterparty}
-              onChange={(e) => onChange({ type: 'set_counterparty', counterparty: e.target.value })}
-              className="mt-1 h-10"
-            />
+            {/* Owner 04.06: вместо input — выпашка существующих + "+" для нового.
+                Schema хранит counterparty: string (name), не id — оставляем
+                совместимость с banking-sync matcher'ом. Если юзер хочет нового
+                контрагента которого нет в списке — кнопка "+" открывает
+                CounterpartyEditModal, после save query инвалидируется и юзер
+                выбирает только что созданного. */}
+            <div className="mt-1 flex gap-2">
+              <Select
+                value={action.counterparty || '__none__'}
+                onValueChange={(v) =>
+                  onChange({ type: 'set_counterparty', counterparty: v === '__none__' ? '' : v })
+                }
+              >
+                <SelectTrigger className="h-10 flex-1">
+                  <SelectValue placeholder="— выбери —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— не выбран —</SelectItem>
+                  {counterparties.map((cp) => (
+                    <SelectItem key={cp.id} value={cp.name}>
+                      {cp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onAddCounterparty}
+                title="Добавить контрагента"
+                className="h-10 shrink-0 px-3"
+              >
+                +
+              </Button>
+            </div>
           </>
         ) : (
           <p className="text-muted-foreground mt-6 text-xs">
