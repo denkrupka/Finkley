@@ -255,6 +255,7 @@ export function VisitsPage({
             salonId={salonId}
             currency={currency}
             editVisit={editingVisit}
+            readOnly={visitsReadOnly}
             onChargeRequest={(visitId) => {
               const v = visits.find((x) => x.id === visitId)
               setEditingVisit(null)

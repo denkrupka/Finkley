@@ -131,6 +131,8 @@ type Props = {
    * VisitDetailModal в ChargeView для этого визита.
    */
   onChargeRequest?: (visitId: string) => void
+  /** Read-only mode: скрывает submit, показывает warning. */
+  readOnly?: boolean
 }
 
 /**
@@ -156,6 +158,7 @@ export function QuickEntryModal({
   prefill,
   editVisit,
   onChargeRequest,
+  readOnly = false,
 }: Props) {
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
@@ -1209,7 +1212,11 @@ export function QuickEntryModal({
             форма с услугами и временем длинная, кнопка Сохранить теряется
             внизу при скролле. */}
         <DialogFooter sticky className={isEdit ? 'sm:justify-between' : undefined}>
-          {isEdit && editVisit ? (
+          {readOnly ? (
+            <p className="text-muted-foreground w-full text-center text-xs">
+              ⚠ Просмотр без редактирования. Попроси администратора дать тебе права.
+            </p>
+          ) : isEdit && editVisit ? (
             <>
               <Button
                 type="button"

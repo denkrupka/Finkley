@@ -33,8 +33,14 @@ export function InventoryPage() {
   const { salonId } = useParams<{ salonId: string }>()
   const { data: salon } = useSalon(salonId)
   const { data: membership } = useSalonMembership(salonId)
-  const canEdit = membership?.role === 'owner' || membership?.role === 'admin'
   const { can } = usePermissions(salonId)
+  // canEdit раньше проверял только role=owner/admin. Теперь учитывает
+  // permissions matrix (T36): юзер с inventory.items=edit тоже видит
+  // кнопки добавления/импорта/инвентаризации.
+  const canEdit =
+    membership?.role === 'owner' ||
+    membership?.role === 'admin' ||
+    can('inventory', 'items', 'edit')
   const { data: items = [], isLoading } = useInventoryItems(salonId, { includeArchived: false })
 
   const [params, setParams] = useSearchParams()
