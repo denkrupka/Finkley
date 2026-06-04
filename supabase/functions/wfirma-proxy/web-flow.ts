@@ -79,6 +79,17 @@ function parseCompaniesFromHtml(html: string): WebFlowCompanyChoice[] {
     /\/user_companies\/login\/(\d+)"[^>]*>\s*([^<]+?)\s*</g,
     // Cascade 3: id + ближайший непустой текст в пределах 200 символов
     /\/user_companies\/login\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
+    // 04.06 — новые варианты wFirma после ребрендинга UI:
+    //   "Wejdź do firmy" button: /wejdz/{id}
+    /\/wejdz\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
+    //   data-href атрибут
+    /data-href="[^"]*\/(?:user_companies\/login|wejdz)\/(\d+)"[^>]*>([\s\S]{0,200}?)</g,
+    //   data-company-id / data-id с именем рядом
+    /data-(?:company-)?id="(\d+)"[^>]*>([\s\S]{0,200}?)</g,
+    //   onclick="loginCompany(ID, 'Name')" или подобное
+    /onclick="[^"]*\((\d+)[^"]*'([^']+)'/g,
+    //   ссылка на /companies/{id} или /firma/{id}
+    /\/(?:companies|firma|pulpit)\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
   ]
 
   for (const re of patterns) {
@@ -96,11 +107,15 @@ function parseCompaniesFromHtml(html: string): WebFlowCompanyChoice[] {
     if (found.size > 0) break
   }
 
-  // Если никто из паттернов не дал name, но id-шники нашли — генерим placeholder
+  // Если никто из паттернов не дал name, но id-шники нашли — генерим placeholder.
+  // Расширил список id-источников теми же путями что выше.
   if (found.size === 0) {
     const idsOnly = new Set<string>()
-    for (const m of html.matchAll(/\/user_companies\/login\/(\d+)/g)) {
-      if (m[1]) idsOnly.add(m[1])
+    const idRe =
+      /\/(?:user_companies\/login|wejdz|companies|firma|pulpit)\/(\d+)|data-(?:company-)?id="(\d+)"/g
+    for (const m of html.matchAll(idRe)) {
+      const id = m[1] ?? m[2]
+      if (id) idsOnly.add(id)
     }
     let i = 1
     for (const id of idsOnly) {
@@ -181,13 +196,16 @@ export async function generateApiKeyViaWebFlow(
   // поэтому пробуем по убыванию специфичности.
   const companies = parseCompaniesFromHtml(companiesHtml)
   if (companies.length === 0) {
-    // Логируем для отладки — sample HTML без приватных данных
-    const sample = companiesHtml.slice(0, 500).replace(/\s+/g, ' ')
+    // Логируем БОЛЬШЕ HTML — wFirma периодически меняют структуру и без
+    // sample невозможно сложить новый regex (owner-feedback 04.06: 2 фирмы
+    // в кабинете, парсер вернул 0). Прокидываем в details чтобы попасть в
+    // edge function logs + UI «прокинь скрин ошибки».
+    const sample = companiesHtml.slice(0, 1500).replace(/\s+/g, ' ')
     console.warn('wfirma: no companies parsed, html sample:', sample)
     return {
       ok: false,
       reason: 'wfirma_no_companies',
-      details: 'parser_no_match — структура wFirma могла измениться',
+      details: `parser_no_match. HTML sample (1500ch): ${sample}`,
     }
   }
   // Если фирм несколько — UI должен показать селектор. Возвращаем список
