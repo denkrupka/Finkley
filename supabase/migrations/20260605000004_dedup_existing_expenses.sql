@@ -19,6 +19,8 @@
 -- =============================================================================
 
 -- ─── (а) Дубли через bank_transaction_id ──────────────────────────────────────
+-- Guard: на свежих staging-проектах колонки expenses.bank_transaction_id
+-- может не быть (миграция 20260509000002 не применилась). Skip block если так.
 do $$
 declare
   v_group     record;
@@ -26,7 +28,20 @@ declare
   v_deleted_in_iter int;
   v_total_deleted int := 0;
   v_groups int := 0;
+  v_col_exists boolean;
 begin
+  select exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'expenses'
+       and column_name = 'bank_transaction_id'
+  ) into v_col_exists;
+
+  if not v_col_exists then
+    raise notice 'expenses dedup (bank_transaction_id): column missing, skipped';
+    return;
+  end if;
+
   for v_group in
     select bank_transaction_id,
            array_agg(id order by created_at asc) as ids
@@ -66,7 +81,19 @@ declare
   v_deleted_in_iter int;
   v_total_deleted int := 0;
   v_groups int := 0;
+  v_col_exists boolean;
 begin
+  select exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'expenses'
+       and column_name = 'bank_transaction_id'
+  ) into v_col_exists;
+
+  if not v_col_exists then
+    raise notice 'expenses dedup (fuzzy): bank_transaction_id missing, skipped';
+    return;
+  end if;
   for v_group in
     select
       salon_id, expense_at, amount_cents,
@@ -108,7 +135,19 @@ declare
   v_deleted_in_iter int;
   v_total_deleted int := 0;
   v_groups int := 0;
+  v_col_exists boolean;
 begin
+  select exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'other_incomes'
+       and column_name = 'bank_transaction_id'
+  ) into v_col_exists;
+
+  if not v_col_exists then
+    raise notice 'other_incomes dedup: bank_transaction_id missing, skipped';
+    return;
+  end if;
   for v_group in
     select bank_transaction_id,
            array_agg(id order by created_at asc) as ids
