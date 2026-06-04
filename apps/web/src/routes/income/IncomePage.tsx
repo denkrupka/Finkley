@@ -12,6 +12,7 @@ import {
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
 import { type OtherIncomeRow } from '@/hooks/useOtherIncomes'
 import { toLocalISODate } from '@/lib/utils/format-date'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { type VisitRow } from '@/hooks/useVisits'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
@@ -95,12 +96,22 @@ export function IncomePage({
   const [localTab, setLocalTab] = useState<IncomeTab>('visits')
   const tabParam = params.get('tab')
   const urlTab: IncomeTab = isIncomeTab(tabParam) ? tabParam : 'visits'
-  const tabsToShow: PageTab<IncomeTab>[] = hideBankingTab
-    ? TABS.filter((t) => t.id !== 'banking')
-    : TABS
+  // T36 — per-tab permissions для income (visits/sales/banking).
+  const { can } = usePermissions(salonId)
+  const canViewVisits = can('income', 'visits')
+  const canViewSales = can('income', 'sales')
+  const canViewBanking = can('income', 'banking')
+  const tabsToShow: PageTab<IncomeTab>[] = TABS.filter((t) => {
+    if (t.id === 'banking' && (hideBankingTab || !canViewBanking)) return false
+    if (t.id === 'visits' && !canViewVisits) return false
+    if (t.id === 'sales' && !canViewSales) return false
+    return true
+  })
   let active: IncomeTab = embedded ? localTab : urlTab
   // Защита: если внешний URL имеет ?tab=banking но мы спрятали таб → fallback.
-  if (active === 'banking' && hideBankingTab) active = 'visits'
+  if (active === 'banking' && (hideBankingTab || !canViewBanking)) active = 'visits'
+  if (active === 'visits' && !canViewVisits) active = canViewSales ? 'sales' : 'banking'
+  if (active === 'sales' && !canViewSales) active = canViewVisits ? 'visits' : 'banking'
 
   function setActive(id: IncomeTab) {
     if (id === 'banking' && hideBankingTab) return

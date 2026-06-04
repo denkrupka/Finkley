@@ -72,6 +72,7 @@ import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate, toLocalISODate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
 import { useBankLinkedIncomeIds, useBankOutflows } from '@/hooks/useBanking'
+import { usePermissions } from '@/hooks/usePermissions'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
 import { BankExportDialog } from './BankExportDialog'
 import { CommissionsPin } from './CommissionsPin'
@@ -154,7 +155,7 @@ export function ExpensesPage({
   const tabParam = params.get('tab')
   const urlTab: ExpenseTab =
     tabParam === 'pending' ? 'pending' : tabParam === 'banking' ? 'banking' : 'paid'
-  const tab: ExpenseTab = embedded ? localTab : urlTab
+  const requestedTab: ExpenseTab = embedded ? localTab : urlTab
   function setTab(value: ExpenseTab) {
     if (embedded) {
       if (value === 'banking') return // в embed нет банкинга
@@ -195,6 +196,27 @@ export function ExpensesPage({
 
   const { data: salon } = useSalon(salonId)
   const { data: categories = [] } = useExpenseCategories(salonId)
+  // T36 — per-tab permissions. Скрываем кнопки табов на которые нет view.
+  // Owner+admin всегда true. Также страница в целом защищена RequirePermission
+  // в App.tsx, так что попасть сюда без 'expenses.*' юзер не может.
+  const { can } = usePermissions(salonId)
+  const canViewPaid = can('expenses', 'paid')
+  const canViewPending = can('expenses', 'pending')
+  const canViewBanking = can('expenses', 'banking')
+  // Если выбранный в URL таб запрещён — fallback на первый разрешённый.
+  const tabAllowed =
+    (requestedTab === 'paid' && canViewPaid) ||
+    (requestedTab === 'pending' && canViewPending) ||
+    (requestedTab === 'banking' && canViewBanking)
+  const tab: ExpenseTab = tabAllowed
+    ? requestedTab
+    : canViewPaid
+      ? 'paid'
+      : canViewPending
+        ? 'pending'
+        : canViewBanking
+          ? 'banking'
+          : 'paid'
   // Контрагенты для колонки «Контрагент» в списке расходов (image #93/#59).
   const { data: counterparties = [] } = useCounterparties(salonId, { includeArchived: true })
   const counterpartyById = useMemo(
@@ -525,39 +547,43 @@ export function ExpensesPage({
         className="border-border bg-card shadow-finsm mb-4 inline-flex rounded-lg border p-1"
         data-tour="expenses-tabs"
       >
-        <button
-          type="button"
-          onClick={() => setTab('paid')}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-            tab === 'paid'
-              ? 'bg-brand-teal-soft text-brand-teal-deep'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <CheckCircle2 className="size-4" strokeWidth={1.8} />
-          {t('expenses.tabs.paid')}
-          <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
-            {expenses.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('pending')}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-            tab === 'pending'
-              ? 'bg-amber-100 text-amber-900'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <CalendarClock className="size-4" strokeWidth={1.8} />
-          {t('expenses.tabs.pending')}
-          <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
-            {pendingCount}
-          </span>
-        </button>
-        {hideBankingTab ? null : (
+        {canViewPaid ? (
+          <button
+            type="button"
+            onClick={() => setTab('paid')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+              tab === 'paid'
+                ? 'bg-brand-teal-soft text-brand-teal-deep'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <CheckCircle2 className="size-4" strokeWidth={1.8} />
+            {t('expenses.tabs.paid')}
+            <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
+              {expenses.length}
+            </span>
+          </button>
+        ) : null}
+        {canViewPending ? (
+          <button
+            type="button"
+            onClick={() => setTab('pending')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+              tab === 'pending'
+                ? 'bg-amber-100 text-amber-900'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <CalendarClock className="size-4" strokeWidth={1.8} />
+            {t('expenses.tabs.pending')}
+            <span className="num text-muted-foreground/70 ml-1 text-[11px] font-bold tabular-nums">
+              {pendingCount}
+            </span>
+          </button>
+        ) : null}
+        {hideBankingTab || !canViewBanking ? null : (
           <button
             type="button"
             onClick={() => setTab('banking')}

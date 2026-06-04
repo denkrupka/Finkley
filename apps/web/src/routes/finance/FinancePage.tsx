@@ -12,6 +12,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { PageTour } from '@/components/onboarding-tour/PageTour'
 import { FINANCE_TOUR_STEPS } from '@/components/onboarding-tour/page-tour-steps'
 import { PageTabsNav, type PageTab } from '@/components/ui/PageTabsNav'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useSalon } from '@/hooks/useSalons'
 import { ReportsPage } from '@/routes/reports/ReportsPage'
 
@@ -62,18 +63,26 @@ export function FinancePage() {
   const { salonId } = useParams<{ salonId: string }>()
   const [params, setParams] = useSearchParams()
   const { data: salon } = useSalon(salonId)
+  // T36 — per-tab permissions для finance (pnl/report/payments/cash/transfers/budgets).
+  const { can } = usePermissions(salonId)
   // Если кассовая дисциплина выключена — таб «Касса» скрываем целиком.
-  const TABS = salon?.cash_discipline_enabled
-    ? ALL_TABS
-    : ALL_TABS.filter((tab) => tab.id !== 'cash')
+  // + фильтр по permissions: скрываем табы на которые нет view.
+  const TABS = (
+    salon?.cash_discipline_enabled ? ALL_TABS : ALL_TABS.filter((tab) => tab.id !== 'cash')
+  ).filter((t) => can('finance', t.id))
 
   const tabParam = params.get('tab')
   // bug 1c77b56e — legacy URL с ?tab=cashflow редиректим на 'report'
   const requested: FinanceTab =
     tabParam === 'cashflow' ? 'report' : isFinanceTab(tabParam) ? tabParam : 'pnl'
-  // Защита от ситуации «приходим по ссылке ?tab=cash, а флаг выключен».
-  const active: FinanceTab =
-    requested === 'cash' && !salon?.cash_discipline_enabled ? 'pnl' : requested
+  // Защита от ситуации «приходим по ссылке ?tab=cash, а флаг выключен»
+  // ИЛИ выбранный таб запрещён → fallback на первый разрешённый.
+  const isAllowed = TABS.some((t) => t.id === requested)
+  const active: FinanceTab = isAllowed
+    ? requested === 'cash' && !salon?.cash_discipline_enabled
+      ? 'pnl'
+      : requested
+    : ((TABS[0]?.id as FinanceTab) ?? 'pnl')
 
   function setActive(id: FinanceTab) {
     const next = new URLSearchParams(params)
