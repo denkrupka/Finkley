@@ -133,8 +133,48 @@ async function solveCloudflareTurnstile(pageUrl: string, siteKey: string): Promi
 }
 
 /**
- * Ищет Turnstile sitekey в HTML страницы. Treatwell использует Cloudflare
- * Turnstile на /login — атрибут `data-sitekey` у div.cf-turnstile.
+ * Sitekey-мапа из официального bundle `/assets/connect-app-*.js`
+ * (export `SITE_WIDGETS`). 05.06: Treatwell НЕ кладёт sitekey в HTML
+ * (data-sitekey) — она зашита в JS, выбирается по hostname в
+ * `getSitekey(window.location.hostname)`. Раньше мы ловили sitekey из
+ * HTML и она всегда возвращалась null → Capsolver не вызывался → login
+ * получал `NOT_VERIFIED_CAPTCHA`.
+ *
+ * Backend ожидает токен в поле `turnstileToken` (export
+ * `BE_TURNSTILE_TOKEN_NAME` из того же модуля).
+ */
+const SITE_WIDGETS: Array<{ key: string; domains: string[] }> = [
+  { key: '0x4AAAAAABgnlBz83RjqFbqR', domains: ['twbox.io', 'twtest.io'] },
+  {
+    key: '0x4AAAAAABgnyMs1otzyQX5B',
+    domains: [
+      'treatwell.at',
+      'treatwell.be',
+      'treatwell.de',
+      'treatwell.es',
+      'treatwell.fr',
+      'treatwell.it',
+      'treatwell.lt',
+      'treatwell.nl',
+      'treatwell.co.uk',
+      'treatwell.dk',
+      'treatwell.lv',
+      'treatwell.pt',
+    ],
+  },
+  { key: '0x4AAAAAABgnydbWugkFafO_', domains: ['treatwell.ie', 'treatwell.ch'] },
+]
+
+function getTurnstileSitekeyForHost(host: string): string | null {
+  for (const w of SITE_WIDGETS) {
+    if (w.domains.some((d) => host.endsWith(d))) return w.key
+  }
+  return null
+}
+
+/**
+ * Fallback: пытаемся достать sitekey из HTML (если когда-то поменяют
+ * и положат туда). На 05.06 не используется.
  */
 function extractTurnstileSitekey(html: string): string | null {
   const m = html.match(/data-sitekey\s*=\s*["']([^"']+)["']/i)
@@ -153,21 +193,32 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     throw new Error('treatwell_login_failed: empty credentials')
   }
 
-  // Preflight: GET /login чтобы получить session cookies (csrf) + html
-  // для извлечения Cloudflare Turnstile sitekey.
+  // Preflight: GET /login чтобы получить session cookies (csrf). Sitekey
+  // берём из hardcoded мапы по hostname (05.06 — Treatwell не кладёт её
+  // в HTML).
   let preflightCookies = ''
-  let turnstileSiteKey: string | null = null
   try {
     const p = await fetch(`${TREATWELL_BASE}/login`, {
       method: 'GET',
       headers: { accept: 'text/html', 'user-agent': UA },
     })
     preflightCookies = extractCookies(p.headers.get('set-cookie') ?? '')
-    const html = await p.text()
-    turnstileSiteKey = extractTurnstileSitekey(html)
+    // Не читаем тело — sitekey всё равно из мапы; экономим память.
+    await p.text().catch(() => '')
   } catch {
     // ignore — попробуем без preflight cookies
   }
+  const baseHost = new URL(TREATWELL_BASE).hostname
+  // Fallback на HTML парсинг: если когда-то добавят data-sitekey, оставим
+  // как safety net (но обычно из мапы).
+  const turnstileSiteKey =
+    getTurnstileSitekeyForHost(baseHost) ??
+    (await fetch(`${TREATWELL_BASE}/login`, {
+      headers: { accept: 'text/html', 'user-agent': UA },
+    })
+      .then((r) => r.text())
+      .then(extractTurnstileSitekey)
+      .catch(() => null))
 
   // Решаем Cloudflare Turnstile через Capsolver если sitekey найден.
   let turnstileToken: string | null = null
@@ -202,26 +253,24 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
         captchaToken: turnstileToken,
       }
     : {}
+  // 05.06: Treatwell ожидает поле `persistentLogin` (без `is`). Раньше
+  // отправляли `isPersistentLogin` — API всегда возвращал
+  // `JSON parse error: ... required attributes are not set
+  // [isPersistentLogin]` и 400. Из bundle также видно что капча-токен
+  // приходит в поле `turnstileToken` (см. BE_TURNSTILE_TOKEN_NAME).
+  // form-urlencoded не поддерживается (415 Content-Type) — оставляем
+  // только JSON.
   const jsonBodies = [
-    JSON.stringify({ user: loginField, password, isPersistentLogin: true, ...tsField }),
-    JSON.stringify({ user: loginField, password, isPersistentLogin: false, ...tsField }),
+    JSON.stringify({ user: loginField, password, persistentLogin: true, ...tsField }),
+    JSON.stringify({ user: loginField, password, persistentLogin: false, ...tsField }),
     JSON.stringify({
       user: loginField,
       password,
-      isPersistentLogin: true,
+      persistentLogin: true,
       email: loginField,
       ...tsField,
     }),
   ]
-  const formBodyParams: Record<string, string> = {
-    user: loginField,
-    password,
-    isPersistentLogin: 'true',
-  }
-  if (turnstileToken) {
-    formBodyParams['cf-turnstile-response'] = turnstileToken
-  }
-  const formBody = new URLSearchParams(formBodyParams).toString()
 
   type Attempt = { url: string; body: string; contentType: string }
   const attempts: Attempt[] = []
@@ -229,17 +278,15 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     for (const b of jsonBodies) {
       attempts.push({ url: TREATWELL_BASE + ep, body: b, contentType: 'application/json' })
     }
-    attempts.push({
-      url: TREATWELL_BASE + ep,
-      body: formBody,
-      contentType: 'application/x-www-form-urlencoded',
-    })
+    // form-urlencoded не пробуем — Treatwell отвечает 415 Content-Type
+    // not supported.
   }
 
   let lastStatus = 0
   let lastText = ''
   let cookies = ''
   let sawNotAuthenticated = false
+  let sawCaptchaRejected = false
   for (const a of attempts) {
     try {
       const r = await fetch(a.url, {
@@ -274,6 +321,13 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
         status: r.status,
         textPreview: txt.slice(0, 400),
       })
+      // Treatwell 200 + body {"result":"NOT_VERIFIED_CAPTCHA"} — токен
+      // капчи отсутствует / истёк / fingerprint браузера отвергнут.
+      // Это НЕ invalid_credentials — отдельная ветка для UI.
+      if (r.ok && /NOT_VERIFIED_CAPTCHA/i.test(txt)) {
+        sawCaptchaRejected = true
+        continue
+      }
       // Treatwell 200 + body {"result":"NOT_AUTHENTICATED"} — endpoint
       // работает, формат принят, но credentials отклонены. Запоминаем
       // флаг чтобы выдать специфичный код ошибки.
@@ -292,6 +346,14 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     }
   }
   if (!cookies) {
+    if (sawCaptchaRejected) {
+      // Capsolver токен не прошёл / sitekey неверный / Capsolver вернул
+      // expired-token. Это РАЗНОЕ от invalid_credentials — отдельная ошибка.
+      if (!CAPSOLVER_API_KEY) {
+        throw new Error('treatwell_solver_not_configured')
+      }
+      throw new Error('treatwell_solver_failed')
+    }
     if (sawNotAuthenticated) {
       // Owner-feedback 04.06: дифференцируем NOT_AUTHENTICATED:
       //  - если CAPSOLVER_API_KEY не задан в secrets — solver не настроен,
@@ -340,10 +402,10 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
       /* try next */
     }
   }
-  // Auth-response тоже проверяем
-  if (!venueId) {
+  // Auth-response тоже проверяем (последний body successful login).
+  if (!venueId && lastText) {
     try {
-      const authJson = JSON.parse(txt)
+      const authJson = JSON.parse(lastText)
       const id =
         deepFindNumberField(authJson, 'venueId') ?? deepFindNumberField(authJson, 'venue_id')
       if (id) venueId = String(id)

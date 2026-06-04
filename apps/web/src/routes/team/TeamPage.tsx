@@ -356,11 +356,20 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
 
       {/* Invite dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader>
-            <DialogTitle>{t('team.invite_title')}</DialogTitle>
-            <DialogDescription>{t('team.invite_subtitle')}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex max-h-[90vh] w-[min(720px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!max-w-[720px]">
+          <div className="px-5 pt-4">
+            <DialogHeader>
+              <DialogTitle>{t('team.invite_title')}</DialogTitle>
+              <DialogDescription>
+                {t('team.invite_subtitle')}{' '}
+                <span className="text-foreground/80 mt-1 block text-xs">
+                  {t('team.invite_perms_hint', {
+                    defaultValue: 'Доступы — внизу формы (прокрути 👇)',
+                  })}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+          </div>
           <form
             className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-3"
             onSubmit={(e) => {

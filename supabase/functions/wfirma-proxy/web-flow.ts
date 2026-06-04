@@ -57,73 +57,97 @@ function cookieHeader(jar: CookieJar): string {
     .join('; ')
 }
 
+/**
+ * Извлекает wf_token из HTML страницы. Каскад из 6 паттернов — копия из
+ * рабочего бота `bookysync-bot/services/wfirma_web.py:_extract_wf_token`.
+ * Формат токена: `40-hex-chars:hex:digits+digits`.
+ */
 function extractDataToken(html: string): string | null {
-  const m = html.match(/data-token="([^"]+)"/)
-  return m?.[1] ?? null
+  const patterns: RegExp[] = [
+    /data-token=["']([0-9a-f]{40,}:[0-9a-f]+:\d+\+\d+)["']/,
+    /wfToken["']?\s*[:=]\s*["']([0-9a-f:+]+)["']/,
+    /x-wf-token["']?\s*[:=]\s*["']([0-9a-f:+]+)["']/,
+    /data-wf-token=["']([0-9a-f:+]+)["']/,
+    /name=["']wf_token["']\s+value=["']([0-9a-f:+]+)["']/,
+    /"token"\s*:\s*"([0-9a-f]{40,}:[0-9a-f]+:\d+\+\d+)"/,
+    // Catch-all: любой data-token (legacy)
+    /data-token="([^"]+)"/,
+  ]
+  for (const re of patterns) {
+    const m = html.match(re)
+    if (m?.[1]) return m[1]
+  }
+  return null
 }
 
 /**
- * Парсит HTML страницы /user_companies/indexTable в список компаний.
- * Каскад regex от специфичного к общему — wFirma периодически переименовывает
- * CSS-классы, поэтому страхуемся.
- *
- * Возвращает уникальные id (Map), имя берём из первого матча по этому id.
+ * Fallback: ищет токен среди cookies (бот делает `_token_from_cookies`).
+ * Имена: wf_token / wftoken / csrftoken / csrf_token.
+ */
+function tokenFromCookies(jar: CookieJar): string | null {
+  for (const [k, v] of jar.entries()) {
+    if (!v) continue
+    const kl = k.toLowerCase()
+    if (
+      kl.includes('wf_token') ||
+      kl.includes('wftoken') ||
+      kl === 'csrftoken' ||
+      kl === 'csrf_token'
+    ) {
+      return v
+    }
+  }
+  return null
+}
+
+/** Маркеры страницы выбора фирмы — копия `_is_company_select_page` из бота. */
+function isCompanySelectPage(html: string): boolean {
+  return (
+    html.includes('"here":"\\/user_companies') ||
+    html.includes('user_companies/index') ||
+    html.toLowerCase().includes('wybranej firmy')
+  )
+}
+
+/**
+ * Парсит HTML страницы выбора фирм в список компаний. Копия из бота
+ * `bookysync-bot/services/wfirma_web.py:_parse_companies` —
+ * один regex с DOTALL (`[\s\S]` в JS), покрывает и /login/{id} и
+ * /setActive/{id}. Имя из inner-text, теги стрипаются.
  */
 function parseCompaniesFromHtml(html: string): WebFlowCompanyChoice[] {
-  const found = new Map<string, string>()
+  const results: WebFlowCompanyChoice[] = []
+  const seen = new Set<string>()
 
-  const patterns: RegExp[] = [
-    // Cascade 1 (текущий): class="active-brand" между id и текстом
-    /\/user_companies\/login\/(\d+)"[^>]*class="[^"]*active-brand[^"]*"[^>]*>([^<]+)</g,
-    // Cascade 2: любой класс/атрибут после id
-    /\/user_companies\/login\/(\d+)"[^>]*>\s*([^<]+?)\s*</g,
-    // Cascade 3: id + ближайший непустой текст в пределах 200 символов
-    /\/user_companies\/login\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
-    // 04.06 — новые варианты wFirma после ребрендинга UI:
-    //   "Wejdź do firmy" button: /wejdz/{id}
-    /\/wejdz\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
-    //   data-href атрибут
-    /data-href="[^"]*\/(?:user_companies\/login|wejdz)\/(\d+)"[^>]*>([\s\S]{0,200}?)</g,
-    //   data-company-id / data-id с именем рядом
-    /data-(?:company-)?id="(\d+)"[^>]*>([\s\S]{0,200}?)</g,
-    //   onclick="loginCompany(ID, 'Name')" или подобное
-    /onclick="[^"]*\((\d+)[^"]*'([^']+)'/g,
-    //   ссылка на /companies/{id} или /firma/{id}
-    /\/(?:companies|firma|pulpit)\/(\d+)[^>]*>([\s\S]{0,200}?)</g,
-  ]
+  // Главный паттерн: <a href="/user_companies/(login|setActive)/{id}">...</a>
+  const mainRe =
+    /<a[^>]*href=["']\/user_companies\/(?:login|setActive)\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/g
 
-  for (const re of patterns) {
-    for (const m of html.matchAll(re)) {
-      const id = m[1]
-      const rawName = (m[2] ?? '').trim()
-      if (!id || found.has(id)) continue
-      // Чистим от вложенных тегов и спан-маркеров
-      const name = rawName
+  for (const m of html.matchAll(mainRe)) {
+    const id = m[1]
+    const raw = m[2] ?? ''
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const name =
+      raw
         .replace(/<[^>]+>/g, '')
         .replace(/\s+/g, ' ')
-        .trim()
-      if (name) found.set(id, name)
-    }
-    if (found.size > 0) break
+        .trim() || `Firma #${id}`
+    results.push({ id, name })
   }
 
-  // Если никто из паттернов не дал name, но id-шники нашли — генерим placeholder.
-  // Расширил список id-источников теми же путями что выше.
-  if (found.size === 0) {
-    const idsOnly = new Set<string>()
-    const idRe =
-      /\/(?:user_companies\/login|wejdz|companies|firma|pulpit)\/(\d+)|data-(?:company-)?id="(\d+)"/g
+  // Fallback: если основной паттерн ничего не дал — собираем хоть id.
+  if (results.length === 0) {
+    const idRe = /\/user_companies\/(?:login|setActive)\/(\d+)/g
     for (const m of html.matchAll(idRe)) {
-      const id = m[1] ?? m[2]
-      if (id) idsOnly.add(id)
-    }
-    let i = 1
-    for (const id of idsOnly) {
-      found.set(id, `Firma ${i++}`)
+      const id = m[1]
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      results.push({ id, name: `Firma #${id}` })
     }
   }
 
-  return Array.from(found.entries()).map(([id, name]) => ({ id, name }))
+  return results
 }
 
 function multipartBody(fields: Record<string, string>, boundary: string): string {
@@ -160,23 +184,44 @@ export async function generateApiKeyViaWebFlow(
     }
   }
 
-  // Step 2: POST /logowanie — login
+  // Step 2: POST /logowanie — login. 05.06: добавил 4 пустых поля из
+  // рабочего бота (data[Invoice][id], data[Invoice][hash], data[User][lock],
+  // data[User][lockBottomMessage]) — без них wfirma иногда не даёт `wasLogged=yes`
+  // или редиректит на /logowanie снова. Также переключаю на redirect: follow —
+  // wfirma делает 302 → /start с финальными cookies, manual режим эти cookies
+  // не подцеплял.
   const loginBody = new URLSearchParams()
   loginBody.set('data[User][login]', email)
   loginBody.set('data[User][password]', password)
+  loginBody.set('data[Invoice][id]', '')
+  loginBody.set('data[Invoice][hash]', '')
+  loginBody.set('data[User][lock]', '')
+  loginBody.set('data[User][lockBottomMessage]', '')
   res = await fetch('https://wfirma.pl/logowanie', {
     method: 'POST',
-    redirect: 'manual',
+    redirect: 'follow',
     headers: {
       'User-Agent': UA,
       'Content-Type': 'application/x-www-form-urlencoded',
+      Referer: 'https://wfirma.pl/logowanie',
       Cookie: cookieHeader(jar),
     },
     body: loginBody.toString(),
   })
   parseSetCookie(res.headers, jar)
-  await res.text()
-  if (jar.get('wasLogged') !== 'yes') {
+  const loginRespUrl = res.url || ''
+  const loginRespBody = await res.text()
+  // Проверка по wasLogged (наш старый сигнал) ИЛИ по поведению бота:
+  // если финальный URL не содержит /logowanie И body не содержит password/haslo,
+  // значит логин прошёл (попали на dashboard / picker).
+  const loginOkByCookie = jar.get('wasLogged') === 'yes'
+  const loginOkByRedirect =
+    !loginRespUrl.includes('/logowanie') ||
+    !(
+      loginRespBody.toLowerCase().includes('password') ||
+      loginRespBody.toLowerCase().includes('haslo')
+    )
+  if (!loginOkByCookie && !loginOkByRedirect) {
     return { ok: false, reason: 'wfirma_login_failed' }
   }
 
@@ -199,93 +244,109 @@ export async function generateApiKeyViaWebFlow(
   parseSetCookie(res.headers, jar)
   const startHtml = await res.text()
 
-  // pickerMarker — маркеры что на /start пришла страница выбора фирмы.
-  // Если их нет — может быть single-company (token прямо в HTML). Но без
-  // companyId Step 6 не пройдёт (CompanyContext[company_id] обязателен),
-  // поэтому всё равно парсим companies и в worst case возвращаем ошибку
-  // с понятным маркером (а не молча ломаемся в Step 6).
-  const pickerMarker =
-    startHtml.includes('"here":"\\/user_companies"') ||
-    startHtml.includes('user_companies/index') ||
-    startHtml.includes('wybranej firmy')
-
-  const companies = parseCompaniesFromHtml(startHtml)
-  if (companies.length === 0) {
-    // Логируем БОЛЬШЕ HTML — wFirma периодически меняют структуру и без
-    // sample невозможно сложить новый regex. Owner-feedback 04.06: 2
-    // фирмы в кабинете, парсер вернул 0. Также маркер пикера для дебага.
-    const sample = startHtml.slice(0, 1500).replace(/\s+/g, ' ')
-    console.warn(
-      'wfirma: no companies parsed, picker_marker:',
-      pickerMarker,
-      'html sample:',
-      sample,
-    )
-    return {
-      ok: false,
-      reason: 'wfirma_no_companies',
-      details: `parser_no_match. picker_marker=${pickerMarker}. HTML sample (1500ch): ${sample}`,
-    }
-  }
-  // Если фирм несколько — UI должен показать селектор. Возвращаем список
-  // и НЕ создаём ключи (создание происходит при повторном вызове с
-  // `selectedCompanyId`).
+  // Точная логика бота (`login_step1`):
+  //   1. ЕСЛИ /start — это picker фирм → парсим companies → возвращаем выбор
+  //   2. ИНАЧЕ ищем wf_token в HTML или cookies → single-company готова
+  //   3. Если ни picker, ни token — фейл ('nieoczekiwana strona po logowaniu')
+  //
+  // Раньше мы тестировали parseCompaniesFromHtml БЕЗ проверки маркеров и
+  // выдавали 'no_companies' даже single-company юзерам.
+  const pickerPage = isCompanySelectPage(startHtml)
   let chosen: WebFlowCompanyChoice
-  if (companies.length === 1) {
-    chosen = companies[0]!
-  } else if (selectedCompanyId) {
-    const found = companies.find((c) => c.id === selectedCompanyId)
-    if (!found) {
-      return { ok: false, reason: 'wfirma_no_companies', details: 'selected_id_not_in_account' }
+  let pickerCompanies: WebFlowCompanyChoice[] = []
+
+  if (pickerPage) {
+    pickerCompanies = parseCompaniesFromHtml(startHtml)
+    if (pickerCompanies.length === 0) {
+      // Picker маркер есть, но парсер не сматчил. Это значит wfirma изменили
+      // HTML структуру — нужен sample.
+      const sample = startHtml.slice(0, 2000).replace(/\s+/g, ' ')
+      console.warn('wfirma: picker detected but no companies parsed. HTML sample:', sample)
+      return {
+        ok: false,
+        reason: 'wfirma_no_companies',
+        details: `picker_detected_but_parser_failed. HTML sample (2000ch): ${sample}`,
+      }
     }
-    chosen = found
+    // Picker present + companies parsed
+    if (pickerCompanies.length === 1) {
+      chosen = pickerCompanies[0]!
+    } else if (selectedCompanyId) {
+      const found = pickerCompanies.find((c) => c.id === selectedCompanyId)
+      if (!found) {
+        return { ok: false, reason: 'wfirma_no_companies', details: 'selected_id_not_in_account' }
+      }
+      chosen = found
+    } else {
+      return { ok: false, reason: 'choose_company', companies: pickerCompanies }
+    }
   } else {
-    return { ok: false, reason: 'choose_company', companies }
+    // Single-company: picker не показался, нужно достать token прямо из /start.
+    const tokenInStart = extractDataToken(startHtml) ?? tokenFromCookies(jar)
+    if (!tokenInStart) {
+      const sample = startHtml.slice(0, 2000).replace(/\s+/g, ' ')
+      console.warn('wfirma: no picker, no token. HTML sample:', sample)
+      return {
+        ok: false,
+        reason: 'wfirma_form_changed',
+        details: `no_picker_no_token. HTML sample (2000ch): ${sample}`,
+      }
+    }
+    // Single-company готова. companyId пуст — wfirma знает текущую активную.
+    // Но Step 6 требует CompanyContext[company_id]. Попробуем достать через
+    // API endpoint, который вернёт активную company. Если не получится —
+    // оставим пустым (worst case Step 6 вернёт ошибку с понятным сигналом).
+    chosen = { id: '', name: 'default' }
   }
   const companyId = chosen.id
   const companyName = chosen.name
 
-  // Step 4: GET /user_companies/login/{company_id} — выбор фирмы. KIKI bot
-  // reference: иногда `/login/{id}` не отрабатывает (302 без cookies), тогда
-  // фолбэк на `/setActive/{id}`. Затем GET /start ещё раз — теперь без
-  // пикера, с финальным wf_token.
-  res = await fetch(`https://wfirma.pl/user_companies/login/${companyId}`, {
-    method: 'GET',
-    redirect: 'follow',
-    headers: { 'User-Agent': UA, Cookie: cookieHeader(jar) },
-  })
-  parseSetCookie(res.headers, jar)
-  let enterHtml = await res.text()
-  let wfToken = extractDataToken(enterHtml)
+  // Step 4: выбор фирмы. Если companyId пуст (single-company) — пропускаем,
+  // токен уже в /start HTML/cookies. Иначе по схеме бота `select_company`:
+  // пробуем /login/{id}, фолбэк на /setActive/{id}, потом GET /start чтобы
+  // достать финальный wf_token.
+  let wfToken: string | null = null
 
-  // Если /login/{id} не дал token — пробуем /setActive/{id} (alternative endpoint).
-  if (!wfToken) {
-    res = await fetch(`https://wfirma.pl/user_companies/setActive/${companyId}`, {
+  if (companyId) {
+    res = await fetch(`https://wfirma.pl/user_companies/login/${companyId}`, {
       method: 'GET',
       redirect: 'follow',
       headers: { 'User-Agent': UA, Cookie: cookieHeader(jar) },
     })
     parseSetCookie(res.headers, jar)
     await res.text()
+    // Бот делает оба endpoint'а independently, не зависит от status — мы
+    // тоже всегда пробуем setActive если первый не дал нам активную сессию.
+    try {
+      const r2 = await fetch(`https://wfirma.pl/user_companies/setActive/${companyId}`, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { 'User-Agent': UA, Cookie: cookieHeader(jar) },
+      })
+      parseSetCookie(r2.headers, jar)
+      await r2.text()
+    } catch {
+      /* ignore */
+    }
   }
 
-  // Step 4b: GET /start ещё раз — финальный recheck, забираем wf_token.
-  if (!wfToken) {
-    res = await fetch('https://wfirma.pl/start', {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { 'User-Agent': UA, Accept: 'text/html', Cookie: cookieHeader(jar) },
-    })
-    parseSetCookie(res.headers, jar)
-    enterHtml = await res.text()
-    wfToken = extractDataToken(enterHtml)
-  }
+  // Финальный GET /start — забираем wf_token (он в HTML или cookies).
+  res = await fetch('https://wfirma.pl/start', {
+    method: 'GET',
+    redirect: 'follow',
+    headers: { 'User-Agent': UA, Accept: 'text/html', Cookie: cookieHeader(jar) },
+  })
+  parseSetCookie(res.headers, jar)
+  const enterHtml = await res.text()
+  wfToken = extractDataToken(enterHtml) ?? tokenFromCookies(jar)
 
   if (!wfToken) {
+    const sample = enterHtml.slice(0, 1000).replace(/\s+/g, ' ')
+    console.warn('wfirma: no token after company switch. HTML sample:', sample)
     return {
       ok: false,
       reason: 'wfirma_form_changed',
-      details: 'no data-token after enter+setActive+start',
+      details: `no_token_after_switch. companyId=${companyId}. HTML sample (1000ch): ${sample}`,
     }
   }
 
