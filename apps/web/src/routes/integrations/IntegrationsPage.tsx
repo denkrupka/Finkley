@@ -12,7 +12,7 @@ import {
   Send,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -355,6 +355,35 @@ function IntegrationCard({
   const booksySync = useBooksySync(salonId)
   const wfirmaSync = useWfirmaSync(salonId)
   const ksefSync = useKsefSync(salonId)
+  // Owner-feedback 04.06: pg_cron почему-то не fire'ит auto-sync (миграции
+  // применены, функция переписана через rendezvous-token, но last_sync_at
+  // упорно не двигается). Клиентский fallback: при загрузке если KSeF
+  // connected и интервал просрочен — дёргаем sync с клиента. One-shot
+  // per mount через ref-guard. Юзер хотя бы получает синк при открытии
+  // страницы Интеграции.
+  const autoSyncFiredRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (provider.id !== 'ksef') return
+    if (!connection || connection.status !== 'connected') return
+    if (autoSyncFiredRef.current.has(provider.id)) return
+    const interval = connection.sync_interval_minutes ?? 60
+    const lastMs = connection.last_sync_at ? new Date(connection.last_sync_at).getTime() : 0
+    if (Date.now() - lastMs < interval * 60_000) return
+    autoSyncFiredRef.current.add(provider.id)
+    ksefSync.mutate(undefined, {
+      onSuccess: (stats) =>
+        toast.success(
+          t('integrations.toast_synced_short', {
+            defaultValue: 'Авто-синк: +{{n}} фактур',
+            n: stats?.expenses_synced ?? 0,
+          }),
+        ),
+      // Тихие ошибки — не пугаем юзера на каждой загрузке. Кнопка
+      // «Синхронизировать сейчас» рядом для явного retry.
+      onError: () => {},
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider.id, connection?.id, connection?.status, connection?.last_sync_at])
   // Универсальный sync для accounting-порталов с api_token-style auth.
   // Передаём null для booksy/wfirma/ksef — они выше в собственных хуках.
   const accountingProviderId =

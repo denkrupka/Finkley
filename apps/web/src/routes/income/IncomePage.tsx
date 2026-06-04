@@ -94,6 +94,8 @@ export function IncomePage({
 
   // Embedded: локальный state вместо URL params чтобы не дёргать history родителя.
   const [localTab, setLocalTab] = useState<IncomeTab>('visits')
+  // Owner 04.06: поиск-фильтр в Банкинге.
+  const [bankingSearchQ, setBankingSearchQ] = useState<string>('')
   const tabParam = params.get('tab')
   const urlTab: IncomeTab = isIncomeTab(tabParam) ? tabParam : 'visits'
   // T36 — per-tab permissions для income (visits/sales/banking).
@@ -170,12 +172,27 @@ export function IncomePage({
           onToggleOtherIncomeSelection={onToggleOtherIncomeSelection}
         />
       ) : (
-        <BankingTransactionsTable
-          salonId={salonId}
-          direction="credit"
-          period={bankingRange}
-          currency={salon?.currency ?? 'PLN'}
-        />
+        <>
+          {/* Owner 04.06: поиск в Банкинге — как в Расходах. */}
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              type="search"
+              value={bankingSearchQ}
+              onChange={(e) => setBankingSearchQ(e.target.value)}
+              placeholder={t('income.banking_search_placeholder', {
+                defaultValue: 'Поиск по контрагенту или назначению…',
+              })}
+              className="border-border bg-card placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
+            />
+          </div>
+          <BankingTransactionsTable
+            salonId={salonId}
+            direction="credit"
+            period={bankingRange}
+            currency={salon?.currency ?? 'PLN'}
+            searchQ={bankingSearchQ}
+          />
+        </>
       )}
     </div>
   )
