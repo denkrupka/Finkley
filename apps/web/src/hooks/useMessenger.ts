@@ -567,13 +567,18 @@ export function useMessengerIntegrations(salonId: string | undefined) {
   })
   // Auto-refresh FB display_name если он плейсхолдер "FB Page 094903"
   // (старый script записывал last-6 digits ID вместо настоящего имени).
-  // One-shot: после успешного refresh — invalidate.
+  // refreshedSalonsRef защищает от infinite loop: если backend failed
+  // обновить (graph token expired / RLS), invalidate → re-fetch → тот же
+  // плейсхолдер → useEffect re-trigger без ref-guard'а.
+  const refreshedSalonsRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!salonId || !query.data) return
+    if (refreshedSalonsRef.current.has(salonId)) return
     const fb = query.data.find(
       (i) => i.channel === 'facebook' && /^FB Page \d{4,8}$/.test(i.display_name ?? ''),
     )
     if (!fb) return
+    refreshedSalonsRef.current.add(salonId)
     void (async () => {
       try {
         const { data: sess } = await supabase.auth.getSession()
