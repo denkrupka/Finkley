@@ -252,6 +252,74 @@ Deno.serve(
         )
       }
 
+      // Retry-проход: если amount пустой/0 при наличии document_number
+      // (значит документ финансовый, не selfie/природа), даём второй
+      // шанс с агрессивным targeted prompt. Owner-feedback 04.06: PDF
+      // FBV 1/6/2026 — все поля извлечены кроме amount=0, расход
+      // сохранился пустой.
+      if ((parsed.amount == null || parsed.amount === 0) && parsed.document_number) {
+        try {
+          const retryRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-api-key': ANTHROPIC_KEY,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-opus-4-7',
+              max_tokens: 200,
+              system:
+                'Ты — OCR-инженер. Документ это финансовый чек/фактура (document_number = ' +
+                parsed.document_number +
+                '). Найди ИТОГ к оплате (Razem brutto / Suma / Do zapłaty / Razem do zapłaty / Brutto razem). ' +
+                'Если итог не виден явно — посчитай как Σ(brutto позиций) или Σ(qty × cena_unit_brutto). ' +
+                'Верни СТРОГО JSON: {"amount": <число brutto, точка десятич. разделитель>, "amount_net": <netto или null>, "vat_rate": <% или null>, "vat_amount": <сумма VAT или null>}. ' +
+                'NULL только если на документе вообще нет денежных полей.',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    contentBlock,
+                    { type: 'text', text: 'Найди ТОЛЬКО суммы. Верни JSON.' },
+                  ],
+                },
+              ],
+            }),
+          })
+          if (retryRes.ok) {
+            const retryData = await retryRes.json()
+            const retryBlock = retryData.content?.[0]
+            if (retryBlock?.type === 'text') {
+              const retryMatch = (retryBlock.text as string).match(/\{[\s\S]*\}/)
+              if (retryMatch) {
+                try {
+                  const retryParsed = JSON.parse(retryMatch[0]) as {
+                    amount?: number | null
+                    amount_net?: number | null
+                    vat_rate?: number | null
+                    vat_amount?: number | null
+                  }
+                  if (retryParsed.amount && retryParsed.amount > 0) {
+                    parsed = {
+                      ...parsed,
+                      amount: retryParsed.amount,
+                      amount_net: retryParsed.amount_net ?? parsed.amount_net,
+                      vat_rate: retryParsed.vat_rate ?? parsed.vat_rate,
+                      vat_amount: retryParsed.vat_amount ?? parsed.vat_amount,
+                    }
+                  }
+                } catch {
+                  /* retry JSON broken — оставляем оригинальный parsed */
+                }
+              }
+            }
+          }
+        } catch {
+          /* retry network — silently fall back to original */
+        }
+      }
+
       return jsonResponse({ ok: true, result: parsed })
     } catch (err) {
       console.error('ocr-receipt', err)

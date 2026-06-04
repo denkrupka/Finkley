@@ -625,6 +625,11 @@ function ActionRow({
                 контрагента которого нет в списке — кнопка "+" открывает
                 CounterpartyEditModal, после save query инвалидируется и юзер
                 выбирает только что созданного. */}
+            {/* Если правило сохранено с именем которого нет в counterparties
+                (юзер переименовал/удалил, или legacy данные) — добавляем
+                его как опцию с пометкой "(удалён)", чтобы юзер видел
+                значение и мог осознанно сменить. Без этого Select показал
+                бы "не выбран" но state остался — путаница. */}
             <div className="mt-1 flex gap-2">
               <Select
                 value={action.counterparty || '__none__'}
@@ -637,6 +642,12 @@ function ActionRow({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">— не выбран —</SelectItem>
+                  {action.counterparty &&
+                  !counterparties.some((cp) => cp.name === action.counterparty) ? (
+                    <SelectItem value={action.counterparty}>
+                      {action.counterparty} (нет в списке)
+                    </SelectItem>
+                  ) : null}
                   {counterparties.map((cp) => (
                     <SelectItem key={cp.id} value={cp.name}>
                       {cp.name}
