@@ -270,8 +270,18 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
   }
   if (!cookies) {
     if (sawNotAuthenticated) {
-      // Конкретный код для UI чтобы показать понятное сообщение про
-      // 2FA / captcha / неправильный пароль.
+      // Owner-feedback 04.06: дифференцируем NOT_AUTHENTICATED:
+      //  - если CAPSOLVER_API_KEY не задан в secrets — solver не настроен,
+      //    Cloudflare turnstile не решён → отдельный код для UI.
+      //  - если задан и turnstile-токен получен, но всё равно
+      //    NOT_AUTHENTICATED — это либо неверный пароль, либо anti-bot
+      //    отверг даже с solved токеном (fingerprint).
+      if (!CAPSOLVER_API_KEY) {
+        throw new Error('treatwell_solver_not_configured')
+      }
+      if (turnstileSiteKey && !turnstileToken) {
+        throw new Error('treatwell_solver_failed')
+      }
       throw new Error('treatwell_invalid_credentials')
     }
     throw new Error(

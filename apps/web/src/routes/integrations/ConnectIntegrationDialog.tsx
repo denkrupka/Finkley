@@ -23,6 +23,20 @@ import type { IntegrationDef, IntegrationProvider } from './integrations-config'
 
 const ACCOUNTING_PROVIDERS: IntegrationProvider[] = ['fakturownia', 'infakt']
 
+/**
+ * Маппинг treatwell-proxy error codes на i18n ключи. Owner-feedback 04.06:
+ * дифференцируем причины NOT_AUTHENTICATED (solver не настроен / solver
+ * не сработал / Treatwell отверг credentials после solver).
+ */
+function pickTreatwellErrorKey(raw: string): string | null {
+  if (raw.includes('treatwell_solver_not_configured'))
+    return 'integrations.errors.treatwell_solver_not_configured'
+  if (raw.includes('treatwell_solver_failed')) return 'integrations.errors.treatwell_solver_failed'
+  if (raw.includes('treatwell_invalid_credentials'))
+    return 'integrations.errors.treatwell_invalid_credentials'
+  return null
+}
+
 function isAccountingProvider(id: IntegrationProvider): id is 'fakturownia' | 'infakt' {
   return ACCOUNTING_PROVIDERS.includes(id)
 }
@@ -113,22 +127,15 @@ export function ConnectIntegrationDialog({
           })
           if (error) {
             const raw = error.message ?? String(error)
-            // Спец-коды proxy → понятные сообщения юзеру.
-            if (raw.includes('treatwell_invalid_credentials')) {
-              toast.error(t('integrations.errors.treatwell_invalid_credentials'))
-            } else {
-              toast.error(raw)
-            }
+            const errKey = pickTreatwellErrorKey(raw)
+            toast.error(errKey ? t(errKey) : raw)
             return
           }
           const res = data as { ok?: boolean; error?: string; note?: string } | null
           if (!res?.ok) {
             const code = res?.error ?? 'connect_failed'
-            if (code === 'treatwell_invalid_credentials') {
-              toast.error(t('integrations.errors.treatwell_invalid_credentials'))
-            } else {
-              toast.error(code)
-            }
+            const errKey = pickTreatwellErrorKey(code)
+            toast.error(errKey ? t(errKey) : code)
             return
           }
           toast.success(

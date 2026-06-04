@@ -3840,7 +3840,9 @@
       "infakt_invalid_credentials": "inFakt не принял токен. Убедись что у тебя партнёрский доступ.",
       "infakt_api_error": "Ошибка inFakt API. Попробуй ещё раз через минуту.",
       "infakt_not_partner_yet": "Интеграция inFakt пока в стадии партнёрской заявки — мы пишем код наперёд, но ключи ещё не выдают.",
-      "treatwell_invalid_credentials": "Treatwell вернул NOT_AUTHENTICATED. Скорее всего сработала Cloudflare-защита (та зелёная капча, которую ты проходишь в браузере на connect.treatwell.de). Headless API не умеет её пройти — нужен token-mode (копирование cookie из браузера) — добавим в ближайшем спринте. Если уверен что email/пароль точные — это оно."
+      "treatwell_invalid_credentials": "Treatwell отверг логин/пароль. Капча пройдена через Capsolver, но credentials не подошли. Проверь email и пароль — попробуй залогиниться в браузере на connect.treatwell.de чтобы убедиться.",
+      "treatwell_solver_not_configured": "Capsolver не настроен на сервере — антикапча не работает. Свяжись с админом, чтобы добавил CAPSOLVER_API_KEY в Supabase secrets.",
+      "treatwell_solver_failed": "Capsolver не смог решить капчу Treatwell. Возможно лимит запросов или временная проблема — попробуй через 1-2 минуты."
     },
     "status": {
       "available": "Готово",
