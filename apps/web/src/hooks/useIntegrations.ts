@@ -302,6 +302,34 @@ export function useUpdateBooksyInterval(salonId: string | undefined) {
   })
 }
 
+/**
+ * Универсальный апдейт sync_interval_minutes для не-Booksy интеграций
+ * (ksef/wfirma/fakturownia/infakt/treatwell). Прямой UPDATE через
+ * Supabase — RLS на salon_integrations позволяет members своего салона.
+ * Owner-feedback 04.06: dropdown в IntegrationsPage показывал toast
+ * "Частота обновлена", но useUpdateBooksyInterval шёл в booksy-proxy,
+ * который игнорировал другие providers — UPDATE не происходил, dropdown
+ * откатывался после invalidateQueries.
+ */
+export function useUpdateProviderInterval(provider: string, salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (intervalMinutes: number) => {
+      if (!salonId) throw new Error('no salon')
+      const { error } = await supabase
+        .from('salon_integrations')
+        .update({ sync_interval_minutes: intervalMinutes })
+        .eq('salon_id', salonId)
+        .eq('provider', provider)
+      if (error) throw error
+      return intervalMinutes
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
 /** Очистить все импортированные визиты (для re-sync с новым форматом). */
 export function useClearBooksyVisits(salonId: string | undefined) {
   const qc = useQueryClient()

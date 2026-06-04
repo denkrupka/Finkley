@@ -30,6 +30,7 @@ import {
   useKsefSync,
   useSalonIntegrations,
   useUpdateBooksyInterval,
+  useUpdateProviderInterval,
   useWfirmaSync,
   type IntegrationProvider,
   type SalonIntegrationPublic,
@@ -363,7 +364,11 @@ function IntegrationCard({
   const clearVisits = useClearBooksyVisits(salonId)
   const backfillAppts = useBackfillBooksyApptUids(salonId)
   const forceHistoryResync = useForceBooksyHistoryResync(salonId)
-  const updateInterval = useUpdateBooksyInterval(salonId)
+  // Booksy имеет свой edge-function update_interval (он re-schedule'ит
+  // pg_cron job). Остальные провайдеры → прямой UPDATE через RLS.
+  const updateBooksyInterval = useUpdateBooksyInterval(salonId)
+  const updateProviderInterval = useUpdateProviderInterval(provider.id, salonId)
+  const updateInterval = provider.id === 'booksy' ? updateBooksyInterval : updateProviderInterval
   const isLocked = provider.status !== 'available' && provider.status !== 'in_research'
   const isConnected = !!connection && connection.status !== 'disconnected'
 
