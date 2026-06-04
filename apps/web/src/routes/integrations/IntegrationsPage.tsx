@@ -521,11 +521,23 @@ function IntegrationCard({
             provider.id === 'ksef' ||
             provider.id === 'fakturownia' ||
             provider.id === 'infakt' ? (
-              <p className="text-foreground mt-1 font-semibold">
+              <p
+                className="text-foreground mt-1 font-semibold"
+                title={
+                  connection.last_sync_stats.skip_reasons &&
+                  connection.last_sync_stats.skip_reasons.length > 0
+                    ? `Причины пропуска:\n${connection.last_sync_stats.skip_reasons.slice(0, 20).join('\n')}`
+                    : undefined
+                }
+              >
                 {t('integrations.last_sync_stats_expenses', {
                   synced: connection.last_sync_stats.expenses_synced ?? 0,
                   skipped: connection.last_sync_stats.expenses_skipped ?? 0,
                 })}
+                {connection.last_sync_stats.skip_reasons &&
+                connection.last_sync_stats.skip_reasons.length > 0 ? (
+                  <span className="text-muted-foreground ml-1 cursor-help text-xs">ⓘ</span>
+                ) : null}
               </p>
             ) : (
               <p className="text-foreground mt-1 font-semibold">

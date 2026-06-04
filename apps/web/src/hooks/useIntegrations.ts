@@ -29,6 +29,7 @@ export type SalonIntegrationPublic = {
     // wFirma / KSeF / Fakturownia / iFirma / 360Księgowość
     expenses_synced?: number
     expenses_skipped?: number
+    skip_reasons?: string[]
   } | null
   last_error: string | null
   connected_at: string
