@@ -191,7 +191,13 @@ export function BankRuleEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:!max-w-3xl">
+      {/* showClose={false} — DialogContent рендерит свой стандартный close
+          (см. dialog.tsx). Мы рисуем свой ниже в шапке — иначе 2 крестика
+          в верхнем правом углу (owner-feedback 04.06). */}
+      <DialogContent
+        showClose={false}
+        className="sm:!w-[min(1100px,calc(100vw-2rem))] sm:!max-w-[min(1100px,calc(100vw-2rem))]"
+      >
         <div className="border-border flex items-start justify-between gap-3 border-b px-5 py-3">
           <h3 className="text-foreground text-base font-bold">
             {rule ? 'Редактирование правила' : 'Новое правило'}
@@ -429,8 +435,8 @@ function ConditionRow({
   }
 
   return (
-    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">
-      <div className="w-full min-w-0 sm:min-w-[140px] sm:flex-1">
+    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-nowrap sm:items-end">
+      <div className="w-full min-w-0 sm:w-[170px] sm:shrink-0">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Поле
         </label>
@@ -447,7 +453,7 @@ function ConditionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-full min-w-0 sm:min-w-[140px] sm:flex-1">
+      <div className="w-full min-w-0 sm:w-[200px] sm:shrink-0">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Условие
         </label>
@@ -473,7 +479,7 @@ function ConditionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-full min-w-0 sm:min-w-[200px] sm:flex-[2]">
+      <div className="w-full min-w-0 sm:flex-1">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           {isText ? 'Текст' : 'Сумма (PLN)'}
         </label>
@@ -540,8 +546,8 @@ function ActionRow({
   const availableTypes = ['set_category', 'set_counterparty', 'ignore'] as const
 
   return (
-    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-wrap sm:items-end">
-      <div className="w-full min-w-0 sm:min-w-[160px] sm:flex-1">
+    <div className="border-border bg-muted/10 relative flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:flex-nowrap sm:items-end">
+      <div className="w-full min-w-0 sm:w-[200px] sm:shrink-0">
         <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
           Действие
         </label>
@@ -561,7 +567,7 @@ function ActionRow({
           </SelectContent>
         </Select>
       </div>
-      <div className="w-full min-w-0 sm:min-w-[200px] sm:flex-[2]">
+      <div className="w-full min-w-0 sm:flex-1">
         {action.type === 'set_category' ? (
           <>
             <label className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
