@@ -612,7 +612,26 @@ Deno.serve(async (req: Request) => {
         }
         return jsonResponse({ ok: true, via: 'smtp' })
       } catch (e) {
-        return jsonResponse({ ok: false, error: (e as Error).message }, 500)
+        // Расшифровка типичных Gmail SMTP ошибок (юзер 04.06: ответ
+        // отправил, но получателю не пришёл → не было видно почему).
+        const raw = (e as Error).message ?? String(e)
+        let friendly = raw
+        const r = raw.toLowerCase()
+        if (
+          r.includes('username and password not accepted') ||
+          r.includes('5.7.8') ||
+          r.includes('badcredentials')
+        ) {
+          friendly =
+            'Gmail отклонил логин/пароль. Если у тебя 2-Step Verification — нужен app-password ' +
+            '(myaccount.google.com → Security → 2-Step Verification → App passwords). ' +
+            'Обычный пароль не работает.'
+        } else if (r.includes('must issue a starttls')) {
+          friendly = 'SMTP-сервер требует STARTTLS — проверь, что порт 587 (не 25 / не 465).'
+        } else if (r.includes('5.7.0')) {
+          friendly = 'Gmail блокирует менее безопасное приложение. Включи app-password или OAuth.'
+        }
+        return jsonResponse({ ok: false, error: friendly }, 500)
       }
     }
     return jsonResponse({ ok: false, error: 'not_connected' }, 404)

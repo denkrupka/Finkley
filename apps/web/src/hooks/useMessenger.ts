@@ -363,6 +363,15 @@ export function useSendMessage(salonId: string | undefined) {
         if (fallback.error) throw fallback.error
         return fallback.data as MessengerMessage
       }
+      // Owner-feedback 04.06: messenger-send всегда возвращает ok:true (сообщение
+      // записано в БД и видно в UI), но delivery_error отдельно. Если внешний
+      // канал не принял (SMTP auth fail, FB token expired, и т.д.) — UI раньше
+      // показывал «отправлено» хотя по факту никто не получил. Делаем throw
+      // чтобы onError выше показал tост.
+      const resp = data as { ok?: boolean; delivered?: boolean; delivery_error?: string | null }
+      if (resp?.delivery_error) {
+        throw new Error(resp.delivery_error)
+      }
       return data as MessengerMessage
     },
     onSuccess: (_d, vars) => {
