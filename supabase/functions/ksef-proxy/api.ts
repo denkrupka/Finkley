@@ -400,46 +400,84 @@ export async function closeSession(accessToken: string): Promise<void> {
 
 export async function querySubjectInvoices(
   accessToken: string,
-  opts: { dateFrom: string; dateTo: string; subjectType: 'subject1' | 'subject2' },
+  opts: {
+    dateFrom: string
+    dateTo: string
+    subjectType: 'subject1' | 'subject2'
+    /** 'Invoicing' = по дате выставления, 'Acquisition' = по дате получения в KSeF (рекомендуется для импорта). */
+    dateType?: 'Invoicing' | 'Acquisition'
+  },
 ): Promise<{ ok: true; invoices: KsefInvoiceListItem[] } | KsefError> {
   // KSeF 2.0: POST /invoices/query/metadata. С 2026 фильтры на top-level
   // (не в обёртке invoiceQueryFilters): subjectType + dateRange прямо в body.
   // E2E проверено с реальным токеном — обёртка filters/invoiceQueryFilters
   // даёт 400 "filters.subjectType must not be empty".
-  const body = {
-    pageOffset: 0,
-    pageSize: 100,
-    subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
-    dateRange: {
-      dateType: 'Invoicing',
-      from: `${opts.dateFrom}T00:00:00.000Z`,
-      to: `${opts.dateTo}T23:59:59.999Z`,
-    },
-  }
-  try {
-    const res = await fetch(`${baseUrl()}/invoices/query/metadata`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${accessToken}`,
+  //
+  // Pagination: KSeF API возвращает page-by-page. Loop пока есть результаты
+  // (owner-feedback 05.06: фактуры за июнь 2026 не подтянулись —
+  // dateType 'Invoicing' пропускает фактуры с выставлением в прошлом, но
+  // отправленные в KSeF недавно. 'Acquisition' = дата получения в KSeF,
+  // охватывает все «свежие в KSeF» фактуры).
+  const dateType = opts.dateType ?? 'Acquisition'
+  const allInvoices: Array<Record<string, unknown>> = []
+  const pageSize = 100
+  let pageOffset = 0
+  let lastError: KsefError | null = null
+  for (let i = 0; i < 50; i++) {
+    // safety cap 50 pages = 5000 фактур
+    const body = {
+      pageOffset,
+      pageSize,
+      subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
+      dateRange: {
+        dateType,
+        from: `${opts.dateFrom}T00:00:00.000Z`,
+        to: `${opts.dateTo}T23:59:59.999Z`,
       },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const text = await res.text()
-      return {
-        ok: false,
-        code: res.status === 401 ? 'AUTH' : 'HTTP',
-        status: res.status,
-        message: text.slice(0, 500),
+    }
+    try {
+      const res = await fetch(`${baseUrl()}/invoices/query/metadata`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        lastError = {
+          ok: false,
+          code: res.status === 401 ? 'AUTH' : 'HTTP',
+          status: res.status,
+          message: text.slice(0, 500),
+        }
+        break
       }
+      const json = (await res.json()) as {
+        invoiceHeaderList?: Array<Record<string, unknown>>
+        invoices?: Array<Record<string, unknown>>
+      }
+      const pageList = json.invoices ?? json.invoiceHeaderList ?? []
+      if (pageList.length === 0) break
+      allInvoices.push(...pageList)
+      if (pageList.length < pageSize) break
+      pageOffset += pageSize
+    } catch (e) {
+      lastError = {
+        ok: false,
+        code: 'NET',
+        status: 0,
+        message: e instanceof Error ? e.message : String(e),
+      }
+      break
     }
-    const json = (await res.json()) as {
-      invoiceHeaderList?: Array<Record<string, unknown>>
-      invoices?: Array<Record<string, unknown>>
-    }
-    const list = json.invoices ?? json.invoiceHeaderList ?? []
+  }
+  if (allInvoices.length === 0 && lastError) return lastError
+  // Передаём накопленный список в существующую обработку (не меняем mapping).
+  try {
+    const list = allInvoices
     const invoices: KsefInvoiceListItem[] = list.map((row) => {
       // Новый формат (2026+): seller/buyer прямо на корне с {nip, name} или
       // {identifier:{type, value}, name}. Legacy форматы (subject1/subject2)
