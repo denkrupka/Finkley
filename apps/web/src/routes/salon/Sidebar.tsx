@@ -52,13 +52,8 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
     <aside
       data-tour="sidebar"
       className={cn(
-        // Bug 2c986f86 (Елена 06.06): h-screen на mobile залезала под URL-бар,
-        // нижние пункты обрезались — переходим на h-full, чтобы внутри drawer
-        // (h-dvh) аккуратно заполнить высоту. width=w-full даёт растягивание
-        // до ширины родителя (на desktop sidebar — фикс-контейнер, тоже w-full
-        // в пределах sticky-обёртки).
-        'border-border bg-card flex h-full w-full flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
-        collapsed ? 'px-2 lg:w-[64px] lg:px-2' : 'px-3.5 lg:w-[232px] lg:px-3.5',
+        'border-border bg-card flex h-screen flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
+        collapsed ? 'w-[64px] px-2' : 'w-[232px] px-3.5',
       )}
     >
       {/* Logo + кнопка сворачивания. T28 — кнопка перенесена снизу наверх к
