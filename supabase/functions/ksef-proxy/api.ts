@@ -496,6 +496,14 @@ export async function querySubjectInvoices(
       }
     }
     void pages
+    // 05.06: если этот dateType дал результаты — break outer, не пробуем
+    // следующие (KSeF возвращает то же или 400). Раньше шли по всем 3 и
+    // last_error из PermanentStorage/Hidden 400 запоминался хотя данные
+    // были собраны.
+    if (dtSuccess) {
+      lastError = null
+      break
+    }
   }
   const allInvoices = Array.from(allMap.values())
   if (!anySuccess && allInvoices.length === 0 && lastError) return lastError
