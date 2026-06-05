@@ -413,68 +413,92 @@ export async function querySubjectInvoices(
   // E2E проверено с реальным токеном — обёртка filters/invoiceQueryFilters
   // даёт 400 "filters.subjectType must not be empty".
   //
-  // Pagination: KSeF API возвращает page-by-page. Loop пока есть результаты
-  // (owner-feedback 05.06: фактуры за июнь 2026 не подтянулись —
-  // dateType 'Invoicing' пропускает фактуры с выставлением в прошлом, но
-  // отправленные в KSeF недавно. 'Acquisition' = дата получения в KSeF,
-  // охватывает все «свежие в KSeF» фактуры).
-  const dateType = opts.dateType ?? 'Acquisition'
-  const allInvoices: Array<Record<string, unknown>> = []
+  // Owner-feedback 05.06: «есть новодобавленные фактуры в KSeF — не
+  // затянуло». KSeF API не принимает 'Acquisition' ('Nieczytelna treść').
+  // Документация называет enum InvoiceQueryDateType по-разному. Ретраим
+  // несколько имён, дедупим по ksefNumber → так захватываем фактуры
+  // независимо от того что серверу нравится сейчас.
+  const dateTypesToTry: string[] = opts.dateType
+    ? [opts.dateType]
+    : ['Invoicing', 'PermanentStorage', 'Hidden']
+  const allMap = new Map<string, Record<string, unknown>>()
   const pageSize = 100
-  let pageOffset = 0
   let lastError: KsefError | null = null
-  for (let i = 0; i < 50; i++) {
-    // safety cap 50 pages = 5000 фактур
-    const body = {
-      pageOffset,
-      pageSize,
-      subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
-      dateRange: {
-        dateType,
-        from: `${opts.dateFrom}T00:00:00.000Z`,
-        to: `${opts.dateTo}T23:59:59.999Z`,
-      },
-    }
-    try {
-      const res = await fetch(`${baseUrl()}/invoices/query/metadata`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+  let anySuccess = false
+  for (const dt of dateTypesToTry) {
+    let pageOffset = 0
+    let dtSuccess = false
+    let pages = 0
+    for (let i = 0; i < 50; i++) {
+      pages++
+      const body = {
+        pageOffset,
+        pageSize,
+        subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
+        dateRange: {
+          dateType: dt,
+          from: `${opts.dateFrom}T00:00:00.000Z`,
+          to: `${opts.dateTo}T23:59:59.999Z`,
         },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        lastError = {
-          ok: false,
-          code: res.status === 401 ? 'AUTH' : 'HTTP',
-          status: res.status,
-          message: text.slice(0, 500),
+      }
+      try {
+        const res = await fetch(`${baseUrl()}/invoices/query/metadata`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) {
+          const text = await res.text()
+          if (res.status === 401) {
+            return { ok: false, code: 'AUTH', status: res.status, message: text.slice(0, 500) }
+          }
+          if (!dtSuccess) {
+            lastError = {
+              ok: false,
+              code: 'HTTP',
+              status: res.status,
+              message: `dateType=${dt}: ${text.slice(0, 400)}`,
+            }
+          }
+          break // следующий dateType
+        }
+        dtSuccess = true
+        anySuccess = true
+        const json = (await res.json()) as {
+          invoiceHeaderList?: Array<Record<string, unknown>>
+          invoices?: Array<Record<string, unknown>>
+        }
+        const pageList = json.invoices ?? json.invoiceHeaderList ?? []
+        if (pageList.length === 0) break
+        for (const row of pageList) {
+          const k =
+            (typeof row.ksefNumber === 'string' ? row.ksefNumber : null) ??
+            (typeof row.ksefReferenceNumber === 'string' ? row.ksefReferenceNumber : null) ??
+            ''
+          if (k && !allMap.has(k)) allMap.set(k, row)
+        }
+        if (pageList.length < pageSize) break
+        pageOffset += pageSize
+      } catch (e) {
+        if (!dtSuccess) {
+          lastError = {
+            ok: false,
+            code: 'NET',
+            status: 0,
+            message: e instanceof Error ? e.message : String(e),
+          }
         }
         break
       }
-      const json = (await res.json()) as {
-        invoiceHeaderList?: Array<Record<string, unknown>>
-        invoices?: Array<Record<string, unknown>>
-      }
-      const pageList = json.invoices ?? json.invoiceHeaderList ?? []
-      if (pageList.length === 0) break
-      allInvoices.push(...pageList)
-      if (pageList.length < pageSize) break
-      pageOffset += pageSize
-    } catch (e) {
-      lastError = {
-        ok: false,
-        code: 'NET',
-        status: 0,
-        message: e instanceof Error ? e.message : String(e),
-      }
-      break
     }
+    void pages
   }
-  if (allInvoices.length === 0 && lastError) return lastError
+  const allInvoices = Array.from(allMap.values())
+  if (!anySuccess && allInvoices.length === 0 && lastError) return lastError
   // Передаём накопленный список в существующую обработку (не меняем mapping).
   try {
     const list = allInvoices
