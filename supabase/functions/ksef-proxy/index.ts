@@ -169,6 +169,8 @@ type SyncStats = {
   query_window?: string
   /** Pagination diagnostic — keys/count/hasMore первых страниц для дебага. */
   pagination_debug?: string[]
+  /** Сколько фактур импортнулось без XML (getInvoiceXml упал/upload failed) — глазок-viewer не работает для них. */
+  xml_missing?: number
   /** Краткие причины каждого skip — для debug в UI/логах. */
   skip_reasons?: string[]
 }
@@ -394,6 +396,18 @@ async function syncKsefToFinkley(
           }
         }
         xmlPath = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
+        if (!xmlPath) {
+          console.warn(`[ksef-sync] uploadKsefXml returned null for ${inv.ksefReferenceNumber}`)
+          stats.xml_missing = (stats.xml_missing ?? 0) + 1
+        }
+      } else {
+        stats.xml_missing = (stats.xml_missing ?? 0) + 1
+        // 05.06: receipt_url=null для всех KSeF фактур — глазок-viewer не
+        // открывается. Логируем причину чтобы было видно (логи logflare
+        // имеют lag, но stats покажет).
+        console.warn(
+          `[ksef-sync] getInvoiceXml failed for ${inv.ksefReferenceNumber}: code=${xmlRes.code} status=${'status' in xmlRes ? xmlRes.status : ''} msg=${'message' in xmlRes ? (xmlRes.message ?? '').slice(0, 200) : ''}`,
+        )
       }
 
       if (!detail.totalGross || detail.totalGross <= 0) {
