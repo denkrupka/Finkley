@@ -1,4 +1,3 @@
-import * as Dialog from '@radix-ui/react-dialog'
 import { format } from 'date-fns'
 import { Suspense, useEffect, useState } from 'react'
 
@@ -218,26 +217,30 @@ export function SalonLayout() {
         />
       </div>
 
-      {/* Sidebar mobile в Drawer. Dialog.Content получает явный bg/ширину,
-          чтобы тёмная тема не превращала drawer в чёрный экран (Sidebar
-          внутри имеет bg-card, но без подложки Dialog.Content рендерил пустой
-          контейнер до того как Sidebar успевал прорисовать содержимое).
-          Bug 2c986f86: drawer ширина = ровно ширине Sidebar (232px), чтобы
-          справа не оставалась пустая подложка от Dialog.Content. Sidebar
-          внутри остаётся со своим w-[232px] / h-screen — без модификаций,
-          которые могли бы сломать визуальный рендер на разных вьюпортах. */}
-      <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden" />
-          <Dialog.Content
-            className="bg-card fixed inset-y-0 left-0 z-50 w-[232px] max-w-[85vw] focus:outline-none lg:hidden"
-            aria-describedby={undefined}
+      {/* Sidebar mobile в Drawer. Bug 2c986f86 (Елена 06.06): Radix Dialog
+          с Portal на некоторых mobile-браузерах (Telegram WebView, embedded)
+          рендерил пустой контейнер вместо Sidebar — портал терял контекст
+          или ловил background re-render. Заменяем на чистый CSS drawer:
+          overlay + slide-in panel прямо в дереве, без портала, без фокус-
+          трапа Radix. Закрытие — клик по overlay или onNavigate из Sidebar. */}
+      {drawerOpen ? (
+        <div className="lg:hidden">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="close menu"
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('nav.drawer_title')}
+            className="bg-card fixed inset-y-0 left-0 z-50 w-[232px] max-w-[85vw] shadow-2xl"
           >
-            <Dialog.Title className="sr-only">{t('nav.drawer_title')}</Dialog.Title>
             <Sidebar salonId={salon.id} onNavigate={() => setDrawerOpen(false)} />
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </div>
+        </div>
+      ) : null}
 
       {/* Right side: TopBar + content + FAB + BottomNav.
           На десктопе сдвинут вправо на ширину фиксированного sidebar (232px).
