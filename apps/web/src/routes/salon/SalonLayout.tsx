@@ -4,7 +4,17 @@ import { Suspense, useEffect, useState } from 'react'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { getDateLocale } from '@/lib/utils/format-date'
 import { useTranslation } from 'react-i18next'
-import { Navigate, Outlet, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import {
+  Navigate,
+  NavLink,
+  Outlet,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
+
+import { LogoLockup } from '@/components/ui/logo'
+import { NAV_ITEMS } from './nav-config'
 
 import { trackUserAction } from '@/lib/analytics/track-user-action'
 
@@ -217,46 +227,18 @@ export function SalonLayout() {
         />
       </div>
 
-      {/* Sidebar mobile в Drawer. Bug 2c986f86 (Елена 06.06): Radix Dialog
-          с Portal на mobile рендерил тёмный экран без содержимого. Чистый
-          conditional + inline-стили исключают любые проблемы с CSS-
-          переменными bg-card / класс-конфликтами / порталом. */}
+      {/* Sidebar mobile в Drawer. Bug 2c986f86 (Елена 06.06): Sidebar
+          компонент по непонятной причине не рендерил содержимое внутри
+          drawer на телефоне (на десктопе работал). Заменяем на inline-
+          верстку с минимальной зависимостью — прямые NavLink + i18n keys
+          без хуков permissions/membership/reviews/messenger которые могли
+          бы фейлиться. */}
       {drawerOpen ? (
-        <div className="lg:hidden">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(false)}
-            aria-label="close menu"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 40,
-              backgroundColor: 'rgba(0,0,0,0.45)',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-            }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('nav.drawer_title')}
-            style={{
-              position: 'fixed',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              zIndex: 50,
-              width: 232,
-              maxWidth: '85vw',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
-              backgroundColor: 'hsl(var(--card))',
-              overflowY: 'auto',
-            }}
-          >
-            <Sidebar salonId={salon.id} onNavigate={() => setDrawerOpen(false)} />
-          </div>
-        </div>
+        <MobileDrawerMenu
+          salonId={salon.id}
+          onClose={() => setDrawerOpen(false)}
+          title={t('nav.drawer_title')}
+        />
       ) : null}
 
       {/* Right side: TopBar + content + FAB + BottomNav.
@@ -369,6 +351,95 @@ export function SalonLayout() {
           gateAction === 'sale' ? setSaleModalOpen(true) : setExpenseModalOpen(true)
         }
       />
+    </div>
+  )
+}
+
+/**
+ * Минимальный mobile-drawer без зависимостей от hooks/permissions/
+ * lazy-загрузок. Bug 2c986f86: полноценный Sidebar не отображался в
+ * drawer на телефоне — заменили на самодостаточный inline-вариант.
+ */
+function MobileDrawerMenu({
+  salonId,
+  onClose,
+  title,
+}: {
+  salonId: string
+  onClose: () => void
+  title: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="lg:hidden">
+      {/* Overlay */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="close menu"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 40,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+        }}
+      />
+      {/* Panel */}
+      <nav
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 50,
+          width: 232,
+          maxWidth: '85vw',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
+          backgroundColor: 'hsl(var(--card, 0 0% 100%))',
+          color: 'hsl(var(--foreground, 0 0% 10%))',
+          overflowY: 'auto',
+          padding: '20px 14px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+        }}
+      >
+        {/* Logo */}
+        <div style={{ marginBottom: 16, padding: '0 8px' }}>
+          <LogoLockup size={28} />
+        </div>
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon
+          return (
+            <NavLink
+              key={item.id}
+              to={`/${salonId}/${item.id}`}
+              onClick={onClose}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 12px',
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: isActive ? 600 : 500,
+                textDecoration: 'none',
+                color: isActive ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
+                backgroundColor: isActive ? 'hsl(var(--primary))' : 'transparent',
+              })}
+            >
+              <Icon size={18} strokeWidth={1.7} style={{ flexShrink: 0 }} />
+              <span>{t(item.i18nKey)}</span>
+            </NavLink>
+          )
+        })}
+      </nav>
     </div>
   )
 }
