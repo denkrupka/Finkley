@@ -407,7 +407,7 @@ export async function querySubjectInvoices(
     /** 'Invoicing' = по дате выставления, 'Acquisition' = по дате получения в KSeF (рекомендуется для импорта). */
     dateType?: 'Invoicing' | 'Acquisition'
   },
-): Promise<{ ok: true; invoices: KsefInvoiceListItem[] } | KsefError> {
+): Promise<{ ok: true; invoices: KsefInvoiceListItem[]; debug?: string[] } | KsefError> {
   // KSeF 2.0: POST /invoices/query/metadata. С 2026 фильтры на top-level
   // (не в обёртке invoiceQueryFilters): subjectType + dateRange прямо в body.
   // E2E проверено с реальным токеном — обёртка filters/invoiceQueryFilters
@@ -423,6 +423,9 @@ export async function querySubjectInvoices(
   // enum value).
   const dateTypesToTry: string[] = opts.dateType ? [opts.dateType] : ['Invoicing']
   const allMap = new Map<string, Record<string, unknown>>()
+  // 05.06: debug — собираем диагностику pagination что вернул KSeF
+  // (видно через last_sync_stats.pagination_debug)
+  const paginationDebug: string[] = []
   // Owner-feedback 05.06: api_returned=10 при том что в KSeF UI видно >20
   // фактур за окно. Корень — pagination сломана: я предполагал что
   // pageSize=100 даст max 100, но KSeF возвращает 10 на page (или меньше).
@@ -480,18 +483,26 @@ export async function querySubjectInvoices(
         const json = (await res.json()) as {
           invoiceHeaderList?: Array<Record<string, unknown>>
           invoices?: Array<Record<string, unknown>>
+          hasMore?: boolean
+          totalCount?: number
+          pagination?: Record<string, unknown>
         }
         const pageList = json.invoices ?? json.invoiceHeaderList ?? []
+        // Capture top-level keys + pagination meta для диагностики
+        if (paginationDebug.length < 5) {
+          const topKeys = Object.keys(json).join(',')
+          paginationDebug.push(
+            `p${pages}(off=${pageOffset}): keys=${topKeys} count=${pageList.length} hasMore=${json.hasMore} total=${json.totalCount}`,
+          )
+        }
         if (pageList.length === 0) {
           emptyStreak++
-          // 2 пустые страницы подряд = конец
           if (emptyStreak >= 2) break
-          // одна пустая может быть результатом offset out-of-range, пробуем
-          // ещё один шаг
           pageOffset += pageSize
           continue
         }
         emptyStreak = 0
+        const beforeAdd = allMap.size
         for (const row of pageList) {
           const k =
             (typeof row.ksefNumber === 'string' ? row.ksefNumber : null) ??
@@ -499,9 +510,10 @@ export async function querySubjectInvoices(
             ''
           if (k && !allMap.has(k)) allMap.set(k, row)
         }
-        // Главный фикс: increment на фактический pageList.length, не на
-        // pageSize. Так получаем ВСЕ страницы независимо от того сколько
-        // KSeF реально вернул.
+        const newAdded = allMap.size - beforeAdd
+        // Если все возвращённые фактуры — дубликаты предыдущих страниц,
+        // значит KSeF игнорирует pageOffset (всегда отдаёт первую страницу).
+        if (newAdded === 0) break
         pageOffset += pageList.length
       } catch (e) {
         if (!dtSuccess) {
@@ -584,7 +596,11 @@ export async function querySubjectInvoices(
         currency: typeof row.currency === 'string' ? row.currency.toUpperCase() : 'PLN',
       }
     })
-    return { ok: true, invoices: invoices.filter((i) => !!i.ksefReferenceNumber) }
+    return {
+      ok: true,
+      invoices: invoices.filter((i) => !!i.ksefReferenceNumber),
+      debug: paginationDebug,
+    }
   } catch (e) {
     return { ok: false, code: 'NETWORK', message: e instanceof Error ? e.message : String(e) }
   }

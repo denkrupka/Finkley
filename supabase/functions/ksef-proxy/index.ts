@@ -167,6 +167,8 @@ type SyncStats = {
   api_returned?: number
   /** Окно запроса dateFrom..dateTo — для UI tooltip. */
   query_window?: string
+  /** Pagination diagnostic — keys/count/hasMore первых страниц для дебага. */
+  pagination_debug?: string[]
   /** Краткие причины каждого skip — для debug в UI/логах. */
   skip_reasons?: string[]
 }
@@ -276,6 +278,7 @@ async function syncKsefToFinkley(
   invoices = list.invoices
   stats.api_returned = invoices.length
   stats.query_window = `${since}..${today}`
+  if (list.debug) stats.pagination_debug = list.debug
   // Owner 04.06: «новые фактуры не подтягиваются». Логируем кол-во и
   // диапазон чтобы понять что возвращает KSeF API на проде. В Supabase
   // Edge Function logs можно увидеть полный список ksef refs.
