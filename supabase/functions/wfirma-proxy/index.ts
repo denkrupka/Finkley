@@ -180,21 +180,35 @@ async function handleConnectWithLogin(
     appKey: WFIRMA_APP_KEY,
     companyId: flowRes.data.companyId,
   }
+  // 05.06: api2.wfirma.pl иногда возвращает 0 компаний сразу после
+  // создания свежего API-ключа (eventual consistency между web-panel и
+  // api2). Но web-flow уже отдал валидные ключи + companyId/companyName,
+  // которые мы УЖЕ знаем. Не блокируемся на NIP — сохраним креды без
+  // него, NIP подцепится при первом успешном sync.
   const find = await wfirmaCompaniesFind(apiCreds)
-  if (!find.ok) {
-    return jsonResponse({ ok: false, error: 'wfirma_keygen_failed', details: find.code })
+  let companyName = flowRes.data.companyName || ''
+  let companyNip = flowRes.data.companyNip || ''
+  let companyId = flowRes.data.companyId
+  if (find.ok) {
+    const company =
+      find.companies.find((c) => String(c.id) === flowRes.data.companyId) ?? find.companies[0]
+    if (company) {
+      companyId = String(company.id)
+      companyName = company.name || companyName
+      companyNip = company.nip || companyNip
+    }
   }
-  const company =
-    find.companies.find((c) => String(c.id) === flowRes.data.companyId) ?? find.companies[0]
-  if (!company) {
-    return jsonResponse({ ok: false, error: 'wfirma_no_companies' })
+  // Дополнительный fallback: если companyName всё ещё пустой и у нас
+  // есть companyId — ставим заглушку «Firma #{id}».
+  if (!companyName && companyId) {
+    companyName = `Firma #${companyId}`
   }
 
-  await saveCreds(admin, salonId, apiCreds, company.name, company.nip, 'auto_login')
+  await saveCreds(admin, salonId, apiCreds, companyName, companyNip, 'auto_login')
 
   return jsonResponse({
     ok: true,
-    company: { id: company.id, name: company.name, nip: company.nip },
+    company: { id: companyId, name: companyName, nip: companyNip },
   })
 }
 

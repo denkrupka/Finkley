@@ -354,124 +354,107 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
         </section>
       ) : null}
 
-      {/* Invite dialog */}
+      {/* Invite dialog — 2 колонки: левая Email/Роль/Мастер, правая Доступы */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="flex max-h-[90vh] w-[min(720px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!max-w-[720px]">
-          <div className="px-5 pt-4">
+        <DialogContent className="flex max-h-[92vh] w-[min(1200px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!max-w-[1200px]">
+          <div className="border-border border-b px-5 py-4">
             <DialogHeader>
               <DialogTitle>{t('team.invite_title')}</DialogTitle>
-              <DialogDescription>
-                {t('team.invite_subtitle')}{' '}
-                <span className="text-foreground/80 mt-1 block text-xs">
-                  {t('team.invite_perms_hint', {
-                    defaultValue: 'Доступы — внизу формы (прокрути 👇)',
-                  })}
-                </span>
-              </DialogDescription>
+              <DialogDescription>{t('team.invite_subtitle')}</DialogDescription>
             </DialogHeader>
           </div>
           <form
-            className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-2 pt-3"
+            className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"
             onSubmit={(e) => {
               e.preventDefault()
               submitInvite()
             }}
           >
-            {/* T26 — блоки Фото/Имя/Фамилия/Телефон удалены: юзер сам заполнит
-                эти данные в форме регистрации после клика по invite-ссылке
-                (см. InviteSignupForm). */}
+            {/* Левая колонка: Email + Роль + Карточка мастера */}
+            <div className="md:border-border flex flex-col gap-4 overflow-y-auto px-5 py-4 md:border-r">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
+                <Input
+                  id="inv-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  autoComplete="email"
+                />
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
-              <Input
-                id="inv-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
-                autoComplete="email"
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('team.invite_role')}</Label>
+                <p className="text-muted-foreground -mt-1 text-xs">
+                  {t('team.invite_role_multi_hint')}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {ROLE_OPTIONS.map((r) => {
+                    const active = selectedRoles.has(r.value)
+                    return (
+                      <label
+                        key={r.value}
+                        className={`border-border flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-sm transition-colors ${
+                          active ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => toggleRole(r.value)}
+                          className="mt-0.5 size-4"
+                        />
+                        <div className="flex-1">
+                          <p className="text-foreground font-semibold">{t(r.key)}</p>
+                          <p className="text-muted-foreground mt-0.5 text-xs">
+                            {t(`team.role_hint.${r.value}`)}
+                          </p>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {isMasterChecked && unlinkedStaff.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="inv-staff-link">{t('team.invite_staff_link')}</Label>
+                  <Select value={staffLinkChoice} onValueChange={setStaffLinkChoice}>
+                    <SelectTrigger id="inv-staff-link">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">{t('team.invite_staff_new')}</SelectItem>
+                      {unlinkedStaff.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.full_name}
+                          {s.external_source ? (
+                            <span className="text-muted-foreground ml-1 text-xs">
+                              · {s.external_source}
+                            </span>
+                          ) : null}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    {staffLinkChoice === 'new'
+                      ? t('team.invite_staff_new_hint')
+                      : t('team.invite_staff_existing_hint')}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Правая колонка: Доступы (дерево разрешений) */}
+            <div className="bg-muted/10 flex flex-col overflow-y-auto px-5 py-4">
+              <PermissionsBlock
+                role={highestRole()}
+                value={permissions ?? undefined}
+                onChange={setPermissions}
               />
             </div>
-            {/* T26 — Имя / Фамилия / Телефон заполняются пользователем при
-                регистрации по invite-ссылке (см. InviteSignupForm). Здесь поля
-                сохраняются в state, но не рендерятся в UI — backend всё ещё
-                принимает их как опциональные при invite.create. */}
-            <div className="flex flex-col gap-1.5">
-              <Label>{t('team.invite_role')}</Label>
-              <p className="text-muted-foreground -mt-1 text-xs">
-                {t('team.invite_role_multi_hint')}
-              </p>
-              <div className="flex flex-col gap-1.5">
-                {ROLE_OPTIONS.map((r) => {
-                  const active = selectedRoles.has(r.value)
-                  return (
-                    <label
-                      key={r.value}
-                      className={`border-border flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-sm transition-colors ${
-                        active ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleRole(r.value)}
-                        className="mt-0.5 size-4"
-                      />
-                      <div className="flex-1">
-                        <p className="text-foreground font-semibold">{t(r.key)}</p>
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          {t(`team.role_hint.${r.value}`)}
-                        </p>
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* T26 — «Связать с мастером» скрываем если все мастера уже
-                привязаны к user_id (unlinkedStaff пуст) — тогда автоматически
-                staffLinkChoice='new', блок не нужен. */}
-            {isMasterChecked && unlinkedStaff.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inv-staff-link">{t('team.invite_staff_link')}</Label>
-                <Select value={staffLinkChoice} onValueChange={setStaffLinkChoice}>
-                  <SelectTrigger id="inv-staff-link">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">{t('team.invite_staff_new')}</SelectItem>
-                    {unlinkedStaff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name}
-                        {s.external_source ? (
-                          <span className="text-muted-foreground ml-1 text-xs">
-                            · {s.external_source}
-                          </span>
-                        ) : null}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs">
-                  {staffLinkChoice === 'new'
-                    ? t('team.invite_staff_new_hint')
-                    : t('team.invite_staff_existing_hint')}
-                </p>
-              </div>
-            ) : null}
-
-            {/* T26 — блок «Доступы». Свёрнут по умолчанию; роль пресетит
-                разрешения (Мастер: видит свои визиты + свой профиль;
-                Администратор: полные права на доходы/расходы/отчёты/склад/
-                маркетинг/мессенджер/AI). Сохранение прав в БД появится в
-                следующей миграции (salon_members.permissions jsonb), сейчас
-                UI отображает преднастройку для подтверждения. */}
-            <PermissionsBlock
-              role={highestRole()}
-              value={permissions ?? undefined}
-              onChange={setPermissions}
-            />
           </form>
           <DialogFooter className="border-border shrink-0 border-t bg-white px-5 py-3">
             <Button
