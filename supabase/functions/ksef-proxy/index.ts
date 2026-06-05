@@ -171,6 +171,8 @@ type SyncStats = {
   pagination_debug?: string[]
   /** Сколько фактур импортнулось без XML (getInvoiceXml упал/upload failed) — глазок-viewer не работает для них. */
   xml_missing?: number
+  /** Конкретные причины xml failures — для определения permission issue vs другая ошибка. */
+  xml_errors?: string[]
   /** Краткие причины каждого skip — для debug в UI/логах. */
   skip_reasons?: string[]
 }
@@ -419,6 +421,12 @@ async function syncKsefToFinkley(
         }
       } else {
         stats.xml_missing = (stats.xml_missing ?? 0) + 1
+        // Сохраняем первые 3 уникальных error для диагностики
+        if (!stats.xml_errors) stats.xml_errors = []
+        const errStr = `${'status' in xmlRes ? xmlRes.status : xmlRes.code}: ${'message' in xmlRes ? (xmlRes.message ?? '').slice(0, 100) : ''}`
+        if (stats.xml_errors.length < 3 && !stats.xml_errors.includes(errStr)) {
+          stats.xml_errors.push(errStr)
+        }
         // 05.06: receipt_url=null для всех KSeF фактур — глазок-viewer не
         // открывается. Логируем причину чтобы было видно (логи logflare
         // имеют lag, но stats покажет).
