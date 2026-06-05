@@ -535,6 +535,7 @@ async function syncKsefToFinkley(
           comment: description.slice(0, 500) || null,
           source: 'ksef',
           external_id: inv.ksefReferenceNumber,
+          receipt_url: xmlPath, // 05.06 — для глазка-viewer KSeF XML
         })
         if (spErr) {
           if (spErr.code === '23505') {
@@ -614,6 +615,123 @@ async function syncKsefToFinkley(
   }
 
   return stats
+}
+
+/**
+ * 05.06 — Backfill XML для existing KSeF фактур (expenses + scheduled_payments)
+ * с receipt_url=null. Используется когда bucket теперь allow XML, но старые
+ * записи ещё без файла.
+ *
+ * Ограничение: 20 записей за вызов (rate limit + edge timeout). Вызывать
+ * повторно через UI кнопку «Подгрузить XML» пока not_done > 0.
+ */
+async function handleBackfillXml(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403)
+  }
+  const creds = await loadCreds(admin, salonId)
+  if (!creds) return jsonResponse({ ok: false, error: 'not_connected' }, 404)
+
+  const session = await openSession(creds.nip, creds.token)
+  if (!session.ok) {
+    return jsonResponse({ ok: false, error: 'ksef_session_failed', code: session.code }, 502)
+  }
+  const accessToken = session.session.accessToken
+
+  // Find KSeF records без receipt_url (в expenses + scheduled_payments).
+  // Limit 20 per call (4s sleep × 20 = 80s, edge timeout 150s).
+  const LIMIT = 20
+  const [{ data: expRows }, { data: spRows }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select('id, external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'ksef')
+      .is('receipt_url', null)
+      .is('deleted_at', null)
+      .not('external_id', 'is', null)
+      .limit(LIMIT),
+    admin
+      .from('scheduled_payments')
+      .select('id, external_id')
+      .eq('salon_id', salonId)
+      .eq('source', 'ksef')
+      .is('receipt_url', null)
+      .is('deleted_at', null)
+      .not('external_id', 'is', null)
+      .limit(LIMIT),
+  ])
+  type RowRef = { table: 'expenses' | 'scheduled_payments'; id: string; ksef: string }
+  const queue: RowRef[] = [
+    ...(expRows ?? []).map(
+      (r) => ({ table: 'expenses', id: r.id as string, ksef: r.external_id as string }) as RowRef,
+    ),
+    ...(spRows ?? []).map(
+      (r) =>
+        ({
+          table: 'scheduled_payments',
+          id: r.id as string,
+          ksef: r.external_id as string,
+        }) as RowRef,
+    ),
+  ].slice(0, LIMIT)
+
+  let processed = 0
+  let updated = 0
+  const errors: string[] = []
+  try {
+    for (const ref of queue) {
+      processed++
+      if (processed > 1) await new Promise((r) => setTimeout(r, 4000))
+      const xml = await getInvoiceXml(accessToken, ref.ksef)
+      if (!xml.ok) {
+        if (errors.length < 3) {
+          errors.push(
+            `${ref.ksef}: ${'status' in xml ? xml.status : xml.code}: ${'message' in xml ? (xml.message ?? '').slice(0, 80) : ''}`,
+          )
+        }
+        continue
+      }
+      const up = await uploadKsefXml(admin, xml.bytes, salonId, ref.ksef)
+      if (!up.path) {
+        if (errors.length < 3) errors.push(`${ref.ksef}: upload_failed ${up.error ?? ''}`)
+        continue
+      }
+      await admin.from(ref.table).update({ receipt_url: up.path }).eq('id', ref.id)
+      updated++
+    }
+  } finally {
+    await closeSession(accessToken)
+  }
+
+  // Check remaining
+  const [{ count: expRemaining }, { count: spRemaining }] = await Promise.all([
+    admin
+      .from('expenses')
+      .select('id', { count: 'exact', head: true })
+      .eq('salon_id', salonId)
+      .eq('source', 'ksef')
+      .is('receipt_url', null)
+      .is('deleted_at', null),
+    admin
+      .from('scheduled_payments')
+      .select('id', { count: 'exact', head: true })
+      .eq('salon_id', salonId)
+      .eq('source', 'ksef')
+      .is('receipt_url', null)
+      .is('deleted_at', null),
+  ])
+  return jsonResponse({
+    ok: true,
+    processed,
+    updated,
+    errors,
+    remaining: (expRemaining ?? 0) + (spRemaining ?? 0),
+  })
 }
 
 async function runSyncForSalon(
@@ -767,6 +885,10 @@ Deno.serve(
       }
       case 'sync':
         return handleSync(admin, userId, body.salon_id)
+      case 'backfill_xml':
+        // 05.06: для existing KSeF фактур без receipt_url (импортнуты до
+        // фикса bucket allow XML) — повторно качаем и uploadим XML.
+        return handleBackfillXml(admin, userId, body.salon_id)
       default:
         return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
     }

@@ -26,6 +26,8 @@ export type ScheduledPaymentRow = {
   amount_net_cents: number | null
   vat_rate_pct: number | null
   vat_skipped: boolean | null
+  /** Путь к KSeF XML / receipt в Storage для глазок-viewer. */
+  receipt_url: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null

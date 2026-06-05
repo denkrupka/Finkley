@@ -412,6 +412,8 @@ export function ExpensesPage({
   const [receiptError, setReceiptError] = useState<string | null>(null)
   // Bug 02.06 (Денис): глазок-кнопка → ExpenseAttachmentsModal с carousel.
   const [viewingExpense, setViewingExpense] = useState<ExpenseRow | null>(null)
+  // 05.06: глазок и для scheduled_payments (неоплаченные KSeF фактуры).
+  const [viewingPayment, setViewingPayment] = useState<ScheduledPaymentRow | null>(null)
 
   async function openReceipt(path: string) {
     setReceiptError(null)
@@ -972,6 +974,24 @@ export function ExpensesPage({
                             </span>
                             {exportMode || isPickerMode ? null : (
                               <div className="flex items-center gap-0.5">
+                                {p.receipt_url ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setViewingPayment(p)
+                                    }}
+                                    className="text-muted-foreground hover:text-brand-teal-deep grid size-9 place-items-center rounded-md"
+                                    aria-label={t('expenses.viewer.open', {
+                                      defaultValue: 'Открыть документ',
+                                    })}
+                                    title={t('expenses.viewer.open', {
+                                      defaultValue: 'Открыть документ',
+                                    })}
+                                  >
+                                    <Eye className="size-4" strokeWidth={1.7} />
+                                  </button>
+                                ) : null}
                                 {canEditPending ? (
                                   <>
                                     <button
@@ -1513,6 +1533,31 @@ export function ExpensesPage({
           expense={viewingExpense}
           currency={currency}
           onClose={() => setViewingExpense(null)}
+        />
+      ) : null}
+
+      {/* 05.06: глазок для scheduled_payments — adapter в ExpenseRow-shape. */}
+      {viewingPayment ? (
+        <ExpenseAttachmentsModal
+          expense={
+            {
+              id: viewingPayment.id,
+              salon_id: viewingPayment.salon_id,
+              category_id: viewingPayment.category_id,
+              expense_at: viewingPayment.due_date,
+              amount_cents: viewingPayment.amount_cents,
+              contractor_name: viewingPayment.vendor_name,
+              description: viewingPayment.comment,
+              invoice_number: viewingPayment.invoice_number,
+              source: viewingPayment.source,
+              external_id: viewingPayment.external_id,
+              receipt_url: viewingPayment.receipt_url,
+              created_at: viewingPayment.created_at,
+              deleted_at: viewingPayment.deleted_at,
+            } as unknown as ExpenseRow
+          }
+          currency={currency}
+          onClose={() => setViewingPayment(null)}
         />
       ) : null}
 
