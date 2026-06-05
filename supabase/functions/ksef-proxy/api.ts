@@ -438,13 +438,19 @@ export async function querySubjectInvoices(
   let anySuccess = false
   for (const dt of dateTypesToTry) {
     let pageOffset = 0
+    let pageNumber = 1
     let dtSuccess = false
     let pages = 0
     let emptyStreak = 0
     for (let i = 0; i < 200; i++) {
       pages++
+      // Owner-feedback 05.06: pageOffset KSeF игнорирует (всегда отдаёт
+      // первую страницу). Отдаём ОБА — pageOffset и pageNumber (1-based)
+      // плюс pageIndex (0-based). Какой KSeF признает — тот сработает.
       const body = {
         pageOffset,
+        pageNumber,
+        pageIndex: pageNumber - 1,
         pageSize,
         subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
         dateRange: {
@@ -512,9 +518,12 @@ export async function querySubjectInvoices(
         }
         const newAdded = allMap.size - beforeAdd
         // Если все возвращённые фактуры — дубликаты предыдущих страниц,
-        // значит KSeF игнорирует pageOffset (всегда отдаёт первую страницу).
+        // значит KSeF игнорирует pagination (отдаёт ту же страницу).
+        // Также break если hasMore=false в response.
         if (newAdded === 0) break
+        if (json.hasMore === false) break
         pageOffset += pageList.length
+        pageNumber++
       } catch (e) {
         if (!dtSuccess) {
           lastError = {
