@@ -233,7 +233,7 @@ async function uploadKsefXml(
   bytes: Uint8Array,
   salonId: string,
   ksefRef: string,
-): Promise<string | null> {
+): Promise<{ path: string | null; error?: string }> {
   const path = `${salonId}/ksef-${ksefRef.replace(/[^a-zA-Z0-9_-]/g, '_')}-${crypto.randomUUID()}.xml`
   const { error } = await admin.storage.from('receipts').upload(path, bytes, {
     contentType: 'application/xml',
@@ -241,9 +241,9 @@ async function uploadKsefXml(
   })
   if (error) {
     console.warn(`ksef xml upload failed for ${ksefRef}: ${error.message}`)
-    return null
+    return { path: null, error: error.message }
   }
-  return path
+  return { path }
 }
 
 async function syncKsefToFinkley(
@@ -414,10 +414,18 @@ async function syncKsefToFinkley(
             totalNet: parsed.totalNet,
           }
         }
-        xmlPath = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
+        const uploadRes = await uploadKsefXml(admin, xmlRes.bytes, salonId, inv.ksefReferenceNumber)
+        xmlPath = uploadRes.path
         if (!xmlPath) {
-          console.warn(`[ksef-sync] uploadKsefXml returned null for ${inv.ksefReferenceNumber}`)
+          console.warn(
+            `[ksef-sync] uploadKsefXml failed for ${inv.ksefReferenceNumber}: ${uploadRes.error}`,
+          )
           stats.xml_missing = (stats.xml_missing ?? 0) + 1
+          if (!stats.xml_errors) stats.xml_errors = []
+          const errStr = `upload(${xmlRes.bytes.byteLength}b): ${uploadRes.error ?? 'unknown'}`
+          if (stats.xml_errors.length < 3 && !stats.xml_errors.includes(errStr)) {
+            stats.xml_errors.push(errStr)
+          }
         }
       } else {
         stats.xml_missing = (stats.xml_missing ?? 0) + 1
