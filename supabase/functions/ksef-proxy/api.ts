@@ -438,20 +438,15 @@ export async function querySubjectInvoices(
   let anySuccess = false
   for (const dt of dateTypesToTry) {
     let pageOffset = 0
-    let pageNumber = 1
     let dtSuccess = false
     let pages = 0
     let emptyStreak = 0
     for (let i = 0; i < 200; i++) {
       pages++
-      // Owner-feedback 05.06: pageOffset KSeF игнорирует (всегда отдаёт
-      // первую страницу). Отдаём ОБА — pageOffset и pageNumber (1-based)
-      // плюс pageIndex (0-based). Какой KSeF признает — тот сработает.
+      // CIRFMF/ksef-api docs: pageOffset/pageSize идут как URL query params,
+      // НЕ в body. Body содержит только InvoiceQueryFilters. Также
+      // указываем sortOrder=Desc чтобы новые фактуры (июнь) пришли первыми.
       const body = {
-        pageOffset,
-        pageNumber,
-        pageIndex: pageNumber - 1,
-        pageSize,
         subjectType: opts.subjectType === 'subject1' ? 'Subject1' : 'Subject2',
         dateRange: {
           dateType: dt,
@@ -460,7 +455,8 @@ export async function querySubjectInvoices(
         },
       }
       try {
-        const res = await fetch(`${baseUrl()}/invoices/query/metadata`, {
+        const url = `${baseUrl()}/invoices/query/metadata?pageOffset=${pageOffset}&pageSize=${pageSize}&sortOrder=Desc`
+        const res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
