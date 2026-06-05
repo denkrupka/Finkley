@@ -255,28 +255,60 @@ export async function generateApiKeyViaWebFlow(
   let chosen: WebFlowCompanyChoice
   let pickerCompanies: WebFlowCompanyChoice[] = []
 
+  // Логируем что увидели — для дебага владельца через Management API.
+  console.log('wfirma /start parsed:', {
+    pickerPage,
+    htmlLen: startHtml.length,
+    cookieNames: Array.from(jar.keys()),
+    selectedCompanyId,
+  })
+
   if (pickerPage) {
     pickerCompanies = parseCompaniesFromHtml(startHtml)
+    console.log(
+      'wfirma picker companies:',
+      pickerCompanies.map((c) => `${c.id}:${c.name}`).join(' | '),
+    )
     if (pickerCompanies.length === 0) {
       // Picker маркер есть, но парсер не сматчил. Это значит wfirma изменили
-      // HTML структуру — нужен sample.
-      const sample = startHtml.slice(0, 2000).replace(/\s+/g, ' ')
-      console.warn('wfirma: picker detected but no companies parsed. HTML sample:', sample)
-      return {
-        ok: false,
-        reason: 'wfirma_no_companies',
-        details: `picker_detected_but_parser_failed. HTML sample (2000ch): ${sample}`,
+      // HTML структуру — нужен sample. Но! Если юзер УЖЕ передал
+      // selectedCompanyId (т.е. в прошлой попытке мы успешно её распарсили),
+      // доверяем этому id — используем как trusted и идём дальше.
+      if (selectedCompanyId) {
+        console.warn(
+          'wfirma: picker but no parse, falling back to trusted selectedCompanyId:',
+          selectedCompanyId,
+        )
+        chosen = { id: selectedCompanyId, name: '' }
+      } else {
+        const sample = startHtml.slice(0, 2000).replace(/\s+/g, ' ')
+        console.warn('wfirma: picker detected but no companies parsed. HTML sample:', sample)
+        return {
+          ok: false,
+          reason: 'wfirma_no_companies',
+          details: `picker_detected_but_parser_failed. HTML sample (2000ch): ${sample}`,
+        }
       }
-    }
-    // Picker present + companies parsed
-    if (pickerCompanies.length === 1) {
+    } else if (pickerCompanies.length === 1) {
       chosen = pickerCompanies[0]!
     } else if (selectedCompanyId) {
       const found = pickerCompanies.find((c) => c.id === selectedCompanyId)
       if (!found) {
-        return { ok: false, reason: 'wfirma_no_companies', details: 'selected_id_not_in_account' }
+        // Парсер вернул фирмы, но selectedCompanyId среди них нет. Возможны
+        // 2 причины:
+        //   а) wfirma реально отдала другой набор (сессия/cache изменились)
+        //   б) парсер сматчил неправильно (id съехал, попал лишний 0)
+        // В обоих случаях юзер ЯВНО выбрал эту фирму минуту назад — доверяем.
+        // Если он промахнулся, Step 4 (/login/{id}) вернёт ошибку 404/403,
+        // и мы вернём `wfirma_form_changed` с понятным details.
+        console.warn('wfirma: selectedCompanyId not in re-parsed list, trusting user choice:', {
+          selectedCompanyId,
+          parsedIds: pickerCompanies.map((c) => c.id),
+        })
+        chosen = { id: selectedCompanyId, name: '' }
+      } else {
+        chosen = found
       }
-      chosen = found
     } else {
       return { ok: false, reason: 'choose_company', companies: pickerCompanies }
     }

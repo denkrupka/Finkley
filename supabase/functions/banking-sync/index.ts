@@ -466,19 +466,34 @@ async function persistTransactions(
   // POSIR PLYWALNIA RATAJE, LAGAR vs LAGARDERE TRAVEL RETAI, FISH HO
   // vs FISH HOUSE DURRES ALB — все с точно одинаковой суммой и датой.
   //
-  // Загружаем existing tx по account_id в окне ±1 день вокруг новых
-  // executed_at, сравниваем (executed_at_date, amount_cents,
-  // counterparty/description substring lowercase). Если матч — скипаем
-  // новую tx.
+  // 05.06 — расширяем cross-account: при переподключении банка через
+  // PSD2 (90-дневный consent expired) создаётся НОВЫЙ bank_accounts.id
+  // с тем же IBAN. Старые tx остаются в БД, новые приходят как «свежие»
+  // → дубли в UI (скрин владельца RYANAIR DUBLIN 02.05 x2).
+  // Решение: ищем дубли по ВСЕМ accounts того же salon (а не только
+  // ctx.accountId).
   let newRows = newRowsByExternalId
   if (newRowsByExternalId.length > 0) {
     const dates = newRowsByExternalId.map((r) => r.executed_at.slice(0, 10)).sort()
     const minDate = dates[0]
     const maxDate = dates[dates.length - 1]
+    // 1) Список всех bank_accounts салона: через 2 запроса (PostgREST !inner
+    // capricious с RLS) — сначала connections салона, потом accounts по ним.
+    const { data: salonConnections } = await admin
+      .from('bank_connections')
+      .select('id')
+      .eq('salon_id', ctx.salonId)
+    const connIds = (salonConnections ?? []).map((c) => c.id as string)
+    const { data: salonAccounts } =
+      connIds.length > 0
+        ? await admin.from('bank_accounts').select('id').in('connection_id', connIds)
+        : { data: [] as { id: string }[] }
+    const accountIds = (salonAccounts ?? []).map((a) => a.id as string)
+    const accountFilter = accountIds.length > 0 ? accountIds : [ctx.accountId]
     const { data: nearby } = await admin
       .from('bank_transactions')
       .select('executed_at, amount_cents, counterparty, description')
-      .eq('account_id', ctx.accountId)
+      .in('account_id', accountFilter)
       .gte('executed_at', `${minDate}T00:00:00Z`)
       .lte('executed_at', `${maxDate}T23:59:59Z`)
     type Nearby = {
