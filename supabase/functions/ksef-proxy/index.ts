@@ -163,6 +163,10 @@ async function handleConnectWithToken(
 type SyncStats = {
   expenses_synced: number
   expenses_skipped: number
+  /** Сколько фактур KSeF API вернул за окно (помогает понять «0 новых = реально пусто vs баг»). */
+  api_returned?: number
+  /** Окно запроса dateFrom..dateTo — для UI tooltip. */
+  query_window?: string
   /** Краткие причины каждого skip — для debug в UI/логах. */
   skip_reasons?: string[]
 }
@@ -270,6 +274,8 @@ async function syncKsefToFinkley(
     throw new Error(`ksef_query_${list.code}${list.message ? ':' + list.message : ''}`)
   }
   invoices = list.invoices
+  stats.api_returned = invoices.length
+  stats.query_window = `${since}..${today}`
   // Owner 04.06: «новые фактуры не подтягиваются». Логируем кол-во и
   // диапазон чтобы понять что возвращает KSeF API на проде. В Supabase
   // Edge Function logs можно увидеть полный список ksef refs.

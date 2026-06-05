@@ -523,21 +523,31 @@ function IntegrationCard({
             provider.id === 'infakt' ? (
               <p
                 className="text-foreground mt-1 font-semibold"
-                title={
-                  connection.last_sync_stats.skip_reasons &&
-                  connection.last_sync_stats.skip_reasons.length > 0
-                    ? `Причины пропуска:\n${connection.last_sync_stats.skip_reasons.slice(0, 20).join('\n')}`
-                    : undefined
-                }
+                title={(() => {
+                  const stats = connection.last_sync_stats as {
+                    skip_reasons?: string[]
+                    api_returned?: number
+                    query_window?: string
+                  }
+                  const lines: string[] = []
+                  if (stats.query_window) {
+                    lines.push(`Окно: ${stats.query_window}`)
+                  }
+                  if (typeof stats.api_returned === 'number') {
+                    lines.push(`API вернул фактур: ${stats.api_returned}`)
+                  }
+                  if (stats.skip_reasons && stats.skip_reasons.length > 0) {
+                    lines.push('Причины пропуска:')
+                    lines.push(...stats.skip_reasons.slice(0, 20))
+                  }
+                  return lines.length > 0 ? lines.join('\n') : undefined
+                })()}
               >
                 {t('integrations.last_sync_stats_expenses', {
                   synced: connection.last_sync_stats.expenses_synced ?? 0,
                   skipped: connection.last_sync_stats.expenses_skipped ?? 0,
                 })}
-                {connection.last_sync_stats.skip_reasons &&
-                connection.last_sync_stats.skip_reasons.length > 0 ? (
-                  <span className="text-muted-foreground ml-1 cursor-help text-xs">ⓘ</span>
-                ) : null}
+                <span className="text-muted-foreground ml-1 cursor-help text-xs">ⓘ</span>
               </p>
             ) : (
               <p className="text-foreground mt-1 font-semibold">
