@@ -619,27 +619,48 @@ export async function getInvoiceXml(
   accessToken: string,
   ksefReferenceNumber: string,
 ): Promise<{ ok: true; bytes: Uint8Array } | KsefError> {
-  try {
-    const res = await fetch(
-      `${baseUrl()}/invoices/ksef/${encodeURIComponent(ksefReferenceNumber)}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/octet-stream, application/xml, application/json',
+  // KSeF rate limit для invoiceDownload: 8 req/s, 16 req/min, 64 req/h.
+  // При 45 фактурах за один sync мы превышаем minute-limit → 429 для
+  // большинства. Делаем retry с exponential backoff на 429 + ждём
+  // 5 секунд между запросами (соблюдаем 16 req/min).
+  const maxRetries = 3
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(
+        `${baseUrl()}/invoices/ksef/${encodeURIComponent(ksefReferenceNumber)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/xml',
+          },
         },
-      },
-    )
-    if (!res.ok) {
+      )
+      if (res.ok) {
+        const buf = new Uint8Array(await res.arrayBuffer())
+        if (buf.byteLength === 0) return { ok: false, code: 'EMPTY' }
+        return { ok: true, bytes: buf }
+      }
+      // 429 = rate limit, retry с backoff. 21165 = «not yet available»,
+      // retry тоже. Иначе fail.
       const text = await res.text()
+      const isRateLimit = res.status === 429
+      const isNotReady = res.status === 400 && text.includes('21165')
+      if ((isRateLimit || isNotReady) && attempt < maxRetries) {
+        const wait = 5000 * Math.pow(2, attempt) // 5s, 10s, 20s
+        await new Promise((r) => setTimeout(r, wait))
+        continue
+      }
       return { ok: false, code: 'HTTP', status: res.status, message: text.slice(0, 200) }
+    } catch (e) {
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 5000))
+        continue
+      }
+      return { ok: false, code: 'NETWORK', message: e instanceof Error ? e.message : String(e) }
     }
-    const buf = new Uint8Array(await res.arrayBuffer())
-    if (buf.byteLength === 0) return { ok: false, code: 'EMPTY' }
-    return { ok: true, bytes: buf }
-  } catch (e) {
-    return { ok: false, code: 'NETWORK', message: e instanceof Error ? e.message : String(e) }
   }
+  return { ok: false, code: 'HTTP', status: 0, message: 'retries exhausted' }
 }
 
 /**

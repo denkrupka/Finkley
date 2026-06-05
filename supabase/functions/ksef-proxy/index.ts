@@ -343,6 +343,11 @@ async function syncKsefToFinkley(
   void getOrCreateImportCategory
   const categoryCache = new Map<string, string | null>()
 
+  // Ограничение per-sync: edge function timeout 150s, на 1 фактуру тратим
+  // ~4s (rate-limit sleep) + 1-2s API call = 5-6s. 25 фактур = ~125-150s.
+  // Остальные подтянутся следующим cron-тиком (каждые 2 мин).
+  const PER_SYNC_LIMIT = 25
+  let processedCount = 0
   try {
     for (const inv of invoices) {
       if (importedSet.has(inv.ksefReferenceNumber)) {
@@ -352,6 +357,13 @@ async function syncKsefToFinkley(
         // (no_total_gross, dup_*) остаются как есть — это сигналы.
         continue
       }
+      if (processedCount >= PER_SYNC_LIMIT) {
+        console.log(
+          `[ksef-sync] per-sync limit ${PER_SYNC_LIMIT} reached, остальные подтянутся следующим cron`,
+        )
+        break
+      }
+      processedCount++
       // Тянем XML фактуры — best-effort. Если упало — берём поля из header
       let detail = {
         totalGross: inv.totalGross,
@@ -370,6 +382,11 @@ async function syncKsefToFinkley(
         isPaid: false,
         vatRatePct: null as number | null,
         totalNet: null as number | null,
+      }
+      // Rate limit KSeF: 16 req/min на invoiceDownload group. 4 sec
+      // между запросами = 15 req/min с запасом.
+      if (stats.expenses_synced + stats.expenses_skipped > 0) {
+        await new Promise((r) => setTimeout(r, 4000))
       }
       let xmlPath: string | null = null
       const xmlRes = await getInvoiceXml(accessToken, inv.ksefReferenceNumber)
