@@ -420,10 +420,16 @@ export async function querySubjectInvoices(
   // независимо от того что серверу нравится сейчас.
   // Only 'Invoicing' is accepted by KSeF API right now. Acquisition /
   // PermanentStorage / Hidden return 400 'Nieczytelna treść' (unknown
-  // enum value). Keep list as single value but support override через
-  // opts.dateType для будущих изменений API.
+  // enum value).
   const dateTypesToTry: string[] = opts.dateType ? [opts.dateType] : ['Invoicing']
   const allMap = new Map<string, Record<string, unknown>>()
+  // Owner-feedback 05.06: api_returned=10 при том что в KSeF UI видно >20
+  // фактур за окно. Корень — pagination сломана: я предполагал что
+  // pageSize=100 даст max 100, но KSeF возвращает 10 на page (или меньше).
+  // Старая логика `if (pageList.length < pageSize) break` останавливалась
+  // после первой страницы → только 10 первых (старейших) фактур.
+  // Фикс: continue пока pageList.length > 0, увеличиваем pageOffset на
+  // фактическое pageList.length. Safety cap 200 страниц = 20000 фактур.
   const pageSize = 100
   let lastError: KsefError | null = null
   let anySuccess = false
@@ -431,7 +437,8 @@ export async function querySubjectInvoices(
     let pageOffset = 0
     let dtSuccess = false
     let pages = 0
-    for (let i = 0; i < 50; i++) {
+    let emptyStreak = 0
+    for (let i = 0; i < 200; i++) {
       pages++
       const body = {
         pageOffset,
@@ -475,7 +482,16 @@ export async function querySubjectInvoices(
           invoices?: Array<Record<string, unknown>>
         }
         const pageList = json.invoices ?? json.invoiceHeaderList ?? []
-        if (pageList.length === 0) break
+        if (pageList.length === 0) {
+          emptyStreak++
+          // 2 пустые страницы подряд = конец
+          if (emptyStreak >= 2) break
+          // одна пустая может быть результатом offset out-of-range, пробуем
+          // ещё один шаг
+          pageOffset += pageSize
+          continue
+        }
+        emptyStreak = 0
         for (const row of pageList) {
           const k =
             (typeof row.ksefNumber === 'string' ? row.ksefNumber : null) ??
@@ -483,8 +499,10 @@ export async function querySubjectInvoices(
             ''
           if (k && !allMap.has(k)) allMap.set(k, row)
         }
-        if (pageList.length < pageSize) break
-        pageOffset += pageSize
+        // Главный фикс: increment на фактический pageList.length, не на
+        // pageSize. Так получаем ВСЕ страницы независимо от того сколько
+        // KSeF реально вернул.
+        pageOffset += pageList.length
       } catch (e) {
         if (!dtSuccess) {
           lastError = {
@@ -498,10 +516,6 @@ export async function querySubjectInvoices(
       }
     }
     void pages
-    // 05.06: если этот dateType дал результаты — break outer, не пробуем
-    // следующие (KSeF возвращает то же или 400). Раньше шли по всем 3 и
-    // last_error из PermanentStorage/Hidden 400 запоминался хотя данные
-    // были собраны.
     if (dtSuccess) {
       lastError = null
       break
