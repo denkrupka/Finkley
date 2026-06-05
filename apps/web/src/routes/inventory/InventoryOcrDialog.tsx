@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useBulkImportInventory, type CsvImportRow } from '@/hooks/useInventory'
+import { resizeImageToJpeg } from '@/lib/image-resize'
 import { supabase } from '@/lib/supabase/client'
 
 type OcrItem = {
@@ -63,9 +64,14 @@ export function InventoryOcrDialog({ open, onClose, salonId, currency }: Props) 
     setStage('loading')
 
     try {
-      const base64 = await fileToBase64(file)
+      // Bug 26088b7f follow-up: фото с iPhone бывают 5–10 МБ — сжимаем
+      // изображения до 1600px JPEG. PDF не трогаем.
+      const isImage = (file.type || '').startsWith('image/')
+      const payload: File | Blob = isImage ? await resizeImageToJpeg(file, 1600, 0.85) : file
+      const mime = isImage ? 'image/jpeg' : file.type
+      const base64 = await fileToBase64(payload)
       const { data, error } = await supabase.functions.invoke('inventory-ocr', {
-        body: { file_base64: base64, mime: file.type },
+        body: { file_base64: base64, mime },
       })
       if (error) throw error
       const list = (data as { items?: OcrItem[] })?.items ?? []
@@ -298,7 +304,7 @@ export function InventoryOcrDialog({ open, onClose, salonId, currency }: Props) 
   )
 }
 
-function fileToBase64(file: File): Promise<string> {
+function fileToBase64(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {

@@ -142,7 +142,7 @@ export function CommissionsModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex max-h-[90vh] w-[min(1200px,96vw)] !max-w-none flex-col gap-0 p-0">
+      <DialogContent className="flex max-h-[92vh] w-[min(1440px,98vw)] !max-w-none flex-col gap-0 p-0">
         {/* Header */}
         <div className="border-border bg-card shrink-0 border-b px-6 py-4">
           <DialogHeader>
@@ -187,23 +187,32 @@ export function CommissionsModal({
             {t('expenses.commissions.empty')}
           </div>
         ) : (
-          <div className="flex-1 overflow-x-auto overflow-y-auto">
-            <table className="w-full min-w-[920px] text-sm">
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-[88px]" />
+                <col className="w-[104px]" />
+                <col className="w-[170px]" />
+                <col />
+                <col className="w-[120px]" />
+                <col className="w-[110px]" />
+                <col className="w-[120px]" />
+              </colgroup>
               <thead className="border-border bg-muted/30 sticky top-0 z-10 border-b">
                 <tr className="text-muted-foreground text-left text-[10px] font-bold uppercase tracking-wider">
-                  <th className="px-4 py-2.5">{t('expenses.commissions.col_date')}</th>
-                  <th className="px-4 py-2.5">{t('expenses.commissions.col_kind')}</th>
-                  <th className="px-4 py-2.5">
+                  <th className="px-3 py-2.5">{t('expenses.commissions.col_date')}</th>
+                  <th className="px-3 py-2.5">{t('expenses.commissions.col_kind')}</th>
+                  <th className="px-3 py-2.5">
                     {t('expenses.commissions.col_client', { defaultValue: 'Клиент' })}
                   </th>
-                  <th className="px-4 py-2.5">
+                  <th className="px-3 py-2.5">
                     {t('expenses.commissions.col_service', { defaultValue: 'Услуга / описание' })}
                   </th>
-                  <th className="px-4 py-2.5">{t('expenses.commissions.col_method')}</th>
-                  <th className="num px-4 py-2.5 text-right">
+                  <th className="px-3 py-2.5">{t('expenses.commissions.col_method')}</th>
+                  <th className="num px-3 py-2.5 text-right">
                     {t('expenses.commissions.col_tx', { defaultValue: 'Сумма' })}
                   </th>
-                  <th className="num px-4 py-2.5 text-right">
+                  <th className="num px-3 py-2.5 text-right">
                     {t('expenses.commissions.col_commission')}
                   </th>
                 </tr>
@@ -250,27 +259,27 @@ export function CommissionsModal({
                         }
                       }}
                     >
-                      <td className="num text-foreground whitespace-nowrap px-4 py-3 text-xs">
+                      <td className="num text-foreground whitespace-nowrap px-3 py-3 text-xs">
                         {formatExpenseDate(e.expense_at)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <span className="border-border bg-card inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                           <KindIcon className="text-muted-foreground size-3" strokeWidth={2} />
                           {kindLabel}
                         </span>
                       </td>
-                      <td className="text-foreground max-w-[180px] truncate px-4 py-3 text-xs font-semibold">
+                      <td className="text-foreground break-words px-3 py-3 text-xs font-semibold">
                         {src?.clientName ?? <span className="text-muted-foreground/60">—</span>}
                       </td>
-                      <td className="text-muted-foreground max-w-[260px] truncate px-4 py-3 text-xs">
+                      <td className="text-muted-foreground break-words px-3 py-3 text-xs">
                         {src?.serviceName ?? <span className="text-muted-foreground/60">—</span>}
                       </td>
-                      <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-xs">
+                      <td className="text-muted-foreground break-words px-3 py-3 text-xs">
                         {e.payment_method
                           ? (labelByCode.get(e.payment_method) ?? e.payment_method)
                           : '—'}
                       </td>
-                      <td className="num text-foreground whitespace-nowrap px-4 py-3 text-right text-xs">
+                      <td className="num text-foreground whitespace-nowrap px-3 py-3 text-right text-xs">
                         {txDisplay ? (
                           <span
                             title={
@@ -288,7 +297,7 @@ export function CommissionsModal({
                           <span className="text-muted-foreground/60">—</span>
                         )}
                       </td>
-                      <td className="num text-destructive whitespace-nowrap px-4 py-3 text-right text-xs font-bold">
+                      <td className="num text-destructive whitespace-nowrap px-3 py-3 text-right text-xs font-bold">
                         −{formatCurrency(commission, currency)}
                       </td>
                     </tr>

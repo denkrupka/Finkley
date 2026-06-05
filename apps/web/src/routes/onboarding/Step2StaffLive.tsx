@@ -1,12 +1,12 @@
-import { Loader2, Mail, Phone, Send, Trash2, UserPlus } from 'lucide-react'
+import { Mail, Phone, Send, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { StaffEditSheet } from '@/routes/staff/StaffEditSheet'
+import { formatError } from '@/lib/format-error'
 import { supabase } from '@/lib/supabase/client'
-import { useStaff } from '@/hooks/useStaff'
+import { useStaff, type StaffRow } from '@/hooks/useStaff'
 import { useInviteMember } from '@/hooks/useTeam'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -26,39 +26,20 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
   const { data: staff = [], isLoading } = useStaff(salonId, { activeOnly: true })
   const invite = useInviteMember(salonId)
 
-  const [addOpen, setAddOpen] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [newPhone, setNewPhone] = useState('')
-  const [newPercent, setNewPercent] = useState(40)
-  const [adding, setAdding] = useState(false)
+  // Bug 37b3b3e0 (Елена 05.06): «Добавить мастера» открывает тот же sheet,
+  // что и при редактировании в /staff — со схемой выплат, %, расписанием,
+  // долей с ретейла и окном возвратов. Полный набор, как в справочнике.
+  const [sheetStaff, setSheetStaff] = useState<StaffRow | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
-  async function addStaff() {
-    if (!newName.trim()) return
-    setAdding(true)
-    try {
-      const { error } = await supabase.from('staff').insert({
-        salon_id: salonId,
-        full_name: newName.trim(),
-        email: newEmail.trim() || null,
-        phone: newPhone.trim() || null,
-        payout_scheme: 'percent_revenue',
-        payout_percent: Math.max(0, Math.min(100, newPercent)),
-        is_active: true,
-      })
-      if (error) throw error
-      toast.success(t('onboarding.step2.added'))
-      setNewName('')
-      setNewEmail('')
-      setNewPhone('')
-      setNewPercent(40)
-      setAddOpen(false)
-      qc.invalidateQueries({ queryKey: ['staff', salonId] })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      setAdding(false)
-    }
+  function openCreate() {
+    setSheetStaff(null)
+    setSheetOpen(true)
+  }
+
+  function openEdit(s: StaffRow) {
+    setSheetStaff(s)
+    setSheetOpen(true)
   }
 
   async function removeStaff(id: string) {
@@ -68,7 +49,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
       if (error) throw error
       qc.invalidateQueries({ queryKey: ['staff', salonId] })
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      toast.error(formatError(err))
     }
   }
 
@@ -110,7 +91,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                   defaultValue: 'Приглашение отправлено на {{email}}',
                 }),
           ),
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+        onError: (err) => toast.error(formatError(err)),
       },
     )
   }
@@ -172,8 +153,15 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                     {initial}
                   </div>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground truncate text-sm font-bold">{s.full_name}</p>
+                <button
+                  type="button"
+                  onClick={() => openEdit(s)}
+                  className="min-w-0 flex-1 text-left"
+                  aria-label="edit"
+                >
+                  <p className="text-foreground hover:text-brand-teal-deep truncate text-sm font-bold transition-colors">
+                    {s.full_name}
+                  </p>
                   {s.email ? (
                     <p className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 truncate text-xs">
                       <Mail className="size-3" strokeWidth={1.8} /> {s.email}
@@ -189,7 +177,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                       Booksy
                     </span>
                   ) : null}
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => removeStaff(s.id)}
@@ -234,7 +222,7 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
 
         <button
           type="button"
-          onClick={() => setAddOpen(true)}
+          onClick={openCreate}
           className="border-brand-border-strong text-muted-foreground hover:border-secondary hover:text-secondary flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-transparent p-4 transition-colors"
           data-testid="onb-staff-add-live"
         >
@@ -245,82 +233,15 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
         </button>
       </div>
 
-      {addOpen ? (
-        <div className="border-brand-teal-deep bg-brand-teal-soft/10 mt-4 rounded-lg border-2 p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="new-name" className="text-xs">
-                {t('onboarding.step2.name_placeholder')}
-              </Label>
-              <Input
-                id="new-name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-pct" className="text-xs">
-                {t('onboarding.step2.percent_label')}
-              </Label>
-              <Input
-                id="new-pct"
-                type="number"
-                min="0"
-                max="100"
-                value={newPercent}
-                onChange={(e) => setNewPercent(Number(e.target.value))}
-                className="num"
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-email" className="text-xs">
-                Email
-              </Label>
-              <Input
-                id="new-email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-phone" className="text-xs">
-                <Phone className="mr-1 inline size-3" /> Phone
-              </Label>
-              <Input
-                id="new-phone"
-                type="tel"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="+48 …"
-              />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={addStaff}
-              disabled={!newName.trim() || adding}
-              className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold disabled:opacity-50"
-            >
-              {adding ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <UserPlus className="size-4" />
-              )}
-              {t('onboarding.step2.add')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddOpen(false)}
-              className="text-muted-foreground hover:text-foreground text-sm"
-            >
-              {t('common.cancel')}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <StaffEditSheet
+        open={sheetOpen}
+        onOpenChange={(v) => {
+          setSheetOpen(v)
+          if (!v) setSheetStaff(null)
+        }}
+        salonId={salonId}
+        staff={sheetStaff}
+      />
     </div>
   )
 }

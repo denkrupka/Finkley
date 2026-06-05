@@ -4864,6 +4864,7 @@ export type Database = {
       seed_demo_data: { Args: { p_salon_id: string }; Returns: Json }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      soft_delete_salon: { Args: { p_salon_id: string }; Returns: string }
       staff_performance_advanced: {
         Args: { p_end_ts: string; p_salon_id: string; p_start_ts: string }
         Returns: {

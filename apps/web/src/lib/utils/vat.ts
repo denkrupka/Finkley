@@ -18,6 +18,8 @@ export type VatRate = {
   isDefault?: boolean
 }
 
+// Bug 4cd36954: добавили VAT-ставки для всех стран из COUNTRY_OPTIONS.
+// Источник: ставки актуальны на 2026 (CZ перешла на 21/12/0 в 2024).
 const RATES_BY_COUNTRY: Record<string, VatRate[]> = {
   // Польша (стандарт + льготные + нулевая + освобождение).
   PL: [
@@ -40,10 +42,30 @@ const RATES_BY_COUNTRY: Record<string, VatRate[]> = {
     { pct: 7, label: '7%' },
     { pct: 0, label: '0%' },
   ],
-  // Чехия: 21%/15%/10%/0%.
+  // Чехия с 2024: только 21% и 12% (10/15 ушли).
   CZ: [
     { pct: 21, label: '21%', isDefault: true },
-    { pct: 15, label: '15%' },
+    { pct: 12, label: '12%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Словакия: 23% стандарт (с 2025), 19%/5% льготные, 0%.
+  SK: [
+    { pct: 23, label: '23%', isDefault: true },
+    { pct: 19, label: '19%' },
+    { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Венгрия: 27% стандарт (самый высокий в ЕС), 18%/5% льготные, 0%.
+  HU: [
+    { pct: 27, label: '27%', isDefault: true },
+    { pct: 18, label: '18%' },
+    { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Австрия: 20% стандарт, 13%/10%/0%.
+  AT: [
+    { pct: 20, label: '20%', isDefault: true },
+    { pct: 13, label: '13%' },
     { pct: 10, label: '10%' },
     { pct: 0, label: '0%' },
   ],
@@ -52,6 +74,33 @@ const RATES_BY_COUNTRY: Record<string, VatRate[]> = {
     { pct: 21, label: '21%', isDefault: true },
     { pct: 9, label: '9%' },
     { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Латвия: 21%/12%/5%/0%.
+  LV: [
+    { pct: 21, label: '21%', isDefault: true },
+    { pct: 12, label: '12%' },
+    { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Эстония: с 2024 — 22% стандарт, 9%/5%/0%.
+  EE: [
+    { pct: 22, label: '22%', isDefault: true },
+    { pct: 9, label: '9%' },
+    { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Румыния: 19% стандарт, 9%/5%/0%.
+  RO: [
+    { pct: 19, label: '19%', isDefault: true },
+    { pct: 9, label: '9%' },
+    { pct: 5, label: '5%' },
+    { pct: 0, label: '0%' },
+  ],
+  // Болгария: 20%/9%/0%.
+  BG: [
+    { pct: 20, label: '20%', isDefault: true },
+    { pct: 9, label: '9%' },
     { pct: 0, label: '0%' },
   ],
 }

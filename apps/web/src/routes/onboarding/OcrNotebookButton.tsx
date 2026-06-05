@@ -3,6 +3,8 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { formatError } from '@/lib/format-error'
+import { resizeImageToJpeg } from '@/lib/image-resize'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 
@@ -60,26 +62,37 @@ export function OcrNotebookButton({
       toast.error(t('onboarding.ocr.no_salon'))
       return
     }
-    if (file.size > 4 * 1024 * 1024) {
+    // Bug 26088b7f: исходный файл может быть до 15 МБ (iPhone HEIC, скан с
+    // галереи). Сжимаем на клиенте до 1600px по большей стороне + JPEG q=0.82
+    // — base64 укладывается в ~1 МБ, edge function больше не падает на
+    // image_too_large (там лимит 3 МБ base64). Чтение текста не теряется.
+    if (file.size > 25 * 1024 * 1024) {
       toast.error(t('onboarding.ocr.too_large'))
       return
     }
     setLoading(true)
     try {
-      const base64 = await blobToBase64(file)
+      const resized = await resizeImageToJpeg(file, 1600, 0.82)
+      const base64 = await blobToBase64(resized)
       const { data, error } = await supabase.functions.invoke('ocr-notebook', {
         body: { image_base64: base64, salon_id: salonId },
       })
-      if (error) throw error
+      if (error) {
+        // supabase-js при non-2xx даёт generic «non-2xx status». Достаём
+        // настоящую причину из тела (data) если оно пришло.
+        const detail =
+          (data as { error?: string; detail?: string } | null)?.error ??
+          (data as { error?: string; detail?: string } | null)?.detail ??
+          formatError(error)
+        throw new Error(detail)
+      }
       const res = data as { visits?: ParsedVisit[]; error?: string }
       if (res.error || !res.visits) throw new Error(res.error ?? 'no_visits')
       setPreview(res.visits)
       setSelected(new Set(res.visits.map((_, i) => i)))
       toast.success(t('onboarding.ocr.toast_done', { count: res.visits.length }))
     } catch (e) {
-      toast.error(
-        t('onboarding.ocr.toast_fail', { msg: e instanceof Error ? e.message : String(e) }),
-      )
+      toast.error(t('onboarding.ocr.toast_fail', { msg: formatError(e) }))
     } finally {
       setLoading(false)
     }

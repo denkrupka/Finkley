@@ -117,32 +117,36 @@ export function StepAiBreakdown({
         chip: '+15% AOV',
       },
     ],
+    // Bug 21462c27 (Den 05.06): убрали срез по деньгам (они на этапе
+    // онбординга часто сырые из импорта и AI выдаёт «космос»), оставили
+    // срез по клиентам: новые vs постоянные, % возвратов, загрузка кресла,
+    // лояльность.
     staff: [
-      {
-        icon: Star,
-        tone: 'gold',
-        title: 'Твои звёзды',
-        body: 'Высокий retention + ★4.5+ → им маржинальные услуги и больше часов.',
-        chip: '+12-18% выручки',
-      },
-      {
-        icon: AlertTriangle,
-        tone: 'amber',
-        title: 'Кому нужна программа',
-        body: 'Низкая загрузка + клиенты не возвращаются — с точкой роста.',
-      },
       {
         icon: Users,
         tone: 'sage',
-        title: 'Свои vs салона',
-        body: 'Индекс лояльности — критично для удержания персонала.',
+        title: 'Новые клиенты на мастере',
+        body: 'Сколько новеньких пришло именно к нему за период. База роста клиентской базы.',
+      },
+      {
+        icon: Star,
+        tone: 'gold',
+        title: '% возвратов',
+        body: 'Из клиентов мастера — сколько возвращается. Низкий % → клиент не возвращается после первого визита.',
+        chip: 'База лояльности',
       },
       {
         icon: TrendingUp,
         tone: 'navy',
         title: 'Загрузка кресла',
-        body: 'Кто пустует, у кого окна — авто-оффер в Telegram/Instagram.',
+        body: 'Сколько часов из доступных мастер был занят. Кто пустует, у кого окна.',
         chip: '+10% часов',
+      },
+      {
+        icon: AlertTriangle,
+        tone: 'amber',
+        title: 'Свои vs салона',
+        body: 'Клиент привязан к мастеру или к салону. Критично для удержания мастеров.',
       },
     ],
     clients: [
@@ -157,13 +161,13 @@ export function StepAiBreakdown({
         tone: 'amber',
         title: 'Под риском и Спящие',
         body: 'AI готовит персонализированную рассылку для возврата.',
-        chip: 'Реактивация 5× дешевле',
+        chip: 'Вернуть клиента 5× дешевле, чем найти нового',
       },
       {
         icon: Brain,
         tone: 'navy',
         title: 'Кого теряешь после первого',
-        body: 'Главный leak — 60% новеньких не возвращаются. Где конкретно.',
+        body: 'Главная утечка — 60% новеньких не возвращаются. Где конкретно.',
       },
       {
         icon: Users,
@@ -231,6 +235,11 @@ export function StepAiBreakdown({
           {heroTitle[topic]}
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">{heroSubtitle[topic]}</p>
+        {salonId && ai.isLoading ? (
+          <p className="text-brand-teal-deep mt-2 text-sm font-semibold">
+            {t('onboarding.ai_summary.processing_hint')}
+          </p>
+        ) : null}
       </div>
 
       {salonId && ai.isLoading ? (

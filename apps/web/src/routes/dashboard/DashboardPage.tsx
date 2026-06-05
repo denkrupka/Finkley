@@ -284,13 +284,16 @@ export function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
       {/* Bug fae81ea6 (Елена 01.06): заголовок «Главная» + название месяца
-          в одной строке с PeriodPickerPopover. */}
+          в одной строке с PeriodPickerPopover.
+          Bug dd6444fc (Елена 06.06): на mobile inline-«Июнь 2026» дублировал
+          лейбл PeriodPickerPopover'а — прячем inline на <sm, оставляем только
+          таб период-пикера. */}
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex items-baseline gap-2">
           <h1 className="text-foreground text-2xl font-bold">
             {t('dashboard.title', { defaultValue: 'Главная' })}
           </h1>
-          <span className="text-muted-foreground text-sm font-semibold capitalize">
+          <span className="text-muted-foreground hidden text-sm font-semibold capitalize sm:inline">
             {format(new Date(range.start), 'LLLL yyyy', { locale: getDateLocale() })}
           </span>
         </div>

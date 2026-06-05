@@ -94,6 +94,12 @@ export function StepAiSummary({
     staleTime: Infinity,
   })
 
+  // Bug 4ba1a19f (Елена 05.06): пока идёт grace + первая загрузка AI
+  // (могут быть 10–15 секунд), юзер видел пустой экран и думал что
+  // окно сломалось. Показываем явный «processing» хинт под заголовком
+  // и расширенную плашку с лоадером.
+  const isBusy = grace || summary.isLoading || summary.isFetching
+
   return (
     <div className="space-y-4">
       <div>
@@ -102,9 +108,14 @@ export function StepAiSummary({
           {t('onboarding.ai_summary.title')}
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">{t('onboarding.ai_summary.subtitle')}</p>
+        {isBusy ? (
+          <p className="text-brand-teal-deep mt-2 text-sm font-semibold">
+            {t('onboarding.ai_summary.processing_hint')}
+          </p>
+        ) : null}
       </div>
 
-      {summary.isLoading ? (
+      {isBusy ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-3 rounded-xl border border-dashed p-4">
           <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
           <p className="text-muted-foreground text-sm">{t('onboarding.ai_summary.loading')}</p>

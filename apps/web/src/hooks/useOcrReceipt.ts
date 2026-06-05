@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 
+import { resizeImageToJpeg } from '@/lib/image-resize'
 import { supabase } from '@/lib/supabase/client'
 
 export type OcrParsedReceipt = {
@@ -26,10 +27,10 @@ export type OcrParsedReceipt = {
 }
 
 /**
- * Конвертирует File в base64 без data: префикса (нужно для Anthropic vision).
+ * Конвертирует File/Blob в base64 без data: префикса (нужно для Anthropic vision).
  * Использует FileReader.readAsDataURL → срезает префикс.
  */
-async function fileToBase64(file: File): Promise<string> {
+async function fileToBase64(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -53,14 +54,23 @@ async function fileToBase64(file: File): Promise<string> {
 export function useOcrReceipt() {
   return useMutation<OcrParsedReceipt, Error, File>({
     mutationFn: async (file) => {
-      // Защита от слишком больших файлов. PDF фактуры обычно <2MB, фото <4MB.
-      // Edge function в свою очередь rejects >8MB после base64-decode.
-      if (file.size > 6 * 1024 * 1024) {
+      // Bug 26088b7f follow-up: фото с iPhone бывают 5-10 МБ (HEIC через
+      // галерею или high-quality jpeg). Для изображений всегда сжимаем
+      // до 1600px JPEG q=0.85 — Claude vision хватает, edge function
+      // принимает <8MB base64. PDF не трогаем (rasterизация на сервере).
+      const isImage = (file.type || '').startsWith('image/')
+      if (!isImage && file.size > 6 * 1024 * 1024) {
         throw new Error('file_too_large')
       }
-      const image_base64 = await fileToBase64(file)
+      let imageBlob: Blob = file
+      let mime = file.type || 'image/jpeg'
+      if (isImage) {
+        imageBlob = await resizeImageToJpeg(file, 1600, 0.85)
+        mime = 'image/jpeg'
+      }
+      const image_base64 = await fileToBase64(imageBlob)
       const { data, error } = await supabase.functions.invoke('ocr-receipt', {
-        body: { image_base64, mime: file.type || 'image/jpeg' },
+        body: { image_base64, mime },
       })
       if (error) throw error
       const json = data as { ok: boolean; result?: OcrParsedReceipt; error?: string }

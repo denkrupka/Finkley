@@ -19,6 +19,7 @@ import { TeamPage } from '@/routes/team/TeamPage'
 
 import { Button } from '@/components/ui/button'
 import { ImageCropper } from '@/components/ui/ImageCropper'
+import { formatError } from '@/lib/format-error'
 import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -63,6 +64,7 @@ import { CollapsibleSection } from '@/routes/dashboard/CollapsibleSection'
 import { UserProfileCard } from './UserProfileCard'
 import { SETTINGS_TABS, SettingsTabsNav, type SettingsTab } from './SettingsTabsNav'
 import { BillingButtons } from '@/routes/billing/BillingButtons'
+import { BillingSubscriptionStatus } from '@/routes/billing/BillingSubscriptionStatus'
 import {
   COUNTRY_OPTIONS,
   SALON_TYPES,
@@ -225,7 +227,7 @@ export function SettingsPage() {
       )
     } catch (err) {
       toast.error(t('settings.export.toast_failed'), {
-        description: err instanceof Error ? err.message : String(err),
+        description: formatError(err),
       })
     } finally {
       setExportPending(false)
@@ -317,7 +319,7 @@ export function SettingsPage() {
             })
           }
         },
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+        onError: (err) => toast.error(formatError(err)),
       },
     )
   }
@@ -334,7 +336,15 @@ export function SettingsPage() {
         setDeleteOpen(false)
         navigate('/', { replace: true })
       },
-      onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      onError: (err) => {
+        const raw = formatError(err)
+        // RPC soft_delete_salon кидает known errcode'ы через RAISE EXCEPTION —
+        // в PostgrestError они приезжают как message. Маппим в i18n,
+        // остальное — как есть.
+        const known = ['not_owner', 'not_authenticated', 'salon_not_found'] as const
+        const matched = known.find((k) => raw.includes(k))
+        toast.error(matched ? t(`settings.delete.errors.${matched}`) : raw)
+      },
     })
   }
 
@@ -724,8 +734,7 @@ export function SettingsPage() {
                             ? t('settings.benchmarks.toast_enabled')
                             : t('settings.benchmarks.toast_disabled'),
                         ),
-                      onError: (err) =>
-                        toast.error(err instanceof Error ? err.message : String(err)),
+                      onError: (err) => toast.error(formatError(err)),
                     })
                   }
                   className="size-4 cursor-pointer"
@@ -924,13 +933,10 @@ export function SettingsPage() {
                 <h2 className="text-brand-navy text-base font-bold tracking-tight">
                   {t('settings.billing.title')}
                 </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {subscription
-                    ? t(`settings.billing.status_${subscription.status}`, {
-                        defaultValue: subscription.status,
-                      })
-                    : t('settings.billing.no_subscription')}
-                </p>
+                <BillingSubscriptionStatus
+                  subscription={subscription ?? null}
+                  salonCreatedAt={salon.created_at}
+                />
               </div>
               <BillingButtons salonId={salonId} subscription={subscription ?? null} />
             </div>
@@ -978,8 +984,9 @@ export function SettingsPage() {
             <Input
               value={confirmName}
               onChange={(e) => setConfirmName(e.target.value)}
-              placeholder={salon.name}
+              placeholder={t('settings.delete.confirm_placeholder')}
               autoFocus
+              autoComplete="off"
               data-testid="settings-delete-confirm"
             />
           </div>
@@ -1018,7 +1025,7 @@ export function SettingsPage() {
             toast.success(t('settings.profile.logo_uploaded'))
             setLogoCropFile(null)
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : String(err))
+            toast.error(formatError(err))
           } finally {
             setLogoUploading(false)
           }

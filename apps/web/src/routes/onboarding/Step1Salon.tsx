@@ -22,6 +22,8 @@ type Props = {
     name: string
     country_code: CountryCode
     salon_type: SalonTypeId
+    /** Bug 40ec7d0e: текст, который юзер вводит при выборе «Другое». */
+    salon_type_custom: string
     address: AddressDraft
     benchmarks_opt_in: boolean
     /** Полная ветка: data URL логотипа (webp blob, ≤512px). После submit
@@ -239,6 +241,20 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
               )
             })}
           </div>
+          {/* Bug 40ec7d0e (Елена 05.06): при выборе «Другое» показываем поле
+              для уточнения. Текст уходит как salon_type на submit. */}
+          {value.salon_type === 'other' ? (
+            <Input
+              className="mt-2"
+              value={value.salon_type_custom}
+              onChange={(e) => onChange({ salon_type_custom: e.target.value })}
+              placeholder={t('onboarding.step1.type_other_placeholder', {
+                defaultValue: 'Опиши тип салона своими словами',
+              })}
+              maxLength={60}
+              data-testid="onb-type-other-input"
+            />
+          ) : null}
         </Field>
       </div>
 

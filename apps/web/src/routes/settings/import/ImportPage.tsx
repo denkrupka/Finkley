@@ -1,7 +1,7 @@
 import { ArrowLeft, FileUp, Loader2, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -134,7 +134,19 @@ function buildMapping(headers: string[]): Record<number, DomainField> {
 export function ImportPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
+  const [search] = useSearchParams()
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Bug fd5197a9: если страница открыта из онбординга — назад ведём в
+  // онбординг (?return=onboarding&salon=<id>), а не в Settings.
+  const returnTo = search.get('return')
+  const returnSalon = search.get('salon') ?? salonId
+  const backLink =
+    returnTo === 'onboarding' ? `/onboarding?salon=${returnSalon}` : `/${salonId}/settings`
+  const backLabel =
+    returnTo === 'onboarding'
+      ? t('import.back_to_onboarding', { defaultValue: 'Назад к онбордингу' })
+      : t('import.back_to_settings')
 
   const [parsed, setParsed] = useState<CsvParseResult | null>(null)
   const [mapping, setMapping] = useState<Record<number, DomainField>>({})
@@ -210,11 +222,11 @@ export function ImportPage() {
     <div className="flex flex-1 flex-col px-5 py-7 sm:px-8 lg:pb-12">
       <div className="mb-5">
         <Link
-          to={`/${salonId}/settings`}
+          to={backLink}
           className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-sm"
         >
           <ArrowLeft className="size-4" strokeWidth={1.7} />
-          {t('import.back_to_settings')}
+          {backLabel}
         </Link>
         <h1 className="text-brand-navy text-2xl font-bold tracking-tight">{t('import.title')}</h1>
         <p className="text-muted-foreground mt-1 text-sm">{t('import.subtitle')}</p>

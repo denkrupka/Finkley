@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import {
   DEFAULT_FINANCIAL_SETTINGS,
+  isSystemAdjustmentsRegister,
   type FinancialSettings,
   type ParamPeriod,
   type ParameterItem,
@@ -223,7 +224,12 @@ export function Step4Expenses({ value, onChange, financial, onFinancialChange }:
   const activeMeta = CATEGORIES[activeIndex]!
   const ActiveIcon = activeMeta.icon
   const activeSection = getSection(activeCategory)
-  const visibleItems = activeSection.items.filter((it) => !it.archived)
+  // Bug 30e830c2 (Den 05.06): системная касса «Корректировки» (preset_key
+  // = 'adjustments') используется только в /reports и в «Перестановке
+  // средств». В онбординге её не показываем и не даём редактировать.
+  const visibleItems = activeSection.items.filter(
+    (it) => !it.archived && !isSystemAdjustmentsRegister(it),
+  )
   const isPercent = activeCategory === 'variable'
   const hasPeriod = activeCategory === 'fixed' || activeCategory === 'taxes'
   const hasCashKind = activeCategory === 'cash_registers'

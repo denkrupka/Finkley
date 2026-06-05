@@ -21,7 +21,11 @@ type Props = {
   onOpenChange: (v: boolean) => void
   salonId: string
   currency: string
-  /** Расход, для которого подыскиваем неpривязанную банковскую транзакцию. */
+  /** Расход, для которого подыскиваем неpривязанную банковскую транзакцию.
+   *  В create-mode (Bug 06e262c7) id может быть пустой — тогда вместо
+   *  мгновенной линковки через RPC мы только возвращаем выбранную
+   *  транзакцию через onPick, а ExpenseFormModal линкует её в
+   *  onSuccess createExpense'a. */
   expense: {
     id: string
     amount_cents: number
@@ -30,6 +34,9 @@ type Props = {
     document_number: string | null
   }
   onLinked?: () => void
+  /** Bug 06e262c7: pick-mode без линковки. Если задан — не дёргаем link
+   *  mutation, просто отдаём выбранную транзакцию и закрываем диалог. */
+  onPick?: (tx: BankOutflowRow) => void
 }
 
 /**
@@ -49,6 +56,7 @@ export function LinkExpenseToBankDialog({
   currency,
   expense,
   onLinked,
+  onPick,
 }: Props) {
   const { t } = useTranslation()
   const link = useLinkBankTransaction(salonId)
@@ -66,6 +74,12 @@ export function LinkExpenseToBankDialog({
   }, [expense.expense_at])
 
   function handlePick(tx: BankOutflowRow) {
+    // Bug 06e262c7: pick-mode (без expense.id) — отдаём tx наверх и закрываемся.
+    if (onPick) {
+      onPick(tx)
+      onOpenChange(false)
+      return
+    }
     link.mutate(
       { transactionId: tx.id, expenseId: expense.id, clearNeedsReview: true },
       {

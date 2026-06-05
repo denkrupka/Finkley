@@ -79,15 +79,16 @@ export async function uploadSalonLogo(
 /**
  * Soft delete салона (`deleted_at = now()`). Через 30 дней grace period
  * scheduled function зачистит окончательно (TASK-26 в стадии 2).
+ *
+ * Bug f0807294: вместо прямого UPDATE используем RPC soft_delete_salon —
+ * он явно проверяет owner и кидает читаемую ошибку (not_owner /
+ * salon_not_found / not_authenticated) вместо немой 0-rows-updated.
  */
 export function useDeleteSalon() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (salonId: string) => {
-      const { error } = await supabase
-        .from('salons')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', salonId)
+      const { error } = await supabase.rpc('soft_delete_salon', { p_salon_id: salonId })
       if (error) throw error
       return salonId
     },

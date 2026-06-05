@@ -22,7 +22,7 @@ import {
   type StaffRow,
   type WeeklySchedule,
 } from '@/hooks/useStaff'
-import { useUpdateStaff } from '@/hooks/useStaffMutations'
+import { useCreateStaff, useUpdateStaff } from '@/hooks/useStaffMutations'
 import {
   useDeleteStaffServiceOverride,
   useStaffServiceOverrides,
@@ -72,6 +72,11 @@ function defaultSchedule(): WeeklySchedule {
 export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
   const { t } = useTranslation()
   const update = useUpdateStaff(salonId)
+  // Bug 37b3b3e0 (Елена 05.06): тот же sheet используется и для add'а
+  // нового мастера в онбординге (передаётся staff=null). В этом режиме
+  // save() инсёртит через useCreateStaff вместо useUpdateStaff.
+  const create = useCreateStaff(salonId)
+  const isCreate = !staff
 
   const [name, setName] = useState('')
   const [scheme, setScheme] = useState<StaffPayoutScheme>('percent_revenue')
@@ -84,7 +89,21 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
   const [schedule, setSchedule] = useState<WeeklySchedule>(defaultSchedule())
 
   useEffect(() => {
-    if (!staff) return
+    if (!staff) {
+      // create-mode: ресетим к дефолтам каждый раз когда sheet открывается
+      // на null (иначе после edit'а одного мастера и закрытия — поля бы
+      // остались заполненными от предыдущего).
+      setName('')
+      setScheme('percent_revenue')
+      setPercent('40')
+      setFixedAmount('')
+      setChairRent('')
+      setRetailEnabled(true)
+      setRetailPercent('')
+      setRetentionDays('')
+      setSchedule(defaultSchedule())
+      return
+    }
     setName(staff.full_name)
     setScheme(staff.payout_scheme)
     setPercent(staff.payout_percent != null ? String(staff.payout_percent) : '40')
@@ -94,10 +113,9 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
     setRetailPercent(staff.retail_payout_percent != null ? String(staff.retail_payout_percent) : '')
     setRetentionDays(staff.retention_window_days != null ? String(staff.retention_window_days) : '')
     setSchedule(staff.weekly_schedule ?? defaultSchedule())
-  }, [staff?.id, staff])
+  }, [staff?.id, staff, open])
 
   function save() {
-    if (!staff) return
     const trimmed = name.trim()
     if (trimmed.length < 2) {
       toast.error(t('staff.errors.name_too_short'))
@@ -129,37 +147,45 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
       return
     }
 
-    update.mutate(
-      {
-        id: staff.id,
-        full_name: trimmed,
-        payout_scheme: scheme,
-        payout_percent: scheme === 'percent_revenue' || scheme === 'mixed' ? pct : null,
-        payout_fixed_cents:
-          scheme === 'fixed' || scheme === 'mixed' ? inputToCents(fixedAmount) : null,
-        chair_rent_cents: scheme === 'chair_rent' ? inputToCents(chairRent) : null,
-        weekly_schedule: schedule,
-        retail_payout_enabled: retailEnabled,
-        retail_payout_percent: retailPctNum,
-        retention_window_days: retentionNum,
+    const payload = {
+      full_name: trimmed,
+      payout_scheme: scheme,
+      payout_percent: scheme === 'percent_revenue' || scheme === 'mixed' ? pct : null,
+      payout_fixed_cents:
+        scheme === 'fixed' || scheme === 'mixed' ? inputToCents(fixedAmount) : null,
+      chair_rent_cents: scheme === 'chair_rent' ? inputToCents(chairRent) : null,
+      weekly_schedule: schedule,
+      retail_payout_enabled: retailEnabled,
+      retail_payout_percent: retailPctNum,
+      retention_window_days: retentionNum,
+    }
+
+    const handlers = {
+      onSuccess: () => {
+        toast.success(t('staff.toast_saved'))
+        onOpenChange(false)
       },
-      {
-        onSuccess: () => {
-          toast.success(t('staff.toast_saved'))
-          onOpenChange(false)
-        },
-        onError: (err) => {
-          toast.error(err instanceof Error ? err.message : String(err))
-        },
+      onError: (err: unknown) => {
+        toast.error(err instanceof Error ? err.message : String(err))
       },
-    )
+    }
+
+    if (isCreate) {
+      create.mutate(payload, handlers)
+    } else {
+      update.mutate({ id: staff!.id, ...payload }, handlers)
+    }
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{t('staff.sheet_title')}</SheetTitle>
+          <SheetTitle>
+            {isCreate
+              ? t('staff.sheet_title_create', { defaultValue: 'Новый мастер' })
+              : t('staff.sheet_title')}
+          </SheetTitle>
           <SheetDescription>{t('staff.sheet_subtitle')}</SheetDescription>
         </SheetHeader>
         <SheetBody className="px-5 py-5">
@@ -354,7 +380,7 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
           </div>
         </SheetBody>
         <SheetFooter>
-          <Button onClick={save} disabled={update.isPending} className="w-full">
+          <Button onClick={save} disabled={update.isPending || create.isPending} className="w-full">
             {t('common.save')}
           </Button>
         </SheetFooter>

@@ -24,23 +24,27 @@ export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuCl
   const { t } = useTranslation()
   const { signOut } = useAuth()
   return (
-    <header className="border-border bg-card flex h-16 flex-shrink-0 items-center gap-4 border-b px-5 sm:gap-6 sm:px-7">
+    <header className="border-border bg-card flex h-16 flex-shrink-0 items-center gap-3 border-b px-3 sm:gap-6 sm:px-7">
       {/* Mobile burger */}
       <button
         type="button"
         onClick={onMenuClick}
-        className="border-border bg-card grid size-9 place-items-center rounded-md border lg:hidden"
+        className="border-border bg-card grid size-9 shrink-0 place-items-center rounded-md border lg:hidden"
         aria-label="menu"
       >
         <Menu className="size-[18px]" strokeWidth={1.7} />
       </button>
 
       {/* Salon name + date (desktop) или просто salon switcher (mobile) */}
-      <div className="hidden flex-col leading-tight lg:flex">
+      <div className="hidden min-w-0 flex-col leading-tight lg:flex">
         <SalonSwitcher salonId={salonId} salonName={salonName} />
         <span className="text-muted-foreground text-xs">{todayLabel}</span>
       </div>
-      <div className="flex flex-1 lg:hidden">
+      {/* Bug 1b88180e (Елена 06.06): длинное имя «WONDERFUL BEAUTY | Salon
+          kosmetyczny» переносилось на 3 строки и наезжало на контент.
+          min-w-0 + overflow-hidden на контейнере → SalonSwitcher (внутри
+          truncate) держит одну строку с многоточием. */}
+      <div className="flex min-w-0 flex-1 overflow-hidden lg:hidden">
         <SalonSwitcher salonId={salonId} salonName={salonName} />
       </div>
 

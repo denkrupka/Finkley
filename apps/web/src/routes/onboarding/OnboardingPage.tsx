@@ -88,13 +88,17 @@ const STEPS_FULL = [
   'path',
   'profile',
   'salon',
-  'schedule',
   'address',
   'public_links',
   'accounting',
   'integrations_bookings',
   'integrations_social',
   'integrations_banking',
+  // Bug 602bfc92 (Елена 05.06): график работы перенесён после интеграций —
+  // если юзер подключил Booksy/Versum, расписание там, и spam'ить им
+  // онбординг до подключения нет смысла. Если интеграция не настроена —
+  // юзер вводит часы вручную после блока интеграций.
+  'schedule',
   'tg_phone',
   'staff',
   'services',
@@ -135,6 +139,9 @@ export type OnboardingState = {
   name: string
   country_code: CountryCode
   salon_type: SalonTypeId
+  /** Bug 40ec7d0e: при salon_type='other' юзер вводит сюда свой текст.
+   *  На submit (RPC) используется как p_salon_type вместо буквы 'other'. */
+  salon_type_custom: string
   // Шаг 2 — Address (только full path)
   address: AddressDraft
   // Шаг 3 — Accounting (только full path)
@@ -193,6 +200,7 @@ const INITIAL: OnboardingState = {
   name: '',
   country_code: 'PL',
   salon_type: 'hair',
+  salon_type_custom: '',
   address: {
     address: '',
     city: '',
@@ -293,7 +301,9 @@ export function OnboardingPage() {
         const hyd = computeHydrate(row)
         if (cancelled || !hyd) return
         if (row?.onboarding_state) {
-          setState({ ...row.onboarding_state, ...hyd.state } as OnboardingState)
+          // Merge INITIAL первым, чтобы новые поля (например salon_type_custom
+          // — bug 40ec7d0e) получили дефолты, если их нет в legacy snapshot.
+          setState({ ...INITIAL, ...row.onboarding_state, ...hyd.state } as OnboardingState)
         } else {
           setState((prev) => ({ ...prev, ...hyd.state }))
         }
@@ -375,8 +385,16 @@ export function OnboardingPage() {
   // Address-шаг скипаем если на Step "salon" юзер уже выбрал место в Google
   // Maps — адрес, координаты и google_place_id оттуда подтянулись, ещё раз
   // показывать форму нет смысла.
+  // Bug be35489a (Елена 05.06): шаг AI-разбора отзывов имеет смысл только
+  // если есть откуда читать отзывы — Google place (нашли салон в Google
+  // Maps) или подвязанный Booksy. Иначе пропускаем шаг, чтобы не показывать
+  // пустой fallback с «пока нет данных».
+  const hasReviewSource =
+    !!state.address.google_place_id || state.selected_integrations.includes('booksy')
   const STEPS: readonly StepId[] = (state.path === 'full' ? STEPS_FULL : STEPS_QUICK).filter(
-    (s) => !(s === 'address' && state.address.google_place_id),
+    (s) =>
+      !(s === 'address' && state.address.google_place_id) &&
+      !(s === 'ai_reviews' && !hasReviewSource),
   )
   const stepId: StepId = (STEPS[stepIndex] ?? 'path') as StepId
   const isFirst = stepIndex === 0
@@ -395,6 +413,17 @@ export function OnboardingPage() {
   /** Early-create salon после Step "salon" — даёт реальный salonId для
    *  последующих integration steps. Если уже создан и юзер изменил
    *  name/country/type — обновляем salons row. */
+  /** Bug 40ec7d0e: если юзер выбрал «Другое» и ввёл свой текст —
+   *  пишем его в salon_type вместо 'other'. Если 'other' но без текста —
+   *  оставляем 'other' (юзер просто пометил тип). */
+  function resolvedSalonType(): string {
+    if (state.salon_type === 'other') {
+      const custom = state.salon_type_custom.trim()
+      if (custom) return custom
+    }
+    return state.salon_type
+  }
+
   async function ensureSalonCreated(): Promise<string | null> {
     if (state.created_salon_id) {
       // Update только базовых полей (name/type/country may have changed)
@@ -403,7 +432,7 @@ export function OnboardingPage() {
           .from('salons')
           .update({
             name: state.name.trim(),
-            salon_type: state.salon_type,
+            salon_type: resolvedSalonType(),
             country_code: state.country_code,
           })
           .eq('id', state.created_salon_id)
@@ -419,7 +448,7 @@ export function OnboardingPage() {
       p_country_code: country.code,
       p_currency: country.currency,
       p_timezone: country.timezone,
-      p_salon_type: state.salon_type,
+      p_salon_type: resolvedSalonType(),
       p_locale: i18n.language.split('-')[0] || 'ru',
     })
     if (error) {
@@ -465,7 +494,7 @@ export function OnboardingPage() {
         p_country_code: country.code,
         p_currency: country.currency,
         p_timezone: country.timezone,
-        p_salon_type: state.salon_type,
+        p_salon_type: resolvedSalonType(),
         p_locale: 'ru',
         p_staff: state.staff
           .filter((s) => s.full_name.trim())
@@ -980,26 +1009,27 @@ export function OnboardingPage() {
                 в строку (разъезжаются на 2 строки, последние шаги ловят
                 raw-ключ). Показываем подпись ТОЛЬКО под active шагом, для
                 остальных — компактная полоска без подписи. */}
+            {/* Bug dd6444fc (Елена 06.06): на mobile title активного шага
+                truncate'ился в ширину одной полоски прогресса (≈10px) и
+                становился многоточием. Выносим title в отдельный ряд под
+                стрипом, чтобы он спокойно занимал всю ширину. */}
             <div className="flex items-center gap-1.5">
               {STEPS.map((s, i) => {
                 const active = i === stepIndex
                 const done = i < stepIndex
                 return (
-                  <div key={s} className="flex flex-1 flex-col items-center">
-                    <div
-                      className={cn(
-                        'h-[5px] w-full rounded-full',
-                        done ? 'bg-brand-sage' : active ? 'bg-primary' : 'bg-border',
-                      )}
-                    />
-                    {active ? (
-                      <div className="text-brand-navy mt-2 truncate text-[12px] font-bold">
-                        {t(`onboarding.steps.${s}`)}
-                      </div>
-                    ) : null}
-                  </div>
+                  <div
+                    key={s}
+                    className={cn(
+                      'h-[5px] flex-1 rounded-full',
+                      done ? 'bg-brand-sage' : active ? 'bg-primary' : 'bg-border',
+                    )}
+                  />
                 )
               })}
+            </div>
+            <div className="text-brand-navy mt-2 truncate text-center text-[12px] font-bold">
+              {t(`onboarding.steps.${stepId}`)}
             </div>
           </div>
 
@@ -1038,6 +1068,7 @@ export function OnboardingPage() {
                     name: state.name,
                     country_code: state.country_code,
                     salon_type: state.salon_type,
+                    salon_type_custom: state.salon_type_custom,
                     address: state.address,
                     benchmarks_opt_in: state.benchmarks_opt_in,
                     logo_data_url: state.logo_data_url,
@@ -1075,6 +1106,7 @@ export function OnboardingPage() {
                     <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
                     <Step3Accounting
                       salonId={state.created_salon_id}
+                      countryCode={state.country_code}
                       value={{ nip: state.nip, company_name: state.company_name }}
                       onChange={(v) =>
                         setState((prev) => ({
@@ -1113,7 +1145,11 @@ export function OnboardingPage() {
                 onOcrVisitsAdded={(v) => patch('ocr_visits', v)}
               />
             )}
-            {/* Bug 29796c7f (Елена 02.06): добавить опцию загрузить CSV с визитами. */}
+            {/* Bug 29796c7f (Елена 02.06): добавить опцию загрузить CSV с визитами.
+                Bug fd5197a9 (Елена 05.06): target="_blank" уводил на onboarding-
+                root через RootRedirect в новом табе (brown-salon guard ловит
+                любой /). Меняем на same-tab navigate с return-param —
+                ImportPage по нему вернёт назад в онбординг. */}
             {stepId === 'integrations_bookings' && state.created_salon_id ? (
               <div className="border-border bg-muted/20 mb-4 rounded-lg border p-3">
                 <p className="text-foreground text-sm font-semibold">
@@ -1127,14 +1163,17 @@ export function OnboardingPage() {
                       'Импортируй данные из своего файла — поддерживаются экспорты Booksy/Excel.',
                   })}
                 </p>
-                <a
-                  href={`/${state.created_salon_id}/settings/import`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/${state.created_salon_id}/settings/import?return=onboarding&salon=${state.created_salon_id}`,
+                    )
+                  }
                   className="text-brand-teal-deep mt-2 inline-flex text-xs font-semibold hover:underline"
                 >
                   {t('onboarding.csv_import.link', { defaultValue: 'Открыть импорт →' })}
-                </a>
+                </button>
               </div>
             ) : null}
             {stepId === 'integrations_bookings' &&
@@ -1296,7 +1335,9 @@ export function OnboardingPage() {
                 hasNip={!!state.nip}
                 companyName={state.company_name}
                 ocrVisitsCount={state.ocr_visits.length}
-                salonType={state.salon_type}
+                // Bug 40ec7d0e follow-up: для AI передаём resolved тип
+                // (текст «Студия эпиляции» вместо буквы 'other').
+                salonType={resolvedSalonType()}
                 country={state.country_code}
                 salonId={state.created_salon_id}
               />
@@ -1315,7 +1356,8 @@ export function OnboardingPage() {
             )}
             {stepId === 'ai_summary' && (
               <StepAiSummary
-                salonType={state.salon_type}
+                // Bug 40ec7d0e follow-up: resolved тип для AI.
+                salonType={resolvedSalonType()}
                 country={state.country_code}
                 selectedIntegrations={state.selected_integrations}
                 staffCount={state.staff.length}
@@ -1452,11 +1494,11 @@ export function OnboardingPage() {
               ← {t('common.back')}
             </button>
             <div className="flex items-center gap-5">
-              {/* Bug ca95d313 (Елена 02.06): убрать "Пропустить" на стартовом
-                  экране (stepIndex===0 - 'path' выбор). Онбординг обязательный,
-                  кнопка вводила в заблуждение. Также прячем на 'salon' (там
-                  имя салона нужно) и на последнем шаге (там submit). */}
-              {!isLast && stepId !== 'salon' && stepIndex > 0 ? (
+              {/* Bug 8aa22df6 (Елена 05.06): убрать «Пропустить онбординг»
+                  только с шага выбора формы (path). На остальных шагах
+                  пропуск разрешён. На последнем шаге (submit) и на salon
+                  (нужно имя для early-create) — тоже прячем. */}
+              {!isLast && stepId !== 'path' && stepId !== 'salon' ? (
                 <button
                   type="button"
                   onClick={skip}

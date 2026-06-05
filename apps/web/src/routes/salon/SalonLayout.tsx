@@ -221,12 +221,16 @@ export function SalonLayout() {
       {/* Sidebar mobile в Drawer. Dialog.Content получает явный bg/ширину,
           чтобы тёмная тема не превращала drawer в чёрный экран (Sidebar
           внутри имеет bg-card, но без подложки Dialog.Content рендерил пустой
-          контейнер до того как Sidebar успевал прорисовать содержимое). */}
+          контейнер до того как Sidebar успевал прорисовать содержимое).
+          Bug 2c986f86 (Елена 06.06): drawer выглядел «пустым» — Dialog был
+          260px, а Sidebar внутри имел жёсткие 232px, оставляя 28px пустой
+          подложки справа. Делаем drawer = ширине Sidebar (232px) и
+          h-dvh (учитывает мобильный URL-бар вместо обрезки h-screen). */}
       <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden" />
           <Dialog.Content
-            className="bg-card fixed inset-y-0 left-0 z-50 w-[260px] max-w-[80vw] focus:outline-none lg:hidden"
+            className="bg-card fixed inset-y-0 left-0 z-50 h-dvh w-[232px] max-w-[85vw] overflow-hidden focus:outline-none lg:hidden"
             aria-describedby={undefined}
           >
             <Dialog.Title className="sr-only">{t('nav.drawer_title')}</Dialog.Title>

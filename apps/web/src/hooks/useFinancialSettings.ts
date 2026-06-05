@@ -155,12 +155,31 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   other_income: {
     items: [preset('monthly', 'Прочие плановые доходы (в месяц)', { amount_cents: 0 })],
   },
+  // Bug 34c47af6 (Den 05.06): порядок и набор налогов по требованию
+  // владельца:
+  //   1) налог на доходы работников (PIT-4)
+  //   2) налог на доходы фирмы (CIT)
+  //   3) VAT
+  //   4) страховые взносы на работников (ZUS pracowników)
+  //   5) налог на доходы самого предпринимателя (PIT-36 / liniowy)
+  //   6) прочее
   taxes: {
     items: [
-      preset('pit36', 'PIT-36 (НДФЛ)', { amount_cents: 0, period: 'month' }),
+      preset('pit_employees', 'Налог на доходы работников (PIT-4)', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('cit', 'Налог на доходы фирмы (CIT)', { amount_cents: 0, period: 'month' }),
       preset('vat', 'VAT (НДС)', { amount_cents: 0, period: 'month' }),
-      preset('cit', 'CIT (налог на прибыль)', { amount_cents: 0, period: 'month' }),
-      preset('pit3', 'PIT-3', { amount_cents: 0, period: 'month' }),
+      preset('zus_workers', 'Страховые взносы работников (ZUS pracowników)', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('pit36', 'Налог на доходы предпринимателя (PIT-36 / liniowy)', {
+        amount_cents: 0,
+        period: 'month',
+      }),
+      preset('taxes_other', 'Прочие налоги', { amount_cents: 0, period: 'month' }),
     ],
   },
   investments: {

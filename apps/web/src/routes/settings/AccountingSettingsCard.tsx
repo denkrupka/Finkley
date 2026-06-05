@@ -21,12 +21,19 @@ import {
 } from '@/hooks/useAccountingSettings'
 import { lookupNip } from '@/hooks/useCounterparties'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
+import { useSalon } from '@/hooks/useSalons'
 import {
   LEGAL_FORMS,
   getLegalForm,
   getTaxForm,
   inferLegalFormFromName,
 } from '@/lib/accounting/forms'
+import {
+  COUNTRY_OPTIONS,
+  taxIdLabelFor,
+  taxIdPlaceholderFor,
+  type CountryCode,
+} from '@/routes/onboarding/onboarding-defaults'
 
 /**
  * AccountingSettingsCard — блок «Бухгалтерия» во вкладке Settings → Профиль
@@ -51,7 +58,19 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
   const { data: settings, isLoading } = useAccountingSettings(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
+  const { data: salon } = useSalon(salonId)
   const save = useUpdateAccountingSettings(salonId)
+
+  // Bug 4d4c58d5/db360d8a: лейбл/placeholder поля tax-ID и поведение
+  // lookup'a зависят от страны салона. Сейчас реестровый lookup есть
+  // только для PL (MF White List через dataport edge function); для
+  // остальных стран кнопка lookup отключена с подсказкой «введите
+  // вручную» — TODO: добавить EU VIES для DE/CZ/SK/HU/AT/etc.
+  const salonCountry = (salon?.country_code ?? 'PL') as CountryCode
+  const taxIdLabel = taxIdLabelFor(salonCountry)
+  const taxIdPlaceholder = taxIdPlaceholderFor(salonCountry)
+  const nipLookupSupported = salonCountry === 'PL'
+  const taxIdPattern = COUNTRY_OPTIONS.find((c) => c.code === salonCountry)?.tax_id_pattern
 
   const [draft, setDraft] = useState<AccountingSettings>({})
   const [nipLookupPending, setNipLookupPending] = useState(false)
@@ -90,7 +109,18 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
   }, [draft.tax_form])
 
   async function runNipLookup() {
-    const nip = (draft.nip ?? '').replace(/[^0-9]/g, '')
+    if (!nipLookupSupported) {
+      toast.info(
+        t('counterparties.nip_lookup_only_pl', {
+          defaultValue:
+            'Автопоиск компании пока работает только для Польши (NIP). Заполните данные вручную.',
+        }),
+      )
+      return
+    }
+    const raw = (draft.nip ?? '').trim()
+    // Для PL — 10 цифр, остальные символы выкидываем (могут вписать с дефисами).
+    const nip = raw.replace(/[^0-9]/g, '')
     if (nip.length !== 10) {
       toast.error(t('counterparties.nip_invalid'))
       return
@@ -166,24 +196,33 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
       <p className="text-muted-foreground mb-5 text-sm">{t('settings.accounting.subtitle')}</p>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {/* NIP + lookup */}
+        {/* Tax ID (NIP / DIČ / USt-IdNr. / etc.) + lookup */}
         <div className="flex flex-col gap-1.5 sm:col-span-2">
-          <Label htmlFor="acc-nip">{t('settings.accounting.nip_label')}</Label>
+          <Label htmlFor="acc-nip">{taxIdLabel}</Label>
           <div className="flex gap-2">
             <Input
               id="acc-nip"
               value={draft.nip ?? ''}
               onChange={(e) => patch('nip', e.target.value)}
-              placeholder="0000000000"
-              inputMode="numeric"
-              maxLength={13}
+              placeholder={taxIdPlaceholder}
+              inputMode="text"
+              maxLength={20}
+              pattern={taxIdPattern}
               className="flex-1"
             />
             <Button
               type="button"
               variant="outline"
               onClick={runNipLookup}
-              disabled={nipLookupPending}
+              disabled={nipLookupPending || !nipLookupSupported}
+              title={
+                !nipLookupSupported
+                  ? t('counterparties.nip_lookup_only_pl', {
+                      defaultValue:
+                        'Автопоиск работает только для Польши. Заполните данные вручную.',
+                    })
+                  : undefined
+              }
             >
               {nipLookupPending ? (
                 <Loader2 className="size-4 animate-spin" strokeWidth={2} />
@@ -193,7 +232,14 @@ export function AccountingSettingsCard({ salonId }: { salonId: string }) {
               {t('counterparties.nip_lookup')}
             </Button>
           </div>
-          <p className="text-muted-foreground text-xs">{t('settings.accounting.nip_hint')}</p>
+          <p className="text-muted-foreground text-xs">
+            {nipLookupSupported
+              ? t('settings.accounting.nip_hint')
+              : t('counterparties.nip_lookup_only_pl', {
+                  defaultValue:
+                    'Автопоиск компании пока работает только для Польши. Введите данные вручную.',
+                })}
+          </p>
         </div>
 
         <div className="flex flex-col gap-1.5 sm:col-span-2">

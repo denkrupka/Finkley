@@ -343,6 +343,15 @@ export function ExpenseFormModal({
   const [gateOpen, setGateOpen] = useState(false)
   // T116 — breakdown текст после клика «Авто-расчёт» («Выручка X × Y% = Z»).
   const [payrollBreakdown, setPayrollBreakdown] = useState<string | null>(null)
+  // Bug 06e262c7: в create-mode для безналичной оплаты юзер выбирает
+  // банковскую транзакцию до сохранения. Храним выбор тут — линкуем
+  // в onSuccess(createExpense).
+  const [pendingBankTx, setPendingBankTx] = useState<{
+    id: string
+    executed_at: string
+    amount_cents: number
+  } | null>(null)
+  const [pendingPickerOpen, setPendingPickerOpen] = useState(false)
   const [dictationPrefillForNewCp, setDictationPrefillForNewCp] = useState<{
     name?: string
     nip?: string
@@ -860,6 +869,19 @@ export function ExpenseFormModal({
             await supabase
               .from('expenses')
               .update({ bank_transaction_id: prefillFromBankTx.bank_transaction_id })
+              .eq('id', created.id)
+            await qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
+            await qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
+          }
+          // Bug 06e262c7: pending pick из create-mode — линкуем после insert.
+          if (pendingBankTx && created?.id) {
+            await supabase
+              .from('bank_transactions')
+              .update({ expense_id: created.id, needs_review: false })
+              .eq('id', pendingBankTx.id)
+            await supabase
+              .from('expenses')
+              .update({ bank_transaction_id: pendingBankTx.id })
               .eq('id', created.id)
             await qc.invalidateQueries({ queryKey: ['bank-outflows', salonId] })
             await qc.invalidateQueries({ queryKey: ['bank-inflows', salonId] })
@@ -1768,6 +1790,28 @@ export function ExpenseFormModal({
           {isEdit && expense ? (
             <ExpenseBankLinkSection salonId={salonId} currency={currency} expense={expense} />
           ) : null}
+
+          {/* Bug 06e262c7: create-mode + paid + безналичный способ оплаты →
+              даём выбрать банковскую транзакцию заранее. Линкуется в
+              onSuccess(createExpense). Для cash-оплаты не показываем — там
+              нет банковской tx. */}
+          {!isEdit &&
+          paid &&
+          form.watch('payment_method') &&
+          form.watch('payment_method') !== 'cash' ? (
+            <PendingBankLinkBlock
+              salonId={salonId}
+              currency={currency}
+              expenseDate={form.watch('expense_at')}
+              amountStr={form.watch('amount')}
+              description={form.watch('description')}
+              documentNumber={form.watch('document_number')}
+              pickedTx={pendingBankTx}
+              onPickTx={setPendingBankTx}
+              pickerOpen={pendingPickerOpen}
+              setPickerOpen={setPendingPickerOpen}
+            />
+          ) : null}
         </form>
 
         {/* Mobile audit (2026-05-30): sticky footer чтобы кнопка Save была
@@ -1779,7 +1823,14 @@ export function ExpenseFormModal({
               type="button"
               size="lg"
               onClick={form.handleSubmit(onSubmit)}
-              disabled={createExpense.isPending || uploading}
+              disabled={
+                createExpense.isPending ||
+                uploading ||
+                // Bug 06e262c7: блокируем «Сохранить» когда сумма 0 / пустая —
+                // Zod refine() показал бы ошибку после клика, но юзер
+                // ожидает что disabled-кнопка скажет это сразу.
+                Number((form.watch('amount') || '0').replace(',', '.')) <= 0
+              }
               data-testid="exp-submit"
             >
               {createExpense.isPending || uploading
@@ -1963,6 +2014,100 @@ function ExpenseBankLinkSection({
           description: expense.description ?? null,
           document_number: expense.document_number,
         }}
+      />
+    </div>
+  )
+}
+
+/**
+ * Bug 06e262c7: блок выбора банковской транзакции в create-mode (расход
+ * ещё не сохранён). В отличие от ExpenseBankLinkSection, тут нет
+ * expense.id — мы просто запоминаем выбранную транзакцию, а линковку
+ * выполняет ExpenseFormModal.onSuccess после createExpense.
+ */
+function PendingBankLinkBlock({
+  salonId,
+  currency,
+  expenseDate,
+  amountStr,
+  description,
+  documentNumber,
+  pickedTx,
+  onPickTx,
+  pickerOpen,
+  setPickerOpen,
+}: {
+  salonId: string
+  currency: string
+  expenseDate: string
+  amountStr: string
+  description: string
+  documentNumber: string
+  pickedTx: { id: string; executed_at: string; amount_cents: number } | null
+  onPickTx: (tx: { id: string; executed_at: string; amount_cents: number } | null) => void
+  pickerOpen: boolean
+  setPickerOpen: (v: boolean) => void
+}) {
+  const { t } = useTranslation()
+  const amountCents = Math.round(Number((amountStr || '0').replace(',', '.')) * 100) || 0
+  return (
+    <div className="border-border bg-muted/20 mt-2 rounded-md border p-3">
+      {pickedTx ? (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-foreground inline-flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+            <span className="text-brand-teal-deep bg-brand-teal-soft inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase">
+              {t('expenses.bank_badge')}
+            </span>
+            {t('banking.reverse_link.linked_label', { defaultValue: 'Привязано к транзакции' })}
+            <span className="text-muted-foreground text-xs">
+              {pickedTx.executed_at?.slice(0, 10)} · {(pickedTx.amount_cents / 100).toFixed(2)}{' '}
+              {currency}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onPickTx(null)}
+            className="text-destructive hover:bg-destructive/10 rounded-md px-2 py-1 text-xs font-semibold"
+          >
+            {t('banking.link_dialog.unlink')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground text-xs">
+            {t('banking.reverse_link.not_linked_hint', {
+              defaultValue:
+                'Привяжите этот расход к банковской транзакции — поможет AI сверять «факт vs план».',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="bg-brand-teal-soft text-brand-teal-deep hover:bg-brand-teal-soft/80 inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold"
+          >
+            {t('banking.reverse_link.button', { defaultValue: 'Выбрать транзакцию' })}
+          </button>
+        </div>
+      )}
+      <LinkExpenseToBankDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        salonId={salonId}
+        currency={currency}
+        expense={{
+          id: '', // pick-mode: id ещё нет, dialog не дёргает mutation
+          amount_cents: amountCents,
+          expense_at: expenseDate,
+          description: description || null,
+          document_number: documentNumber || null,
+        }}
+        onPick={(tx) =>
+          onPickTx({
+            id: tx.id,
+            executed_at: tx.executed_at,
+            amount_cents: tx.amount_cents,
+          })
+        }
       />
     </div>
   )

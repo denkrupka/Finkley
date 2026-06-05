@@ -3,15 +3,136 @@
  * Вынесены в отдельный модуль чтобы переиспользовать в шагах и при сабмите.
  */
 
+/**
+ * Bug c23825f2 + 4d4c58d5 + db360d8a + 4cd36954: расширили список стран и
+ * добавили метаданные tax_id (NIP / DIČ / Steuernummer / etc.) — лейбл,
+ * placeholder и regex для валидации. По этим же данным VAT lookup и подпись
+ * в UI больше не «прибиты к Польше».
+ */
 export const COUNTRY_OPTIONS = [
-  { code: 'PL', name: 'Польша', currency: 'PLN', timezone: 'Europe/Warsaw' },
-  { code: 'DE', name: 'Германия', currency: 'EUR', timezone: 'Europe/Berlin' },
-  { code: 'LT', name: 'Литва', currency: 'EUR', timezone: 'Europe/Vilnius' },
-  { code: 'CZ', name: 'Чехия', currency: 'CZK', timezone: 'Europe/Prague' },
-  { code: 'EE', name: 'Эстония', currency: 'EUR', timezone: 'Europe/Tallinn' },
+  {
+    code: 'PL',
+    name: 'Польша',
+    currency: 'PLN',
+    timezone: 'Europe/Warsaw',
+    tax_id_label: 'NIP',
+    tax_id_placeholder: '1234567890',
+    tax_id_pattern: '^\\d{10}$',
+  },
+  {
+    code: 'DE',
+    name: 'Германия',
+    currency: 'EUR',
+    timezone: 'Europe/Berlin',
+    tax_id_label: 'USt-IdNr.',
+    tax_id_placeholder: 'DE123456789',
+    tax_id_pattern: '^DE\\d{9}$',
+  },
+  {
+    code: 'CZ',
+    name: 'Чехия',
+    currency: 'CZK',
+    timezone: 'Europe/Prague',
+    tax_id_label: 'DIČ',
+    tax_id_placeholder: 'CZ12345678',
+    tax_id_pattern: '^CZ\\d{8,10}$',
+  },
+  {
+    code: 'SK',
+    name: 'Словакия',
+    currency: 'EUR',
+    timezone: 'Europe/Bratislava',
+    tax_id_label: 'IČ DPH',
+    tax_id_placeholder: 'SK1234567890',
+    tax_id_pattern: '^SK\\d{10}$',
+  },
+  {
+    code: 'HU',
+    name: 'Венгрия',
+    currency: 'HUF',
+    timezone: 'Europe/Budapest',
+    tax_id_label: 'Adószám',
+    tax_id_placeholder: 'HU12345678',
+    tax_id_pattern: '^HU\\d{8}$',
+  },
+  {
+    code: 'AT',
+    name: 'Австрия',
+    currency: 'EUR',
+    timezone: 'Europe/Vienna',
+    tax_id_label: 'UID-Nummer',
+    tax_id_placeholder: 'ATU12345678',
+    tax_id_pattern: '^ATU\\d{8}$',
+  },
+  {
+    code: 'LT',
+    name: 'Литва',
+    currency: 'EUR',
+    timezone: 'Europe/Vilnius',
+    tax_id_label: 'PVM kodas',
+    tax_id_placeholder: 'LT123456789',
+    tax_id_pattern: '^LT\\d{9,12}$',
+  },
+  {
+    code: 'LV',
+    name: 'Латвия',
+    currency: 'EUR',
+    timezone: 'Europe/Riga',
+    tax_id_label: 'PVN reģ. nr.',
+    tax_id_placeholder: 'LV12345678901',
+    tax_id_pattern: '^LV\\d{11}$',
+  },
+  {
+    code: 'EE',
+    name: 'Эстония',
+    currency: 'EUR',
+    timezone: 'Europe/Tallinn',
+    tax_id_label: 'KMKR nr.',
+    tax_id_placeholder: 'EE123456789',
+    tax_id_pattern: '^EE\\d{9}$',
+  },
+  {
+    code: 'RO',
+    name: 'Румыния',
+    currency: 'RON',
+    timezone: 'Europe/Bucharest',
+    tax_id_label: 'CIF',
+    tax_id_placeholder: 'RO12345678',
+    tax_id_pattern: '^RO\\d{2,10}$',
+  },
+  {
+    code: 'BG',
+    name: 'Болгария',
+    currency: 'BGN',
+    timezone: 'Europe/Sofia',
+    tax_id_label: 'EIK',
+    tax_id_placeholder: 'BG123456789',
+    tax_id_pattern: '^BG\\d{9,10}$',
+  },
+  {
+    code: 'UA',
+    name: 'Украина',
+    currency: 'UAH',
+    timezone: 'Europe/Kyiv',
+    tax_id_label: 'ЄДРПОУ / ІПН',
+    tax_id_placeholder: '12345678',
+    tax_id_pattern: '^\\d{8,10}$',
+  },
 ] as const
 
 export type CountryCode = (typeof COUNTRY_OPTIONS)[number]['code']
+
+/** Bug 4d4c58d5/db360d8a — подпись поля «NIP» по выбранной стране. */
+export function taxIdLabelFor(code: CountryCode | string | null | undefined): string {
+  const c = COUNTRY_OPTIONS.find((co) => co.code === (code ?? 'PL'))
+  return c?.tax_id_label ?? 'Tax ID'
+}
+
+/** Placeholder с примером формата tax-ID для выбранной страны. */
+export function taxIdPlaceholderFor(code: CountryCode | string | null | undefined): string {
+  const c = COUNTRY_OPTIONS.find((co) => co.code === (code ?? 'PL'))
+  return c?.tax_id_placeholder ?? ''
+}
 
 export const SALON_TYPES = [
   { id: 'hair', name: 'Парикмахерская' },

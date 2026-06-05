@@ -3,8 +3,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useServiceCategories, useServices, type ServiceRow } from '@/hooks/useServices'
+import { formatError } from '@/lib/format-error'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,8 +36,16 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
   const visibleServices = services.filter((s) => !s.is_archived)
   const visibleCategories = categories.filter((c) => !c.is_archived)
 
+  // Bug 39eba1d1 (Елена 05.06): новые добавленные категории без услуг не
+  // показывались — карта строилась только по реальным услугам. Теперь
+  // сначала зачерпываем ВСЕ visibleCategories, потом раскладываем услуги
+  // — пустые категории остаются с items=[] и отображаются с кнопкой
+  // «Добавить услугу».
   const groups = useMemo(() => {
     const map = new Map<string, ServiceRow[]>()
+    for (const c of visibleCategories) {
+      map.set(c.id, [])
+    }
     for (const s of visibleServices) {
       const key = s.category_id ?? 'uncat'
       if (!map.has(key)) map.set(key, [])
@@ -98,19 +117,36 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
     }
   }
 
+  // Bug 42798bfa (Елена 05.06): заменили browser prompt() на нормальную
+  // модалку. Раньше при добавлении категории появлялось «Подтвердите
+  // действие на finkley.app» — выглядит как ошибка.
+  const [addCatOpen, setAddCatOpen] = useState(false)
+  const [addCatName, setAddCatName] = useState('')
+  const [addCatPending, setAddCatPending] = useState(false)
+
+  function openAddCategory() {
+    setAddCatName('')
+    setAddCatOpen(true)
+  }
+
   async function addCategory() {
-    const name = prompt(t('onboarding.step3.add_category'))
-    if (!name?.trim()) return
+    const name = addCatName.trim()
+    if (!name) return
+    setAddCatPending(true)
     try {
       const { error } = await supabase.from('service_categories').insert({
         salon_id: salonId,
-        name: name.trim(),
+        name,
         sort_order: categories.length,
       })
       if (error) throw error
       qc.invalidateQueries({ queryKey: ['service_categories', salonId] })
+      setAddCatOpen(false)
+      setAddCatName('')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      toast.error(formatError(err))
+    } finally {
+      setAddCatPending(false)
     }
   }
 
@@ -141,7 +177,7 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
         </h1>
         <button
           type="button"
-          onClick={addCategory}
+          onClick={openAddCategory}
           className="text-secondary text-sm font-semibold hover:underline"
         >
           + {t('onboarding.step3.add_category')}
@@ -229,6 +265,54 @@ export function Step3ServicesLive({ salonId }: { salonId: string }) {
           )
         })}
       </div>
+
+      {/* Bug 42798bfa: модалка добавления категории вместо browser prompt() */}
+      <Dialog open={addCatOpen} onOpenChange={setAddCatOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('onboarding.step3.add_category')}</DialogTitle>
+            <DialogDescription>
+              {t('onboarding.step3.add_category_subtitle', {
+                defaultValue: 'Например: «Окрашивание» или «Маникюр».',
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-5 py-4">
+            <Label htmlFor="add-cat-name" className="text-xs">
+              {t('onboarding.step3.add_category_label', { defaultValue: 'Название категории' })}
+            </Label>
+            <Input
+              id="add-cat-name"
+              autoFocus
+              value={addCatName}
+              onChange={(e) => setAddCatName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && addCatName.trim() && !addCatPending) {
+                  e.preventDefault()
+                  void addCategory()
+                }
+              }}
+              placeholder={t('onboarding.step3.add_category_placeholder', {
+                defaultValue: 'Например: Окрашивание',
+              })}
+              maxLength={60}
+              className="mt-1.5"
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={addCategory} disabled={!addCatName.trim() || addCatPending} size="lg">
+              {addCatPending ? t('common.loading') : t('common.add', { defaultValue: 'Добавить' })}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setAddCatOpen(false)}
+              className="text-muted-foreground hover:text-foreground text-center text-sm font-semibold"
+            >
+              {t('common.cancel')}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

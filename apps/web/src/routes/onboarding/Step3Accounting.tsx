@@ -12,6 +12,7 @@ import { KsefConnectDialog } from '@/routes/integrations/KsefConnectDialog'
 import { WfirmaConnectDialog } from '@/routes/integrations/WfirmaConnectDialog'
 
 import { ConnectIntegrationDialog } from './ConnectIntegrationDialog'
+import { taxIdLabelFor, taxIdPlaceholderFor, type CountryCode } from './onboarding-defaults'
 import type { OnboardingIntegration, PendingCredentials } from './OnboardingPage'
 
 type AccountingProvider = {
@@ -94,6 +95,9 @@ type Props = {
    *  провайдеров; если null — старое поведение (collect credentials, apply
    *  после создания салона). */
   salonId?: string | null
+  /** Bug 4d4c58d5: код страны салона — для подписи поля «NIP / DIČ / …»
+   *  и placeholder примера формата. */
+  countryCode?: CountryCode
 }
 
 /**
@@ -113,8 +117,11 @@ export function Step3Accounting({
   credentials,
   onCredentialsChange,
   salonId,
+  countryCode,
 }: Props) {
   const { t } = useTranslation()
+  const taxIdLabel = taxIdLabelFor(countryCode)
+  const taxIdPlaceholder = taxIdPlaceholderFor(countryCode)
   // T122 — модалка подключения провайдера бухгалтерии при клике (без salonId).
   const [pendingProvider, setPendingProvider] = useState<OnboardingIntegration | null>(null)
   // Live (with salonId) — реальные диалоги провайдеров.
@@ -220,15 +227,17 @@ export function Step3Accounting({
             htmlFor="ob-nip"
             className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
           >
-            {t('onboarding.step_accounting.nip_label')}
+            {/* Bug 4d4c58d5: лейбл tax-ID меняется по стране салона
+                (NIP / DIČ / USt-IdNr. / …). */}
+            {taxIdLabel}
           </Label>
           <Input
             id="ob-nip"
             value={value.nip}
             onChange={(e) => onChange({ ...value, nip: e.target.value })}
-            placeholder="5252123456"
+            placeholder={taxIdPlaceholder}
             className="num"
-            inputMode="numeric"
+            inputMode="text"
           />
         </div>
         <div>

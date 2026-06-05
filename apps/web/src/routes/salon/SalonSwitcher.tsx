@@ -35,11 +35,13 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className="text-brand-navy hover:text-brand-navy-soft inline-flex items-center gap-1.5 rounded-md text-[15px] font-bold tracking-tight"
+          className="text-brand-navy hover:text-brand-navy-soft flex w-full min-w-0 items-center gap-1.5 rounded-md text-left text-[15px] font-bold tracking-tight"
           data-testid="salon-switcher"
         >
-          {salonName}
-          <ChevronsUpDown className="text-muted-foreground size-4" strokeWidth={1.7} />
+          {/* Bug 1b88180e: truncate чтобы длинное имя салона на mobile
+              не переносилось на несколько строк и не наезжало на контент. */}
+          <span className="min-w-0 flex-1 truncate">{salonName}</span>
+          <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
