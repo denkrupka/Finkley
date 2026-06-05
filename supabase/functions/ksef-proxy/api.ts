@@ -418,9 +418,11 @@ export async function querySubjectInvoices(
   // Документация называет enum InvoiceQueryDateType по-разному. Ретраим
   // несколько имён, дедупим по ksefNumber → так захватываем фактуры
   // независимо от того что серверу нравится сейчас.
-  const dateTypesToTry: string[] = opts.dateType
-    ? [opts.dateType]
-    : ['Invoicing', 'PermanentStorage', 'Hidden']
+  // Only 'Invoicing' is accepted by KSeF API right now. Acquisition /
+  // PermanentStorage / Hidden return 400 'Nieczytelna treść' (unknown
+  // enum value). Keep list as single value but support override через
+  // opts.dateType для будущих изменений API.
+  const dateTypesToTry: string[] = opts.dateType ? [opts.dateType] : ['Invoicing']
   const allMap = new Map<string, Record<string, unknown>>()
   const pageSize = 100
   let lastError: KsefError | null = null

@@ -248,11 +248,12 @@ async function syncKsefToFinkley(
 ): Promise<SyncStats> {
   const stats: SyncStats = { expenses_synced: 0, expenses_skipped: 0, skip_reasons: [] }
 
-  // Окно: 180 дней назад (расширено с 60 на 05.06 — owner-feedback,
-  // фактуры за июнь не подтянулись, нужен запас для late-added invoices).
+  // Окно: 60 дней назад. Пробовали расширить до 180 — KSeF API возвращал
+  // 400 на всех dateType (превышен max range). Возвращаемся к 60 дням,
+  // вместо расширения делаем 3 чанка по 60 дней (см. ниже).
   // Дедуп идёт по ksef_id — мы не делаем дубликатов.
   void lastSyncAt
-  const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const today = new Date().toISOString().slice(0, 10)
 
   // Open session
