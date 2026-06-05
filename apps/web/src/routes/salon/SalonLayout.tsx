@@ -218,24 +218,41 @@ export function SalonLayout() {
       </div>
 
       {/* Sidebar mobile в Drawer. Bug 2c986f86 (Елена 06.06): Radix Dialog
-          с Portal на некоторых mobile-браузерах (Telegram WebView, embedded)
-          рендерил пустой контейнер вместо Sidebar — портал терял контекст
-          или ловил background re-render. Заменяем на чистый CSS drawer:
-          overlay + slide-in panel прямо в дереве, без портала, без фокус-
-          трапа Radix. Закрытие — клик по overlay или onNavigate из Sidebar. */}
+          с Portal на mobile рендерил тёмный экран без содержимого. Чистый
+          conditional + inline-стили исключают любые проблемы с CSS-
+          переменными bg-card / класс-конфликтами / порталом. */}
       {drawerOpen ? (
         <div className="lg:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(false)}
             aria-label="close menu"
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 40,
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-label={t('nav.drawer_title')}
-            className="bg-card fixed inset-y-0 left-0 z-50 w-[232px] max-w-[85vw] shadow-2xl"
+            style={{
+              position: 'fixed',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 50,
+              width: 232,
+              maxWidth: '85vw',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
+              backgroundColor: 'hsl(var(--card))',
+              overflowY: 'auto',
+            }}
           >
             <Sidebar salonId={salon.id} onNavigate={() => setDrawerOpen(false)} />
           </div>

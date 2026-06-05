@@ -12,7 +12,7 @@
  * в `activate`. Сейчас single-version, потому что precache пустой.
  */
 
-const CACHE_NAME = 'finkley-shell-v2'
+const CACHE_NAME = 'finkley-shell-v3'
 const APP_SHELL = '/app/'
 
 self.addEventListener('install', (event) => {
