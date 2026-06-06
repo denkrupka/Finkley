@@ -5262,9 +5262,13 @@
       "toast_auto_pushed": "Расход добавлен и отправлен в wFirma ✓",
       "toast_manual_pushed": "Расход отправлен в wFirma ✓",
       "toast_already_pushed": "Этот расход уже есть в wFirma",
-      "toast_skipped_no_nip": "В wFirma не отправлено: на чеке нет NIP покупателя. Кнопка «Отправить вручную» в списке расходов.",
-      "toast_skipped_nip_mismatch": "В wFirma не отправлено: NIP nabywcy на чеке не совпадает с твоей фирмой. Кнопка «Отправить вручную» в списке расходов.",
-      "toast_push_failed": "Не получилось отправить в wFirma"
+      "toast_skipped_no_nip": "В wFirma не отправлено: на чеке нет NIP покупателя.",
+      "toast_skipped_nip_mismatch": "В wFirma не отправлено: NIP nabywcy ({{buyer}}) ≠ NIP компании ({{company}}).",
+      "toast_push_failed": "Не получилось отправить в wFirma",
+      "toast_ocr_sent": "Чек отправлен в wFirma OCR ✓ wFirma сама разнесёт по фактурам.",
+      "toast_ocr_sent_anyway": "Чек отправлен в wFirma OCR (вручную) ✓",
+      "toast_need_login_reconnect": "Для отправки чеков в OCR пере-подключи wFirma через email/пароль (manual API keys не подходят).",
+      "action_send_anyway": "Wyślij mimo to"
     },
     "portal": {
       "push_button": "Отправить в {{portal}}",

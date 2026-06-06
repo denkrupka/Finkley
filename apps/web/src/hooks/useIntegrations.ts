@@ -566,8 +566,51 @@ export function useTreatwellSync(salonId: string | undefined) {
 }
 
 // useWfirmaSync удалён 06.06: pull-синк из wFirma больше не используется.
-// wFirma теперь — push-only через OCR (см. useWfirmaPushReceiptOcr в
-// commit 2). Существующие импорты убраны.
+// wFirma теперь — push-only через OCR (useWfirmaPushReceiptOcr ниже).
+
+/**
+ * Push расхода с чеком/фактурой в wFirma OCR. Бэк сам логинится в web-
+ * панель wFirma (web-flow), шлёт файл в /common_files/add/DocumentOcr,
+ * триггерит OCR — wFirma сама создаёт expense и разносит по фактурам.
+ *
+ * - `force: false` — серверный фильтр по NIP покупателя:
+ *   если в metadata.buyer_nip отсутствует или не совпадает с company_nip —
+ *   skipped (UI рисует кнопку «Wyślij mimo to»).
+ * - `force: true`  — игнор NIP-проверки, пушим в любом случае.
+ */
+export type WfirmaOcrPushResult =
+  | { kind: 'sent'; documentId: number }
+  | { kind: 'skipped_no_receipt' }
+  | { kind: 'skipped_no_buyer_nip' }
+  | { kind: 'skipped_nip_mismatch'; buyerNip: string; companyNip: string }
+  | { kind: 'skipped_not_login_connected' }
+  | { kind: 'error'; reason: string; details?: string }
+
+export function useWfirmaPushReceiptOcr(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<WfirmaOcrPushResult, Error, { expenseId: string; force: boolean }>({
+    mutationFn: async ({ expenseId, force }) => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('wfirma-proxy', {
+        body: {
+          action: 'push_receipt_ocr',
+          salon_id: salonId,
+          expense_id: expenseId,
+          force,
+        },
+      })
+      if (error) throw error
+      const json = data as WfirmaResponse<{ result?: WfirmaOcrPushResult }>
+      if (!json.ok) {
+        throw new Error(json.error ?? json.message ?? 'push_receipt_ocr_failed')
+      }
+      return json.result ?? { kind: 'error', reason: 'no_result' }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+    },
+  })
+}
 
 // =============================================================================
 // Universal accounting-portal connector + sync (TASK-47..50)

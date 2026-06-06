@@ -27,6 +27,7 @@ import { withSentry } from '../_shared/sentry.ts'
 
 import { wfirmaCompaniesFind, type WfirmaApiCreds } from './api.ts'
 import { decryptSecret, encryptSecret } from './crypto.ts'
+import { pushReceiptToWfirmaOcr } from './ocr-flow.ts'
 import { generateApiKeyViaWebFlow } from './web-flow.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -52,6 +53,12 @@ type StoredCredentials = {
   company_nip: string
   company_name: string
   connected_via: 'auto_login' | 'manual'
+  /** Bug 06.06: для OCR push через web-flow (login → upload) нужны
+   *  email+password юзера wFirma. Сохраняем encrypted только если юзер
+   *  подключался через connect_with_login. Для connect_with_credentials
+   *  (manual ввод API keys) OCR push недоступен — нечего хранить. */
+  email_enc?: string
+  password_enc?: string
 }
 
 async function loadCreds(
@@ -86,7 +93,18 @@ async function saveCreds(
   companyName: string,
   companyNip: string,
   via: 'auto_login' | 'manual',
+  webCreds?: { email: string; password: string } | null,
 ): Promise<void> {
+  // Если уже что-то сохранено для этого салона — merge'ним чтобы не потерять
+  // email_enc/password_enc когда юзер пере-подключается через manual flow.
+  const { data: existingRow } = await admin
+    .from('salon_integrations')
+    .select('credentials')
+    .eq('salon_id', salonId)
+    .eq('provider', 'wfirma')
+    .maybeSingle()
+  const existing = existingRow?.credentials as StoredCredentials | undefined
+
   const stored: StoredCredentials = {
     access_key: creds.accessKey,
     secret_key_enc: await encryptSecret(creds.secretKey),
@@ -94,6 +112,11 @@ async function saveCreds(
     company_nip: companyNip,
     company_name: companyName,
     connected_via: via,
+    // Bug 06.06: храним email+password encrypted для OCR push web-flow.
+    // Если новый connect не через login — оставляем старые email/password
+    // если они были (юзер мог сначала auto-login потом подменить keys).
+    email_enc: webCreds ? await encryptSecret(webCreds.email) : existing?.email_enc,
+    password_enc: webCreds ? await encryptSecret(webCreds.password) : existing?.password_enc,
   }
   await admin.from('salon_integrations').upsert(
     {
@@ -190,7 +213,10 @@ async function handleConnectWithLogin(
     companyName = `Firma #${companyId}`
   }
 
-  await saveCreds(admin, salonId, apiCreds, companyName, companyNip, 'auto_login')
+  await saveCreds(admin, salonId, apiCreds, companyName, companyNip, 'auto_login', {
+    email,
+    password,
+  })
 
   return jsonResponse({
     ok: true,
@@ -246,6 +272,161 @@ async function handleConnectWithCredentials(
 }
 
 // =============================================================================
+// OCR push (Finkley → wFirma)
+// =============================================================================
+
+type PushReceiptOcrResult =
+  | { kind: 'sent'; documentId: number }
+  | { kind: 'skipped_no_receipt' }
+  | { kind: 'skipped_no_buyer_nip' }
+  | { kind: 'skipped_nip_mismatch'; buyerNip: string; companyNip: string }
+  | { kind: 'skipped_not_login_connected' }
+  | { kind: 'error'; reason: string; details?: string }
+
+/**
+ * Bug 06.06: push расхода в wFirma OCR. Скачивает receipt из Storage,
+ * проверяет NIP покупателя (если force=false), логинится в wFirma web
+ * и шлёт файл в OCR-папку. wFirma сама распознает и создаст expense.
+ */
+async function handlePushReceiptOcr(
+  admin: SupabaseClient,
+  userId: string,
+  salonId: string,
+  expenseId: string,
+  force: boolean,
+): Promise<Response> {
+  if (!(await ensureMember(admin, userId, salonId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' })
+  }
+
+  const loaded = await loadCreds(admin, salonId)
+  if (!loaded) {
+    return jsonResponse({
+      ok: true,
+      result: { kind: 'error', reason: 'not_connected' } satisfies PushReceiptOcrResult,
+    })
+  }
+  if (!loaded.meta.email_enc || !loaded.meta.password_enc) {
+    // Юзер подключался через manual ввод API keys — пароль не хранится,
+    // OCR push web-flow невозможен. Просим пере-подключиться через login.
+    return jsonResponse({
+      ok: true,
+      result: { kind: 'skipped_not_login_connected' } satisfies PushReceiptOcrResult,
+    })
+  }
+
+  // Подтягиваем расход — receipt_url + metadata.buyer_nip
+  const { data: ex } = await admin
+    .from('expenses')
+    .select('id, receipt_url, metadata, contractor_name, invoice_number, expense_at, amount_cents')
+    .eq('id', expenseId)
+    .eq('salon_id', salonId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (!ex) {
+    return jsonResponse({
+      ok: true,
+      result: { kind: 'error', reason: 'expense_not_found' } satisfies PushReceiptOcrResult,
+    })
+  }
+
+  if (!ex.receipt_url) {
+    return jsonResponse({
+      ok: true,
+      result: { kind: 'skipped_no_receipt' } satisfies PushReceiptOcrResult,
+    })
+  }
+
+  const meta = (ex.metadata ?? {}) as Record<string, unknown>
+  const buyerNip = typeof meta.buyer_nip === 'string' ? meta.buyer_nip.replace(/\D/g, '') : ''
+  const companyNip = (loaded.meta.company_nip || '').replace(/\D/g, '')
+
+  if (!force) {
+    if (!buyerNip) {
+      return jsonResponse({
+        ok: true,
+        result: { kind: 'skipped_no_buyer_nip' } satisfies PushReceiptOcrResult,
+      })
+    }
+    if (!companyNip || buyerNip !== companyNip) {
+      return jsonResponse({
+        ok: true,
+        result: {
+          kind: 'skipped_nip_mismatch',
+          buyerNip,
+          companyNip,
+        } satisfies PushReceiptOcrResult,
+      })
+    }
+  }
+
+  // Скачиваем receipt из Storage. receipt_url у нас — path в bucket 'receipts'.
+  const receiptPath = ex.receipt_url as string
+  const { data: blob, error: dlErr } = await admin.storage.from('receipts').download(receiptPath)
+  if (dlErr || !blob) {
+    return jsonResponse({
+      ok: true,
+      result: {
+        kind: 'error',
+        reason: 'receipt_download_failed',
+        details: dlErr?.message,
+      } satisfies PushReceiptOcrResult,
+    })
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+
+  // Имя файла: из path после последнего "/" или дефолт.
+  const fileName =
+    receiptPath.split('/').pop() ||
+    `expense-${expenseId}.${blob.type === 'application/pdf' ? 'pdf' : 'jpg'}`
+  const mime =
+    blob.type || (fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
+
+  // Decrypt email+password для login
+  let email: string
+  let password: string
+  try {
+    email = await decryptSecret(loaded.meta.email_enc)
+    password = await decryptSecret(loaded.meta.password_enc)
+  } catch (e) {
+    return jsonResponse({
+      ok: true,
+      result: {
+        kind: 'error',
+        reason: 'credentials_decrypt_failed',
+        details: e instanceof Error ? e.message : String(e),
+      } satisfies PushReceiptOcrResult,
+    })
+  }
+
+  const ocrRes = await pushReceiptToWfirmaOcr(
+    email,
+    password,
+    loaded.meta.company_id || undefined,
+    { name: fileName, mime, bytes },
+  )
+  if (!ocrRes.ok) {
+    return jsonResponse({
+      ok: true,
+      result: {
+        kind: 'error',
+        reason: ocrRes.reason,
+        details: ocrRes.details,
+      } satisfies PushReceiptOcrResult,
+    })
+  }
+
+  // Сохраняем wfirma document id в metadata расхода чтобы не пушить повторно
+  const newMeta = { ...meta, wfirma_ocr_document_id: ocrRes.documentId }
+  await admin.from('expenses').update({ metadata: newMeta }).eq('id', expenseId)
+
+  return jsonResponse({
+    ok: true,
+    result: { kind: 'sent', documentId: ocrRes.documentId } satisfies PushReceiptOcrResult,
+  })
+}
+
+// =============================================================================
 // HTTP entrypoint
 // =============================================================================
 
@@ -266,6 +447,8 @@ Deno.serve(
       secret_key?: string
       company_id?: string
       selected_company_id?: string
+      expense_id?: string
+      force?: boolean
     }
     try {
       body = await req.json()
@@ -319,11 +502,19 @@ Deno.serve(
           body.secret_key,
           body.company_id,
         )
+      case 'push_receipt_ocr':
+        if (!body.expense_id) {
+          return jsonResponse({ ok: false, error: 'expense_id_required' }, 400)
+        }
+        return handlePushReceiptOcr(
+          admin,
+          userId,
+          body.salon_id,
+          body.expense_id,
+          body.force === true,
+        )
       default:
         return jsonResponse({ ok: false, error: 'unknown_action' }, 400)
     }
   }),
 )
-
-// Suppress unused warning until commit 2 introduces push_receipt_ocr.
-export { loadCreds }

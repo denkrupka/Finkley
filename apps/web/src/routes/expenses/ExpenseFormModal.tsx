@@ -51,6 +51,7 @@ import {
   pickActiveAccountingProvider,
   useAccountingPushExpense,
   useSalonIntegrations,
+  useWfirmaPushReceiptOcr,
 } from '@/hooks/useIntegrations'
 
 const PORTAL_DISPLAY_NAME: Record<string, string> = {
@@ -359,7 +360,9 @@ export function ExpenseFormModal({
   } | null>(null)
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
-  // wFirma push (06.06): pull-синк удалён, OCR push возвращается в commit 2/3.
+  // wFirma OCR push (06.06): после save отправляем receipt в wFirma OCR
+  // (web-flow). Проверка по NIP покупателя серверная.
+  const wfirmaOcrPush = useWfirmaPushReceiptOcr(salonId)
   const ocr = useOcrReceipt()
   const dictate = useDictateExpense()
 
@@ -948,10 +951,72 @@ export function ExpenseFormModal({
           if (activeAccounting && receiptUrl && created?.id) {
             const portalLabel = PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
             if (activeAccounting === 'wfirma') {
-              // wFirma push 06.06: pull-синк удалён. OCR push возвращается
-              // в commit 2/3 — новый useWfirmaPushReceiptOcr + UI badge
-              // «✅/⚠ Wyślij mimo to». Пока no-op чтобы не звать удалённый
-              // /push_expense action.
+              // wFirma OCR push (06.06): чек идёт на OCR-разбор в wFirma,
+              // если NIP покупателя совпал с NIP компании.
+              const expenseId = created.id
+              const sendAnyway = () => {
+                wfirmaOcrPush.mutate(
+                  { expenseId, force: true },
+                  {
+                    onSuccess: (r) => {
+                      if (r.kind === 'sent') {
+                        toast.success(t('expenses.wfirma.toast_ocr_sent_anyway'))
+                      } else if (r.kind === 'error') {
+                        toast.error(t('expenses.wfirma.toast_push_failed'), {
+                          description: r.reason + (r.details ? ': ' + r.details : ''),
+                        })
+                      }
+                    },
+                    onError: (err) =>
+                      toast.error(t('expenses.wfirma.toast_push_failed'), {
+                        description: err instanceof Error ? err.message : String(err),
+                      }),
+                  },
+                )
+              }
+              wfirmaOcrPush.mutate(
+                { expenseId, force: false },
+                {
+                  onSuccess: (res) => {
+                    if (res.kind === 'sent') {
+                      toast.success(t('expenses.wfirma.toast_ocr_sent'))
+                    } else if (res.kind === 'skipped_no_buyer_nip') {
+                      toast.info(t('expenses.wfirma.toast_skipped_no_nip'), {
+                        action: {
+                          label: t('expenses.wfirma.action_send_anyway'),
+                          onClick: sendAnyway,
+                        },
+                      })
+                    } else if (res.kind === 'skipped_nip_mismatch') {
+                      toast.info(
+                        t('expenses.wfirma.toast_skipped_nip_mismatch', {
+                          buyer: res.buyerNip,
+                          company: res.companyNip,
+                        }),
+                        {
+                          action: {
+                            label: t('expenses.wfirma.action_send_anyway'),
+                            onClick: sendAnyway,
+                          },
+                        },
+                      )
+                    } else if (res.kind === 'skipped_no_receipt') {
+                      // no-op: расход без чека — не пушим
+                    } else if (res.kind === 'skipped_not_login_connected') {
+                      toast.warning(t('expenses.wfirma.toast_need_login_reconnect'))
+                    } else if (res.kind === 'error') {
+                      toast.error(t('expenses.wfirma.toast_push_failed'), {
+                        description: res.reason + (res.details ? ': ' + res.details : ''),
+                      })
+                    }
+                  },
+                  onError: (err) => {
+                    toast.error(t('expenses.wfirma.toast_push_failed'), {
+                      description: err instanceof Error ? err.message : String(err),
+                    })
+                  },
+                },
+              )
             } else {
               accountingPush.mutate(
                 { expenseId: created.id, auto: true },
