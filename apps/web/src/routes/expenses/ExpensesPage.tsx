@@ -61,7 +61,6 @@ import {
   pickActiveAccountingProvider,
   useAccountingPushExpense,
   useSalonIntegrations,
-  useWfirmaPushExpense,
 } from '@/hooks/useIntegrations'
 import { useCashRegisters } from '@/hooks/useCashRegisters'
 import { useCounterparties } from '@/hooks/useCounterparties'
@@ -375,7 +374,7 @@ export function ExpensesPage({
   }
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const deleteExpense = useDeleteExpense(salonId)
-  const wfirmaPush = useWfirmaPushExpense(salonId)
+  // wFirma push 06.06: pull-синк удалён, OCR push возвращается в commit 2/3.
   // Активный accounting-портал (приоритет wFirma > Fakturownia > ... — см.
   // ADR-013). Один портал на UI-кнопку: если у юзера подключено несколько,
   // выбираем первый по приоритету. Можно потом добавить выбор куда пушить
@@ -1244,7 +1243,7 @@ export function ExpensesPage({
                                 PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
                               const isPushing =
                                 activeAccounting === 'wfirma'
-                                  ? wfirmaPush.isPending && wfirmaPush.variables?.expenseId === e.id
+                                  ? false // wFirma push temporarily disabled (commit 1)
                                   : accountingPush.isPending &&
                                     accountingPush.variables?.expenseId === e.id
                               if (pushedId) {
@@ -1300,21 +1299,10 @@ export function ExpensesPage({
                                         },
                                       )
                                     if (activeAccounting === 'wfirma') {
-                                      wfirmaPush.mutate(
-                                        { expenseId: e.id, auto: false },
-                                        {
-                                          onSuccess: (res) =>
-                                            onCommonResult(
-                                              res.kind === 'ok'
-                                                ? 'ok'
-                                                : res.kind === 'already_pushed'
-                                                  ? 'already_pushed'
-                                                  : 'error',
-                                              'reason' in res ? res.reason : undefined,
-                                            ),
-                                          onError: onErr,
-                                        },
-                                      )
+                                      // wFirma push temporarily disabled
+                                      // (commit 1). OCR push возвращается в
+                                      // commit 2/3 с новой логикой.
+                                      onCommonResult('error', 'wfirma_push_disabled')
                                     } else {
                                       accountingPush.mutate(
                                         { expenseId: e.id, auto: false },

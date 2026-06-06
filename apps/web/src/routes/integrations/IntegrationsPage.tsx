@@ -31,7 +31,6 @@ import {
   useSalonIntegrations,
   useUpdateBooksyInterval,
   useUpdateProviderInterval,
-  useWfirmaSync,
   type IntegrationProvider,
   type SalonIntegrationPublic,
 } from '@/hooks/useIntegrations'
@@ -353,7 +352,6 @@ function IntegrationCard({
   const { t } = useTranslation()
   const Icon = provider.icon
   const booksySync = useBooksySync(salonId)
-  const wfirmaSync = useWfirmaSync(salonId)
   const ksefSync = useKsefSync(salonId)
   // Owner-feedback 04.06: pg_cron почему-то не fire'ит auto-sync (миграции
   // применены, функция переписана через rendezvous-token, но last_sync_at
@@ -402,19 +400,8 @@ function IntegrationCard({
   const isConnected = !!connection && connection.status !== 'disconnected'
 
   function triggerSync() {
-    if (provider.id === 'wfirma') {
-      wfirmaSync.mutate(undefined, {
-        onSuccess: (stats) =>
-          toast.success(
-            t('integrations.toast_synced_wfirma', {
-              synced: stats.expenses_synced,
-              skipped: stats.expenses_skipped,
-            }),
-          ),
-        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
-      })
-      return
-    }
+    // wFirma 06.06: pull-синк удалён, triggerSync для wFirma не должен
+    // вызываться (кнопка Sync now скрыта в UI выше).
     if (provider.id === 'ksef') {
       ksefSync.mutate(undefined, {
         onSuccess: (stats) =>
@@ -466,13 +453,11 @@ function IntegrationCard({
     })
   }
   const syncPending =
-    provider.id === 'wfirma'
-      ? wfirmaSync.isPending
-      : provider.id === 'ksef'
-        ? ksefSync.isPending
-        : accountingProviderId
-          ? accountingSync.isPending
-          : booksySync.isPending
+    provider.id === 'ksef'
+      ? ksefSync.isPending
+      : accountingProviderId
+        ? accountingSync.isPending
+        : booksySync.isPending
 
   return (
     <div
@@ -507,7 +492,17 @@ function IntegrationCard({
 
       {isConnected && connection ? (
         <div className="border-border bg-muted/30 rounded-md border p-2.5 text-xs">
-          {connection.last_sync_at ? (
+          {/* wFirma 06.06: для push-only интеграции last_sync_at не имеет
+              смысла — расходы экспортируются по факту создания. Показываем
+              соответствующую подсказку вместо «никогда не синхрон». */}
+          {provider.id === 'wfirma' ? (
+            <p className="text-muted-foreground">
+              {t('integrations.wfirma_push_hint', {
+                defaultValue:
+                  'Расходы с фото/документом автоматически отправляются в OCR wFirma при создании, если NIP покупателя совпадает с NIP компании.',
+              })}
+            </p>
+          ) : connection.last_sync_at ? (
             <p className="text-muted-foreground">
               {t('integrations.last_sync_at', {
                 date: new Date(connection.last_sync_at).toLocaleString('ru-RU'),
@@ -517,10 +512,7 @@ function IntegrationCard({
             <p className="text-muted-foreground">{t('integrations.never_synced')}</p>
           )}
           {connection.last_sync_stats ? (
-            provider.id === 'wfirma' ||
-            provider.id === 'ksef' ||
-            provider.id === 'fakturownia' ||
-            provider.id === 'infakt' ? (
+            provider.id === 'ksef' || provider.id === 'fakturownia' || provider.id === 'infakt' ? (
               <p
                 className="text-foreground mt-1 font-semibold"
                 title={(() => {
@@ -562,12 +554,10 @@ function IntegrationCard({
           {connection.last_error ? (
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
           ) : null}
-          {/* Авто-синк интервал — теперь для всех поддерживаемых провайдеров
-              (Booksy + KSeF + wFirma + Fakturownia + inFakt + Treatwell).
-              Юзер 02.06: 'делай период для KSeF на выбор клиента — как в букси'. */}
-          {['booksy', 'ksef', 'wfirma', 'fakturownia', 'infakt', 'treatwell'].includes(
-            provider.id,
-          ) ? (
+          {/* Авто-синк интервал — для pull-провайдеров (Booksy + KSeF +
+              Fakturownia + inFakt + Treatwell). wFirma 06.06 удалена из
+              списка: pull-синк выпилен, wFirma теперь push-only через OCR. */}
+          {['booksy', 'ksef', 'fakturownia', 'infakt', 'treatwell'].includes(provider.id) ? (
             <div className="border-border mt-2 flex items-center justify-between gap-2 border-t pt-2">
               <label
                 htmlFor={`int-${provider.id}-interval`}
@@ -609,19 +599,24 @@ function IntegrationCard({
           </span>
         ) : isConnected ? (
           <>
-            <button
-              type="button"
-              onClick={triggerSync}
-              disabled={syncPending}
-              className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline disabled:opacity-50"
-            >
-              {syncPending ? (
-                <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-              ) : (
-                <RefreshCw className="size-3.5" strokeWidth={2} />
-              )}
-              {t('integrations.sync_now')}
-            </button>
+            {/* wFirma 06.06: pull-синк удалён, кнопка «Синхронизировать сейчас»
+                для неё не нужна — расходы экспортируются в OCR при создании
+                расхода с фото/документом, см. ExpenseFormModal. */}
+            {provider.id !== 'wfirma' ? (
+              <button
+                type="button"
+                onClick={triggerSync}
+                disabled={syncPending}
+                className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline disabled:opacity-50"
+              >
+                {syncPending ? (
+                  <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                ) : (
+                  <RefreshCw className="size-3.5" strokeWidth={2} />
+                )}
+                {t('integrations.sync_now')}
+              </button>
+            ) : null}
             {provider.id === 'booksy' ? (
               <>
                 <button

@@ -51,7 +51,6 @@ import {
   pickActiveAccountingProvider,
   useAccountingPushExpense,
   useSalonIntegrations,
-  useWfirmaPushExpense,
 } from '@/hooks/useIntegrations'
 
 const PORTAL_DISPLAY_NAME: Record<string, string> = {
@@ -360,7 +359,7 @@ export function ExpenseFormModal({
   } | null>(null)
   const createExpense = useCreateExpense(salonId)
   const updateExpense = useUpdateExpense(salonId)
-  const wfirmaPush = useWfirmaPushExpense(salonId)
+  // wFirma push (06.06): pull-синк удалён, OCR push возвращается в commit 2/3.
   const ocr = useOcrReceipt()
   const dictate = useDictateExpense()
 
@@ -949,31 +948,10 @@ export function ExpenseFormModal({
           if (activeAccounting && receiptUrl && created?.id) {
             const portalLabel = PORTAL_DISPLAY_NAME[activeAccounting] ?? activeAccounting
             if (activeAccounting === 'wfirma') {
-              wfirmaPush.mutate(
-                { expenseId: created.id, auto: true },
-                {
-                  onSuccess: (res) => {
-                    if (res.kind === 'ok') {
-                      toast.success(t('expenses.wfirma.toast_auto_pushed'))
-                    } else if (res.kind === 'skipped') {
-                      if (res.reason === 'nip_mismatch') {
-                        toast.info(t('expenses.wfirma.toast_skipped_nip_mismatch'))
-                      } else if (res.reason === 'no_buyer_nip') {
-                        toast.info(t('expenses.wfirma.toast_skipped_no_nip'))
-                      }
-                    } else if (res.kind === 'error') {
-                      toast.error(t('expenses.wfirma.toast_push_failed'), {
-                        description: res.reason,
-                      })
-                    }
-                  },
-                  onError: (err) => {
-                    toast.error(t('expenses.wfirma.toast_push_failed'), {
-                      description: err instanceof Error ? err.message : String(err),
-                    })
-                  },
-                },
-              )
+              // wFirma push 06.06: pull-синк удалён. OCR push возвращается
+              // в commit 2/3 — новый useWfirmaPushReceiptOcr + UI badge
+              // «✅/⚠ Wyślij mimo to». Пока no-op чтобы не звать удалённый
+              // /push_expense action.
             } else {
               accountingPush.mutate(
                 { expenseId: created.id, auto: true },
