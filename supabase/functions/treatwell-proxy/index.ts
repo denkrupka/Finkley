@@ -374,16 +374,68 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
     )
   }
 
-  // Получаем venueId — пробуем несколько endpoints. HAR показал что body
-  // у extranet-settings часто пустой/без venueId, поэтому добавляем
-  // fallback'и + рекурсивный поиск.
+  // Получаем venueId. Bug 06.06: у части аккаунтов ни extranet-settings,
+  // ни role-permissions, ни treatments не содержат поля venueId/venue_id
+  // (ответ — только account.id + permissions). Расширяем стратегию:
+  //   1. Больше endpoints — venue/list/me/businesses/dashboard/HTML home
+  //   2. Больше имён полей — currentVenueId, businessId, supplierId,
+  //      partnerId, defaultVenueId, accountVenues[].id, venues[].id
+  //   3. HTML-парсинг главной (часто venueId зашит в JSON-stringify рядом
+  //      с initial state)
+  //   4. Fallback: account.id (если такого поля везде нет — Treatwell
+  //      использует account как venue в single-venue режиме)
   let venueId = ''
   const tryEndpoints = [
     '/api/extranet-settings.json',
+    '/api/me.json',
+    '/api/venue.json',
+    '/api/venues.json',
+    '/api/venue/list.json',
+    '/api/business.json',
+    '/api/businesses.json',
+    '/api/dashboard.json',
+    '/api/extranet.json',
     '/api/role-permissions.json',
     '/api/treatments.json',
   ]
+  const fieldNames = [
+    'venueId',
+    'venue_id',
+    'currentVenueId',
+    'current_venue_id',
+    'defaultVenueId',
+    'default_venue_id',
+    'venuesId',
+    'businessId',
+    'business_id',
+    'supplierId',
+    'supplier_id',
+    'partnerId',
+    'partner_id',
+  ]
   const fetched: Array<{ path: string; body: unknown }> = []
+
+  function findVenueIdAnywhere(data: unknown): string | null {
+    for (const name of fieldNames) {
+      const id = deepFindNumberField(data, name)
+      if (id) return String(id)
+    }
+    // Также пробуем достать через вложенные объекты: venue.id, currentVenue.id,
+    // venues[0].id, accountVenues[0].id.
+    const nested = deepFindNestedId(data, [
+      'venue',
+      'currentVenue',
+      'current_venue',
+      'business',
+      'supplier',
+      'partner',
+    ])
+    if (nested) return String(nested)
+    const arr = deepFindArrayFirstId(data, ['venues', 'accountVenues', 'businesses', 'suppliers'])
+    if (arr) return String(arr)
+    return null
+  }
+
   for (const path of tryEndpoints) {
     try {
       const res = await fetch(`${TREATWELL_BASE}${path}`, {
@@ -393,9 +445,9 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
       const data = await res.json().catch(() => null)
       if (!data) continue
       fetched.push({ path, body: data })
-      const id = deepFindNumberField(data, 'venueId') ?? deepFindNumberField(data, 'venue_id')
-      if (id) {
-        venueId = String(id)
+      const found = findVenueIdAnywhere(data)
+      if (found) {
+        venueId = found
         break
       }
     } catch {
@@ -406,22 +458,88 @@ async function login(loginField: string, password: string): Promise<AuthOk> {
   if (!venueId && lastText) {
     try {
       const authJson = JSON.parse(lastText)
-      const id =
-        deepFindNumberField(authJson, 'venueId') ?? deepFindNumberField(authJson, 'venue_id')
-      if (id) venueId = String(id)
+      const found = findVenueIdAnywhere(authJson)
+      if (found) venueId = found
     } catch {
       /* ignore */
     }
   }
+  // Last-ditch: пробуем парсить HTML главной (initial state часто содержит
+  // window.__INITIAL_STATE__ = {... venueId: 12345 ...}).
+  if (!venueId) {
+    try {
+      const r = await fetch(`${TREATWELL_BASE}/`, {
+        headers: { accept: 'text/html', cookie: cookies, 'user-agent': UA },
+      })
+      if (r.ok) {
+        const html = await r.text()
+        for (const name of fieldNames) {
+          const m = new RegExp(`["']${name}["']\\s*:\\s*["']?(\\d+)`).exec(html)
+          if (m && m[1]) {
+            venueId = m[1]
+            break
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  // Crash-fallback: используем account.id как venueId. У single-venue
+  // аккаунтов Treatwell часто account.id ≡ venueId.
+  if (!venueId) {
+    for (const f of fetched) {
+      const acc = (f.body as { account?: { id?: number | string } } | null)?.account?.id
+      if (acc && (typeof acc === 'number' || (typeof acc === 'string' && /^\d+$/.test(acc)))) {
+        venueId = String(acc)
+        break
+      }
+    }
+  }
   if (!venueId) {
     const diag = fetched
-      .map((f) => `${f.path}: ${JSON.stringify(f.body).slice(0, 200)}`)
+      .map((f) => `${f.path}: ${JSON.stringify(f.body).slice(0, 400)}`)
       .join(' | ')
     throw new Error(
-      `treatwell_no_venueid: не удалось извлечь venueId из API. Диагностика: ${diag.slice(0, 500)}`,
+      `treatwell_no_venueid: не удалось извлечь venueId из API. Диагностика: ${diag.slice(0, 1500)}`,
     )
   }
   return { sessionCookies: cookies, venueId }
+}
+
+/** Ищет поле id внутри одного из named объектов (venue.id, currentVenue.id ...). */
+function deepFindNestedId(obj: unknown, parentNames: string[]): number | undefined {
+  if (!obj || typeof obj !== 'object') return undefined
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (parentNames.includes(k) && v && typeof v === 'object') {
+      const id = (v as { id?: number | string }).id
+      if (typeof id === 'number') return id
+      if (typeof id === 'string' && /^\d+$/.test(id)) return Number(id)
+    }
+    if (v && typeof v === 'object') {
+      const found = deepFindNestedId(v, parentNames)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
+/** Ищет первый элемент массива с .id внутри одного из named массивов. */
+function deepFindArrayFirstId(obj: unknown, arrayNames: string[]): number | undefined {
+  if (!obj || typeof obj !== 'object') return undefined
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (arrayNames.includes(k) && Array.isArray(v) && v.length > 0) {
+      const first = v[0] as { id?: number | string }
+      const id = first?.id
+      if (typeof id === 'number') return id
+      if (typeof id === 'string' && /^\d+$/.test(id)) return Number(id)
+    }
+    if (v && typeof v === 'object') {
+      const found = deepFindArrayFirstId(v, arrayNames)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
 }
 
 async function api<T>(cookies: string, path: string): Promise<T> {
