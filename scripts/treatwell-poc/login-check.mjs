@@ -25,9 +25,18 @@
 import { launch } from 'cloakbrowser'
 
 const BASE = process.env.TREATWELL_BASE ?? 'https://connect.treatwell.de'
-const LOGIN = process.env.TREATWELL_LOGIN ?? ''
-const PASSWORD = process.env.TREATWELL_PASSWORD ?? ''
 const HEADLESS = process.env.TREATWELL_HEADLESS === '1'
+
+// ── Режим проверки ──
+// Главный вопрос PoC: «проходит ли Turnstile с этой машины?» — а НЕ «верный ли
+// пароль». Поэтому реальные учётки НЕ нужны: если зайти с заведомо неверным
+// паролем и Treatwell ответит NOT_AUTHENTICATED (а не NOT_VERIFIED_CAPTCHA),
+// значит капча ПРОЙДЕНА (просто пароль неверный) — для нас это успех.
+// Секреты в GitHub добавлять не надо. Если учётки всё же переданы — проверим
+// полный вход (до ACCOUNT_AUTHENTICATED).
+const DUMMY = !process.env.TREATWELL_LOGIN || !process.env.TREATWELL_PASSWORD
+const LOGIN = process.env.TREATWELL_LOGIN || 'finsalon-turnstile-probe@example.com'
+const PASSWORD = process.env.TREATWELL_PASSWORD || 'definitely-wrong-pw-9X7q!'
 
 const SHOT = 'treatwell-login.png'
 
@@ -35,10 +44,7 @@ function log(...a) {
   console.log('[tw-poc]', ...a)
 }
 
-if (!LOGIN || !PASSWORD) {
-  console.error('[tw-poc] FATAL: TREATWELL_LOGIN / TREATWELL_PASSWORD не заданы')
-  process.exit(2)
-}
+log(DUMMY ? 'РЕЖИМ: dummy (проверяем только обход Turnstile, секреты не нужны)' : 'РЕЖИМ: реальные учётки')
 
 /** Печатает result-коды auth-ответов по мере их прихода. */
 const authResults = []
@@ -127,23 +133,40 @@ async function main() {
 
   await browser.close()
 
+  // Turnstile считаем пройденным, если backend дошёл до проверки учёток —
+  // т.е. вернул ЛЮБОЙ из ACCOUNT_AUTHENTICATED / PROFILE_AUTHENTICATED /
+  // NOT_AUTHENTICATED (последнее = «капча ок, пароль неверный»). Заблокирован
+  // Turnstile — только если видим NOT_VERIFIED_CAPTCHA.
+  const turnstilePassed = authOk || badCreds
+
   console.log('\n===== РЕЗУЛЬТАТ =====')
+  console.log('режим:', DUMMY ? 'dummy (неверный пароль ожидаем)' : 'реальные учётки')
   console.log('auth responses:', JSON.stringify(authResults, null, 2))
-  if (authOk || (leftLogin && !captchaRejected && !badCreds)) {
-    console.log('✅ ВХОД ПРОШЁЛ — CloakBrowser с этой машины обходит Turnstile.')
+
+  if (captchaRejected && !turnstilePassed) {
+    console.log('❌ NOT_VERIFIED_CAPTCHA — Turnstile НЕ пройден с IP этой машины.')
+    console.log('   → CloakBrowser не пробил капчу здесь. Нужен резидентный прокси')
+    console.log('     (launch({proxy})) или headed-режим (он уже включён под Xvfb).')
+    process.exit(1)
+  }
+  if (turnstilePassed) {
+    console.log('✅ TURNSTILE ПРОЙДЕН — CloakBrowser с этой машины обходит капчу.')
+    if (authOk) {
+      console.log('   + полный вход удался (ACCOUNT/PROFILE_AUTHENTICATED).')
+    } else if (DUMMY && badCreds) {
+      console.log('   Ответ NOT_AUTHENTICATED — это ОЖИДАЕМО: пароль заведомо неверный.')
+      console.log('   Главное: капча пройдена. Можно строить полный синк.')
+    } else if (badCreds) {
+      console.log('   ⚠️ Но NOT_AUTHENTICATED — реальные логин/пароль отвергнуты, проверь их.')
+    }
     process.exit(0)
   }
-  if (captchaRejected) {
-    console.log('❌ NOT_VERIFIED_CAPTCHA — Turnstile НЕ пройден с этого IP.')
-    console.log('   → нужен резидентный прокси (launch({proxy})) или headed-режим.')
-    process.exit(1)
+  if (leftLogin) {
+    console.log('✅ Похоже, вошли (ушли с /login). Turnstile, скорее всего, пройден.')
+    process.exit(0)
   }
-  if (badCreds) {
-    console.log('⚠️  NOT_AUTHENTICATED — капча ПРОШЛА, но логин/пароль отвергнуты.')
-    console.log('   → проверь TREATWELL_LOGIN/PASSWORD. Capt­cha-барьер при этом решён!')
-    process.exit(1)
-  }
-  console.log('❓ Непонятный исход — смотри скриншот-артефакт и лог выше.')
+  console.log('❓ Непонятный исход — ни captcha-отказа, ни auth-ответа. Смотри скриншот-артефакт.')
+  console.log('   Возможно, изменилась форма логина (селекторы) — проверь treatwell-login.png.')
   process.exit(1)
 }
 

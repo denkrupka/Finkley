@@ -1,15 +1,16 @@
 name: Treatwell login PoC
 
-# Ручная проверка: проходит ли вход в Treatwell через CloakBrowser с машины
-# GitHub Actions (обход Cloudflare Turnstile). Запускается вручную из вкладки
+# Ручная проверка: проходит ли Turnstile (Cloudflare-капча) при входе в
+# Treatwell через CloakBrowser с машины GitHub Actions. Запуск: вкладка
 # Actions → "Treatwell login PoC" → Run workflow.
 #
-# Нужны два секрета репозитория (Settings → Secrets and variables → Actions):
-#   TREATWELL_LOGIN     — email аккаунта Treatwell Connect
-#   TREATWELL_PASSWORD  — пароль
+# СЕКРЕТЫ НЕ НУЖНЫ. По умолчанию workflow логинится с заведомо неверным
+# паролем — нам важно только пройти капчу, а не угадать пароль:
+#   - ответ NOT_AUTHENTICATED  → ✅ капча ПРОЙДЕНА (пароль неверный — это ок)
+#   - ответ NOT_VERIFIED_CAPTCHA → ❌ капча НЕ пройдена (нужен прокси)
 #
-# Опционально можно выбрать headed (по умолчанию — под Xvfb, надёжнее против
-# анти-бота) или headless.
+# (Опционально, для проверки ПОЛНОГО входа, можно задать секреты
+#  TREATWELL_LOGIN / TREATWELL_PASSWORD — тогда проверится и пароль.)
 
 on:
   workflow_dispatch:
