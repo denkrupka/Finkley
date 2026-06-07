@@ -1,0 +1,14 @@
+{
+  "name": "treatwell-poc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PoC: проверка входа в Treatwell через CloakBrowser (обход Cloudflare Turnstile). Не часть pnpm-workspace — ставится отдельным npm install в GitHub Action.",
+  "scripts": {
+    "login-check": "node login-check.mjs"
+  },
+  "dependencies": {
+    "cloakbrowser": "^0.3.31",
+    "playwright-core": ">=1.53.0"
+  }
+}
