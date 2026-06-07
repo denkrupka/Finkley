@@ -45,6 +45,9 @@ jobs:
         env:
           TREATWELL_LOGIN: ${{ secrets.TREATWELL_LOGIN }}
           TREATWELL_PASSWORD: ${{ secrets.TREATWELL_PASSWORD }}
+          # Резидентный прокси (опц.): http://user:pass@host:port. Без него
+          # Turnstile с датацентр-IP GitHub, скорее всего, не пройдёт.
+          TREATWELL_PROXY: ${{ secrets.TREATWELL_PROXY }}
           TREATWELL_HEADLESS: ${{ inputs.headless && '1' || '0' }}
         run: |
           if [ "$TREATWELL_HEADLESS" = "1" ]; then

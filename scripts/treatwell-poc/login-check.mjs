@@ -49,9 +49,19 @@ log(DUMMY ? 'РЕЖИМ: dummy (проверяем только обход Turns
 /** Печатает result-коды auth-ответов по мере их прихода. */
 const authResults = []
 
+// Опциональный резидентный прокси (TREATWELL_PROXY=http://user:pass@host:port).
+// Turnstile упирается в РЕПУТАЦИЮ IP: с датацентр-IP (GitHub/VPS) капча не
+// проходит даже со стелс-фингерпринтом. Резидентный exit-IP это лечит. geoip
+// подгоняет timezone/locale под IP прокси — иначе фингерпринт противоречив.
+const PROXY = process.env.TREATWELL_PROXY || ''
+
 async function main() {
-  log('launch CloakBrowser', { headless: HEADLESS, base: BASE })
-  const browser = await launch({ headless: HEADLESS })
+  log('launch CloakBrowser', { headless: HEADLESS, base: BASE, proxy: PROXY ? 'on' : 'off' })
+  const browser = await launch({
+    headless: HEADLESS,
+    humanize: true,
+    ...(PROXY ? { proxy: PROXY, geoip: true } : {}),
+  })
   const page = await browser.newPage()
 
   // Перехватываем ответ авторизации — это самый честный сигнал что произошло.
@@ -82,41 +92,68 @@ async function main() {
   await page.fill(emailSel, LOGIN)
   await page.fill(passSel, PASSWORD)
 
-  // Ждём, пока Turnstile проставит токен в скрытое поле. CloakBrowser должен
-  // решить челлендж автоматически. Поллим до 90с.
-  log('wait for turnstile token…')
-  let tokenSeen = false
-  for (let i = 0; i < 45; i++) {
-    const val = await page
+  // Ждём авто-решения Turnstile. CloakBrowser решает челлендж через стелс +
+  // humanize. Сигналы решения: токен в DOM ИЛИ window.turnstile.getResponse()
+  // ИЛИ submit-кнопка стала активной. Поллим до 120с, лог каждые ~15с.
+  async function turnstileToken() {
+    return page
       .evaluate(() => {
         const el =
           document.querySelector('input[name="cf-turnstile-response"]') ||
           document.querySelector('input[name="turnstileToken"]') ||
           document.querySelector('.cf-turnstile input[type="hidden"]')
-        return el && 'value' in el ? el.value : ''
+        const fromInput = el && 'value' in el ? el.value : ''
+        let fromApi = ''
+        try {
+          // window.turnstile.getResponse() без widgetId вернёт токен активного виджета
+          fromApi = window.turnstile?.getResponse?.() || ''
+        } catch {
+          /* ignore */
+        }
+        return fromInput || fromApi || ''
       })
       .catch(() => '')
+  }
+  log('wait for turnstile solve…')
+  let tokenSeen = false
+  for (let i = 0; i < 60; i++) {
+    const val = await turnstileToken()
     if (val && val.length > 10) {
       tokenSeen = true
-      log('turnstile token present, len=', val.length)
+      log('turnstile SOLVED, token len=', val.length)
       break
     }
+    if (i > 0 && i % 8 === 0) log(`  …ещё нет токена (${i * 2}с)`)
     await page.waitForTimeout(2000)
   }
-  if (!tokenSeen) log('WARN: turnstile token не появился за 90с — сабмитим как есть')
+  if (!tokenSeen) log('WARN: токен Turnstile не появился за 120с')
 
-  log('submit')
-  const submitSel = 'button[type="submit"], button:has-text("Anmelden"), button:has-text("Log in"), button:has-text("Sign in")'
-  // Кликаем и ждём auth-ответ (или таймаут).
-  await Promise.allSettled([
-    page.waitForResponse((r) => /authentication\.json|login\.json/.test(r.url()), {
-      timeout: 60_000,
-    }),
-    page.click(submitSel).catch(() => page.keyboard.press('Enter')),
-  ])
+  const submitSel =
+    'button[type="submit"], button:has-text("Anmelden"), button:has-text("Log in"), button:has-text("Sign in")'
+
+  // Сабмитим и ждём auth-ответ. Если первый ответ NOT_VERIFIED_CAPTCHA —
+  // капча могла дорешаться позже: ждём и пробуем ещё (до 3 попыток).
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const before = authResults.length
+    log(`submit (попытка ${attempt})`)
+    await Promise.allSettled([
+      page.waitForResponse((r) => /authentication\.json|login\.json/.test(r.url()), {
+        timeout: 45_000,
+      }),
+      page.click(submitSel).catch(() => page.keyboard.press('Enter')),
+    ])
+    await page.waitForTimeout(2500)
+    const last = authResults[authResults.length - 1]
+    const gotNew = authResults.length > before
+    if (gotNew && last && !/NOT_VERIFIED_CAPTCHA/.test(last.body)) break // прошли капчу
+    if (attempt < 3) {
+      log('  ответ всё ещё NOT_VERIFIED_CAPTCHA — ждём 20с, даём капче дорешаться…')
+      await page.waitForTimeout(20_000)
+    }
+  }
 
   // Дать SPA дорисоваться/редиректнуться.
-  await page.waitForTimeout(4000)
+  await page.waitForTimeout(3000)
 
   const finalUrl = page.url()
   const cookies = await page.context().cookies()
