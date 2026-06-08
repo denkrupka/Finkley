@@ -201,7 +201,8 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
       setParams(next2, { replace: true })
     } else {
       const def = INTEGRATIONS.find((p) => p.id === provider)
-      if (def) setConnecting(def)
+      if (def?.connect_via === 'import') navigate(`/${salonId}/settings/import`)
+      else if (def) setConnecting(def)
     }
   }
 
@@ -249,6 +250,9 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     if (p.id === 'booksy') setBooksyOpen(true)
     else if (p.id === 'wfirma') setWfirmaOpen(true)
     else if (p.id === 'ksef') setKsefOpen(true)
+    // Treatwell и др. import-провайдеры: автоматический логин невозможен —
+    // ведём на загрузку CSV-выгрузки вместо диалога credentials.
+    else if (p.connect_via === 'import') navigate(`/${salonId}/settings/import`)
     else setConnecting(p)
   }
 
@@ -555,9 +559,9 @@ function IntegrationCard({
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
           ) : null}
           {/* Авто-синк интервал — для pull-провайдеров (Booksy + KSeF +
-              Fakturownia + inFakt + Treatwell). wFirma 06.06 удалена из
-              списка: pull-синк выпилен, wFirma теперь push-only через OCR. */}
-          {['booksy', 'ksef', 'fakturownia', 'infakt', 'treatwell'].includes(provider.id) ? (
+              Fakturownia + inFakt). wFirma (push-only OCR) и Treatwell
+              (CSV-импорт, без автосинка) из списка исключены. */}
+          {['booksy', 'ksef', 'fakturownia', 'infakt'].includes(provider.id) ? (
             <div className="border-border mt-2 flex items-center justify-between gap-2 border-t pt-2">
               <label
                 htmlFor={`int-${provider.id}-interval`}
@@ -717,7 +721,9 @@ function IntegrationCard({
             onClick={onConnect}
             className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
           >
-            {t('integrations.connect')}
+            {provider.connect_via === 'import'
+              ? t('integrations.import_csv', { defaultValue: 'Импортировать CSV' })
+              : t('integrations.connect')}
             <ChevronRight className="size-3.5" strokeWidth={2} />
           </button>
         )}

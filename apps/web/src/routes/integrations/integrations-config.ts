@@ -57,6 +57,13 @@ export type IntegrationDef = {
   brandColor: string
   /** Поля connect-формы. Сейчас только UI, потом — сохранение в salon_integrations. */
   connectFields: ConnectField[]
+  /**
+   * Способ подключения. По умолчанию — диалог (credentials/OAuth). 'import' —
+   * провайдер подключается через загрузку CSV (Settings → Импорт), а не через
+   * автоматический логин. Treatwell: автоматический вход невозможен (Cloudflare
+   * Turnstile блокирует серверный логин), поэтому только CSV-импорт.
+   */
+  connect_via?: 'dialog' | 'import'
   /** Доступна для подключения сейчас, или «скоро». */
   status: 'available' | 'coming_soon' | 'in_research'
 }
@@ -198,15 +205,10 @@ export const INTEGRATIONS: IntegrationDef[] = [
     description_key: 'integrations.providers.treatwell.description',
     icon: CalendarClock,
     brandColor: '#7C3AED',
-    connectFields: [
-      { key: 'login', label_key: 'integrations.fields.email', type: 'email', required: true },
-      {
-        key: 'password',
-        label_key: 'integrations.fields.password',
-        type: 'password',
-        required: true,
-      },
-    ],
+    // Автоматический вход в Treatwell невозможен (Cloudflare Turnstile блокирует
+    // серверный логин) — подключение через импорт CSV-выгрузки.
+    connectFields: [],
+    connect_via: 'import',
     status: 'available',
   },
   {
