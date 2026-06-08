@@ -62,9 +62,11 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
+      # Node 22: нативный global WebSocket. На Node 20 supabase-js падал в e2e
+      # с «Node.js 20 detected without native WebSocket support».
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -72,10 +74,13 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter web exec playwright install --with-deps chromium
 
+      # Собираем с TEST-env: vite preview (см. playwright.config webServer) отдаёт
+      # эту сборку, и приложение должно указывать на тот же Supabase (TEST), где
+      # тесты создают юзеров. Раньше собиралось с STAGING → логин-тесты не сходились.
       - name: Build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_STAGING || 'https://placeholder.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_STAGING || 'placeholder' }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_TEST || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_TEST || 'placeholder' }}
         run: pnpm build
 
       - name: Run Playwright tests
