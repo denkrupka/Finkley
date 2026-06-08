@@ -1,0 +1,50 @@
+name: Treatwell sync
+
+# Воркер синка Treatwell. Логинится через Capsolver (с IP GitHub, который
+# Cloudflare принимает — в отличие от Supabase Edge) и синкает salon_integrations
+# с provider='treatwell' (status pending/connected) в Supabase.
+#
+# Триггеры:
+#   - schedule: периодический авто-синк
+#   - workflow_dispatch: ручной запуск (можно указать salon_id)
+#   - repository_dispatch (type: treatwell-sync): мгновенный синк по подключению
+#     из портала (edge function treatwell-connect шлёт dispatch с salon_id)
+#
+# Секреты: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CAPSOLVER_API_KEY
+
+on:
+  schedule:
+    - cron: '0 * * * *' # ежечасно
+  workflow_dispatch:
+    inputs:
+      salon_id:
+        description: 'Синкать только этот salon_id (опц.)'
+        required: false
+  repository_dispatch:
+    types: [treatwell-sync]
+
+concurrency:
+  group: treatwell-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install worker deps
+        working-directory: scripts/treatwell-worker
+        run: npm install --no-package-lock
+      - name: Run sync
+        working-directory: scripts/treatwell-worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+          # salon_id из workflow_dispatch или из repository_dispatch payload
+          ONLY_SALON: ${{ github.event.inputs.salon_id || github.event.client_payload.salon_id }}
+        run: node sync.mjs

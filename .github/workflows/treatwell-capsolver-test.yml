@@ -1,0 +1,25 @@
+name: Treatwell Capsolver host test
+
+# Проверяет, принимает ли Treatwell Capsolver-токен с раннера GitHub Actions
+# (вопрос: годится ли бесплатный GitHub как хост для логина Treatwell, или
+# нужен VPS). Триггер на push в саму ветку фикса — чтобы прогналось сразу.
+# Нужен секрет CAPSOLVER_API_KEY.
+
+on:
+  push:
+    branches: [fix/treatwell-capsolver-ua]
+  workflow_dispatch:
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Capsolver host test
+        env:
+          CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+        run: node scripts/treatwell-poc/capsolver-host-test.mjs

@@ -90,10 +90,34 @@ export function ConnectIntegrationDialog({
       return
     }
     if (!accountingId) {
-      // Fresha / BookOn: дёргаем соответствующий proxy для connect. Treatwell
-      // здесь НЕ обрабатывается — у него connect_via:'import' (автоматический
-      // вход невозможен из-за Cloudflare Turnstile), кнопка ведёт на /settings/
-      // import, а не в этот диалог.
+      // Treatwell: сохраняем креды через edge-функцию treatwell-connect (она
+      // ставит pending + дёргает GitHub-воркер, который логинится через
+      // Capsolver и синкает — с IP GitHub, а не Supabase Edge).
+      if (provider.id === 'treatwell' && salonId) {
+        ;(async () => {
+          const { data, error } = await supabase.functions.invoke('treatwell-connect', {
+            body: { salon_id: salonId, login: values.login, password: values.password },
+          })
+          if (error) {
+            toast.error(error.message ?? String(error))
+            return
+          }
+          const res = data as { ok?: boolean; error?: string } | null
+          if (!res?.ok) {
+            toast.error(res?.error ?? 'connect_failed')
+            return
+          }
+          toast.success(
+            t('integrations.treatwell_connecting', {
+              defaultValue:
+                'Treatwell подключён. Синхронизируем визиты — появятся в течение нескольких минут.',
+            }),
+          )
+          onClose()
+        })()
+        return
+      }
+      // Fresha / BookOn: дёргаем соответствующий proxy для connect.
       const proxyMap: Record<string, string> = {
         fresha: 'fresha-proxy',
         bookon: 'bookon-proxy',
