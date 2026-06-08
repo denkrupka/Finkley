@@ -23,20 +23,6 @@ import type { IntegrationDef, IntegrationProvider } from './integrations-config'
 
 const ACCOUNTING_PROVIDERS: IntegrationProvider[] = ['fakturownia', 'infakt']
 
-/**
- * Маппинг treatwell-proxy error codes на i18n ключи. Owner-feedback 04.06:
- * дифференцируем причины NOT_AUTHENTICATED (solver не настроен / solver
- * не сработал / Treatwell отверг credentials после solver).
- */
-function pickTreatwellErrorKey(raw: string): string | null {
-  if (raw.includes('treatwell_solver_not_configured'))
-    return 'integrations.errors.treatwell_solver_not_configured'
-  if (raw.includes('treatwell_solver_failed')) return 'integrations.errors.treatwell_solver_failed'
-  if (raw.includes('treatwell_invalid_credentials'))
-    return 'integrations.errors.treatwell_invalid_credentials'
-  return null
-}
-
 function isAccountingProvider(id: IntegrationProvider): id is 'fakturownia' | 'infakt' {
   return ACCOUNTING_PROVIDERS.includes(id)
 }
@@ -44,10 +30,11 @@ function isAccountingProvider(id: IntegrationProvider): id is 'fakturownia' | 'i
 /**
  * Generic connect-форма для провайдеров, которые подключаются через простой
  * набор полей (subdomain/api_token/login/...). Использует useAccountingConnect
- * для реальных бухгалтерских порталов; для остальных (Fresha/Treatwell/
- * YCLIENTS — все coming_soon) показывает stub-toast.
+ * для реальных бухгалтерских порталов; для Fresha/BookOn — соответствующий
+ * proxy; для остальных coming_soon — stub-toast.
  *
  * Booksy / wFirma / KSeF имеют выделенные диалоги (см. соответствующие *.tsx).
+ * Treatwell подключается через CSV-импорт (connect_via:'import'), не сюда.
  */
 export function ConnectIntegrationDialog({
   provider,
@@ -103,12 +90,11 @@ export function ConnectIntegrationDialog({
       return
     }
     if (!accountingId) {
-      // Treatwell / Fresha: дёргаем соответствующий proxy. Sync будет
-      // включён после реализации в следующем спринте; connect сохраняет
-      // venue_id и помечает интеграцию connected — юзер видит зелёный
-      // badge и понимает что credentials приняты.
+      // Fresha / BookOn: дёргаем соответствующий proxy для connect. Treatwell
+      // здесь НЕ обрабатывается — у него connect_via:'import' (автоматический
+      // вход невозможен из-за Cloudflare Turnstile), кнопка ведёт на /settings/
+      // import, а не в этот диалог.
       const proxyMap: Record<string, string> = {
-        treatwell: 'treatwell-proxy',
         fresha: 'fresha-proxy',
         bookon: 'bookon-proxy',
       }
@@ -126,48 +112,17 @@ export function ConnectIntegrationDialog({
             },
           })
           if (error) {
-            const raw = error.message ?? String(error)
-            const errKey = pickTreatwellErrorKey(raw)
-            toast.error(errKey ? t(errKey) : raw)
+            toast.error(error.message ?? String(error))
             return
           }
           const res = data as { ok?: boolean; error?: string; note?: string } | null
           if (!res?.ok) {
-            const code = res?.error ?? 'connect_failed'
-            const errKey = pickTreatwellErrorKey(code)
-            toast.error(errKey ? t(errKey) : code)
+            toast.error(res?.error ?? 'connect_failed')
             return
           }
           toast.success(
             res.note ?? t('integrations.toast_connected', { name: provider?.name ?? '' }),
           )
-          // Auto-sync сразу после connect (только для treatwell — Fresha
-          // Data Connector pull пока не реализован).
-          if (provider?.id === 'treatwell') {
-            toast.info(
-              t('integrations.toast_sync_started', { name: provider?.name ?? 'Treatwell' }),
-            )
-            const syncRes = await supabase.functions.invoke('treatwell-proxy', {
-              body: { action: 'sync', salon_id: salonId, days: 30 },
-            })
-            if (syncRes.error) {
-              toast.error(syncRes.error.message ?? String(syncRes.error))
-            } else {
-              const s = syncRes.data as {
-                ok?: boolean
-                stats?: { staff: number; services: number; clients: number; visits: number }
-              }
-              if (s.ok && s.stats) {
-                toast.success(
-                  t('integrations.toast_synced', {
-                    staff: s.stats.staff,
-                    services: s.stats.services,
-                    visits: s.stats.visits,
-                  }),
-                )
-              }
-            }
-          }
           onClose()
         })()
         return
