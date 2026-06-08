@@ -327,16 +327,25 @@ async function main() {
 
   let q = admin
     .from('salon_integrations')
-    .select('salon_id, credentials, status')
+    .select('salon_id, credentials, status, sync_interval_minutes, last_sync_at')
     .eq('provider', 'treatwell')
     .in('status', ['pending', 'connected'])
   if (ONLY_SALON) q = q.eq('salon_id', ONLY_SALON)
-  const { data: integs, error } = await q
+  const { data: allIntegs, error } = await q
   if (error) { console.error('select salon_integrations:', error.message); process.exit(1) }
-  log(`салонов к синку: ${integs?.length ?? 0}`)
+
+  // ONLY_SALON (ручной запуск / dispatch при подключении) — синкаем сразу,
+  // игнорируя интервал. Cron — только «просроченные» по sync_interval_minutes.
+  const integs = (allIntegs ?? []).filter((it) => {
+    if (ONLY_SALON || it.status === 'pending') return true
+    const interval = it.sync_interval_minutes ?? 60
+    if (!it.last_sync_at) return true
+    return Date.now() - new Date(it.last_sync_at).getTime() >= interval * 60000
+  })
+  log(`салонов к синку: ${integs.length} (всего treatwell: ${allIntegs?.length ?? 0})`)
 
   let failures = 0
-  for (const it of integs ?? []) {
+  for (const it of integs) {
     const creds = it.credentials || {}
     try {
       const stats = await syncSalon(admin, it.salon_id, creds.login, creds.password)

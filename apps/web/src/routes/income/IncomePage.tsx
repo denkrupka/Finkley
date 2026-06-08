@@ -10,6 +10,7 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import { useTreatwellAutoSync } from '@/hooks/useIntegrations'
 import { type OtherIncomeRow } from '@/hooks/useOtherIncomes'
 import { toLocalISODate } from '@/lib/utils/format-date'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -83,6 +84,9 @@ export function IncomePage({
   const salonId = pickerSalonId ?? params_.salonId
   const [params, setParams] = useSearchParams()
   const { data: salon } = useSalon(salonId)
+  // Авто-синк Treatwell при открытии Доходов (как Booksy). One-shot, если
+  // интеграция connected и интервал просрочен. Тихо, в фоне.
+  useTreatwellAutoSync(salonId)
   const [bankingPeriod, setBankingPeriod] = useState<PeriodValue>(() => currentMonthPeriod())
   const bankingRange = useMemo(() => {
     const r = periodToRange(bankingPeriod)

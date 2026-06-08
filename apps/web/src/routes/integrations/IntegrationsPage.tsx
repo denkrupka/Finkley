@@ -29,6 +29,7 @@ import {
   useForceBooksyHistoryResync,
   useKsefSync,
   useSalonIntegrations,
+  useTreatwellSyncTrigger,
   useUpdateBooksyInterval,
   useUpdateProviderInterval,
   type IntegrationProvider,
@@ -387,6 +388,7 @@ function IntegrationCard({
   const accountingProviderId =
     provider.id === 'fakturownia' || provider.id === 'infakt' ? provider.id : null
   const accountingSync = useAccountingSync(accountingProviderId, salonId)
+  const treatwellTrigger = useTreatwellSyncTrigger(salonId)
   const disconnect = useDisconnectIntegration(salonId)
   const clearVisits = useClearBooksyVisits(salonId)
   const backfillAppts = useBackfillBooksyApptUids(salonId)
@@ -409,6 +411,20 @@ function IntegrationCard({
             t('integrations.toast_synced_ksef', {
               synced: stats.expenses_synced,
               skipped: stats.expenses_skipped,
+            }),
+          ),
+        onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
+      })
+      return
+    }
+    if (provider.id === 'treatwell') {
+      // Синк Treatwell идёт на GitHub-воркере — это лишь триггер. Данные
+      // появятся через ~минуту, поэтому показываем info-toast, а не stats.
+      treatwellTrigger.mutate(undefined, {
+        onSuccess: () =>
+          toast.info(
+            t('integrations.treatwell_sync_started', {
+              defaultValue: 'Синхронизация Treatwell запущена — данные появятся через минуту.',
             }),
           ),
         onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
@@ -455,9 +471,11 @@ function IntegrationCard({
   const syncPending =
     provider.id === 'ksef'
       ? ksefSync.isPending
-      : accountingProviderId
-        ? accountingSync.isPending
-        : booksySync.isPending
+      : provider.id === 'treatwell'
+        ? treatwellTrigger.isPending
+        : accountingProviderId
+          ? accountingSync.isPending
+          : booksySync.isPending
 
   return (
     <div
@@ -555,9 +573,9 @@ function IntegrationCard({
             <p className="text-destructive mt-1 line-clamp-2">⚠ {connection.last_error}</p>
           ) : null}
           {/* Авто-синк интервал — для pull-провайдеров (Booksy + KSeF +
-              Fakturownia + inFakt). wFirma (push-only OCR) и Treatwell
-              (CSV-импорт, без автосинка) из списка исключены. */}
-          {['booksy', 'ksef', 'fakturownia', 'infakt'].includes(provider.id) ? (
+              Fakturownia + inFakt + Treatwell). wFirma (push-only OCR)
+              исключена. */}
+          {['booksy', 'ksef', 'fakturownia', 'infakt', 'treatwell'].includes(provider.id) ? (
             <div className="border-border mt-2 flex items-center justify-between gap-2 border-t pt-2">
               <label
                 htmlFor={`int-${provider.id}-interval`}

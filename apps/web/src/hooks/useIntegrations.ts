@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
@@ -853,3 +855,49 @@ export function useKsefSync(salonId: string | undefined) {
 // используется. Заменён на push_receipt_ocr через web-flow (см. commit 2,
 // новый useWfirmaPushReceiptOcr). Триггер — после сохранения расхода с
 // фото/документом + matching NIP.
+
+/**
+ * Триггер синка Treatwell — дёргает edge-функцию treatwell-sync-trigger,
+ * которая запускает GitHub-воркер (логин через Capsolver + синк). Данные
+ * появятся через ~минуту (синк идёт на GitHub, не на Supabase Edge).
+ */
+export function useTreatwellSyncTrigger(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      if (!salonId) throw new Error('no salon')
+      const { data, error } = await supabase.functions.invoke('treatwell-sync-trigger', {
+        body: { salon_id: salonId },
+      })
+      if (error) throw error
+      const json = data as { ok?: boolean; error?: string; dispatched?: boolean } | null
+      if (!json?.ok) throw new Error(json?.error ?? 'trigger_failed')
+      return json
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salon-integrations', salonId] })
+    },
+  })
+}
+
+/**
+ * Авто-синк Treatwell при открытии страницы (как Booksy). One-shot per mount:
+ * если treatwell connected и last_sync_at просрочен по sync_interval_minutes —
+ * тихо дёргает триггер. Ошибки не показываем (фон).
+ */
+export function useTreatwellAutoSync(salonId: string | undefined) {
+  const { data: integrations = [] } = useSalonIntegrations(salonId)
+  const trigger = useTreatwellSyncTrigger(salonId)
+  const firedRef = useRef(false)
+  const tw = integrations.find((i) => i.provider === 'treatwell')
+  useEffect(() => {
+    if (firedRef.current) return
+    if (!tw || tw.status !== 'connected') return
+    const interval = tw.sync_interval_minutes ?? 60
+    const lastMs = tw.last_sync_at ? new Date(tw.last_sync_at).getTime() : 0
+    if (Date.now() - lastMs < interval * 60_000) return
+    firedRef.current = true
+    trigger.mutate(undefined, { onError: () => undefined })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tw?.status, tw?.last_sync_at, tw?.sync_interval_minutes])
+}
