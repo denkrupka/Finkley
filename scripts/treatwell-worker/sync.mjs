@@ -164,8 +164,6 @@ async function fetchStaff(cookies, venueId) {
     external_id: String(e.id),
     full_name: e.name?.trim() || 'Без имени',
     email: e.emailAddress ?? null,
-    phone: e.phone ?? null,
-    job_title: e.jobTitle ?? null,
     is_active: e.active !== false,
   }))
 }
@@ -178,9 +176,9 @@ async function fetchServices(cookies, venueId) {
       const to = o.pricing?.to ?? from
       return {
         external_id: String(o.id),
-        title: o.name?.trim() || 'Услуга',
-        price_cents: Math.round(((from + to) / 2) * 100),
-        duration_minutes: o.durationMinutes ?? 60,
+        name: o.name?.trim() || 'Услуга',
+        default_price_cents: Math.round(((from + to) / 2) * 100),
+        default_duration_min: o.durationMinutes ?? 60,
       }
     })
 }
@@ -225,16 +223,13 @@ async function syncSalon(admin, salonId, login_, password) {
   log(`salon ${salonId}: venueId=${venueId}`)
 
   const staff = await fetchStaff(sessionCookies, venueId)
-  if (staff.length)
-    await upsert(admin, 'staff', staff.map((s) => ({ salon_id: salonId, external_source: 'treatwell', ...s })), 'salon_id,external_source,external_id')
+  await upsertByExternal(admin, 'staff', salonId, staff.map((s) => ({ salon_id: salonId, external_source: 'treatwell', ...s })))
 
   const services = await fetchServices(sessionCookies, venueId)
-  if (services.length)
-    await upsert(admin, 'services', services.map((s) => ({ salon_id: salonId, external_source: 'treatwell', is_active: true, ...s })), 'salon_id,external_source,external_id')
+  await upsertByExternal(admin, 'services', salonId, services.map((s) => ({ salon_id: salonId, external_source: 'treatwell', ...s })))
 
   const clients = await fetchClients(sessionCookies, venueId)
-  if (clients.length)
-    await upsert(admin, 'clients', clients.map((c) => ({ salon_id: salonId, external_source: 'treatwell', ...c })), 'salon_id,external_source,external_id')
+  await upsertByExternal(admin, 'clients', salonId, clients.map((c) => ({ salon_id: salonId, external_source: 'treatwell', ...c })))
 
   // FK-мапа
   const [{ data: staffRows }, { data: serviceRows }, { data: clientRows }] = await Promise.all([
@@ -275,6 +270,37 @@ async function syncSalon(admin, salonId, login_, password) {
 async function upsert(admin, table, rows, onConflict, ignoreDuplicates = false) {
   const { error } = await admin.from(table).upsert(rows, { onConflict, ignoreDuplicates })
   if (error) throw new Error(`upsert ${table}: ${error.message}`)
+}
+
+/**
+ * Ручной upsert по (salon_id, external_source='treatwell', external_id) для
+ * staff/services/clients: их unique-индексы ПАРТИАЛЬНЫЕ (where external_id is
+ * not null), и PostgREST не матчит их в ON CONFLICT. Select → insert новых +
+ * update существующих по id (сохраняет FK из visits).
+ */
+async function upsertByExternal(admin, table, salonId, rows) {
+  if (!rows.length) return
+  const extIds = rows.map((r) => r.external_id)
+  const { data: existing, error: selErr } = await admin
+    .from(table)
+    .select('id, external_id')
+    .eq('salon_id', salonId)
+    .eq('external_source', 'treatwell')
+    .in('external_id', extIds)
+  if (selErr) throw new Error(`select ${table}: ${selErr.message}`)
+  const byExt = new Map((existing ?? []).map((r) => [r.external_id, r.id]))
+  const toInsert = rows.filter((r) => !byExt.has(r.external_id))
+  if (toInsert.length) {
+    const { error } = await admin.from(table).insert(toInsert)
+    if (error) throw new Error(`insert ${table}: ${error.message}`)
+  }
+  for (const r of rows) {
+    const id = byExt.get(r.external_id)
+    if (!id) continue
+    const { external_id, external_source, salon_id, ...patch } = r
+    const { error } = await admin.from(table).update(patch).eq('id', id)
+    if (error) throw new Error(`update ${table}: ${error.message}`)
+  }
 }
 
 async function main() {
