@@ -27,7 +27,15 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'] } },
   ],
   webServer: process.env.CI
-    ? undefined
+    ? {
+        // В CI приложение уже собрано (pnpm build с TEST-env, см. ci.yml e2e job),
+        // поднимаем статику через vite preview. Раньше здесь было `undefined` —
+        // сервер не стартовал, и ВСЕ тесты падали с net::ERR_CONNECTION_REFUSED.
+        command: 'pnpm exec vite preview --port 5173 --strictPort',
+        url: 'http://localhost:5173',
+        reuseExistingServer: false,
+        timeout: 120_000,
+      }
     : {
         command: 'pnpm dev',
         url: 'http://localhost:5173',
