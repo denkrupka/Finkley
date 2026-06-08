@@ -112,6 +112,6 @@ test.describe('Blocked pages', () => {
   test('публичный /blocked/account рендерится без авторизации', async ({ page }) => {
     await page.goto('/blocked/account')
     await expect(page.getByRole('heading', { name: 'Ваш аккаунт заблокирован' })).toBeVisible()
-    await expect(page.getByText('support@finsalon.app')).toBeVisible()
+    await expect(page.getByText('support@finkley.app')).toBeVisible()
   })
 })

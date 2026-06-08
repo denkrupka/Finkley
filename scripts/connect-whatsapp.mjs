@@ -1,5 +1,5 @@
 /**
- * One-shot скрипт: подключает WhatsApp Business номер к мессенджеру FinSalon
+ * One-shot скрипт: подключает WhatsApp Business номер к мессенджеру Finkley
  * для owner-салона.
  *
  * Использование:
@@ -157,7 +157,7 @@ const headers = {
 
   console.log('')
   console.log('═══════════════════════════════════════════════════════')
-  console.log('  ✓ WhatsApp Cloud API подключён к FinSalon')
+  console.log('  ✓ WhatsApp Cloud API подключён к Finkley')
   console.log(`  Phone: ${phoneInfo.display_phone_number ?? PHONE_NUMBER}`)
   console.log(`  WABA:  ${WABA_ID}`)
   console.log(`  Salon: ${salonName}`)

@@ -188,7 +188,9 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'available',
+    // sync пока не реализован (fresha-proxy — skeleton). До готовности
+    // pull-логики показываем как «скоро», чтобы клиент не подключал в пустоту.
+    status: 'coming_soon',
   },
   {
     id: 'treatwell',
@@ -264,7 +266,9 @@ export const INTEGRATIONS: IntegrationDef[] = [
         required: true,
       },
     ],
-    status: 'available',
+    // sync пока заглушка (bookon-proxy — skeleton, public API не задокументирован).
+    // До реализации pull-логики показываем как «скоро».
+    status: 'coming_soon',
   },
 ]
 

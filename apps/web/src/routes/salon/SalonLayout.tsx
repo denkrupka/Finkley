@@ -182,8 +182,8 @@ export function SalonLayout() {
       }
       setQuickEntryOpen(true)
     }
-    window.addEventListener('finsalon:open-quick-entry', onOpenQuickEntry)
-    return () => window.removeEventListener('finsalon:open-quick-entry', onOpenQuickEntry)
+    window.addEventListener('finkley:open-quick-entry', onOpenQuickEntry)
+    return () => window.removeEventListener('finkley:open-quick-entry', onOpenQuickEntry)
   }, [])
 
   if (isLoading) {

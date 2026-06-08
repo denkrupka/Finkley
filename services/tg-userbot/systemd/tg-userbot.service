@@ -1,5 +1,5 @@
 [Unit]
-Description=FinSalon Telegram userbot bridge (FastAPI + Telethon)
+Description=Finkley Telegram userbot bridge (FastAPI + Telethon)
 Documentation=https://github.com/denkrupka/Finkley/blob/main/decisions/015-telegram-userbot.md
 After=network-online.target
 Wants=network-online.target

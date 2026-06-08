@@ -571,7 +571,7 @@ export function MessengerPage() {
                       className="shrink-0"
                       onClick={() => {
                         window.dispatchEvent(
-                          new CustomEvent('finsalon:open-quick-entry', {
+                          new CustomEvent('finkley:open-quick-entry', {
                             detail: {
                               staffId: '',
                               when: new Date().toISOString(),

@@ -9,7 +9,7 @@ import { InfoHelpButton } from './InfoHelpButton'
 
 /**
  * Презентационные секции дашборда. Структура / визуальный язык — по
- * образцу finsalon_dashboard.html (5 KPI-карточек, две колонки секций,
+ * образцу finkley_dashboard.html (5 KPI-карточек, две колонки секций,
  * операции, маркетинг). Цвета адаптированы под нашу палитру Tailwind /
  * brand-токенов (emerald/amber/rose/blue/violet/teal/pink/slate).
  *

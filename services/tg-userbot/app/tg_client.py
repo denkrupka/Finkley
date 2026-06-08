@@ -13,7 +13,7 @@ def make_client(session_string: str | None = None) -> TelegramClient:
         StringSession(session_string),
         s.TG_API_ID,
         s.TG_API_HASH,
-        device_model="FinSalon",
+        device_model="Finkley",
         system_version="Linux Server",
         app_version="1.0.0",
         lang_code="ru",

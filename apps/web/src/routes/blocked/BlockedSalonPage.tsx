@@ -33,8 +33,8 @@ export function BlockedSalonPage() {
         ) : null}
         <p className="text-muted-foreground text-xs">
           {t('blocked.salon.contact')}{' '}
-          <a className="text-primary underline" href="mailto:support@finsalon.app">
-            support@finsalon.app
+          <a className="text-primary underline" href="mailto:support@finkley.app">
+            support@finkley.app
           </a>
         </p>
         {otherSalons.length > 0 ? (

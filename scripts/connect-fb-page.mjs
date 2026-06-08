@@ -1,5 +1,5 @@
 /**
- * One-shot скрипт: подключает Facebook Page к мессенджеру FinSalon.
+ * One-shot скрипт: подключает Facebook Page к мессенджеру Finkley.
  *
  * Шаги:
  *   1. GET /me?access_token=...  → page_id + page_name (валидация токена)
@@ -197,7 +197,7 @@ async function main() {
 
   console.log('')
   console.log('═══════════════════════════════════════════════════════')
-  console.log('  ✓ Facebook Page подключена к FinSalon')
+  console.log('  ✓ Facebook Page подключена к Finkley')
   console.log(`  Page:  ${me.name} (${me.id})`)
   console.log(`  Salon: ${salon.salons?.name ?? salonId}`)
   console.log('  Status: connected · webhook subscribed')
