@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="FinSalon tg-userbot bridge",
+        title="Finkley tg-userbot bridge",
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/docs" if settings.is_dev else None,

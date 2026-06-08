@@ -225,7 +225,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
    *   - если currentIdx === startIdx (клик без перетаскивания) → открываем
    *     обычный subslot-popover (как было раньше);
    *   - если currentIdx > startIdx (реальный drag) → диспатчим событие
-   *     `finsalon:open-quick-entry` с `endAt`, чтобы QuickEntry открылся
+   *     `finkley:open-quick-entry` с `endAt`, чтобы QuickEntry открылся
    *     с предзаполненным временем от/до.
    * startRect — bounding rect стартового субслота, нужен только для
    * позиционирования popover'а в single-click ветке.
@@ -1079,7 +1079,7 @@ export function VisitsCalendarView({ salonId }: { salonId: string }) {
               type="button"
               onClick={() => {
                 window.dispatchEvent(
-                  new CustomEvent('finsalon:open-quick-entry', {
+                  new CustomEvent('finkley:open-quick-entry', {
                     detail: {
                       staffId: subslotMenu.staffId,
                       when: subslotMenu.when.toISOString(),

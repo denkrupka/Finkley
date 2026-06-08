@@ -27,8 +27,8 @@ export function BlockedAccountPage() {
         <p className="text-muted-foreground text-sm">{t('blocked.account.body')}</p>
         <p className="text-muted-foreground text-xs">
           {t('blocked.account.contact')}{' '}
-          <a className="text-primary underline" href="mailto:support@finsalon.app">
-            support@finsalon.app
+          <a className="text-primary underline" href="mailto:support@finkley.app">
+            support@finkley.app
           </a>
         </p>
         <div className="mt-2 flex gap-2">

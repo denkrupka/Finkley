@@ -1,5 +1,5 @@
 /**
- * Build-time loader: статьи finsalon.app/media из Supabase media_posts.
+ * Build-time loader: статьи finkley.app/media из Supabase media_posts.
  * Используется в /media/index.astro и /media/[slug].astro — мерджится
  * с markdown-постами из content-collection.
  *

@@ -1,6 +1,6 @@
 /**
  * One-shot скрипт: подключает Instagram Business аккаунт (flow B — Instagram
- * Login API) к мессенджеру FinSalon для owner-салона.
+ * Login API) к мессенджеру Finkley для owner-салона.
  *
  * Использование:
  *   node scripts/connect-ig-account.mjs [<IG_LONG_LIVED_TOKEN>]
@@ -173,7 +173,7 @@ async function main() {
 
   console.log('')
   console.log('═══════════════════════════════════════════════════════')
-  console.log('  ✓ Instagram-аккаунт подключён к FinSalon (flow B)')
+  console.log('  ✓ Instagram-аккаунт подключён к Finkley (flow B)')
   console.log(`  IG user: ${name} (${userId})`)
   console.log(`  Salon:   ${salon.salons?.name ?? salonId}`)
   console.log('  Status:  connected · webhook subscribed')
