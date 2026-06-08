@@ -201,8 +201,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
       setParams(next2, { replace: true })
     } else {
       const def = INTEGRATIONS.find((p) => p.id === provider)
-      if (def?.connect_via === 'import') navigate(`/${salonId}/settings/import`)
-      else if (def) setConnecting(def)
+      if (def) setConnecting(def)
     }
   }
 
@@ -250,9 +249,6 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean } = 
     if (p.id === 'booksy') setBooksyOpen(true)
     else if (p.id === 'wfirma') setWfirmaOpen(true)
     else if (p.id === 'ksef') setKsefOpen(true)
-    // Treatwell и др. import-провайдеры: автоматический логин невозможен —
-    // ведём на загрузку CSV-выгрузки вместо диалога credentials.
-    else if (p.connect_via === 'import') navigate(`/${salonId}/settings/import`)
     else setConnecting(p)
   }
 
@@ -721,9 +717,7 @@ function IntegrationCard({
             onClick={onConnect}
             className="text-secondary inline-flex items-center gap-1 text-sm font-semibold hover:underline"
           >
-            {provider.connect_via === 'import'
-              ? t('integrations.import_csv', { defaultValue: 'Импортировать CSV' })
-              : t('integrations.connect')}
+            {t('integrations.connect')}
             <ChevronRight className="size-3.5" strokeWidth={2} />
           </button>
         )}

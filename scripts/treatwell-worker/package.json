@@ -1,0 +1,13 @@
+{
+  "name": "treatwell-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Actions воркер: логин в Treatwell через Capsolver (с принимаемого IP) + синк в Supabase. Не часть pnpm-workspace.",
+  "scripts": {
+    "sync": "node sync.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
