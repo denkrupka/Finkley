@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { useMyProfile } from '@/hooks/useMyProfile'
+import { usePermissions } from '@/hooks/usePermissions'
 import { usePersistedCollapse } from '@/routes/dashboard/useCollapsedState'
 import {
   useUpdateNotificationPref,
@@ -65,6 +66,10 @@ const TYPE_GROUPS: Array<{
   },
 ]
 
+/** Типы уведомлений, релевантные мастеру (staff): только про его визиты.
+ *  Финансы/платежи/склад/дайджесты/AI-инсайты — owner-инфо, мастеру не нужны. */
+const MASTER_TYPE_KEYS = new Set<NotificationTypeKey>(['booksy_new_visits', 'calendar_conflicts'])
+
 type Channel = 'push' | 'email' | 'telegram' | 'sms'
 const CHANNELS: Channel[] = ['push', 'email', 'telegram', 'sms']
 const CHANNEL_LABEL: Record<Channel, string> = {
@@ -78,6 +83,15 @@ export function NotificationsTabContent({ salon }: { salon: SalonRow }) {
   const { t } = useTranslation()
   const updatePref = useUpdateNotificationPref(salon.id)
   const { data: profile } = useMyProfile()
+  const { role } = usePermissions(salon.id)
+  // Мастеру (staff/external) показываем только уведомления про его визиты.
+  const isMaster = role === 'staff' || role === 'external'
+  const groups = isMaster
+    ? TYPE_GROUPS.map((g) => ({
+        ...g,
+        items: g.items.filter((i) => MASTER_TYPE_KEYS.has(i.key)),
+      })).filter((g) => g.items.length > 0)
+    : TYPE_GROUPS
   const prefs = salon.notification_prefs ?? {}
   const telegramLinked = !!profile?.telegram_id
   const phoneLinked = !!profile?.phone
@@ -121,7 +135,7 @@ export function NotificationsTabContent({ salon }: { salon: SalonRow }) {
           })}
         </p>
         <div className="mt-5 flex flex-col gap-3">
-          {TYPE_GROUPS.map((group) => (
+          {groups.map((group) => (
             <CollapsibleNotificationGroup
               key={group.group}
               groupKey={group.group}
