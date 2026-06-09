@@ -7,7 +7,7 @@
  * может менять email.
  *
  * Body:
- *   { salon_id, target_user_id, first_name?, last_name?, phone? }
+ *   { salon_id, target_user_id, first_name?, last_name?, phone?, avatar_url? }
  *
  * Проверки:
  *   - Caller — owner/admin того же salon_id
@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
   const firstName = typeof body.first_name === 'string' ? body.first_name.trim() : undefined
   const lastName = typeof body.last_name === 'string' ? body.last_name.trim() : undefined
   const phone = typeof body.phone === 'string' ? body.phone.trim() : undefined
+  const avatarUrl = typeof body.avatar_url === 'string' ? body.avatar_url.trim() : undefined
 
   const patch: Record<string, string | null> = {}
   if (firstName !== undefined || lastName !== undefined) {
@@ -90,6 +91,9 @@ Deno.serve(async (req: Request) => {
   }
   if (phone !== undefined) {
     patch.phone = phone.length > 0 ? phone : null
+  }
+  if (avatarUrl !== undefined) {
+    patch.avatar_url = avatarUrl.length > 0 ? avatarUrl : null
   }
 
   if (Object.keys(patch).length === 0) {

@@ -14,6 +14,7 @@ export type TeamMember = {
   email: string | null
   full_name: string | null
   phone: string | null
+  avatar_url: string | null
 }
 
 export type Invitation = {
@@ -54,21 +55,33 @@ export function useTeamMembers(salonId: string | undefined) {
       const { data: rpc } = await supabase.rpc('list_salon_team', { p_salon_id: salonId })
       const byId = new Map<
         string,
-        { email: string | null; full_name: string | null; phone: string | null }
+        {
+          email: string | null
+          full_name: string | null
+          phone: string | null
+          avatar_url: string | null
+        }
       >()
       for (const r of (rpc ?? []) as {
         user_id: string
         email: string | null
         full_name: string | null
         phone: string | null
+        avatar_url: string | null
       }[]) {
-        byId.set(r.user_id, { email: r.email, full_name: r.full_name, phone: r.phone })
+        byId.set(r.user_id, {
+          email: r.email,
+          full_name: r.full_name,
+          phone: r.phone,
+          avatar_url: r.avatar_url,
+        })
       }
       return memberRows.map<TeamMember>((m) => ({
         ...m,
         email: byId.get(m.user_id)?.email ?? m.invited_email,
         full_name: byId.get(m.user_id)?.full_name ?? null,
         phone: byId.get(m.user_id)?.phone ?? null,
+        avatar_url: byId.get(m.user_id)?.avatar_url ?? null,
       }))
     },
     enabled: !!salonId,
@@ -185,6 +198,7 @@ export function useUpdateMemberProfile(salonId: string | undefined) {
       first_name?: string
       last_name?: string
       phone?: string
+      avatar_url?: string | null
     }) => {
       const { data, error } = await supabase.functions.invoke('team-update-member', {
         body: {
@@ -193,6 +207,7 @@ export function useUpdateMemberProfile(salonId: string | undefined) {
           first_name: input.first_name,
           last_name: input.last_name,
           phone: input.phone,
+          avatar_url: input.avatar_url,
         },
       })
       if (error) throw error
