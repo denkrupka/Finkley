@@ -120,8 +120,8 @@ Deno.serve(
       return jsonResponse({ error: 'ai_not_configured' }, 503)
     }
 
-    const userRes = await getUserFromRequest(req)
-    if (!userRes.ok) return jsonResponse({ error: 'unauthorized' }, 401)
+    const userRes = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
+    if (!userRes) return jsonResponse({ error: 'unauthorized' }, 401)
 
     let body: { image_base64?: string; salon_id?: string }
     try {
@@ -146,7 +146,7 @@ Deno.serve(
       .from('salon_members')
       .select('id')
       .eq('salon_id', body.salon_id)
-      .eq('user_id', userRes.user.id)
+      .eq('user_id', userRes.userId)
       .maybeSingle()
     if (!membership) return jsonResponse({ error: 'forbidden' }, 403)
 
