@@ -28,7 +28,7 @@ import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 import { useInventoryItems } from '@/hooks/useInventory'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useReviews } from '@/hooks/useReviews'
-import { useSalon } from '@/hooks/useSalons'
+import { useSalon, useSalonMembership } from '@/hooks/useSalons'
 import { useServiceCategories, useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { useVisits } from '@/hooks/useVisits'
@@ -55,6 +55,7 @@ import {
 } from './dashboard-aggregates'
 import { InsightsWidget } from './InsightsWidget'
 import { LowStockWidget } from './LowStockWidget'
+import { MasterDashboard } from './MasterDashboard'
 import {
   ClientsSection,
   ExpensesSection,
@@ -91,6 +92,12 @@ export function DashboardPage() {
   // собственника. Прячем AI-виджет для staff/external.
   const { role } = usePermissions(salonId)
   const showOwnerInsights = role !== 'staff' && role !== 'external'
+  // Мастер-дашборд: роль staff видит свой дашборд (зарплата + показатели +
+  // AI-советы) вместо owner-дашборда с финансами салона. Привязка к staff —
+  // через salon_members.staff_id.
+  const { data: membership } = useSalonMembership(salonId)
+  const myStaffId = membership?.staff_id ?? null
+  const isMaster = role === 'staff'
   // T114 — динамический период. Дефолт = текущий месяц, но юзер может
   // выбрать любой через плашку справа сверху (PeriodPickerPopover):
   // месяц / год / range / последние N дней.
@@ -285,6 +292,13 @@ export function DashboardPage() {
     lowStockCount,
     occupancyPct,
   })
+
+  // Мастер видит свой дашборд (зарплата/показатели/AI-советы), а не
+  // owner-финансы салона. Если мастер не привязан к staff-карточке —
+  // показываем общий дашборд как fallback.
+  if (isMaster && myStaffId) {
+    return <MasterDashboard salonId={salonId!} staffId={myStaffId} />
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-3 px-5 py-7 sm:px-8 lg:pb-12">
