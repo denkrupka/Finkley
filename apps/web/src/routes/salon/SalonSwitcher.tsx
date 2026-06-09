@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
+import { usePermissions } from '@/hooks/usePermissions'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 
@@ -24,9 +25,13 @@ type Props = {
 export function SalonSwitcher({ salonId, salonName }: Props) {
   const { t } = useTranslation()
   const { data: salons } = useMySalons()
+  const { role } = usePermissions(salonId)
   const navigate = useNavigate()
 
   const list = salons ?? []
+  // Bug (баг-трекер): мастер (staff) видел «Создать ещё салон». Это owner-
+  // действие — скрываем для staff/external.
+  const canCreateSalon = role !== 'staff' && role !== 'external'
   // Даже при одном салоне показываем dropdown — внутри пункт «+ Создать ещё».
   // Раньше тут был просто текст; теперь это всегда кнопка-меню.
 
@@ -71,15 +76,19 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
               </DropdownMenu.Item>
             )
           })}
-          <DropdownMenu.Separator className="bg-border my-1 h-px" />
-          <DropdownMenu.Item
-            className="text-secondary data-[highlighted]:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm font-semibold outline-none"
-            onSelect={() => navigate('/onboarding')}
-            data-testid="salon-switcher-add"
-          >
-            <Plus className="size-4" strokeWidth={2} />
-            {t('salon_switcher.add_new')}
-          </DropdownMenu.Item>
+          {canCreateSalon ? (
+            <>
+              <DropdownMenu.Separator className="bg-border my-1 h-px" />
+              <DropdownMenu.Item
+                className="text-secondary data-[highlighted]:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm font-semibold outline-none"
+                onSelect={() => navigate('/onboarding?new=1')}
+                data-testid="salon-switcher-add"
+              >
+                <Plus className="size-4" strokeWidth={2} />
+                {t('salon_switcher.add_new')}
+              </DropdownMenu.Item>
+            </>
+          ) : null}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
