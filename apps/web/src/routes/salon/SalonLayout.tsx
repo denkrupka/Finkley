@@ -28,6 +28,7 @@ import {
   Dialog as DialogUi,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
+import { useMyProfile } from '@/hooks/useMyProfile'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMessengerNotifications } from '@/hooks/useMessenger'
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
@@ -94,6 +95,7 @@ export function SalonLayout() {
     path.endsWith('/staff') ||
     path.includes('/settings')
   const { user } = useAuth()
+  const { data: myProfile } = useMyProfile()
   const { data: salons, isLoading } = useMySalons()
   const [drawerOpen, setDrawerOpen] = useState(false)
   // bug 94dd5f53 — collapse sidebar (только иконки). Состояние в
@@ -256,6 +258,7 @@ export function SalonLayout() {
           salonName={salon.name}
           todayLabel={todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}
           ownerInitials={ownerInitials}
+          avatarUrl={myProfile?.avatar_url ?? null}
           onMenuClick={() => setDrawerOpen(true)}
         />
 

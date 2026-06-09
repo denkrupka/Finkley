@@ -26,6 +26,7 @@ import { useRegisterBalances } from '@/hooks/useCashTransfers'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 import { useInventoryItems } from '@/hooks/useInventory'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useReviews } from '@/hooks/useReviews'
 import { useSalon } from '@/hooks/useSalons'
 import { useServiceCategories, useServices } from '@/hooks/useServices'
@@ -86,6 +87,10 @@ export function DashboardPage() {
   const { t } = useTranslation()
   const { salonId } = useParams<{ salonId: string }>()
   const [params] = useSearchParams()
+  // Bug (баг-трекер): мастер (staff) видел AI-помощника с рекомендациями для
+  // собственника. Прячем AI-виджет для staff/external.
+  const { role } = usePermissions(salonId)
+  const showOwnerInsights = role !== 'staff' && role !== 'external'
   // T114 — динамический период. Дефолт = текущий месяц, но юзер может
   // выбрать любой через плашку справа сверху (PeriodPickerPopover):
   // месяц / год / range / последние N дней.
@@ -312,11 +317,13 @@ export function DashboardPage() {
         </CollapsibleSection>
       ) : null}
 
-      <div data-tour="dashboard-insights">
-        <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>
-          <InsightsWidget salonId={salonId} fallback={localInsights} />
-        </CollapsibleSection>
-      </div>
+      {showOwnerInsights ? (
+        <div data-tour="dashboard-insights">
+          <CollapsibleSection id="insights" title={t('dashboard.collapsible.insights')} defaultOpen>
+            <InsightsWidget salonId={salonId} fallback={localInsights} />
+          </CollapsibleSection>
+        </div>
+      ) : null}
 
       {/* Блок 1 — 5 KPI */}
       <div data-tour="dashboard-kpi">

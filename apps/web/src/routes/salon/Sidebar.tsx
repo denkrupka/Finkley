@@ -42,11 +42,14 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
   const { data: unreadMessenger = 0 } = useUnreadMessengerCount(salonId)
   // T35 — фильтр nav-пунктов по permissions матрице. Главная и Настройки
   // всегда видны (минимально нужны юзеру даже с самыми ограниченными правами).
-  const { can } = usePermissions(salonId)
+  const { can, role } = usePermissions(salonId)
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === 'dashboard' || item.id === 'settings') return true
     return can(item.id, 'view')
   })
+  // Bug (баг-трекер): мастер (staff) видел блок «бонус за приглашённого друга».
+  // Реферал — owner-инструмент, прячем для staff/external.
+  const showReferral = role !== 'staff' && role !== 'external'
 
   return (
     <aside
@@ -176,7 +179,7 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
           жёлтой ленте Tester'а (TesterBanner) и была доступна только
           тестерам; теперь — всем юзерам по запросу владельца. */}
       <div className="border-border mt-3 flex flex-col gap-2 border-t pt-3">
-        {collapsed ? null : <ReferralButton variant="sidebar" />}
+        {collapsed || !showReferral ? null : <ReferralButton variant="sidebar" />}
         <button
           type="button"
           onClick={() => setBugOpen(true)}

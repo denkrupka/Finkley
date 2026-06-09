@@ -2,6 +2,7 @@ import { MoreHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
 
+import { usePermissions } from '@/hooks/usePermissions'
 import { cn } from '@/lib/utils/cn'
 import { BOTTOM_NAV_ITEMS } from './nav-config'
 
@@ -17,13 +18,19 @@ import { BOTTOM_NAV_ITEMS } from './nav-config'
  */
 export function BottomNav({ salonId }: { salonId: string }) {
   const { t } = useTranslation()
+  // Bug (баг-трекер): мобильный bottom-nav не фильтровался по правам — мастер
+  // видел «Расходы» и «AI», хотя в десктоп-сайдбаре они скрыты. Фильтруем так
+  // же, как Sidebar (dashboard всегда; остальное — can(id,'view')).
+  const { can } = usePermissions(salonId)
+  const items = BOTTOM_NAV_ITEMS.filter((i) => i.id === 'dashboard' || can(i.id, 'view'))
 
   return (
     <nav
-      className="border-border bg-card fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-5 border-t lg:hidden"
+      className="border-border bg-card fixed inset-x-0 bottom-0 z-30 grid h-16 border-t lg:hidden"
+      style={{ gridTemplateColumns: `repeat(${items.length + 1}, minmax(0, 1fr))` }}
       aria-label="bottom navigation"
     >
-      {BOTTOM_NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon
         return (
           <NavLink

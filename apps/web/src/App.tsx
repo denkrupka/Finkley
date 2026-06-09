@@ -287,8 +287,25 @@ function App() {
             <RequirePermission category="expenses">{lazyRoute(<ExpensesPage />)}</RequirePermission>
           }
         />
-        <Route path="staff" element={lazyRoute(<StaffPage />)} />
-        <Route path="services" element={lazyRoute(<ServicesPage />)} />
+        {/* Bug (баг-трекер): мастер (staff) мог открыть справочники Мастера/
+            Услуги и видеть кнопку «Добавить» / править справочные данные.
+            Гейтим через settings.catalogs — owner/admin проходят всегда. */}
+        <Route
+          path="staff"
+          element={
+            <RequirePermission category="settings" sub="catalogs">
+              {lazyRoute(<StaffPage />)}
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="services"
+          element={
+            <RequirePermission category="settings" sub="catalogs">
+              {lazyRoute(<ServicesPage />)}
+            </RequirePermission>
+          }
+        />
         <Route
           path="inventory"
           element={
