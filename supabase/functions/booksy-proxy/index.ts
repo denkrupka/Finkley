@@ -1733,8 +1733,15 @@ async function syncVisits(
       const customer = bookings[0]!.customer
       if (!customer?.id) continue
 
+      const clientExtId = String(customer.id)
+      // Bug (Telegram, Elena): у активных/будущих визитов customer.name из
+      // /calendar часто пустой. Если клиента ещё нет в кэше и имени в /calendar
+      // тоже нет — фетчим appointment detail, чтобы взять customer_profile.full_name.
+      // Иначе клиент создаётся как «Booksy client» и в календаре «Без записи».
+      const needNameFetch = !caches.clientByExtId.has(clientExtId) && !customer.name?.trim()
+
       let detail = apptDetailCache.get(apptUid)
-      if (detail === undefined && isClosedBooksy) {
+      if (detail === undefined && (isClosedBooksy || needNameFetch)) {
         const detailRes = await booksyGet<AppointmentDetail>(
           `/me/businesses/${businessId}/appointments/${apptUid}/`,
           accessToken,
@@ -1796,8 +1803,7 @@ async function syncVisits(
         }
       }
 
-      // Find/create client
-      const clientExtId = String(customer.id)
+      // Find/create client (clientExtId вычислен выше)
       let clientId = caches.clientByExtId.get(clientExtId) ?? null
       if (!clientId) {
         const profile = detail?.profile
@@ -1817,10 +1823,33 @@ async function syncVisits(
           })
           .select('id')
           .single()
-        if (insErr) console.warn(`client insert ${clientExtId}: ${insErr.message}`)
         if (newClient) {
           clientId = newClient.id
-          caches.clientByExtId.set(clientExtId, clientId)
+          caches.clientByExtId.set(clientExtId, clientId!)
+        } else {
+          // Bug (Telegram, Elena): insert мог упасть по unique-индексу
+          // ux_clients_external — клиент уже есть в БД, но не попал в кэш
+          // (например, создан прошлым прогоном/другим tier'ом). Раньше clientId
+          // оставался null → визит импортировался с client_id=null → в
+          // календаре «Без записи». Достаём существующего вместо null.
+          const { data: existing } = await admin
+            .from('clients')
+            .select('id, name')
+            .eq('salon_id', salonId)
+            .eq('external_source', 'booksy')
+            .eq('external_id', clientExtId)
+            .maybeSingle()
+          if (existing) {
+            clientId = existing.id
+            caches.clientByExtId.set(clientExtId, clientId!)
+            // Бэкфилл имени: у существующего стоит плейсхолдер, а сейчас есть
+            // настоящее имя — обновляем, чтобы в календаре было имя клиента.
+            if (existing.name === 'Booksy client' && name !== 'Booksy client') {
+              await admin.from('clients').update({ name }).eq('id', clientId)
+            }
+          } else if (insErr) {
+            console.warn(`client insert ${clientExtId}: ${insErr.message}`)
+          }
         }
       }
 
