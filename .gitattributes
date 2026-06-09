@@ -1,0 +1,16 @@
+# Нормализуем окончания строк к LF во всём репозитории.
+# Без этого на Windows-чекаутах prettier --check (pre-push хук format:check)
+# ложно падал на сотнях файлов из-за CRLF, блокируя push.
+* text=auto eol=lf
+
+# Бинарные файлы — git не трогает окончания строк.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary
