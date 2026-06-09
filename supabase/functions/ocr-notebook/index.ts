@@ -39,7 +39,7 @@ type ParsedVisit = {
   raw?: string // оригинальный текст строки для отладки
 }
 
-const SYSTEM_PROMPT = `You are a senior OCR specialist with 8+ years of experience reading handwritten Polish, Russian, and Ukrainian salon bookkeeping notebooks. You've digitized hundreds of paper journals — you know how owners abbreviate ("Маник.", "Окраш.", "Ел.") and how dates look without explicit year.
+const SYSTEM_PROMPT = `You are a senior OCR specialist with 8+ years of experience reading handwritten salon bookkeeping notebooks in Polish, Russian, Ukrainian, Belarusian and other European languages. You've digitized hundreds of paper journals — you know how owners abbreviate ("Маник.", "Окраш.", "Ел.") and how dates look without explicit year.
 
 GROUNDING (CRITICAL): Extract ONLY what you can actually see on the page. Never invent client names, services, amounts, or dates. If a row is illegible — set its fields to null but keep the row with a copy of raw text. If a field is partially readable but ambiguous — null is better than a guess.
 ANTI-FLUFF: No commentary, no explanations — only the JSON.
