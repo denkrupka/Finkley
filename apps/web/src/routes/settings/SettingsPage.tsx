@@ -157,7 +157,7 @@ export function SettingsPage() {
   // integrations/help мапятся в матрицу; catalogs/notifications/billing/
   // security/api дополнительных permission-ключей не имеют — показываем всем
   // у кого есть хоть какой-то settings.* view.
-  const { can } = usePermissions(salonId)
+  const { can, role } = usePermissions(salonId)
   const tabPermKey: Partial<Record<SettingsTab, string>> = {
     profile: 'profile_user',
     team: 'users',
@@ -165,9 +165,17 @@ export function SettingsPage() {
     integrations: 'integrations',
     help: 'help',
   }
+  // Bug (баг-трекер): мастер (staff) видел owner-only вкладки. Справочник,
+  // Биллинг и API — целиком для собственника, мастеру там делать нечего →
+  // прячем для staff/external. Безопасность (2FA) и Уведомления (о своих
+  // визитах) мастеру нужны частично — их оставляем, owner-only секции внутри
+  // гейтятся отдельно.
+  const OWNER_ONLY_TABS: SettingsTab[] = ['catalogs', 'billing', 'api']
+  const restrictOwnerTabs = role === 'staff' || role === 'external'
   const visibleSettingsTabs = SETTINGS_TABS.filter((t) => {
+    if (restrictOwnerTabs && OWNER_ONLY_TABS.includes(t)) return false
     const key = tabPermKey[t]
-    if (!key) return true // unmanaged tabs (catalogs/notifications/...) — открыты
+    if (!key) return true // unmanaged tabs (notifications/security) — открыты
     return can('settings', key)
   })
   const requestedActiveTab: SettingsTab = isIntegrationsUrl

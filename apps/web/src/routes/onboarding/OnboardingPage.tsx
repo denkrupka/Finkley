@@ -285,18 +285,24 @@ export function OnboardingPage() {
         const cols =
           'id, onboarding_state, onboarding_step_id, onboarding_completed_at, opening_hours, address, city, lat, lng, google_place_id, google_place_url, financial_settings, accounting_settings'
         const querySalonId = searchParams.get('salon')
+        // Bug (баг-трекер): «Создать ещё салон» вело на голый /onboarding,
+        // и гидрация подхватывала ПОСЛЕДНИЙ незавершённый салон юзера →
+        // экран выглядел пустым/чужим. В режиме ?new=1 пропускаем авто-подхват
+        // и стартуем чистый онбординг (Step Welcome).
+        const isNew = searchParams.get('new') === '1'
         const querySalon = querySalonId
           ? await supabase.from('salons').select(cols).eq('id', querySalonId).maybeSingle()
           : null
-        const myUnfinishedRes = querySalon?.data
-          ? null
-          : await supabase
-              .from('salons')
-              .select(cols)
-              .is('onboarding_completed_at', null)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
+        const myUnfinishedRes =
+          querySalon?.data || isNew
+            ? null
+            : await supabase
+                .from('salons')
+                .select(cols)
+                .is('onboarding_completed_at', null)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
         const row = (querySalon?.data ?? myUnfinishedRes?.data) as HydrateRow | null
         const hyd = computeHydrate(row)
         if (cancelled || !hyd) return

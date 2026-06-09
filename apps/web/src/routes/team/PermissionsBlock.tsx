@@ -261,7 +261,7 @@ export function PermissionsBlock({
         </span>
       </div>
       <div>
-        <div className="border-border bg-muted/10 grid grid-cols-[1fr_80px_80px] gap-2 border-b px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider">
+        <div className="border-border bg-muted/10 grid grid-cols-[minmax(0,1fr)_72px_72px] gap-2 border-b px-3 py-1.5 text-[10px] font-bold uppercase leading-tight">
           <span className="text-muted-foreground">
             {t('team.perm_col_section', { defaultValue: 'Раздел' })}
           </span>
@@ -293,7 +293,7 @@ export function PermissionsBlock({
             return (
               <div key={cat.key}>
                 <div
-                  className={`grid grid-cols-[1fr_80px_80px] items-center gap-2 px-3 py-2 ${
+                  className={`grid grid-cols-[minmax(0,1fr)_72px_72px] items-center gap-2 px-3 py-2 ${
                     hasItems ? 'cursor-pointer' : ''
                   }`}
                   onClick={() => {
@@ -353,7 +353,7 @@ export function PermissionsBlock({
                       return (
                         <div
                           key={it.key}
-                          className="grid grid-cols-[1fr_80px_80px] items-center gap-2 px-3 py-1.5"
+                          className="grid grid-cols-[minmax(0,1fr)_72px_72px] items-center gap-2 px-3 py-1.5"
                         >
                           <span className="text-muted-foreground pl-5 text-xs">
                             {t(it.label, { defaultValue: CATEGORY_DEFAULTS[it.label] ?? it.label })}

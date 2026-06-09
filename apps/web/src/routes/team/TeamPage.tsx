@@ -364,14 +364,14 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
             </DialogHeader>
           </div>
           <form
-            className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"
+            className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:overflow-hidden"
             onSubmit={(e) => {
               e.preventDefault()
               submitInvite()
             }}
           >
             {/* Левая колонка: Email + Роль + Карточка мастера */}
-            <div className="md:border-border flex flex-col gap-4 overflow-y-auto px-5 py-4 md:border-r">
+            <div className="lg:border-border flex min-w-0 flex-col gap-4 px-5 py-4 lg:overflow-y-auto lg:border-r">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
                 <Input
@@ -448,7 +448,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
             </div>
 
             {/* Правая колонка: Доступы (дерево разрешений) */}
-            <div className="bg-muted/10 flex flex-col overflow-y-auto px-5 py-4">
+            <div className="bg-muted/10 flex min-w-0 flex-col px-5 py-4 lg:overflow-y-auto">
               <PermissionsBlock
                 role={highestRole()}
                 value={permissions ?? undefined}

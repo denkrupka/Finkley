@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermissions } from '@/hooks/usePermissions'
 import { NotificationsBell } from './NotificationsBell'
 import { SalonSwitcher } from './SalonSwitcher'
 
@@ -16,13 +17,27 @@ type Props = {
   todayLabel: string
   /** Инициалы пользователя — для аватара в правом верхнем углу. */
   ownerInitials: string
+  /** URL аватара пользователя (profiles.avatar_url). Если задан — показываем
+   *  картинку вместо инициалов. */
+  avatarUrl?: string | null
   /** Дёргается на mobile при клике на бургер — родитель открывает drawer-sidebar */
   onMenuClick?: () => void
 }
 
-export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuClick }: Props) {
+export function TopBar({
+  salonId,
+  salonName,
+  todayLabel,
+  ownerInitials,
+  avatarUrl,
+  onMenuClick,
+}: Props) {
   const { t } = useTranslation()
   const { signOut } = useAuth()
+  // Bug (баг-трекер): мастер (staff) видел бейдж тарифа/подписки (owner-инфо).
+  // Скрываем для staff/external.
+  const { role } = usePermissions(salonId)
+  const showPlanBadge = role !== 'staff' && role !== 'external'
   return (
     <header className="border-border bg-card flex h-16 flex-shrink-0 items-center gap-3 border-b px-3 sm:gap-6 sm:px-7">
       {/* Mobile burger */}
@@ -63,27 +78,35 @@ export function TopBar({ salonId, salonName, todayLabel, ownerInitials, onMenuCl
         </div>
 
         {/* Plan badge — clickable → /billing. Скрыто на самых узких экранах,
-            чтобы не теснить топбар. Аватар видим всегда. */}
-        <Link
-          to={`/${salonId}/settings?tab=billing`}
-          className="border-brand-yellow-deep/40 hidden h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 transition-shadow hover:shadow-sm sm:inline-flex"
-          aria-label={t('plan.badge_aria')}
-          title={t('plan.pro_label')}
-        >
-          <span className="from-brand-gold grid size-5 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[10px] font-extrabold leading-none text-white">
-            ★
-          </span>
-          <span className="text-brand-navy-ink text-[11px] font-bold">{t('plan.pro_label')}</span>
-        </Link>
+            чтобы не теснить топбар. Аватар видим всегда. Для staff/external
+            скрыт полностью (owner-инфо). */}
+        {showPlanBadge ? (
+          <Link
+            to={`/${salonId}/settings?tab=billing`}
+            className="border-brand-yellow-deep/40 hidden h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 transition-shadow hover:shadow-sm sm:inline-flex"
+            aria-label={t('plan.badge_aria')}
+            title={t('plan.pro_label')}
+          >
+            <span className="from-brand-gold grid size-5 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[10px] font-extrabold leading-none text-white">
+              ★
+            </span>
+            <span className="text-brand-navy-ink text-[11px] font-bold">{t('plan.pro_label')}</span>
+          </Link>
+        ) : null}
 
-        {/* Avatar — clickable → /settings (профиль). */}
+        {/* Avatar — clickable → /settings (профиль). Если загружен аватар
+            (profiles.avatar_url) — показываем картинку, иначе инициалы. */}
         <Link
           to={`/${salonId}/settings`}
-          className="text-brand-navy-ink grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#E8C4B8] to-[#D4A599] text-xs font-bold transition-shadow hover:shadow-sm"
+          className="text-brand-navy-ink grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#E8C4B8] to-[#D4A599] text-xs font-bold transition-shadow hover:shadow-sm"
           aria-label={t('common.profile_aria')}
           title={ownerInitials}
         >
-          {ownerInitials}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={ownerInitials} className="size-full object-cover" />
+          ) : (
+            ownerInitials
+          )}
         </Link>
 
         {/* Sign-out — позже переедет в dropdown профиля (TASK-18) */}

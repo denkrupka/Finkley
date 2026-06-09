@@ -95,8 +95,11 @@ const STEPS: Step[] = [
     icon: Calendar,
     titleKey: 'tour.steps.calendar.title',
     bodyKey: 'tour.steps.calendar.body',
-    target: '[data-tour-nav="reports"]',
-    navigatePath: '/reports',
+    // Bug (баг-трекер): шаг вёл на /reports — для роли staff раздел запрещён
+    // (RequirePermission → toast «Нет доступа» + чёрный фон оверлея на редиректе).
+    // Календарь визитов живёт во вкладке «Визиты» (доступна и мастеру), туда и ведём.
+    target: '[data-tour-nav="income"]',
+    navigatePath: '/income?tab=visits',
   },
   {
     id: 'notifications',
@@ -147,12 +150,17 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { data: membership } = useSalonMembership(salonId)
-  const role = (membership?.role ?? 'owner') as 'owner' | 'admin' | 'staff' | 'accountant'
+  // Bug (баг-трекер): раньше тут было `?? 'owner'` — пока membership грузился,
+  // мастеру показывались owner-шаги и тур уводил его в owner-разделы → «Нет
+  // доступа». Теперь ждём загрузку роли (roleReady) и до неё показываем только
+  // общие шаги (без roles).
+  const role = membership?.role as 'owner' | 'admin' | 'staff' | 'accountant' | undefined
+  const roleReady = membership !== undefined
   const [open, setOpen] = useState(false)
   const [stepIndex, setStepIndexState] = useState(0)
 
   // Фильтруем шаги по роли текущего юзера.
-  const steps = STEPS.filter((s) => !s.roles || s.roles.includes(role))
+  const steps = STEPS.filter((s) => !s.roles || (role ? s.roles.includes(role) : false))
 
   // T147 — wrapper для setStepIndex который persist'ит index в localStorage.
   function setStepIndex(value: number | ((prev: number) => number)) {
@@ -216,15 +224,15 @@ export function OnboardingTour({ salonId, force = false }: { salonId: string; fo
   // туда. useTargetRect перемеряет каждые 800ms и сам поймает элемент
   // после нового рендера страницы.
   useEffect(() => {
-    if (!open || !step.navigatePath) return
+    if (!open || !roleReady || !step.navigatePath) return
     const full = `/${salonId}${step.navigatePath}`
     const current = window.location.pathname + window.location.search
     const fullPath = full.split('?')[0]!
     if (current.startsWith(fullPath)) return
     navigate(full)
-  }, [open, stepIndex, step.navigatePath, salonId, navigate])
+  }, [open, roleReady, stepIndex, step.navigatePath, salonId, navigate])
 
-  if (!open) return null
+  if (!open || !roleReady) return null
 
   function next() {
     // Финиш тура → редирект на дашборд (там запустится локальный PageTour).
