@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   Banknote,
-  Bell,
   CalendarClock,
   CreditCard,
   Landmark,
@@ -132,13 +131,9 @@ export const DASHBOARD_TOUR_STEPS: TourStep[] = [
     bodyKey: 'tour.page.dashboard.fab.body',
     target: '[data-tour="fab-add"]',
   },
-  {
-    id: 'notifications',
-    icon: Bell,
-    titleKey: 'tour.page.dashboard.notifications.title',
-    bodyKey: 'tour.page.dashboard.notifications.body',
-    target: '[data-tour="bell"]',
-  },
+  // Bug (баг-трекер): шаг «Уведомления» дублировался — он уже есть в главном
+  // OnboardingTour (STEPS → notifications). Убрали из дашбордного PageTour,
+  // чтобы про колокольчик не рассказывали дважды разными текстами.
 ]
 
 export const INVENTORY_TOUR_STEPS: TourStep[] = [
