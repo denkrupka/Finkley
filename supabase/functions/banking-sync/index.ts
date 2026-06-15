@@ -248,6 +248,7 @@ async function syncConnection(
   let txNew = 0
   let expensesCreated = 0
   let pendingCount = 0
+  const accountErrors: string[] = []
 
   // Range: при первом синке тащим conn.history_days назад. При следующих —
   // от last_synced_at − 7 дней (overlap для свежесозданных booked транзакций).
@@ -293,10 +294,17 @@ async function syncConnection(
         `[banking-sync] listTransactions account=${acc.external_id} from=${effectiveFrom} to=${rangeTo} got=${txs.length}`,
       )
     } catch (e) {
-      console.error('listTransactions failed', acc.external_id, e)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('listTransactions failed', acc.external_id, msg)
+      accountErrors.push(msg)
+      // Похоже на истёкший доступ/SCA (часто после ~90 дней consent'а у PL
+      // банков): помечаем expired, чтобы UI предложил переподключить, а не
+      // делал вид что всё ок. 422 у некоторых банков = тоже протухший доступ.
+      const looksAuth =
+        /401|403|419|422|expired|invalid|unauthor|consent|session|forbidden|token/i.test(msg)
       await admin
         .from('bank_connections')
-        .update({ last_error: e instanceof Error ? e.message : String(e) })
+        .update({ last_error: msg, ...(looksAuth ? { status: 'expired' } : {}) })
         .eq('id', connectionId)
       continue
     }
@@ -319,6 +327,22 @@ async function syncConnection(
   // 2) action='auto_create' → создаём expense (source='bank_ai') если нет
   //    дубля по сумме (±1 PLN) и дате (±3 дня).
   await applyBankTxRules(admin, conn.salon_id as string)
+
+  // Если хотя бы один аккаунт не отдал транзакции — НЕ рапортуем успех и НЕ
+  // двигаем last_synced_at (иначе пропущенное окно не подтянется в следующий
+  // раз). Пишем реальную причину в last_error — её увидит UI.
+  const hadErrors = accountErrors.length > 0
+  if (hadErrors) {
+    return {
+      ok: false,
+      error: accountErrors[0],
+      accounts_synced: accounts?.length ?? 0,
+      tx_total: txTotal,
+      tx_new: txNew,
+      pending: pendingCount,
+      expenses_created: expensesCreated,
+    }
+  }
 
   await admin
     .from('bank_connections')

@@ -328,12 +328,45 @@ export function BankingTransactionsTable({
       return
     }
     let done = 0
+    let totalNew = 0
+    const errors: string[] = []
     for (const c of active) {
       sync.mutate(c.id, {
-        onSuccess: () => {
+        onSuccess: (res) => {
           done += 1
+          if (res.ok) totalNew += res.tx_new ?? 0
+          else errors.push(res.error ?? 'error')
           if (done === active.length) {
-            toast.success(t('banking.transactions.sync_done'))
+            // Раньше тут всегда показывали «завершено», игнорируя результат —
+            // из-за этого протухший consent выглядел как успешный синк. Теперь
+            // показываем реальный статус: ошибка/переподключение или +N новых.
+            const needReconnect = errors.some((e) =>
+              /expired|consent|eb_transactions_failed|401|403|unauthor|session|token|forbidden/i.test(
+                e,
+              ),
+            )
+            if (needReconnect) {
+              toast.error(
+                t('banking.transactions.sync_reconnect', {
+                  defaultValue:
+                    'Банк требует переподключения — свежие транзакции не загрузились. Переподключите счёт в Интеграции → Банк.',
+                }),
+              )
+            } else if (errors.length > 0) {
+              toast.error(
+                t('banking.transactions.sync_failed', {
+                  defaultValue: 'Синхронизация с ошибкой: {{err}}',
+                  err: errors[0],
+                }),
+              )
+            } else {
+              toast.success(
+                t('banking.transactions.sync_done_count', {
+                  defaultValue: 'Синхронизация завершена: +{{n}} новых',
+                  n: totalNew,
+                }),
+              )
+            }
             // T20 — извлекаем контрагентов из новых транзакций автоматически
             // после успешной синхронизации. Без UI-кнопки: запускается тихо в
             // фоне; ошибки логируются, но юзеру не мешают.

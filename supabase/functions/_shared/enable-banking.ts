@@ -309,6 +309,7 @@ export async function listTransactions(
   // на 'default' (только booked). Большинство банков поддерживают 'all',
   // а кто не — даёт хотя бы booked tx.
   const strategies: Array<'all' | 'default' | undefined> = ['all', 'default', undefined]
+  let lastErr = 'unknown'
   for (const strategy of strategies) {
     const all: EbTransaction[] = []
     let continuation: string | null = null
@@ -329,6 +330,7 @@ export async function listTransactions(
         continuation = data.continuation_key
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
+        lastErr = msg
         // 422 WRONG_REQUEST_PARAMETERS на первой странице → пробуем
         // следующий strategy. На N+1 странице — реальная ошибка, прерываем.
         if (page === 0 && /422|WRONG_REQUEST_PARAMETERS/i.test(msg)) {
@@ -341,9 +343,11 @@ export async function listTransactions(
     if (firstPageFailed) continue
     return all
   }
-  // Все стратегии упали — возвращаем пусто, banking-sync залогит last_error
-  // через outer try в banking-sync/index.ts.
-  return []
+  // Все стратегии упали (часто = протухший consent/SCA или quirk банка).
+  // РАНЬШЕ возвращали [] — из-за этого banking-sync рапортовал ложный успех
+  // и данные «застывали». Теперь бросаем с телом ошибки EB, чтобы причина
+  // попала в last_error и UI мог показать «переподключите банк».
+  throw new Error(`eb_transactions_failed: ${lastErr}`)
 }
 
 /**
