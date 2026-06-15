@@ -1,10 +1,10 @@
-import { Loader2, Save, Upload, User as UserIcon, X } from 'lucide-react'
+import { Loader2, Save, ShieldCheck, Upload, User as UserIcon, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ImageCropper } from '@/components/ui/ImageCropper'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,18 +17,21 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
 import {
+  useUpdateMemberPermissions,
   useUpdateMemberProfile,
   useUpdateMemberRole,
   type SalonRole,
   type TeamMember,
 } from '@/hooks/useTeam'
 import { supabase } from '@/lib/supabase/client'
+import { PermissionsBlock, type PermissionsMap } from '@/routes/team/PermissionsBlock'
 
 const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
   { value: 'owner', key: 'team.role.owner' },
   { value: 'admin', key: 'team.role.admin' },
   { value: 'accountant', key: 'team.role.accountant' },
   { value: 'staff', key: 'team.role.staff' },
+  { value: 'external', key: 'team.role.external' },
 ]
 
 /**
@@ -38,6 +41,11 @@ const ROLE_OPTIONS: { value: SalonRole; key: string }[] = [
  * промежуточный read-only экран с кнопкой «Изменить»). Поля: аватар, имя,
  * фамилия, телефон, роль. Email — read-only (смена требует auth-flow,
  * доступна только super-admin порталу).
+ *
+ * Owner-feedback 15.06: карточка стала широкой 2-колоночной — слева профиль
+ * (как раньше), справа матрица доступов (PermissionsBlock) с возможностью
+ * редактировать, точно как в модалке приглашения. Для owner права не
+ * редактируются (полный доступ + RLS блокирует UPDATE owner-строки).
  *
  * Если у текущего юзера нет прав на управление (canEdit=false) — поля
  * показываются disabled, кнопка «Сохранить» скрыта.
@@ -57,6 +65,7 @@ export function MemberCardModal({
   const { user } = useAuth()
   const update = useUpdateMemberProfile(salonId)
   const updateRole = useUpdateMemberRole(salonId)
+  const updatePerms = useUpdateMemberPermissions(salonId)
 
   const [firstName, ...rest] = (member.full_name ?? '').trim().split(/\s+/).filter(Boolean)
   const lastName = rest.join(' ')
@@ -67,6 +76,11 @@ export function MemberCardModal({
     role: member.role,
     avatar_url: member.avatar_url,
   })
+  // T30 — матрица прав участника. null = использовать дефолт по роли (preset).
+  // При смене роли PermissionsBlock сам пересчитает preset через onChange.
+  const [permissions, setPermissions] = useState<PermissionsMap | null>(
+    member.permissions ? { ...member.permissions } : null,
+  )
 
   const [uploading, setUploading] = useState(false)
   const [cropFile, setCropFile] = useState<File | null>(null)
@@ -117,45 +131,45 @@ export function MemberCardModal({
     }
   }
 
-  function save() {
-    update.mutate(
-      {
+  const isOwner = draft.role === 'owner'
+
+  async function save() {
+    try {
+      await update.mutateAsync({
         target_user_id: member.user_id,
         first_name: draft.first_name.trim(),
         last_name: draft.last_name.trim(),
         phone: draft.phone.trim(),
         avatar_url: draft.avatar_url,
-      },
-      {
-        onSuccess: () => {
-          // Если роль изменилась — дёргаем updateRole отдельно (другой RPC).
-          if (draft.role !== member.role) {
-            updateRole.mutate(
-              { memberId: member.id, role: draft.role },
-              {
-                onSuccess: () => {
-                  toast.success(t('team.member_card.toast_saved'))
-                  onClose()
-                },
-                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-              },
-            )
-          } else {
-            toast.success(t('team.member_card.toast_saved'))
-            onClose()
-          }
-        },
-        onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
-      },
-    )
+      })
+      // Если роль изменилась — отдельный RPC (другой write).
+      if (draft.role !== member.role) {
+        await updateRole.mutateAsync({ memberId: member.id, role: draft.role })
+      }
+      // Права сохраняем только для не-owner: у owner полный доступ, а RLS
+      // блокирует UPDATE owner-строки (with check role <> 'owner').
+      if (!isOwner) {
+        const permsToSend = permissions
+          ? (Object.fromEntries(
+              Object.entries(permissions).filter(([, v]) => v === 'view' || v === 'edit'),
+            ) as Record<string, 'view' | 'edit'>)
+          : null
+        await updatePerms.mutateAsync({ memberId: member.id, permissions: permsToSend })
+      }
+      toast.success(t('team.member_card.toast_saved'))
+      onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
   }
 
-  const saving = update.isPending || updateRole.isPending
+  const saving = update.isPending || updateRole.isPending || updatePerms.isPending
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="flex max-h-[92vh] w-[min(980px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!w-[min(980px,calc(100vw-2rem))] sm:!max-w-[980px]">
+        {/* Header */}
+        <div className="border-border border-b px-5 py-4 pr-14">
           <DialogTitle className="flex items-center gap-2">
             {draft.avatar_url ? (
               <img
@@ -177,124 +191,157 @@ export function MemberCardModal({
               {t(`roles.${member.role}`, { defaultValue: member.role })}
             </span>
           </DialogTitle>
-        </DialogHeader>
+        </div>
 
-        <div className="space-y-4 overflow-y-auto px-5 py-4">
-          {/* Аватар */}
-          <div className="flex items-center gap-4">
-            {draft.avatar_url ? (
-              <img
-                src={draft.avatar_url}
-                alt={displayName}
-                className="border-border bg-muted size-16 rounded-full border object-cover"
-              />
-            ) : (
-              <div className="bg-muted text-foreground grid size-16 place-items-center rounded-full text-lg font-bold">
-                {initials || <UserIcon className="size-6" strokeWidth={1.8} />}
-              </div>
-            )}
-            {canEdit ? (
-              <div className="flex flex-col gap-1">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) pickAvatarFile(f)
-                    e.target.value = ''
-                  }}
+        {/* Body: 2 колонки — слева профиль, справа доступы */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:overflow-hidden">
+          {/* Левая колонка: профиль */}
+          <div className="lg:border-border flex min-w-0 flex-col gap-4 px-5 py-4 lg:overflow-y-auto lg:border-r">
+            {/* Аватар */}
+            <div className="flex items-center gap-4">
+              {draft.avatar_url ? (
+                <img
+                  src={draft.avatar_url}
+                  alt={displayName}
+                  className="border-border bg-muted size-16 rounded-full border object-cover"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-                  ) : (
-                    <Upload className="size-3.5" strokeWidth={2} />
-                  )}
-                  {t('team.member_card.upload_avatar', { defaultValue: 'Загрузить фото' })}
-                </Button>
-                <p className="text-muted-foreground text-[11px]">
-                  {t('team.member_card.avatar_hint', { defaultValue: 'PNG / JPG / WEBP, до 5 МБ' })}
+              ) : (
+                <div className="bg-muted text-foreground grid size-16 place-items-center rounded-full text-lg font-bold">
+                  {initials || <UserIcon className="size-6" strokeWidth={1.8} />}
+                </div>
+              )}
+              {canEdit ? (
+                <div className="flex flex-col gap-1">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) pickAvatarFile(f)
+                      e.target.value = ''
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                    ) : (
+                      <Upload className="size-3.5" strokeWidth={2} />
+                    )}
+                    {t('team.member_card.upload_avatar', { defaultValue: 'Загрузить фото' })}
+                  </Button>
+                  <p className="text-muted-foreground text-[11px]">
+                    {t('team.member_card.avatar_hint', {
+                      defaultValue: 'PNG / JPG / WEBP, до 5 МБ',
+                    })}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs">{t('team.member_card.first_name')}</Label>
+                <Input
+                  value={draft.first_name}
+                  onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))}
+                  disabled={!canEdit}
+                  className="mt-1 h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">{t('team.member_card.last_name')}</Label>
+                <Input
+                  value={draft.last_name}
+                  onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))}
+                  disabled={!canEdit}
+                  className="mt-1 h-9"
+                />
+              </div>
+              {/* Email — read-only (менять только super-admin через /admin/users) */}
+              <div className="sm:col-span-2">
+                <Label className="text-xs">{t('team.member_card.email')}</Label>
+                <Input
+                  value={member.email ?? member.invited_email ?? ''}
+                  readOnly
+                  className="text-muted-foreground mt-1 h-9 bg-slate-50"
+                />
+                <p className="text-muted-foreground mt-1 text-[10px]">
+                  {t('team.member_card.email_readonly')}
                 </p>
               </div>
-            ) : null}
+              <div className="sm:col-span-2">
+                <Label className="text-xs">{t('team.member_card.phone')}</Label>
+                <Input
+                  value={draft.phone}
+                  onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                  disabled={!canEdit}
+                  placeholder="+48 ..."
+                  className="mt-1 h-9"
+                />
+              </div>
+              {/* Роль. Owner может изменить себя если в салоне есть второй
+                  участник — RPC сама проверит инвариант «минимум 1 owner». */}
+              <div className="sm:col-span-2">
+                <Label className="text-xs">{t('team.role.label')}</Label>
+                <Select
+                  value={draft.role}
+                  onValueChange={(v) => setDraft((d) => ({ ...d, role: v as SalonRole }))}
+                  disabled={!canEdit}
+                >
+                  <SelectTrigger className="mt-1 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {t(r.key)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground mt-1 text-[10px]">
+                  {t(`team.role_hint.${draft.role}`)}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">{t('team.member_card.first_name')}</Label>
-              <Input
-                value={draft.first_name}
-                onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))}
-                disabled={!canEdit}
-                className="mt-1 h-9"
+          {/* Правая колонка: доступы */}
+          <div className="bg-muted/10 flex min-w-0 flex-col px-5 py-4 lg:overflow-y-auto">
+            {isOwner ? (
+              <div className="border-border bg-card flex flex-1 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-5 py-10 text-center">
+                <ShieldCheck className="text-brand-navy size-7" strokeWidth={1.7} />
+                <p className="text-foreground text-sm font-semibold">
+                  {t('team.member_card.owner_full_access_title', {
+                    defaultValue: 'Полный доступ ко всему',
+                  })}
+                </p>
+                <p className="text-muted-foreground max-w-xs text-xs">
+                  {t('team.member_card.owner_full_access_hint', {
+                    defaultValue:
+                      'Владелец видит и редактирует все разделы. Доступы настраиваются только для остальных ролей.',
+                  })}
+                </p>
+              </div>
+            ) : (
+              <PermissionsBlock
+                role={draft.role}
+                value={permissions ?? undefined}
+                onChange={canEdit ? setPermissions : undefined}
               />
-            </div>
-            <div>
-              <Label className="text-xs">{t('team.member_card.last_name')}</Label>
-              <Input
-                value={draft.last_name}
-                onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))}
-                disabled={!canEdit}
-                className="mt-1 h-9"
-              />
-            </div>
-            {/* Email — read-only (менять только super-admin через /admin/users) */}
-            <div className="sm:col-span-2">
-              <Label className="text-xs">{t('team.member_card.email')}</Label>
-              <Input
-                value={member.email ?? member.invited_email ?? ''}
-                readOnly
-                className="text-muted-foreground mt-1 h-9 bg-slate-50"
-              />
-              <p className="text-muted-foreground mt-1 text-[10px]">
-                {t('team.member_card.email_readonly')}
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <Label className="text-xs">{t('team.member_card.phone')}</Label>
-              <Input
-                value={draft.phone}
-                onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
-                disabled={!canEdit}
-                placeholder="+48 ..."
-                className="mt-1 h-9"
-              />
-            </div>
-            {/* Роль. Owner может изменить себя если в салоне есть второй
-                участник — RPC сама проверит инвариант «минимум 1 owner». */}
-            <div className="sm:col-span-2">
-              <Label className="text-xs">{t('team.role.label')}</Label>
-              <Select
-                value={draft.role}
-                onValueChange={(v) => setDraft((d) => ({ ...d, role: v as SalonRole }))}
-                disabled={!canEdit}
-              >
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {t(r.key)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground mt-1 text-[10px]">
-                {t(`team.role_hint.${draft.role}`)}
-              </p>
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="border-border flex justify-end gap-2 border-t px-5 py-3">
+        {/* Footer */}
+        <div className="border-border flex shrink-0 justify-end gap-2 border-t bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
             <X className="size-3.5" strokeWidth={2} />
             {t('common.cancel')}

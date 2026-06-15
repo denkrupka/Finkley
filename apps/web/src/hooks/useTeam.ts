@@ -15,6 +15,8 @@ export type TeamMember = {
   full_name: string | null
   phone: string | null
   avatar_url: string | null
+  /** T30 — матрица прав { "<cat>.<sub>": "view"|"edit" }. NULL = дефолт по роли. */
+  permissions: Record<string, 'view' | 'edit'> | null
 }
 
 export type Invitation = {
@@ -37,7 +39,7 @@ export function useTeamMembers(salonId: string | undefined) {
       // ставится при invite в форме команды и используется как fallback).
       const { data: members, error } = await supabase
         .from('salon_members')
-        .select('id, user_id, role, staff_id, joined_at, invited_email')
+        .select('id, user_id, role, staff_id, joined_at, invited_email, permissions')
         .eq('salon_id', salonId)
       if (error) throw error
       const memberRows = (members ?? []) as Array<{
@@ -47,6 +49,7 @@ export function useTeamMembers(salonId: string | undefined) {
         staff_id: string | null
         joined_at: string | null
         invited_email: string | null
+        permissions: Record<string, 'view' | 'edit'> | null
       }>
       if (memberRows.length === 0) return [] as TeamMember[]
 
@@ -172,6 +175,28 @@ export function useUpdateMemberRole(salonId: string | undefined) {
       const { error } = await supabase
         .from('salon_members')
         .update({ role: input.role })
+        .eq('id', input.memberId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['team-members', salonId] }),
+  })
+}
+
+/**
+ * T30 — обновление матрицы прав существующего участника.
+ * Прямой UPDATE по salon_members.permissions (RLS «admins update member role»
+ * пропускает любого admin/owner при role <> 'owner'). NULL = вернуть дефолт по роли.
+ */
+export function useUpdateMemberPermissions(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      memberId: string
+      permissions: Record<string, 'view' | 'edit'> | null
+    }) => {
+      const { error } = await supabase
+        .from('salon_members')
+        .update({ permissions: input.permissions })
         .eq('id', input.memberId)
       if (error) throw error
     },

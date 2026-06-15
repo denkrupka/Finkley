@@ -356,7 +356,7 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
 
       {/* Invite dialog — 2 колонки: левая Email/Роль/Мастер, правая Доступы */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="flex max-h-[92vh] w-[min(1200px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!max-w-[1200px]">
+        <DialogContent className="flex max-h-[92vh] w-[min(1200px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0 sm:!w-[min(1200px,calc(100vw-2rem))] sm:!max-w-[1200px]">
           <div className="border-border border-b px-5 py-4">
             <DialogHeader>
               <DialogTitle>{t('team.invite_title')}</DialogTitle>

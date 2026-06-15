@@ -2180,6 +2180,8 @@
       "upload_avatar": "Загрузить фото",
       "avatar_hint": "PNG / JPG / WEBP, до 5 МБ",
       "avatar_too_large": "Макс. 5 МБ",
+      "owner_full_access_title": "Полный доступ ко всему",
+      "owner_full_access_hint": "Владелец видит и редактирует все разделы. Доступы настраиваются только для остальных ролей.",
       "close": "Закрыть",
       "cancel": "Отменить",
       "save": "Сохранить",
