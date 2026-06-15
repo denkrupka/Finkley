@@ -922,14 +922,14 @@ export function SettingsPage() {
                   {t('settings.api.docs_subtitle')}
                 </p>
               </div>
-              <a
-                href="/docs/api"
+              <Link
+                to="/docs/api"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="border-border bg-card hover:bg-muted/40 inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold"
               >
                 {t('settings.api.docs_link')}
-              </a>
+              </Link>
             </div>
           </section>
 
@@ -945,8 +945,8 @@ export function SettingsPage() {
               <li>{t('settings.api.howto_step4')}</li>
             </ol>
             <pre className="bg-muted/40 mt-4 overflow-x-auto rounded-md p-3 text-xs">
-              {`curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  https://api.finkley.app/v1/visits?period=month`}
+              {`curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  ${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api/v1/visits?from=2026-06-01&to=2026-06-30`}
             </pre>
           </section>
         </>

@@ -2202,8 +2202,8 @@
       "docs_link": "Otwórz docs",
       "howto_title": "Jak zacząć",
       "howto_step1": "Utwórz klucz w bloku wyżej — pokaże się raz. Skopiuj i zapisz w menedżerze haseł.",
-      "howto_step2": "Przekaż klucz w nagłówku Authorization: Bearer YOUR_API_KEY.",
-      "howto_step3": "Wszystkie endpointy żyją pod bazowym URL https://api.finkley.app/v1.",
+      "howto_step2": "Przekaż klucz w nagłówku Authorization: Bearer fnk_live_…",
+      "howto_step3": "Bazowy URL to <twój-projekt>.supabase.co/functions/v1/public-api, wersja ścieżek /v1. Pełny opis endpointów — na stronie dokumentacji (przycisk wyżej).",
       "howto_step4": "Jeśli uprawnienia (scope) niewystarczające — dostaniesz 403. Utwórz nowy klucz z uprawnieniem write."
     },
     "referral": {
