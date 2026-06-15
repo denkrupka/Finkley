@@ -522,6 +522,7 @@ async function fetchCustomerBookings(
 type SyncStats = {
   staff_synced?: number
   staff_filtered_out?: number
+  staff_services_synced?: number
   services_synced?: number
   service_categories_synced?: number
   visits_synced?: number
@@ -936,6 +937,51 @@ async function syncCatalog(
       await admin.from('staff').insert(insert)
       stats.staff_synced = (stats.staff_synced ?? 0) + 1
     }
+  }
+
+  // ── Staff ↔ services: resource.services[] → staff_services ──────────────
+  // Booksy у каждого ресурса (мастера) хранит список service-id, которые он
+  // выполняет. Маппим Booksy-id → наши id (по external_id) и добавляем связи.
+  // Additive: ручные связи не удаляем (anti-overwrite, как и прочий catalog).
+  try {
+    const { data: staffRows } = await admin
+      .from('staff')
+      .select('id, external_id')
+      .eq('salon_id', salonId)
+      .eq('external_source', 'booksy')
+      .not('external_id', 'is', null)
+    const staffByExt = new Map(
+      (staffRows ?? []).map((s) => [String(s.external_id), s.id as string]),
+    )
+
+    const { data: svcRows } = await admin
+      .from('services')
+      .select('id, external_id')
+      .eq('salon_id', salonId)
+      .eq('external_source', 'booksy')
+      .not('external_id', 'is', null)
+    const svcByExt = new Map((svcRows ?? []).map((s) => [String(s.external_id), s.id as string]))
+
+    const bindings: { salon_id: string; staff_id: string; service_id: string }[] = []
+    for (const detail of details) {
+      if (!detail || !shouldImportAsStaff(detail)) continue
+      const staffId = staffByExt.get(String(detail.id))
+      if (!staffId) continue
+      for (const bsid of detail.services ?? []) {
+        const serviceId = svcByExt.get(String(bsid))
+        if (serviceId)
+          bindings.push({ salon_id: salonId, staff_id: staffId, service_id: serviceId })
+      }
+    }
+    if (bindings.length > 0) {
+      const { error } = await admin
+        .from('staff_services')
+        .upsert(bindings, { onConflict: 'staff_id,service_id', ignoreDuplicates: true })
+      if (error) console.warn('staff_services upsert failed:', error.message)
+      else stats.staff_services_synced = bindings.length
+    }
+  } catch (e) {
+    console.warn('staff_services binding step skipped:', e instanceof Error ? e.message : e)
   }
 
   return stats
