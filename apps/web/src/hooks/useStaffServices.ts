@@ -26,6 +26,27 @@ export function useStaffServices(staffId: string | undefined) {
   })
 }
 
+/**
+ * Все связи мастер↔услуга по салону. Нужно, например, чтобы в форме визита
+ * показывать только мастеров, выполняющих выбранную услугу.
+ */
+export function useSalonStaffServices(salonId: string | undefined) {
+  return useQuery<{ staff_id: string; service_id: string }[]>({
+    queryKey: ['salon-staff-services', salonId],
+    queryFn: async () => {
+      if (!salonId) return []
+      const { data, error } = await supabase
+        .from('staff_services')
+        .select('staff_id, service_id')
+        .eq('salon_id', salonId)
+      if (error) throw error
+      return (data ?? []) as { staff_id: string; service_id: string }[]
+    },
+    enabled: !!salonId,
+    staleTime: 60_000,
+  })
+}
+
 /** Включить/выключить одну услугу у мастера. */
 export function useToggleStaffService(salonId: string | undefined, staffId: string | undefined) {
   const qc = useQueryClient()
@@ -50,7 +71,10 @@ export function useToggleStaffService(salonId: string | undefined, staffId: stri
         if (error) throw error
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff-services', staffId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-services', staffId] })
+      qc.invalidateQueries({ queryKey: ['salon-staff-services', salonId] })
+    },
   })
 }
 
@@ -80,6 +104,9 @@ export function useBulkSetStaffServices(salonId: string | undefined, staffId: st
         if (error) throw error
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff-services', staffId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-services', staffId] })
+      qc.invalidateQueries({ queryKey: ['salon-staff-services', salonId] })
+    },
   })
 }

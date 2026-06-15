@@ -41,6 +41,7 @@ import {
 import { useInventoryItems } from '@/hooks/useInventory'
 import { useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
+import { useSalonStaffServices } from '@/hooks/useStaffServices'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { cn } from '@/lib/utils/cn'
 import { useClient } from '@/hooks/useClients'
@@ -163,7 +164,32 @@ export function QuickEntryModal({
   const { t } = useTranslation()
   const { data: staff = [] } = useStaff(salonId)
   const { data: services = [] } = useServices(salonId)
+  const { data: staffServices = [] } = useSalonStaffServices(salonId)
   const { data: integrations = [] } = useSalonIntegrations(salonId)
+
+  // service_id → набор staff_id, кто выполняет услугу (для фильтра мастеров).
+  const performersByService = useMemo(() => {
+    const m = new Map<string, Set<string>>()
+    for (const r of staffServices) {
+      let set = m.get(r.service_id)
+      if (!set) {
+        set = new Set<string>()
+        m.set(r.service_id, set)
+      }
+      set.add(r.staff_id)
+    }
+    return m
+  }, [staffServices])
+
+  // Мастера, выполняющие услугу. Fallback: если на услугу никто не назначен —
+  // показываем всех (чтобы не блокировать создание визита).
+  function staffForService(serviceId: string | null | undefined) {
+    if (!serviceId) return staff
+    const set = performersByService.get(serviceId)
+    if (!set || set.size === 0) return staff
+    const filtered = staff.filter((s) => set.has(s.id))
+    return filtered.length ? filtered : staff
+  }
   const createVisit = useCreateVisit(salonId)
   const { hasOpenShift } = useRequireCashShift(salonId)
   const updateVisit = useUpdateVisit(salonId)
@@ -270,12 +296,15 @@ export function QuickEntryModal({
   // предыдущей строки (юзер обычно добавляет несколько услуг к одному
   // мастеру), (2) prefill.staffId (если открыли из календаря на конкретном
   // мастере), (3) localStorage last-staff, (4) первого мастера в списке.
-  function pickDefaultStaffForNewLine(): string | null {
+  function pickDefaultStaffForNewLine(serviceId: string): string | null {
+    // По умолчанию назначаем мастера, который ВЫПОЛНЯЕТ эту услугу.
+    const performers = staffForService(serviceId)
+    const ok = (id: string | null | undefined) => !!id && performers.some((s) => s.id === id)
     const lastInLines = lines[lines.length - 1]?.staff_id
-    if (lastInLines) return lastInLines
-    if (prefill?.staffId && staff.some((s) => s.id === prefill.staffId)) return prefill.staffId
-    if (initialStaff && staff.some((s) => s.id === initialStaff)) return initialStaff
-    return staff[0]?.id ?? null
+    if (ok(lastInLines)) return lastInLines!
+    if (prefill?.staffId && ok(prefill.staffId)) return prefill.staffId
+    if (initialStaff && ok(initialStaff)) return initialStaff
+    return performers[0]?.id ?? null
   }
 
   // Auto-suggest мастера (image #86): когда выбран клиент И первая услуга,
@@ -758,7 +787,7 @@ export function QuickEntryModal({
                   setPendingServiceId(v)
                   const svc = services.find((s) => s.id === v)
                   if (!svc) return
-                  const defaultStaff = pickDefaultStaffForNewLine()
+                  const defaultStaff = pickDefaultStaffForNewLine(svc.id)
                   setLines((prev) => [
                     ...prev,
                     {
@@ -813,6 +842,14 @@ export function QuickEntryModal({
                 {lines.map((l, lineIdx) => {
                   const av = staffAvatar(l.staff_id)
                   const missingStaff = lineStaffError && !l.staff_id
+                  // Показываем только мастеров, выполняющих услугу этой строки.
+                  // Текущего выбранного (если вдруг не в списке) добавляем, чтобы
+                  // значение селекта корректно отображалось.
+                  const lineStaff = staffForService(l.service_id)
+                  const staffOpts =
+                    l.staff_id && !lineStaff.some((s) => s.id === l.staff_id)
+                      ? [...lineStaff, ...staff.filter((s) => s.id === l.staff_id)]
+                      : lineStaff
                   // Image #125: cumulative start/end. Старт первой строки =
                   // form.start_time, далее каждая следующая стартует там же,
                   // где закончилась предыдущая. Длительность по-умолчанию 60.
@@ -896,7 +933,7 @@ export function QuickEntryModal({
                             </span>
                           </SelectTrigger>
                           <SelectContent>
-                            {staff.map((s) => (
+                            {staffOpts.map((s) => (
                               <SelectItem key={s.id} value={s.id}>
                                 {s.full_name}
                               </SelectItem>
