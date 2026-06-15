@@ -740,8 +740,12 @@ export function useBankSyncNow(salonId: string | undefined) {
         headers: { ...headers, 'content-type': 'application/json' },
         body: JSON.stringify({ connection_id: connectionId }),
       })
-      if (!res.ok) throw new Error(`sync ${res.status}: ${await res.text()}`)
-      return (await res.json()) as {
+      // banking-sync отдаёт структурный { ok, error, ... } даже при ошибке
+      // синка (HTTP 502 с error). Не бросаем на 502 — возвращаем тело, чтобы
+      // onSuccess показал понятный статус (переподключение / +N). Бросаем
+      // только на реально неожиданном ответе (не наш JSON-шейп).
+      const text = await res.text()
+      let json: {
         ok: boolean
         accounts_synced: number
         tx_total: number
@@ -749,7 +753,16 @@ export function useBankSyncNow(salonId: string | undefined) {
         pending?: number
         expenses_created: number
         error?: string
+      } | null = null
+      try {
+        json = JSON.parse(text)
+      } catch {
+        throw new Error(`sync ${res.status}: ${text.slice(0, 200)}`)
       }
+      if (!json || typeof json.ok !== 'boolean') {
+        throw new Error(`sync ${res.status}: ${text.slice(0, 200)}`)
+      }
+      return json
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bank-connections', salonId] })
