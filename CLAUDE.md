@@ -332,8 +332,22 @@ i18next падёт на `ru` через `fallbackLng: 'ru'` если ключ о
 - OCR-обработка чеков (не светим Anthropic API-ключ)
 - Booksy callback (стадия 3)
 - Запланированные задачи (cron, weekly digest, sync)
+- Публичный API салона (`public-api`) — аутентификация по ключу `fnk_live_`,
+  service-role + ручной salon-scoping (см. ADR-032)
 
 Простые CRUD-операции — через Supabase JS клиент с RLS из SPA. Не плоди функции там, где RLS справится.
+
+**Публичный API (`public-api`) — registry-driven.** Внешний REST API салона
+живёт в `supabase/functions/public-api/`. Единый источник истины —
+`registry.ts` (декларативный список ресурсов: таблица/вью/RPC, читаемые/
+записываемые колонки, фильтры, money-поля, правило скоупинга). И движок
+(`index.ts`), и публичная страница документации `/docs/api`
+(`apps/web/src/routes/public/ApiDocsPage.tsx`) читают этот реестр через
+discovery-эндпоинт `GET /v1`, поэтому документация не расходится с API.
+Добавляешь сущность в продукт и хочешь в API — добавь запись в `registry.ts`
+(не хардкодь эндпоинт). `verify_jwt = false` в `config.toml` обязателен.
+Тесты — `deno test supabase/functions/public-api/` (lib/registry/smoke).
+Подробности и границы v1 — в [ADR-032](./decisions/032-public-api.md).
 
 ### Multi-salon с дня 1
 
