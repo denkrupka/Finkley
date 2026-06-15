@@ -383,6 +383,32 @@ export function BankingTransactionsTable({
   // «общая сумма поступлений». Считаем по rows (с учётом unlinkedOnly).
   const periodSum = rows.reduce((s, r) => s + r.amount_cents, 0)
 
+  // Сколько транзакций скрыто фильтром «Показать связанные» (они уже стали
+  // расходом/привязаны к визиту). Типичная путаница владельца: банк подтянул
+  // свежие транзакции, они авто-превратились в расходы → и пропали из этого
+  // списка. Показываем подсказку с кнопкой «показать», чтобы было очевидно,
+  // что синк сработал.
+  const linkedHiddenCount =
+    unlinkedOnly || showLinked
+      ? 0
+      : (bankFilter === 'all'
+          ? allRows
+          : allRows.filter((tx) => (tx.bank_name ?? '') === bankFilter)
+        )
+          .filter((tx) =>
+            searchQLower
+              ? (tx.counterparty ?? '').toLowerCase().includes(searchQLower) ||
+                (tx.description ?? '').toLowerCase().includes(searchQLower)
+              : true,
+          )
+          .filter(
+            (tx) =>
+              !!tx.expense_id ||
+              !!tx.linked_visit_id ||
+              !!tx.linked_other_income_id ||
+              !!bankLinkedAll?.linkedTxIds.has(tx.id),
+          ).length
+
   return (
     <div className="border-border bg-card shadow-finsm rounded-lg border">
       {/* Header */}
@@ -405,6 +431,22 @@ export function BankingTransactionsTable({
               {direction === 'debit' ? '−' : '+'}
               {formatCurrency(periodSum, currency)}
             </span>
+          ) : null}
+          {linkedHiddenCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowLinked(true)}
+              className="text-secondary ml-2 text-xs font-semibold hover:underline"
+              title={t('banking.transactions.linked_hidden_title', {
+                defaultValue:
+                  'Эти транзакции уже превратились в расходы (или связаны с визитом) и поэтому скрыты',
+              })}
+            >
+              {t('banking.transactions.linked_hidden_hint', {
+                defaultValue: '+{{n}} связаны с расходами — показать',
+                n: linkedHiddenCount,
+              })}
+            </button>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
