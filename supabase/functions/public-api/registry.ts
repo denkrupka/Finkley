@@ -1,5 +1,5 @@
 /**
- * public-api/registry.ts — ЕДИНЫЙ источник истины для публичного API FinSalon.
+ * public-api/registry.ts — ЕДИНЫЙ источник истины для публичного API Finkley.
  *
  * Декларативный реестр ресурсов. И сама Edge Function (index.ts), и публичная
  * страница документации (через discovery-эндпоинт GET /v1) читают этот реестр,
@@ -809,6 +809,24 @@ export const RESOURCES: ResourceDef[] = [
     money: ['payout_fixed_cents', 'chair_rent_cents'],
     required: ['full_name'],
     description: 'Мастера. payout_scheme определяет используемые поля выплат.',
+  },
+  {
+    resource: 'staff-services',
+    table: 'staff_services',
+    kind: 'table',
+    pk: 'id',
+    salonColumn: 'salon_id',
+    softDeleteColumn: null,
+    read: ['id', 'salon_id', 'staff_id', 'service_id', 'created_at'],
+    create: ['staff_id', 'service_id'],
+    update: [],
+    allowDelete: true,
+    filters: ['staff_id', 'service_id'],
+    dateColumn: 'created_at',
+    defaultOrder: order('created_at'),
+    money: [],
+    required: ['staff_id', 'service_id'],
+    description: 'Какие услуги выполняет мастер (связь мастер↔услуга). Фильтр ?staff_id=.',
   },
   {
     resource: 'staff-time-blocks',

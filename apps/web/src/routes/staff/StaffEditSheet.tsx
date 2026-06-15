@@ -15,7 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { useServices, type ServiceRow } from '@/hooks/useServices'
+import { useServiceCategories, useServices, type ServiceRow } from '@/hooks/useServices'
 import {
   DAY_KEYS,
   type StaffPayoutScheme,
@@ -28,6 +28,11 @@ import {
   useStaffServiceOverrides,
   useUpsertStaffServiceOverride,
 } from '@/hooks/useStaffServiceOverrides'
+import {
+  useBulkSetStaffServices,
+  useStaffServices,
+  useToggleStaffService,
+} from '@/hooks/useStaffServices'
 
 const SCHEMES: StaffPayoutScheme[] = [
   'percent_revenue',
@@ -262,6 +267,11 @@ export function StaffEditSheet({ open, onOpenChange, salonId, staff }: Props) {
             {scheme === 'percent_service' ? (
               <ServiceOverridesEditor staffId={staff?.id} salonId={salonId} />
             ) : null}
+
+            {/* ─── Услуги, которые выполняет мастер ───────────────────── */}
+            <div className="border-border rounded-md border p-4">
+              <StaffServicesEditor staffId={staff?.id} salonId={salonId} />
+            </div>
 
             {/* ─── Рабочее расписание ─────────────────────────────────── */}
             <div className="border-border rounded-md border p-4">
@@ -530,5 +540,133 @@ function ServiceOverrideRow({
         <span className="w-6" />
       )}
     </div>
+  )
+}
+
+/**
+ * Выбор услуг, которые ВЫПОЛНЯЕТ мастер (таблица staff_services). Группировка
+ * по категориям + чекбоксы по услугам + «выбрать/снять всю категорию».
+ * Виден всегда (не зависит от схемы выплат). Для нового (ещё не сохранённого)
+ * мастера просит сначала сохранить (нужен staff_id).
+ */
+function StaffServicesEditor({
+  staffId,
+  salonId,
+}: {
+  staffId: string | undefined
+  salonId: string
+}) {
+  const { t } = useTranslation()
+  const { data: services = [] } = useServices(salonId)
+  const { data: categories = [] } = useServiceCategories(salonId)
+  const { data: assigned = [] } = useStaffServices(staffId)
+  const toggle = useToggleStaffService(salonId, staffId)
+  const bulk = useBulkSetStaffServices(salonId, staffId)
+
+  const selected = useMemo(() => new Set(assigned.map((a) => a.service_id)), [assigned])
+
+  const groups = useMemo(() => {
+    const m = new Map<string, ServiceRow[]>()
+    for (const s of services) {
+      const key = s.category_id ?? '__none__'
+      if (!m.has(key)) m.set(key, [])
+      m.get(key)!.push(s)
+    }
+    return m
+  }, [services])
+
+  if (!staffId) {
+    return (
+      <>
+        <Label className="mb-2 block">
+          {t('staff.services.title', { defaultValue: 'Услуги мастера' })}
+        </Label>
+        <p className="text-muted-foreground text-xs">
+          {t('staff.services.save_first', {
+            defaultValue: 'Сначала сохрани мастера — потом сможешь отметить его услуги.',
+          })}
+        </p>
+      </>
+    )
+  }
+
+  if (services.length === 0) {
+    return (
+      <>
+        <Label className="mb-2 block">
+          {t('staff.services.title', { defaultValue: 'Услуги мастера' })}
+        </Label>
+        <p className="text-muted-foreground text-xs">
+          {t('staff.services.no_services', {
+            defaultValue: 'Сначала добавь услуги в Справочники → Услуги.',
+          })}
+        </p>
+      </>
+    )
+  }
+
+  const catName = new Map(categories.map((c) => [c.id, c.name]))
+  const orderedKeys = [
+    ...categories.map((c) => c.id).filter((id) => groups.has(id)),
+    ...(groups.has('__none__') ? ['__none__'] : []),
+  ]
+
+  return (
+    <>
+      <div className="mb-1 flex items-center justify-between">
+        <Label>{t('staff.services.title', { defaultValue: 'Услуги мастера' })}</Label>
+        <span className="text-muted-foreground text-xs">
+          {t('staff.services.count', { defaultValue: 'выбрано: {{n}}', n: selected.size })}
+        </span>
+      </div>
+      <p className="text-muted-foreground mb-3 text-xs">
+        {t('staff.services.hint', {
+          defaultValue: 'Отметь услуги, которые делает мастер. Можно выбрать целую категорию.',
+        })}
+      </p>
+      <div className="border-border divide-border bg-card divide-y rounded-md border">
+        {orderedKeys.map((key) => {
+          const items = groups.get(key) ?? []
+          const name =
+            key === '__none__'
+              ? t('staff.services.uncategorized', { defaultValue: 'Без категории' })
+              : (catName.get(key) ?? '—')
+          const ids = items.map((s) => s.id)
+          const allOn = ids.length > 0 && ids.every((id) => selected.has(id))
+          return (
+            <div key={key} className="p-2">
+              <div className="mb-1 flex items-center justify-between px-1">
+                <span className="text-brand-navy text-xs font-bold uppercase tracking-wide">
+                  {name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => bulk.mutate({ service_ids: ids, enabled: !allOn })}
+                  className="text-secondary text-xs font-semibold hover:underline"
+                >
+                  {allOn
+                    ? t('staff.services.clear_cat', { defaultValue: 'снять все' })
+                    : t('staff.services.select_cat', { defaultValue: 'выбрать все' })}
+                </button>
+              </div>
+              {items.map((s) => (
+                <label
+                  key={s.id}
+                  className="hover:bg-muted/40 flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(s.id)}
+                    onChange={(e) => toggle.mutate({ service_id: s.id, enabled: e.target.checked })}
+                    className="size-4 cursor-pointer"
+                  />
+                  <span className="text-foreground flex-1 truncate">{s.name}</span>
+                </label>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </>
   )
 }
