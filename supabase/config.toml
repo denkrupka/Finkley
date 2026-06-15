@@ -83,6 +83,12 @@ verify_jwt = false
 [functions.telegram-user-bot]
 verify_jwt = false
 
+# public-api — публичный REST API салона. Внешние клиенты (Zapier/n8n/скрипты)
+# не передают Supabase-JWT, аутентификация делается нашим ключом fnk_live_…
+# внутри функции (SHA-256 → api_keys). Поэтому gateway-проверка JWT отключена.
+[functions.public-api]
+verify_jwt = false
+
 [analytics]
 enabled = false
 
