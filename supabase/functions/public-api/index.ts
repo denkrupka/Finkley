@@ -1,5 +1,5 @@
 /**
- * public-api — публичный REST API FinSalon для собственных интеграций салона
+ * public-api — публичный REST API Finkley для собственных интеграций салона
  * (Zapier, n8n, Make, скрипты). Аутентификация — по ключу `fnk_live_…`,
  * созданному в Настройки → API (Edge Function api-keys-create).
  *
@@ -51,7 +51,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-api-key, content-type, accept',
+  'Access-Control-Allow-Headers': 'authorization, apikey, x-api-key, content-type, accept',
   'Access-Control-Max-Age': '86400',
 }
 

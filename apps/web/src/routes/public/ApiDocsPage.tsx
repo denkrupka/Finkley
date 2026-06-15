@@ -19,7 +19,6 @@ import { LogoLockup } from '@/components/ui/logo'
  */
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? ''
-const SUPABASE_ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
 const API_BASE = SUPABASE_URL
   ? `${SUPABASE_URL}/functions/v1/public-api`
   : '/functions/v1/public-api'
@@ -185,14 +184,10 @@ export function ApiDocsPage() {
 
   useEffect(() => {
     let alive = true
-    const headers: Record<string, string> = {}
-    // public-api с verify_jwt=false доступен без ключа, но anon-apikey не мешает
-    // и страхует от gateway-настроек проекта.
-    if (SUPABASE_ANON) {
-      headers.apikey = SUPABASE_ANON
-      headers.Authorization = `Bearer ${SUPABASE_ANON}`
-    }
-    fetch(`${API_BASE}/v1`, { headers })
+    // discovery (/v1) публичен (verify_jwt=false) — шлём ПРОСТОЙ GET без
+    // кастомных заголовков, чтобы не триггерить CORS-preflight (иначе браузер
+    // блокировал бы запрос на заголовке apikey).
+    fetch(`${API_BASE}/v1`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: Catalog) => {
         if (!alive) return
@@ -244,6 +239,37 @@ export function ApiDocsPage() {
 const { data, pagination } = await res.json()
 console.log(data, pagination)`
 
+  // ── Рецепты под частые вопросы ──
+  const recipeCreateVisit = `# 1) узнать id мастера/услуги (если нужны): GET /v1/staff, GET /v1/services
+# 2) создать визит (amount_cents — в копейках: 15000 = 150,00)
+curl -X POST "${API_BASE}/v1/visits" \\
+  -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "visit_at": "2026-06-15T12:30:00Z",
+    "amount_cents": 15000,
+    "staff_id": "<uuid мастера>",
+    "client_id": "<uuid клиента>",
+    "service_id": "<uuid услуги>",
+    "payment_method": "card"
+  }'`
+
+  const recipeServices = `# Список услуг с ценами (default_price_cents) и себестоимостью (cost_cents)
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/services?limit=200"
+# каждая услуга: { id, name, category_id, default_price_cents, cost_cents, default_duration_min, ... }
+# категории услуг:
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" "${API_BASE}/v1/service-categories"`
+
+  const recipeStaff = `# Список мастеров
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/staff?is_active=true"`
+
+  const recipeStaffServices = `# Услуги, которые выполняет конкретный мастер (обязателен ?staff_id=)
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/staff-services?staff_id=<uuid мастера>"
+# вернёт строки { staff_id, service_id } — соедини с GET /v1/services по service_id`
+
   const copyLabel = t('docs_api.copied', { defaultValue: 'Скопировано' })
 
   return (
@@ -254,11 +280,11 @@ console.log(data, pagination)`
             <LogoLockup size={24} />
           </Link>
           <a
-            href="mailto:support@finkley.app"
+            href="mailto:info@finkley.app"
             className="text-secondary inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
           >
             <ExternalLink className="size-4" strokeWidth={1.7} />
-            support@finkley.app
+            info@finkley.app
           </a>
         </div>
       </header>
@@ -273,7 +299,7 @@ console.log(data, pagination)`
           </span>
           <div>
             <h1 className="text-brand-navy text-3xl font-bold tracking-tight">
-              {t('docs_api.title', { defaultValue: 'API FinSalon' })}
+              {t('docs_api.title', { defaultValue: 'API Finkley' })}
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
               {t('docs_api.subtitle', {
@@ -393,8 +419,36 @@ console.log(data, pagination)`
           </ul>
         </Section>
 
+        {/* Рецепты — частые задачи */}
+        <Section title={t('docs_api.recipes', { defaultValue: 'Рецепты — частые задачи' })}>
+          <div className="space-y-4">
+            <Example
+              title={t('docs_api.rc_create_visit', { defaultValue: 'Как создать визит' })}
+              code={recipeCreateVisit}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_services', { defaultValue: 'Как вытянуть услуги и цены' })}
+              code={recipeServices}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_staff', { defaultValue: 'Как вытянуть список мастеров' })}
+              code={recipeStaff}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_staff_services', {
+                defaultValue: 'Какие услуги выполняет мастер',
+              })}
+              code={recipeStaffServices}
+              copyLabel={copyLabel}
+            />
+          </div>
+        </Section>
+
         {/* Примеры */}
-        <Section title={t('docs_api.examples', { defaultValue: 'Примеры' })}>
+        <Section title={t('docs_api.examples', { defaultValue: 'Примеры запросов' })}>
           <div className="space-y-4">
             <Example
               title={t('docs_api.ex_list', { defaultValue: 'Список визитов за период' })}
@@ -551,7 +605,7 @@ console.log(data, pagination)`
         </Section>
 
         <p className="text-muted-foreground mt-10 text-center text-xs">
-          {t('docs_api.footer', { defaultValue: 'FinSalon API · v1' })} ·{' '}
+          {t('docs_api.footer', { defaultValue: 'Finkley API · v1' })} ·{' '}
           <a href="/privacy" className="hover:underline">
             Privacy
           </a>{' '}
