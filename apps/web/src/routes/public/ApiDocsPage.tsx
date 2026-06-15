@@ -270,6 +270,21 @@ curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
   "${API_BASE}/v1/staff-services?staff_id=<uuid мастера>"
 # вернёт строки { staff_id, service_id } — соедини с GET /v1/services по service_id`
 
+  const recipePhotos = `# Фото мастеров — поле avatar_url в /v1/staff
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/staff?is_active=true"
+# у каждого мастера: { id, full_name, avatar_url, ... }`
+
+  const recipeReviews = `# Отзывы с Google / Booksy (их подтягивает наш портал) + internal
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/reviews?source=google"      # или source=booksy / internal
+# поля: rating (1-5), body, author_name, posted_at, external_url, reply_text`
+
+  const recipeRating = `# Агрегатный рейтинг салона (Google / Booksy)
+curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
+  "${API_BASE}/v1/salon-metrics?kind=rating"
+# snapshot по source: data = { rating: 4.9, count: 213 }`
+
   const copyLabel = t('docs_api.copied', { defaultValue: 'Скопировано' })
 
   return (
@@ -442,6 +457,21 @@ curl -H "Authorization: Bearer fnk_live_ВАШ_КЛЮЧ" \\
                 defaultValue: 'Какие услуги выполняет мастер',
               })}
               code={recipeStaffServices}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_photos', { defaultValue: 'Фото мастеров' })}
+              code={recipePhotos}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_reviews', { defaultValue: 'Отзывы с Google / Booksy' })}
+              code={recipeReviews}
+              copyLabel={copyLabel}
+            />
+            <Example
+              title={t('docs_api.rc_rating', { defaultValue: 'Рейтинг салона (Google / Booksy)' })}
+              code={recipeRating}
               copyLabel={copyLabel}
             />
           </div>
