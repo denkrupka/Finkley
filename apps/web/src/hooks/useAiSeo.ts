@@ -64,3 +64,23 @@ export function useAiSuggestTopics() {
       callAi<{ topics: string[] }>('suggest_topics', vars),
   })
 }
+
+export type FullArticle = {
+  title: string
+  seo_title: string
+  description: string
+  seo_description: string
+  slug: string
+  keywords: string[]
+  tags: string[]
+  body_html: string
+}
+
+/** Полная генерация статьи одним кликом (заголовок, slug, мета, ключи, теги,
+ *  тело) под максимальный SEO score. Обложку и ссылки добивает клиент. */
+export function useAiGenerateFullArticle() {
+  return useMutation({
+    mutationFn: (vars: { target_keyword: string; title?: string }) =>
+      callAi<FullArticle>('generate_full_article', vars),
+  })
+}

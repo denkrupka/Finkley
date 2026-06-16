@@ -11,6 +11,11 @@
  *   generate_outline     { title, target_keyword? }     → outline H2/H3 структура
  *   improve_text         { text, instruction? }        → улучшенный текст
  *   suggest_topics       { target_keyword }            → 5 идей тем статей
+ *   generate_full_article { target_keyword, title? }   → вся статья одним
+ *       вызовом: { title, seo_title, description, seo_description, slug,
+ *       keywords[], tags[], body_html } — заточено под максимальный SEO score
+ *       (см. apps/web/src/lib/seo/seo-utils.ts). Картинку/обложку добивает
+ *       клиент (canvas → PNG), ссылки гарантирует пост-обработка.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
@@ -188,6 +193,75 @@ ANTI-FLUFF: запрещены кликбейтные шаблоны типа «
         .filter(Boolean)
         .slice(0, 5)
       return json({ topics })
+    }
+
+    if (action === 'generate_full_article') {
+      const kw = ((body.target_keyword as string) ?? '').trim()
+      const hint = ((body.title as string) ?? '').trim()
+      if (!kw && !hint) return json({ error: 'target_keyword_or_title_required' }, 400)
+      const focus = kw || hint
+      // Полная генерация статьи под максимальный SEO score. Промпт жёстко
+      // задаёт ВСЕ требования чеклиста (см. seo-utils.evaluateSeo): длина
+      // title/description, точное вхождение ключа в title, плотность ключа
+      // 1–2%, ≥2 H2, ≥600 слов, без H1 в теле, чистый HTML.
+      const system = `Ты — ведущий SEO-копирайтер и редактор с 8+ годами опыта в B2B SaaS для малого бизнеса (Польша / СНГ). Пишешь блог Finkley — управленческий учёт для владельцев салонов красоты (1–5 мастеров). Аудитория: владелица салона, не финансист, читает с телефона. Твоя статья должна одновременно быть полезной человеку И идеально технически оптимизированной под Google.
+
+Ты возвращаешь ОДИН объект JSON (без markdown, без префиксов, без code fences) строго такой формы:
+{
+  "title": "<H1/заголовок, РОВНО 50–60 символов, ОБЯЗАТЕЛЬНО содержит точную фразу целевого ключа дословно, без кликбейта>",
+  "seo_title": "<= title или его вариант 50–60 символов с ключом>",
+  "description": "<краткое описание для карточки, 140–160 символов, с ключом, заканчивается мягким CTA>",
+  "seo_description": "<= description, 140–160 символов>",
+  "slug": "<латиница-через-дефис, транслит заголовка, СТРОГО <= 55 символов, только [a-z0-9-]>",
+  "keywords": ["<целевой ключ первым>", "...", "5–7 штук, по-русски, LSI/синонимы из текста"],
+  "tags": ["<2–4 коротких тега по-русски>"],
+  "body_html": "<тело статьи в чистом HTML>"
+}
+
+ЖЁСТКИЕ ТРЕБОВАНИЯ К body_html (от них зависит SEO-оценка):
+1. Объём — 650–950 слов живого текста по-русски.
+2. НЕ используй тег <h1> внутри тела (заголовок H1 — это title). Только <h2> и <h3>.
+3. Ровно 4–6 секций <h2>. Целевой ключ дословно встречается минимум в 2 из <h2>.
+4. Целевой ключ «${focus}» встречается во ВСЁМ тексте 6–9 раз (в первом абзаце, в паре подзаголовков, в тексте) — это плотность ~1–2%, не больше. Не переспамь.
+5. Первый абзац (до первого <h2>) — 2–3 предложения, отвечает на запрос сразу, содержит ключ.
+6. Используй списки <ul>/<ol> с <li> где уместно. Последняя секция <h2> — практический чек-лист из <ul>.
+7. Разрешённые теги: <h2> <h3> <p> <ul> <ol> <li> <strong> <em> <a>. Без <html>, <body>, <head>, <style>, <script>, без markdown, без code fences.
+8. Конкретика и цифры (PLN/злотые, %, сроки), реальные сценарии салона. Без воды.
+9. ANTI-FLUFF: запрещены «возможно», «в среднем», «секреты», «всё что нужно знать», «дорогой читатель», канцелярит.
+
+Тон: уверенный, тёплый, прикладной — как опытная коллега-практик. Пиши на «ты».`
+      const prompt = `Целевое ключевое слово (главный поисковый запрос): «${focus}».${
+        hint && hint !== focus ? `\nЖелаемая тема/заголовок от автора: «${hint}».` : ''
+      }\n\nНапиши полностью готовую, максимально SEO-оптимизированную статью для блога Finkley по этому ключу. Верни СТРОГО один JSON-объект по схеме из системного промпта. Ничего кроме JSON.`
+      const raw = await claudeMessage(prompt, system, 4000)
+      let parsed: Record<string, unknown> = {}
+      try {
+        const m = raw.match(/\{[\s\S]*\}/)
+        parsed = m ? (JSON.parse(m[0]) as Record<string, unknown>) : {}
+      } catch {
+        return json({ error: 'ai_returned_invalid_json' }, 502)
+      }
+      const asStr = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+      const asArr = (v: unknown) =>
+        Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []
+      const result = {
+        title: asStr(parsed.title),
+        seo_title: asStr(parsed.seo_title) || asStr(parsed.title),
+        description: asStr(parsed.description),
+        seo_description: asStr(parsed.seo_description) || asStr(parsed.description),
+        slug: asStr(parsed.slug),
+        keywords: asArr(parsed.keywords).slice(0, 8),
+        tags: asArr(parsed.tags).slice(0, 6),
+        body_html: asStr(parsed.body_html),
+      }
+      if (!result.title || !result.body_html) {
+        return json({ error: 'ai_incomplete_article' }, 502)
+      }
+      // Гарантируем, что целевой ключ есть в массиве ключей первым.
+      if (!result.keywords.some((k) => k.toLowerCase() === focus.toLowerCase())) {
+        result.keywords = [focus, ...result.keywords].slice(0, 8)
+      }
+      return json(result)
     }
 
     return json({ error: 'unknown_action' }, 400)

@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   useAiGenerateDescription,
+  useAiGenerateFullArticle,
   useAiGenerateKeywords,
   useAiGenerateOutline,
   useAiGenerateTitle,
@@ -37,7 +38,8 @@ import {
   useUpsertMediaPost,
   type MediaPost,
 } from '@/hooks/useMediaPosts'
-import { evaluateSeo, slugify } from '@/lib/seo/seo-utils'
+import { renderBrandedCover } from '@/lib/seo/generate-cover'
+import { ensureSeoElements, evaluateSeo, normalizeSlug, slugify } from '@/lib/seo/seo-utils'
 import { supabase } from '@/lib/supabase/client'
 
 /**
@@ -63,6 +65,7 @@ export function AdminMediaPage() {
   const [targetKeyword, setTargetKeyword] = useState('')
   const [autoSlug, setAutoSlug] = useState(true)
   const [showSeoFields, setShowSeoFields] = useState(true)
+  const [fullBusy, setFullBusy] = useState(false)
 
   // AI hooks
   const aiTitle = useAiGenerateTitle()
@@ -71,6 +74,7 @@ export function AdminMediaPage() {
   const aiOutline = useAiGenerateOutline()
   const aiImprove = useAiImproveText()
   const aiTopics = useAiSuggestTopics()
+  const aiFull = useAiGenerateFullArticle()
 
   useEffect(() => {
     if (selected) {
@@ -162,6 +166,91 @@ export function AdminMediaPage() {
       toast.success(t('admin.media.toast_cover_uploaded'))
     }
     input.click()
+  }
+
+  async function uploadImageBlob(blob: Blob, name: string): Promise<string> {
+    const path = `covers/${Date.now()}-${name}`
+    const { error } = await supabase.storage
+      .from('blog-images')
+      .upload(path, blob, { cacheControl: '3600', upsert: false, contentType: 'image/png' })
+    if (error) throw error
+    return supabase.storage.from('blog-images').getPublicUrl(path).data.publicUrl
+  }
+
+  /**
+   * «Сгенерировать статью целиком» — один клик: ИИ пишет заголовок, slug,
+   * мета, ключи, теги и тело статьи под максимальный SEO score, клиент
+   * добивает брендовую обложку (canvas → PNG) + иллюстрацию + гарантирует
+   * внутренние/внешние ссылки. Результат — черновик: владелец проверяет и
+   * публикует.
+   */
+  async function generateFullArticle(kwOverride?: string) {
+    const kw = (kwOverride ?? '').trim() || targetKeyword.trim() || (draft.title ?? '').trim()
+    if (!kw) {
+      toast.error(
+        t('admin.media.ai.error_keyword_required', {
+          defaultValue: 'Сначала впиши целевое ключевое слово или тему',
+        }),
+      )
+      return
+    }
+    setFullBusy(true)
+    try {
+      const art = await aiFull.mutateAsync({
+        target_keyword: kw,
+        title: (draft.title ?? '').trim() || undefined,
+      })
+
+      // Брендовые картинки: обложка (заголовок) + иллюстрация (ключ).
+      // Не критично для текста — при сбое продолжаем без картинки.
+      let coverUrl: string | null = null
+      let inlineUrl: string | null = null
+      try {
+        const coverBlob = await renderBrandedCover({ title: art.title, variant: 'cover' })
+        coverUrl = await uploadImageBlob(coverBlob, 'cover.png')
+        const inlineBlob = await renderBrandedCover({
+          title: targetKeyword.trim() || kw,
+          eyebrow: 'FINKLEY',
+          variant: 'inline',
+        })
+        inlineUrl = await uploadImageBlob(inlineBlob, 'inline.png')
+      } catch (imgErr) {
+        console.warn('cover generation failed', imgErr)
+      }
+
+      const body = ensureSeoElements(art.body_html, {
+        title: art.title,
+        inlineImageUrl: inlineUrl,
+        altText: targetKeyword.trim() || art.title,
+      })
+      const slug = normalizeSlug(art.slug, art.title)
+
+      setAutoSlug(false)
+      setDraft((d) => ({
+        ...d,
+        title: art.title,
+        seo_title: art.seo_title || art.title,
+        slug,
+        description: art.description,
+        seo_description: art.seo_description || art.description,
+        keywords: art.keywords,
+        tags: art.tags.length ? art.tags : (d.tags ?? []),
+        body_html: body,
+        cover_url: coverUrl ?? d.cover_url ?? null,
+        og_image_url: coverUrl ?? d.og_image_url ?? null,
+        draft: true,
+      }))
+      if (art.keywords[0]) setTargetKeyword(art.keywords[0])
+      toast.success(
+        t('admin.media.ai.toast_full_done', {
+          defaultValue: 'Статья сгенерирована. Проверь и нажми «Опубликовать».',
+        }),
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setFullBusy(false)
+    }
   }
 
   function save() {
@@ -371,6 +460,8 @@ export function AdminMediaPage() {
                 setTargetKeyword={setTargetKeyword}
                 aiTopics={aiTopics}
                 onPick={(topic) => setDraft((d) => ({ ...d, title: topic }))}
+                onGenerateFull={generateFullArticle}
+                fullBusy={fullBusy}
               />
             ) : null}
 
@@ -497,6 +588,30 @@ export function AdminMediaPage() {
                 })}
                 className="h-9"
               />
+              <button
+                type="button"
+                onClick={() => generateFullArticle()}
+                disabled={fullBusy}
+                data-testid="generate-full-article"
+                className="mt-2.5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-sm font-bold text-white shadow-sm transition-colors hover:from-violet-700 hover:to-fuchsia-700 disabled:opacity-60"
+              >
+                {fullBusy ? (
+                  <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+                ) : (
+                  <Wand2 className="size-4" strokeWidth={2.2} />
+                )}
+                {fullBusy
+                  ? t('admin.media.ai.full_generating', { defaultValue: 'Генерирую статью…' })
+                  : t('admin.media.ai.generate_full', {
+                      defaultValue: 'Сгенерировать статью целиком',
+                    })}
+              </button>
+              <p className="mt-1.5 text-[10px] leading-tight text-amber-800/70">
+                {t('admin.media.ai.full_hint', {
+                  defaultValue:
+                    'Один клик — заголовок, текст, теги, ключи, мета, URL и обложка. Цель: SEO-оценка 100/100.',
+                })}
+              </p>
             </div>
 
             {/* WYSIWYG */}
@@ -755,11 +870,15 @@ function TopicSuggester({
   setTargetKeyword,
   aiTopics,
   onPick,
+  onGenerateFull,
+  fullBusy,
 }: {
   targetKeyword: string
   setTargetKeyword: (v: string) => void
   aiTopics: ReturnType<typeof useAiSuggestTopics>
   onPick: (topic: string) => void
+  onGenerateFull: (keyword: string) => void
+  fullBusy: boolean
 }) {
   const { t } = useTranslation()
   const [keyword, setKeyword] = useState(targetKeyword)
@@ -809,6 +928,39 @@ function TopicSuggester({
           {t('admin.media.topic_suggest.generate')}
         </Button>
       </div>
+
+      {/* Или сразу готовую статью одним кликом */}
+      <div className="my-2.5 flex items-center gap-2">
+        <div className="h-px flex-1 bg-violet-200" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700/70">
+          {t('admin.media.topic_suggest.or', { defaultValue: 'или' })}
+        </span>
+        <div className="h-px flex-1 bg-violet-200" />
+      </div>
+      <button
+        type="button"
+        onClick={() => onGenerateFull(keyword)}
+        disabled={fullBusy || !keyword.trim()}
+        data-testid="generate-full-article-topic"
+        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-sm font-bold text-white shadow-sm transition-colors hover:from-violet-700 hover:to-fuchsia-700 disabled:opacity-60"
+      >
+        {fullBusy ? (
+          <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+        ) : (
+          <Wand2 className="size-4" strokeWidth={2.2} />
+        )}
+        {fullBusy
+          ? t('admin.media.ai.full_generating', { defaultValue: 'Генерирую статью…' })
+          : t('admin.media.ai.generate_full_oneclick', {
+              defaultValue: 'Сразу сгенерировать готовую статью',
+            })}
+      </button>
+      <p className="mt-1.5 text-[10px] leading-tight text-violet-800/70">
+        {t('admin.media.ai.full_hint', {
+          defaultValue:
+            'Один клик — заголовок, текст, теги, ключи, мета, URL и обложка. Цель: SEO-оценка 100/100.',
+        })}
+      </p>
       {topics.length > 0 ? (
         <div className="mt-3 space-y-1.5">
           {topics.map((topic) => (

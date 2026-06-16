@@ -122,6 +122,78 @@ export function slugify(title: string): string {
     .slice(0, 80)
 }
 
+function escapeAttr(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
+ * Приводит slug к виду, который проходит SEO-чек: только [a-z0-9-], <= 60
+ * символов, без обрезанного «хвоста» слова и без лишних дефисов.
+ */
+export function normalizeSlug(raw: string, fallbackTitle: string): string {
+  let s = (raw ?? '').toLowerCase().trim()
+  if (!s || !/^[a-z0-9-]+$/.test(s)) s = slugify(fallbackTitle)
+  s = s
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  if (s.length > 60) {
+    s =
+      s
+        .slice(0, 60)
+        .replace(/-[^-]*$/, '')
+        .replace(/-+$/, '') || s.slice(0, 60)
+  }
+  return s
+}
+
+/**
+ * Пост-обработка сгенерированного body_html, чтобы статья гарантированно
+ * проходила технические SEO-чеки (см. evaluateSeo):
+ *   - <h1> в теле понижается до <h2> (H1 — это заголовок статьи);
+ *   - вставляется одна иллюстрация <img alt> (чек img_alt);
+ *   - гарантируются ≥1 внутренняя (/...) и ≥1 внешняя (https://) ссылки.
+ * Идемпотентна: если ссылка/картинка уже есть — не дублирует.
+ */
+export function ensureSeoElements(
+  html: string,
+  opts: { title: string; inlineImageUrl?: string | null; altText?: string },
+): string {
+  let out = (html ?? '').trim()
+
+  // 1) H1 в теле → H2 (в теле допустимы только H2/H3).
+  out = out.replace(/<(\/?)h1(\b[^>]*)>/gi, '<$1h2$2>')
+
+  // 2) Иллюстрация с alt — если в теле ещё нет <img>.
+  if (opts.inlineImageUrl && !/<img\b/i.test(out)) {
+    const alt = escapeAttr(opts.altText || opts.title)
+    const figure = `<figure><img src="${escapeAttr(opts.inlineImageUrl)}" alt="${alt}" /><figcaption>${escapeAttr(opts.title)}</figcaption></figure>`
+    // После первого </h2> (под первым подзаголовком), иначе — в начало.
+    if (/<\/h2>/i.test(out)) {
+      out = out.replace(/<\/h2>/i, (m) => `${m}\n${figure}`)
+    } else {
+      out = `${figure}\n${out}`
+    }
+  }
+
+  // 3) Внутренняя и внешняя ссылки.
+  const hasInternal = /href="\/(?!\/)/.test(out)
+  const hasExternal = /href="https?:/i.test(out)
+  if (!hasInternal || !hasExternal) {
+    const ext = hasExternal
+      ? 'Finkley'
+      : '<a href="https://finkley.app" target="_blank" rel="noopener noreferrer">Finkley</a>'
+    const int = hasInternal ? 'другие разборы' : '<a href="/media">другие разборы</a>'
+    out += `\n<p>${ext} помогает владельцам салонов видеть прибыль без таблиц. Загляни в ${int}, чтобы навести порядок в финансах салона.</p>`
+  }
+
+  return out
+}
+
 export function evaluateSeo(input: SeoInput): SeoResult {
   const plain = htmlToPlainText(input.body_html)
   const wordCount = countWords(plain)
