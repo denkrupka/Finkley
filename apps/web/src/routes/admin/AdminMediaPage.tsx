@@ -224,6 +224,11 @@ export function AdminMediaPage() {
         altText: targetKeyword.trim() || art.title,
       })
       const slug = normalizeSlug(art.slug, art.title)
+      // Подстраховка под SEO-чек длины описания: snippet Google ≤160.
+      const clampDesc = (s: string) =>
+        s.length > 160 ? `${s.slice(0, 157).replace(/\s+\S*$/, '')}…` : s
+      const desc = clampDesc(art.description)
+      const seoDesc = clampDesc(art.seo_description || art.description)
 
       setAutoSlug(false)
       setDraft((d) => ({
@@ -231,8 +236,8 @@ export function AdminMediaPage() {
         title: art.title,
         seo_title: art.seo_title || art.title,
         slug,
-        description: art.description,
-        seo_description: art.seo_description || art.description,
+        description: desc,
+        seo_description: seoDesc,
         keywords: art.keywords,
         tags: art.tags.length ? art.tags : (d.tags ?? []),
         body_html: body,
