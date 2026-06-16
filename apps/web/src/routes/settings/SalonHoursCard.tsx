@@ -73,7 +73,13 @@ export function SalonHoursCard() {
           {t('settings.opening_hours.title')}
         </h2>
       </div>
-      <p className="text-muted-foreground mb-4 text-sm">{t('settings.opening_hours.subtitle')}</p>
+      <p className="text-muted-foreground mb-2 text-sm">{t('settings.opening_hours.subtitle')}</p>
+      <p className="text-muted-foreground border-brand-teal-deep/40 bg-brand-teal-soft/15 mb-4 rounded-md border-l-2 px-3 py-2 text-xs">
+        {t('settings.opening_hours.master_note', {
+          defaultValue:
+            'Это график салона — для клиентов и расчёта загрузки. Он не ограничивает мастеров: у каждого мастера свой график (Мастера → карточка мастера), и принять клиента можно даже когда салон по этому графику закрыт.',
+        })}
+      </p>
 
       <div className="border-border bg-muted/10 mb-5 overflow-hidden rounded-md border">
         <table className="w-full text-sm">

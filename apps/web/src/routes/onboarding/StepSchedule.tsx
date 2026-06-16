@@ -26,10 +26,10 @@ type Props = {
 
 /**
  * T98 — рабочий график в полной ветке онбординга. Сохраняется в
- * salons.opening_hours jsonb. Используется для:
- *   - расчёта occupancy (доступные часы)
- *   - валидации онлайн-бронирований
- *   - i18n письма клиенту: «мы открыты пн-пт 9:00-20:00».
+ * salons.opening_hours jsonb. Это СПРАВОЧНЫЙ график салона (для клиентов,
+ * витрины и расчёта загрузки). Он НЕ ограничивает мастеров: у каждого
+ * мастера свой график (staff.weekly_schedule), и визит можно создать даже
+ * когда салон по этому графику закрыт — см. подсказку в UI (запрос владельца).
  *
  * Минималистичный UI — на каждый день своя строка с checkbox «работаем» +
  * 2 time-input'а. Чтобы не загромождать — кнопка «Применить ко всем
@@ -60,6 +60,13 @@ export function StepSchedule({ value, onChange }: Props) {
         <Clock className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
         {t('onboarding.schedule.title')}
       </h1>
+
+      <p className="text-muted-foreground mt-1 text-sm">
+        {t('onboarding.schedule.hint', {
+          defaultValue:
+            'Это график салона — для клиентов и расчёта загрузки. Он не ограничивает мастеров: у каждого свой график, и принять клиента можно даже когда салон закрыт.',
+        })}
+      </p>
 
       <div className="mt-3 flex flex-col gap-1.5">
         {DAYS.map((d) => {

@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Loader2, Phone } from 'lucide-react'
+import { BellRing, CheckCircle2, Loader2, Phone, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -88,34 +88,78 @@ export function StepTelegramPhone({ value, onChange }: Props) {
     }, 2000)
   }
 
+  const benefits: Array<{ icon: typeof Sparkles; key: string; fallback: string }> = [
+    {
+      icon: Sparkles,
+      key: 'onboarding.tg_phone.benefit_digest',
+      fallback: 'Каждое утро в 9:00 — короткий разбор: сколько салон заработал вчера.',
+    },
+    {
+      icon: BellRing,
+      key: 'onboarding.tg_phone.benefit_alerts',
+      fallback: 'Уведомления о важном: оплаты, напоминания о счетах, новые записи.',
+    },
+    {
+      icon: Smartphone,
+      key: 'onboarding.tg_phone.benefit_pocket',
+      fallback: 'Цифры салона всегда под рукой в телефоне — без входа в приложение.',
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
-        <Bell className="text-brand-teal-deep mr-2 inline-block size-6" strokeWidth={2} />
-        {t('onboarding.tg_phone.title')}
-      </h1>
+      <div>
+        <h1 className="text-brand-navy text-2xl font-bold tracking-tight">
+          {t('onboarding.tg_phone.title')}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t('onboarding.tg_phone.intro', {
+            defaultValue: 'Два способа быть на связи с салоном. Оба — по желанию.',
+          })}
+        </p>
+      </div>
 
-      <Field id="onb-phone" label={t('onboarding.tg_phone.phone_label')}>
-        <div className="relative">
-          <Phone
-            className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
-            strokeWidth={1.8}
-          />
-          <Input
-            id="onb-phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={value.phone}
-            onChange={(e) => onChange({ phone: e.target.value })}
-            placeholder="+48 600 123 456"
-            className="num pl-10"
-          />
+      {/* Блок 1 — номер телефона (для SMS) */}
+      <div className="border-border bg-card rounded-xl border p-4">
+        <div className="flex items-start gap-3">
+          <div className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg">
+            <Phone className="size-5" strokeWidth={2} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground text-sm font-bold">
+              {t('onboarding.tg_phone.phone_section_title', { defaultValue: 'Номер телефона' })}
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {t('onboarding.tg_phone.phone_hint', {
+                defaultValue:
+                  'По желанию. Пришлём SMS, только если случится что-то важное — спамить не будем.',
+              })}
+            </p>
+          </div>
         </div>
-      </Field>
+        <Field id="onb-phone" label={t('onboarding.tg_phone.phone_label')} className="mt-3">
+          <div className="relative">
+            <Phone
+              className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
+              strokeWidth={1.8}
+            />
+            <Input
+              id="onb-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={value.phone}
+              onChange={(e) => onChange({ phone: e.target.value })}
+              placeholder="+48 600 123 456"
+              className="num pl-10"
+            />
+          </div>
+        </Field>
+      </div>
 
+      {/* Блок 2 — Telegram-бот (мобильный доступ к салону) */}
       {isLinked ? (
-        <div className="flex items-start gap-3 rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-3">
+        <div className="flex items-start gap-3 rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-4">
           <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-600 text-white">
             <CheckCircle2 className="size-5" strokeWidth={2.2} />
           </div>
@@ -131,7 +175,7 @@ export function StepTelegramPhone({ value, onChange }: Props) {
           </div>
         </div>
       ) : (
-        <div className="border-border bg-card flex flex-col gap-2 rounded-xl border-2 p-3">
+        <div className="border-brand-teal-deep/30 bg-brand-teal-soft/15 flex flex-col gap-3 rounded-xl border-2 p-4">
           <div className="flex items-start gap-3">
             <div className="bg-brand-teal-soft text-brand-teal-deep grid size-9 shrink-0 place-items-center rounded-lg">
               <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
@@ -140,13 +184,33 @@ export function StepTelegramPhone({ value, onChange }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-foreground text-sm font-bold">
-                {t('onboarding.tg_phone.tg_title')}
+                {t('onboarding.tg_phone.tg_section_title', {
+                  defaultValue: 'Telegram-бот — твой салон в телефоне',
+                })}
               </p>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                {t('onboarding.tg_phone.tg_body_v2')}
+                {t('onboarding.tg_phone.tg_intro', {
+                  defaultValue:
+                    'Подключи бота — и следи за салоном прямо из телефона. Это главный мобильный канал Finkley.',
+                })}
               </p>
             </div>
           </div>
+
+          <ul className="space-y-1.5">
+            {benefits.map((b) => {
+              const Icon = b.icon
+              return (
+                <li key={b.key} className="flex items-start gap-2">
+                  <Icon className="text-brand-teal-deep mt-0.5 size-4 shrink-0" strokeWidth={2} />
+                  <span className="text-foreground text-xs leading-snug">
+                    {t(b.key, { defaultValue: b.fallback })}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+
           <Button
             type="button"
             onClick={linkTelegram}
