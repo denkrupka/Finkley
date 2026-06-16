@@ -41,6 +41,7 @@ import { BottomNav } from './BottomNav'
 import { FAB } from './FAB'
 import { HelpDeskBanner } from './HelpDeskBanner'
 import { Sidebar } from './Sidebar'
+import { SyncStatusBanner } from './SyncStatusBanner'
 import { TopBar } from './TopBar'
 
 // QuickEntryModal лениво — он тащит ClientPicker → libphonenumber-js (~80KB).
@@ -263,6 +264,8 @@ export function SalonLayout() {
         />
 
         <SubscriptionBanner />
+
+        <SyncStatusBanner salonId={salon.id} />
 
         <main className="relative flex min-h-0 flex-1 flex-col pb-24 lg:overflow-y-auto lg:pb-0">
           <Outlet />
