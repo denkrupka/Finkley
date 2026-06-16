@@ -32,9 +32,12 @@ export type AiBreakdownTopic = 'services' | 'staff' | 'clients' | 'reviews'
 export function StepAiBreakdown({
   topic,
   salonId,
+  currency,
 }: {
   topic: AiBreakdownTopic
   salonId?: string | null
+  /** Валюта салона (ISO 4217) — чтобы AI писал суммы в правильной валюте. */
+  currency?: string
 }) {
   const { t, i18n } = useTranslation()
 
@@ -50,6 +53,7 @@ export function StepAiBreakdown({
           mode: 'breakdown',
           topic,
           locale: i18n.language.split('-')[0],
+          currency,
         },
       })
       if (error) throw error

@@ -9,6 +9,18 @@ export type StaffPayoutScheme =
   | 'chair_rent'
   | 'mixed'
 
+/** Роль сотрудника в работе салона (см. миграцию 20260616000001_staff_job_role).
+ *  Только 'master' принимает клиентов и учитывается в AI-анализах/аналитике. */
+export type StaffJobRole = 'master' | 'admin' | 'manager' | 'reception' | 'other'
+
+export const STAFF_JOB_ROLES: ReadonlyArray<{ value: StaffJobRole; labelKey: string }> = [
+  { value: 'master', labelKey: 'staff.role.master' },
+  { value: 'admin', labelKey: 'staff.role.admin' },
+  { value: 'manager', labelKey: 'staff.role.manager' },
+  { value: 'reception', labelKey: 'staff.role.reception' },
+  { value: 'other', labelKey: 'staff.role.other' },
+]
+
 export type WeeklyDay = { start: string; end: string; off: boolean }
 export type WeeklySchedule = {
   mon: WeeklyDay
@@ -43,6 +55,8 @@ export type StaffRow = {
   payout_fixed_cents: number | null
   chair_rent_cents: number | null
   is_active: boolean
+  /** master | admin | manager | reception | other. Дефолт 'master'. */
+  job_role: StaffJobRole
   weekly_schedule: WeeklySchedule
   retail_payout_enabled: boolean
   retail_payout_percent: number | null
@@ -54,7 +68,7 @@ export type StaffRow = {
 }
 
 const STAFF_FIELDS =
-  'id, salon_id, full_name, email, phone, avatar_url, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days, external_id, external_source, invite_sent_at, visible_on_calendar'
+  'id, salon_id, full_name, email, phone, avatar_url, payout_scheme, payout_percent, payout_fixed_cents, chair_rent_cents, is_active, job_role, weekly_schedule, retail_payout_enabled, retail_payout_percent, retention_window_days, external_id, external_source, invite_sent_at, visible_on_calendar'
 
 export function useStaff(salonId: string | undefined, opts?: { activeOnly?: boolean }) {
   const activeOnly = opts?.activeOnly ?? true

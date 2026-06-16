@@ -134,6 +134,16 @@ export function taxIdPlaceholderFor(code: CountryCode | string | null | undefine
   return c?.tax_id_placeholder ?? ''
 }
 
+/**
+ * Валюта (ISO 4217) по коду страны. Используется чтобы передать валюту салона
+ * в AI-шаги онбординга — иначе Claude по умолчанию писал суммы в EUR даже для
+ * Польши (PLN). Фолбэк — PLN (основной рынок).
+ */
+export function currencyFor(code: CountryCode | string | null | undefined): string {
+  const c = COUNTRY_OPTIONS.find((co) => co.code === (code ?? 'PL'))
+  return c?.currency ?? 'PLN'
+}
+
 export const SALON_TYPES = [
   { id: 'hair', name: 'Парикмахерская' },
   { id: 'nails', name: 'Маникюрный салон' },

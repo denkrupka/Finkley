@@ -38,6 +38,7 @@ import {
   COUNTRY_OPTIONS,
   DEFAULT_EXPENSE_CATEGORIES,
   SEED_SERVICES_BY_TYPE,
+  currencyFor,
   type CountryCode,
   type SalonTypeId,
 } from './onboarding-defaults'
@@ -1345,26 +1346,44 @@ export function OnboardingPage() {
                 // (текст «Студия эпиляции» вместо буквы 'other').
                 salonType={resolvedSalonType()}
                 country={state.country_code}
+                currency={currencyFor(state.country_code)}
                 salonId={state.created_salon_id}
               />
             )}
             {stepId === 'ai_services' && (
-              <StepAiBreakdown topic="services" salonId={state.created_salon_id} />
+              <StepAiBreakdown
+                topic="services"
+                salonId={state.created_salon_id}
+                currency={currencyFor(state.country_code)}
+              />
             )}
             {stepId === 'ai_staff' && (
-              <StepAiBreakdown topic="staff" salonId={state.created_salon_id} />
+              <StepAiBreakdown
+                topic="staff"
+                salonId={state.created_salon_id}
+                currency={currencyFor(state.country_code)}
+              />
             )}
             {stepId === 'ai_clients' && (
-              <StepAiBreakdown topic="clients" salonId={state.created_salon_id} />
+              <StepAiBreakdown
+                topic="clients"
+                salonId={state.created_salon_id}
+                currency={currencyFor(state.country_code)}
+              />
             )}
             {stepId === 'ai_reviews' && (
-              <StepAiBreakdown topic="reviews" salonId={state.created_salon_id} />
+              <StepAiBreakdown
+                topic="reviews"
+                salonId={state.created_salon_id}
+                currency={currencyFor(state.country_code)}
+              />
             )}
             {stepId === 'ai_summary' && (
               <StepAiSummary
                 // Bug 40ec7d0e follow-up: resolved тип для AI.
                 salonType={resolvedSalonType()}
                 country={state.country_code}
+                currency={currencyFor(state.country_code)}
                 selectedIntegrations={state.selected_integrations}
                 staffCount={state.staff.length}
                 servicesCount={state.services.length}

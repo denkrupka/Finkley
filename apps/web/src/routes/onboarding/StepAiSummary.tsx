@@ -36,6 +36,7 @@ export function StepAiSummary({
   hasNip,
   companyName,
   ocrVisitsCount,
+  currency,
   salonId,
 }: {
   salonType?: string
@@ -47,6 +48,8 @@ export function StepAiSummary({
   hasNip?: boolean
   companyName?: string
   ocrVisitsCount?: number
+  /** Валюта салона (ISO 4217) — чтобы AI писал суммы в правильной валюте. */
+  currency?: string
   /** D1+ — early-created salon ID для real-data grounding AI. */
   salonId?: string | null
 }) {
@@ -79,6 +82,7 @@ export function StepAiSummary({
           company_name: companyName || null,
           ocr_visits_count: ocrVisitsCount ?? 0,
           locale: i18n.language.split('-')[0],
+          currency,
           mode: 'full_summary',
           salon_id: salonId ?? undefined,
         },

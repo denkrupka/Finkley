@@ -75,6 +75,7 @@ export function StepWowAi({
   ocrVisitsCount = 0,
   salonType,
   country,
+  currency,
   salonId,
 }: {
   hasBookings: boolean
@@ -96,6 +97,8 @@ export function StepWowAi({
   // T125 #2 — для AI prompt
   salonType?: string
   country?: string
+  /** Валюта салона (ISO 4217) — чтобы AI писал суммы в правильной валюте. */
+  currency?: string
   /** D1+ — early-created salon ID. Если есть, edge function подгружает
    *  реальные visits/staff/services из БД для grounding AI. */
   salonId?: string | null
@@ -120,6 +123,7 @@ export function StepWowAi({
           company_name: companyName || null,
           ocr_visits_count: ocrVisitsCount,
           locale: i18n.language.split('-')[0],
+          currency,
           salon_id: salonId ?? undefined,
         },
       })

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { StaffEditSheet } from '@/routes/staff/StaffEditSheet'
 import { formatError } from '@/lib/format-error'
 import { supabase } from '@/lib/supabase/client'
-import { useStaff, type StaffRow } from '@/hooks/useStaff'
+import { useStaff, STAFF_JOB_ROLES, type StaffJobRole, type StaffRow } from '@/hooks/useStaff'
 import { useInviteMember } from '@/hooks/useTeam'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -46,6 +46,19 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
     if (!confirm(t('common.confirm_delete'))) return
     try {
       const { error } = await supabase.from('staff').update({ is_active: false }).eq('id', id)
+      if (error) throw error
+      qc.invalidateQueries({ queryKey: ['staff', salonId] })
+    } catch (err) {
+      toast.error(formatError(err))
+    }
+  }
+
+  // Роль сотрудника: мастер по умолчанию. В AI-анализах и аналитике учитываются
+  // только мастера, поэтому админов/ресепшен можно переключить здесь — и они
+  // перестанут попадать в разбор (запрос владельца).
+  async function updateRole(id: string, role: StaffJobRole) {
+    try {
+      const { error } = await supabase.from('staff').update({ job_role: role }).eq('id', id)
       if (error) throw error
       qc.invalidateQueries({ queryKey: ['staff', salonId] })
     } catch (err) {
@@ -130,7 +143,14 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
 
       {staff.length === 0 ? (
         <p className="text-muted-foreground mt-3 text-sm">{t('onboarding.step2.empty_hint')}</p>
-      ) : null}
+      ) : (
+        <p className="text-muted-foreground mt-2 text-sm">
+          {t('onboarding.step2.role_hint', {
+            defaultValue:
+              'Проверь роль каждого. В AI-разборе участвуют только мастера — администраторов и ресепшен переключи, чтобы про них не было советов.',
+          })}
+        </p>
+      )}
 
       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {staff.map((s) => {
@@ -187,6 +207,26 @@ export function Step2StaffLive({ salonId }: { salonId: string }) {
                   <Trash2 className="size-4" strokeWidth={1.7} />
                 </button>
               </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-muted-foreground whitespace-nowrap text-[11px] font-semibold">
+                  {t('onboarding.step2.role_label', { defaultValue: 'Роль' })}
+                </span>
+                <select
+                  value={s.job_role}
+                  onChange={(e) => updateRole(s.id, e.target.value as StaffJobRole)}
+                  aria-label={t('onboarding.step2.role_label', { defaultValue: 'Роль' })}
+                  className="border-border bg-background text-foreground focus:border-brand-teal-deep h-8 flex-1 rounded-md border px-2 text-xs font-medium outline-none"
+                  data-testid="onb-staff-role-select"
+                >
+                  {STAFF_JOB_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {t(r.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {s.invite_sent_at ? (
                 <div className="border-brand-sage bg-brand-sage-soft/30 text-brand-sage-deep mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] px-3 py-2 text-xs font-bold">
                   <Send className="size-3.5" strokeWidth={2} />
