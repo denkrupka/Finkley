@@ -103,31 +103,38 @@ export type RfmSegment = {
   text: string
 }
 
+export type RfmKey = RfmSegment['key']
+
+/**
+ * Сегмент одного клиента (та же логика, что в computeRfm — вынесена, чтобы
+ * можно было ФИЛЬТРОВАТЬ клиентов по сегменту при клике на плитку дашборда,
+ * не только считать).
+ */
+export function rfmSegmentForClient(
+  c: Pick<ClientRow, 'visit_count' | 'last_visit_at'>,
+  now: Date = new Date(),
+): RfmKey {
+  const day = 24 * 3600 * 1000
+  const ts = now.getTime()
+  const visits = c.visit_count ?? 0
+  const lastVisitMs = c.last_visit_at ? new Date(c.last_visit_at).getTime() : 0
+  const daysSinceLast = lastVisitMs > 0 ? (ts - lastVisitMs) / day : Infinity
+  // T92 — Perspective опираемся на last_visit, не created_at.
+  if (visits >= 5 && daysSinceLast <= 30) return 'champions'
+  if (visits >= 3 && daysSinceLast <= 60) return 'loyal'
+  if (visits >= 1 && visits <= 2 && daysSinceLast <= 30) return 'potential'
+  if (visits >= 3 && daysSinceLast > 60 && daysSinceLast <= 90) return 'risk'
+  if (daysSinceLast > 90 && daysSinceLast <= 180) return 'sleep'
+  return 'lost'
+}
+
 export function computeRfm(
   clients: Array<Pick<ClientRow, 'visit_count' | 'last_visit_at' | 'created_at'>>,
   now: Date = new Date(),
 ): RfmSegment[] {
-  const day = 24 * 3600 * 1000
-  const ts = now.getTime()
   const counts = { champions: 0, loyal: 0, potential: 0, risk: 0, sleep: 0, lost: 0 }
   for (const c of clients) {
-    const visits = c.visit_count ?? 0
-    const lastVisitMs = c.last_visit_at ? new Date(c.last_visit_at).getTime() : 0
-    const createdMs = c.created_at ? new Date(c.created_at).getTime() : 0
-    const daysSinceLast = lastVisitMs > 0 ? (ts - lastVisitMs) / day : Infinity
-    const daysSinceCreate = createdMs > 0 ? (ts - createdMs) / day : Infinity
-
-    // T92 — Perspective опираемся на last_visit, не created_at. При импорте
-    // всех клиентов разом created_at = NOW → 922 «перспективных» из 1000.
-    // По last_visit ≤30 дней мы реально видим тех, кто пришёл недавно
-    // первый-второй раз и его ещё можно дотянуть в лояльных.
-    if (visits >= 5 && daysSinceLast <= 30) counts.champions++
-    else if (visits >= 3 && daysSinceLast <= 60) counts.loyal++
-    else if (visits >= 1 && visits <= 2 && daysSinceLast <= 30) counts.potential++
-    else if (visits >= 3 && daysSinceLast > 60 && daysSinceLast <= 90) counts.risk++
-    else if (daysSinceLast > 90 && daysSinceLast <= 180) counts.sleep++
-    else counts.lost++
-    void daysSinceCreate
+    counts[rfmSegmentForClient(c, now)]++
   }
   return [
     {

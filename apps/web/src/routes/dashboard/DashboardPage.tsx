@@ -52,7 +52,9 @@ import {
   computeRevenueByCategory,
   computeRfm,
   workingDaysInRange,
+  type RfmKey,
 } from './dashboard-aggregates'
+import { SegmentClientsModal } from './SegmentClientsModal'
 import { InsightsWidget } from './InsightsWidget'
 import { LowStockWidget } from './LowStockWidget'
 import { MasterDashboard } from './MasterDashboard'
@@ -112,6 +114,8 @@ export function DashboardPage() {
   const period: PeriodKey = periodValue.kind === 'month' ? 'month' : 'custom'
   const now = new Date()
   const [cashDetailsOpen, setCashDetailsOpen] = useState(false)
+  // Открытый RFM-сегмент (клик по плитке в блоке «Маркетинг») → список клиентов.
+  const [openSegment, setOpenSegment] = useState<RfmKey | null>(null)
 
   void periodLabel // PeriodPickerPopover сам рендерит лейбл
 
@@ -439,10 +443,21 @@ export function DashboardPage() {
         cacByChannel={[]}
         avgCacCents={null}
         rfm={rfm}
+        onSegmentClick={setOpenSegment}
         totalClients={totalClients}
         activeClients={activeClients}
         needsReactivation={needsReactivation}
       />
+
+      {salonId ? (
+        <SegmentClientsModal
+          salonId={salonId}
+          currency={currency}
+          segmentKey={openSegment}
+          segmentName={rfm.find((s) => s.key === openSegment)?.name ?? ''}
+          onClose={() => setOpenSegment(null)}
+        />
+      ) : null}
     </div>
   )
 }

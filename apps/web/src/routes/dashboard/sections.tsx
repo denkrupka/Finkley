@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
+import type { RfmKey } from './dashboard-aggregates'
 import { InfoHelpButton } from './InfoHelpButton'
 
 /**
@@ -873,12 +874,15 @@ export type MarketingSectionProps = {
   cacByChannel?: Array<{ channel: string; cacCents: number | null }>
   avgCacCents?: number | null
   rfm?: Array<{
+    key: RfmKey
     name: string
     count: number
     description: string
     fill: string
     text: string
   }>
+  /** Клик по плитке сегмента → открыть список клиентов этого сегмента. */
+  onSegmentClick?: (key: RfmKey) => void
   totalClients?: number | null
   activeClients?: number | null
   needsReactivation?: number | null
@@ -932,22 +936,43 @@ export function MarketingSection(p: MarketingSectionProps) {
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-1.5">
-              {p.rfm.map((s) => (
-                <div key={s.name} className="rounded-md p-2.5" style={{ background: s.fill }}>
-                  <div className="text-[11px] font-semibold" style={{ color: s.text }}>
-                    {s.name}
-                  </div>
-                  <div
-                    className="num mt-0.5 text-xl font-bold leading-none"
-                    style={{ color: s.text }}
+              {p.rfm.map((s) => {
+                const clickable = !!p.onSegmentClick && s.count > 0
+                return (
+                  <button
+                    key={s.name}
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => p.onSegmentClick?.(s.key)}
+                    title={
+                      clickable
+                        ? t('dashboard.sections.marketing.open_segment', {
+                            defaultValue: 'Показать клиентов',
+                          })
+                        : undefined
+                    }
+                    className={`rounded-md p-2.5 text-left transition ${
+                      clickable
+                        ? 'cursor-pointer hover:ring-2 hover:brightness-95'
+                        : 'cursor-default'
+                    }`}
+                    style={{ background: s.fill }}
                   >
-                    {s.count}
-                  </div>
-                  <div className="mt-0.5 text-[11px]" style={{ color: s.text }}>
-                    {s.description}
-                  </div>
-                </div>
-              ))}
+                    <div className="text-[11px] font-semibold" style={{ color: s.text }}>
+                      {s.name}
+                    </div>
+                    <div
+                      className="num mt-0.5 text-xl font-bold leading-none"
+                      style={{ color: s.text }}
+                    >
+                      {s.count}
+                    </div>
+                    <div className="mt-0.5 text-[11px]" style={{ color: s.text }}>
+                      {s.description}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
           <div className="mt-3">
