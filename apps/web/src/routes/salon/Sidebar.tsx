@@ -55,7 +55,12 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
     <aside
       data-tour="sidebar"
       className={cn(
-        'border-border bg-card flex h-screen flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
+        // h-full (а не h-screen): родитель — fixed inset-y-0, его высота уже
+        // равна видимой области. h-screen (100vh) на планшете/мобиле больше
+        // видимой высоты → футер («Сообщить о баге» и пр.) уходил за экран и
+        // не доставался скроллом. С h-full nav скроллится при нужде, футер
+        // всегда виден (задача 11).
+        'border-border bg-card flex h-full flex-shrink-0 flex-col border-r pb-4 pt-5 transition-all',
         collapsed ? 'w-[64px] px-2' : 'w-[232px] px-3.5',
       )}
     >

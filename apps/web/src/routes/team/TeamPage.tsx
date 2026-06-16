@@ -364,14 +364,14 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
             </DialogHeader>
           </div>
           <form
-            className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:overflow-hidden"
+            className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden"
             onSubmit={(e) => {
               e.preventDefault()
               submitInvite()
             }}
           >
             {/* Левая колонка: Email + Роль + Карточка мастера */}
-            <div className="lg:border-border flex min-w-0 flex-col gap-4 px-5 py-4 lg:overflow-y-auto lg:border-r">
+            <div className="lg:border-border flex min-h-0 min-w-0 flex-col gap-4 px-5 py-4 lg:overflow-y-auto lg:border-r">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="inv-email">{t('team.invite_email')}</Label>
                 <Input
@@ -447,8 +447,10 @@ export function TeamPage({ inline = false }: { inline?: boolean } = {}) {
               ) : null}
             </div>
 
-            {/* Правая колонка: Доступы (дерево разрешений) */}
-            <div className="bg-muted/10 flex min-w-0 flex-col px-5 py-4 lg:overflow-y-auto">
+            {/* Правая колонка: Доступы (дерево разрешений). min-h-0 +
+                grid-rows-[minmax(0,1fr)] на form — чтобы lg:overflow-y-auto
+                реально скроллил длинный список доступов, а не обрезал низ. */}
+            <div className="bg-muted/10 flex min-h-0 min-w-0 flex-col px-5 py-4 lg:overflow-y-auto">
               <PermissionsBlock
                 role={highestRole()}
                 value={permissions ?? undefined}
