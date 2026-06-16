@@ -105,10 +105,10 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     return m
   }, [allTimeVisits])
 
-  // Per (staff_id × client_id): first_at + total_count за ВСЁ время.
-  // Используется для split «новый клиент мастера» vs «постоянный».
+  // Per (staff_id × client_id): first_at + last_at + total_count за ВСЁ время.
+  // Используется для расчёта Возврат/Удержание за всю историю (а не за период).
   const firstVisitMap = useMemo(() => {
-    const m = new Map<string, { first_at: number; count: number }>()
+    const m = new Map<string, { first_at: number; last_at: number; count: number }>()
     for (const v of allTimeVisits) {
       if (!v.staff_id || !v.client_id) continue
       const key = `${v.staff_id}::${v.client_id}`
@@ -116,9 +116,10 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
       const cur = m.get(key)
       if (cur) {
         if (t < cur.first_at) cur.first_at = t
+        if (t > cur.last_at) cur.last_at = t
         cur.count += 1
       } else {
-        m.set(key, { first_at: t, count: 1 })
+        m.set(key, { first_at: t, last_at: t, count: 1 })
       }
     }
     return m
@@ -137,6 +138,8 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     return map
   }, [visits])
 
+  // Period-метрики: визиты/выручка/клиенты за ВЫБРАННЫЙ период. Эти колонки
+  // намеренно зависят от периода (сколько мастер сделал за месяц/квартал).
   function statsFor(staffId: string, windowDays: number) {
     // Если задан period — фильтрация по нему общая для всех мастеров.
     // Иначе — по индивидуальному retention-окну (старое поведение).
@@ -161,38 +164,6 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
     }
     const revenueCents = visitsRevenueCents + retailRevenueCents
 
-    // Retention split: «новый клиент» (первый раз пришёл к этому мастеру
-    // в периоде) vs «постоянный» (≥2 визитов в истории, первый был ДО периода).
-    const periodClientIds = new Set(
-      Array.from(visitsByStaff.get(staffId) ?? [])
-        .filter((v) => {
-          const t = new Date(v.visit_at).getTime()
-          return v.client_id && t >= startMs && t <= endMs
-        })
-        .map((v) => v.client_id as string),
-    )
-    let newClients = 0
-    let newClientsReturned = 0
-    let regularClients = 0
-    let regularClientsActive = 0
-    for (const [key, fv] of firstVisitMap) {
-      const sep = key.indexOf('::')
-      const sid = key.slice(0, sep)
-      const cid = key.slice(sep + 2)
-      if (sid !== staffId) continue
-      if (fv.first_at >= startMs && fv.first_at <= endMs) {
-        newClients += 1
-        if (fv.count >= 2) newClientsReturned += 1
-      } else if (fv.first_at < startMs && fv.count >= 2) {
-        regularClients += 1
-        if (periodClientIds.has(cid)) regularClientsActive += 1
-      }
-    }
-    const newRetentionPct =
-      newClients > 0 ? Math.round((newClientsReturned * 100) / newClients) : null
-    const regularRetentionPct =
-      regularClients > 0 ? Math.round((regularClientsActive * 100) / regularClients) : null
-
     return {
       visitCount: inWindow.length,
       revenueCents,
@@ -200,6 +171,41 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
       retailRevenueCents,
       tipsCents,
       uniqueClients: clientVisitCount.size,
+    }
+  }
+
+  /**
+   * Возврат / Удержание за ВСЮ историю (запрос владельца 16.06): цикличность
+   * визитов у мастеров разная, поэтому привязка к выбранному периоду давала
+   * неверные числа. Считаем по всей истории визитов мастера, с учётом
+   * индивидуального окна активности `windowDays`:
+   *   - Возврат  — из всех клиентов мастера сколько приходили ≥2 раз.
+   *   - Удержание — из «постоянных» (≥2 визита) сколько ещё активны (последний
+   *     визит к мастеру не старше windowDays).
+   * Переключение периода на эти метрики НЕ влияет.
+   */
+  function retentionFor(staffId: string, windowDays: number) {
+    const activeCutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000
+    let newClients = 0
+    let newClientsReturned = 0
+    let regularClients = 0
+    let regularClientsActive = 0
+    for (const [key, fv] of firstVisitMap) {
+      const sep = key.indexOf('::')
+      const sid = key.slice(0, sep)
+      if (sid !== staffId) continue
+      newClients += 1
+      if (fv.count >= 2) {
+        newClientsReturned += 1
+        regularClients += 1
+        if (fv.last_at >= activeCutoff) regularClientsActive += 1
+      }
+    }
+    const newRetentionPct =
+      newClients > 0 ? Math.round((newClientsReturned * 100) / newClients) : null
+    const regularRetentionPct =
+      regularClients > 0 ? Math.round((regularClientsActive * 100) / regularClients) : null
+    return {
       newClients,
       newClientsReturned,
       newRetentionPct,
@@ -210,54 +216,16 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
   }
 
   /**
-   * Period-aware churn (запрос юзера 01.06):
-   *   «Из клиентов которые были у мастера в ОКНЕ-ПРЕДШЕСТВЕННИКЕ той же
-   *    длины, что и текущий период, сколько НЕ пришли в текущем периоде?»
-   *
-   * Пример. Период = «Май 2026» (31 день).
-   *   prevWindow = «Апрель 2026» (31 день).
-   *   prevClients = клиенты мастера в апреле.
-   *   currentInSalon = клиенты любого мастера салона в мае.
-   *   churned = prevClients ∖ currentInSalon → % = churned / prevClients.
-   *
-   * Если периода нет (старый flow) — fallback на «давно не были»:
-   * last_in_salon < (today − churn_window_days). Если периода нет И у
-   * мастера 0 клиентов когда-либо — `null` (показываем «—»).
+   * Отток за ВСЮ историю (запрос владельца 16.06): период на отток не влияет.
+   *   «Из всех клиентов, которые когда-либо были у мастера, сколько после
+   *    этого вообще не вернулись в салон дольше, чем churn_window_days?»
+   *   churned = клиенты, у которых последний визит в салон (к любому мастеру)
+   *   старше, чем (today − churn_window_days).
+   * Если у мастера 0 клиентов когда-либо — `null` (показываем «—»).
    *
    * Скоринг — newR × regR × (1 − ch), 0..1.
    */
   function churnFor(staffId: string): { churn_pct: number | null; total: number } {
-    if (periodRange) {
-      const periodStartMs = periodRange.start.getTime()
-      const periodEndMs = periodRange.end.getTime()
-      const periodLenMs = periodEndMs - periodStartMs
-      const prevStartMs = periodStartMs - periodLenMs
-      const prevEndMs = periodStartMs
-
-      const prevClientsAtMaster = new Set<string>()
-      const currentInSalon = new Set<string>()
-      for (const v of allTimeVisits) {
-        if (!v.client_id) continue
-        const t = new Date(v.visit_at).getTime()
-        if (t >= prevStartMs && t < prevEndMs && v.staff_id === staffId) {
-          prevClientsAtMaster.add(v.client_id)
-        }
-        if (t >= periodStartMs && t <= periodEndMs) {
-          currentInSalon.add(v.client_id)
-        }
-      }
-      if (prevClientsAtMaster.size === 0) return { churn_pct: null, total: 0 }
-      let churned = 0
-      for (const cid of prevClientsAtMaster) {
-        if (!currentInSalon.has(cid)) churned += 1
-      }
-      return {
-        churn_pct: (churned / prevClientsAtMaster.size) * 100,
-        total: prevClientsAtMaster.size,
-      }
-    }
-
-    // Fallback (нет periodRange): классическое «давно не были».
     const clientsAtMaster = new Set<string>()
     for (const v of allTimeVisits) {
       if (v.staff_id === staffId && v.client_id) clientsAtMaster.add(v.client_id)
@@ -327,10 +295,11 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
         {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
       </div>
 
-      {/* T85 — без horizontal-scroll. Padding/font сжаты, (n/m) суффиксы
-          переведены в подстрочный font-[10px] чтобы не съедать ширину. */}
-      <div>
-        <table className="w-full text-xs">
+      {/* Задача 12 — на планшете 12 колонок «разъезжались». Даём таблице
+          min-width и горизонтальный скролл внутри карточки, чтобы колонки
+          не сжимались и не наезжали друг на друга. */}
+      <div className="-mx-1 overflow-x-auto">
+        <table className="w-full min-w-[720px] text-xs">
           <thead>
             <tr className="text-muted-foreground border-border border-b text-left text-[10px] uppercase tracking-wider">
               <th className="py-2 pr-2 font-semibold">{t('staff.performance.col_master')}</th>
@@ -355,21 +324,23 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
               <th className="py-2 pr-2 text-right font-semibold">
                 {t('staff.performance.col_clients')}
               </th>
+              {/* Возврат / Удержание / Отток / Скоринг — за всю историю
+                  (период на них не влияет). Выделены левым разделителем и
+                  фоном, чтобы было видно: это отдельная группа метрик. */}
               <th
-                className="py-2 pr-2 text-right font-semibold"
+                className="border-brand-border bg-muted/15 border-l-2 py-2 pr-2 text-right font-semibold"
                 title={t('staff.performance.col_retention_new_hint')}
               >
                 {t('staff.performance.col_retention_new')}
               </th>
               <th
-                className="py-2 pr-2 text-right font-semibold"
+                className="bg-muted/15 py-2 pr-2 text-right font-semibold"
                 title={t('staff.performance.col_retention_regular_hint')}
               >
                 {t('staff.performance.col_retention_regular')}
               </th>
-              {/* T85 — Отток + Скоринг (server-side, RPC) */}
               <th
-                className="py-2 pr-2 text-right font-semibold"
+                className="bg-muted/15 py-2 pr-2 text-right font-semibold"
                 title={t('reports_hub.staff.col_churn_tooltip', {
                   defaultValue:
                     '% клиентов мастера, которые после визита у него больше не вернулись в салон',
@@ -378,7 +349,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                 {t('reports_hub.staff.col_churn', { defaultValue: 'Отток' })}
               </th>
               <th
-                className="py-2 pr-2 text-right font-semibold"
+                className="bg-muted/15 py-2 pr-2 text-right font-semibold"
                 title={t('reports_hub.staff.col_scoring_tooltip', {
                   defaultValue: '(Возврат × Удержание) / Отток. Чем выше — тем лучше.',
                 })}
@@ -391,6 +362,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
             {sortedStaff.map((s, i) => {
               const masterWindow = s.retention_window_days ?? salonWindow
               const st = statsFor(s.id, masterWindow)
+              const ret = retentionFor(s.id, masterWindow)
               const visits = st.visitCount
               const rev = st.revenueCents
               const clients = st.uniqueClients
@@ -472,55 +444,55 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                   </td>
                   <td className="num text-muted-foreground py-2 pr-2 text-right">{clients}</td>
                   <td
-                    className="num py-2 pr-2 text-right"
+                    className="num border-brand-border bg-muted/15 border-l-2 py-2 pr-2 text-right"
                     title={t('staff.performance.col_retention_new_title', {
-                      returned: st.newClientsReturned,
-                      total: st.newClients,
+                      returned: ret.newClientsReturned,
+                      total: ret.newClients,
                     })}
                   >
-                    {st.newRetentionPct === null ? (
+                    {ret.newRetentionPct === null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <span
                         className={cn(
-                          st.newRetentionPct >= 50
+                          ret.newRetentionPct >= 50
                             ? 'text-brand-sage-deep font-bold'
-                            : st.newRetentionPct >= 25
+                            : ret.newRetentionPct >= 25
                               ? 'text-brand-gold-deep font-semibold'
                               : 'text-destructive font-semibold',
                         )}
                       >
-                        {st.newRetentionPct}%
+                        {ret.newRetentionPct}%
                         <span className="text-muted-foreground ml-1 text-[10px]">
-                          ({st.newClientsReturned}/{st.newClients})
+                          ({ret.newClientsReturned}/{ret.newClients})
                         </span>
                       </span>
                     )}
                   </td>
                   <td
-                    className="num py-2 pr-2 text-right"
+                    className="num bg-muted/15 py-2 pr-2 text-right"
                     title={t('staff.performance.col_retention_regular_title', {
-                      active: st.regularClientsActive,
-                      total: st.regularClients,
+                      active: ret.regularClientsActive,
+                      total: ret.regularClients,
                       window: masterWindow,
                       custom: isCustomWindow ? ' (индивид.)' : '',
                     })}
                   >
-                    {st.regularRetentionPct === null ? (
+                    {ret.regularRetentionPct === null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <span
                         className={cn(
-                          st.regularRetentionPct >= 60
+                          ret.regularRetentionPct >= 60
                             ? 'text-brand-sage-deep font-bold'
-                            : st.regularRetentionPct >= 30
+                            : ret.regularRetentionPct >= 30
                               ? 'text-brand-gold-deep font-semibold'
                               : 'text-destructive font-semibold',
                         )}
                       >
-                        {st.regularRetentionPct}%
+                        {ret.regularRetentionPct}%
                         <span className="text-muted-foreground ml-1 text-[10px]">
-                          ({st.regularClientsActive}/{st.regularClients})
+                          ({ret.regularClientsActive}/{ret.regularClients})
                         </span>
                       </span>
                     )}
@@ -534,11 +506,15 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                   {(() => {
                     const local = churnFor(s.id)
                     const churnPct = local.churn_pct
-                    const scoring = scoringFor(st.newRetentionPct, st.regularRetentionPct, churnPct)
+                    const scoring = scoringFor(
+                      ret.newRetentionPct,
+                      ret.regularRetentionPct,
+                      churnPct,
+                    )
                     return (
                       <>
                         <td
-                          className="num py-2 pr-2 text-right"
+                          className="num bg-muted/15 py-2 pr-2 text-right"
                           title={
                             churnPct !== null && local.total > 0
                               ? `${Math.round((churnPct / 100) * local.total)}/${local.total} клиентов`
@@ -562,7 +538,7 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                             </span>
                           )}
                         </td>
-                        <td className="num py-2 pr-2 text-right">
+                        <td className="num bg-muted/15 py-2 pr-2 text-right">
                           {scoring === null ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
@@ -628,10 +604,12 @@ export function StaffPerformanceSection({ salonId, staff, currency, period, head
                       <td className="num text-foreground py-2 pr-2 text-right">
                         {totalVisits} · {totalClients}
                       </td>
-                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
-                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
-                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
-                      <td className="text-muted-foreground py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground border-brand-border bg-muted/15 border-l-2 py-2 pr-2 text-right">
+                        —
+                      </td>
+                      <td className="text-muted-foreground bg-muted/15 py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground bg-muted/15 py-2 pr-2 text-right">—</td>
+                      <td className="text-muted-foreground bg-muted/15 py-2 pr-2 text-right">—</td>
                     </tr>
                   </tfoot>
                 )

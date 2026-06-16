@@ -361,14 +361,18 @@ function PerformanceSubTab({
               </tbody>
               {totalRevenue > 0 ? (
                 <tfoot className="border-border bg-muted/10 border-t">
+                  {/* 13 колонок: Имя | Услуги | Доп.продажи | Чаевые | Итого |
+                      Визиты | Клиенты | Возврат | Загрузка | Отток | Скоринг |
+                      Заработок | Доля. «Итого выручка» ставим под колонку
+                      «Итого» (5-я), сумму зарплат — под «Заработок» (12-я). */}
                   <tr>
                     <td className="text-muted-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-wider">
                       {t('reports_hub.staff.total')}
                     </td>
+                    <td colSpan={3} />
                     <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
                       {formatCurrency(totalRevenue, currency)}
                     </td>
-                    {/* +2 колонки (Отток+Скоринг) — увеличиваем colSpan на 2 */}
                     <td colSpan={6} />
                     <td className="num text-foreground px-3 py-2 text-right text-sm font-bold">
                       {formatCurrency(
