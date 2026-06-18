@@ -1967,7 +1967,7 @@
       "trial_ending_one": "Okres próbny kończy się jutro",
       "trial_ending_other": "Okres próbny kończy się za {{count}} dni",
       "expired_title": "Subskrypcja nieaktywna. Możesz przeglądać dane, ale nowe wpisy są chwilowo zablokowane.",
-      "cta_subscribe": "Wykup za €15/mies",
+      "cta_subscribe": "Wybierz plan",
       "cta_upgrade": "Zapłać"
     }
   },
@@ -2284,9 +2284,9 @@
     },
     "billing": {
       "title": "Subskrypcja",
-      "no_subscription": "Subskrypcja nie jest aktywna. Po 14 dniach bezpłatnego okresu próbnego konto przejdzie w tryb tylko do odczytu.",
-      "status_trialing": "Okres próbny — €15/mies po jego zakończeniu",
-      "status_active": "Aktywna — €15/mies",
+      "no_subscription": "Brak subskrypcji. Po 14-dniowym demo zostajesz na planie Darmowym (tylko Przychody).",
+      "status_trialing": "Demo — wybierz plan przed końcem",
+      "status_active": "Aktywna",
       "status_past_due": "Płatność nie przeszła. Zaktualizuj kartę w portalu rozliczeń.",
       "status_canceled": "Anulowana. Dostęp do końca opłaconego okresu.",
       "status_unpaid": "Nieopłacona. Wykup subskrypcję, żeby kontynuować.",

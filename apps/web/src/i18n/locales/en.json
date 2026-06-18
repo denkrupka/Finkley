@@ -2917,7 +2917,7 @@
       "trial_ending_one": "Trial ends tomorrow",
       "trial_ending_other": "Trial ends in {{count}} days",
       "expired_title": "Subscription is not active. You can view data, but new entries are temporarily disabled.",
-      "cta_subscribe": "Subscribe for €15/mo",
+      "cta_subscribe": "Choose a plan",
       "cta_upgrade": "Pay now"
     }
   },
@@ -3573,9 +3573,9 @@
     },
     "billing": {
       "title": "Subscription",
-      "no_subscription": "No subscription. After the 14-day free trial the account becomes read-only.",
-      "status_trialing": "Trial — €15/mo after it ends",
-      "status_active": "Active — €15/mo",
+      "no_subscription": "No subscription. After the 14-day demo you stay on the Free plan (Income only).",
+      "status_trialing": "Demo — choose a plan before it ends",
+      "status_active": "Active",
       "status_past_due": "Payment failed. Update your card in the billing portal.",
       "status_canceled": "Cancelled. Access until the end of the paid period.",
       "status_unpaid": "Unpaid. Subscribe to keep going.",
