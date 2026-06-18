@@ -25,6 +25,7 @@ export type DictKey =
   | 'nav.features'
   | 'nav.pricing'
   | 'nav.media'
+  | 'nav.blog'
   | 'nav.login'
   | 'nav.signup'
   // Hero
@@ -60,6 +61,7 @@ export const dict: Record<Lang, Record<DictKey, string>> = {
     'nav.features': 'Интеграции',
     'nav.pricing': 'Цены',
     'nav.media': 'Медиа',
+    'nav.blog': 'Блог',
     'nav.login': 'Войти',
     'nav.signup': 'Начать бесплатно',
     'hero.tagline': 'Учёт денег для салонов красоты',
@@ -99,6 +101,7 @@ export const dict: Record<Lang, Record<DictKey, string>> = {
     'nav.features': 'Integrations',
     'nav.pricing': 'Pricing',
     'nav.media': 'Blog',
+    'nav.blog': 'Blog',
     'nav.login': 'Sign in',
     'nav.signup': 'Start free',
     'hero.tagline': 'Management accounting for beauty salons',
@@ -137,6 +140,7 @@ export const dict: Record<Lang, Record<DictKey, string>> = {
     'nav.features': 'Integracje',
     'nav.pricing': 'Cennik',
     'nav.media': 'Blog',
+    'nav.blog': 'Blog',
     'nav.login': 'Zaloguj się',
     'nav.signup': 'Zacznij za darmo',
     'hero.tagline': 'Rachunkowość zarządcza dla salonów urody',

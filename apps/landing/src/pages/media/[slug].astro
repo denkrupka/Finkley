@@ -44,7 +44,7 @@ function fmt(d: Date): string {
 const post = { data }
 ---
 
-<Layout title={`${post.data.title} — Finkley`} description={post.data.description} active="media">
+<Layout title={`${post.data.title} — Finkley`} description={post.data.description} image={post.data.cover} active="media">
   <article>
     <header class="border-b border-brand-border bg-white">
       <div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
@@ -68,6 +68,13 @@ const post = { data }
       </div>
     </header>
     <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      {post.data.cover ? (
+        <img
+          src={post.data.cover}
+          alt={post.data.title}
+          class="mb-8 aspect-[16/9] w-full rounded-xl border border-brand-border object-cover"
+        />
+      ) : null}
       <div class="prose prose-slate max-w-none prose-h2:text-brand-navy prose-h3:text-brand-navy prose-a:text-brand-teal">
         {ContentComp ? <ContentComp /> : <div set:html={renderedHtml ?? ''} />}
       </div>

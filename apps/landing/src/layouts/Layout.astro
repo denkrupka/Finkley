@@ -42,9 +42,10 @@ const HREFLANGS = [
   { hreflang: 'x-default', href: canonicalUrl },
 ]
 
-// JSON-LD: SoftwareApplication. €15/мес после 14-дневного trial.
+// JSON-LD: SoftwareApplication. Бесплатный тариф навсегда + платные от €19/мес.
 // applicationCategory: FinanceApplication — Google понимает это как
-// финансовый софт. offers.price = 15 EUR / month (recurring subscription).
+// финансовый софт. offers — диапазон тарифов 0…99 EUR / month, lowPrice = 0
+// (бесплатный тариф), highPrice = 99 (мульти-салон). Демо 14 дней без карты.
 const softwareLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
@@ -56,17 +57,11 @@ const softwareLd = {
   url: SITE_ORIGIN,
   inLanguage: ['ru', 'en', 'pl'],
   offers: {
-    '@type': 'Offer',
-    price: '15.00',
+    '@type': 'AggregateOffer',
     priceCurrency: 'EUR',
-    priceSpecification: {
-      '@type': 'UnitPriceSpecification',
-      price: '15.00',
-      priceCurrency: 'EUR',
-      billingDuration: 'P1M',
-      billingIncrement: 1,
-      unitText: 'month',
-    },
+    lowPrice: '0',
+    highPrice: '99',
+    offerCount: 6,
     availability: 'https://schema.org/InStock',
     eligibleRegion: ['PL', 'EU'],
   },
@@ -166,6 +161,13 @@ const organizationLd = {
           >
             {t['nav.pricing']}
           </a>
+          <a
+            href="/media/"
+            class={`text-sm font-medium ${active === 'media' ? 'text-brand-navy' : 'text-brand-text-muted hover:text-brand-text'}`}
+            data-i18n="nav.blog"
+          >
+            {t['nav.blog']}
+          </a>
         </nav>
 
         <div class="flex items-center gap-3">
@@ -256,6 +258,13 @@ const organizationLd = {
             data-i18n="nav.pricing"
           >
             {t['nav.pricing']}
+          </a>
+          <a
+            href="/media/"
+            class={`flex h-12 items-center ${active === 'media' ? 'text-brand-navy' : 'text-brand-text'}`}
+            data-i18n="nav.blog"
+          >
+            {t['nav.blog']}
           </a>
           <a
             href={APP_URL + 'login'}
