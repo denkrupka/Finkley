@@ -75,9 +75,11 @@ export async function createCheckoutSession(
     cancel_url: input.cancelUrl,
     'metadata[salon_id]': input.salonId,
     'subscription_data[metadata][salon_id]': input.salonId,
-    automatic_tax: { enabled: 'true' },
+    // Владелец освобождён от НДС (оборот < 240k/год, mały podatnik) → налог НЕ
+    // добавляем: клиент платит ровно сумму тарифа (нетто = брутто). Когда
+    // появится обязанность по НДС — вернуть automatic_tax + tax_id_collection.
+    automatic_tax: { enabled: 'false' },
     billing_address_collection: 'auto',
-    'tax_id_collection[enabled]': 'true',
     // Включаем встроенный «Add promotion code» на Stripe Checkout странице.
     // Юзер вводит BETA3M (или другой активный promo) — Stripe сам валидирует
     // и применяет скидку. Свой UI не нужен.
@@ -131,9 +133,9 @@ export async function createOneTimeCheckout(
     cancel_url: input.cancelUrl,
     'metadata[salon_id]': input.salonId,
     'payment_intent_data[metadata][salon_id]': input.salonId,
-    automatic_tax: { enabled: 'true' },
+    // VAT-exempt владелец — налог не добавляем (нетто = брутто).
+    automatic_tax: { enabled: 'false' },
     billing_address_collection: 'auto',
-    'tax_id_collection[enabled]': 'true',
   }
   if (input.productDescription) {
     body['line_items[0][price_data][product_data][description]'] = input.productDescription
