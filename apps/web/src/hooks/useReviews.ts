@@ -1,6 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
+
+/**
+ * Инвалидирует ВСЕ review-зависимые кэши: список отзывов + бейджи-счётчики
+ * (unread-by-source для табов/сайдбара + legacy negative-count).
+ *
+ * Раньше мутации инвалидировали только ['reviews', salonId] → список обновлялся,
+ * но бейдж непрочитанных висел на старом значении до истечения staleTime
+ * (импорт новых отзывов / пометка прочитанным не двигали счётчик). Bug-фикс:
+ * счётчик обязан пересчитываться синхронно со списком.
+ */
+function invalidateReviewQueries(qc: QueryClient, salonId: string | undefined) {
+  qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+  qc.invalidateQueries({ queryKey: ['reviews-unread-by-source', salonId] })
+  qc.invalidateQueries({ queryKey: ['reviews-unread-negative-count', salonId] })
+}
 
 export type ReviewSource = 'internal' | 'booksy' | 'google'
 export type ReviewVisibility = 'private' | 'public'
@@ -147,7 +163,7 @@ export function useMarkAllReviewsRead(salonId: string | undefined) {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+      invalidateReviewQueries(qc, salonId)
     },
   })
 }
@@ -168,7 +184,7 @@ export function useSaveReviewReply(salonId: string | undefined) {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+      invalidateReviewQueries(qc, salonId)
     },
   })
 }
@@ -185,7 +201,7 @@ export function useMarkReviewRead(salonId: string | undefined) {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['reviews', salonId] })
+      invalidateReviewQueries(qc, salonId)
     },
   })
 }
@@ -208,6 +224,6 @@ export function useReviewsImport(salonId: string | undefined) {
       if (error) throw error
       return (data as { imported?: number } | null)?.imported ?? 0
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['reviews', salonId] }),
+    onSuccess: () => invalidateReviewQueries(qc, salonId),
   })
 }
