@@ -20,6 +20,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { isValidPaidPlan, priceIdForPlan } from '../_shared/plans.ts'
 import { withSentry } from '../_shared/sentry.ts'
 import { createCheckoutSession } from '../_shared/stripe.ts'
 
@@ -41,14 +42,14 @@ Deno.serve(
     if (req.method === 'OPTIONS') return preflight()
     if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-    if (!STRIPE_KEY || !STRIPE_PRICE_ID || !SUPABASE_URL || !SERVICE_ROLE) {
+    if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_ROLE) {
       return jsonResponse({ error: 'function_not_configured' }, 500)
     }
 
     const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
 
-    let body: { salonId?: string; prompt?: string }
+    let body: { salonId?: string; prompt?: string; plan?: string }
     try {
       body = await req.json()
     } catch {
@@ -56,6 +57,12 @@ Deno.serve(
     }
     const salonId = body.salonId
     if (!salonId) return jsonResponse({ error: 'salon_id_required' }, 400)
+
+    // T7 — выбор тарифа. Если plan валиден и для него настроена цена —
+    // используем её, иначе fallback на legacy STRIPE_PRICE_ID.
+    const priceId =
+      (isValidPaidPlan(body.plan) ? priceIdForPlan(body.plan) : null) ?? STRIPE_PRICE_ID
+    if (!priceId) return jsonResponse({ error: 'price_not_configured' }, 500)
     // T186 — после Stripe success/cancel вернуть юзера в integrations с
     // его prompt (онбординг ставит цепочку Booksy/wFirma/etc). Это
     // гарантирует что юзер не теряется при cancel.
@@ -87,7 +94,7 @@ Deno.serve(
 
     try {
       const session = await createCheckoutSession(STRIPE_KEY, {
-        price: STRIPE_PRICE_ID,
+        price: priceId,
         customerEmail: email,
         salonId,
         successUrl: `${APP_URL}${salonId}/settings?stripe=success${promptQs}`,

@@ -28,6 +28,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { sendEmail, type EmailTemplate } from '../_shared/notify.ts'
+import { planForPriceId } from '../_shared/plans.ts'
 import { getOwnerByStripeCustomer, getOwnerBySubscriptionId } from '../_shared/salon-lookup.ts'
 import { captureException } from '../_shared/sentry.ts'
 import { createSmsApiSender } from '../_shared/smsapi-sender.ts'
@@ -270,12 +271,15 @@ Deno.serve(async (req: Request) => {
         const sub = event.data.object as unknown as SubObj
         const salonId = sub.metadata?.salon_id
         if (!salonId) break
+        const priceId = sub.items.data[0]?.price.id ?? ''
         await admin.from('salon_subscriptions').upsert(
           {
             salon_id: salonId,
             stripe_customer_id: sub.customer,
             stripe_subscription_id: sub.id,
-            stripe_price_id: sub.items.data[0]?.price.id ?? '',
+            stripe_price_id: priceId,
+            // T7 — тариф из price_id (price→plan map).
+            plan: planForPriceId(priceId),
             status: sub.status,
             trial_ends_at: ts(sub.trial_end),
             current_period_start: ts(sub.current_period_start)!,

@@ -1,77 +1,212 @@
 ---
 import Layout from '../layouts/Layout.astro'
 
-const FEATURES = [
-  'Дашборд с прибылью за день/неделю/месяц',
-  'Быстрый ввод визитов и расходов',
-  'Управление мастерами и услугами',
-  'Анализ маржи по услугам',
-  'Несколько салонов на одном аккаунте',
-  'Экспорт данных в CSV',
-  'Хранение данных в ЕС (Frankfurt)',
-  'Email поддержка',
+// 6-уровневая модель тарифов. Цены — netto (НДС добавляется сверху, Stripe Tax считает
+// сам). Демо и Бесплатный — €0. Платные растут по объёму разделов:
+// €19 (база + расходы/отчёты/мессенджер), €49 (+ маркетинг/AI, «Популярный»),
+// €69 (всё: финансы P&L/ДДС + склад), €99 (+ мульти-салон).
+
+// Демо и Бесплатный — пара карточек сверху (оба €0, разная природа).
+const FREE_PLANS = [
+  {
+    name: 'Демо',
+    price: '€0',
+    note: '14 дней',
+    badge: '14 дней бесплатно, без карты',
+    blurb: 'Весь функционал без ограничений на 14 дней. Карта не нужна.',
+    cta: 'Начать бесплатно',
+    features: [
+      'Все разделы и интеграции',
+      'Без лимитов на 14 дней',
+      'Без привязки карты',
+      'После — выбери любой тариф',
+    ],
+  },
+  {
+    name: 'Бесплатный',
+    price: '€0',
+    note: 'навсегда',
+    badge: 'Навсегда бесплатно',
+    blurb: 'Базовый учёт доходов без срока. Остальные разделы видно, но они заблокированы.',
+    cta: 'Начать бесплатно',
+    features: [
+      'Раздел «Доходы»: визиты и выручка',
+      'Остальные разделы видны, но заблокированы',
+      'Без срока действия',
+      'Апгрейд в один клик в любой момент',
+    ],
+  },
+]
+
+// Платные тарифы. highlight — €49 («Популярный»).
+const PAID_PLANS = [
+  {
+    name: 'Старт',
+    price: '€19',
+    period: '/ мес',
+    highlight: false,
+    blurb: 'Полный учёт денег: доходы, расходы и отчётность.',
+    cta: 'Выбрать',
+    features: [
+      'Всё из бесплатного',
+      'Раздел «Расходы»',
+      'Раздел «Отчёты»',
+      'Раздел «Мессенджер»',
+    ],
+  },
+  {
+    name: 'Рост',
+    price: '€49',
+    period: '/ мес',
+    highlight: true,
+    blurb: 'Учёт плюс привлечение клиентов и AI-помощник.',
+    cta: 'Выбрать',
+    features: [
+      'Всё из тарифа €19',
+      'Раздел «Маркетинг»',
+      'AI-помощник',
+    ],
+  },
+  {
+    name: 'Полный',
+    price: '€69',
+    period: '/ мес',
+    highlight: false,
+    blurb: 'Все разделы продукта, включая финансы и склад.',
+    cta: 'Выбрать',
+    features: [
+      'Всё из тарифа €49',
+      'Раздел «Финансы»: P&L и ДДС',
+      'Раздел «Склад»',
+      'Все интеграции',
+    ],
+  },
+  {
+    name: 'Сеть',
+    price: '€99',
+    period: '/ мес',
+    highlight: false,
+    blurb: 'Для нескольких салонов на одном аккаунте.',
+    cta: 'Выбрать',
+    features: [
+      'Всё из тарифа €69',
+      'Несколько салонов на одном аккаунте',
+      'Переключатель салонов в шапке',
+      'Каждый салон считается отдельно',
+    ],
+  },
 ]
 ---
 
-<Layout title="Finkley — цены" description="€15/мес после 14 дней бесплатно. Без карты на старте." active="pricing">
+<Layout
+  title="Finkley — цены"
+  description="Бесплатный тариф навсегда, демо 14 дней без карты и платные планы от €19/мес. Платите только за то, чем пользуетесь."
+  active="pricing"
+>
   <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
     <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
       <div class="text-center">
         <h1 class="text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl">
-          Простой тариф. Без сюрпризов.
+          Простые тарифы. Платите только за то, чем пользуетесь.
         </h1>
         <p class="mx-auto mt-4 max-w-2xl text-lg text-brand-text-muted">
-          14 дней бесплатно без карты. После — €15 в месяц за салон. Отменить можно в один клик.
+          Демо 14 дней без карты, бесплатный тариф навсегда и платные планы от €19/мес. Отменить
+          можно в один клик.
         </p>
       </div>
 
-      <div class="mx-auto mt-12 max-w-md">
-        <div
-          class="overflow-hidden rounded-xl border-2 border-brand-navy bg-white shadow-2xl shadow-brand-navy/10"
-        >
-          <div class="bg-brand-navy px-6 py-4 text-white">
-            <div class="text-xs font-bold uppercase tracking-wider opacity-65">Тариф</div>
-            <div class="text-2xl font-extrabold tracking-tight">Finkley Pro</div>
-          </div>
-          <div class="px-6 py-7">
-            <div class="flex items-baseline gap-2">
-              <span class="font-mono text-5xl font-extrabold tracking-tight text-brand-navy"
-                >€15</span
-              >
-              <span class="text-base text-brand-text-muted">/ месяц</span>
-            </div>
-            <div class="mt-1 text-xs text-brand-text-faint">
-              VAT добавляется автоматически по стране салона
-            </div>
-
-            <div class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage-soft px-3 py-1 text-xs font-bold text-brand-sage">
-              <span>✨</span> 14 дней бесплатно — без карты
-            </div>
-
-            <ul class="mt-7 space-y-3">
-              {
-                FEATURES.map((f) => (
+      <!-- Демо + Бесплатный: пара карточек сверху -->
+      <div class="mx-auto mt-12 grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2">
+        {
+          FREE_PLANS.map((plan) => (
+            <div class="flex flex-col rounded-xl border border-brand-border bg-white p-6 shadow-sm">
+              <div class="flex items-baseline justify-between">
+                <div class="text-lg font-extrabold tracking-tight text-brand-navy">{plan.name}</div>
+                <div class="flex items-baseline gap-1">
+                  <span class="font-mono text-3xl font-extrabold tracking-tight text-brand-navy">
+                    {plan.price}
+                  </span>
+                  <span class="text-sm text-brand-text-muted">/ {plan.note}</span>
+                </div>
+              </div>
+              <div class="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-sage-soft px-3 py-1 text-xs font-bold text-brand-sage">
+                <span>✨</span> {plan.badge}
+              </div>
+              <p class="mt-4 text-sm leading-relaxed text-brand-text-muted">{plan.blurb}</p>
+              <ul class="mt-5 flex-1 space-y-2.5">
+                {plan.features.map((f) => (
                   <li class="flex items-start gap-2.5 text-sm text-brand-text">
                     <span class="mt-0.5 text-brand-sage">✓</span>
                     <span>{f}</span>
                   </li>
-                ))
-              }
-            </ul>
-
-            <a
-              href="/app/signup"
-              class="mt-8 inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-navy text-sm font-bold text-white hover:bg-brand-navy-soft"
-            >
-              Начать бесплатно
-            </a>
-          </div>
-        </div>
-
-        <p class="mt-6 text-center text-sm text-brand-text-muted">
-          Платежи через Stripe · Можно платить картой Visa / Mastercard
-        </p>
+                ))}
+              </ul>
+              <a
+                href="/app/signup"
+                class="mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg border border-brand-navy text-sm font-bold text-brand-navy hover:bg-brand-bg"
+              >
+                {plan.cta}
+              </a>
+            </div>
+          ))
+        }
       </div>
+
+      <!-- Платные тарифы -->
+      <div class="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          PAID_PLANS.map((plan) => (
+            <div
+              class={`relative flex flex-col rounded-xl bg-white p-6 ${
+                plan.highlight
+                  ? 'border-2 border-brand-navy shadow-2xl shadow-brand-navy/10'
+                  : 'border border-brand-border shadow-sm'
+              }`}
+            >
+              {plan.highlight && (
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span class="inline-flex items-center rounded-full bg-brand-navy px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+                    Популярный
+                  </span>
+                </div>
+              )}
+              <div class="text-lg font-extrabold tracking-tight text-brand-navy">{plan.name}</div>
+              <div class="mt-3 flex items-baseline gap-1.5">
+                <span class="font-mono text-4xl font-extrabold tracking-tight text-brand-navy">
+                  {plan.price}
+                </span>
+                <span class="text-base text-brand-text-muted">{plan.period}</span>
+              </div>
+              <p class="mt-3 min-h-[2.5rem] text-sm leading-relaxed text-brand-text-muted">
+                {plan.blurb}
+              </p>
+              <ul class="mt-5 flex-1 space-y-2.5">
+                {plan.features.map((f) => (
+                  <li class="flex items-start gap-2.5 text-sm text-brand-text">
+                    <span class="mt-0.5 text-brand-sage">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="/app/signup"
+                class={`mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold ${
+                  plan.highlight
+                    ? 'bg-brand-navy text-white hover:bg-brand-navy-soft'
+                    : 'border border-brand-navy text-brand-navy hover:bg-brand-bg'
+                }`}
+              >
+                {plan.cta}
+              </a>
+            </div>
+          ))
+        }
+      </div>
+
+      <p class="mt-8 text-center text-sm text-brand-text-muted">
+        Цены указаны без НДС — налог добавляется при оплате (Stripe Tax считает автоматически по
+        стране салона). Платежи через Stripe · Visa / Mastercard.
+      </p>
     </div>
   </section>
 
@@ -85,13 +220,40 @@ const FEATURES = [
       <div class="mt-8 space-y-3">
         <details class="group rounded-md border border-brand-border bg-brand-bg p-5 open:bg-white open:shadow-sm">
           <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
-            А что после 14 дней?
+            Чем демо отличается от бесплатного тарифа?
             <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
           </summary>
           <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
-            На 12-й день мы напомним по email — оплати, и ничего не изменится. Если не оплатишь,
-            аккаунт перейдёт в режим только для чтения: можешь смотреть данные, но не добавлять
-            новые. Подписаться можно в любой момент.
+            Демо — это весь функционал без ограничений на 14 дней, чтобы попробовать всё. Карта не
+            нужна. Бесплатный тариф действует навсегда, но в нём открыт только раздел «Доходы» (учёт
+            визитов и выручки) — остальные разделы видны, но заблокированы. В любой момент можно
+            перейти на платный тариф.
+          </p>
+        </details>
+
+        <details class="group rounded-md border border-brand-border bg-brand-bg p-5 open:bg-white open:shadow-sm">
+          <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+            А что после 14 дней демо?
+            <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
+            На 12-й день мы напомним по email. Можно выбрать платный тариф и продолжить со всеми
+            разделами, либо остаться на бесплатном тарифе — тогда останется доступен раздел «Доходы»,
+            а остальные разделы заблокируются. Данные никуда не денутся. Подписаться можно в любой
+            момент.
+          </p>
+        </details>
+
+        <details class="group rounded-md border border-brand-border bg-brand-bg p-5 open:bg-white open:shadow-sm">
+          <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+            Какой тариф выбрать?
+            <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
+            €19 — если нужен учёт доходов, расходов, отчёты и мессенджер. €49 (самый популярный)
+            добавляет маркетинг и AI-помощника. €69 открывает всё, включая финансы (P&L и ДДС) и
+            склад. €99 — если у тебя несколько салонов на одном аккаунте. Перейти между тарифами
+            можно в любой момент.
           </p>
         </details>
 
@@ -101,7 +263,19 @@ const FEATURES = [
             <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
           </summary>
           <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
-            €15/мес за каждый салон отдельно. Один аккаунт — переключатель салонов в шапке.
+            Мульти-салон входит в тариф €99/мес: один аккаунт, переключатель салонов в шапке, каждый
+            салон считается отдельно. На остальных тарифах — один салон на аккаунт.
+          </p>
+        </details>
+
+        <details class="group rounded-md border border-brand-border bg-brand-bg p-5 open:bg-white open:shadow-sm">
+          <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+            Цены с НДС или без?
+            <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
+            Цены указаны без НДС (netto) — налог добавляется сверху при оплате. Stripe Tax сам
+            определяет ставку по стране салона и показывает её в чеке.
           </p>
         </details>
 
@@ -111,8 +285,8 @@ const FEATURES = [
             <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">+</span>
           </summary>
           <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">
-            Да, в один клик в Настройках → Подписка. До конца оплаченного периода аккаунт работает
-            как обычно, потом переходит в read-only.
+            Да, в один клик в Настройках → Подписка. До конца оплаченного периода тариф работает как
+            обычно, потом аккаунт переходит на бесплатный тариф (остаётся раздел «Доходы»).
           </p>
         </details>
 

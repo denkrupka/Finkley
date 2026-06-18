@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireGuest } from '@/components/auth/RequireAuth'
 import { RequirePermission } from '@/components/auth/RequirePermission'
+import { RequireEntitlement } from '@/components/auth/RequireEntitlement'
 import { RouteErrorBoundary } from '@/components/error-boundary/ErrorBoundary'
 import { useI18nSync } from '@/i18n/useI18nSync'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -290,7 +291,11 @@ function App() {
         <Route
           path="expenses"
           element={
-            <RequirePermission category="expenses">{lazyRoute(<ExpensesPage />)}</RequirePermission>
+            <RequirePermission category="expenses">
+              <RequireEntitlement section="expenses">
+                {lazyRoute(<ExpensesPage />)}
+              </RequireEntitlement>
+            </RequirePermission>
           }
         />
         {/* Bug (баг-трекер): мастер (staff) мог открыть справочники Мастера/
@@ -316,7 +321,9 @@ function App() {
           path="inventory"
           element={
             <RequirePermission category="inventory">
-              {lazyRoute(<InventoryPage />)}
+              <RequireEntitlement section="inventory">
+                {lazyRoute(<InventoryPage />)}
+              </RequireEntitlement>
             </RequirePermission>
           }
         />
@@ -324,7 +331,9 @@ function App() {
           path="marketing"
           element={
             <RequirePermission category="marketing">
-              {lazyRoute(<MarketingPage />)}
+              <RequireEntitlement section="marketing">
+                {lazyRoute(<MarketingPage />)}
+              </RequireEntitlement>
             </RequirePermission>
           }
         />
@@ -332,7 +341,9 @@ function App() {
           path="messenger"
           element={
             <RequirePermission category="messenger">
-              {lazyRoute(<MessengerPage />)}
+              <RequireEntitlement section="messenger">
+                {lazyRoute(<MessengerPage />)}
+              </RequireEntitlement>
             </RequirePermission>
           }
         />
@@ -342,7 +353,9 @@ function App() {
           path="reports"
           element={
             <RequirePermission category="reports">
-              {lazyRoute(<ReportsHubPage />)}
+              <RequireEntitlement section="reports">
+                {lazyRoute(<ReportsHubPage />)}
+              </RequireEntitlement>
             </RequirePermission>
           }
         />
@@ -355,12 +368,20 @@ function App() {
         <Route
           path="finance"
           element={
-            <RequirePermission category="finance">{lazyRoute(<FinancePage />)}</RequirePermission>
+            <RequirePermission category="finance">
+              <RequireEntitlement section="finance">
+                {lazyRoute(<FinancePage />)}
+              </RequireEntitlement>
+            </RequirePermission>
           }
         />
         <Route
           path="ai"
-          element={<RequirePermission category="ai">{lazyRoute(<AIPage />)}</RequirePermission>}
+          element={
+            <RequirePermission category="ai">
+              <RequireEntitlement section="ai">{lazyRoute(<AIPage />)}</RequireEntitlement>
+            </RequirePermission>
+          }
         />
         <Route path="settings" element={lazyRoute(<SettingsPage />)} />
         <Route path="settings/import" element={lazyRoute(<ImportPage />)} />

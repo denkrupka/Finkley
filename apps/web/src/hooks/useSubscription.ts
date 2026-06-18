@@ -14,14 +14,21 @@ export type SubscriptionStatus =
 
 export type SalonSubscription = {
   salon_id: string
-  stripe_customer_id: string
-  stripe_subscription_id: string
-  stripe_price_id: string
+  /** Nullable после миграции 20260514150000 (ручные/бонусные подписки без Stripe). */
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  stripe_price_id: string | null
   status: SubscriptionStatus
   trial_ends_at: string | null
   current_period_start: string
   current_period_end: string
   cancel_at_period_end: boolean
+  /** Тарифный план (T7, миграция 20260618000002). demo|free|t19|t49|t69|t99. */
+  plan?: string | null
+  /** Бонусные дни поверх подписки (ручной грант / награда за настройку). */
+  bonus_until?: string | null
+  /** 'stripe' | 'manual_admin'. */
+  source?: string | null
 }
 
 export function useSubscription(salonId: string | undefined) {

@@ -1,4 +1,4 @@
-import { Bug, ChevronsLeft, ChevronsRight, HelpCircle } from 'lucide-react'
+import { Bug, ChevronsLeft, ChevronsRight, HelpCircle, Lock } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink } from 'react-router-dom'
@@ -6,9 +6,11 @@ import { Link, NavLink } from 'react-router-dom'
 import { LogoLockup } from '@/components/ui/logo'
 import { ReferralButton } from '@/components/ui/ReferralButton'
 import { ThemeToggleButton } from '@/components/ui/ThemeToggleButton'
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { useUnreadMessengerCount } from '@/hooks/useMessenger'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useUnreadReviewsBySource } from '@/hooks/useReviews'
+import { type SectionId } from '@/lib/entitlements'
 import { cn } from '@/lib/utils/cn'
 import { NAV_ITEMS } from './nav-config'
 
@@ -43,6 +45,9 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
   // T35 — фильтр nav-пунктов по permissions матрице. Главная и Настройки
   // всегда видны (минимально нужны юзеру даже с самыми ограниченными правами).
   const { can, role } = usePermissions(salonId)
+  // T7 — секции, недоступные на текущем тарифе, показываем с замком (но
+  // оставляем кликабельными — при переходе откроется upgrade-плашка).
+  const { canAccessSection } = useEntitlements(salonId)
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === 'dashboard' || item.id === 'settings') return true
     return can(item.id, 'view')
@@ -130,6 +135,17 @@ export function Sidebar({ salonId, onNavigate, collapsed = false, onToggleCollap
                     strokeWidth={1.7}
                   />
                   {collapsed ? null : <span className="flex-1">{t(item.i18nKey)}</span>}
+                  {/* T7 — замок для секций вне тарифа (кликабельны → плашка). */}
+                  {!collapsed && !canAccessSection(item.id as SectionId) ? (
+                    <Lock
+                      className={cn(
+                        'size-3.5 shrink-0',
+                        isActive ? 'text-primary-foreground/70' : 'text-muted-foreground/50',
+                      )}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  ) : null}
                   {/* В collapsed badge показываем как маленькую red-dot
                       в углу иконки (через absolute, требует relative parent) */}
                   {item.id === 'reports' && unreadNegative > 0 ? (

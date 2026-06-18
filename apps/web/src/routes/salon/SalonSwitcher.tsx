@@ -1,8 +1,10 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Check, ChevronsUpDown, Plus } from 'lucide-react'
+import { Check, ChevronsUpDown, Lock, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
@@ -26,12 +28,30 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
   const { t } = useTranslation()
   const { data: salons } = useMySalons()
   const { role } = usePermissions(salonId)
+  const { canCreateMultipleSalons } = useEntitlements(salonId)
   const navigate = useNavigate()
 
   const list = salons ?? []
   // Bug (баг-трекер): мастер (staff) видел «Создать ещё салон». Это owner-
   // действие — скрываем для staff/external.
   const canCreateSalon = role !== 'staff' && role !== 'external'
+  // T7 — несколько салонов только на тарифе €99. Если уже есть салон и тариф
+  // ниже — ведём на апгрейд вместо создания.
+  const multiSalonLocked = list.length >= 1 && !canCreateMultipleSalons
+
+  function handleAddSalon() {
+    if (multiSalonLocked) {
+      toast.message(
+        t('billing.multi_salon_locked', {
+          defaultValue:
+            'Несколько салонов доступно на тарифе €99. Откройте его, чтобы добавить салон.',
+        }),
+      )
+      navigate(`/${salonId}/settings?tab=billing&plan=t99`)
+      return
+    }
+    navigate('/onboarding?new=1')
+  }
   // Даже при одном салоне показываем dropdown — внутри пункт «+ Создать ещё».
   // Раньше тут был просто текст; теперь это всегда кнопка-меню.
 
@@ -81,10 +101,14 @@ export function SalonSwitcher({ salonId, salonName }: Props) {
               <DropdownMenu.Separator className="bg-border my-1 h-px" />
               <DropdownMenu.Item
                 className="text-secondary data-[highlighted]:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm font-semibold outline-none"
-                onSelect={() => navigate('/onboarding?new=1')}
+                onSelect={handleAddSalon}
                 data-testid="salon-switcher-add"
               >
-                <Plus className="size-4" strokeWidth={2} />
+                {multiSalonLocked ? (
+                  <Lock className="size-4" strokeWidth={2} />
+                ) : (
+                  <Plus className="size-4" strokeWidth={2} />
+                )}
                 {t('salon_switcher.add_new')}
               </DropdownMenu.Item>
             </>
