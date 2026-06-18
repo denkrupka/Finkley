@@ -482,7 +482,9 @@ async function fetchCustomersPage(
   accessToken: string,
   businessId: number,
   page: number,
-  perPage = 100,
+  // Больший пакет = больше клиентов за один HTTP-запрос (меньше round-trip'ов
+  // в рамках BUDGET_MS). Booksy /customers поддерживает увеличенный per_page.
+  perPage = 200,
 ): Promise<CustomersListResp | null> {
   const res = await booksyGet<CustomersListResp>(
     `/me/businesses/${businessId}/customers?page=${page}&per_page=${perPage}&compact=true`,
@@ -501,7 +503,8 @@ async function fetchCustomerBookings(
   customerId: number,
   state: 'active' | 'inactive',
   page = 1,
-  perPage = 50,
+  // Больший пакет истории визитов на клиента → меньше round-trip'ов.
+  perPage = 100,
 ): Promise<CustomerBookingsResp | null> {
   const res = await booksyGet<CustomerBookingsResp>(
     `/me/businesses/${businessId}/customers/${customerId}/bookings` +
@@ -1001,7 +1004,9 @@ async function syncClients(
   const stats: SyncStats = { clients_synced: 0, history_visits_synced: 0 }
 
   const startTs = Date.now()
-  const BUDGET_MS = 50_000
+  // Больше времени на прогон = больше клиентов+истории за один запуск (cron-
+  // тик / connect). Запас под Supabase edge ~150s walltime сохранён.
+  const BUDGET_MS = 90_000
 
   // Caches для resolve booksy_id → uuid (staff/service)
   const caches = await buildResolveCaches(admin, salonId)
@@ -1066,7 +1071,7 @@ async function syncClients(
   let page = Math.max(1, Number(meta.clients_resume_page ?? 1))
   if (!Number.isFinite(page) || page < 1) page = 1
   console.info(`[booksy-sync] customers resume from page ${page}`)
-  const perPage = 100
+  const perPage = 200
   let finishedAllPages = false
   while (Date.now() - startTs < BUDGET_MS) {
     const resp = await fetchCustomersPage(accessToken, businessId, page, perPage)
@@ -1241,9 +1246,11 @@ async function backfillCustomerHistory(
 ): Promise<number> {
   let added = 0
   let page = 1
-  const perPage = 50
-  // Лимит страниц per-клиента чтобы не закопаться на одном супер-VIP клиенте
-  const MAX_PAGES = 5
+  const perPage = 100
+  // Лимит страниц per-клиента чтобы не закопаться на одном супер-VIP клиенте.
+  // Увеличен (5→10): при perPage=100 это до 1000 визитов истории на клиента
+  // за прогон — тяжёлые/VIP клиенты догружаются быстрее.
+  const MAX_PAGES = 10
 
   while (page <= MAX_PAGES) {
     const resp = await fetchCustomerBookings(
@@ -1670,7 +1677,9 @@ async function syncVisits(
   }> = []
 
   const startTs = Date.now()
-  const BUDGET_MS = 45_000
+  // Больше времени на прогон визитов/календаря за один запуск. Запас под
+  // Supabase edge ~150s walltime сохранён.
+  const BUDGET_MS = 90_000
 
   const now = new Date()
   // Если opts задан (day-sync) — узкое окно. Иначе ±60 дней (полный sync).
@@ -3133,7 +3142,8 @@ async function handleForceResyncHistory(
       : 0
 
   const startTs = Date.now()
-  const BUDGET_MS = 50_000
+  // Принудительный ресинк истории: больше клиентов за прогон (запас под ~150s).
+  const BUDGET_MS = 90_000
 
   let processed = 0
   let historyVisitsAdded = 0
