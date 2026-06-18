@@ -76,11 +76,23 @@ export type FullArticle = {
   body_html: string
 }
 
+/** Языки генерации статьи (независимы от языка UI-локали). */
+export type ArticleLang = 'uk' | 'ru' | 'pl' | 'en' | 'de' | 'cs'
+
+export const ARTICLE_LANGS: { code: ArticleLang; label: string; flag: string }[] = [
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { code: 'uk', label: 'Українська', flag: '🇺🇦' },
+  { code: 'pl', label: 'Polski', flag: '🇵🇱' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { code: 'cs', label: 'Čeština', flag: '🇨🇿' },
+]
+
 /** Полная генерация статьи одним кликом (заголовок, slug, мета, ключи, теги,
  *  тело) под максимальный SEO score. Обложку и ссылки добивает клиент. */
 export function useAiGenerateFullArticle() {
   return useMutation({
-    mutationFn: (vars: { target_keyword: string; title?: string }) =>
+    mutationFn: (vars: { target_keyword: string; title?: string; language?: ArticleLang }) =>
       callAi<FullArticle>('generate_full_article', vars),
   })
 }

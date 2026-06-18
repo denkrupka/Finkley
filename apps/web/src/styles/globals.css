@@ -258,3 +258,108 @@
     flex: initial;
   }
 }
+
+/* ── Типографика статей блога (.prose) ───────────────────────────────────────
+   @tailwindcss/typography НЕ подключён — поэтому базовые стили заголовков/
+   абзацев/списков/выделений заданы вручную. Без них preflight обнуляет
+   отступы и размеры, и статья выглядит «всё в кучу». Используется в публичной
+   статье (/media) и в превью редактора (TipTap). */
+.prose {
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose > :last-child {
+  margin-bottom: 0;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: hsl(var(--brand-navy));
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.prose h1 {
+  font-size: 1.875rem;
+  margin: 2rem 0 1rem;
+}
+.prose h2 {
+  font-size: 1.5rem;
+  margin: 2rem 0 0.75rem;
+}
+.prose h3 {
+  font-size: 1.25rem;
+  margin: 1.5rem 0 0.5rem;
+}
+.prose p {
+  margin: 0 0 1.15rem;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 1.15rem;
+  padding-left: 1.5rem;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li {
+  margin: 0.35rem 0;
+  padding-left: 0.25rem;
+}
+.prose li::marker {
+  color: hsl(var(--brand-teal-deep));
+}
+.prose strong {
+  font-weight: 700;
+  color: hsl(var(--brand-navy));
+}
+.prose em {
+  font-style: italic;
+}
+.prose a {
+  color: hsl(var(--brand-teal-deep));
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose a:hover {
+  opacity: 0.85;
+}
+.prose blockquote {
+  margin: 0 0 1.15rem;
+  border-left: 3px solid hsl(var(--brand-teal-deep));
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.prose figure {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+.prose img {
+  margin: 1.5rem auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+.prose figure img {
+  margin: 0 auto;
+}
+.prose figcaption {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+.prose hr {
+  margin: 2rem 0;
+  border-color: hsl(var(--border));
+}

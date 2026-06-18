@@ -56,36 +56,93 @@ export function countWords(text: string): number {
   return m?.length ?? 0
 }
 
-/** Плотность keyword в %. Считается по plain text body. */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Регэксп для поиска вхождений ключа с учётом кириллицы и словоизменения.
+ *
+ * ASCII `\b` НЕ работает на кириллице (между кириллическими буквами нет
+ * ASCII-границы слова) → density для русских ключей всегда был 0.0%. Здесь
+ * используем Unicode-границы через lookaround (\p{L}/\p{N}, флаг u), а у
+ * последнего слова допускаем короткое окончание (учёт/учёта/учётом —
+ * русская/польская морфология). Fallback на ASCII-границы, если среда не
+ * поддерживает lookbehind.
+ */
+function buildKeywordRegex(keyword: string): RegExp | null {
+  const words = keyword.toLowerCase().trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return null
+  const phrase = words.map(escapeRe).join('\\s+') + '[\\p{L}]{0,3}'
+  try {
+    return new RegExp(`(?<![\\p{L}\\p{N}])${phrase}(?![\\p{L}\\p{N}])`, 'giu')
+  } catch {
+    return new RegExp(`\\b${words.map(escapeRe).join('\\s+')}\\b`, 'gi')
+  }
+}
+
+/** Плотность keyword в %. Считается по plain text body (Unicode-aware). */
 export function keywordDensity(text: string, keyword: string): number {
   if (!keyword.trim() || !text.trim()) return 0
   const total = countWords(text)
   if (total === 0) return 0
-  const kw = keyword.toLowerCase().trim()
-  const t = text.toLowerCase()
-  // Простой подсчёт: разбиваем text на слова, ищем подстроку (для multi-word
-  // keyword использовать regex). Этого достаточно для feedback внутри админки.
-  let count = 0
-  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const re = new RegExp(`\\b${escaped}\\b`, 'gi')
-  const matches = t.match(re)
-  if (matches) count = matches.length
-  return (count / total) * 100
+  const re = buildKeywordRegex(keyword)
+  if (!re) return 0
+  const matches = text.toLowerCase().match(re)
+  return matches ? (matches.length / total) * 100 : 0
 }
 
-/** Автогенерация slug из заголовка: транслитерация ru → ascii. */
+/** Нормализация для нестрогого сравнения (регистр, пунктуация, пробелы). */
+function normForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[«»""''`.,!?:;()\-—–]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Содержит ли заголовок целевой ключ. Строгое substring-вхождение ИЛИ (для
+ * морфологии/порядка слов) ≥70% значимых слов ключа присутствуют в title по
+ * стему. Иначе хорошая статья с инфлектированным ключом ложно фейлила чек.
+ */
+export function titleContainsKeyword(title: string, keyword: string): boolean {
+  const nt = normForMatch(title)
+  const nk = normForMatch(keyword)
+  if (!nk) return false
+  if (nt.includes(nk)) return true
+  // Стем-матч: 4-символьный префикс выравнивает словоизменение разной длины
+  // (учёт ↔ учёта, прибыль ↔ прибыли). Пасс, если ≥70% значимых слов ключа есть.
+  const STEM = 4
+  const kw = nk.split(' ').filter((w) => w.length >= STEM)
+  if (kw.length === 0) return nt.includes(nk)
+  const titleStems = new Set(
+    nt
+      .split(' ')
+      .filter((w) => w.length >= STEM)
+      .map((w) => w.slice(0, STEM)),
+  )
+  const hit = kw.filter((w) => titleStems.has(w.slice(0, STEM))).length
+  return hit / kw.length >= 0.7
+}
+
+/** Автогенерация slug из заголовка: транслитерация ru/uk + латинские
+ *  диакритики (pl/de/cs) → ascii. */
 export function slugify(title: string): string {
   const map: Record<string, string> = {
+    // Русский + украинский кириллический
     а: 'a',
     б: 'b',
     в: 'v',
     г: 'g',
+    ґ: 'g',
     д: 'd',
     е: 'e',
     ё: 'yo',
+    є: 'ye',
     ж: 'zh',
     з: 'z',
     и: 'i',
+    і: 'i',
+    ї: 'yi',
     й: 'y',
     к: 'k',
     л: 'l',
@@ -109,17 +166,31 @@ export function slugify(title: string): string {
     э: 'e',
     ю: 'yu',
     я: 'ya',
+    // Латинские лигатуры/буквы, не раскладываемые NFKD
+    ß: 'ss',
+    ł: 'l',
+    đ: 'd',
+    ø: 'o',
+    æ: 'ae',
+    œ: 'oe',
   }
-  return title
-    .toLowerCase()
-    .split('')
-    .map((ch) => map[ch] ?? ch)
-    .join('')
-    .replace(/[^a-z0-9-\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 80)
+  return (
+    title
+      .toLowerCase()
+      // Кириллицу транслитерируем ДО NFKD: иначе NFKD разложит ё→е, й→и
+      // (combining-знаки) и сломает русскую транслитерацию.
+      .split('')
+      .map((ch) => map[ch] ?? ch)
+      .join('')
+      // Затем снимаем латинские диакритики (ä→a, č→c, é→e, ó→o …) разложением.
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9-\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 80)
+  )
 }
 
 function escapeAttr(s: string): string {
@@ -317,15 +388,11 @@ export function evaluateSeo(input: SeoInput): SeoResult {
     {
       id: 'target_in_title',
       label: target
-        ? effectiveTitle.toLowerCase().includes(target.toLowerCase())
+        ? titleContainsKeyword(effectiveTitle, target)
           ? 'Целевое слово есть в title'
           : 'Целевое слово НЕ в title'
         : 'Целевое слово не задано',
-      status: !target
-        ? 'warn'
-        : effectiveTitle.toLowerCase().includes(target.toLowerCase())
-          ? 'pass'
-          : 'fail',
+      status: !target ? 'warn' : titleContainsKeyword(effectiveTitle, target) ? 'pass' : 'fail',
       hint: 'Точное вхождение целевого ключа в title заметно поднимает CTR.',
       weight: 10,
     },

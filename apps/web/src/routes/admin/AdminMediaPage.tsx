@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  ARTICLE_LANGS,
   useAiGenerateDescription,
   useAiGenerateFullArticle,
   useAiGenerateKeywords,
@@ -30,6 +31,7 @@ import {
   useAiGenerateTitle,
   useAiImproveText,
   useAiSuggestTopics,
+  type ArticleLang,
 } from '@/hooks/useAiSeo'
 import {
   useAllMediaPosts,
@@ -66,6 +68,7 @@ export function AdminMediaPage() {
   const [autoSlug, setAutoSlug] = useState(true)
   const [showSeoFields, setShowSeoFields] = useState(true)
   const [fullBusy, setFullBusy] = useState(false)
+  const [articleLang, setArticleLang] = useState<ArticleLang>('ru')
 
   // AI hooks
   const aiTitle = useAiGenerateTitle()
@@ -199,6 +202,7 @@ export function AdminMediaPage() {
       const art = await aiFull.mutateAsync({
         target_keyword: kw,
         title: (draft.title ?? '').trim() || undefined,
+        language: articleLang,
       })
 
       // Брендовые картинки: обложка (заголовок) + иллюстрация (ключ).
@@ -245,7 +249,10 @@ export function AdminMediaPage() {
         og_image_url: coverUrl ?? d.og_image_url ?? null,
         draft: true,
       }))
-      if (art.keywords[0]) setTargetKeyword(art.keywords[0])
+      // НЕ перезаписываем target на keywords[0] (LSI-ключ мог разойтись с
+      // тем, что реально вписано в title и повторено в теле). Держим фокус,
+      // который отправляли модели — тогда SEO-чеки title/плотность сходятся.
+      setTargetKeyword(kw)
       toast.success(
         t('admin.media.ai.toast_full_done', {
           defaultValue: 'Статья сгенерирована. Проверь и нажми «Опубликовать».',
@@ -593,6 +600,24 @@ export function AdminMediaPage() {
                 })}
                 className="h-9"
               />
+              {/* Язык статьи — независим от языка UI. */}
+              <div className="mt-2 flex items-center gap-2">
+                <Label className="text-muted-foreground shrink-0 text-[11px] font-semibold">
+                  {t('admin.media.ai.article_language', { defaultValue: 'Язык статьи' })}
+                </Label>
+                <select
+                  value={articleLang}
+                  onChange={(e) => setArticleLang(e.target.value as ArticleLang)}
+                  data-testid="article-language"
+                  className="border-input bg-background h-9 flex-1 rounded-md border px-2 text-sm"
+                >
+                  {ARTICLE_LANGS.map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.flag} {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={() => generateFullArticle()}

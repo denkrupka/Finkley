@@ -5,3 +5,107 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* ── Типографика статей блога (.prose) ───────────────────────────────────────
+   @tailwindcss/typography НЕ подключён — базовые стили заголовков/абзацев/
+   списков/выделений заданы вручную, иначе preflight обнуляет отступы (статья
+   «всё в кучу»). Цвета — бренд лендинга (navy #1A1A2E, teal #1E6B8A). */
+.prose {
+  color: #374151;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose > :last-child {
+  margin-bottom: 0;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: #1a1a2e;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.prose h1 {
+  font-size: 2rem;
+  margin: 2.25rem 0 1rem;
+}
+.prose h2 {
+  font-size: 1.6rem;
+  margin: 2.25rem 0 0.85rem;
+}
+.prose h3 {
+  font-size: 1.3rem;
+  margin: 1.75rem 0 0.6rem;
+}
+.prose p {
+  margin: 0 0 1.25rem;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.5rem;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li {
+  margin: 0.4rem 0;
+  padding-left: 0.25rem;
+}
+.prose li::marker {
+  color: #1e6b8a;
+}
+.prose strong {
+  font-weight: 700;
+  color: #1a1a2e;
+}
+.prose em {
+  font-style: italic;
+}
+.prose a {
+  color: #1e6b8a;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose a:hover {
+  opacity: 0.85;
+}
+.prose blockquote {
+  margin: 0 0 1.25rem;
+  border-left: 3px solid #1e6b8a;
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: #6b7280;
+  font-style: italic;
+}
+.prose figure {
+  margin: 1.75rem 0;
+  text-align: center;
+}
+.prose img {
+  margin: 1.75rem auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.6rem;
+}
+.prose figure img {
+  margin: 0 auto;
+}
+.prose figcaption {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.prose hr {
+  margin: 2.25rem 0;
+  border-color: #e5e7eb;
+}
