@@ -210,7 +210,13 @@ export function AdminMediaPage() {
       let coverUrl: string | null = null
       let inlineUrl: string | null = null
       try {
-        const coverBlob = await renderBrandedCover({ title: art.title, variant: 'cover' })
+        // Надпись на обложке по языку статьи: кириллица для ru/uk, латиница иначе.
+        const blogWord = articleLang === 'ru' || articleLang === 'uk' ? 'БЛОГ' : 'BLOG'
+        const coverBlob = await renderBrandedCover({
+          title: art.title,
+          eyebrow: `FINKLEY · ${blogWord}`,
+          variant: 'cover',
+        })
         coverUrl = await uploadImageBlob(coverBlob, 'cover.png')
         const inlineBlob = await renderBrandedCover({
           title: targetKeyword.trim() || kw,
