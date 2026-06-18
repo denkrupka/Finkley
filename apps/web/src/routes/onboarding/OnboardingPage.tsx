@@ -47,31 +47,25 @@ import { LiveIntegrationCategoryStep } from './LiveIntegrationCategoryStep'
 import { OcrManualBookingsBlock } from './OcrManualBookingsBlock'
 import { computeHydrate, type HydrateRow } from './onboarding-hydrate'
 import { type ParsedVisit } from './OcrNotebookButton'
-import { StepAiBreakdown } from './StepAiBreakdown'
 import { StepAiSummary } from './StepAiSummary'
-import { StepPublicLinks } from './StepPublicLinks'
-import { Step0Path, type OnboardingPath } from './Step0Path'
-import { StepSchedule, type OpeningHoursDraft } from './StepSchedule'
 import { StepTelegramPhone } from './StepTelegramPhone'
 import { StepUserProfile } from './StepUserProfile'
 import { StepWelcome } from './StepWelcome'
 import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
-import { Step2Address, type AddressDraft } from './Step2Address'
-import { Step2Staff, type StaffDraft } from './Step2Staff'
-import { Step2StaffLive } from './Step2StaffLive'
-import { Step3Accounting, type AccountingMode } from './Step3Accounting'
-import { AccountingSettingsCard } from '@/routes/settings/AccountingSettingsCard'
-import { ShieldCheck } from 'lucide-react'
-import { Step3Services, type ServiceDraft } from './Step3Services'
-import { Step3ServicesLive } from './Step3ServicesLive'
-import { Step4Expenses } from './Step4Expenses'
+import { type AddressDraft } from './Step2Address'
+import { type StaffDraft } from './Step2Staff'
+import { type AccountingMode } from './Step3Accounting'
+import { type ServiceDraft } from './Step3Services'
+import { type OpeningHoursDraft } from './StepSchedule'
 import { Step5Done } from './Step5Done'
-import { TutorialNote } from './TutorialNote'
 
+// T-onboarding-short: остался ТОЛЬКО короткий онбординг. Полный онбординг
+// (STEPS_FULL) и шаг выбора пути ('path' / Step0Path) удалены — юзер сразу
+// попадает в короткий поток. Доустановку остальных данных (staff/services/
+// расходы/интеграции) добивает gamified «Настройка Finkley» после онбординга.
 const STEPS_QUICK = [
   'welcome',
-  'path',
   'profile',
   'salon',
   'integrations_bookings',
@@ -79,39 +73,12 @@ const STEPS_QUICK = [
   'integrations_banking',
   'tg_phone',
   'wow',
-  // T157 — даже в быстрой ветке показываем общий AI-анализ. Это главная
-  // wow-фича, юзер должен её увидеть.
+  // T157 — показываем общий AI-анализ. Это главная wow-фича, юзер
+  // должен её увидеть.
   'ai_summary',
   'done',
 ] as const
-const STEPS_FULL = [
-  'welcome',
-  'path',
-  'profile',
-  'salon',
-  'address',
-  'public_links',
-  'accounting',
-  'integrations_bookings',
-  'integrations_social',
-  'integrations_banking',
-  // Bug 602bfc92 (Елена 05.06): график работы перенесён после интеграций —
-  // если юзер подключил Booksy/Versum, расписание там, и spam'ить им
-  // онбординг до подключения нет смысла. Если интеграция не настроена —
-  // юзер вводит часы вручную после блока интеграций.
-  'schedule',
-  'tg_phone',
-  'staff',
-  'services',
-  'expenses',
-  'ai_services',
-  'ai_staff',
-  'ai_clients',
-  'ai_reviews',
-  'ai_summary',
-  'done',
-] as const
-type StepId = (typeof STEPS_FULL)[number] | (typeof STEPS_QUICK)[number]
+type StepId = (typeof STEPS_QUICK)[number]
 
 export type OnboardingIntegration =
   | 'booksy'
@@ -134,8 +101,6 @@ export type OnboardingIntegration =
   | 'yclients'
 
 export type OnboardingState = {
-  // Шаг 0 — путь (быстрый/полный). null = ещё не выбран.
-  path: OnboardingPath | null
   // Шаг 1
   name: string
   country_code: CountryCode
@@ -197,7 +162,6 @@ export type OnboardingState = {
 export type PendingCredentials = Record<string, string>
 
 const INITIAL: OnboardingState = {
-  path: null,
   name: '',
   country_code: 'PL',
   salon_type: 'hair',
@@ -239,15 +203,12 @@ const INITIAL: OnboardingState = {
   financial_settings: DEFAULT_FINANCIAL_SETTINGS,
   accounting_mode: null,
   pending_credentials: {},
-  // bug ee00e1a7 — отключаем требование привязки карты в первых шагах.
-  // Юзер хочет полностью бесшовный trial: попадает в /dashboard сразу,
-  // без редиректа в Stripe Checkout. Активация подписки переехала в
-  // /settings/billing где юзер увидит CTA «Активировать».
-  // T164 — после T159 (paywall UI убран) дефолт включён: каждый юзер
-  // после онбординга идёт через Stripe Checkout с 14-дневным trial.
-  // Если юзеру не нужна подписка — отключит в Settings → Биллинг после первого
-  // dashboard'a.
-  subscribe_after_submit: true,
+  // T7 — новая тарифная модель (Demo/Free/€19/€49/€69/€99). Demo = весь
+  // функционал 14 дней через implicit-trial (без карты). Онбординг больше НЕ
+  // редиректит автоматически в Stripe Checkout — юзер попадает на /dashboard
+  // и выбирает тариф позже в Settings → Биллинг (или остаётся на Free).
+  // Чекбокс «активировать подписку» на финальном шаге остаётся доступен.
+  subscribe_after_submit: false,
   created_salon_id: null,
 }
 
@@ -315,14 +276,11 @@ export function OnboardingPage() {
           setState((prev) => ({ ...prev, ...hyd.state }))
         }
         if (hyd.stepId) {
-          requestAnimationFrame(() => {
-            setState((cur) => {
-              const list = cur.path === 'full' ? STEPS_FULL : STEPS_QUICK
-              const idx = (list as readonly string[]).indexOf(hyd.stepId!)
-              if (idx >= 0) setStepIndex(idx)
-              return cur
-            })
-          })
+          // Legacy brown-салоны могли сохранить step-id из удалённого полного
+          // онбординга (address/schedule/staff/…). indexOf вернёт -1 → юзер
+          // стартует с начала короткого потока. Это ожидаемый fallback.
+          const idx = (STEPS_QUICK as readonly string[]).indexOf(hyd.stepId)
+          if (idx >= 0) setStepIndex(idx)
         }
       } catch (err) {
         console.warn('onboarding hydrate failed', err)
@@ -343,9 +301,7 @@ export function OnboardingPage() {
   useEffect(() => {
     if (!hydrated || !state.created_salon_id) return
     const sid = state.created_salon_id
-    const stepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
-      stepIndex
-    ]
+    const stepId = (STEPS_QUICK as readonly string[])[stepIndex]
     const timer = window.setTimeout(() => {
       supabase
         .from('salons')
@@ -367,9 +323,7 @@ export function OnboardingPage() {
   // max(case action=enter then 1).
   useEffect(() => {
     if (!hydrated || !state.created_salon_id) return
-    const stepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
-      stepIndex
-    ]
+    const stepId = (STEPS_QUICK as readonly string[])[stepIndex]
     if (!stepId) return
     void supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
@@ -380,30 +334,17 @@ export function OnboardingPage() {
           salon_id: state.created_salon_id,
           event_type: 'onboarding_step',
           path: stepId,
-          metadata: { action: 'enter', path: state.path },
+          metadata: { action: 'enter' },
         })
         .then(({ error }) => {
           if (error) console.warn('tracking_events insert failed:', error.message)
         })
     })
-  }, [stepIndex, hydrated, state.path, state.created_salon_id])
+  }, [stepIndex, hydrated, state.created_salon_id])
 
-  // STEPS зависят от выбранного пути: пока не выбран — только path-шаг.
-  // Address-шаг скипаем если на Step "salon" юзер уже выбрал место в Google
-  // Maps — адрес, координаты и google_place_id оттуда подтянулись, ещё раз
-  // показывать форму нет смысла.
-  // Bug be35489a (Елена 05.06): шаг AI-разбора отзывов имеет смысл только
-  // если есть откуда читать отзывы — Google place (нашли салон в Google
-  // Maps) или подвязанный Booksy. Иначе пропускаем шаг, чтобы не показывать
-  // пустой fallback с «пока нет данных».
-  const hasReviewSource =
-    !!state.address.google_place_id || state.selected_integrations.includes('booksy')
-  const STEPS: readonly StepId[] = (state.path === 'full' ? STEPS_FULL : STEPS_QUICK).filter(
-    (s) =>
-      !(s === 'address' && state.address.google_place_id) &&
-      !(s === 'ai_reviews' && !hasReviewSource),
-  )
-  const stepId: StepId = (STEPS[stepIndex] ?? 'path') as StepId
+  // Короткий онбординг — фиксированный список шагов (полный поток удалён).
+  const STEPS: readonly StepId[] = STEPS_QUICK
+  const stepId: StepId = (STEPS[stepIndex] ?? 'welcome') as StepId
   const isFirst = stepIndex === 0
   const isLast = stepIndex === STEPS.length - 1
 
@@ -470,12 +411,13 @@ export function OnboardingPage() {
   }
 
   async function next() {
-    if (stepIndex === 1) {
+    // На уходе с шага "salon" (тип салона уже выбран): засеваем услуги по типу
+    // и делаем early-create салона, если введено имя.
+    if (stepId === 'salon') {
       patch('services', ensureServicesSeed(state.salon_type, state.services))
-    }
-    // Early-create после Step "salon" — если юзер ввёл имя, создаём салон.
-    if (stepId === 'salon' && state.name.trim()) {
-      await ensureSalonCreated()
+      if (state.name.trim()) {
+        await ensureSalonCreated()
+      }
     }
     setStepIndex((i) => Math.min(i + 1, STEPS.length - 1))
   }
@@ -613,11 +555,9 @@ export function OnboardingPage() {
     if (state.booksy_url.trim()) extraPatch.booksy_url = state.booksy_url.trim()
     if (state.instagram_url.trim()) extraPatch.instagram_url = state.instagram_url.trim()
     if (state.facebook_url.trim()) extraPatch.facebook_url = state.facebook_url.trim()
-    // T106 — структурированный financial_settings (только для full ветки).
-    // В quick — пропускаем, бэкенд возьмёт DEFAULT_FINANCIAL_SETTINGS.
-    if (state.path === 'full') {
-      extraPatch.financial_settings = state.financial_settings
-    }
+    // financial_settings/opening_hours в коротком онбординге не собираются —
+    // бэкенд (create_salon_with_setup) ставит дефолты. Доустройка позже в
+    // /settings.
     if (state.nip.trim()) {
       // Бухгалтерия живёт в accounting_settings jsonb (миграция 20260516000002).
       // Merge через accounting_settings — но проще держать в отдельных колонках:
@@ -667,11 +607,6 @@ export function OnboardingPage() {
         }
       }
     }
-    // T98 — рабочий график в salon.opening_hours
-    if (state.path === 'full') {
-      extraPatch.opening_hours = state.opening_hours
-    }
-
     // T81 — заливаем логотип в salon-logos bucket (если был выбран). Это
     // делается ПОСЛЕ создания салона, потому что bucket-policy требует
     // salon_id в первом компоненте пути.
@@ -884,15 +819,13 @@ export function OnboardingPage() {
     // Tracking: финальный шаг complete event для admin Tracking analytics.
     void supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
-      const finalStepId = ((state.path === 'full' ? STEPS_FULL : STEPS_QUICK) as readonly string[])[
-        stepIndex
-      ]
+      const finalStepId = (STEPS_QUICK as readonly string[])[stepIndex]
       void supabase.from('tracking_events').insert({
         user_id: data.user.id,
         salon_id: newSalonId,
         event_type: 'onboarding_step',
         path: finalStepId ?? 'submit',
-        metadata: { action: 'complete', path: state.path },
+        metadata: { action: 'complete' },
       })
     })
 
@@ -933,7 +866,6 @@ export function OnboardingPage() {
 
   // Валидация перехода. Step5 — терминальный, переход = submit.
   function canProceed(): boolean {
-    if (stepId === 'path') return state.path !== null
     if (stepId === 'salon') return state.name.trim().length >= 2
     return true
   }
@@ -945,14 +877,8 @@ export function OnboardingPage() {
     switch (stepId) {
       case 'welcome':
         return t('onboarding.cta.welcome')
-      case 'path':
-        return t('onboarding.cta.path')
       case 'salon':
         return t('onboarding.cta.salon')
-      case 'address':
-        return t('onboarding.cta.address')
-      case 'accounting':
-        return t('onboarding.cta.accounting')
       case 'integrations_bookings':
         return t('onboarding.cta.integrations_bookings')
       case 'integrations_social':
@@ -965,24 +891,6 @@ export function OnboardingPage() {
         return t('onboarding.cta.profile')
       case 'tg_phone':
         return t('onboarding.cta.tg_phone')
-      case 'schedule':
-        return t('onboarding.cta.schedule')
-      case 'public_links':
-        return t('onboarding.cta.public_links')
-      case 'ai_services':
-        return t('onboarding.cta.ai_services')
-      case 'ai_staff':
-        return t('onboarding.cta.ai_staff')
-      case 'ai_clients':
-        return t('onboarding.cta.ai_clients')
-      case 'ai_reviews':
-        return t('onboarding.cta.ai_reviews')
-      case 'staff':
-        return t('onboarding.cta.staff')
-      case 'services':
-        return t('onboarding.cta.services')
-      case 'expenses':
-        return t('onboarding.cta.expenses')
       default:
         return `${t('common.next')} →`
     }
@@ -1043,9 +951,6 @@ export function OnboardingPage() {
           {/* Step body */}
           <div data-testid={`onboarding-step-${stepId}`}>
             {stepId === 'welcome' && <StepWelcome />}
-            {stepId === 'path' && (
-              <Step0Path value={state.path} onChange={(v) => patch('path', v)} />
-            )}
             {stepId === 'profile' && (
               <StepUserProfile
                 value={{
@@ -1054,12 +959,6 @@ export function OnboardingPage() {
                   avatar_data_url: state.avatar_data_url,
                 }}
                 onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
-              />
-            )}
-            {stepId === 'schedule' && (
-              <StepSchedule
-                value={state.opening_hours}
-                onChange={(v) => patch('opening_hours', v)}
               />
             )}
             {stepId === 'tg_phone' && (
@@ -1081,70 +980,11 @@ export function OnboardingPage() {
                     logo_data_url: state.logo_data_url,
                   }}
                   onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
-                  showLogo={state.path === 'full'}
+                  showLogo={false}
                 />
               </>
             )}
             {/* End Step1Salon */}
-            {stepId === 'address' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.address')}</TutorialNote>
-                <Step2Address value={state.address} onChange={(v) => patch('address', v)} />
-              </>
-            )}
-            {stepId === 'accounting' && (
-              <>
-                {/* Privacy-note сверху: данные не передаём третьим лицам,
-                    нужны только для автоматизации доставки фактур/чеков
-                    бухгалтеру. */}
-                <div className="border-brand-teal-deep/30 bg-brand-teal-soft/20 mb-4 flex items-start gap-3 rounded-lg border-2 p-3">
-                  <ShieldCheck
-                    className="text-brand-teal-deep mt-0.5 size-5 shrink-0"
-                    strokeWidth={2}
-                  />
-                  <p className="text-foreground/90 text-sm leading-snug">
-                    {t('onboarding.step_accounting.privacy_note')}
-                  </p>
-                </div>
-                {state.created_salon_id ? (
-                  <AccountingSettingsCard salonId={state.created_salon_id} />
-                ) : (
-                  <>
-                    <TutorialNote>{t('onboarding.tutorial.accounting')}</TutorialNote>
-                    <Step3Accounting
-                      salonId={state.created_salon_id}
-                      countryCode={state.country_code}
-                      value={{ nip: state.nip, company_name: state.company_name }}
-                      onChange={(v) =>
-                        setState((prev) => ({
-                          ...prev,
-                          nip: v.nip,
-                          company_name: v.company_name,
-                        }))
-                      }
-                      selectedIntegrations={state.selected_integrations}
-                      onToggleIntegration={(id) =>
-                        patch(
-                          'selected_integrations',
-                          state.selected_integrations.includes(id)
-                            ? state.selected_integrations.filter((x) => x !== id)
-                            : [...state.selected_integrations, id],
-                        )
-                      }
-                      accountingMode={state.accounting_mode ?? undefined}
-                      onAccountingModeChange={(mode) => patch('accounting_mode', mode)}
-                      credentials={state.pending_credentials}
-                      onCredentialsChange={(id, creds) =>
-                        patch('pending_credentials', {
-                          ...state.pending_credentials,
-                          [id]: creds ?? {},
-                        })
-                      }
-                    />
-                  </>
-                )}
-              </>
-            )}
             {stepId === 'integrations_bookings' && (
               <OcrManualBookingsBlock
                 salonId={state.created_salon_id}
@@ -1334,7 +1174,7 @@ export function OnboardingPage() {
                 hasSocial={state.selected_integrations.some((x) =>
                   ['instagram', 'facebook', 'telegram'].includes(x),
                 )}
-                full={state.path === 'full'}
+                full={false}
                 selectedIntegrations={state.selected_integrations}
                 staffCount={state.staff.length}
                 servicesCount={state.services.length}
@@ -1348,34 +1188,6 @@ export function OnboardingPage() {
                 country={state.country_code}
                 currency={currencyFor(state.country_code)}
                 salonId={state.created_salon_id}
-              />
-            )}
-            {stepId === 'ai_services' && (
-              <StepAiBreakdown
-                topic="services"
-                salonId={state.created_salon_id}
-                currency={currencyFor(state.country_code)}
-              />
-            )}
-            {stepId === 'ai_staff' && (
-              <StepAiBreakdown
-                topic="staff"
-                salonId={state.created_salon_id}
-                currency={currencyFor(state.country_code)}
-              />
-            )}
-            {stepId === 'ai_clients' && (
-              <StepAiBreakdown
-                topic="clients"
-                salonId={state.created_salon_id}
-                currency={currencyFor(state.country_code)}
-              />
-            )}
-            {stepId === 'ai_reviews' && (
-              <StepAiBreakdown
-                topic="reviews"
-                salonId={state.created_salon_id}
-                currency={currencyFor(state.country_code)}
               />
             )}
             {stepId === 'ai_summary' && (
@@ -1392,16 +1204,6 @@ export function OnboardingPage() {
                 companyName={state.company_name}
                 ocrVisitsCount={state.ocr_visits.length}
                 salonId={state.created_salon_id}
-              />
-            )}
-            {stepId === 'public_links' && (
-              <StepPublicLinks
-                value={{
-                  booksy_url: state.booksy_url,
-                  instagram_url: state.instagram_url,
-                  facebook_url: state.facebook_url,
-                }}
-                onChange={(v) => setState((prev) => ({ ...prev, ...v }))}
               />
             )}
             {stepId === 'integrations_banking' &&
@@ -1449,41 +1251,6 @@ export function OnboardingPage() {
                   }
                 />
               ))}
-            {stepId === 'staff' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.staff')}</TutorialNote>
-                {state.created_salon_id ? (
-                  <Step2StaffLive salonId={state.created_salon_id} />
-                ) : (
-                  <Step2Staff value={state.staff} onChange={(v) => patch('staff', v)} />
-                )}
-              </>
-            )}
-            {stepId === 'services' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.services')}</TutorialNote>
-                {state.created_salon_id ? (
-                  <Step3ServicesLive salonId={state.created_salon_id} />
-                ) : (
-                  <Step3Services
-                    value={state.services}
-                    onChange={(v) => patch('services', v)}
-                    salonType={state.salon_type}
-                  />
-                )}
-              </>
-            )}
-            {stepId === 'expenses' && (
-              <>
-                <TutorialNote>{t('onboarding.tutorial.expenses')}</TutorialNote>
-                <Step4Expenses
-                  value={state.expense_categories}
-                  onChange={(v) => patch('expense_categories', v)}
-                  financial={state.financial_settings}
-                  onFinancialChange={(v) => patch('financial_settings', v)}
-                />
-              </>
-            )}
             {stepId === 'done' && (
               <Step5Done
                 summary={{ salonName: state.name }}
@@ -1491,12 +1258,6 @@ export function OnboardingPage() {
                 onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
                 subscribeAfterSubmit={state.subscribe_after_submit}
                 onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
-                path={state.path}
-                onSwitchToFull={() => {
-                  patch('path', 'full')
-                  const fullIndex = (STEPS_FULL as readonly string[]).indexOf('schedule')
-                  if (fullIndex >= 0) setStepIndex(fullIndex)
-                }}
               />
             )}
           </div>
@@ -1519,11 +1280,9 @@ export function OnboardingPage() {
               ← {t('common.back')}
             </button>
             <div className="flex items-center gap-5">
-              {/* Bug 8aa22df6 (Елена 05.06): убрать «Пропустить онбординг»
-                  только с шага выбора формы (path). На остальных шагах
-                  пропуск разрешён. На последнем шаге (submit) и на salon
-                  (нужно имя для early-create) — тоже прячем. */}
-              {!isLast && stepId !== 'path' && stepId !== 'salon' ? (
+              {/* Пропуск разрешён на всех шагах кроме последнего (submit) и
+                  salon (нужно имя для early-create). */}
+              {!isLast && stepId !== 'salon' ? (
                 <button
                   type="button"
                   onClick={skip}

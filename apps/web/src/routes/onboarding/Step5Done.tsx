@@ -1,4 +1,4 @@
-import { ArrowRight, Check, CreditCard, Sparkles, TrendingUp } from 'lucide-react'
+import { Check, CreditCard, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 type Props = {
@@ -12,13 +12,6 @@ type Props = {
    *  активации подписки, может включить позже в Settings → Биллинг. */
   subscribeAfterSubmit: boolean
   onSubscribeToggle: (value: boolean) => void
-  /** T105 — текущий путь онбординга. В quick показываем CTA «Доделать
-   *  полный setup» — переключение на full и переход к первому шагу
-   *  отсутствующему в quick (schedule). */
-  path?: 'quick' | 'full' | null
-  /** T105 — обработчик переключения на полную ветку. Меняет path на 'full'
-   *  и навигирует на schedule (первый full-only шаг). */
-  onSwitchToFull?: () => void
 }
 
 export function Step5Done({
@@ -27,8 +20,6 @@ export function Step5Done({
   onBenchmarksToggle,
   subscribeAfterSubmit,
   onSubscribeToggle,
-  path,
-  onSwitchToFull,
 }: Props) {
   const { t } = useTranslation()
 
@@ -40,18 +31,6 @@ export function Step5Done({
       <h1 className="text-brand-navy mt-6 text-3xl font-extrabold tracking-tight">
         {t('onboarding.step5.title', { name: summary.salonName.trim() || '...' })}
       </h1>
-
-      {path === 'quick' && onSwitchToFull ? (
-        <button
-          type="button"
-          onClick={onSwitchToFull}
-          className="border-brand-teal-deep bg-brand-teal-soft/30 hover:bg-brand-teal-soft/60 text-brand-teal-deep mx-auto mt-6 inline-flex max-w-md items-center gap-2 rounded-xl border-2 border-dashed px-5 py-3 text-sm font-bold transition-colors"
-        >
-          <Sparkles className="size-4" strokeWidth={2} />
-          {t('onboarding.step5.switch_to_full')}
-          <ArrowRight className="size-4" strokeWidth={2.4} />
-        </button>
-      ) : null}
 
       <label
         className={`mx-auto mt-6 flex max-w-md cursor-pointer items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
