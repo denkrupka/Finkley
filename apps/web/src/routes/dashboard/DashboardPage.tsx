@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { format, startOfMonth, subMonths } from 'date-fns'
 import { getDateLocale } from '@/lib/utils/format-date'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -29,6 +29,7 @@ import { useInventoryItems } from '@/hooks/useInventory'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useReviews } from '@/hooks/useReviews'
 import { useSalon, useSalonMembership } from '@/hooks/useSalons'
+import { useMarkDashboardOpened } from '@/hooks/useSetupProgress'
 import { useServiceCategories, useServices } from '@/hooks/useServices'
 import { useStaff } from '@/hooks/useStaff'
 import { useVisits } from '@/hooks/useVisits'
@@ -100,6 +101,14 @@ export function DashboardPage() {
   const { data: membership } = useSalonMembership(salonId)
   const myStaffId = membership?.staff_id ?? null
   const isMaster = role === 'staff'
+
+  // T2 — «Откройте дашборд прибыли» из «Настройки Finkley». Отмечаем серверным
+  // событием (идемпотентно), чтобы шаг засчитался и бар прогресса обновился.
+  const markDashboardOpened = useMarkDashboardOpened()
+  useEffect(() => {
+    if (salonId) markDashboardOpened.mutate(salonId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salonId])
   // T114 — динамический период. Дефолт = текущий месяц, но юзер может
   // выбрать любой через плашку справа сверху (PeriodPickerPopover):
   // месяц / год / range / последние N дней.

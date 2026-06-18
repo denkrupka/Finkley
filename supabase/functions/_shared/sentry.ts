@@ -101,6 +101,56 @@ export async function captureException(
 }
 
 /**
+ * Отправляет message-событие в Sentry (не исключение). Для аудита/алертов
+ * вроде «выдана награда» или «достигнут лимит выдачи». Никогда не бросает.
+ */
+export async function captureMessage(
+  message: string,
+  level: 'info' | 'warning' | 'error' = 'info',
+  context: Record<string, unknown> = {},
+): Promise<void> {
+  console.log(`[sentry:${level}]`, message, context)
+
+  const dsn = parseDsn()
+  if (!dsn) return
+
+  const event = {
+    event_id: uuid(),
+    timestamp: new Date().toISOString(),
+    level,
+    platform: 'javascript',
+    sdk: { name: 'finkley.edge', version: '1.0' },
+    server_name: 'supabase-edge',
+    message: { formatted: message },
+    extra: context,
+    tags: {
+      runtime: 'deno',
+      ...(context.fn ? { fn: String(context.fn) } : {}),
+    },
+  }
+
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 3000)
+    const res = await fetch(`https://${dsn.host}/api/${dsn.projectId}/store/`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${dsn.publicKey}, sentry_client=finkley.edge/1.0`,
+      },
+      body: JSON.stringify(event),
+    })
+    clearTimeout(t)
+    if (!res.ok) {
+      console.warn('Sentry message send failed:', res.status, await res.text().catch(() => ''))
+    }
+  } catch (e) {
+    console.warn('Sentry message exception:', e instanceof Error ? e.message : e)
+  }
+}
+
+/**
  * Обёртка для Deno.serve — ловит любые unhandled exceptions из handler'а
  * и шлёт в Sentry с тегом fn=<name>. Возвращает 500 c { ok: false, error: 'internal' }
  * чтобы клиент видел стандартизованный ответ.

@@ -42,6 +42,7 @@ import { FAB } from './FAB'
 import { HelpDeskBanner } from './HelpDeskBanner'
 import { Sidebar } from './Sidebar'
 import { SyncStatusBanner } from './SyncStatusBanner'
+import { SetupProgressBar } from './SetupProgressBar'
 import { TopBar } from './TopBar'
 
 // QuickEntryModal лениво — он тащит ClientPicker → libphonenumber-js (~80KB).
@@ -266,6 +267,23 @@ export function SalonLayout() {
         <SubscriptionBanner />
 
         <SyncStatusBanner salonId={salon.id} />
+
+        {/* T2 — gamified «Настройка Finkley» (висит пока setup < 100%, owner-only). */}
+        <SetupProgressBar
+          salonId={salon.id}
+          onAddVisit={() => {
+            setQuickEntryPrefill(null)
+            setQuickEntryOpen(true)
+          }}
+          onAddExpense={() => {
+            if (!hasOpenShift) {
+              setGateAction('expense')
+              setGateOpen(true)
+              return
+            }
+            setExpenseModalOpen(true)
+          }}
+        />
 
         <main className="relative flex min-h-0 flex-1 flex-col pb-24 lg:overflow-y-auto lg:pb-0">
           <Outlet />
