@@ -122,8 +122,6 @@ export type OnboardingState = {
   // Done
   benchmarks_opt_in: boolean
   selected_integrations: OnboardingIntegration[]
-  /** В Done step: после submit редиректить в Stripe Checkout (trial 14д). */
-  subscribe_after_submit: boolean
   /** T81 — data URL логотипа (webp blob) из ImageCropper. Заливается в
    *  Storage после создания салона (надо salon_id для RLS). NULL — без логотипа. */
   logo_data_url: string | null
@@ -203,12 +201,6 @@ const INITIAL: OnboardingState = {
   financial_settings: DEFAULT_FINANCIAL_SETTINGS,
   accounting_mode: null,
   pending_credentials: {},
-  // T7 — новая тарифная модель (Demo/Free/€19/€49/€69/€99). Demo = весь
-  // функционал 14 дней через implicit-trial (без карты). Онбординг больше НЕ
-  // редиректит автоматически в Stripe Checkout — юзер попадает на /dashboard
-  // и выбирает тариф позже в Settings → Биллинг (или остаётся на Free).
-  // Чекбокс «активировать подписку» на финальном шаге остаётся доступен.
-  subscribe_after_submit: false,
   created_salon_id: null,
 }
 
@@ -785,36 +777,11 @@ export function OnboardingPage() {
       })
     }
 
-    // Paywall: если юзер не снял чек-бокс «активировать trial» — редиректим
-    // в Stripe Checkout (мode=subscription, trialDays=14). Стандартный
-    // success_url возвращает на settings?stripe=success → дальше dashboard.
-    if (state.subscribe_after_submit) {
-      try {
-        const { data: checkoutData, error: checkoutErr } = await supabase.functions.invoke(
-          'create-checkout-session',
-          {
-            body: {
-              salonId: newSalonId,
-              // T186 — Stripe success/cancel вернёт сюда с prompt,
-              // IntegrationsPage откроет цепочку connect dialog'ов.
-              prompt: state.selected_integrations.join(','),
-            },
-          },
-        )
-        const url = (checkoutData as { url?: string } | null)?.url
-        if (url && !checkoutErr) {
-          window.location.href = url
-          return
-        }
-        // Если что-то пошло не так — не валим онбординг, просто едем на dashboard.
-        console.warn('create-checkout-session failed:', checkoutErr)
-      } catch (e) {
-        console.warn('create-checkout-session threw:', e)
-      }
-    }
+    // T7 — онбординг НЕ редиректит в Stripe Checkout. Demo = implicit-trial
+    // 14 дней (без карты); тариф юзер выбирает позже в Settings → Биллинг.
 
     // T199 — credentials + prompt уже сохранены в один localStorage entry
-    // выше (saveOnboardingTransit), перед Stripe redirect. Не дублируем.
+    // выше (saveOnboardingTransit). Не дублируем.
 
     // Tracking: финальный шаг complete event для admin Tracking analytics.
     void supabase.auth.getUser().then(({ data }) => {
@@ -1256,8 +1223,6 @@ export function OnboardingPage() {
                 summary={{ salonName: state.name }}
                 benchmarksOptIn={state.benchmarks_opt_in}
                 onBenchmarksToggle={(v) => patch('benchmarks_opt_in', v)}
-                subscribeAfterSubmit={state.subscribe_after_submit}
-                onSubscribeToggle={(v) => patch('subscribe_after_submit', v)}
               />
             )}
           </div>
@@ -1300,11 +1265,7 @@ export function OnboardingPage() {
                   disabled={submitting}
                   data-testid="onboarding-submit"
                 >
-                  {submitting
-                    ? t('common.loading')
-                    : state.subscribe_after_submit
-                      ? t('onboarding.activate_subscription')
-                      : t('onboarding.open_dashboard')}
+                  {submitting ? t('common.loading') : t('onboarding.open_dashboard')}
                 </Button>
               ) : (
                 <Button
