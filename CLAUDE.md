@@ -243,6 +243,14 @@ usage). Если хочешь переиспользовать диалог гд
 cron'ом через RPC `cleanup_brown_salons()` через 7 дней. Owner
 настраивает pg_cron job отдельно. Подробности — [ADR-030](./decisions/030-early-create-onboarding.md).
 
+**Онбординг — ТОЛЬКО короткий (2026-06-18).** Полный онбординг (`STEPS_FULL`)
+и шаг выбора пути (`Step0Path`) удалены — юзер сразу идёт по короткому потоку
+(`STEPS_QUICK`). Доустройку остального (визиты/расходы/Booksy/банк/дашборд)
+добивает gamified «Настройка Finkley» (`SetupProgressBar`, серверный трекинг
+через RPC `setup_progress` + награда «+14 дней», [ADR-034](./decisions/034-setup-progress-reward.md)).
+Онбординг больше НЕ авто-редиректит в Stripe (Demo = implicit-trial 14д без
+карты, см. ADR-033).
+
 **Resume онбординга — autosave + hydrate.** Миграция
 `20260529000005_salons_onboarding_state` добавила колонки
 `salons.onboarding_state jsonb` (snapshot всего `OnboardingState`) и
@@ -376,7 +384,13 @@ discovery-эндпоинт `GET /v1`, поэтому документация н
 
 - Не покупай платные сервисы (даже €1/мес trials)
 - Не подключай новые внешние API
-- Не меняй pricing-логику (€15/мес brutto, Stripe Tax добавляет VAT автоматически)
+- Не меняй pricing-логику. С 2026-06-18 действует **6-уровневая модель**
+  (Demo 14д / Free=Доходы / €19 / €49 / €69 / €99-мультисалон), цены brutto
+  (Stripe Tax считает VAT). Источник правды энтайтлментов —
+  `apps/web/src/lib/entitlements.ts` + `supabase/functions/_shared/plans.ts`;
+  гейтинг секций — `RequireEntitlement`/`UpgradeOverlay` (UI-altitude, как RBAC).
+  Подробности — [ADR-033](./decisions/033-pricing-tiers-and-gating.md). Не
+  возвращай single-price `STRIPE_PRICE_ID`-логику.
 - Не меняй маркетинговый месседж в копирайте
 
 ## Связь с владельцем
