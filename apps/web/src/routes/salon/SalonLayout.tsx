@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { Lock } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
 
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -28,6 +29,9 @@ import {
   Dialog as DialogUi,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
+import { useEntitlements } from '@/hooks/useEntitlements'
+import { usePermissions } from '@/hooks/usePermissions'
+import { type SectionId } from '@/lib/entitlements'
 import { useMyProfile } from '@/hooks/useMyProfile'
 import { useRequireCashShift } from '@/hooks/useCashShifts'
 import { useMessengerNotifications } from '@/hooks/useMessenger'
@@ -380,9 +384,16 @@ export function SalonLayout() {
 }
 
 /**
- * Минимальный mobile-drawer без зависимостей от hooks/permissions/
- * lazy-загрузок. Bug 2c986f86: полноценный Sidebar не отображался в
- * drawer на телефоне — заменили на самодостаточный inline-вариант.
+ * Минимальный mobile-drawer на inline-вёрстке. Bug 2c986f86: полноценный
+ * Sidebar не отображался в drawer на телефоне — заменили на самодостаточный
+ * inline-вариант.
+ *
+ * Bug 2c986f86 (хвост): drawer показывал ВЕСЬ NAV_ITEMS без фильтрации —
+ * staff/external видели пункты, ведущие в недоступные разделы («меню ведёт
+ * в пустоту»). Фильтруем по правам так же, как Sidebar/BottomNav (dashboard
+ * и settings всегда; остальное — can(id,'view')), и рисуем замок для секций
+ * вне тарифа (кликабельны → откроется upgrade-плашка). usePermissions/
+ * useEntitlements безопасны на мобиле — те же хуки крутятся в BottomNav.
  */
 function MobileDrawerMenu({
   salonId,
@@ -394,6 +405,12 @@ function MobileDrawerMenu({
   title: string
 }) {
   const { t } = useTranslation()
+  const { can } = usePermissions(salonId)
+  const { canAccessSection } = useEntitlements(salonId)
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.id === 'dashboard' || item.id === 'settings') return true
+    return can(item.id, 'view')
+  })
   return (
     <div className="lg:hidden">
       {/* Overlay */}
@@ -438,8 +455,9 @@ function MobileDrawerMenu({
         <div style={{ marginBottom: 16, padding: '0 8px' }}>
           <LogoLockup size={28} />
         </div>
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon
+          const locked = !canAccessSection(item.id as SectionId)
           return (
             <NavLink
               key={item.id}
@@ -459,7 +477,15 @@ function MobileDrawerMenu({
               })}
             >
               <Icon size={18} strokeWidth={1.7} style={{ flexShrink: 0 }} />
-              <span>{t(item.i18nKey)}</span>
+              <span style={{ flex: 1 }}>{t(item.i18nKey)}</span>
+              {locked ? (
+                <Lock
+                  size={14}
+                  strokeWidth={2}
+                  style={{ flexShrink: 0, opacity: 0.5 }}
+                  aria-hidden
+                />
+              ) : null}
             </NavLink>
           )
         })}
