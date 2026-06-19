@@ -1786,14 +1786,19 @@ async function syncVisits(
       // isPaidBooksy уточняется ПОСЛЕ fetch'а через basket_id.
       const isClosedBooksy = bookings[0]!.status === 'F'
       const customer = bookings[0]!.customer
-      if (!customer?.id) continue
+      // Bug (Telegram, Elena 09.06): раньше appointment без customer.id
+      // (walk-in / анонимная запись Booksy) пропускался целиком (`continue`) —
+      // визит вообще не импортировался, отсюда «количество визитов не
+      // совпадает». Теперь импортируем как визит без клиента (walk-in,
+      // client_id=null) — календарь показывает его как «Без записи».
+      const clientExtId = customer?.id != null ? String(customer.id) : null
 
-      const clientExtId = String(customer.id)
       // Bug (Telegram, Elena): у активных/будущих визитов customer.name из
       // /calendar часто пустой. Если клиента ещё нет в кэше и имени в /calendar
       // тоже нет — фетчим appointment detail, чтобы взять customer_profile.full_name.
       // Иначе клиент создаётся как «Booksy client» и в календаре «Без записи».
-      const needNameFetch = !caches.clientByExtId.has(clientExtId) && !customer.name?.trim()
+      const needNameFetch =
+        clientExtId != null && !caches.clientByExtId.has(clientExtId) && !customer?.name?.trim()
 
       let detail = apptDetailCache.get(apptUid)
       if (detail === undefined && (isClosedBooksy || needNameFetch)) {
@@ -1858,12 +1863,13 @@ async function syncVisits(
         }
       }
 
-      // Find/create client (clientExtId вычислен выше)
-      let clientId = caches.clientByExtId.get(clientExtId) ?? null
-      if (!clientId) {
+      // Find/create client (clientExtId вычислен выше). Walk-in без
+      // customer.id (clientExtId === null) → clientId остаётся null.
+      let clientId = clientExtId ? (caches.clientByExtId.get(clientExtId) ?? null) : null
+      if (clientExtId && !clientId) {
         const profile = detail?.profile
-        const name = profile?.full_name?.trim() || customer.name?.trim() || 'Booksy client'
-        const phone = profile?.cell_phone?.trim() || customer.phone?.trim() || null
+        const name = profile?.full_name?.trim() || customer?.name?.trim() || 'Booksy client'
+        const phone = profile?.cell_phone?.trim() || customer?.phone?.trim() || null
         const email = profile?.email?.trim() || null
         const { data: newClient, error: insErr } = await admin
           .from('clients')
@@ -2025,7 +2031,7 @@ async function syncVisits(
             newlyInserted.push({
               visit_at: visitAtIso,
               serviceName,
-              clientName: detail?.profile?.full_name ?? customer.name ?? null,
+              clientName: detail?.profile?.full_name ?? customer?.name ?? null,
             })
           }
         }
@@ -2261,6 +2267,43 @@ async function processReservations(
     if (v.external_reservation_id) portalOwnedReservationIds.add(String(v.external_reservation_id))
   }
 
+  // Bug (Telegram, Elena 09.06): «лишние серые блоки Резерв времени, которых
+  // в Booksy нет как визитов». Booksy в /calendar под каждый реальный
+  // appointment может вернуть ещё и reservation-запись. Дедуп по
+  // external_reservation_id (выше) ловит её только если apptUid совпадает; у
+  // части резервов идентификатор иной → серый блок ложится ПОВЕРХ визита.
+  // Дополнительный, устойчивый фильтр: отбрасываем резерв, чей слот
+  // пересекается с уже импортированным визитом того же мастера. Реальные
+  // блокировки (перерывы) визитов не пересекают и остаются.
+  let resMinMs = Infinity
+  let resMaxMs = -Infinity
+  for (const r of rawList) {
+    const from = r.reserved_from ?? r.booked_from
+    const till = r.reserved_till ?? r.booked_till
+    if (from) resMinMs = Math.min(resMinMs, new Date(`${from}:00+02:00`).getTime())
+    if (till) resMaxMs = Math.max(resMaxMs, new Date(`${till}:00+02:00`).getTime())
+  }
+  const visitIntervalsByStaff = new Map<string, Array<[number, number]>>()
+  if (Number.isFinite(resMinMs) && Number.isFinite(resMaxMs)) {
+    // Буфер 24ч слева — визит мог начаться чуть раньше окна и тянуться внутрь.
+    const { data: visitRows } = await admin
+      .from('visits')
+      .select('staff_id, visit_at, duration_min')
+      .eq('salon_id', salonId)
+      .is('deleted_at', null)
+      .not('staff_id', 'is', null)
+      .gte('visit_at', new Date(resMinMs - 24 * 60 * 60 * 1000).toISOString())
+      .lte('visit_at', new Date(resMaxMs).toISOString())
+    for (const v of visitRows ?? []) {
+      if (!v.staff_id || !v.visit_at) continue
+      const start = new Date(v.visit_at).getTime()
+      const end = start + (v.duration_min ?? 0) * 60_000
+      const arr = visitIntervalsByStaff.get(v.staff_id) ?? []
+      arr.push([start, end])
+      visitIntervalsByStaff.set(v.staff_id, arr)
+    }
+  }
+
   // Для cancel'а нужен appointment_uid, а не reservation.id — храним именно
   // его в staff_time_blocks.external_id чтобы delete-reservation работало
   // одинаково и для импортированных, и для созданных в портале блоков.
@@ -2319,6 +2362,8 @@ async function processReservations(
     // внутри суток.
     const startsAt = new Date(`${from}:00+02:00`).toISOString()
     const endsAt = new Date(`${till}:00+02:00`).toISOString()
+    const startMs = new Date(startsAt).getTime()
+    const endMs = new Date(endsAt).getTime()
     const label = (r.reason ?? r.description ?? '')?.trim() || null
 
     for (const stafferExt of resIds) {
@@ -2327,6 +2372,11 @@ async function processReservations(
         console.warn(`reservation ${apptUid}: staff_ext=${stafferExt} not mapped`)
         continue
       }
+      // Резерв пересекается с реальным визитом этого мастера → это
+      // «slot-резерв» самого визита, не отдельная блокировка. Не импортируем,
+      // иначе серый блок наезжает на карточку визита.
+      const visitIntervals = visitIntervalsByStaff.get(staffUuid)
+      if (visitIntervals?.some(([s, e]) => startMs < e && endMs > s)) continue
       const blockExternalId = buildReservationExternalId(String(apptUid), stafferExt, resIds.length)
       if (existingExt.has(blockExternalId)) continue
 
