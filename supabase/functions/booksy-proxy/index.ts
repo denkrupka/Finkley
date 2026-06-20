@@ -1393,6 +1393,9 @@ type ResolveCaches = {
   staffByExtId: Map<string, string>
   serviceByExtId: Map<string, { id: string; price: number }>
   clientByExtId: Map<string, string>
+  /** extId клиентов с именем-плейсхолдером 'Booksy client' — их имя ещё
+   *  надо догрузить из appointment detail при следующем визите. */
+  placeholderClientExtIds: Set<string>
 }
 
 type BooksyConfig = {
@@ -1405,6 +1408,7 @@ async function buildResolveCaches(admin: SupabaseClient, salonId: string): Promi
     staffByExtId: new Map(),
     serviceByExtId: new Map(),
     clientByExtId: new Map(),
+    placeholderClientExtIds: new Set(),
   }
   const { data: staff } = await admin
     .from('staff')
@@ -1431,12 +1435,15 @@ async function buildResolveCaches(admin: SupabaseClient, salonId: string): Promi
   }
   const { data: clients } = await admin
     .from('clients')
-    .select('id, external_id')
+    .select('id, external_id, name')
     .eq('salon_id', salonId)
     .eq('external_source', 'booksy')
     .not('external_id', 'is', null)
   for (const c of clients ?? []) {
-    if (c.external_id) caches.clientByExtId.set(c.external_id, c.id)
+    if (c.external_id) {
+      caches.clientByExtId.set(c.external_id, c.id)
+      if (c.name === 'Booksy client') caches.placeholderClientExtIds.add(c.external_id)
+    }
   }
   return caches
 }
@@ -1712,8 +1719,45 @@ async function syncVisits(
     } | null
   >()
 
-  for (const week of weeks) {
-    if (Date.now() - startTs > BUDGET_MS) break
+  // Resume по неделям. Раньше при таймауте BUDGET_MS цикл (будущее→прошлое)
+  // обрывался и дальние недели никогда не догружались (как в syncClients до
+  // T115) → «количество визитов не совпадает». Теперь полный sync идёт
+  // СПЛОШНЫМ окном со стопа: visits_resume_week_idx в salon_integrations.meta
+  // указывает, с какой недели продолжить; дойдя до конца — сброс на 0 (новый
+  // цикл с будущего). Сплошное (без дыр) окно важно: reverse-delete работает
+  // по диапазону опрошенных недель, дыры дали бы ложные soft-delete. Быструю
+  // свежесть текущего дня держит отдельный day-sync (opts.visitsRange).
+  const isFullSync = !(opts?.rangeStart && opts?.rangeEnd)
+  let visitsMeta: Record<string, unknown> = {}
+  let resumeWeekIdx = 0
+  if (isFullSync) {
+    const { data: integRow } = await admin
+      .from('salon_integrations')
+      .select('meta')
+      .eq('salon_id', salonId)
+      .eq('provider', 'booksy')
+      .maybeSingle()
+    visitsMeta = (integRow?.meta as Record<string, unknown> | null) ?? {}
+    const raw = Number(visitsMeta.visits_resume_week_idx ?? 0)
+    resumeWeekIdx = Number.isFinite(raw) && raw > 0 && raw < weeks.length ? raw : 0
+  }
+  const weekOrder: number[] = []
+  for (let i = isFullSync ? resumeWeekIdx : 0; i < weeks.length; i++) weekOrder.push(i)
+  console.info(
+    `[booksy-sync] visits weeks=${weeks.length} resumeFrom=${resumeWeekIdx} order=${weekOrder.length}`,
+  )
+
+  // По умолчанию (прошли все недели до конца) → следующий цикл с начала (0).
+  let nextResumeWeekIdx = 0
+  for (let oi = 0; oi < weekOrder.length; oi++) {
+    const wi = weekOrder[oi]!
+    if (Date.now() - startTs > BUDGET_MS) {
+      // Прервались по бюджету — продолжим со ПЕРВОЙ необработанной недели.
+      // weekOrder возрастающий и сплошной, поэтому это просто текущий wi.
+      nextResumeWeekIdx = wi
+      break
+    }
+    const week = weeks[wi]!
 
     const url =
       `/me/businesses/${businessId}/calendar` +
@@ -1797,8 +1841,13 @@ async function syncVisits(
       // /calendar часто пустой. Если клиента ещё нет в кэше и имени в /calendar
       // тоже нет — фетчим appointment detail, чтобы взять customer_profile.full_name.
       // Иначе клиент создаётся как «Booksy client» и в календаре «Без записи».
+      // Фетчим detail с реальным именем, когда: клиента ещё нет в кэше ИЛИ
+      // он в кэше с плейсхолдером 'Booksy client' (имя так и не догрузилось
+      // прошлыми прогонами) — и при этом в /calendar имени тоже нет.
       const needNameFetch =
-        clientExtId != null && !caches.clientByExtId.has(clientExtId) && !customer?.name?.trim()
+        clientExtId != null &&
+        !customer?.name?.trim() &&
+        (!caches.clientByExtId.has(clientExtId) || caches.placeholderClientExtIds.has(clientExtId))
 
       let detail = apptDetailCache.get(apptUid)
       if (detail === undefined && (isClosedBooksy || needNameFetch)) {
@@ -1887,6 +1936,9 @@ async function syncVisits(
         if (newClient) {
           clientId = newClient.id
           caches.clientByExtId.set(clientExtId, clientId!)
+          // Создан с плейсхолдером → пометить, чтобы следующий визит этого
+          // клиента догрузил реальное имя из detail.
+          if (name === 'Booksy client') caches.placeholderClientExtIds.add(clientExtId)
         } else {
           // Bug (Telegram, Elena): insert мог упасть по unique-индексу
           // ux_clients_external — клиент уже есть в БД, но не попал в кэш
@@ -1907,10 +1959,25 @@ async function syncVisits(
             // настоящее имя — обновляем, чтобы в календаре было имя клиента.
             if (existing.name === 'Booksy client' && name !== 'Booksy client') {
               await admin.from('clients').update({ name }).eq('id', clientId)
+              caches.placeholderClientExtIds.delete(clientExtId)
+            } else if (existing.name === 'Booksy client') {
+              caches.placeholderClientExtIds.add(clientExtId)
             }
           } else if (insErr) {
             console.warn(`client insert ${clientExtId}: ${insErr.message}`)
           }
+        }
+      }
+
+      // Бэкфилл имени для клиента, пришедшего из кэша с плейсхолдером
+      // 'Booksy client' (создан прошлым прогоном без detail). Теперь detail
+      // (или /calendar) дал настоящее имя — обновляем, иначе в календаре
+      // навсегда оставалось бы «Booksy client».
+      if (clientExtId && clientId && caches.placeholderClientExtIds.has(clientExtId)) {
+        const realName = detail?.profile?.full_name?.trim() || customer?.name?.trim()
+        if (realName && realName !== 'Booksy client') {
+          await admin.from('clients').update({ name: realName }).eq('id', clientId)
+          caches.placeholderClientExtIds.delete(clientExtId)
         }
       }
 
@@ -2037,6 +2104,17 @@ async function syncVisits(
         }
       }
     }
+  }
+
+  // Сохраняем resume-курсор недель. Прошли всё → ALWAYS_FRESH_WEEKS (ротация
+  // старых стартует заново), иначе → первая необработанная старая неделя.
+  if (isFullSync) {
+    await admin
+      .from('salon_integrations')
+      .update({ meta: { ...visitsMeta, visits_resume_week_idx: nextResumeWeekIdx } })
+      .eq('salon_id', salonId)
+      .eq('provider', 'booksy')
+    console.info(`[booksy-sync] visits next resume week idx = ${nextResumeWeekIdx}`)
   }
 
   // Применяем накопленные duration_min патчи одним батчем (по 100 строк).
