@@ -1,0 +1,316 @@
+---
+import Layout from '../../layouts/Layout.astro'
+
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+
+// Таблица сравнения: критерий → есть ли в Finkley / в Booksy.
+// '✓' = есть, '—' = нет/не основная функция. Последняя строка — цена (текст).
+const COMPARE = [
+  ['Онлайн-запись клиентов', '—', '✓'],
+  ['Календарь и напоминания клиентам', '—', '✓'],
+  ['Чистая прибыль за период', '✓', '—'],
+  ['Расходы по категориям', '✓', '—'],
+  ['Зарплата мастеров (% / фикс / аренда кресла)', '✓', '—'],
+  ['Маржа по услугам', '✓', '—'],
+  ['Подключение к банку', '✓', '—'],
+  ['Фактуры / KSeF в расходы', '✓', '—'],
+  ['AI-помощник по прибыли', '✓', '—'],
+  ['Цена', 'Demo 14 дней → Free, платные €19–99', 'Отдельный тариф записи'],
+]
+
+const STEPS = [
+  'В онбординге выбери «Подключить Booksy» и войди в свой аккаунт Booksy — один раз.',
+  'Finkley сам подтянет визиты, услуги, клиентов и оплаты. Переносить данные руками не нужно.',
+  'Дальше синхронизация идёт в фоне: новые визиты из Booksy появляются в Finkley автоматически.',
+  'Добавляешь расходы и зарплаты — и видишь чистую прибыль по данным из Booksy.',
+]
+
+const FAQ = [
+  {
+    q: 'Finkley заменяет Booksy?',
+    a: 'Нет. Booksy ведёт онлайн-запись и календарь клиентов, Finkley считает деньги салона — прибыль, расходы, зарплаты, маржу. Это разные задачи. Большинство салонов используют их вместе: запись в Booksy, учёт денег в Finkley.',
+  },
+  {
+    q: 'Нужно ли переносить данные из Booksy?',
+    a: 'Нет. Подключаешь Booksy один раз в онбординге, и Finkley сам тянет визиты, оплаты, услуги и клиентов. Ничего вводить и переносить вручную не нужно — синхронизация идёт автоматически.',
+  },
+  {
+    q: 'Сколько стоит Finkley рядом с Booksy?',
+    a: 'Finkley — отдельная подписка от вашего тарифа Booksy. Есть демо на 14 дней без карты, бесплатный тариф навсегда (учёт доходов) и платные тарифы €19–99/мес. НДС не взимается. Тариф Booksy при этом не меняется.',
+  },
+  {
+    q: 'Работает ли Finkley без Booksy?',
+    a: 'Да. Booksy не обязателен. Если записи ведутся в другом сервисе или в блокноте, визит можно внести в Finkley вручную примерно за 10 секунд, а расходы и зарплаты считаются так же. Booksy просто избавляет от ручного ввода визитов.',
+  },
+]
+
+const itemListLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Finkley vs Booksy',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Finkley',
+      description: 'Управленческий учёт денег салона красоты: визиты, расходы, зарплаты мастеров, маржа и чистая прибыль.',
+      url: SITE_ORIGIN,
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Booksy',
+      description: 'Система онлайн-записи клиентов и календарь для салонов красоты.',
+      url: 'https://booksy.com/',
+    },
+  ],
+}
+
+// FAQPage — точное зеркало видимого FAQ (требование Google).
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: { '@type': 'Answer', text: item.a },
+  })),
+}
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Сравнение', item: new URL('/compare/', SITE_ORIGIN).toString() },
+    { '@type': 'ListItem', position: 3, name: 'Finkley и Booksy', item: new URL('/compare/finkley-vs-booksy/', SITE_ORIGIN).toString() },
+  ],
+}
+---
+
+<Layout
+  title="Finkley и Booksy: запись клиентов vs учёт денег"
+  description="Booksy ведёт запись клиентов, Finkley считает деньги салона: прибыль, маржу, зарплаты, расходы. Чем отличаются и как работают вместе. Демо 14 дней."
+  active="features"
+  jsonLd={[itemListLd, faqLd, breadcrumbLd]}
+>
+  <!-- Hero + answer-блок -->
+  <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
+    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+      <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">Сравнение</p>
+      <h1
+        class="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
+      >
+        Finkley и Booksy: <span class="text-brand-sage">в чём разница и зачем вместе</span>
+      </h1>
+      <p
+        class="mt-6 max-w-3xl rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Коротко.</strong> Booksy — система онлайн-записи клиентов и календаря. Finkley —
+        управленческий учёт денег салона: визиты, расходы, зарплаты мастеров и чистая прибыль. Это не
+        конкуренты: Booksy ведёт расписание, Finkley подключается к нему и считает, сколько вы реально
+        заработали. Их используют вместе.
+      </p>
+    </div>
+  </section>
+
+  <!-- Что делает Booksy -->
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">Что делает Booksy</h2>
+      <p
+        class="mt-5 rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Booksy — это запись клиентов.</strong> Сервис закрывает онлайн-бронирование,
+        календарь мастеров, напоминания клиентам, онлайн-оплату и маркетплейс, где клиенты находят
+        салон. Это сильный инструмент для расписания и потока клиентов. Но Booksy не показывает чистую
+        прибыль салона и не собирает все расходы — он про записи, а не про деньги.
+      </p>
+      <ul class="mt-6 space-y-2 text-base text-brand-text-muted">
+        <li>✓ Онлайн-запись и календарь мастеров</li>
+        <li>✓ Напоминания клиентам, отмены и переносы</li>
+        <li>✓ Онлайн-оплата и предоплата за визит</li>
+        <li>✓ Маркетплейс — клиенты находят салон в приложении Booksy</li>
+        <li>✗ Не показывает чистую прибыль после всех расходов</li>
+        <li>✗ Не считает зарплаты мастеров и расходы по категориям</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Что делает Finkley -->
+  <section class="border-b border-brand-border bg-brand-bg">
+    <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">Что делает Finkley</h2>
+      <p
+        class="mt-5 rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Finkley — это учёт денег.</strong> Сервис берёт визиты и оплаты (из Booksy или
+        вручную), добавляет к ним расходы — материалы, аренду, налоги, комиссии — считает зарплаты
+        мастеров и показывает чистую прибыль, маржу по услугам и отчёт о прибыли (P&amp;L). Сверху —
+        AI-помощник, который объясняет цифры обычными словами, без формул и курсов по аналитике.
+      </p>
+      <ul class="mt-6 space-y-2 text-base text-brand-text-muted">
+        <li>✓ Чистая прибыль за день, неделю и месяц</li>
+        <li>✓ Расходы по категориям: материалы, аренда, ZUS, реклама</li>
+        <li>✓ Зарплаты мастеров: % от выручки, фикс или аренда кресла</li>
+        <li>✓ Маржа по каждой услуге и отчёт о прибыли (P&amp;L)</li>
+        <li>✓ Подключение к банку и фактуры / KSeF прямо в расходы</li>
+        <li>✓ AI-помощник по прибыли на русском</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Таблица сравнения -->
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+        Сравнение: запись против учёта денег
+      </h2>
+      <p
+        class="mt-5 rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Главное различие в одной таблице.</strong> Booksy закрывает запись и календарь
+        клиентов, Finkley — деньги: прибыль, расходы, зарплаты и маржу. Пересечения почти нет, поэтому
+        сервисы не мешают друг другу, а дополняют. Ниже — построчное сравнение по ключевым функциям
+        салона красоты.
+      </p>
+      <div class="mt-8 overflow-x-auto rounded-lg border border-brand-border">
+        <table class="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr class="bg-brand-navy text-white">
+              <th class="px-4 py-3 font-semibold">Что умеет</th>
+              <th class="px-4 py-3 text-center font-semibold">Finkley</th>
+              <th class="px-4 py-3 text-center font-semibold">Booksy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              COMPARE.map(([label, fin, bk], i) => (
+                <tr class={i % 2 === 0 ? 'bg-white' : 'bg-brand-bg'}>
+                  <td class="border-t border-brand-border px-4 py-3 font-medium text-brand-text">
+                    {label}
+                  </td>
+                  <td class={`border-t border-brand-border px-4 py-3 text-center font-bold ${fin === '✓' ? 'text-brand-sage' : 'text-brand-text-muted'}`}>
+                    {fin}
+                  </td>
+                  <td class={`border-t border-brand-border px-4 py-3 text-center font-bold ${bk === '✓' ? 'text-brand-sage' : 'text-brand-text-muted'}`}>
+                    {bk}
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-4 text-xs text-brand-text-faint">
+        «—» означает, что функция не является задачей сервиса, а не недоработку.
+      </p>
+    </div>
+  </section>
+
+  <!-- Можно ли вместо Booksy -->
+  <section class="border-b border-brand-border bg-brand-bg">
+    <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+        Можно ли использовать Finkley вместо Booksy?
+      </h2>
+      <p
+        class="mt-5 rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Честно: нет, Finkley не заменяет запись.</strong> В Finkley нет онлайн-бронирования,
+        маркетплейса и автоматических напоминаний клиентам — этим занимается Booksy. Finkley закрывает
+        деньги: прибыль, расходы и зарплаты. Поэтому два сервиса дополняют друг друга, а синхронизация
+        между ними настраивается в один клик при подключении.
+      </p>
+      <p class="mt-4 text-base leading-relaxed text-brand-text-muted">
+        Если запись клиентов уже идёт в Booksy — оставьте её там. Finkley подключится сверху и
+        возьмёт оттуда визиты и оплаты, чтобы посчитать реальную прибыль. А если Booksy нет — визиты
+        можно вносить вручную, и учёт денег всё равно работает.
+      </p>
+    </div>
+  </section>
+
+  <!-- Как подключить -->
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+        Как подключить Booksy к Finkley
+      </h2>
+      <p
+        class="mt-5 rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+      >
+        <strong>Подключение занимает пару минут и не требует переноса данных.</strong> Один раз
+        входишь в Booksy через онбординг Finkley — и визиты, оплаты, услуги и клиенты подтягиваются
+        сами. Дальше всё работает в фоне.
+      </p>
+      <ol class="mt-6 list-decimal space-y-3 pl-6 text-base leading-relaxed text-brand-text-muted">
+        {STEPS.map((s) => <li>{s}</li>)}
+      </ol>
+      <p class="mt-6 text-base text-brand-text-muted">
+        Подробнее про интеграции —
+        <a href="/features/integrations/" class="font-semibold text-brand-navy hover:underline">
+          на странице интеграций</a
+        >.
+      </p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="border-b border-brand-border bg-brand-bg">
+    <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+      <h2 class="text-center text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+        Частые вопросы
+      </h2>
+      <div class="mt-10 space-y-3">
+        {
+          FAQ.map((item) => (
+            <details class="group rounded-md border border-brand-border bg-white p-5 open:shadow-sm">
+              <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+                {item.q}
+                <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Внутренние ссылки -->
+  <section class="border-b border-brand-border bg-white">
+    <div class="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      <p class="text-base text-brand-text-muted">
+        Дальше по теме:
+        <a href="/use-cases/uchet-dlya-salona-krasoty/" class="font-semibold text-brand-navy hover:underline"
+          >учёт для салона красоты</a
+        >,
+        <a href="/media/kak-schitat-pribyl-salona/" class="font-semibold text-brand-navy hover:underline"
+          >как считать прибыль салона</a
+        > и
+        <a href="/pricing" class="font-semibold text-brand-navy hover:underline">тарифы Finkley</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="bg-brand-navy text-white">
+    <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+      <h2 class="text-3xl font-extrabold tracking-tight sm:text-4xl">
+        Подключи Booksy и увидь свою прибыль
+      </h2>
+      <p class="mt-4 text-base text-white/70">
+        Finkley берёт визиты из Booksy и считает деньги за тебя.
+      </p>
+      <a
+        href="/app/signup"
+        class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-sage px-8 text-sm font-bold hover:bg-brand-sage/90"
+      >
+        Начать бесплатно — 14 дней
+      </a>
+      <p class="mt-3 text-xs text-white/60">Без карты</p>
+    </div>
+  </section>
+</Layout>
