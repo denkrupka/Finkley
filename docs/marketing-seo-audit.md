@@ -121,13 +121,25 @@ voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endow
 - /compare/finkley-vs-booksy/ (ItemList+FAQPage+BreadcrumbList), /use-cases/
   uchet-dlya-salona-krasoty/ (pillar), 3 блог-статьи (маникюр/барбершоп/прибыль).
 
-### Осталось из workflow:
+### Сделано в 3-й итерации (ultracode, параллельно):
 
-- **Stream 2** — activation-drip + win-back письма (P1, нужен owner-гейт на
-  register ты/вы + unsubscribe). Спека готова в workflow-результате.
-- **Stream 4** — PL-локаль лендинга (P0-бизнес, но последней: L-эффорт, рефактор
-  флагманских index/pricing в shared Body, обязательна вычитка носителем PL).
-  Подход B-prime: per-locale content-модули + один shared шаблон; фикс hreflang.
+- **preflight-фикс** ✅ (commit 3111524) — payment-reminders + daily-notifications
+  больше не no-op (см. находку ниже).
+- **Stream 2 — lifecycle-письма** ✅ (commit 0a5b952) — activation-drip (day2/3) +
+  win-back (протухший implicit-trial); edge-function + миграция 20260625000002 +
+  3 шаблона ru/en/pl + 18 unit-тестов. Owner-гейт: register ты/вы, unsubscribe,
+  миграция на staging.
+- **Stream 4 часть 1 — hreflang + i18n инфра** ✅ (commit 50f1b0b) — ИСПРАВЛЕН
+  сломанный hreflang (был ru/en/pl/x-default → один URL); routing.ts (+9 тестов);
+  Layout props lang/localized + реципрокные hreflang + свитчер-навигация (EN убран).
+
+### Осталось:
+
+- **Stream 4 часть 2 — контент /pl/ страниц** (B-prime: per-locale content-модули
+  src/i18n/content/{home,pricing}.ts + shared HomeBody.astro/PricingBody.astro +
+  тонкие RU-обёртки + pl/index.astro, pl/pricing.astro; localized={true} на обеих
+  локалях). Делать аккуратно: диффнуть dist body RU до/после (не должен меняться).
+  PL-копирайт — draft, обязательна вычитка носителем PL (owner-гейт).
 
 ## 🔴 Находка вне скоупа (важно владельцу)
 
