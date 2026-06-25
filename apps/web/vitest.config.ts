@@ -23,6 +23,10 @@ export default defineConfig({
       '../../supabase/functions/send-email/*.{test,spec}.ts',
       // trial-reminders — pure-логика выбора получателей и bucket'ов.
       '../../supabase/functions/trial-reminders/*.{test,spec}.ts',
+      // send-lifecycle-emails — pure-логика eligibility (activation/winback).
+      '../../supabase/functions/send-lifecycle-emails/*.{test,spec}.ts',
+      // landing i18n routing (localizedPath/stripLocale/alternatesFor).
+      '../landing/src/i18n/*.{test,spec}.ts',
     ],
     exclude: ['node_modules', 'dist', 'tests/e2e/**'],
     // RPC/edge-function тесты ходят в реальный Supabase staging — иногда

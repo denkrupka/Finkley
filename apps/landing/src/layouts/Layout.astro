@@ -1,12 +1,21 @@
 ---
 import '../styles/global.css'
-import { dict, LANGS } from '../i18n/dict'
+import { dict } from '../i18n/dict'
+import { alternatesFor, localizedPath, stripLocale, type Locale } from '../i18n/routing'
 
 interface Props {
   title: string
   description?: string
   /** Активный пункт топ-меню для подсветки */
   active?: 'home' | 'features' | 'pricing' | 'media' | 'privacy' | 'terms'
+  /** Язык текущей страницы (SSG per-locale). Дефолт ru. */
+  lang?: Locale
+  /**
+   * Есть ли у этой страницы PL-версия. Если true — эмитим реципрокные
+   * hreflang ru↔pl. Если false (только RU) — pl-альтернативу не указываем,
+   * чтобы hreflang не вёл на 404.
+   */
+  localized?: boolean
   /** Тип Open Graph — обычно website, для статей блога — article */
   ogType?: 'website' | 'article'
   /** Кастомное og:image (абсолютный URL или путь от корня) */
@@ -23,6 +32,8 @@ const {
   title,
   description = 'Finkley — учёт денег для салонов красоты. Видишь свою прибыль, а не только записи клиентов.',
   active = 'home',
+  lang = 'ru',
+  localized = false,
   ogType = 'website',
   image,
   jsonLd,
@@ -30,26 +41,33 @@ const {
 
 const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
 
-// Дефолтный язык на статике — RU. Клиентский JS на DOMContentLoaded
-// меняет тексты в [data-i18n="key"] если в localStorage другой выбор.
-const t = dict.ru
+// Язык страницы известен на билде (SSG per-locale) — словарь nav/footer берём
+// сразу нужный, без клиентской подмены текста.
+const t = dict[lang]
 const APP_URL = '/app/'
 
-// Canonical URL для каждой страницы. Astro.site задан в astro.config.mjs
-// (https://finkley.app). Astro.url.pathname — текущий путь.
+// Canonical = self-URL текущей локали. Astro.site задан в astro.config.mjs.
 const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
 const canonicalUrl = new URL(Astro.url.pathname, SITE_ORIGIN).toString()
 const ogImageUrl = new URL(image ?? '/og-image.svg', SITE_ORIGIN).toString()
 
-// hreflang alternates. EN/PL пока живут как client-side switcher
-// (см. dict.ts) — оба URL пока совпадают с RU. Когда сделаем SSR-маршруты
-// /en/, /pl/ — обновить здесь.
-const HREFLANGS = [
-  { hreflang: 'ru', href: canonicalUrl },
-  { hreflang: 'en', href: canonicalUrl },
-  { hreflang: 'pl', href: canonicalUrl },
-  { hreflang: 'x-default', href: canonicalUrl },
-]
+// hreflang: реципрокные ru↔pl + self + x-default только для локалей, в которых
+// страница реально существует (см. routing.alternatesFor). RU-only страницы
+// pl-альтернативу не эмитят.
+const basePath = stripLocale(Astro.url.pathname)
+const pageLocales: Locale[] = localized ? ['ru', 'pl'] : ['ru']
+const HREFLANGS = alternatesFor(basePath, pageLocales).map((a) => ({
+  hreflang: a.hreflang,
+  href: new URL(a.path, SITE_ORIGIN).toString(),
+}))
+
+// Навигационные ссылки переключателя языка (свитчер навигирует, не подменяет
+// текст). RU всегда есть; PL — на свою версию страницы, если она есть, иначе
+// на польскую главную.
+const ruHref = localizedPath(basePath, 'ru')
+const plHref = localized ? localizedPath(basePath, 'pl') : '/pl/'
+const ogLocale = lang === 'pl' ? 'pl_PL' : 'ru_RU'
+const ogLocaleAlt = lang === 'pl' ? 'ru_RU' : 'pl_PL'
 
 // JSON-LD: SoftwareApplication. Бесплатный тариф навсегда + платные от €19/мес.
 // applicationCategory: FinanceApplication — Google понимает это как
@@ -99,13 +117,13 @@ const websiteLd = {
   '@type': 'WebSite',
   name: 'Finkley',
   url: SITE_ORIGIN,
-  inLanguage: 'ru',
+  inLanguage: lang,
   publisher: { '@type': 'Organization', name: 'Finkley', url: SITE_ORIGIN },
 }
 ---
 
 <!DOCTYPE html>
-<html lang="ru">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -124,9 +142,8 @@ const websiteLd = {
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Finkley — финансы салона" />
-    <meta property="og:locale" content="ru_RU" />
-    <meta property="og:locale:alternate" content="en_US" />
-    <meta property="og:locale:alternate" content="pl_PL" />
+    <meta property="og:locale" content={ogLocale} />
+    {localized && <meta property="og:locale:alternate" content={ogLocaleAlt} />}
     <meta property="og:site_name" content="Finkley" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
@@ -215,8 +232,8 @@ const websiteLd = {
               class="inline-flex h-9 items-center gap-1 rounded-md border border-brand-border bg-white px-2 text-sm font-medium text-brand-text-muted hover:bg-brand-bg"
               aria-label="Language"
             >
-              <span id="lang-current-flag">🇷🇺</span>
-              <span class="hidden sm:inline" id="lang-current-label">RU</span>
+              <span id="lang-current-flag">{lang === 'pl' ? '🇵🇱' : '🇷🇺'}</span>
+              <span class="hidden sm:inline" id="lang-current-label">{lang === 'pl' ? 'PL' : 'RU'}</span>
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" />
               </svg>
@@ -226,20 +243,26 @@ const websiteLd = {
               class="absolute right-0 top-full mt-1 hidden min-w-[140px] rounded-md border border-brand-border bg-white shadow-lg"
               role="menu"
             >
-              {
-                LANGS.map((l) => (
-                  <li>
-                    <button
-                      type="button"
-                      data-lang={l.code}
-                      class="lang-option flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brand-text hover:bg-brand-bg"
-                    >
-                      <span>{l.flag}</span>
-                      <span>{l.label}</span>
-                    </button>
-                  </li>
-                ))
-              }
+              <li>
+                <a
+                  href={ruHref}
+                  hreflang="ru"
+                  class={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-brand-bg ${lang === 'ru' ? 'font-bold text-brand-navy' : 'text-brand-text'}`}
+                >
+                  <span>🇷🇺</span>
+                  <span>Русский</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href={plHref}
+                  hreflang="pl"
+                  class={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-brand-bg ${lang === 'pl' ? 'font-bold text-brand-navy' : 'text-brand-text'}`}
+                >
+                  <span>🇵🇱</span>
+                  <span>Polski</span>
+                </a>
+              </li>
             </ul>
           </div>
           <a
@@ -346,53 +369,10 @@ const websiteLd = {
     </footer>
 
     <script>
-      import { dict, type Lang } from '../i18n/dict'
-
-      const LS_KEY = 'finkley.lang'
-
-      function applyLang(lang: Lang) {
-        const d = dict[lang]
-        document.documentElement.lang = lang
-        // Заменяем все элементы с data-i18n="key"
-        document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
-          const key = el.dataset.i18n as keyof typeof d
-          const v = d[key]
-          if (v) el.textContent = v
-        })
-        // Обновляем индикатор в свитчере
-        const flagMap: Record<Lang, string> = { ru: '🇷🇺', en: '🇬🇧', pl: '🇵🇱' }
-        const labelMap: Record<Lang, string> = { ru: 'RU', en: 'EN', pl: 'PL' }
-        const fEl = document.getElementById('lang-current-flag')
-        const lEl = document.getElementById('lang-current-label')
-        if (fEl) fEl.textContent = flagMap[lang]
-        if (lEl) lEl.textContent = labelMap[lang]
-      }
-
-      function getStored(): Lang | null {
-        try {
-          const v = localStorage.getItem(LS_KEY)
-          if (v === 'ru' || v === 'en' || v === 'pl') return v
-        } catch {
-          /* ignore */
-        }
-        return null
-      }
-
-      function detectBrowserLang(): Lang {
-        const nav = (navigator.language || 'ru').toLowerCase()
-        if (nav.startsWith('en')) return 'en'
-        if (nav.startsWith('pl')) return 'pl'
-        return 'ru'
-      }
-
-      // На старте — применяем сохранённый или авто-определённый язык
+      // Язык страницы — серверный (SSG per-locale), текст не подменяем.
+      // Свитчер языка — обычные ссылки (RU ↔ /pl/). Здесь только UI-тогглы.
       document.addEventListener('DOMContentLoaded', () => {
-        const stored = getStored()
-        const initial = stored ?? detectBrowserLang()
-        if (initial !== 'ru') applyLang(initial)
-        else applyLang('ru')
-
-        // Тоггл меню
+        // Дропдаун языка
         const btn = document.getElementById('lang-switcher-btn')
         const menu = document.getElementById('lang-switcher-menu')
         btn?.addEventListener('click', (e) => {
@@ -401,27 +381,13 @@ const websiteLd = {
         })
         document.addEventListener('click', () => menu?.classList.add('hidden'))
 
-        // Mobile burger menu toggle
+        // Бургер-меню (мобайл)
         const mobBtn = document.getElementById('mobile-menu-btn')
         const mobMenu = document.getElementById('mobile-menu')
         mobBtn?.addEventListener('click', (e) => {
           e.stopPropagation()
           const isHidden = mobMenu?.classList.toggle('hidden')
           mobBtn.setAttribute('aria-expanded', isHidden ? 'false' : 'true')
-        })
-
-        // Выбор языка
-        document.querySelectorAll<HTMLButtonElement>('.lang-option').forEach((b) => {
-          b.addEventListener('click', () => {
-            const lang = b.dataset.lang as Lang
-            try {
-              localStorage.setItem(LS_KEY, lang)
-            } catch {
-              /* ignore */
-            }
-            applyLang(lang)
-            menu?.classList.add('hidden')
-          })
         })
       })
     </script>
