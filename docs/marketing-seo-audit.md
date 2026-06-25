@@ -49,13 +49,44 @@
 
 ## Осталось (следующие итерации)
 
-### Phase 5 — Onboarding / Emails / SMS (in-product)
+### Phase 5 — Onboarding / Emails / SMS (in-product) — ИНВЕНТАРЬ ГОТОВ
 
-- Прочитать скиллы onboarding, emails, sms, launch, marketing-ideas.
-- Аудит email-шаблонов (`supabase/functions/send-email`, digest, trial-reminder),
-  онбординг-флоу (`apps/web/src/routes/onboarding/`), SMS/уведомлений.
-- Применить: goal-gradient/IKEA в онбординг (уже есть SetupProgressBar — усилить),
-  welcome/trial-ending/winback email-последовательности, SMS-комплаенс.
+Провайдер email — Resend; шаблоны inline в `supabase/functions/send-email/templates.ts`
+(+ зеркало в `docs/email-templates/`). SMS — мультипровайдер (`_shared/sms.ts`:
+smsapi/flysms/twilio, по умолчанию `none`). Крон — pg_cron + rendezvous-token.
+
+**Есть и работает:** welcome (ru/pl/en, founder-voice), payment_succeeded/failed/
+canceled (Stripe), weekly_digest (email+TG), team_invitation, gdpr_export,
+bank_consent_expiring, privacy_alert; геймифицированный SetupProgressBar
+(endowed-progress 40% + goal-gradient + награда «+14 дней», server-validated,
+анти-абьюз — ADR-034); review-request SMS/email с 5★-гейтингом на Google;
+visit-reminder (lapsed client) SMS/email; per-salon SMS-биллинг.
+
+**Дыры (приоритет для следующей итерации):**
+
+1. 🔴 **БАГ выручки: trial-ending письмо не уходит для implicit-trial.** Шаблон
+   `trial_ending` привязан к Stripe `customer.subscription.trial_will_end`, но
+   онбординг создаёт implicit-trial 14 дней БЕЗ карты и БЕЗ Stripe-подписки
+   (`OnboardingPage.tsx:780`). Такие салоны никогда не генерят это событие →
+   письма нет. Нет крона, сканирующего дедлайны триала
+   (`salon_subscriptions.trial_ends_at`/`bonus_until`/`created_at+14d`).
+   **Фикс:** новый edge-function + pg_cron (по паттерну rendezvous-token),
+   сканирует дедлайны, шлёт `trial_ending` за 3/1 дн + trial-expired notice.
+   Чувствительно (биллинг/миграция) — тесты + проверка на staging.
+2. 🔴 Нет activation-drip: «добавь первый визит» только in-app (SetupProgressBar),
+   нет email-напоминания о незавершённой настройке и о окне награды +14 дней.
+3. 🔴 Нет win-back/re-engagement (только один cancel-email; ничего для
+   протухших implicit-trial и неактивных владельцев).
+4. 🔴 Нет SMS-напоминания клиенту о предстоящем визите (есть только post-visit
+   review + lapsed-client).
+5. 🟡 Дуннинг single-shot (только один `payment_failed`, без эскалации day1/3/final).
+6. 🟡 Большинство lifecycle-писем RU-only (pl/en фоллбэк на русский) — критично
+   для PL-рынка.
+
+**Что усилить по скиллам (после фикса дыр):** welcome-tone уже хорош (founder-
+voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endowed-progress —
+добавить email-подкрепление окна награды; trial-ending как часть launch/emails
+последовательности.
 
 ### Phase 6 — Programmatic SEO + контент + PL-локаль
 
