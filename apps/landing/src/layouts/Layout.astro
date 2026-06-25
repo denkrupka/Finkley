@@ -11,6 +11,12 @@ interface Props {
   ogType?: 'website' | 'article'
   /** Кастомное og:image (абсолютный URL или путь от корня) */
   image?: string
+  /**
+   * Постраничная structured data (JSON-LD). Один объект или массив объектов —
+   * FAQPage, Product, BreadcrumbList, BlogPosting и т.п. Рендерится в <head>
+   * дополнительно к site-wide SoftwareApplication/Organization/WebSite.
+   */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[]
 }
 
 const {
@@ -19,7 +25,10 @@ const {
   active = 'home',
   ogType = 'website',
   image,
+  jsonLd,
 } = Astro.props
+
+const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
 
 // Дефолтный язык на статике — RU. Клиентский JS на DOMContentLoaded
 // меняет тексты в [data-i18n="key"] если в localStorage другой выбор.
@@ -81,6 +90,17 @@ const organizationLd = {
   logo: new URL('/logo.svg', SITE_ORIGIN).toString(),
   email: 'info@finkley.app',
   description: 'Финансы и операционка для салонов красоты.',
+  sameAs: [],
+}
+
+// JSON-LD: WebSite (entity recognition + потенциальные sitelinks).
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Finkley',
+  url: SITE_ORIGIN,
+  inLanguage: 'ru',
+  publisher: { '@type': 'Organization', name: 'Finkley', url: SITE_ORIGIN },
 }
 ---
 
@@ -118,12 +138,16 @@ const organizationLd = {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <script type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
     <script type="application/ld+json" set:html={JSON.stringify(organizationLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
+    {pageJsonLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-brand-bg font-display text-brand-text antialiased">

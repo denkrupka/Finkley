@@ -21,9 +21,44 @@ const posts = Array.from(bySlug.values()).sort(
 function fmt(d: Date): string {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 }
+
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+
+// Blog schema со списком статей — помогает Google/AI понять это как блог-хаб
+// и подтягивать отдельные статьи в выдачу.
+const blogLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Blog',
+  name: 'Блог Finkley — финансы салона красоты',
+  description: 'Статьи о финансовом учёте, маржинальности и операционке салона красоты.',
+  url: new URL('/media/', SITE_ORIGIN).toString(),
+  inLanguage: 'ru',
+  publisher: { '@type': 'Organization', name: 'Finkley', url: SITE_ORIGIN },
+  blogPost: posts.map((p) => ({
+    '@type': 'BlogPosting',
+    headline: p.data.title,
+    description: p.data.description,
+    datePublished: p.data.date.toISOString(),
+    url: new URL(`/media/${p.slug}/`, SITE_ORIGIN).toString(),
+  })),
+}
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Блог', item: new URL('/media/', SITE_ORIGIN).toString() },
+  ],
+}
 ---
 
-<Layout title="Finkley — медиа и блог о финансах салона" description="Статьи о финансовом учёте, маржинальности и операционке салона красоты." active="media">
+<Layout
+  title="Блог Finkley — финансы и учёт салона красоты"
+  description="Статьи о финансовом учёте, марже, прибыли и операционке салона красоты. Простыми словами, без воды — то, что реально влияет на ваш P&L."
+  active="media"
+  jsonLd={[blogLd, breadcrumbLd]}
+>
   <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
     <div class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
       <p class="text-xs font-bold uppercase tracking-wider text-brand-teal">Media</p>

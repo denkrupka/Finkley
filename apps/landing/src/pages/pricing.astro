@@ -96,12 +96,87 @@ const PAID_PLANS = [
     ],
   },
 ]
+
+// FAQ для оплаты — отзеркалено в FAQPage schema (текст совпадает с видимым).
+const PAYMENT_FAQ = [
+  {
+    q: 'Чем демо отличается от бесплатного тарифа?',
+    a: 'Демо — это весь функционал без ограничений на 14 дней, чтобы попробовать всё. Карта не нужна. Бесплатный тариф действует навсегда, но в нём открыт только раздел «Доходы» (учёт визитов и выручки) — остальные разделы видны, но заблокированы. В любой момент можно перейти на платный тариф.',
+  },
+  {
+    q: 'А что после 14 дней демо?',
+    a: 'На 12-й день мы напомним по email. Можно выбрать платный тариф и продолжить со всеми разделами, либо остаться на бесплатном тарифе — тогда останется доступен раздел «Доходы», а остальные разделы заблокируются. Данные никуда не денутся. Подписаться можно в любой момент.',
+  },
+  {
+    q: 'Какой тариф выбрать?',
+    a: '€19 — если нужен учёт доходов, расходов, отчёты и мессенджер. €49 (самый популярный) добавляет маркетинг и AI-помощника. €69 открывает всё, включая финансы (P&L и ДДС) и склад. €99 — если у тебя несколько салонов на одном аккаунте. Перейти между тарифами можно в любой момент.',
+  },
+  {
+    q: 'Если у меня несколько салонов?',
+    a: 'Мульти-салон входит в тариф €99/мес: один аккаунт, переключатель салонов в шапке, каждый салон считается отдельно. На остальных тарифах — один салон на аккаунт.',
+  },
+  {
+    q: 'Цены с НДС или без?',
+    a: 'НДС не взимается — в чеке ровно сумма тарифа, без налога сверху. Цены окончательные.',
+  },
+  {
+    q: 'Можно отменить подписку?',
+    a: 'Да, в один клик в Настройках → Подписка. До конца оплаченного периода тариф работает как обычно, потом аккаунт переходит на бесплатный тариф (остаётся раздел «Доходы»).',
+  },
+  {
+    q: 'Возвраты?',
+    a: 'Если что-то пошло не так в первые 14 дней оплаченной подписки — вернём деньги. Напиши на info@finkley.app.',
+  },
+]
+
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+
+// FAQPage schema — rich result + извлекаемые Q&A для AI-движков.
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: PAYMENT_FAQ.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: { '@type': 'Answer', text: item.a },
+  })),
+}
+
+// Product schema с offers по всем тарифам — машиночитаемые цены для AI-агентов.
+const priceToNumber = (p: string) => p.replace(/[^\d]/g, '')
+const productLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: 'Finkley',
+  description:
+    'Управленческий учёт и аналитика для салонов красоты: доходы, расходы, зарплаты, прибыль, отчёты и AI-помощник.',
+  brand: { '@type': 'Brand', name: 'Finkley' },
+  offers: [...FREE_PLANS, ...PAID_PLANS].map((plan) => ({
+    '@type': 'Offer',
+    name: `Finkley ${plan.name}`,
+    price: priceToNumber(plan.price),
+    priceCurrency: 'EUR',
+    availability: 'https://schema.org/InStock',
+    url: new URL('/pricing', SITE_ORIGIN).toString(),
+    description: plan.blurb,
+  })),
+}
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Цены', item: new URL('/pricing', SITE_ORIGIN).toString() },
+  ],
+}
 ---
 
 <Layout
-  title="Finkley — цены"
-  description="Бесплатный тариф навсегда, демо 14 дней без карты и платные планы от €19/мес. Платите только за то, чем пользуетесь."
+  title="Цены Finkley — учёт для салона красоты от €19/мес"
+  description="Тарифы Finkley для салонов красоты: бесплатный план навсегда, демо 14 дней без карты и платные планы от €19/мес. НДС не взимается, отмена в один клик."
   active="pricing"
+  jsonLd={[productLd, faqLd, breadcrumbLd]}
 >
   <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
     <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">

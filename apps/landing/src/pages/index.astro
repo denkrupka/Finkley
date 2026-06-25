@@ -193,9 +193,26 @@ const FAQ = [
     a: 'Один аккаунт — несколько салонов с переключателем сверху, каждый салон считается отдельно. Мульти-салон входит в тариф €99/мес.',
   },
 ]
+
+// FAQPage schema — отзеркаливает видимый FAQ (8 Q&A), даёт rich result в Google
+// и извлекаемые ответы для AI-движков (ChatGPT/Perplexity/AI Overviews).
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: { '@type': 'Answer', text: item.a },
+  })),
+}
 ---
 
-<Layout title="Finkley — прибыль твоего салона в одном месте" active="home">
+<Layout
+  title="Finkley — учёт денег и прибыли для салона красоты"
+  description="Finkley — управленческий учёт для салонов красоты: визиты из Booksy, расходы, зарплаты мастеров и чистая прибыль в одном месте. Демо 14 дней без карты."
+  active="home"
+  jsonLd={faqLd}
+>
   <!-- Hero -->
   <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
     <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">

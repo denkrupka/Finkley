@@ -42,9 +42,51 @@ function fmt(d: Date): string {
 }
 
 const post = { data }
+
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const articleUrl = new URL(Astro.url.pathname, SITE_ORIGIN).toString()
+const imageAbs = new URL(post.data.cover ?? '/og-image.svg', SITE_ORIGIN).toString()
+
+// BlogPosting schema — author/datePublished для Google + извлекаемость в AI-движках.
+const articleLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  image: imageAbs,
+  datePublished: post.data.date.toISOString(),
+  dateModified: post.data.date.toISOString(),
+  inLanguage: 'ru',
+  url: articleUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': articleUrl },
+  author: { '@type': 'Organization', name: post.data.author ?? 'Finkley', url: SITE_ORIGIN },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Finkley',
+    logo: { '@type': 'ImageObject', url: new URL('/logo.svg', SITE_ORIGIN).toString() },
+  },
+  keywords: (post.data.tags ?? []).join(', '),
+}
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Блог', item: new URL('/media/', SITE_ORIGIN).toString() },
+    { '@type': 'ListItem', position: 3, name: post.data.title, item: articleUrl },
+  ],
+}
 ---
 
-<Layout title={`${post.data.title} — Finkley`} description={post.data.description} image={post.data.cover} active="media">
+<Layout
+  title={`${post.data.title} — Finkley`}
+  description={post.data.description}
+  image={post.data.cover}
+  ogType="article"
+  active="media"
+  jsonLd={[articleLd, breadcrumbLd]}
+>
   <article>
     <header class="border-b border-brand-border bg-white">
       <div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
