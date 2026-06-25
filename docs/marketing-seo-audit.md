@@ -138,9 +138,13 @@ voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endow
 - **PL /pl/pricing** ✅ (commit c55d1ea) — B-prime: content/pricing.ts (ru verbatim +
   pl draft) + PricingBody.astro + тонкие обёртки + pl/pricing.astro. RU видимый
   текст идентичен baseline (только &→&amp;), hreflang реципрокен, schema на месте.
-- **PL /pl/ (home)** — делается субагентом по тому же паттерну (build + diff RU
-  verification). Ревью + коммит — по завершении.
-- Опционально далее: PL feature-страницы, PL-сиблинги Stream-5 контента.
+- **PL /pl/ (home)** ✅ (commit 3989ef2) — флагман: content/home.ts (ru verbatim +
+  pl draft) + HomeBody.astro; index.astro 626→19 строк. RU видимый текст ИДЕНТИЧЕН
+  baseline (нулевая регрессия), hreflang реципрокен (ru=/, pl=/pl/, x-default=/),
+  PL hero «My pokazujemy Twój zysk», FAQ-схема в обеих.
+- **Stream 4 P0 (home + pricing) ЗАВЕРШЁН.** Опционально далее: PL feature-страницы
+  (ai/integrations/messenger) + PL-сиблинги Stream-5 (compare/use-cases) — те же
+  модули-обёртки; feature-страницы сейчас localized=false → корректный ru+x-default.
 
 **Owner-гейт (важно):** все PL-строки в content/\*.ts — машинный ЧЕРНОВИК,
 обязательна вычитка носителем польского перед публичным анонсом.
