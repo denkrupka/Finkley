@@ -301,39 +301,39 @@ const pl: FeaturesCopy = {
   ai: {
     title: 'AI dla salonu piękności: OCR paragonów i asystent — Finkley',
     description:
-      'AI w Finkley rozpoznaje paragony i faktury (kwota, data, dostawca, NIP) i odpowiada na pytania o zysk salonu. Mniej ręcznego wpisywania — więcej czasu dla klientów.',
+      'AI w Finkley rozpoznaje paragony i faktury (kwota, data, dostawca, NIP) i odpowiada na pytania o zysk salonu. Mniej ręcznego wpisywania — więcej czasu dla klientek.',
     eyebrow: 'AI dla salonu piękności',
-    h1: { pre: 'Żadnego ręcznego wpisywania ', accent: '— AI robi to za Ciebie', br: false },
+    h1: { pre: 'Koniec z ręcznym wpisywaniem ', accent: '— AI zrobi to za Ciebie', br: false },
     subtitle:
-      'Zrób zdjęcie paragonu, zadaj pytanie na głos — Finkley rozpoznaje, liczy, odpowiada. Mniej rutyny — więcej klientów.',
-    answerBlockTitle: 'Co robi AI Finkley.',
+      'Zrób zdjęcie paragonu, zadaj pytanie na głos — Finkley rozpozna, policzy i odpowie. Mniej papierkowej roboty — więcej czasu dla klientek.',
+    answerBlockTitle: 'Co robi AI w Finkley.',
     answerBlockText:
-      'Sztuczna inteligencja w Finkley rozwiązuje dwa zadania salonu piękności: rozpoznaje paragony i faktury dostawców (kwota, data, sprzedawca, NIP) i automatycznie wpisuje je w koszty, a także odpowiada na pytania o zysk, marżę i obłożenie pracowników zwykłymi słowami — bez formuł, tabel i kursów z analityki.',
+      'Sztuczna inteligencja w Finkley odpowiada na dwie potrzeby salonu piękności: rozpoznaje paragony i faktury od dostawców (kwota, data, sprzedawca, NIP) i automatycznie zapisuje je w kosztach, a do tego odpowiada zwykłymi słowami na pytania o zysk, marżę i obłożenie pracowników — bez wzorów, tabel i kursów z analityki.',
     ocr: {
       title: 'OCR paragonów i faktur',
-      text: 'Zdjęcie paragonu lub PDF faktury od dostawcy → rozpoznanie kwoty, daty, NIP sprzedawcy, NIP nabywcy i automatyczny wpis w odpowiednią pozycję kosztów. Jeśli NIP nabywcy zgadza się z Twoją firmą — koszt trafia do podłączonej księgowości automatycznie.',
+      text: 'Zdjęcie paragonu albo PDF faktury od dostawcy → Finkley rozpozna kwotę, datę, NIP sprzedawcy i NIP nabywcy oraz sam wpisze wszystko do właściwej kategorii kosztów. Jeśli NIP nabywcy zgadza się z Twoją firmą, koszt trafia do podłączonej księgowości automatycznie.',
       items: [
-        'Obsługa cyrylicy, łacinki, polskiego',
-        'Działa z dowolnymi formatami: papierowy paragon, PDF, faktura e-mail',
-        'Automatyczna kategoryzacja (materiały, najem, marketing…)',
-        'Inwentarz — pozycje towarowe z paragonu od razu do magazynu',
+        'Obsługa cyrylicy, alfabetu łacińskiego i polskich znaków',
+        'Działa z każdym formatem: papierowy paragon, PDF, faktura z e-maila',
+        'Automatyczne przypisywanie do kategorii (materiały, czynsz, marketing…)',
+        'Magazyn — pozycje z paragonu od razu na stanie',
       ],
     },
     assistant: {
       title: 'Asystent AI',
-      text: 'Pytasz słowami — odpowiada liczbami i wykresami. „Ile zarobiłam w zeszłym miesiącu?", „Która usługa jest najbardziej opłacalna?", „Który pracownik jest niedociążony?" — bez formuł i tabel.',
+      text: 'Pytasz zwykłymi słowami — dostajesz odpowiedź w liczbach i na wykresach. „Ile zarobiłam w zeszłym miesiącu?”, „Która usługa jest najbardziej opłacalna?”, „Która pracownica ma za mało pracy?” — bez wzorów i tabel.',
       items: [
-        'Analiza marżowości usług i pracowników',
-        'Insights: „Twój dochód wzrósł o 12% w tydzień — sprzedaż produktów +30%"',
-        'Prognoza na miesiąc według trendu',
-        'Benchmarki względem podobnych salonów Twojej wielkości',
+        'Analiza rentowności usług i pracowników',
+        'Podpowiedzi: „Twój przychód wzrósł o 12% w tydzień — sprzedaż produktów +30%”',
+        'Prognoza na miesiąc na podstawie trendu',
+        'Porównania z podobnymi salonami Twojej wielkości',
       ],
     },
     cta: {
       heading: 'Odzyskaj 5 godzin tygodniowo',
-      text: 'Średni czas, który salon traci na finanse ręcznie. Finkley go zwraca.',
+      text: 'Tyle średnio zajmuje salonowi ręczne ogarnianie finansów. Finkley oddaje Ci ten czas.',
       button: 'Zacznij za darmo — 14 dni',
-      microcopy: 'Bez karty, anulowanie jednym kliknięciem',
+      microcopy: 'Bez karty, rezygnacja jednym kliknięciem',
     },
     breadcrumbHome: 'Strona główna',
     breadcrumbSelf: 'AI i OCR paragonów',
@@ -346,10 +346,10 @@ const pl: FeaturesCopy = {
     eyebrow: 'Integracje',
     h1: { pre: 'Podłącz swoje narzędzia —', accent: 'w 2 kliknięcia, bez programisty', br: true },
     subtitle:
-      'Booksy, wFirma, banki, komunikatory. Raz skonfigurowane — dalej Finkley sam pobiera dane.',
+      'Booksy, wFirma, banki, komunikatory. Konfigurujesz raz, a potem Finkley sam pobiera dane.',
     answerBlockTitle: 'Z czym integruje się Finkley.',
     answerBlockText:
-      'Finkley łączy się z systemem rezerwacji Booksy, bankami UE przez otwartą bankowość (PSD2), polskimi usługami księgowymi i podatkowymi (KSeF, wFirma, Fakturownia, iFirma, 360Księgowość), ze Stripe, a także z komunikatorami Facebook, Instagram, Telegram i WhatsApp oraz kalendarzami Google i Apple — łącznie 15+ integracji, bez ręcznego przenoszenia danych.',
+      'Finkley łączy się z systemem rezerwacji Booksy, z bankami w UE przez otwartą bankowość (PSD2), z polskimi programami księgowymi i podatkowymi (KSeF, wFirma, Fakturownia, iFirma, 360Księgowość), ze Stripe, a także z komunikatorami Facebook, Instagram, Telegram i WhatsApp oraz kalendarzami Google i Apple — w sumie ponad 15 integracji, bez ręcznego przepisywania danych.',
     integrations: [
       {
         name: 'Booksy',
@@ -359,21 +359,25 @@ const pl: FeaturesCopy = {
       {
         name: 'wFirma',
         cat: 'Księgowość PL',
-        desc: 'Automatyczne wysyłanie kosztów do księgowości.',
+        desc: 'Automatyczne przesyłanie kosztów do księgowości.',
       },
       {
         name: 'KSeF',
-        cat: 'Skarbówka PL',
+        cat: 'Podatki PL',
         desc: 'Bezpośrednia wymiana faktur przez system państwowy.',
       },
       { name: 'Fakturownia', cat: 'Księgowość PL', desc: 'Import kosztów i wystawianie faktur.' },
-      { name: 'iFirma', cat: 'Księgowość PL', desc: 'Sync kosztów i kontrahentów.' },
+      { name: 'iFirma', cat: 'Księgowość PL', desc: 'Synchronizacja kosztów i kontrahentów.' },
       {
         name: 'inFakt',
         cat: 'Księgowość PL',
         desc: 'Pełna dwukierunkowa integracja (program partnerski).',
       },
-      { name: '360Księgowość', cat: 'Księgowość PL', desc: 'Autoeksport faktur i operacji.' },
+      {
+        name: '360Księgowość',
+        cat: 'Księgowość PL',
+        desc: 'Automatyczny eksport faktur i operacji.',
+      },
       {
         name: 'Stripe',
         cat: 'Płatności',
@@ -387,7 +391,7 @@ const pl: FeaturesCopy = {
       {
         name: 'Facebook Messenger',
         cat: 'Komunikatory',
-        desc: 'Logowanie OAuth w 2 kliknięcia, wiadomości w jednym inboxie.',
+        desc: 'Logowanie OAuth w 2 kliknięcia, wiadomości w jednej skrzynce.',
       },
       {
         name: 'Instagram Direct',
@@ -415,7 +419,7 @@ const pl: FeaturesCopy = {
       heading: 'Potrzebujesz integracji, której jeszcze nie ma?',
       textPre: 'Napisz na ',
       emailLabel: 'info@finkley.app',
-      textPost: ' — dodajemy je na życzenie klientów.',
+      textPost: ' — dodajemy je na życzenie klientek.',
       button: 'Wypróbuj 14 dni za darmo',
     },
     breadcrumbHome: 'Strona główna',
@@ -425,15 +429,15 @@ const pl: FeaturesCopy = {
   messenger: {
     title: 'Komunikator dla salonu: FB, IG, Telegram, WhatsApp — Finkley',
     description:
-      'Wszystkie wiadomości klientów z Facebooka, Instagrama, Telegrama i WhatsAppa w jednej osi czasu Finkley. Powiązanie z kartą klienta, zapis na wizytę w parę kliknięć, masowe wysyłki.',
+      'Wszystkie wiadomości klientek z Facebooka, Instagrama, Telegrama i WhatsAppa w jednym miejscu w Finkley. Powiązanie z kartą klientki, zapis na wizytę w parę kliknięć, masowe wysyłki.',
     eyebrow: 'Unified Messenger',
     h1: {
-      pre: 'Jeden ekran dla wszystkich klientów —',
+      pre: 'Jeden ekran dla wszystkich klientek —',
       accent: 'FB, IG, Telegram, WhatsApp.',
       br: true,
     },
     subtitle:
-      'Wiadomości ze wszystkich komunikatorów przychodzą do Finkley. Odpowiedź — jednym przyciskiem. Historia — na zawsze. Nowy klient → jednym przyciskiem dodaje się do bazy i łączy z rozmową.',
+      'Wiadomości ze wszystkich komunikatorów trafiają do Finkley. Odpowiadasz jednym przyciskiem, a historia rozmów zostaje na zawsze. Nową klientkę jednym kliknięciem dodajesz do bazy i łączysz z rozmową.',
     ctaPrimary: 'Wypróbuj 14 dni za darmo',
     ctaSecondary: 'Ceny →',
     mock: {
@@ -441,74 +445,75 @@ const pl: FeaturesCopy = {
       status: 'Instagram · w bazie',
       visitButton: '+ Wizyta',
       msg1: 'Cześć! Macie wolny termin na manicure w sobotę?',
-      msg2: 'Cześć! Tak, w sobotę jest 14:00 i 17:00. Który pasuje bardziej?',
+      msg2: 'Cześć! Tak, w sobotę mamy 14:00 i 17:00. Która godzina pasuje bardziej?',
       msg3: '17:00 idealnie 🥰',
       inputPlaceholder: 'Napisz wiadomość…',
     },
-    channelsHeading: '4 kanały, jeden inbox',
-    channelsSubtitle: 'Klienci piszą tam, gdzie wygodnie. Do Ciebie — trafia w jedno miejsce.',
+    channelsHeading: '4 kanały, jedna skrzynka',
+    channelsSubtitle:
+      'Klientki piszą tam, gdzie im wygodnie. Do Ciebie trafia wszystko w jedno miejsce.',
     channels: [
       {
         name: 'Telegram',
-        text: 'Bot w @BotFather → token w Finkley. Odpowiedzi z portalu trafiają do klienta na Telegramie.',
+        text: 'Bot w @BotFather → token w Finkley. Odpowiedzi z portalu trafiają do klientki na Telegramie.',
         glyph: '✈',
         bg: '#229ED9',
       },
       {
         name: 'WhatsApp Business',
-        text: 'Przez WhatsApp Cloud API. Podłącz swój numer firmowy — klienci piszą jak zwykle.',
+        text: 'Przez WhatsApp Cloud API. Podłącz swój numer firmowy — klientki piszą tak jak zwykle.',
         glyph: '☎',
         bg: '#25D366',
       },
       {
         name: 'Instagram Direct',
-        text: '„Zaloguj przez Instagram" → jedno kliknięcie, i wiadomości DM są już w Finkley.',
+        text: '„Zaloguj się przez Instagram” → jedno kliknięcie i wiadomości DM są już w Finkley.',
         glyph: '📷',
         bg: '#E4405F',
       },
       {
         name: 'Facebook Messenger',
-        text: '„Zaloguj przez Facebook" podłączy i Page Messenger, i Instagram powiązany z tą Page.',
+        text: '„Zaloguj się przez Facebook” podłączy zarówno Page Messenger, jak i Instagram powiązany z tą Page.',
         glyph: 'f',
         bg: '#1877F2',
       },
     ],
-    highlightsHeading: 'Co czyni Finkley świetnym komunikatorem',
+    highlightsHeading: 'Dlaczego Finkley to świetny komunikator',
     highlights: [
       {
         emoji: '🪪',
-        title: 'Powiązanie z kartą klienta',
-        text: 'W nagłówku czatu — zielona plakietka „W bazie", jeśli klient już u Ciebie jest. Jeśli nie — przycisk „+ Do klientów" tworzy kartę z wypełnionym imieniem i od razu wiąże rozmowę. Następnym razem — już zielona plakietka.',
+        title: 'Powiązanie z kartą klientki',
+        text: 'W nagłówku czatu zobaczysz zieloną plakietkę „W bazie”, jeśli klientka już u Ciebie jest. Jeśli nie — przycisk „+ Do klientek” utworzy kartę z wpisanym imieniem i od razu powiąże rozmowę. Następnym razem zobaczysz już zieloną plakietkę.',
       },
       {
         emoji: '⚡',
         title: 'Zapis na wizytę w 5 sekund',
-        text: 'Z nagłówka czatu przycisk „Utwórz wizytę" — okno otwiera się z podstawionym klientem. Wybierasz pracownika i usługę — gotowe, wizyta w grafiku.',
+        text: 'Z nagłówka czatu klikasz „Utwórz wizytę” — okno otwiera się z już wybraną klientką. Dobierasz pracownika i usługę i gotowe, wizyta jest w grafiku.',
       },
       {
         emoji: '📸',
         title: 'Zdjęcia i pliki — w obie strony',
-        text: 'Klient przysyła zdjęcie referencji — wyświetla się od razu w czacie. Możesz wysłać portfolio lub cennik PDF jednym przyciskiem — klient dostanie je w swoim komunikatorze.',
+        text: 'Klientka przysyła zdjęcie inspiracji — wyświetla się od razu w czacie. Ty jednym przyciskiem wyślesz portfolio albo cennik w PDF — klientka dostanie je w swoim komunikatorze.',
       },
       {
         emoji: '📣',
         title: 'Masowa wysyłka',
-        text: 'Wybierasz dowolnych klientów z osi czasu (wszystkich z IG, wszystkich z ostatnią wizytą >30 dni) — jedna wiadomość trafia do każdego. Reaktywacja klientów w 2 kliknięcia.',
+        text: 'Zaznaczasz dowolne klientki z listy (wszystkie z Instagrama albo te z ostatnią wizytą sprzed ponad 30 dni) — jedna wiadomość trafia do każdej. Reaktywacja klientek w 2 kliknięcia.',
       },
       {
         emoji: '🔔',
         title: 'Powiadomienia w Telegramie',
-        text: 'Nowa wiadomość od klienta → push na Twój Telegram. Nie przegapisz, nawet gdy salon jest już zamknięty, a Ty w sklepie.',
+        text: 'Nowa wiadomość od klientki → powiadomienie na Twój Telegram. Nie przegapisz jej, nawet gdy salon jest już zamknięty, a Ty robisz właśnie zakupy.',
       },
       {
         emoji: '🛡',
-        title: 'Bezpieczeństwo domyślnie',
-        text: 'Tokeny dostępu Meta szyfrowane AES-256-GCM. Każdy salon widzi tylko swoje rozmowy (Row-Level Security w Postgresie). Pełna zgodność z RODO i Meta App Review.',
+        title: 'Bezpieczeństwo od pierwszej chwili',
+        text: 'Tokeny dostępu Meta są szyfrowane algorytmem AES-256-GCM. Każdy salon widzi tylko swoje rozmowy (Row-Level Security w Postgresie). Pełna zgodność z RODO i Meta App Review.',
       },
     ],
     cta: {
       heading: 'Przestań kopiować wiadomości między aplikacjami',
-      text: '14 dni za darmo. Podłączenie FB/IG w 2 kliknięcia. Bot Telegram w 5 minut.',
+      text: '14 dni za darmo. Podłączenie FB/IG w 2 kliknięcia. Bot na Telegramie w 5 minut.',
       button: 'Zacznij za darmo',
     },
     breadcrumbHome: 'Strona główna',

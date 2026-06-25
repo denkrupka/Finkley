@@ -910,11 +910,11 @@ Cześć, {{full_name}}!
 </h1>
 
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Dzięki, że dołączasz do Finkley. Cieszymy się, że jesteś z nami.
+Dziękuję, że dołączasz do Finkley. Cieszę się, że jesteś z nami.
 </p>
 
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Finkley pomoże Ci zobaczyć realny zysk Twojego salonu <strong>{{salon_name}}</strong> — po wszystkich wydatkach, bez arkuszy i kalkulatora.
+Finkley pomoże Ci zobaczyć realny zysk netto Twojego salonu piękności <strong>{{salon_name}}</strong> — po wszystkich wydatkach, bez arkuszy i kalkulatora.
 </p>
 
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
@@ -930,11 +930,11 @@ Otwórz Finkley
 </table>
 
 <p style="margin:32px 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Masz <strong>14 dni bezpłatnego okresu próbnego</strong>. Bez karty, bez kruczków. Jeśli coś Ci się nie spodoba — po prostu nie płacisz.
+Masz <strong>14 dni bezpłatnego okresu próbnego</strong>. Bez karty, bez żadnych haczyków. Jeśli coś Ci się nie spodoba — po prostu nie płacisz.
 </p>
 
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Pytania albo coś nie działa — napisz na <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>. Odpowiadam osobiście.
+Masz pytania albo coś nie działa? Napisz na <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a> — odpowiadam osobiście.
 </p>
 
 <p style="margin:0; font-size:16px; line-height:24px; color:#334155;">
@@ -1014,8 +1014,8 @@ const TEAM_INVITATION_PL: EmailTemplate = {
     {{inviter_name}} zaprasza Cię do&nbsp;„{{salon_name}}"
   </h1>
   <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:#334155;">
-    Zostałeś zaproszony do pracy w Finkley w roli <strong>{{role}}</strong>.
-    Przyjmij zaproszenie, aby uzyskać dostęp do danych salonu.
+    Masz zaproszenie do pracy w Finkley w roli <strong>{{role}}</strong>.
+    Przyjmij je, aby uzyskać dostęp do danych salonu.
   </p>
   <p style="margin:24px 0;">
     <a href="{{invite_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
@@ -1029,12 +1029,12 @@ const TEAM_INVITATION_PL: EmailTemplate = {
     <a href="{{invite_url}}" style="color:#0f172a;">{{invite_url}}</a>
   </p>
   <p style="margin:0;font-size:13px;color:#64748b;">
-    Link jest ważny przez {{expires_in_days}} dni. Jeśli nie spodziewałeś się tego zaproszenia — po prostu zignoruj tę wiadomość.
+    Link jest ważny przez {{expires_in_days}} dni. Jeśli to zaproszenie trafiło do Ciebie przez pomyłkę — po prostu zignoruj tę wiadomość.
   </p>
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
   <p style="margin:0;font-size:12px;color:#94a3b8;">
-    Finkley · księgowość zarządcza dla salonów kosmetycznych
+    Finkley · księgowość zarządcza dla salonów piękności
   </p>
 </td></tr>
 </table>
@@ -1161,11 +1161,11 @@ W tym tygodniu: <strong>{{visits_count}}</strong> wizyt.
 </table>
 
 <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
-Nie chcesz więcej digestów? Otwórz Ustawienia i wyłącz „Cotygodniowy digest".
+Nie chcesz już dostawać tych podsumowań? Otwórz Ustawienia i wyłącz „Cotygodniowe podsumowanie".
 </p>
 
 </div>
-<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów kosmetycznych<br>info@finkley.app</p>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów piękności<br>info@finkley.app</p>
 </div>
 </body>
 </html>`,
@@ -1227,7 +1227,7 @@ const TRIAL_ENDING_PL: EmailTemplate = {
 Twój okres próbny w Finkley kończy się za <strong>{{days_left}} dni</strong>.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-W tym czasie wprowadziłeś <strong>{{visits_during_trial}}</strong> wizyt na kwotę <strong>{{revenue_during_trial}}</strong>. Dobry początek.
+W tym czasie masz wprowadzone <strong>{{visits_during_trial}}</strong> wizyt na kwotę <strong>{{revenue_during_trial}}</strong>. Dobry początek.
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
 <tr><td>
@@ -1242,10 +1242,10 @@ W tym czasie wprowadziłeś <strong>{{visits_during_trial}}</strong> wizyt na kw
 </td></tr>
 </table>
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Płatność kartą przez Stripe — bezpiecznie. 14-dniowa gwarancja zwrotu przy subskrypcji płatnej — jeśli zmienisz zdanie.
+Płatność kartą przez Stripe — bezpiecznie. Przy planie płatnym masz 14 dni na zwrot pieniędzy, jeśli zmienisz zdanie.
 </p>
 <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Jeśli zdecydujesz nie kontynuować — Twoje dane zostaną zachowane 30 dni, potem usunięte. Do tego czasu możesz wyeksportować wszystko do CSV.
+Jeśli zdecydujesz nie kontynuować — Twoje dane przechowamy jeszcze przez 30 dni, a potem je usuniemy. Do tego czasu możesz wyeksportować wszystko do pliku CSV.
 </p>
 <p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">{{owner_name}}<br>
 <span style="color:#64748b; font-size:14px;">info@finkley.app</span></p>
@@ -1382,7 +1382,7 @@ Aby nie utracić dostępu — zaktualizuj kartę lub potwierdź płatność:
 </td></tr>
 </table>
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Dostęp do Finkley pozostaje jeszcze kilka dni. Jeśli płatność się nie powiedzie po kilku próbach — konto przejdzie w tryb "tylko do odczytu", ale dane pozostaną.
+Dostęp do Finkley masz jeszcze przez kilka dni. Jeśli płatność nie powiedzie się po kilku próbach — konto przejdzie w tryb „tylko do odczytu", ale Twoje dane zostaną nienaruszone.
 </p>
 <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
 Pytania — napisz na <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>.
@@ -1445,13 +1445,13 @@ const SUBSCRIPTION_CANCELED_PL: EmailTemplate = {
 <tr><td>
 <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Subskrypcja anulowana. Szkoda, że nie podeszło.
+Subskrypcja została anulowana. Szkoda, że tym razem nie wypaliło.
 </p>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Dostęp do Finkley pozostaje do <strong>{{period_end_date}}</strong>. Później konto przejdzie w tryb "tylko do odczytu" — dane będą widoczne, ale nie można będzie dodawać nowych wpisów.
+Dostęp do Finkley masz do <strong>{{period_end_date}}</strong>. Później konto przejdzie w tryb „tylko do odczytu" — dane będą widoczne, ale nie będzie można dodawać nowych wpisów.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-Możesz wyeksportować wszystkie dane do CSV — na wypadek przejścia do Excel lub innego narzędzia:
+Możesz wyeksportować wszystkie dane do pliku CSV — na wypadek, gdybyś chciała przejść do Excela lub innego narzędzia:
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
 <tr><td style="background:#f1f5f9; border-radius:6px; padding:12px 24px;">
@@ -1467,10 +1467,10 @@ Jeśli zmienisz zdanie — możesz wrócić w dowolnym momencie. Dane zachowane 
 </td></tr>
 </table>
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Powiedz, dlaczego anulowałeś? Jeden akapit naprawdę pomógłby ulepszyć produkt: <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>
+Napiszesz, co skłoniło Cię do rezygnacji? Jeden akapit naprawdę pomógłby nam ulepszyć produkt: <a href="mailto:info@finkley.app" style="color:#10b981; text-decoration:none;">info@finkley.app</a>
 </p>
 <p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
-Dzięki, że próbowałeś.<br>{{owner_name}}
+Dziękuję za to, że nam zaufałaś.<br>{{owner_name}}
 </p>
 </td></tr></table>
 <p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska</p>
@@ -1528,22 +1528,22 @@ const GDPR_EXPORT_PL: EmailTemplate = {
 <p style="margin:0 0 24px 0;font-size:14px;font-weight:700;letter-spacing:0.05em;color:#1A1A2E;">FINKLEY</p>
 <h1 style="margin:0 0 16px 0;font-size:22px;line-height:30px;color:#0f172a;">Archiwum gotowe</h1>
 <p style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#334155;">
-Cześć, {{full_name}}. Spakowaliśmy wszystkie Twoje dane Finkley w jedno archiwum ZIP.
+Cześć, {{full_name}}. Spakowaliśmy wszystkie Twoje dane z Finkley w jedno archiwum ZIP.
 </p>
 <p style="margin:0 0 24px 0;font-size:16px;line-height:24px;color:#334155;">
-Link jest ważny 24 godziny. Później trzeba poprosić o nowy eksport.
+Link jest ważny przez 24 godziny. Później wystarczy poprosić o nowy eksport.
 </p>
 <p style="margin:0 0 24px 0;">
 <a href="{{download_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Pobierz archiwum</a>
 </p>
 <p style="margin:24px 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
-W środku — CSV z wizytami, wydatkami, klientami, mistrzami, usługami i kategoriami. README.txt wyjaśnia każdą kolumnę.
+W środku znajdziesz pliki CSV z wizytami, wydatkami, klientami, pracownikami, usługami i kategoriami. Plik README.txt wyjaśnia każdą kolumnę.
 </p>
 <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#64748b;">
-Chcesz usunąć konto po pobraniu? — napisz na info@finkley.app, odpowiemy w ciągu 5 dni roboczych.
+Chcesz usunąć konto po pobraniu? Napisz na info@finkley.app, a odpowiemy w ciągu 5 dni roboczych.
 </p>
 </div>
-<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów kosmetycznych<br>Pytania — info@finkley.app</p>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;text-align:center;">Finkley · Księgowość zarządcza dla salonów piękności<br>Pytania — info@finkley.app</p>
 </div>
 </body>
 </html>`,
@@ -1605,15 +1605,15 @@ const PRIVACY_ALERT_PL: EmailTemplate = {
     Administrator przejrzał kontakty {{client_count}}+ klientów
   </h1>
   <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
-    Dziś administrator <strong>{{actor_name}}</strong> otworzył listę klientów
-    salonu <strong>{{salon_name}}</strong>, gdzie były widoczne dane kontaktowe
-    ponad {{client_count}} klientów.
+    Dziś osoba z rolą administratora — <strong>{{actor_name}}</strong> — otworzyła
+    listę klientów salonu <strong>{{salon_name}}</strong>, na której widoczne były
+    dane kontaktowe ponad {{client_count}} klientów.
   </p>
   <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
-    To standardowe działanie dla roli „administrator" — ma pełny dostęp do bazy
-    klientów domyślnie. Jeśli chcesz ukryć kontakty konkretnie przed tą osobą lub
-    zmienić jej rolę na „mistrz" / „księgowy", przejdź do sekcji „Zespół"
-    w ustawieniach salonu.
+    To standardowe działanie dla roli „administrator" — domyślnie ma ona pełny
+    dostęp do bazy klientów. Jeśli chcesz ukryć kontakty konkretnie przed tą osobą
+    lub zmienić jej rolę na „specjalistę" albo „księgowość", przejdź do sekcji
+    „Zespół" w ustawieniach salonu.
   </p>
   <p style="margin:24px 0;">
     <a href="{{team_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
@@ -1621,12 +1621,12 @@ const PRIVACY_ALERT_PL: EmailTemplate = {
     </a>
   </p>
   <p style="margin:0;font-size:13px;color:#64748b;">
-    To automatyczne powiadomienie przychodzi maksymalnie raz dziennie — nawet jeśli administrator otwierał listę wielokrotnie.
+    To automatyczne powiadomienie wysyłamy najwyżej raz dziennie — nawet jeśli ta osoba otwierała listę wielokrotnie.
   </p>
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
   <p style="margin:0;font-size:12px;color:#94a3b8;">
-    Finkley · księgowość zarządcza dla salonów kosmetycznych
+    Finkley · księgowość zarządcza dla salonów piękności
   </p>
 </td></tr>
 </table>
@@ -1691,14 +1691,14 @@ const BANK_CONSENT_EXPIRING_PL: EmailTemplate = {
     Połączenie z bankiem „{{bank_name}}" wkrótce wygaśnie
   </h1>
   <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
-    Zgodnie z PSD2 bank wymaga, abyś osobiście potwierdzał dostęp Finkley do
+    Zgodnie z PSD2 bank wymaga osobistego potwierdzenia dostępu Finkley do
     transakcji co najmniej raz na 6 miesięcy. Obecne potwierdzenie dla
     „{{bank_name}}" ({{salon_name}}) wygasa <strong>{{valid_until}}</strong>.
   </p>
   <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#334155;">
-    Bez ponownego połączenia — auto-import wydatków się zatrzyma. Nie martw się:
-    transakcje już pobrane pozostaną, po prostu nie będziesz otrzymywać nowych.
-    Aby kontynuować, kliknij przycisk i przejdź potwierdzenie w banku (zajmie 30 sekund).
+    Bez ponownego połączenia automatyczny import wydatków się zatrzyma. Nie martw się:
+    transakcje już pobrane pozostaną, przestaniesz po prostu otrzymywać nowe.
+    Aby kontynuować, kliknij przycisk i potwierdź dostęp w banku (zajmie to 30 sekund).
   </p>
   <p style="margin:24px 0;">
     <a href="{{reconnect_url}}" style="display:inline-block;background:#1A1A2E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
@@ -1706,13 +1706,13 @@ const BANK_CONSENT_EXPIRING_PL: EmailTemplate = {
     </a>
   </p>
   <p style="margin:0;font-size:13px;color:#64748b;">
-    Jeśli już nie korzystasz z tego banku — możesz po prostu go odłączyć w
+    Jeśli już nie korzystasz z tego banku — możesz go po prostu odłączyć w
     ustawieniach integracji. Wcześniej zaimportowane wydatki pozostaną.
   </p>
 </td></tr>
 <tr><td style="padding:16px 32px 24px;border-top:1px solid #E5E1D8;">
   <p style="margin:0;font-size:12px;color:#94a3b8;">
-    Finkley · księgowość zarządcza dla salonów kosmetycznych
+    Finkley · księgowość zarządcza dla salonów piękności
   </p>
 </td></tr>
 </table>
@@ -1787,10 +1787,10 @@ const TRIAL_EXPIRED_PL: EmailTemplate = {
 Cześć {{full_name}}.
 </h1>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Okres próbny Finkley dla salonu <strong>{{salon_name}}</strong> dobiegł końca. Konto przeszło na plan darmowy — sekcja „Przychody" (wizyty i utarg) pozostaje otwarta, reszta jest widoczna, ale zablokowana.
+Okres próbny Finkley dla salonu piękności <strong>{{salon_name}}</strong> dobiegł końca. Konto przeszło na plan darmowy — sekcja „Przychody" (wizyty i utarg) pozostaje otwarta, reszta jest widoczna, ale zablokowana.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-Wszystkie Twoje dane są bezpieczne i nigdzie nie znikną. Aby znów widzieć zysk netto, koszty i raporty — wykup subskrypcję, to kilka kliknięć.
+Wszystkie Twoje dane są bezpieczne i nigdzie nie znikną. Aby znów widzieć zysk netto, koszty i raporty — wykup subskrypcję, to tylko kilka kliknięć.
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
@@ -1860,10 +1860,10 @@ const ACTIVATION_DRIP_VISIT_PL: EmailTemplate = {
 <tr><td>
 <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}!</h1>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Widzę, że założyłeś <strong>{{salon_name}}</strong> w Finkley, ale nie dodałeś jeszcze ani jednej wizyty.
+Widzę, że masz już w Finkley salon <strong>{{salon_name}}</strong>, ale nie ma w nim jeszcze ani jednej wizyty.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-To minuta — a Finkley zacznie liczyć realny zysk, a nie obrót. I jeszcze jedno: dokończ konfigurację do 100% w ciągu <strong>{{reward_days_left}}</strong> dni — podaruję Ci +14 dni demo.
+To minuta — a Finkley zacznie liczyć realny zysk netto, a nie sam obrót. I jeszcze jedno: dokończ konfigurację do 100% w ciągu <strong>{{reward_days_left}}</strong> dni, a podaruję Ci +14 dni demo.
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
@@ -1926,10 +1926,10 @@ const ACTIVATION_DRIP_REWARD_PL: EmailTemplate = {
 <tr><td>
 <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}!</h1>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Świetny start z <strong>{{salon_name}}</strong> — masz już dodane i wizyty, i wydatki. Zostało niewiele.
+Świetny start z salonem <strong>{{salon_name}}</strong> — masz już dodane i wizyty, i wydatki. Zostało naprawdę niewiele.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-Osiągnij 100% konfiguracji w ciągu <strong>{{reward_days_left}}</strong> dni — a podaruję Ci <strong>+14 dni demo</strong>. To proste: zostaje podłączyć kilka integracji i otworzyć pulpit.
+Osiągnij 100% konfiguracji w ciągu <strong>{{reward_days_left}}</strong> dni, a podaruję Ci <strong>+14 dni demo</strong>. To proste: wystarczy podłączyć kilka integracji i otworzyć pulpit.
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
@@ -1995,10 +1995,10 @@ const WINBACK_TRIAL_PL: EmailTemplate = {
 <tr><td>
 <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Twój okres próbny dla <strong>{{salon_name}}</strong> się zakończył, ale wszystkie dane wciąż tu są — wizyty, wydatki, klienci. Nic nie zniknęło.
+Twój okres próbny dla salonu <strong>{{salon_name}}</strong> dobiegł końca, ale wszystkie dane wciąż tu są — wizyty, wydatki, klienci. Nic nie zniknęło.
 </p>
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
-Wróć — a znów zobaczysz zysk netto, koszty i raporty dokładnie tam, gdzie skończyłeś.
+Wróć — a znów zobaczysz zysk netto, koszty i raporty dokładnie tam, gdzie były.
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
@@ -2006,7 +2006,7 @@ Wróć — a znów zobaczysz zysk netto, koszty i raporty dokładnie tam, gdzie 
 </td></tr>
 </table>
 <p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
-Gotowy kontynuować na poważnie? <a href="{{billing_url}}" style="color:#0f172a;">Wybierz plan</a>.
+Chcesz kontynuować na poważnie? <a href="{{billing_url}}" style="color:#0f172a;">Wybierz plan</a>.
 </p>
 <p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
 {{owner_name}}<br>

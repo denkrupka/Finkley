@@ -409,18 +409,18 @@ const ru: HomeCopy = {
 // Имена мастеров в моке (Аня/Катя/Марина) и отзывах (Magda/Anna/Olga) — демо,
 // оставлены/транслитерированы как есть.
 const pl: HomeCopy = {
-  title: 'Finkley — księgowość pieniędzy i zysku dla salonu piękności',
+  title: 'Finkley — kontrola pieniędzy i zysku dla salonu piękności',
   description:
-    'Finkley — księgowość zarządcza dla salonów piękności: wizyty z Booksy, koszty, wynagrodzenia pracowników i zysk netto w jednym miejscu. Demo 14 dni bez karty.',
+    'Finkley — rachunkowość zarządcza dla salonów piękności: wizyty z Booksy, koszty, wynagrodzenia specjalistów i zysk netto w jednym miejscu. Demo 14 dni bez karty.',
 
   hero: {
-    eyebrow: 'Księgowość pieniędzy dla salonów piękności',
+    eyebrow: 'Kontrola pieniędzy dla salonów piękności',
     h1Line1: 'Booksy pokazuje klientów.',
     h1Line2: 'My pokazujemy Twój zysk.',
     subtitle:
-      'Wpiszesz wizytę — od razu widzisz, ile zarobiłaś. Każdego ranka — konkretna liczba zysku. Bez tabel, formuł i zbędnych telefonów do księgowej.',
+      'Dodajesz wizytę — i od razu widzisz, ile zarobiłaś. Każdego ranka masz konkretną liczbę zysku. Bez tabel, formuł i zbędnych telefonów do księgowej.',
     ctaLabel: 'Zacznij za darmo — 14 dni',
-    ctaMicrocopy: 'Bez karty, anulowanie jednym kliknięciem',
+    ctaMicrocopy: 'Bez karty, anulujesz jednym kliknięciem',
   },
 
   heroMock: {
@@ -432,85 +432,85 @@ const pl: HomeCopy = {
   },
 
   whatsInside: {
-    heading: 'Co w środku',
-    subtitle: 'Wszystkie potrzebne liczby w jednym miejscu, bez nauki.',
-    tabsIntro: 'A w środku jest też:',
+    heading: 'Co znajdziesz w środku',
+    subtitle: 'Wszystkie potrzebne liczby w jednym miejscu, bez uczenia się obsługi.',
+    tabsIntro: 'A oprócz tego znajdziesz:',
   },
 
   timeSavedSection: {
     heading: 'Ile czasu odzyskasz',
     subtitle:
-      'Realne godziny w tygodniu, które teraz pochłania księgowość. Z Finkley — połowa z nich na automacie.',
-    footnotePre: 'Razem średnio — ',
+      'Realne godziny w tygodniu, które dziś pochłania prowadzenie rozliczeń. Z Finkley połowa z nich dzieje się automatycznie.',
+    footnotePre: 'Łącznie średnio ',
     footnoteBold: '15–20 godzin miesięcznie',
     footnotePost:
-      ', które wcześniej zjadały Excel, kalkulator i poczta. A co najważniejsze — dokładna liczba zysku zamiast przybliżonej.',
-    footnoteSmall: '* Na podstawie danych pierwszych klientów z pierwszych 3 miesięcy korzystania.',
+      ', które wcześniej pochłaniały Excel, kalkulator i poczta. A co najważniejsze — dokładna liczba zysku zamiast szacunków.',
+    footnoteSmall: '* Na podstawie danych pierwszych klientek z pierwszych 3 miesięcy korzystania.',
   },
 
   testimonialsSection: {
     heading: 'Co mówią właścicielki salonów',
-    subtitle: 'Pierwsi klienci Finkley to małe salony w Polsce.',
+    subtitle: 'Pierwsze klientki Finkley to małe salony w Polsce.',
   },
 
   integrationsSection: {
     heading: 'Łączy się z tym, czego już używasz',
     subtitle:
-      'Żadnego „przenieś wszystkie dane ręcznie". Podłącz potrzebne usługi — dane synchronizują się automatycznie w obie strony.',
+      'Żadnego „przepisz wszystkie dane ręcznie". Podłącz potrzebne usługi, a dane będą synchronizować się automatycznie w obie strony.',
     cta: 'Więcej o integracjach →',
   },
 
   notDoingSection: {
     heading: 'Czego NIE robimy',
-    subtitle: 'Finkley — o pieniądzach. Do reszty — inne narzędzia.',
+    subtitle: 'Finkley jest o pieniądzach. Do reszty masz inne narzędzia.',
   },
 
   securitySection: {
-    heading: 'Twoje dane — tylko Twoje',
-    subtitle: 'Finanse salonu to sprawa prywatna. Traktujemy je tak poważnie jak bank.',
-    footnotePrefix: 'Więcej — w ',
+    heading: 'Twoje dane są tylko Twoje',
+    subtitle: 'Finanse salonu to sprawa prywatna. Traktujemy je równie poważnie jak bank.',
+    footnotePrefix: 'Więcej w ',
     footnoteLink: 'polityce prywatności',
   },
 
   faqSection: {
-    heading: 'Częste pytania',
+    heading: 'Najczęstsze pytania',
   },
 
   ctaBottom: {
     heading: '14 dni za darmo — potem zdecydujesz',
-    subtitle: 'Karta nie jest potrzebna. Jeśli nie pasuje — anulowanie jednym kliknięciem.',
+    subtitle: 'Karta nie jest potrzebna. Jeśli nie podejdzie — anulujesz jednym kliknięciem.',
     cta: 'Zacznij za darmo',
   },
 
   features: [
     {
       title: 'Ile zarobiłaś — widać od razu',
-      text: 'Otwierasz aplikację — pierwsze, co widzisz: ile wpłynęło, ile wyszło, ile zostało. Realne pieniądze, a nie tylko liczba klientów.',
+      text: 'Otwierasz aplikację i od razu widzisz: ile wpłynęło, ile wyszło, ile zostało. Realne pieniądze, a nie tylko liczba klientów.',
       emoji: '💰',
     },
     {
-      title: 'Działa z Booksy bez przenoszenia danych',
-      text: 'Podłącz raz — wizyty i płatności same pojawią się w Finkley. Nic nie trzeba wprowadzać ręcznie.',
+      title: 'Działa z Booksy bez przepisywania danych',
+      text: 'Podłączasz raz, a wizyty i płatności same pojawiają się w Finkley. Niczego nie trzeba wpisywać ręcznie.',
       emoji: '🔄',
     },
     {
       title: 'Bank podłącza się automatycznie',
-      text: 'Wpływy i koszty z konta pojawiają się w aplikacji same. Nie trzeba ręcznie zestawiać wyciągów.',
+      text: 'Wpływy i koszty z konta pojawiają się w aplikacji same. Nie musisz ręcznie sprawdzać wyciągów.',
       emoji: '🏦',
     },
     {
-      title: 'Wynagrodzenia pracowników — jednym przyciskiem',
-      text: '% od utargu, stała kwota, wynajem fotela lub schemat mieszany. Na koniec miesiąca — przycisk „Zamknij okres", i wyliczenie gotowe.',
+      title: 'Wynagrodzenia specjalistów — jednym przyciskiem',
+      text: '% od utargu, stała kwota, wynajem fotela albo schemat mieszany. Na koniec miesiąca klikasz „Zamknij okres" i wyliczenie jest gotowe.',
       emoji: '💸',
     },
     {
       title: 'Podpowiedzi AI każdego ranka',
-      text: '„Zysk spadł o 12%, przyczyna — wzrost kosztów materiałów u pracownika X". Po polsku, bez kursów z analityki.',
+      text: '„Zysk spadł o 12%, przyczyną jest wzrost kosztów materiałów u specjalistki X". Po polsku, bez kursów z analityki.',
       emoji: '🧠',
     },
     {
-      title: 'Kalendarz pracowników',
-      text: 'Wszystkie wizyty wg pracowników na jednej siatce. Przeciąganie myszką, kolorowe statusy, rezerwacje czasu. Gotowy zamiennik grafiku w notesie.',
+      title: 'Kalendarz specjalistów',
+      text: 'Wszystkie wizyty według specjalistów na jednej siatce. Przeciąganie myszką, kolorowe statusy, rezerwacje czasu. Gotowy zamiennik grafiku w notesie.',
       emoji: '📅',
     },
   ],
@@ -520,14 +520,17 @@ const pl: HomeCopy = {
       id: 'data',
       label: 'Ewidencja danych',
       items: [
-        ['Wizyty i płatności', 'Pobierają się z Booksy same albo wpisujesz ręcznie w 10 sekund.'],
         [
-          'Koszty wg kategorii',
-          'Najem, wynagrodzenia, materiały, reklama, podatki. Plan vs Wykonanie.',
+          'Wizyty i płatności',
+          'Pobierają się z Booksy same albo wpisujesz je ręcznie w 10 sekund.',
+        ],
+        [
+          'Koszty według kategorii',
+          'Najem, wynagrodzenia, materiały, reklama, podatki. Plan vs wykonanie.',
         ],
         [
           'Magazyn i materiały',
-          'Lakiery, żel, materiały zużywalne. Odpis przy sprzedaży usługi, powiadomienie o niskim stanie.',
+          'Lakiery, żel, materiały zużywalne. Odpis przy sprzedaży usługi i powiadomienie o niskim stanie.',
         ],
         [
           'Multi-salon',
@@ -542,15 +545,15 @@ const pl: HomeCopy = {
         ['Booksy', 'Dwukierunkowa synchronizacja: wizyty, klienci, usługi, płatności.'],
         [
           'Automatyczne podłączenie banku',
-          'Przez otwartą bankowość UE — wpływy i wypłaty przychodzą same.',
+          'Przez otwartą bankowość UE — wpływy i wydatki pojawiają się same.',
         ],
         [
           'Faktury od dostawców',
-          'KSeF (urząd skarbowy w Polsce), wFirma, Fakturownia, iFirma — trafiają w koszty same.',
+          'KSeF (urząd skarbowy w Polsce), wFirma, Fakturownia, iFirma — same trafiają do kosztów.',
         ],
         [
           'Telegram + Instagram + FB',
-          'Wszystkie rozmowy z klientami w jednym oknie z szablonami i asystentem AI.',
+          'Wszystkie rozmowy z klientami w jednym oknie, z szablonami i asystentem AI.',
         ],
       ],
     },
@@ -558,15 +561,18 @@ const pl: HomeCopy = {
       id: 'reports',
       label: 'Raporty',
       items: [
-        ['Dashboard', 'Zysk, przychody, koszty za miesiąc. Dynamika względem poprzedniego okresu.'],
-        ['Raport o zysku (plan/wykonanie)', 'Pełny raport wg miesięcy — plan vs rzeczywistość.'],
+        ['Pulpit', 'Zysk, przychody i koszty za miesiąc. Zmiana względem poprzedniego okresu.'],
         [
-          'Przepływy pieniężne',
-          'Wg dni i kas — gotówka vs bezgotówka. Wykresy i narastające saldo.',
+          'Raport o zysku (plan/wykonanie)',
+          'Pełny raport według miesięcy — plan vs rzeczywistość.',
         ],
         [
-          'Którzy klienci przynoszą najwięcej',
-          'Top klientów wg przychodu. Kto dawno nie był — lista jednym przyciskiem.',
+          'Przepływy pieniężne',
+          'Według dni i kas — gotówka vs przelew. Wykresy i narastające saldo.',
+        ],
+        [
+          'Które klientki przynoszą najwięcej',
+          'Najlepsze klientki według utargu. Kto dawno nie był — lista jednym przyciskiem.',
         ],
       ],
     },
@@ -576,16 +582,16 @@ const pl: HomeCopy = {
       items: [
         [
           'Kalendarz płatności',
-          'Wszystkie przyszłe płatności do dostawców z przypomnieniami 2 dni przed terminem.',
+          'Wszystkie przyszłe płatności do dostawców z przypomnieniem 2 dni przed terminem.',
         ],
-        ['Budżety wg kategorii', 'Cele kosztowe z powiadomieniami push przy przekroczeniu.'],
+        ['Budżety według kategorii', 'Cele kosztowe z powiadomieniami push przy przekroczeniu.'],
         [
           'Bot Telegram',
-          'Zapisałaś wizytę głosem w bocie — trafiła do portalu. Codzienny digest w TG.',
+          'Zapisujesz wizytę głosem w bocie — trafia do portalu. Codzienne podsumowanie w TG.',
         ],
         [
           'Eksport CSV/Excel',
-          'W każdej chwili — wszystkie dane dla siebie. Nie wiążemy Cię z nami.',
+          'W każdej chwili pobierzesz wszystkie swoje dane. Niczym Cię nie wiążemy.',
         ],
       ],
     },
@@ -594,18 +600,18 @@ const pl: HomeCopy = {
   timeSaved: [
     {
       title: 'Ewidencja wizyt',
-      before: '~20 min/dzień ręcznie w Excelu',
-      after: 'Autosynchronizacja z Booksy — 0 min',
+      before: '~20 min dziennie ręcznie w Excelu',
+      after: 'Automatyczna synchronizacja z Booksy — 0 min',
       saved: '~10 godzin / mies.',
     },
     {
       title: 'Koszty i faktury',
-      before: '~30 min/tydzień wpisywania z poczty',
+      before: '~30 min tygodniowo na wpisywanie z poczty',
       after: 'KSeF i wFirma pobierają same',
       saved: '~2 godziny / mies.',
     },
     {
-      title: 'Wynagrodzenia pracowników',
+      title: 'Wynagrodzenia specjalistów',
       before: '~2 godziny na koniec miesiąca z kalkulatorem',
       after: 'Przycisk „Zamknij okres"',
       saved: '~2 godziny / mies.',
@@ -619,8 +625,8 @@ const pl: HomeCopy = {
     {
       title: 'Kalendarz płatności',
       before: 'Zaległości, kary, pominięte faktury',
-      after: 'Push + email + TG 2 dni przed terminem',
-      saved: 'Pieniądze na karach',
+      after: 'Push + e-mail + TG 2 dni przed terminem',
+      saved: 'Oszczędność na karach',
     },
     {
       title: 'Podejmowanie decyzji',
@@ -639,7 +645,7 @@ const pl: HomeCopy = {
     ['iFirma', 'Księgowość'],
     ['Bank UE', 'Automatyczne podłączenie przez otwartą bankowość'],
     ['Stripe', 'Subskrypcja'],
-    ['Telegram', 'Bot + komunikator'],
+    ['Telegram', 'Bot i komunikator'],
     ['Instagram + FB', 'Komunikator'],
     ['Google OAuth', 'Logowanie'],
   ],
@@ -650,27 +656,27 @@ const pl: HomeCopy = {
       name: 'Magda K.',
       role: 'Właścicielka studia manicure, Warszawa',
       quote:
-        'Wcześniej zamykałam miesiąc w Excelu przez dwa wieczory. Teraz — otwieram aplikację rano i od razu widzę, ile zarobiłam. Zestawianie wyciągów zajmuje 5 minut zamiast godziny.',
+        'Wcześniej zamykałam miesiąc w Excelu przez dwa wieczory. Teraz otwieram aplikację rano i od razu widzę, ile zarobiłam. Uzgodnienie wyciągów zajmuje 5 minut zamiast godziny.',
     },
     {
       initials: 'AP',
       name: 'Anna P.',
       role: 'Salon piękności, Kraków',
       quote:
-        'Wynagrodzenia trzem pracownikom liczyłam ręcznie z kalkulatorem. Teraz klikam „Zamknij okres" — i gotowe. Zyskałam 2 godziny na koniec każdego miesiąca.',
+        'Wynagrodzenia trzech specjalistek liczyłam ręcznie na kalkulatorze. Teraz klikam „Zamknij okres" i jest gotowe. Co miesiąc oszczędzam dzięki temu 2 godziny.',
     },
     {
       initials: 'OL',
       name: 'Olga L.',
       role: 'Barbershop, Wrocław',
       quote:
-        'Najbardziej przydatne — podpowiedzi AI. W zeszłym tygodniu podświetliło, że jeden pracownik zużył dużo materiałów. Sama bym nie zauważyła.',
+        'Najbardziej przydatne są podpowiedzi AI. W zeszłym tygodniu zwróciły mi uwagę, że jedna osoba zużyła dużo materiałów. Sama bym tego nie zauważyła.',
     },
   ],
 
   notDoing: [
-    ['Nie zastępujemy Booksy', 'Rezerwacje klientów zostają tam, gdzie przywykłaś'],
-    ['Nie robimy rozliczeń podatkowych', 'Księgowy nadal jest potrzebny do rozliczeń w urzędzie'],
+    ['Nie zastępujemy Booksy', 'Rezerwacje klientów zostają tam, gdzie się do nich przyzwyczaiłaś'],
+    ['Nie robimy rozliczeń podatkowych', 'Księgowa nadal jest potrzebna do rozliczeń w urzędzie'],
     [
       'Nie prowadzimy pełnego magazynu produkcyjnego',
       'Prosta ewidencja materiałów jest, ale to nie pełny system magazynowy',
@@ -685,57 +691,57 @@ const pl: HomeCopy = {
     {
       emoji: '🇪🇺',
       title: 'Przechowywane w Europie',
-      text: 'Serwery we Frankfurcie (Niemcy), wszystko pod RODO. Dane nie opuszczają UE.',
+      text: 'Serwery we Frankfurcie (Niemcy), wszystko zgodnie z RODO. Dane nie opuszczają UE.',
     },
     {
       emoji: '🔒',
-      title: 'Szyfrowanie na wszystkich poziomach',
-      text: 'Dane szyfrowane przy przechowywaniu (AES-256) i przy przesyłaniu (TLS). Hasła oraz dostępy do banku i Booksy — pod osobnym kluczem.',
+      title: 'Szyfrowanie na każdym etapie',
+      text: 'Dane są szyfrowane podczas przechowywania (AES-256) i podczas przesyłania (TLS). Hasła oraz dostępy do banku i Booksy chronimy osobnym kluczem.',
     },
     {
       emoji: '🙈',
-      title: 'Nikt postronny nie widzi',
-      text: 'Dostęp do Twojego salonu — tylko Ty i osoby, które sama zaprosisz. Sąsiedni salon nie zobaczy żadnej Twojej liczby.',
+      title: 'Nikt postronny nic nie zobaczy',
+      text: 'Dostęp do Twojego salonu masz tylko Ty i osoby, które sama zaprosisz. Sąsiedni salon nie zobaczy ani jednej Twojej liczby.',
     },
     {
       emoji: '🧾',
       title: 'Nie przekazujemy danych do urzędu skarbowego',
-      text: 'Finkley nie dzieli się Twoimi danymi z urzędem skarbowym ani osobami trzecimi. Zechcesz odejść — wyeksportujesz wszystko do CSV i usuniesz konto jednym kliknięciem.',
+      text: 'Finkley nie dzieli się Twoimi danymi z urzędem skarbowym ani z osobami trzecimi. Jeśli zechcesz odejść, wyeksportujesz wszystko do CSV i usuniesz konto jednym kliknięciem.',
     },
   ],
 
   faq: [
     {
       q: 'Przecież to po prostu kolejny Excel?',
-      a: 'Excel to świetne narzędzie, ale nie liczy zysku automatycznie. Finkley robi to za Ciebie i pokazuje liczbę w pierwszym wierszu za każdym razem, gdy wchodzisz.',
+      a: 'Excel to świetne narzędzie, ale nie liczy zysku automatycznie. Finkley robi to za Ciebie i pokazuje gotową liczbę w pierwszym wierszu za każdym razem, gdy wchodzisz do aplikacji.',
     },
     {
-      q: 'Całe życie prowadzę ewidencję w zeszycie. Po co mi to?',
-      a: 'Zeszyt uczciwie działa — dopóki jest jeden i wszystko zgadza się w głowie. Trudności przychodzą później: zeszytu nie otworzysz z domu, łatwo go zgubić albo zalać kawą, a żeby zrozumieć „w tym miesiącu zarobiłam więcej czy mniej" — trzeba usiąść i wszystko przeliczyć ręcznie. Finkley robi to samo, co zeszyt, tylko sam liczy sumy, trzyma kopię w chmurze i pokazuje zysk jedną liczbą. Wpisywać wizyty można równie szybko — albo w ogóle głosem przez Telegram. Zeszyt zostaw na notatki, a pieniądze niech liczy aplikacja.',
+      q: 'Całe życie prowadzę zapiski w zeszycie. Po co mi to?',
+      a: 'Zeszyt dobrze się sprawdza, dopóki jest jeden i wszystko zgadza się w głowie. Trudności przychodzą później: zeszytu nie otworzysz z domu, łatwo go zgubić albo zalać kawą, a żeby sprawdzić, czy w tym miesiącu zarobiłaś więcej czy mniej, trzeba usiąść i wszystko przeliczyć ręcznie. Finkley robi to samo co zeszyt, tylko sam liczy sumy, trzyma kopię w chmurze i pokazuje zysk jedną liczbą. Wizyty wpisujesz równie szybko — albo w ogóle dyktujesz głosem przez Telegram. Zeszyt zostaw na notatki, a pieniądze niech liczy aplikacja.',
     },
     {
-      q: 'Czym różni się to od Booksy?',
-      a: 'Booksy to system rezerwacji klientów. Finkley to księgowość pieniędzy salonu. Można używać razem: Booksy do rezerwacji, Finkley do pieniędzy.',
+      q: 'Czym to się różni od Booksy?',
+      a: 'Booksy to system rezerwacji klientów. Finkley to kontrola pieniędzy salonu. Możesz korzystać z obu naraz: Booksy do rezerwacji, Finkley do pieniędzy.',
     },
     {
-      q: 'Ewidencję wizyt i wynagrodzeń mam już w Booksy. Po co więc wy?',
-      a: 'Booksy świetnie pokazuje, ile masz rezerwacji i klientów. Ale nie odpowiada na główne pytanie — ile realnie zarobiłaś po najmie, materiałach, podatkach i wynagrodzeniach. Finkley bierze wizyty i płatności prosto z Booksy (nie trzeba nic wpisywać ponownie), dodaje do nich koszty i liczy zysk netto. Plus wynagrodzenia pracowników: procent, stała kwota lub wynajem fotela — klikasz „Zamknij okres", i wyliczenie gotowe. Booksy — o rezerwacjach klientów, Finkley — o pieniądzach.',
+      q: 'Ewidencję wizyt i wynagrodzeń mam już w Booksy. Po co mi więc wy?',
+      a: 'Booksy świetnie pokazuje, ile masz rezerwacji i klientów. Nie odpowiada jednak na najważniejsze pytanie — ile realnie zarobiłaś po odjęciu najmu, materiałów, podatków i wynagrodzeń. Finkley bierze wizyty i płatności prosto z Booksy (niczego nie wpisujesz ponownie), dodaje do nich koszty i liczy zysk netto. Do tego wynagrodzenia specjalistów: procent, stała kwota lub wynajem fotela — klikasz „Zamknij okres" i wyliczenie jest gotowe. Booksy jest o rezerwacjach klientów, Finkley o pieniądzach.',
     },
     {
       q: 'Ile to kosztuje?',
-      a: 'Plany płatne od €19/mies. Jest darmowy plan na zawsze (ewidencja przychodów) i demo na 14 dni ze wszystkimi sekcjami — bez karty. Wyższe plany otwierają koszty, raporty, marketing, asystenta AI, finanse, magazyn i multi-salon. Szczegóły — na stronie cennika.',
+      a: 'Plany płatne zaczynają się od €19/mies. Jest też darmowy plan na zawsze (ewidencja przychodów) oraz demo na 14 dni ze wszystkimi sekcjami — bez karty. Wyższe plany otwierają koszty, raporty, marketing, asystenta AI, finanse, magazyn i multi-salon. Szczegóły znajdziesz na stronie cennika.',
     },
     {
       q: 'A jeśli nie chcę płacić?',
-      a: 'Zostajesz na darmowym planie na zawsze: dostępna jest sekcja „Przychody" (ewidencja wizyt i utargu), pozostałe sekcje widać, ale są zablokowane. Przejść na plan płatny można w dowolnej chwili.',
+      a: 'Zostajesz na darmowym planie na zawsze: dostępna jest sekcja „Przychody" (ewidencja wizyt i utargu), pozostałe sekcje widzisz, ale są zablokowane. Na plan płatny możesz przejść w dowolnej chwili.',
     },
     {
-      q: 'A moje dane?',
-      a: 'Wszystkie dane przechowywane są w Supabase w UE (Frankfurt), zaszyfrowane i chronione. Przy usunięciu konta — 30 dni do namysłu, potem trwałe usunięcie danych. Wszystko można wyeksportować do CSV w dowolnej chwili.',
+      q: 'A co z moimi danymi?',
+      a: 'Wszystkie dane przechowujemy w Supabase na terenie UE (Frankfurt), zaszyfrowane i chronione. Po usunięciu konta masz 30 dni do namysłu, a potem dane są trwale usuwane. Wszystko możesz w każdej chwili wyeksportować do CSV.',
     },
     {
       q: 'A jeśli mam kilka salonów?',
-      a: 'Jedno konto — kilka salonów z przełącznikiem u góry, każdy salon liczony osobno. Multi-salon wchodzi w plan €99/mies.',
+      a: 'Jedno konto, a w nim kilka salonów z przełącznikiem u góry — każdy salon liczony osobno. Multi-salon wchodzi w plan €99/mies.',
     },
   ],
 }

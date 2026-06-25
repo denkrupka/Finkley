@@ -179,16 +179,16 @@ const ru: PricingCopy = {
 
 // ⚠️ PL — машинный черновик, ТРЕБУЕТ ВЫЧИТКИ НОСИТЕЛЕМ ПОЛЬСКОГО перед публикацией.
 const pl: PricingCopy = {
-  title: 'Cennik Finkley — księgowość dla salonu od €19/mies.',
+  title: 'Cennik Finkley — księgowość dla salonu piękności od €19/mies.',
   description:
-    'Plany Finkley dla salonów piękności: darmowy plan na zawsze, demo 14 dni bez karty i plany płatne od €19/mies. Bez VAT, anulowanie jednym kliknięciem.',
-  h1: 'Proste plany. Płacisz tylko za to, czego używasz.',
+    'Plany Finkley dla salonów piękności: darmowy plan na zawsze, demo 14 dni bez karty i plany płatne od €19/mies. Bez VAT, anulujesz jednym kliknięciem.',
+  h1: 'Proste plany. Płacisz tylko za to, z czego korzystasz.',
   subtitle:
-    'Demo 14 dni bez karty, darmowy plan na zawsze i plany płatne od €19/mies — to mniej niż jeden manicure miesięcznie, by zawsze widzieć zysk netto salonu.',
+    'Demo 14 dni bez karty, darmowy plan na zawsze i plany płatne od €19/mies. — to mniej niż jeden manicure miesięcznie za to, by zawsze mieć przed oczami zysk netto swojego salonu.',
   riskReversal: [
-    'Bez karty na start',
-    'Anulowanie jednym kliknięciem',
-    'Zwrot pieniędzy w pierwsze 14 dni',
+    'Na start bez karty',
+    'Anulujesz jednym kliknięciem',
+    'Zwrot pieniędzy w pierwszych 14 dniach',
     'Bez VAT',
   ],
   freePlans: [
@@ -197,13 +197,13 @@ const pl: PricingCopy = {
       price: '€0',
       note: '14 dni',
       badge: '14 dni za darmo, bez karty',
-      blurb: 'Pełna funkcjonalność bez ograniczeń przez 14 dni. Karta nie jest potrzebna.',
+      blurb: 'Pełna funkcjonalność bez ograniczeń przez 14 dni. Nie potrzebujesz karty.',
       cta: 'Zacznij za darmo',
       features: [
         'Wszystkie sekcje i integracje',
         'Bez limitów przez 14 dni',
         'Bez podawania karty',
-        'Potem — wybierz dowolny plan',
+        'Później wybierasz dowolny plan',
       ],
     },
     {
@@ -212,13 +212,13 @@ const pl: PricingCopy = {
       note: 'na zawsze',
       badge: 'Na zawsze za darmo',
       blurb:
-        'Podstawowa księgowość przychodów bez limitu czasu. Pozostałe sekcje widoczne, ale zablokowane.',
+        'Podstawowy rachunek przychodów bez limitu czasu. Pozostałe sekcje widzisz, ale są zablokowane.',
       cta: 'Zacznij za darmo',
       features: [
         'Sekcja „Przychody": wizyty i utarg',
         'Pozostałe sekcje widoczne, ale zablokowane',
         'Bez limitu czasu',
-        'Upgrade jednym kliknięciem w dowolnej chwili',
+        'Przejście na wyższy plan jednym kliknięciem w dowolnej chwili',
       ],
     },
   ],
@@ -228,10 +228,10 @@ const pl: PricingCopy = {
       price: '€19',
       period: '/ mies.',
       highlight: false,
-      blurb: 'Pełna księgowość pieniędzy: przychody, koszty i raporty.',
+      blurb: 'Pełna kontrola nad pieniędzmi: przychody, koszty i raporty.',
       cta: 'Wybierz',
       features: [
-        'Wszystko z darmowego',
+        'Wszystko z planu darmowego',
         'Sekcja „Koszty"',
         'Sekcja „Raporty"',
         'Sekcja „Komunikator"',
@@ -242,7 +242,7 @@ const pl: PricingCopy = {
       price: '€49',
       period: '/ mies.',
       highlight: true,
-      blurb: 'Księgowość plus pozyskiwanie klientów i asystent AI.',
+      blurb: 'Kontrola finansów plus pozyskiwanie klientek i asystent AI.',
       cta: 'Wybierz',
       features: ['Wszystko z planu €19', 'Sekcja „Marketing"', 'Asystent AI'],
     },
@@ -251,11 +251,11 @@ const pl: PricingCopy = {
       price: '€69',
       period: '/ mies.',
       highlight: false,
-      blurb: 'Wszystkie sekcje produktu, w tym finanse i magazyn.',
+      blurb: 'Wszystkie sekcje produktu, łącznie z finansami i magazynem.',
       cta: 'Wybierz',
       features: [
         'Wszystko z planu €49',
-        'Sekcja „Finanse": P&L i przepływy',
+        'Sekcja „Finanse": P&L i przepływy pieniężne',
         'Sekcja „Magazyn"',
         'Wszystkie integracje',
       ],
@@ -277,40 +277,40 @@ const pl: PricingCopy = {
   ],
   popularBadge: 'Popularny',
   finePrint:
-    'Ceny ostateczne — bez VAT. Płacisz dokładnie kwotę planu. Płatności przez Stripe · Visa / Mastercard.',
-  faqHeading: 'O płatnościach — częste pytania',
+    'Ceny ostateczne — bez VAT. Płacisz dokładnie tyle, ile wynosi plan. Płatności przez Stripe · Visa / Mastercard.',
+  faqHeading: 'Płatności — najczęstsze pytania',
   faq: [
     {
       q: 'Czym demo różni się od planu darmowego?',
-      a: 'Demo to pełna funkcjonalność bez ograniczeń przez 14 dni, by wszystko wypróbować. Karta nie jest potrzebna. Plan darmowy działa na zawsze, ale otwarta jest w nim tylko sekcja „Przychody" (wizyty i utarg) — pozostałe sekcje są widoczne, ale zablokowane. W każdej chwili można przejść na plan płatny.',
+      a: 'Demo to pełna funkcjonalność bez ograniczeń przez 14 dni, żebyś mogła wszystko wypróbować. Karta nie jest potrzebna. Plan darmowy działa na zawsze, ale otwarta jest w nim tylko sekcja „Przychody" (wizyty i utarg) — pozostałe sekcje widzisz, ale są zablokowane. W każdej chwili możesz przejść na plan płatny.',
     },
     {
       q: 'A co po 14 dniach demo?',
-      a: '12. dnia przypomnimy mailem. Można wybrać plan płatny i kontynuować ze wszystkimi sekcjami albo zostać na planie darmowym — wtedy pozostanie dostępna sekcja „Przychody", a pozostałe się zablokują. Dane nigdzie nie znikną. Subskrybować można w dowolnym momencie.',
+      a: '12. dnia przypomnimy Ci mailem. Możesz wybrać plan płatny i korzystać dalej ze wszystkich sekcji albo zostać na planie darmowym — wtedy zostanie Ci sekcja „Przychody", a pozostałe się zablokują. Twoje dane nigdzie nie znikną. Subskrypcję możesz włączyć w dowolnym momencie.',
     },
     {
       q: 'Który plan wybrać?',
-      a: '€19 — jeśli potrzebujesz księgowości przychodów, kosztów, raportów i komunikatora. €49 (najpopularniejszy) dodaje marketing i asystenta AI. €69 otwiera wszystko, w tym finanse (P&L i przepływy) oraz magazyn. €99 — jeśli masz kilka salonów na jednym koncie. Plany można zmieniać w dowolnej chwili.',
+      a: '€19 — jeśli potrzebujesz rachunku przychodów, kosztów, raportów i komunikatora. €49 (najpopularniejszy) dodaje marketing i asystenta AI. €69 otwiera wszystko, w tym finanse (P&L i przepływy pieniężne) oraz magazyn. €99 — jeśli masz kilka salonów na jednym koncie. Plan możesz zmienić w dowolnej chwili.',
     },
     {
       q: 'A jeśli mam kilka salonów?',
-      a: 'Multi-salon wchodzi w plan €99/mies.: jedno konto, przełącznik salonów w nagłówku, każdy salon liczony osobno. W pozostałych planach — jeden salon na konto.',
+      a: 'Multi-salon należy do planu €99/mies.: jedno konto, przełącznik salonów w nagłówku, każdy salon liczony osobno. W pozostałych planach jest jeden salon na konto.',
     },
     {
-      q: 'Ceny z VAT czy bez?',
-      a: 'VAT nie jest naliczany — na rachunku jest dokładnie kwota planu, bez podatku na wierzchu. Ceny są ostateczne.',
+      q: 'Ceny są z VAT czy bez?',
+      a: 'VAT nie jest naliczany — na rachunku widzisz dokładnie kwotę planu, bez podatku doliczanego na wierzchu. Ceny są ostateczne.',
     },
     {
-      q: 'Czy można anulować subskrypcję?',
-      a: 'Tak, jednym kliknięciem w Ustawienia → Subskrypcja. Do końca opłaconego okresu plan działa normalnie, potem konto przechodzi na plan darmowy (zostaje sekcja „Przychody").',
+      q: 'Czy mogę anulować subskrypcję?',
+      a: 'Tak, jednym kliknięciem w Ustawienia → Subskrypcja. Do końca opłaconego okresu plan działa normalnie, a potem konto przechodzi na plan darmowy (zostaje Ci sekcja „Przychody").',
     },
     {
-      q: 'Zwroty?',
-      a: 'Jeśli coś poszło nie tak w pierwsze 14 dni opłaconej subskrypcji — zwrócimy pieniądze. Napisz na info@finkley.app.',
+      q: 'A zwroty?',
+      a: 'Jeśli w pierwszych 14 dniach opłaconej subskrypcji coś pójdzie nie tak — zwrócimy Ci pieniądze. Napisz na info@finkley.app.',
     },
   ],
   productDescription:
-    'Księgowość zarządcza i analityka dla salonów piękności: przychody, koszty, wynagrodzenia, zysk, raporty i asystent AI.',
+    'Rachunkowość zarządcza i analityka dla salonów piękności: przychody, koszty, wynagrodzenia, zysk, raporty i asystent AI.',
   breadcrumbHome: 'Strona główna',
   breadcrumbPricing: 'Cennik',
 }
