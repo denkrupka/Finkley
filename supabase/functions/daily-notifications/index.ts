@@ -323,8 +323,7 @@ async function processOneSalon(admin: SupabaseClient, salon: SalonRow): Promise<
 
 Deno.serve(
   withSentry('daily-notifications', async (req: Request) => {
-    const pf = preflight(req)
-    if (pf) return pf
+    if (req.method === 'OPTIONS') return preflight()
     if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'method_not_allowed' }, 405)
     if (!SUPABASE_URL || !SERVICE_KEY)
       return jsonResponse({ ok: false, error: 'function_not_configured' }, 500)
