@@ -133,13 +133,17 @@ voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endow
   сломанный hreflang (был ru/en/pl/x-default → один URL); routing.ts (+9 тестов);
   Layout props lang/localized + реципрокные hreflang + свитчер-навигация (EN убран).
 
-### Осталось:
+### Stream 4 часть 2 — контент /pl/ страниц (в работе):
 
-- **Stream 4 часть 2 — контент /pl/ страниц** (B-prime: per-locale content-модули
-  src/i18n/content/{home,pricing}.ts + shared HomeBody.astro/PricingBody.astro +
-  тонкие RU-обёртки + pl/index.astro, pl/pricing.astro; localized={true} на обеих
-  локалях). Делать аккуратно: диффнуть dist body RU до/после (не должен меняться).
-  PL-копирайт — draft, обязательна вычитка носителем PL (owner-гейт).
+- **PL /pl/pricing** ✅ (commit c55d1ea) — B-prime: content/pricing.ts (ru verbatim +
+  pl draft) + PricingBody.astro + тонкие обёртки + pl/pricing.astro. RU видимый
+  текст идентичен baseline (только &→&amp;), hreflang реципрокен, schema на месте.
+- **PL /pl/ (home)** — делается субагентом по тому же паттерну (build + diff RU
+  verification). Ревью + коммит — по завершении.
+- Опционально далее: PL feature-страницы, PL-сиблинги Stream-5 контента.
+
+**Owner-гейт (важно):** все PL-строки в content/\*.ts — машинный ЧЕРНОВИК,
+обязательна вычитка носителем польского перед публичным анонсом.
 
 ## 🔴 Находка вне скоупа (важно владельцу)
 
