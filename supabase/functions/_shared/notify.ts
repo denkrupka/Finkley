@@ -19,6 +19,9 @@ export type EmailTemplate =
   | 'subscription_canceled'
   | 'weekly_digest'
   | 'team_invitation'
+  | 'activation_drip_visit'
+  | 'activation_drip_reward'
+  | 'winback_trial'
 
 /**
  * Возвращает готовый HTML-блок с логотипом салона для подстановки в письмо.

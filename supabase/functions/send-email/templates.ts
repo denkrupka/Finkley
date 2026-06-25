@@ -21,6 +21,9 @@ export type TemplateAlias =
   | 'team_invitation'
   | 'bank_consent_expiring'
   | 'privacy_alert'
+  | 'activation_drip_visit'
+  | 'activation_drip_reward'
+  | 'winback_trial'
 
 export type EmailTemplate = {
   subject: string
@@ -654,6 +657,147 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 </td></tr>
 </table>
 </body></html>`,
+  },
+
+  activation_drip_visit: {
+    subject: 'Один визит — и Finkley покажет твою прибыль',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Добавь первый визит</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Привет, {{full_name}}!
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Вижу, ты завёл <strong>{{salon_name}}</strong> в Finkley, но ещё не добавил ни одного визита.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Это минута — а Finkley начнёт считать реальную прибыль, а не оборот. И ещё: закроешь настройку на 100% за <strong>{{reward_days_left}}</strong> дн. — подарю +14 дней демо.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Добавить первый визит
+</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
+Не хочешь такие напоминания? Напиши info@finkley.app
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  activation_drip_reward: {
+    subject: 'Ты почти у цели — забери +14 дней 🎁',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Забери +14 дней</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Привет, {{full_name}}!
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Отличный старт по <strong>{{salon_name}}</strong> — ты уже добавил и визиты, и расходы. Осталось чуть-чуть.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Дойди до 100% настройки за <strong>{{reward_days_left}}</strong> дн. — и я подарю тебе <strong>+14 дней демо</strong>. Это просто: останется подключить пару интеграций и открыть дашборд.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Закончить настройку
+</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
+Не хочешь такие напоминания? Напиши info@finkley.app
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  winback_trial: {
+    subject: 'Твои данные по {{salon_name}} всё ещё здесь',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вернись в Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Привет, {{full_name}}.
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Твой пробный период по <strong>{{salon_name}}</strong> закончился, но все данные на месте — визиты, расходы, клиенты. Ничего не пропало.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Зайди — и снова увидишь чистую прибыль, расходы и отчёты ровно там, где оставил.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Вернуться в Finkley
+</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Готов продолжить всерьёз? <a href="{{billing_url}}" style="color:#0f172a;">Выбрать тариф</a>.
+</p>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
+Не хочешь такие напоминания? Напиши info@finkley.app
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
   },
 }
 
@@ -1673,6 +1817,210 @@ Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska
 </html>`,
 }
 
+const ACTIVATION_DRIP_VISIT_EN: EmailTemplate = {
+  subject: 'One visit — and Finkley shows your profit',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}!</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+I see you set up <strong>{{salon_name}}</strong> in Finkley, but you haven't added a single visit yet.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+It takes a minute — and Finkley will start counting real profit, not just turnover. And one more thing: finish setup to 100% in <strong>{{reward_days_left}}</strong> days — I'll gift you +14 days of demo.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Add your first visit</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland<br>
+Don't want these reminders? Email info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
+const ACTIVATION_DRIP_VISIT_PL: EmailTemplate = {
+  subject: 'Jedna wizyta — i Finkley pokaże Twój zysk',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}!</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Widzę, że założyłeś <strong>{{salon_name}}</strong> w Finkley, ale nie dodałeś jeszcze ani jednej wizyty.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+To minuta — a Finkley zacznie liczyć realny zysk, a nie obrót. I jeszcze jedno: dokończ konfigurację do 100% w ciągu <strong>{{reward_days_left}}</strong> dni — podaruję Ci +14 dni demo.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Dodaj pierwszą wizytę</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska<br>
+Nie chcesz takich przypomnień? Napisz na info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
+const ACTIVATION_DRIP_REWARD_EN: EmailTemplate = {
+  subject: "You're almost there — grab +14 days 🎁",
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}!</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Great start with <strong>{{salon_name}}</strong> — you've already added both visits and expenses. Just a little left.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Reach 100% setup in <strong>{{reward_days_left}}</strong> days — and I'll gift you <strong>+14 days of demo</strong>. It's easy: just connect a couple of integrations and open the dashboard.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Finish setup</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland<br>
+Don't want these reminders? Email info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
+const ACTIVATION_DRIP_REWARD_PL: EmailTemplate = {
+  subject: 'Jesteś prawie u celu — odbierz +14 dni 🎁',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}!</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Świetny start z <strong>{{salon_name}}</strong> — masz już dodane i wizyty, i wydatki. Zostało niewiele.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Osiągnij 100% konfiguracji w ciągu <strong>{{reward_days_left}}</strong> dni — a podaruję Ci <strong>+14 dni demo</strong>. To proste: zostaje podłączyć kilka integracji i otworzyć pulpit.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Dokończ konfigurację</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska<br>
+Nie chcesz takich przypomnień? Napisz na info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
+const WINBACK_TRIAL_EN: EmailTemplate = {
+  subject: 'Your data for {{salon_name}} is still here',
+  html: `<!DOCTYPE html>
+<html lang="en"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Hi {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Your trial for <strong>{{salon_name}}</strong> has ended, but all your data is still here — visits, expenses, clients. Nothing is lost.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Come back — and you'll see net profit, expenses and reports right where you left them.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Return to Finkley</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Ready to continue for real? <a href="{{billing_url}}" style="color:#0f172a;">Choose a plan</a>.
+</p>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland<br>
+Don't want these reminders? Email info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
+const WINBACK_TRIAL_PL: EmailTemplate = {
+  subject: 'Twoje dane dla {{salon_name}} wciąż tu są',
+  html: `<!DOCTYPE html>
+<html lang="pl"><body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Cześć, {{full_name}}.</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Twój okres próbny dla <strong>{{salon_name}}</strong> się zakończył, ale wszystkie dane wciąż tu są — wizyty, wydatki, klienci. Nic nie zniknęło.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Wróć — a znów zobaczysz zysk netto, koszty i raporty dokładnie tam, gdzie skończyłeś.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{app_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Wróć do Finkley</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Gotowy kontynuować na poważnie? <a href="{{billing_url}}" style="color:#0f172a;">Wybierz plan</a>.
+</p>
+<p style="margin:32px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska<br>
+Nie chcesz takich przypomnień? Napisz na info@finkley.app
+</p>
+</td></tr></table></body></html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
@@ -1687,6 +2035,9 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     gdpr_export: GDPR_EXPORT_EN,
     privacy_alert: PRIVACY_ALERT_EN,
     bank_consent_expiring: BANK_CONSENT_EXPIRING_EN,
+    activation_drip_visit: ACTIVATION_DRIP_VISIT_EN,
+    activation_drip_reward: ACTIVATION_DRIP_REWARD_EN,
+    winback_trial: WINBACK_TRIAL_EN,
   },
   pl: {
     welcome: WELCOME_PL,
@@ -1700,6 +2051,9 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     gdpr_export: GDPR_EXPORT_PL,
     privacy_alert: PRIVACY_ALERT_PL,
     bank_consent_expiring: BANK_CONSENT_EXPIRING_PL,
+    activation_drip_visit: ACTIVATION_DRIP_VISIT_PL,
+    activation_drip_reward: ACTIVATION_DRIP_REWARD_PL,
+    winback_trial: WINBACK_TRIAL_PL,
   },
 }
 
