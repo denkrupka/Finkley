@@ -133,9 +133,9 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
 
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
 <tr><td>
-<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Тариф Finkley Standard</p>
-<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">€15 / месяц</p>
-<p style="margin:0; font-size:14px; color:#64748b;">VAT добавляется автоматически в зависимости от твоей страны</p>
+<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Платные тарифы Finkley</p>
+<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">от €19 / месяц</p>
+<p style="margin:0; font-size:14px; color:#64748b;">НДС не взимается — платишь ровно сумму тарифа</p>
 </td></tr>
 </table>
 
@@ -148,7 +148,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
 </table>
 
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Оплата по карте через Stripe — безопасно. Money-back guarantee 7 дней — если передумаешь, вернём деньги.
+Оплата по карте через Stripe — безопасно. Возврат денег в первые 14 дней оплаченной подписки — если передумаешь.
 </p>
 
 <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
@@ -1188,9 +1188,9 @@ So far you've recorded <strong>{{visits_during_trial}}</strong> visits for <stro
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
 <tr><td>
-<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Finkley Standard plan</p>
-<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">€15 / month</p>
-<p style="margin:0; font-size:14px; color:#64748b;">VAT added automatically by your country</p>
+<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Finkley paid plans</p>
+<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">from €19 / month</p>
+<p style="margin:0; font-size:14px; color:#64748b;">No VAT — you pay exactly the plan price</p>
 </td></tr>
 </table>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -1199,7 +1199,7 @@ So far you've recorded <strong>{{visits_during_trial}}</strong> visits for <stro
 </td></tr>
 </table>
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Card payment via Stripe — secure. 7-day money-back guarantee — if you change your mind, we'll refund.
+Card payment via Stripe — secure. 14-day money-back guarantee on paid subscriptions — if you change your mind.
 </p>
 <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
 If you decide not to continue — your data is preserved for 30 days, then deleted. Until then you can export everything to CSV.
@@ -1231,9 +1231,9 @@ W tym czasie wprowadziłeś <strong>{{visits_during_trial}}</strong> wizyt na kw
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9; border-radius:6px; padding:20px; margin-bottom:24px;">
 <tr><td>
-<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Plan Finkley Standard</p>
-<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">15 € / miesiąc</p>
-<p style="margin:0; font-size:14px; color:#64748b;">VAT dodawany automatycznie w zależności od kraju</p>
+<p style="margin:0 0 8px 0; font-size:14px; color:#64748b;">Plany płatne Finkley</p>
+<p style="margin:0 0 4px 0; font-size:24px; font-weight:600; color:#0f172a;">od 19 € / miesiąc</p>
+<p style="margin:0; font-size:14px; color:#64748b;">Bez VAT — płacisz dokładnie kwotę planu</p>
 </td></tr>
 </table>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -1242,7 +1242,7 @@ W tym czasie wprowadziłeś <strong>{{visits_during_trial}}</strong> wizyt na kw
 </td></tr>
 </table>
 <p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
-Płatność kartą przez Stripe — bezpiecznie. 7-dniowa gwarancja zwrotu — jeśli zmienisz zdanie, zwrócimy pieniądze.
+Płatność kartą przez Stripe — bezpiecznie. 14-dniowa gwarancja zwrotu przy subskrypcji płatnej — jeśli zmienisz zdanie.
 </p>
 <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
 Jeśli zdecydujesz nie kontynuować — Twoje dane zostaną zachowane 30 dni, potem usunięte. Do tego czasu możesz wyeksportować wszystko do CSV.
