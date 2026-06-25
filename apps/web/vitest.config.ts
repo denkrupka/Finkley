@@ -21,6 +21,8 @@ export default defineConfig({
       '../../supabase/functions/_shared/**/*.{test,spec}.ts',
       // I4 — pure-логика send-email/templates (pickTemplate, render, normalize).
       '../../supabase/functions/send-email/*.{test,spec}.ts',
+      // trial-reminders — pure-логика выбора получателей и bucket'ов.
+      '../../supabase/functions/trial-reminders/*.{test,spec}.ts',
     ],
     exclude: ['node_modules', 'dist', 'tests/e2e/**'],
     // RPC/edge-function тесты ходят в реальный Supabase staging — иногда

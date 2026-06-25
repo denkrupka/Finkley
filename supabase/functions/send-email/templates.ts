@@ -12,6 +12,7 @@
 export type TemplateAlias =
   | 'welcome'
   | 'trial_ending'
+  | 'trial_expired'
   | 'payment_succeeded'
   | 'payment_failed'
   | 'subscription_canceled'
@@ -166,6 +167,54 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 </td></tr>
 </table>
 
+</body>
+</html>`,
+  },
+
+  trial_expired: {
+    subject: 'Пробный период Finkley закончился — данные на месте',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пробный период закончился</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Привет, {{full_name}}.
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Пробный период Finkley по салону <strong>{{salon_name}}</strong> закончился. Аккаунт перешёл на бесплатный тариф — открыт раздел «Доходы» (визиты и выручка), остальные разделы видны, но заблокированы.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Все твои данные на месте и никуда не денутся. Чтобы снова видеть чистую прибыль, расходы и отчёты — оформи подписку, это пара кликов.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Выбрать тариф
+</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Или просто <a href="{{app_url}}" style="color:#0f172a;">зайди в приложение</a> — раздел «Доходы» доступен всегда.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">info@finkley.app</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
+</p>
+</td></tr>
+</table>
 </body>
 </html>`,
   },
@@ -1528,6 +1577,102 @@ const BANK_CONSENT_EXPIRING_PL: EmailTemplate = {
 </body></html>`,
 }
 
+const TRIAL_EXPIRED_EN: EmailTemplate = {
+  subject: 'Your Finkley trial has ended — your data is safe',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trial ended</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Hi {{full_name}}.
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Your Finkley trial for <strong>{{salon_name}}</strong> has ended. The account moved to the Free plan — the "Income" section (visits and revenue) stays open, the rest are visible but locked.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+All your data is safe and stays put. To see net profit, expenses and reports again, just subscribe — it takes a couple of clicks.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Choose a plan
+</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Or just <a href="{{app_url}}" style="color:#0f172a;">open the app</a> — the "Income" section is always available.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">info@finkley.app</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
+const TRIAL_EXPIRED_PL: EmailTemplate = {
+  subject: 'Okres próbny Finkley dobiegł końca — Twoje dane są bezpieczne',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Okres próbny zakończony</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">
+Cześć {{full_name}}.
+</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Okres próbny Finkley dla salonu <strong>{{salon_name}}</strong> dobiegł końca. Konto przeszło na plan darmowy — sekcja „Przychody" (wizyty i utarg) pozostaje otwarta, reszta jest widoczna, ale zablokowana.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Wszystkie Twoje dane są bezpieczne i nigdzie nie znikną. Aby znów widzieć zysk netto, koszty i raporty — wykup subskrypcję, to kilka kliknięć.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+Wybierz plan
+</a>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:14px; line-height:22px; color:#64748b;">
+Albo po prostu <a href="{{app_url}}" style="color:#0f172a;">otwórz aplikację</a> — sekcja „Przychody" jest zawsze dostępna.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">info@finkley.app</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
@@ -1535,6 +1680,7 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     team_invitation: TEAM_INVITATION_EN,
     weekly_digest: WEEKLY_DIGEST_EN,
     trial_ending: TRIAL_ENDING_EN,
+    trial_expired: TRIAL_EXPIRED_EN,
     payment_succeeded: PAYMENT_SUCCEEDED_EN,
     payment_failed: PAYMENT_FAILED_EN,
     subscription_canceled: SUBSCRIPTION_CANCELED_EN,
@@ -1547,6 +1693,7 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     team_invitation: TEAM_INVITATION_PL,
     weekly_digest: WEEKLY_DIGEST_PL,
     trial_ending: TRIAL_ENDING_PL,
+    trial_expired: TRIAL_EXPIRED_PL,
     payment_succeeded: PAYMENT_SUCCEEDED_PL,
     payment_failed: PAYMENT_FAILED_PL,
     subscription_canceled: SUBSCRIPTION_CANCELED_PL,

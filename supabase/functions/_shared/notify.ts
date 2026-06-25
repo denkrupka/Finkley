@@ -13,6 +13,7 @@ const FUNCTION_SECRET = Deno.env.get('FUNCTION_INTERNAL_SECRET') ?? ''
 export type EmailTemplate =
   | 'welcome'
   | 'trial_ending'
+  | 'trial_expired'
   | 'payment_succeeded'
   | 'payment_failed'
   | 'subscription_canceled'
