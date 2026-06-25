@@ -1,0 +1,24 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import PricingBody from '../../components/PricingBody.astro'
+import { buildPricingJsonLd, pricingContent } from '../../i18n/content/pricing'
+
+const copy = pricingContent.pl
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const jsonLd = buildPricingJsonLd(
+  copy,
+  new URL('/pl/pricing', SITE_ORIGIN).toString(),
+  new URL('/pl/', SITE_ORIGIN).toString(),
+)
+---
+
+<Layout
+  title={copy.title}
+  description={copy.description}
+  active="pricing"
+  lang="pl"
+  localized
+  jsonLd={jsonLd}
+>
+  <PricingBody copy={copy} />
+</Layout>
