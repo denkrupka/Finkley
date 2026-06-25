@@ -99,7 +99,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
   },
 
   trial_ending: {
-    subject: 'Твой пробный период заканчивается через {{days_left}} дня',
+    subject: 'Пробный период Finkley заканчивается совсем скоро',
     html: `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -120,7 +120,7 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
 </h1>
 
 <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
-Твой пробный период в Finkley заканчивается через <strong>{{days_left}} дня</strong>.
+Твой пробный период в Finkley заканчивается через <strong>{{days_left}}</strong> дн.
 </p>
 
 <p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
@@ -614,10 +614,11 @@ export const ALLOWED_TEMPLATES = new Set<TemplateAlias>(Object.keys(TEMPLATES) a
  * Локализованные варианты шаблонов. Ключ — locale, значение — частичная карта
  * (можно покрывать не все шаблоны, отсутствующие наследуют RU из TEMPLATES).
  *
- * Pattern roadmap:
- *   - сейчас: только `welcome` переведено EN/PL, остальные — RU fallback.
- *   - дальше: переводим weekly_digest, team_invitation, trial_ending.
- *   - в последнюю очередь: payment_*, gdpr_export, bank_consent_expiring.
+ * Статус локализации: все алиасы из TEMPLATES переведены на EN и PL (см.
+ * LOCALE_OVERRIDES.en / .pl ниже). pickTemplate падает обратно на RU только
+ * если для конкретного alias перевод когда-нибудь удалят. Паритет плейсхолдеров
+ * {{var}} между ru/en/pl и отсутствие «тихого» RU-fallback проверяются в
+ * templates.test.ts — новый непереведённый alias уронит тест, а не утечёт в прод.
  */
 export type EmailLocale = 'ru' | 'pl' | 'en'
 

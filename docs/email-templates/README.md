@@ -17,6 +17,22 @@ Edge function `supabase/functions/send-email/index.ts` принимает
 полный HTML inline с каждым запросом. Так проще: все шаблоны под git, нет
 расхождений между Resend Dashboard и кодом.
 
+## Локализация
+
+Все алиасы переведены на **ru / en / pl**. RU — база в `TEMPLATES`, EN/PL — в
+`LOCALE_OVERRIDES` (`templates.ts`). `pickTemplate(alias, locale)` падает обратно
+на RU, только если перевод для alias когда-нибудь удалят. Локаль приходит от
+вызывающего по каскаду `_shared/salon-lookup.ts → pickLocale`:
+`profiles.locale → salons.locale → country_code (PL→pl, GB/US/…→en, RU/UA/…→ru) → 'ru'`.
+
+Reference-копии в `docs/email-templates/*.html` — **только RU** (для дизайн-ревью),
+они не локализуются. Инварианты EN/PL (паритет плейсхолдеров `{{var}}` с RU,
+отсутствие тихого RU-fallback, lang-атрибут, отсутствие кириллицы) проверяются в
+`templates.test.ts` — непереведённый или сломанный alias уронит тест до деплоя.
+
+> ⚠️ Юридический футер `<юр.лицо>, <адрес>` (RU/EN/PL) надо заменить реальным
+> адресом юрлица до прод-рассылок (CAN-SPAM/GDPR требуют физический адрес отправителя).
+
 ## Алиасы шаблонов
 
 | Алиас                   | Когда отправляется                             |

@@ -65,6 +65,68 @@ describe('pickTemplate', () => {
   })
 })
 
+// Извлекает множество плейсхолдеров {{var}} из subject+html шаблона.
+function tokenSet(
+  alias: Parameters<typeof pickTemplate>[0],
+  locale: Parameters<typeof pickTemplate>[1],
+): Set<string> {
+  const tpl = pickTemplate(alias, locale)
+  const tokens = new Set<string>()
+  for (const src of [tpl.subject, tpl.html]) {
+    for (const m of src.matchAll(/\{\{(\w+)\}\}/g)) tokens.add(m[1])
+  }
+  return tokens
+}
+
+describe('локализация шаблонов (регрессия)', () => {
+  // (A) Паритет плейсхолдеров: EN/PL не должны терять {{var}}, который есть в RU —
+  // иначе в проде (напр. billing-письмо) переменная отрендерится пустой строкой.
+  it('EN и PL имеют тот же набор {{var}}, что и RU, для каждого alias', () => {
+    for (const alias of ALLOWED_TEMPLATES) {
+      const ru = [...tokenSet(alias, 'ru')].sort()
+      const en = [...tokenSet(alias, 'en')].sort()
+      const pl = [...tokenSet(alias, 'pl')].sort()
+      expect(en, `EN(${alias}) плейсхолдеры расходятся с RU`).toEqual(ru)
+      expect(pl, `PL(${alias}) плейсхолдеры расходятся с RU`).toEqual(ru)
+    }
+  })
+
+  // (B) Нет «тихого» RU-fallback: каждый alias реально переведён на EN и PL.
+  // Новый непереведённый alias уронит этот тест, а не утечёт RU польским юзерам.
+  it('каждый alias имеет EN и PL subject+html, отличные от RU', () => {
+    for (const alias of ALLOWED_TEMPLATES) {
+      const ru = pickTemplate(alias, 'ru')
+      const en = pickTemplate(alias, 'en')
+      const pl = pickTemplate(alias, 'pl')
+      expect(en.subject, `EN(${alias}) subject == RU`).not.toBe(ru.subject)
+      expect(en.html, `EN(${alias}) html == RU`).not.toBe(ru.html)
+      expect(pl.subject, `PL(${alias}) subject == RU`).not.toBe(ru.subject)
+      expect(pl.html, `PL(${alias}) html == RU`).not.toBe(ru.html)
+    }
+  })
+
+  // (C) lang-атрибут: EN/PL версии помечены правильной локалью на <html>.
+  it('EN/PL html содержат корректный lang-атрибут', () => {
+    for (const alias of ALLOWED_TEMPLATES) {
+      expect(pickTemplate(alias, 'en').html, `EN(${alias}) без lang="en"`).toContain('lang="en"')
+      expect(pickTemplate(alias, 'pl').html, `PL(${alias}) без lang="pl"`).toContain('lang="pl"')
+    }
+  })
+
+  // (D) В EN/PL не должно быть кириллицы (правило CLAUDE.md: не класть русский в en/pl).
+  it('EN/PL html не содержат кириллицы', () => {
+    const cyrillic = /[А-Яа-яЁё]/
+    for (const alias of ALLOWED_TEMPLATES) {
+      expect(cyrillic.test(pickTemplate(alias, 'en').html), `EN(${alias}) содержит кириллицу`).toBe(
+        false,
+      )
+      expect(cyrillic.test(pickTemplate(alias, 'pl').html), `PL(${alias}) содержит кириллицу`).toBe(
+        false,
+      )
+    }
+  })
+})
+
 describe('render', () => {
   it('подставляет {{var}}', () => {
     expect(render('Hello {{name}}', { name: 'Anna' })).toBe('Hello Anna')

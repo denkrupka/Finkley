@@ -1,15 +1,15 @@
 /**
  * send-email — отправка транзакционных писем через Resend API.
  *
- * Принимает `{ template, to, vars }` и рендерит соответствующий шаблон
+ * Принимает `{ template, to, vars, locale }` и рендерит соответствующий шаблон
  * (см. ./templates.ts) с подстановкой переменных, шлёт через Resend.
  *
- * Шаблоны:
- *   - welcome
- *   - trial_ending
- *   - payment_succeeded
- *   - payment_failed
- *   - subscription_canceled
+ * Шаблоны (все переведены на ru/en/pl, pickTemplate падает на RU как fallback):
+ *   - welcome, trial_ending, payment_succeeded, payment_failed,
+ *     subscription_canceled, gdpr_export, weekly_digest, team_invitation,
+ *     bank_consent_expiring, privacy_alert
+ *   locale приходит от вызывающего (см. _shared/salon-lookup.ts pickLocale:
+ *   profiles.locale → salons.locale → country_code → 'ru').
  *
  * ENV:
  *   RESEND_API_KEY — send-only ключ (re_...)
