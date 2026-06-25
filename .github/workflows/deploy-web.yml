@@ -10,6 +10,11 @@ on:
       - 'pnpm-lock.yaml'
       - 'package.json'
   workflow_dispatch:
+  # Пересборка по требованию: edge function rebuild-landing-trigger дёргает
+  # этот event при публикации статьи в /admin/media (лендинг — SSG, тянет
+  # media_posts на билде, поэтому новые статьи появляются только после rebuild).
+  repository_dispatch:
+    types: [rebuild-landing]
 
 # Только один деплой Pages в один момент времени
 concurrency:

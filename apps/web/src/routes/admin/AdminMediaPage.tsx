@@ -5,6 +5,7 @@ import {
   Lightbulb,
   Loader2,
   Plus,
+  RefreshCw,
   Save,
   Sparkles,
   Trash2,
@@ -37,6 +38,7 @@ import {
   useAllMediaPosts,
   useDeleteMediaPost,
   useIsAppAdmin,
+  useRebuildLanding,
   useUpsertMediaPost,
   type MediaPost,
 } from '@/hooks/useMediaPosts'
@@ -53,8 +55,11 @@ import { supabase } from '@/lib/supabase/client'
  *   - SEO Lab (правый): score 0-100, чек-лист, Google snippet preview,
  *     OG preview, ИИ-помощник
  *
- * Публикация мгновенная — статья появляется на /media сразу после сохранения,
- * без перестройки лендинга.
+ * Публичный блог finkley.app/media — Astro SSG (тянет media_posts на билде),
+ * поэтому опубликованная статья появляется там ТОЛЬКО после пересборки сайта.
+ * Пересборка дёргается автоматически при публикации (draft=false) и кнопкой
+ * «Пересобрать сайт» (useRebuildLanding → rebuild-landing-trigger). Билд+деплой
+ * ~1-2 минуты. (Внутри SPA /app/media список обновляется сразу.)
  */
 export function AdminMediaPage() {
   const { t } = useTranslation()
@@ -62,6 +67,7 @@ export function AdminMediaPage() {
   const { data: posts = [], isLoading } = useAllMediaPosts()
   const upsert = useUpsertMediaPost()
   const remove = useDeleteMediaPost()
+  const rebuild = useRebuildLanding()
   const [selected, setSelected] = useState<MediaPost | null>(null)
   const [draft, setDraft] = useState<Partial<MediaPost>>({})
   const [targetKeyword, setTargetKeyword] = useState('')
@@ -412,15 +418,51 @@ export function AdminMediaPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">{t('admin.media.subtitle')}</p>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setSelected(null)}
-          data-testid="new-post"
-        >
-          <Plus className="size-4" strokeWidth={2} />
-          {t('admin.media.new_post')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() =>
+              rebuild.mutate(undefined, {
+                onSuccess: (r) =>
+                  r?.dispatched
+                    ? toast.success(
+                        t('admin.media.rebuild_started', {
+                          defaultValue:
+                            'Сайт пересобирается — статьи появятся на finkley.app/media через пару минут.',
+                        }),
+                      )
+                    : toast.warning(
+                        t('admin.media.rebuild_no_token', {
+                          defaultValue:
+                            'Пересборка не настроена: добавь секрет GH_DISPATCH_TOKEN в Supabase.',
+                        }),
+                      ),
+                onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+              })
+            }
+            disabled={rebuild.isPending}
+            title={t('admin.media.rebuild_hint', {
+              defaultValue:
+                'Лендинг finkley.app/media — статический. Пересборка показывает новые статьи.',
+            })}
+          >
+            <RefreshCw
+              className={`size-4 ${rebuild.isPending ? 'animate-spin' : ''}`}
+              strokeWidth={2}
+            />
+            {t('admin.media.rebuild', { defaultValue: 'Пересобрать сайт' })}
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setSelected(null)}
+            data-testid="new-post"
+          >
+            <Plus className="size-4" strokeWidth={2} />
+            {t('admin.media.new_post')}
+          </Button>
+        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)_340px]">

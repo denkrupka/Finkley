@@ -124,7 +124,31 @@ export function useUpsertMediaPost() {
       if (error) throw error
       return data as MediaPost
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['media-posts'] }),
+    onSuccess: (saved) => {
+      qc.invalidateQueries({ queryKey: ['media-posts'] })
+      // Лендинг (finkley.app/media) — Astro SSG, тянет media_posts на билде.
+      // Опубликованная статья появится только после пересборки сайта.
+      if (saved && !saved.draft) {
+        void supabase.functions.invoke('rebuild-landing-trigger', { body: {} }).catch(() => {})
+      }
+    },
+  })
+}
+
+/**
+ * Ручной триггер пересборки лендинга (кнопка «Пересобрать сайт» в админке).
+ * Нужен, чтобы показать на finkley.app/media уже добавленные ранее статьи
+ * без повторного сохранения каждой. Билд+деплой занимает ~1-2 минуты.
+ */
+export function useRebuildLanding() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('rebuild-landing-trigger', {
+        body: {},
+      })
+      if (error) throw error
+      return data as { ok: boolean; dispatched: boolean; note?: string }
+    },
   })
 }
 
