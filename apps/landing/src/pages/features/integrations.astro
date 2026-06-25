@@ -18,12 +18,23 @@ const INTEGRATIONS = [
   { name: 'Google Calendar / iCal', cat: 'Календари', desc: 'iCal-фид для подключения календаря мастера.' },
   { name: 'Apple Calendar', cat: 'Календари', desc: 'Тот же iCal-фид — мастер видит расписание на iPhone.' },
 ]
+
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Интеграции', item: new URL('/features/integrations/', SITE_ORIGIN).toString() },
+  ],
+}
 ---
 
 <Layout
-  title="Интеграции — Finkley"
-  description="15+ готовых интеграций: Booksy, wFirma, KSeF, Stripe, FB/IG/TG/WA, банки PSD2, Apple/Google Calendar."
+  title="Интеграции Finkley: Booksy, банк, KSeF, wFirma и ещё 11"
+  description="15+ интеграций для салона красоты: Booksy, банки ЕС (PSD2), KSeF, wFirma, Fakturownia, iFirma, Stripe, Facebook, Instagram, Telegram, WhatsApp, Google и Apple Calendar."
   active="features"
+  jsonLd={breadcrumbLd}
 >
   <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
     <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
@@ -35,6 +46,14 @@ const INTEGRATIONS = [
       </h1>
       <p class="mt-6 max-w-2xl text-lg leading-relaxed text-brand-text-muted">
         Booksy, wFirma, банки, мессенджеры. Один раз настроил — дальше Finkley сам тянет данные.
+      </p>
+      <!-- Answer-блок: самодостаточный ответ для AI-движков -->
+      <p class="mt-6 max-w-3xl rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text">
+        <strong>С чем интегрируется Finkley.</strong> Finkley подключается к системе записи Booksy,
+        банкам ЕС через открытый банкинг (PSD2), польским бухгалтерским и налоговым сервисам (KSeF,
+        wFirma, Fakturownia, iFirma, 360Księgowość), к Stripe, а также к мессенджерам Facebook,
+        Instagram, Telegram и WhatsApp и календарям Google и Apple — всего 15+ интеграций, без
+        ручного переноса данных.
       </p>
     </div>
   </section>
