@@ -142,9 +142,11 @@ voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endow
   pl draft) + HomeBody.astro; index.astro 626→19 строк. RU видимый текст ИДЕНТИЧЕН
   baseline (нулевая регрессия), hreflang реципрокен (ru=/, pl=/pl/, x-default=/),
   PL hero «My pokazujemy Twój zysk», FAQ-схема в обеих.
-- **Stream 4 P0 (home + pricing) ЗАВЕРШЁН.** Опционально далее: PL feature-страницы
-  (ai/integrations/messenger) + PL-сиблинги Stream-5 (compare/use-cases) — те же
-  модули-обёртки; feature-страницы сейчас localized=false → корректный ru+x-default.
+- **PL feature-страницы** ✅ (commit 8ebce3b) — ai/integrations/messenger двуязычные
+  по тому же B-prime (content/features.ts + 3 Body-компонента + обёртки). RU без
+  регрессии, hreflang реципрокен. Свитчер связен на всей продуктовой навигации.
+- **Stream 4 ЗАВЕРШЁН** (главная + цены + 3 фичи на RU+PL). Опционально далее:
+  PL-сиблинги Stream-5 (compare/use-cases/блог) — те же модули-обёртки.
 
 **Owner-гейт (важно):** все PL-строки в content/\*.ts — машинный ЧЕРНОВИК,
 обязательна вычитка носителем польского перед публичным анонсом.
