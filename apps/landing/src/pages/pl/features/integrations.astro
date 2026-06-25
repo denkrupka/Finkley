@@ -1,0 +1,25 @@
+---
+import Layout from '../../../layouts/Layout.astro'
+import IntegrationsBody from '../../../components/IntegrationsBody.astro'
+import { buildFeatureBreadcrumb, featuresContent } from '../../../i18n/content/features'
+
+const copy = featuresContent.pl.integrations
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const breadcrumbLd = buildFeatureBreadcrumb(
+  copy.breadcrumbHome,
+  copy.breadcrumbSelf,
+  new URL('/pl/features/integrations/', SITE_ORIGIN).toString(),
+  new URL('/pl/', SITE_ORIGIN).toString(),
+)
+---
+
+<Layout
+  title={copy.title}
+  description={copy.description}
+  active="features"
+  lang="pl"
+  localized
+  jsonLd={breadcrumbLd}
+>
+  <IntegrationsBody copy={copy} />
+</Layout>

@@ -1,0 +1,61 @@
+---
+import type { IntegrationsCopy } from '../i18n/content/features'
+
+interface Props {
+  copy: IntegrationsCopy
+}
+const { copy } = Astro.props
+---
+
+<section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+    <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">{copy.eyebrow}</p>
+    <h1
+      class="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
+    >
+      {copy.h1.pre}{copy.h1.br && <br />}<span class="text-brand-sage">{copy.h1.accent}</span>
+    </h1>
+    <p class="mt-6 max-w-2xl text-lg leading-relaxed text-brand-text-muted">
+      {copy.subtitle}
+    </p>
+    <!-- Answer-блок: самодостаточный ответ для AI-движков -->
+    <p class="mt-6 max-w-3xl rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text">
+      <strong>{copy.answerBlockTitle}</strong> {copy.answerBlockText}
+    </p>
+  </div>
+</section>
+
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        copy.integrations.map((i) => (
+          <div class="rounded-xl border border-brand-border bg-white p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-brand-teal">
+              {i.cat}
+            </div>
+            <h3 class="mt-2 text-lg font-bold text-brand-navy">{i.name}</h3>
+            <p class="mt-2 text-sm text-brand-text-muted leading-snug">{i.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+    <h2 class="text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.cta.heading}
+    </h2>
+    <p class="mt-4 text-base text-brand-text-muted">
+      {copy.cta.textPre}<a href="mailto:info@finkley.app" class="text-brand-navy underline">{copy.cta.emailLabel}</a>{copy.cta.textPost}
+    </p>
+    <a
+      href="/app/signup"
+      class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-navy px-8 text-sm font-bold text-white shadow-lg shadow-brand-navy/20 hover:bg-brand-navy-soft"
+    >
+      {copy.cta.button}
+    </a>
+  </div>
+</section>

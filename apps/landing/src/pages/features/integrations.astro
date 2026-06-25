@@ -1,95 +1,25 @@
 ---
 import Layout from '../../layouts/Layout.astro'
+import IntegrationsBody from '../../components/IntegrationsBody.astro'
+import { buildFeatureBreadcrumb, featuresContent } from '../../i18n/content/features'
 
-const INTEGRATIONS = [
-  { name: 'Booksy', cat: 'Записи', desc: 'Двусторонняя синхронизация визитов и мастеров.' },
-  { name: 'wFirma', cat: 'Бухгалтерия PL', desc: 'Автоматическая отправка расходов в бухгалтерию.' },
-  { name: 'KSeF', cat: 'Налоговая PL', desc: 'Прямой обмен фактурами через государственную систему.' },
-  { name: 'Fakturownia', cat: 'Бухгалтерия PL', desc: 'Импорт расходов и выставление счетов.' },
-  { name: 'iFirma', cat: 'Бухгалтерия PL', desc: 'Sync расходов и контрагентов.' },
-  { name: 'inFakt', cat: 'Бухгалтерия PL', desc: 'Полная двусторонняя интеграция (партнёрская программа).' },
-  { name: '360Księgowość', cat: 'Бухгалтерия PL', desc: 'Автоэкспорт фактур и операций.' },
-  { name: 'Stripe', cat: 'Платежи', desc: 'Online-платежи + автоматический Stripe Tax (VAT).' },
-  { name: 'Open Banking (PSD2)', cat: 'Банки', desc: 'Импорт банковских операций через Enable Banking.' },
-  { name: 'Facebook Messenger', cat: 'Мессенджеры', desc: 'OAuth-вход в 2 клика, сообщения в едином inbox.' },
-  { name: 'Instagram Direct', cat: 'Мессенджеры', desc: 'Через Facebook Page или Instagram Login API.' },
-  { name: 'Telegram', cat: 'Мессенджеры', desc: 'Бот в @BotFather → токен → готово.' },
-  { name: 'WhatsApp Business Cloud API', cat: 'Мессенджеры', desc: 'Cloud API без сторонних BSP.' },
-  { name: 'Google Calendar / iCal', cat: 'Календари', desc: 'iCal-фид для подключения календаря мастера.' },
-  { name: 'Apple Calendar', cat: 'Календари', desc: 'Тот же iCal-фид — мастер видит расписание на iPhone.' },
-]
-
+const copy = featuresContent.ru.integrations
 const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
-const breadcrumbLd = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_ORIGIN + '/' },
-    { '@type': 'ListItem', position: 2, name: 'Интеграции', item: new URL('/features/integrations/', SITE_ORIGIN).toString() },
-  ],
-}
+const breadcrumbLd = buildFeatureBreadcrumb(
+  copy.breadcrumbHome,
+  copy.breadcrumbSelf,
+  new URL('/features/integrations/', SITE_ORIGIN).toString(),
+  SITE_ORIGIN + '/',
+)
 ---
 
 <Layout
-  title="Интеграции Finkley: Booksy, банк, KSeF, wFirma и ещё 11"
-  description="15+ интеграций для салона красоты: Booksy, банки ЕС (PSD2), KSeF, wFirma, Fakturownia, iFirma, Stripe, Facebook, Instagram, Telegram, WhatsApp, Google и Apple Calendar."
+  title={copy.title}
+  description={copy.description}
   active="features"
+  lang="ru"
+  localized
   jsonLd={breadcrumbLd}
 >
-  <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
-    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
-      <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">Интеграции</p>
-      <h1
-        class="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
-      >
-        Подключи свои инструменты —<br /><span class="text-brand-sage">в 2 клика, без программиста</span>
-      </h1>
-      <p class="mt-6 max-w-2xl text-lg leading-relaxed text-brand-text-muted">
-        Booksy, wFirma, банки, мессенджеры. Один раз настроил — дальше Finkley сам тянет данные.
-      </p>
-      <!-- Answer-блок: самодостаточный ответ для AI-движков -->
-      <p class="mt-6 max-w-3xl rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text">
-        <strong>С чем интегрируется Finkley.</strong> Finkley подключается к системе записи Booksy,
-        банкам ЕС через открытый банкинг (PSD2), польским бухгалтерским и налоговым сервисам (KSeF,
-        wFirma, Fakturownia, iFirma, 360Księgowość), к Stripe, а также к мессенджерам Facebook,
-        Instagram, Telegram и WhatsApp и календарям Google и Apple — всего 15+ интеграций, без
-        ручного переноса данных.
-      </p>
-    </div>
-  </section>
-
-  <section class="border-b border-brand-border bg-white">
-    <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {
-          INTEGRATIONS.map((i) => (
-            <div class="rounded-xl border border-brand-border bg-white p-5">
-              <div class="text-xs font-semibold uppercase tracking-wider text-brand-teal">
-                {i.cat}
-              </div>
-              <h3 class="mt-2 text-lg font-bold text-brand-navy">{i.name}</h3>
-              <p class="mt-2 text-sm text-brand-text-muted leading-snug">{i.desc}</p>
-            </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <section class="bg-white">
-    <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
-      <h2 class="text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
-        Нужна интеграция, которой ещё нет?
-      </h2>
-      <p class="mt-4 text-base text-brand-text-muted">
-        Напиши на <a href="mailto:info@finkley.app" class="text-brand-navy underline">info@finkley.app</a> — мы добавляем по запросам клиентов.
-      </p>
-      <a
-        href="/app/signup"
-        class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-navy px-8 text-sm font-bold text-white shadow-lg shadow-brand-navy/20 hover:bg-brand-navy-soft"
-      >
-        Попробовать 14 дней бесплатно
-      </a>
-    </div>
-  </section>
+  <IntegrationsBody copy={copy} />
 </Layout>
