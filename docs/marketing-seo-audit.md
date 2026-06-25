@@ -98,6 +98,48 @@ voice); SetupProgressBar уже применяет goal-gradient/Zeigarnik/endow
 - Новые блог-статьи под programmatic-seo, оптимизированные под AI-цитирование
   (статистика с источниками, FAQ-блоки, BlogPosting schema уже автоматом).
 
+## Сделано во 2-й итерации (ultracode + design-workflow)
+
+Многоагентный workflow спроектировал и адверсариально проверил 5 потоков
+(см. `wf_ffc0c0a7-08e`). Реализованы 3:
+
+### Stream 3 — i18n guard + плюрал-фикс ✅ (commit ~Stream3)
+
+- Корректировка премисы: EN/PL переводы всех 10 шаблонов УЖЕ были (LOCALE_OVERRIDES).
+- Фикс RU-бага плюрала `{{days_left}} дня` → count-agnostic.
+- +4 теста-инварианта (паритет плейсхолдеров, нет тихого RU-fallback, lang, без кириллицы).
+
+### Stream 1 — trial-reminders cron ✅ (commit 22dab2b)
+
+- Закрыт реальный баг: trial_ending слался только по Stripe-событию, которого у
+  implicit-trial не бывает. Новый edge-function + миграция + 20 unit-тестов.
+- Новый шаблон trial_expired (ru/en/pl). Owner-гейты перед включением cron:
+  обновить стейл-копирайт «€15/месяц», применить миграцию на staging, задеплоить.
+
+### Stream 5 — programmatic-SEO контент ✅ (commit f82d3a3)
+
+- /compare/finkley-vs-booksy/ (ItemList+FAQPage+BreadcrumbList), /use-cases/
+  uchet-dlya-salona-krasoty/ (pillar), 3 блог-статьи (маникюр/барбершоп/прибыль).
+
+### Осталось из workflow:
+
+- **Stream 2** — activation-drip + win-back письма (P1, нужен owner-гейт на
+  register ты/вы + unsubscribe). Спека готова в workflow-результате.
+- **Stream 4** — PL-локаль лендинга (P0-бизнес, но последней: L-эффорт, рефактор
+  флагманских index/pricing в shared Body, обязательна вычитка носителем PL).
+  Подход B-prime: per-locale content-модули + один shared шаблон; фикс hreflang.
+
+## 🔴 Находка вне скоупа (важно владельцу)
+
+`payment-reminders` и `daily-notifications` используют багованный preflight-идиом
+`const pf = preflight(req); if (pf) return pf`. Но `preflight()` ВСЕГДА возвращает
+204 (не зависит от метода) — значит обе cron-функции **молча возвращают 204 и не
+выполняют работу**: напоминания о платежах и daily-уведомления (низкий склад,
+конфликты календаря) скорее всего НЕ отправляются. Правильный идиом (как в ~40
+других функциях): `if (req.method === 'OPTIONS') return preflight()`. Фикс на
+1 строку в каждой, но меняет поведение прод-cron → отдельный коммит + проверка
+на staging (не трогал в этой итерации).
+
 ## Известные ограничения / на согласование владельцу
 
 - **hreflang сломан** (ru/en/pl/x-default → один URL). Чинить вместе с PL SSR.
