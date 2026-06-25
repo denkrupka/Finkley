@@ -1,0 +1,19 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import HomeBody from '../../components/HomeBody.astro'
+import { buildHomeJsonLd, homeContent } from '../../i18n/content/home'
+
+const copy = homeContent.pl
+const jsonLd = buildHomeJsonLd(copy)
+---
+
+<Layout
+  title={copy.title}
+  description={copy.description}
+  active="home"
+  lang="pl"
+  localized
+  jsonLd={jsonLd}
+>
+  <HomeBody copy={copy} />
+</Layout>

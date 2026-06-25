@@ -1,0 +1,390 @@
+---
+import type { HomeCopy } from '../i18n/content/home'
+
+interface Props {
+  copy: HomeCopy
+}
+const { copy } = Astro.props
+
+// Имена мастеров в моке дашборда — демо, локале-инвариантны.
+const MOCK_MASTERS = [
+  { name: 'Аня', value: 1240 },
+  { name: 'Катя', value: 980 },
+  { name: 'Марина', value: 420 },
+]
+---
+
+<!-- Hero -->
+<section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+    <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">
+          {copy.hero.eyebrow}
+        </p>
+        <h1
+          class="mt-4 text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
+        >
+          {copy.hero.h1Line1}<br />
+          <span class="text-brand-sage">{copy.hero.h1Line2}</span>
+        </h1>
+        <p class="mt-6 max-w-xl text-lg leading-relaxed text-brand-text-muted">
+          {copy.hero.subtitle}
+        </p>
+        <div class="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <a
+            href="/app/signup"
+            class="inline-flex h-12 items-center rounded-lg bg-brand-navy px-6 text-sm font-bold text-white shadow-lg shadow-brand-navy/20 hover:bg-brand-navy-soft"
+          >
+            {copy.hero.ctaLabel}
+          </a>
+        </div>
+        <p class="mt-3 text-xs text-brand-text-faint">
+          {copy.hero.ctaMicrocopy}
+        </p>
+      </div>
+
+      <!-- Hero «скриншот» — реальный SVG-mock дашборда (inline, без PNG) -->
+      <div class="relative">
+        <div
+          class="rounded-xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/15"
+        >
+          <div class="mb-4 flex items-center justify-between">
+            <span class="text-xs font-bold text-brand-text-muted">{copy.heroMock.monthLabel}</span>
+            <span
+              class="rounded-full bg-brand-sage-soft px-2 py-0.5 text-[10px] font-bold text-brand-sage"
+              >{copy.heroMock.deltaLabel}</span
+            >
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="rounded-md border border-brand-border p-3">
+              <div class="text-[10px] font-semibold text-brand-text-muted">{copy.heroMock.revenueLabel}</div>
+              <div class="mt-1 font-mono text-lg font-bold text-brand-sage">€2 840</div>
+            </div>
+            <div class="rounded-md border border-brand-border p-3">
+              <div class="text-[10px] font-semibold text-brand-text-muted">{copy.heroMock.expensesLabel}</div>
+              <div class="mt-1 font-mono text-lg font-bold text-brand-red">−€1 205</div>
+            </div>
+            <div class="rounded-md bg-brand-navy p-3 text-white">
+              <div class="text-[10px] font-bold uppercase tracking-wider opacity-65">{copy.heroMock.profitLabel}</div>
+              <div class="mt-1 font-mono text-2xl font-bold">€1 635</div>
+            </div>
+          </div>
+          <div class="mt-4 space-y-2">
+            {
+              MOCK_MASTERS.map((m) => (
+                <div class="flex items-center gap-2">
+                  <div class="w-12 text-xs font-semibold text-brand-text">{m.name}</div>
+                  <div class="h-2 flex-1 overflow-hidden rounded-full bg-brand-bg">
+                    <div
+                      class="h-full bg-gradient-to-r from-brand-teal to-brand-navy"
+                      style={`width: ${(m.value / 1240) * 100}%`}
+                    />
+                  </div>
+                  <div class="font-mono text-xs font-bold text-brand-navy">€{m.value}</div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features (top-6, сокращённые) -->
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.whatsInside.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.whatsInside.subtitle}
+    </p>
+    <div class="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        copy.features.map((f) => (
+          <div class="rounded-lg border border-brand-border bg-brand-bg p-6 transition-colors hover:bg-white hover:shadow-md">
+            <div class="text-3xl">{f.emoji}</div>
+            <h3 class="mt-4 text-lg font-bold tracking-tight text-brand-navy">{f.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-brand-text-muted">{f.text}</p>
+          </div>
+        ))
+      }
+    </div>
+
+    <!-- Tabs: остальные возможности под спойлером + табы -->
+    <div class="mt-12">
+      <p class="text-center text-sm font-semibold text-brand-navy">
+        {copy.whatsInside.tabsIntro}
+      </p>
+      <div class="mt-6" data-tabs>
+        <div class="flex flex-wrap justify-center gap-2 border-b border-brand-border" role="tablist">
+          {
+            copy.featureTabs.map((t, i) => (
+              <button
+                type="button"
+                role="tab"
+                data-tab-btn={t.id}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                class={`-mb-px h-11 min-w-[140px] rounded-t-md border-b-2 px-4 text-sm font-semibold transition ${i === 0 ? 'border-brand-navy text-brand-navy' : 'border-transparent text-brand-text-muted hover:text-brand-text'}`}
+              >
+                {t.label}
+              </button>
+            ))
+          }
+        </div>
+        <div class="mt-6">
+          {
+            copy.featureTabs.map((t, i) => (
+              <div
+                role="tabpanel"
+                data-tab-panel={t.id}
+                class={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${i === 0 ? '' : 'hidden'}`}
+              >
+                {t.items.map(([title, desc]) => (
+                  <div class="flex items-start gap-3 rounded-md border border-brand-border bg-white p-4">
+                    <span class="mt-0.5 text-brand-sage">▸</span>
+                    <div>
+                      <div class="text-sm font-bold text-brand-navy">{title}</div>
+                      <div class="mt-0.5 text-xs leading-relaxed text-brand-text-muted">{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Сколько времени экономит -->
+<section class="border-b border-brand-border bg-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.timeSavedSection.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.timeSavedSection.subtitle}
+    </p>
+    <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+      {
+        copy.timeSaved.map((t) => (
+          <div class="rounded-lg border border-brand-border bg-white p-5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-brand-navy">{t.title}</h3>
+              <span class="rounded-full bg-brand-sage-soft px-3 py-1 font-mono text-xs font-bold text-brand-sage">
+                {t.saved}
+              </span>
+            </div>
+            <div class="mt-3 space-y-1.5 text-sm">
+              <div class="flex items-start gap-2">
+                <span class="text-brand-red">✗</span>
+                <span class="text-brand-text-muted">{t.before}</span>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="text-brand-sage">✓</span>
+                <span class="font-semibold text-brand-text">{t.after}</span>
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <p class="mx-auto mt-8 max-w-2xl text-center text-sm text-brand-text-muted">
+      {copy.timeSavedSection.footnotePre}<strong class="text-brand-navy">{copy.timeSavedSection.footnoteBold}</strong>{copy.timeSavedSection.footnotePost}
+    </p>
+    <p class="mx-auto mt-2 max-w-2xl text-center text-xs text-brand-text-faint">
+      {copy.timeSavedSection.footnoteSmall}
+    </p>
+  </div>
+</section>
+
+<!-- Отзывы -->
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.testimonialsSection.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.testimonialsSection.subtitle}
+    </p>
+    <div class="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+      {
+        copy.testimonials.map((tst) => (
+          <figure class="flex flex-col rounded-lg border border-brand-border bg-brand-bg p-6">
+            <blockquote class="flex-1 text-sm leading-relaxed text-brand-text">
+              «{tst.quote}»
+            </blockquote>
+            <figcaption class="mt-5 flex items-center gap-3">
+              <div class="grid size-10 place-items-center rounded-full bg-brand-navy font-bold text-white">
+                <span class="text-xs">{tst.initials}</span>
+              </div>
+              <div>
+                <div class="text-sm font-bold text-brand-navy">{tst.name}</div>
+                <div class="text-xs text-brand-text-muted">{tst.role}</div>
+              </div>
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- Интеграции -->
+<section class="border-b border-brand-border bg-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.integrationsSection.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.integrationsSection.subtitle}
+    </p>
+    <div class="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {
+        copy.integrations.map(([name, desc]) => (
+          <div class="rounded-md border border-brand-border bg-white p-4 transition hover:shadow-sm">
+            <div class="text-sm font-bold text-brand-navy">{name}</div>
+            <div class="mt-1 text-xs text-brand-text-muted">{desc}</div>
+          </div>
+        ))
+      }
+    </div>
+    <div class="mt-10 text-center">
+      <a
+        href="/features/integrations"
+        class="inline-flex items-center text-sm font-semibold text-brand-navy hover:underline"
+      >
+        {copy.integrationsSection.cta}
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Не заменяем — секция -->
+<section class="bg-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.notDoingSection.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.notDoingSection.subtitle}
+    </p>
+    <div class="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+      {
+        copy.notDoing.map(([title, sub]) => (
+          <div class="flex items-start gap-3 rounded-md border border-brand-border bg-white p-4">
+            <span class="mt-0.5 text-lg">✗</span>
+            <div>
+              <div class="text-sm font-bold text-brand-navy">{title}</div>
+              <div class="text-xs text-brand-text-muted">{sub}</div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- Безопасность и приватность -->
+<section class="border-t border-brand-border bg-white">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.securitySection.heading}
+    </h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-base text-brand-text-muted">
+      {copy.securitySection.subtitle}
+    </p>
+    <div class="mx-auto mt-12 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2">
+      {
+        copy.security.map((item) => (
+          <div class="flex items-start gap-4 rounded-lg border border-brand-border bg-brand-bg p-6">
+            <div class="text-3xl">{item.emoji}</div>
+            <div>
+              <h3 class="text-base font-bold tracking-tight text-brand-navy">{item.title}</h3>
+              <p class="mt-1.5 text-sm leading-relaxed text-brand-text-muted">{item.text}</p>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <p class="mx-auto mt-8 max-w-2xl text-center text-sm text-brand-text-muted">
+      {copy.securitySection.footnotePrefix}<a href="/privacy" class="font-semibold text-brand-navy hover:underline">{copy.securitySection.footnoteLink}</a>.
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="border-t border-brand-border bg-white">
+  <div class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
+    <h2 class="text-center text-3xl font-extrabold tracking-tight text-brand-navy sm:text-4xl">
+      {copy.faqSection.heading}
+    </h2>
+    <div class="mt-10 space-y-3">
+      {
+        copy.faq.map((item) => (
+          <details class="group rounded-md border border-brand-border bg-brand-bg p-5 open:bg-white open:shadow-sm">
+            <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+              {item.q}
+              <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">
+                +
+              </span>
+            </summary>
+            <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- CTA bottom -->
+<section class="bg-brand-navy text-white">
+  <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+    <h2 class="text-3xl font-extrabold tracking-tight sm:text-4xl">
+      {copy.ctaBottom.heading}
+    </h2>
+    <p class="mt-4 text-base text-white/70">
+      {copy.ctaBottom.subtitle}
+    </p>
+    <a
+      href="/app/signup"
+      class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-sage px-6 text-sm font-bold hover:bg-brand-sage/90"
+    >
+      {copy.ctaBottom.cta}
+    </a>
+  </div>
+</section>
+
+<!-- Tabs JS: переключение панелей внутри [data-tabs] -->
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-tabs]').forEach((root) => {
+      const btns = root.querySelectorAll('[data-tab-btn]')
+      const panels = root.querySelectorAll('[data-tab-panel]')
+      btns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-tab-btn')
+          btns.forEach((b) => {
+            const active = b.getAttribute('data-tab-btn') === id
+            b.setAttribute('aria-selected', active ? 'true' : 'false')
+            if (active) {
+              b.classList.add('border-brand-navy', 'text-brand-navy')
+              b.classList.remove('border-transparent', 'text-brand-text-muted')
+            } else {
+              b.classList.remove('border-brand-navy', 'text-brand-navy')
+              b.classList.add('border-transparent', 'text-brand-text-muted')
+            }
+          })
+          panels.forEach((p) => {
+            const active = p.getAttribute('data-tab-panel') === id
+            p.classList.toggle('hidden', !active)
+          })
+        })
+      })
+    })
+  })
+</script>
