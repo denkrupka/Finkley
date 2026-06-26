@@ -336,9 +336,9 @@
     "bonus_cta": "Claim bonus — €15",
     "bonus_hint": "for inviting a friend",
     "modal_title": "Invite friends to Finkley",
-    "modal_subtitle": "For each invited person who pays for subscription — one month free for you and them.",
+    "modal_subtitle": "For each invited person who pays for a subscription — €15 for you.",
     "share_title": "Finkley — management accounting for salons",
-    "share_text": "Hi! Try Finkley — management accounting for beauty salons. 14 days free, and a month of free subscription as a gift: {{link}}",
+    "share_text": "Hi! Try Finkley — management accounting for beauty salons. 14 days free, no card: {{link}}",
     "copy": "Copy",
     "toast_copied": "Link copied",
     "stats_sent": "Sent",
@@ -3567,12 +3567,12 @@
     },
     "referral": {
       "title": "Invite friends",
-      "subtitle": "Share your code — both of you get a free month on the first payment.",
+      "subtitle": "Share your code — get €15 for each friend who subscribes.",
       "copy": "Copy",
       "toast_copied": "Code copied",
       "invited": "Invited",
       "activated": "Activated",
-      "fineprint": "The bonus is applied automatically after the invitee's first payment. 100% off one month of subscription."
+      "fineprint": "€15 bonus is granted after your invitee's first payment."
     },
     "mfa": {
       "title": "Two-factor authentication",

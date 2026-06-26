@@ -53,8 +53,9 @@ export function useMarkDashboardOpened() {
 export type ClaimRewardResult = {
   granted: boolean
   reason?: string
-  bonus_days?: number
-  bonus_until?: string
+  /** Одноразовый Stripe-промокод €20 (ADR-036). Показываем юзеру + дублируем email. */
+  code?: string
+  amount_cents?: number
 }
 
 /** Забирает приз «+14 дней» через edge function claim-setup-reward. */

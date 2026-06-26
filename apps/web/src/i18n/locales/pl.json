@@ -2278,12 +2278,12 @@
     },
     "referral": {
       "title": "Zaproś znajomych",
-      "subtitle": "Udostępnij swój kod — oboje dostaniecie miesiąc gratis przy pierwszej płatności.",
+      "subtitle": "Udostępnij swój kod — otrzymaj €15 za każdego znajomego, który wykupi subskrypcję.",
       "copy": "Kopiuj",
       "toast_copied": "Kod skopiowany",
       "invited": "Zaproszeń",
       "activated": "Aktywowanych",
-      "fineprint": "Bonus jest naliczany automatycznie po pierwszej płatności zaproszonego. Rabat 100% na jeden miesiąc subskrypcji."
+      "fineprint": "Bonus €15 naliczany po pierwszej płatności zaproszonego."
     },
     "mfa": {
       "title": "Uwierzytelnianie dwuskładnikowe",
@@ -4580,9 +4580,9 @@
     "bonus_cta": "Odbierz bonus — 15 €",
     "bonus_hint": "za zaproszenie znajomego",
     "modal_title": "Zaproś znajomych do Finkley",
-    "modal_subtitle": "Za każdego zaproszonego, który opłaci subskrypcję — miesiąc gratis dla Ciebie i dla niego.",
+    "modal_subtitle": "Za każdego zaproszonego, który opłaci subskrypcję — €15 dla Ciebie.",
     "share_title": "Finkley — księgowość zarządcza dla salonów",
-    "share_text": "Cześć! Spróbuj Finkley — księgowość zarządcza dla salonów kosmetycznych. 14 dni gratis i miesiąc darmowej subskrypcji w prezencie: {{link}}",
+    "share_text": "Cześć! Spróbuj Finkley — księgowość zarządcza dla salonów kosmetycznych. 14 dni gratis, bez karty: {{link}}",
     "copy": "Skopiuj",
     "toast_copied": "Link skopiowany",
     "stats_sent": "Wysłane",

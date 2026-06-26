@@ -357,9 +357,11 @@ export function SetupProgressWidget({
         if (res.granted) {
           toast.success(
             t('setup_progress.reward.claimed', {
-              days: res.bonus_days ?? 14,
-              defaultValue: '🎁 +{{days}} дней демо добавлено! Спасибо, что настроили Finkley.',
+              code: res.code ?? '',
+              defaultValue:
+                '🎁 Промокод €20: {{code}} — отправили на email. Примените при оплате подписки.',
             }),
+            { duration: 12000 },
           )
         } else {
           toast.message(
