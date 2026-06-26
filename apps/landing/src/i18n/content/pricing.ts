@@ -107,7 +107,7 @@ const ru: PricingCopy = {
       name: 'Рост',
       price: '€49',
       period: '/ мес',
-      highlight: true,
+      highlight: false,
       blurb: 'Учёт плюс возврат клиентов рассылками и AI-помощник по прибыли.',
       cta: 'Выбрать',
       features: [
@@ -121,7 +121,7 @@ const ru: PricingCopy = {
       name: 'Полный',
       price: '€69',
       period: '/ мес',
-      highlight: false,
+      highlight: true,
       blurb: 'Все разделы продукта, включая финансы и склад.',
       cta: 'Выбрать',
       features: [
@@ -239,7 +239,7 @@ const pl: PricingCopy = {
       name: 'Wzrost',
       price: '€49',
       period: '/ mies.',
-      highlight: true,
+      highlight: false,
       blurb: 'Kontrola finansów plus odzyskiwanie klientek wysyłkami i asystent AI od zysku.',
       cta: 'Wybierz',
       features: [
@@ -253,7 +253,7 @@ const pl: PricingCopy = {
       name: 'Pełny',
       price: '€69',
       period: '/ mies.',
-      highlight: false,
+      highlight: true,
       blurb: 'Wszystkie sekcje produktu, łącznie z finansami i magazynem.',
       cta: 'Wybierz',
       features: [
