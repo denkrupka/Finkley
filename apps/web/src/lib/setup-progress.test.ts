@@ -7,8 +7,12 @@ import {
   ENDOWED_PERCENT,
   isAllComplete,
   isRewardEligible,
+  remainingExtraSteps,
   remainingSteps,
   rewardDaysLeft,
+  SETUP_PROGRESS_DEFAULTS,
+  SETUP_REQUIRED_STEPS,
+  SETUP_STEP_ORDER,
   shouldShowSetupBar,
   type SetupProgressData,
   type SetupStepId,
@@ -26,6 +30,7 @@ function makeData(over: Partial<SetupProgressData> = {}): SetupProgressData {
     dashboard_opened: false,
     created_at: new Date(NOW - 1 * DAY_MS).toISOString(),
     reward_granted_at: null,
+    ...SETUP_PROGRESS_DEFAULTS,
     ...over,
   }
 }
@@ -48,6 +53,26 @@ describe('computeSetupSteps', () => {
     // 'visit' не dismissable — пропуск игнорируется.
     expect(steps.find((s) => s.id === 'visit')?.done).toBe(false)
     expect(steps.find((s) => s.id === 'visit')?.dismissed).toBe(false)
+  })
+
+  it('maps v2 extra server booleans and marks them as non-required', () => {
+    const steps = computeSetupSteps(
+      makeData({ has_competitor: true, has_inventory_item: true, ai_assistant_seen: true }),
+      NONE,
+    )
+    expect(steps.find((s) => s.id === 'competitor')?.serverDone).toBe(true)
+    expect(steps.find((s) => s.id === 'competitor')?.required).toBe(false)
+    expect(steps.find((s) => s.id === 'inventory_item')?.done).toBe(true)
+    expect(steps.find((s) => s.id === 'ai_assistant')?.done).toBe(true)
+    // extra-шаги, не выполненные на сервере, остаются not-done
+    expect(steps.find((s) => s.id === 'finance_report')?.done).toBe(false)
+  })
+
+  it('renders the full ordered checklist with the 5 core steps required', () => {
+    const steps = computeSetupSteps(makeData(), NONE)
+    expect(steps.length).toBe(SETUP_STEP_ORDER.length)
+    expect(steps.filter((s) => s.required).map((s) => s.id)).toEqual(SETUP_REQUIRED_STEPS)
+    expect(SETUP_REQUIRED_STEPS).toEqual(['visit', 'expense', 'booksy', 'bank', 'dashboard'])
   })
 })
 
@@ -73,6 +98,25 @@ describe('computePercent / remainingSteps', () => {
   it('each completed step adds 12% above the endowed baseline', () => {
     const steps = computeSetupSteps(makeData({ has_visit: true }), NONE)
     expect(computePercent(steps)).toBe(ENDOWED_PERCENT + 12)
+  })
+
+  it('extra (non-required) steps do NOT affect percent or remaining', () => {
+    // Все 5 core done/dismissed → 100%, даже если все extra не выполнены.
+    const data = makeData({ has_visit: true, has_expense: true, dashboard_opened: true })
+    const steps = computeSetupSteps(data, new Set<SetupStepId>(['booksy', 'bank']))
+    expect(computePercent(steps)).toBe(100)
+    expect(remainingSteps(steps)).toBe(0)
+    // А extra-задачи полноты ещё остаются.
+    expect(remainingExtraSteps(steps)).toBeGreaterThan(0)
+  })
+
+  it('remainingExtraSteps drops when extra steps are done', () => {
+    const base = computeSetupSteps(makeData(), NONE)
+    const some = computeSetupSteps(
+      makeData({ has_competitor: true, has_inventory_item: true }),
+      NONE,
+    )
+    expect(remainingExtraSteps(some)).toBe(remainingExtraSteps(base) - 2)
   })
 })
 

@@ -1,5 +1,5 @@
 /**
- * Чистая логика gamified «Настройки Finkley» (T2).
+ * Чистая логика gamified «Настройки Finkley» (T2 / v2).
  *
  * Прогресс/проценты/«осталось N шагов»/право на награду считаются здесь,
  * чтобы покрыть unit-тестами и держать UI тупым. Серверный авторитет —
@@ -9,6 +9,16 @@
  * Поведенческие рычаги (Nunes–Drèze endowed progress, goal-gradient,
  * Zeigarnik): бар стартует НЕ с 0%, а с ENDOWED_PERCENT (салон уже создан),
  * и считает «осталось N шагов», а не «X из N».
+ *
+ * v2 (онбординг сокращён): чек-лист доводит салон до полного заполнения.
+ * Шаги делятся на:
+ *   - CORE (required) — визит/расход/booksy/банк/дашборд. Они гейтят 100% и
+ *     награду (прогресс-бар + reward считаются ТОЛЬКО по ним → endowed/percent
+ *     совместимы со старой моделью).
+ *   - EXTRA (optional) — конкуренты/склад/маркетинг/мессенджеры/AI/интеграции/
+ *     соц-страницы/Google/финотчёт/банк-линковка и т.д. Рендерятся в чек-листе
+ *     для полноты, но НЕ влияют на процент/награду. Уже-подключённые на
+ *     онбординге интеграции приезжают как done с сервера.
  */
 
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -21,6 +31,7 @@ export const MAX_VISIBLE_AGE_DAYS = 30
 export const REWARD_BONUS_DAYS = 14
 
 export type SetupProgressData = {
+  // ── core (back-compat) ──
   salon_created: boolean
   has_visit: boolean
   has_expense: boolean
@@ -29,74 +40,343 @@ export type SetupProgressData = {
   dashboard_opened: boolean
   created_at: string
   reward_granted_at: string | null
+  // ── v2 трекинг полноты ──
+  has_first_client_closed: boolean
+  has_expense_calculated: boolean
+  has_scheduled_payment: boolean
+  bank_synced: boolean
+  has_bank_tx_linked: boolean
+  has_finance_report: boolean
+  has_competitor: boolean
+  has_social_page: boolean
+  has_google_profile: boolean
+  has_inventory_item: boolean
+  has_marketing_broadcast: boolean
+  has_messenger_message: boolean
+  ai_assistant_seen: boolean
+  booking_connected: boolean
+  any_integration: boolean
 }
 
-export type SetupStepId = 'visit' | 'expense' | 'booksy' | 'bank' | 'dashboard'
+/** Безопасные дефолты для v2-полей (старый сервер / отсутствующие ключи → false). */
+export const SETUP_PROGRESS_DEFAULTS: Pick<
+  SetupProgressData,
+  | 'has_first_client_closed'
+  | 'has_expense_calculated'
+  | 'has_scheduled_payment'
+  | 'bank_synced'
+  | 'has_bank_tx_linked'
+  | 'has_finance_report'
+  | 'has_competitor'
+  | 'has_social_page'
+  | 'has_google_profile'
+  | 'has_inventory_item'
+  | 'has_marketing_broadcast'
+  | 'has_messenger_message'
+  | 'ai_assistant_seen'
+  | 'booking_connected'
+  | 'any_integration'
+> = {
+  has_first_client_closed: false,
+  has_expense_calculated: false,
+  has_scheduled_payment: false,
+  bank_synced: false,
+  has_bank_tx_linked: false,
+  has_finance_report: false,
+  has_competitor: false,
+  has_social_page: false,
+  has_google_profile: false,
+  has_inventory_item: false,
+  has_marketing_broadcast: false,
+  has_messenger_message: false,
+  ai_assistant_seen: false,
+  booking_connected: false,
+  any_integration: false,
+}
+
+export type SetupStepId =
+  // core
+  | 'visit'
+  | 'expense'
+  | 'booksy'
+  | 'bank'
+  | 'dashboard'
+  // extra (v2)
+  | 'first_client_closed'
+  | 'expense_calculated'
+  | 'scheduled_payment'
+  | 'bank_synced'
+  | 'bank_tx_linked'
+  | 'finance_report'
+  | 'competitor'
+  | 'social_page'
+  | 'google_profile'
+  | 'inventory_item'
+  | 'marketing_broadcast'
+  | 'messenger_message'
+  | 'ai_assistant'
+  | 'booking'
+  | 'any_integration'
+
+/** Логическая группа карточки в чек-листе (для подзаголовков/группировки в UI). */
+export type SetupStepGroup =
+  | 'income'
+  | 'expenses'
+  | 'finance'
+  | 'banking'
+  | 'growth'
+  | 'integrations'
 
 export type SetupStep = {
   id: SetupStepId
+  group: SetupStepGroup
+  /** Core-шаг — влияет на процент/награду. Extra — только полнота чек-листа. */
+  required: boolean
   /** Засчитан: либо реально выполнен на сервере, либо пропущен юзером (для dismissable). */
   done: boolean
   /** Реально выполнен по серверным данным (для иконки «галка» vs «пропущено»). */
   serverDone: boolean
-  /** Можно пропустить (Booksy/банк — салон может ими не пользоваться). */
+  /** Можно пропустить (салон может не пользоваться этим разделом). */
   dismissable: boolean
   /** Пропущен юзером (клиентский localStorage-флаг). */
   dismissed: boolean
 }
 
-/** Порядок карточек в чек-листе. */
-export const SETUP_STEP_ORDER: SetupStepId[] = ['visit', 'expense', 'booksy', 'bank', 'dashboard']
+type StepDef = {
+  id: SetupStepId
+  group: SetupStepGroup
+  required: boolean
+  dismissable: boolean
+  /** Картирование на серверное булево. */
+  serverKey: (data: SetupProgressData) => boolean
+}
 
-const DISMISSABLE: ReadonlySet<SetupStepId> = new Set<SetupStepId>(['booksy', 'bank'])
+/**
+ * Источник правды по шагам. Порядок = порядок карточек в чек-листе.
+ * Core-шаги первыми (визит/расход/booksy/банк/дашборд — как раньше),
+ * далее extra-шаги полноты, сгруппированные по смыслу.
+ */
+const STEP_DEFS: readonly StepDef[] = [
+  // ── CORE (required, гейтят процент + награду) ──
+  {
+    id: 'visit',
+    group: 'income',
+    required: true,
+    dismissable: false,
+    serverKey: (d) => d.has_visit,
+  },
+  {
+    id: 'expense',
+    group: 'expenses',
+    required: true,
+    dismissable: false,
+    serverKey: (d) => d.has_expense,
+  },
+  {
+    id: 'booksy',
+    group: 'integrations',
+    required: true,
+    dismissable: true,
+    serverKey: (d) => d.booksy_connected,
+  },
+  {
+    id: 'bank',
+    group: 'banking',
+    required: true,
+    dismissable: true,
+    serverKey: (d) => d.bank_connected,
+  },
+  {
+    id: 'dashboard',
+    group: 'finance',
+    required: true,
+    dismissable: false,
+    serverKey: (d) => d.dashboard_opened,
+  },
+
+  // ── EXTRA: доходы ──
+  {
+    id: 'first_client_closed',
+    group: 'income',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_first_client_closed,
+  },
+
+  // ── EXTRA: расходы ──
+  {
+    id: 'expense_calculated',
+    group: 'expenses',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_expense_calculated,
+  },
+  {
+    id: 'scheduled_payment',
+    group: 'expenses',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_scheduled_payment,
+  },
+
+  // ── EXTRA: банк ──
+  {
+    id: 'bank_synced',
+    group: 'banking',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.bank_synced,
+  },
+  {
+    id: 'bank_tx_linked',
+    group: 'banking',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_bank_tx_linked,
+  },
+
+  // ── EXTRA: финансы ──
+  {
+    id: 'finance_report',
+    group: 'finance',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_finance_report,
+  },
+
+  // ── EXTRA: рост / маркетинг ──
+  {
+    id: 'competitor',
+    group: 'growth',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_competitor,
+  },
+  {
+    id: 'social_page',
+    group: 'growth',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_social_page,
+  },
+  {
+    id: 'google_profile',
+    group: 'growth',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_google_profile,
+  },
+  {
+    id: 'marketing_broadcast',
+    group: 'growth',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_marketing_broadcast,
+  },
+
+  // ── EXTRA: склад / мессенджеры / AI ──
+  {
+    id: 'inventory_item',
+    group: 'expenses',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_inventory_item,
+  },
+  {
+    id: 'messenger_message',
+    group: 'integrations',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.has_messenger_message,
+  },
+  {
+    id: 'ai_assistant',
+    group: 'finance',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.ai_assistant_seen,
+  },
+
+  // ── EXTRA: интеграции ──
+  {
+    id: 'booking',
+    group: 'integrations',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.booking_connected,
+  },
+  {
+    id: 'any_integration',
+    group: 'integrations',
+    required: false,
+    dismissable: true,
+    serverKey: (d) => d.any_integration,
+  },
+]
+
+const STEP_DEF_BY_ID = new Map<SetupStepId, StepDef>(STEP_DEFS.map((d) => [d.id, d]))
+
+/** Порядок карточек в чек-листе (весь набор). */
+export const SETUP_STEP_ORDER: SetupStepId[] = STEP_DEFS.map((d) => d.id)
+
+/** Только core-шаги — они гейтят процент/награду (back-compat со старой моделью). */
+export const SETUP_REQUIRED_STEPS: SetupStepId[] = STEP_DEFS.filter((d) => d.required).map(
+  (d) => d.id,
+)
 
 function serverDoneFor(data: SetupProgressData, id: SetupStepId): boolean {
-  switch (id) {
-    case 'visit':
-      return data.has_visit
-    case 'expense':
-      return data.has_expense
-    case 'booksy':
-      return data.booksy_connected
-    case 'bank':
-      return data.bank_connected
-    case 'dashboard':
-      return data.dashboard_opened
-  }
+  return STEP_DEF_BY_ID.get(id)?.serverKey(data) ?? false
 }
 
 export function computeSetupSteps(
   data: SetupProgressData,
   dismissed: ReadonlySet<SetupStepId>,
 ): SetupStep[] {
-  return SETUP_STEP_ORDER.map((id) => {
-    const serverDone = serverDoneFor(data, id)
-    const dismissable = DISMISSABLE.has(id)
-    const isDismissed = dismissable && dismissed.has(id)
+  return STEP_DEFS.map((def) => {
+    const serverDone = serverDoneFor(data, def.id)
+    const isDismissed = def.dismissable && dismissed.has(def.id)
     return {
-      id,
+      id: def.id,
+      group: def.group,
+      required: def.required,
       serverDone,
-      dismissable,
+      dismissable: def.dismissable,
       dismissed: isDismissed,
       done: serverDone || isDismissed,
     }
   })
 }
 
-/** Процент готовности: 40% endowed (салон создан) + 60% поровну по шагам. */
+/** Только core-шаги (визит/расход/booksy/банк/дашборд). */
+function requiredSteps(steps: SetupStep[]): SetupStep[] {
+  return steps.filter((s) => s.required)
+}
+
+/**
+ * Процент готовности: 40% endowed (салон создан) + 60% поровну по CORE-шагам.
+ * Extra-шаги полноты намеренно НЕ влияют на процент — иначе бар никогда не
+ * дойдёт до 100% и приз станет недостижим.
+ */
 export function computePercent(steps: SetupStep[]): number {
-  if (steps.length === 0) return 100
-  const doneCount = steps.filter((s) => s.done).length
-  return Math.round(ENDOWED_PERCENT + (100 - ENDOWED_PERCENT) * (doneCount / steps.length))
+  const core = requiredSteps(steps)
+  if (core.length === 0) return 100
+  const doneCount = core.filter((s) => s.done).length
+  return Math.round(ENDOWED_PERCENT + (100 - ENDOWED_PERCENT) * (doneCount / core.length))
 }
 
-/** Goal-gradient: сколько шагов ещё осталось (не «X из N»). */
+/** Goal-gradient: сколько CORE-шагов ещё осталось (не «X из N»). */
 export function remainingSteps(steps: SetupStep[]): number {
-  return steps.filter((s) => !s.done).length
+  return requiredSteps(steps).filter((s) => !s.done).length
 }
 
+/** Все ли CORE-шаги выполнены (extra не учитываются). */
 export function isAllComplete(steps: SetupStep[]): boolean {
-  return steps.every((s) => s.done)
+  return requiredSteps(steps).every((s) => s.done)
+}
+
+/** Сколько extra-задач полноты ещё не выполнено (для подсказки в UI). */
+export function remainingExtraSteps(steps: SetupStep[]): number {
+  return steps.filter((s) => !s.required && !s.done).length
 }
 
 /** Сколько дней осталось до закрытия окна приза (>=0, может быть 0). */
@@ -111,8 +391,8 @@ export function withinRewardWindow(createdAt: string, now: number = Date.now()):
 
 /**
  * Право забрать приз (клиентский гейт; реальный авторитет — сервер).
- * Все шаги выполнены + есть реальные данные (визит И расход) + окно 7 дней
- * ещё открыто + приз не выдан.
+ * Все CORE-шаги выполнены + есть реальные данные (визит И расход) + окно 7 дней
+ * ещё открыто + приз не выдан. Extra-шаги на награду не влияют.
  */
 export function isRewardEligible(
   data: SetupProgressData,
@@ -127,7 +407,8 @@ export function isRewardEligible(
 
 /**
  * Показывать ли бар. Только owner; не назойливо для старых салонов (>30 дней);
- * скрываем когда всё сделано и приз уже неактуален/выдан.
+ * скрываем когда CORE-набор сделан и приз уже неактуален/выдан. Extra-задачи
+ * не держат бар на экране — они видны при раскрытии, но не блокируют закрытие.
  */
 export function shouldShowSetupBar(
   data: SetupProgressData,

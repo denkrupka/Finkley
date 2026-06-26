@@ -1,13 +1,27 @@
 import {
   Banknote,
+  Bot,
+  CalendarClock,
   CalendarPlus,
   Check,
   ChevronDown,
+  FileBarChart,
   Gift,
+  Globe,
+  Instagram,
+  Landmark,
   LineChart,
+  Link2,
   Loader2,
+  MessageCircle,
+  Megaphone,
+  Package,
+  Plug,
   Receipt,
   Sparkles,
+  Target,
+  UserCheck,
+  Wallet,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -38,11 +52,28 @@ import { cn } from '@/lib/utils/cn'
 type CtaMap = Record<SetupStepId, () => void>
 
 const ICONS: Record<SetupStepId, typeof CalendarPlus> = {
+  // core
   visit: CalendarPlus,
   expense: Receipt,
   booksy: CalendarPlus, // переопределяется BrandIcon ниже
   bank: Banknote,
   dashboard: LineChart,
+  // extra (v2)
+  first_client_closed: UserCheck,
+  expense_calculated: Wallet,
+  scheduled_payment: CalendarClock,
+  bank_synced: Landmark,
+  bank_tx_linked: Link2,
+  finance_report: FileBarChart,
+  competitor: Target,
+  social_page: Instagram,
+  google_profile: Globe,
+  inventory_item: Package,
+  marketing_broadcast: Megaphone,
+  messenger_message: MessageCircle,
+  ai_assistant: Bot,
+  booking: CalendarPlus,
+  any_integration: Plug,
 }
 
 /**
@@ -83,6 +114,8 @@ export function SetupProgressBar({
   const remaining = remainingSteps(steps)
   const eligible = isRewardEligible(progress, steps)
   const daysLeft = rewardDaysLeft(progress.created_at)
+  const coreSteps = steps.filter((s) => s.required)
+  const extraSteps = steps.filter((s) => !s.required)
 
   function toggleDismiss(step: SetupStepId) {
     setDismissed((prev) => {
@@ -95,7 +128,13 @@ export function SetupProgressBar({
     })
   }
 
+  const go = (to: string) => () => {
+    setExpanded(false)
+    navigate(to)
+  }
+
   const cta: CtaMap = {
+    // core
     visit: () => {
       setExpanded(false)
       onAddVisit()
@@ -106,10 +145,23 @@ export function SetupProgressBar({
     },
     booksy: () => navigate(`/${salonId}/settings?tab=integrations&prompt=booksy`),
     bank: () => navigate(`/${salonId}/settings?tab=integrations&prompt=banking`),
-    dashboard: () => {
-      setExpanded(false)
-      navigate(`/${salonId}/dashboard`)
-    },
+    dashboard: go(`/${salonId}/dashboard`),
+    // extra (v2)
+    first_client_closed: go(`/${salonId}/income?tab=visits`),
+    expense_calculated: go(`/${salonId}/payouts`),
+    scheduled_payment: go(`/${salonId}/finance?tab=payments`),
+    bank_synced: () => navigate(`/${salonId}/settings?tab=integrations&prompt=banking`),
+    bank_tx_linked: go(`/${salonId}/finance?tab=cash`),
+    finance_report: go(`/${salonId}/finance?tab=report`),
+    competitor: go(`/${salonId}/reports?tab=competitors`),
+    social_page: go(`/${salonId}/settings?tab=profile`),
+    google_profile: go(`/${salonId}/settings?tab=profile`),
+    inventory_item: go(`/${salonId}/inventory`),
+    marketing_broadcast: go(`/${salonId}/marketing`),
+    messenger_message: go(`/${salonId}/messenger`),
+    ai_assistant: go(`/${salonId}/ai`),
+    booking: () => navigate(`/${salonId}/settings?tab=integrations`),
+    any_integration: () => navigate(`/${salonId}/settings?tab=integrations`),
   }
 
   function handleClaim() {
@@ -254,9 +306,13 @@ export function SetupProgressBar({
                 ) : null}
               </div>
 
-              {/* Карточки шагов */}
+              {/* Карточки шагов: сначала ключевые (влияют на %/приз),
+                  затем «полная картина» (трекинг полноты, на приз не влияют). */}
+              <p className="text-muted-foreground mb-2 text-[11px] font-bold uppercase tracking-wide">
+                {t('setup_progress.section.core', { defaultValue: 'Главное' })}
+              </p>
               <div className="flex flex-col gap-2">
-                {steps.map((step) => (
+                {coreSteps.map((step) => (
                   <SetupCard
                     key={step.id}
                     step={step}
@@ -266,6 +322,27 @@ export function SetupProgressBar({
                   />
                 ))}
               </div>
+
+              {extraSteps.length > 0 ? (
+                <>
+                  <p className="text-muted-foreground mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide">
+                    {t('setup_progress.section.extra', {
+                      defaultValue: 'Полная картина салона',
+                    })}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {extraSteps.map((step) => (
+                      <SetupCard
+                        key={step.id}
+                        step={step}
+                        onCta={cta[step.id]}
+                        onDismiss={() => toggleDismiss(step.id)}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </>

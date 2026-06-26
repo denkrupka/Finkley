@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase/client'
-import type { SetupProgressData, SetupStepId } from '@/lib/setup-progress'
+import {
+  SETUP_PROGRESS_DEFAULTS,
+  type SetupProgressData,
+  type SetupStepId,
+} from '@/lib/setup-progress'
 
 /**
  * Серверный прогресс «Настройки Finkley» — RPC setup_progress (security
@@ -17,7 +21,14 @@ export function useSetupProgress(salonId: string | undefined) {
         .rpc('setup_progress', { p_salon_id: salonId })
         .maybeSingle()
       if (error) throw error
-      return (data as SetupProgressData | null) ?? null
+      if (!data) return null
+      // Мерджим v2-дефолты: если БД ещё на старой версии RPC (нет новых
+      // полей) — UI не падает, новые задачи просто not-done. После применения
+      // миграции 20260626000002 сервер вернёт реальные значения.
+      return {
+        ...SETUP_PROGRESS_DEFAULTS,
+        ...(data as Partial<SetupProgressData>),
+      } as SetupProgressData
     },
     enabled: !!salonId,
     staleTime: 30_000,
