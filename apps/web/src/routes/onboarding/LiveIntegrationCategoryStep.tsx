@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useBankConnections } from '@/hooks/useBanking'
 import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useTgSessions } from '@/hooks/useTgUserbot'
@@ -53,6 +54,11 @@ export function LiveIntegrationCategoryStep({
   const { data: connected = [] } = useSalonIntegrations(salonId)
   const { data: messengers = [] } = useMessengerIntegrations(salonId)
   const { data: tgSessions = [] } = useTgSessions(salonId)
+  // Banking хранится НЕ в salon_integrations, а в отдельной таблице
+  // bank_connections (PSD2 / Enable Banking). useBankConnections уже
+  // отфильтровывает revoked — поэтому любая оставшаяся запись означает,
+  // что банк подключён (pending → connected → expired/error).
+  const { data: bankConnections = [] } = useBankConnections(salonId)
 
   const [booksyOpen, setBooksyOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
@@ -70,7 +76,12 @@ export function LiveIntegrationCategoryStep({
       const m = messengers.find((mi) => mi.channel === id)
       return !!m && m.status === 'connected'
     }
-    if (id === 'booksy' || id === 'wfirma' || id === 'banking' || id === 'ksef') {
+    if (id === 'banking') {
+      // PSD2 connect пишет в bank_connections, не в salon_integrations.
+      // Подключено = есть live-connection (revoked уже отфильтрован хуком).
+      return bankConnections.some((c) => c.status === 'connected' || c.status === 'pending')
+    }
+    if (id === 'booksy' || id === 'wfirma' || id === 'ksef') {
       const c = connected.find((ci) => ci.provider === id)
       return !!c && c.status !== 'disconnected'
     }
