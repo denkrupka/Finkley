@@ -231,34 +231,141 @@ export function SetupProgressBar({
     })
   }
 
-  const collapsedHint = eligible
-    ? t('setup_progress.collapsed_reward_ready', {
-        defaultValue: 'всё готово — заберите +14 дней 🎁',
-      })
-    : remaining === 0
-      ? t('setup_progress.all_done', { defaultValue: 'всё готово' })
-      : t('setup_progress.tasks_left', {
-          count: remaining,
-          defaultValue: 'осталось {{count}} заданий',
-        })
+  // Текст подсказки: «всё готово» ТОЛЬКО когда реально не осталось заданий.
+  // Если награда доступна (core готов), но extra-задания ещё есть — показываем
+  // «осталось N · заберите +14 дней 🎁», а не ложное «всё готово».
+  const collapsedHint =
+    remaining === 0
+      ? t('setup_progress.all_done', { defaultValue: 'всё готово 🎉' })
+      : eligible
+        ? t('setup_progress.tasks_left_reward', {
+            count: remaining,
+            defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
+          })
+        : t('setup_progress.tasks_left', {
+            count: remaining,
+            defaultValue: 'осталось {{count}} заданий',
+          })
 
   return (
-    <div className="relative z-20">
-      {/* Свёрнутая плашка */}
+    <div className="fixed bottom-4 right-4 z-40 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col">
+      {/* Раскрытая панель — растёт ВВЕРХ над свёрнутым баром (Stripe-style) */}
+      {expanded ? (
+        <div className="border-border bg-card shadow-finlg mb-2 flex max-h-[68vh] flex-col overflow-hidden rounded-2xl border">
+          {/* Шапка */}
+          <div className="border-border flex items-start justify-between gap-2 border-b px-4 py-3">
+            <p className="text-brand-navy text-sm font-bold leading-snug">
+              {t('setup_progress.expanded_header', {
+                defaultValue:
+                  'Закончите настройку — и Finkley покажет реальную прибыль салона, а не просто оборот.',
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="text-muted-foreground hover:text-foreground -mr-1 grid size-7 shrink-0 place-items-center rounded-md"
+              aria-label={t('common.close', { defaultValue: 'Закрыть' })}
+            >
+              <X className="size-4" strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* Скролл-контент */}
+          <div className="overflow-y-auto px-3 py-3">
+            {/* Плашка приза «+14 дней» */}
+            <div
+              className={cn(
+                'mb-3 flex items-center gap-3 rounded-lg border-2 border-dashed p-3',
+                eligible
+                  ? 'border-brand-gold-deep bg-brand-gold-soft/30'
+                  : 'border-brand-teal-deep/30 bg-brand-teal-soft/15',
+              )}
+            >
+              <Gift
+                className={cn(
+                  'size-5 shrink-0',
+                  eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+                )}
+                strokeWidth={2}
+              />
+              <p className="text-foreground/90 min-w-0 flex-1 text-xs leading-snug">
+                {eligible
+                  ? t('setup_progress.reward.ready', {
+                      defaultValue: 'Всё готово! Заберите подарок — 14 дополнительных дней демо.',
+                    })
+                  : t('setup_progress.reward.promise', {
+                      days: daysLeft,
+                      defaultValue:
+                        'Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.',
+                    })}
+              </p>
+              {eligible ? (
+                <button
+                  type="button"
+                  onClick={handleClaim}
+                  disabled={claim.isPending}
+                  className="bg-brand-gold-deep inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {claim.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+                  ) : (
+                    <Gift className="size-3.5" strokeWidth={2.2} />
+                  )}
+                  {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать +14 дней' })}
+                </button>
+              ) : null}
+            </div>
+
+            {/* Категории-аккордеоны */}
+            <div className="flex flex-col gap-2">
+              {groups.map((group) => (
+                <SetupGroupSection
+                  key={group.group}
+                  group={group}
+                  open={openGroups.has(group.group)}
+                  onToggle={() => toggleGroup(group.group)}
+                  cta={cta}
+                  onDismiss={toggleDismiss}
+                  t={t}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Свёрнутый бар — всегда виден, плавает справа снизу, выделяется */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className={cn(
-          'flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors sm:px-6',
+          'relative flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left shadow-xl transition-colors',
           eligible
-            ? 'border-brand-gold-deep/30 bg-brand-gold-soft/25 hover:bg-brand-gold-soft/40'
-            : 'border-brand-teal-deep/20 bg-brand-teal-soft/25 hover:bg-brand-teal-soft/40',
+            ? 'border-brand-gold-deep bg-brand-gold-soft/50 hover:bg-brand-gold-soft/70'
+            : 'border-brand-teal-deep/50 bg-card hover:bg-brand-teal-soft/20',
         )}
         aria-expanded={expanded}
       >
+        {/* Пульсирующая точка-нотификация — притягивает взгляд, пока есть задания */}
+        {!expanded ? (
+          <span className="absolute -right-1.5 -top-1.5 flex size-3.5">
+            <span
+              className={cn(
+                'absolute inline-flex h-full w-full animate-ping rounded-full opacity-60',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+              )}
+            />
+            <span
+              className={cn(
+                'relative inline-flex size-3.5 rounded-full ring-2 ring-white',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+              )}
+            />
+          </span>
+        ) : null}
         <Sparkles
           className={cn(
-            'size-4 shrink-0',
+            'size-5 shrink-0',
             eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
           )}
           strokeWidth={2.2}
@@ -276,8 +383,8 @@ export function SetupProgressBar({
             >
               {percent}%
             </span>
-            <span className="text-muted-foreground truncate text-xs">· {collapsedHint}</span>
           </div>
+          <p className="text-muted-foreground mt-0.5 truncate text-xs">{collapsedHint}</p>
           {/* Прогресс-полоска */}
           <div
             className={cn(
@@ -294,11 +401,6 @@ export function SetupProgressBar({
             />
           </div>
         </div>
-        <span className="text-muted-foreground hidden text-xs font-medium sm:inline">
-          {expanded
-            ? t('setup_progress.collapse', { defaultValue: 'Свернуть' })
-            : t('setup_progress.expand', { defaultValue: 'Развернуть' })}
-        </span>
         <ChevronDown
           className={cn(
             'size-4 shrink-0 transition-transform',
@@ -308,97 +410,6 @@ export function SetupProgressBar({
           strokeWidth={2.2}
         />
       </button>
-
-      {/* Раскрытая панель (Stripe-style accordion по категориям) */}
-      {expanded ? (
-        <>
-          <button
-            type="button"
-            aria-label={t('common.close', { defaultValue: 'Закрыть' })}
-            onClick={() => setExpanded(false)}
-            className="fixed inset-0 z-10 cursor-default bg-black/20"
-          />
-          <div className="border-border bg-card shadow-finlg absolute left-0 right-0 top-full z-20 max-h-[80vh] overflow-y-auto border-b px-4 py-4 sm:px-6">
-            <div className="mx-auto max-w-3xl">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <p className="text-brand-navy text-sm font-bold leading-snug">
-                  {t('setup_progress.expanded_header', {
-                    defaultValue:
-                      'Закончите настройку — и Finkley покажет реальную прибыль салона, а не просто оборот.',
-                  })}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setExpanded(false)}
-                  className="text-muted-foreground hover:text-foreground -mr-1 grid size-7 shrink-0 place-items-center rounded-md"
-                  aria-label={t('common.close', { defaultValue: 'Закрыть' })}
-                >
-                  <X className="size-4" strokeWidth={2} />
-                </button>
-              </div>
-
-              {/* Плашка приза «+14 дней» */}
-              <div
-                className={cn(
-                  'mb-4 flex items-center gap-3 rounded-lg border-2 border-dashed p-3',
-                  eligible
-                    ? 'border-brand-gold-deep bg-brand-gold-soft/30'
-                    : 'border-brand-teal-deep/30 bg-brand-teal-soft/15',
-                )}
-              >
-                <Gift
-                  className={cn(
-                    'size-5 shrink-0',
-                    eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
-                  )}
-                  strokeWidth={2}
-                />
-                <p className="text-foreground/90 min-w-0 flex-1 text-xs leading-snug">
-                  {eligible
-                    ? t('setup_progress.reward.ready', {
-                        defaultValue: 'Всё готово! Заберите подарок — 14 дополнительных дней демо.',
-                      })
-                    : t('setup_progress.reward.promise', {
-                        days: daysLeft,
-                        defaultValue:
-                          'Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.',
-                      })}
-                </p>
-                {eligible ? (
-                  <button
-                    type="button"
-                    onClick={handleClaim}
-                    disabled={claim.isPending}
-                    className="bg-brand-gold-deep inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                  >
-                    {claim.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
-                    ) : (
-                      <Gift className="size-3.5" strokeWidth={2.2} />
-                    )}
-                    {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать +14 дней' })}
-                  </button>
-                ) : null}
-              </div>
-
-              {/* Категории-аккордеоны */}
-              <div className="flex flex-col gap-2">
-                {groups.map((group) => (
-                  <SetupGroupSection
-                    key={group.group}
-                    group={group}
-                    open={openGroups.has(group.group)}
-                    onToggle={() => toggleGroup(group.group)}
-                    cta={cta}
-                    onDismiss={toggleDismiss}
-                    t={t}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      ) : null}
     </div>
   )
 }
