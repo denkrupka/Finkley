@@ -956,10 +956,12 @@ export function SettingsPage() {
 
       {activeTab === 'billing' && (
         <>
-          {/* Подписка */}
+          {/* Подписка (фича L): карточка текущего тарифа + смена тарифа +
+              инвойсы/платежи. Реальный план берётся из effectivePlan
+              (salon_subscriptions + implicit-trial) внутри BillingButtons. */}
           <section className="border-border bg-card shadow-finsm mb-6 rounded-lg border p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
                 <h2 className="text-brand-navy text-base font-bold tracking-tight">
                   {t('settings.billing.title')}
                 </h2>

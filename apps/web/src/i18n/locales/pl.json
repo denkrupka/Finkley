@@ -1004,7 +1004,15 @@
   "plan": {
     "pro_label": "Plan Pro",
     "pro_until": "okres próbny",
-    "badge_aria": "Plan i rozliczenia"
+    "badge_aria": "Plan i rozliczenia",
+    "names": {
+      "demo": "Demo",
+      "free": "Darmowy",
+      "t19": "Start",
+      "t49": "Rozwój",
+      "t69": "Pełny",
+      "t99": "Sieć"
+    }
   },
   "coming_soon": {
     "subtitle": "Ta sekcja będzie dostępna na etapie {{stage}}. Na razie jej nie ma — ale jest w planie.",
@@ -1963,6 +1971,15 @@
     "portal_button": "Zarządzaj subskrypcją",
     "checkout_error": "Nie udało się otworzyć płatności",
     "portal_error": "Nie udało się otworzyć portalu rozliczeń",
+    "per_month": "/mies.",
+    "choose_plan": "Wybierz",
+    "current_plan": "Plan: {{plan}}",
+    "current_label": "Bieżący",
+    "change_plan": "Zmień plan",
+    "invoices_button": "Faktury i płatności",
+    "picker_title": "Wybór planu",
+    "picker_subtitle_new": "Wybierz plan — płatność przez bezpieczną stronę Stripe.",
+    "picker_subtitle_active": "Zmiana planu otworzy portal rozliczeń — tam można zmienić plan lub anulować subskrypcję.",
     "banner": {
       "trial_ending_one": "Okres próbny kończy się jutro",
       "trial_ending_other": "Okres próbny kończy się za {{count}} dni",

@@ -1894,7 +1894,15 @@
   "plan": {
     "pro_label": "Pro plan",
     "pro_until": "trial period",
-    "badge_aria": "Plan and billing"
+    "badge_aria": "Plan and billing",
+    "names": {
+      "demo": "Demo",
+      "free": "Free",
+      "t19": "Start",
+      "t49": "Growth",
+      "t69": "Full",
+      "t99": "Network"
+    }
   },
   "coming_soon": {
     "subtitle": "This section will be available in stage {{stage}}. It's not here yet — but it's on the roadmap.",
@@ -2913,6 +2921,15 @@
     "portal_button": "Manage subscription",
     "checkout_error": "Couldn't open checkout",
     "portal_error": "Couldn't open the billing portal",
+    "per_month": "/mo",
+    "choose_plan": "Choose",
+    "current_plan": "Plan: {{plan}}",
+    "current_label": "Current",
+    "change_plan": "Change plan",
+    "invoices_button": "Invoices & payments",
+    "picker_title": "Choose a plan",
+    "picker_subtitle_new": "Pick a plan — payment via a secure Stripe page.",
+    "picker_subtitle_active": "Changing your plan opens the billing portal — there you can switch plans or cancel.",
     "banner": {
       "trial_ending_one": "Trial ends tomorrow",
       "trial_ending_other": "Trial ends in {{count}} days",

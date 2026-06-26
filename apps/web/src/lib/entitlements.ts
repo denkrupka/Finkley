@@ -50,6 +50,20 @@ export const PLAN_PRICE_EUR: Record<Plan, number> = {
   t99: 99,
 }
 
+/**
+ * i18n-ключ человекочитаемого имени плана — единый источник правды для
+ * бейджа в шапке и биллинг-секции (Demo / Бесплатный / Старт / Рост /
+ * Полный / Сеть). Не хардкодь строки в JSX — резолвь через `t(PLAN_NAME_KEY[plan])`.
+ */
+export const PLAN_NAME_KEY: Record<Plan, string> = {
+  demo: 'plan.names.demo',
+  free: 'plan.names.free',
+  t19: 'plan.names.t19',
+  t49: 'plan.names.t49',
+  t69: 'plan.names.t69',
+  t99: 'plan.names.t99',
+}
+
 /** Платные планы в порядке возрастания — для пикера тарифов. */
 export const PAID_PLANS: Plan[] = ['t19', 't49', 't69', 't99']
 

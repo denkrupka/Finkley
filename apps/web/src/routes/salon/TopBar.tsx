@@ -5,7 +5,9 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { LocaleSwitcher } from '@/components/ui/locale-switcher'
 import { useAuth } from '@/hooks/useAuth'
+import { useEntitlements } from '@/hooks/useEntitlements'
 import { usePermissions } from '@/hooks/usePermissions'
+import { PLAN_NAME_KEY } from '@/lib/entitlements'
 import { NotificationsBell } from './NotificationsBell'
 import { SalonSwitcher } from './SalonSwitcher'
 
@@ -38,6 +40,10 @@ export function TopBar({
   // Скрываем для staff/external.
   const { role } = usePermissions(salonId)
   const showPlanBadge = role !== 'staff' && role !== 'external'
+  // Bug (J): бейдж показывал хардкод «Pro план». Теперь — реальный план из
+  // источника правды (effectivePlan: salon_subscriptions + implicit-trial).
+  const { plan } = useEntitlements(salonId)
+  const planName = t(PLAN_NAME_KEY[plan])
   return (
     <header className="border-border bg-card flex h-16 flex-shrink-0 items-center gap-3 border-b px-3 sm:gap-6 sm:px-7">
       {/* Mobile burger */}
@@ -85,12 +91,12 @@ export function TopBar({
             to={`/${salonId}/settings?tab=billing`}
             className="border-brand-yellow-deep/40 hidden h-9 items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 transition-shadow hover:shadow-sm sm:inline-flex"
             aria-label={t('plan.badge_aria')}
-            title={t('plan.pro_label')}
+            title={planName}
           >
             <span className="from-brand-gold grid size-5 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[10px] font-extrabold leading-none text-white">
               ★
             </span>
-            <span className="text-brand-navy-ink text-[11px] font-bold">{t('plan.pro_label')}</span>
+            <span className="text-brand-navy-ink text-[11px] font-bold">{planName}</span>
           </Link>
         ) : null}
 
