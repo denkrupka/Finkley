@@ -23,6 +23,12 @@ export type DbPost = {
     draft: boolean
   }
   body: string
+  /**
+   * Готовый HTML из TipTap-редактора админки (media_posts.body_html). Статьи
+   * из /admin/media сохраняют контент именно сюда, а body_md обычно пустой —
+   * поэтому рендерить надо bodyHtml, иначе тело статьи будет пустым.
+   */
+  bodyHtml: string | null
   source: 'db'
 }
 
@@ -35,7 +41,7 @@ export async function loadDbPosts(): Promise<DbPost[]> {
     return []
   }
   try {
-    const url = `${SUPABASE_URL}/rest/v1/media_posts?select=slug,title,description,body_md,cover_url,tags,author,draft,published_at&draft=eq.false&order=published_at.desc`
+    const url = `${SUPABASE_URL}/rest/v1/media_posts?select=slug,title,description,body_md,body_html,cover_url,tags,author,draft,published_at&draft=eq.false&order=published_at.desc`
     const resp = await fetch(url, {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -53,6 +59,7 @@ export async function loadDbPosts(): Promise<DbPost[]> {
       title: string
       description: string
       body_md: string | null
+      body_html: string | null
       cover_url: string | null
       tags: string[] | null
       author: string | null
@@ -71,6 +78,7 @@ export async function loadDbPosts(): Promise<DbPost[]> {
         draft: false,
       },
       body: row.body_md ?? '',
+      bodyHtml: row.body_html ?? null,
       source: 'db' as const,
     }))
   } catch (e) {

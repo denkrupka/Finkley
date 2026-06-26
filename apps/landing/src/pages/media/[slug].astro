@@ -27,8 +27,14 @@ export async function getStaticPaths() {
 const props = Astro.props as PostProp
 
 const data = props.kind === 'md' ? props.entry.data : props.post.data
+// DB-посты из админки хранят контент в body_html (TipTap), body_md обычно пуст.
+// Рендерим готовый HTML; на legacy-посты только с body_md — fallback через marked.
 const renderedHtml =
-  props.kind === 'md' ? null : marked.parse(props.post.body ?? '', { async: false }) as string
+  props.kind === 'md'
+    ? null
+    : props.post.bodyHtml && props.post.bodyHtml.trim()
+      ? props.post.bodyHtml
+      : (marked.parse(props.post.body ?? '', { async: false }) as string)
 
 const ContentComp =
   props.kind === 'md' ? (await props.entry.render()).Content : null
