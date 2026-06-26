@@ -1,0 +1,202 @@
+---
+import type { UseCasesCopy } from '../i18n/content/seo-pages'
+import { localeFromPath, localizedPath } from '../i18n/routing'
+
+interface Props {
+  copy: UseCasesCopy
+}
+const { copy } = Astro.props
+
+// Локаль текущей страницы (по префиксу пути). Внутренние ссылки на
+// локализованные страницы строим через localizedPath; /media/ — без префикса
+// (PL-версии блога нет).
+const locale = localeFromPath(Astro.url.pathname)
+const compareHref = localizedPath('/compare/finkley-vs-booksy/', locale)
+const aiHref = localizedPath('/features/ai/', locale)
+const whyMoreHref = '/media/zachem-salonu-financhniy-uchet/'
+const profitMoreHref = '/media/kak-schitat-pribyl-salona/'
+---
+
+<!-- Hero + определение -->
+<section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+    <p class="text-sm font-semibold uppercase tracking-wider text-brand-teal">{copy.eyebrow}</p>
+    <h1
+      class="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-brand-navy sm:text-5xl lg:text-6xl"
+    >
+      {copy.h1Pre}<span class="text-brand-sage">{copy.h1Accent}</span>
+    </h1>
+    <p
+      class="mt-6 max-w-3xl rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.answerTitle}</strong>{copy.answerText}
+    </p>
+  </div>
+</section>
+
+<!-- Почему кассы и Excel недостаточно -->
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.whyHeading}
+    </h2>
+    <p
+      class="mt-5 rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.whyLead}</strong>{copy.whyIntro}
+    </p>
+    <ul class="mt-6 space-y-2 text-base text-brand-text-muted">
+      {copy.whyList.map((item) => <li>{item}</li>)}
+    </ul>
+    <p class="mt-6 text-base text-brand-text-muted">
+      {copy.whyMorePre}
+      <a href={whyMoreHref} class="font-semibold text-brand-navy hover:underline"
+        >{copy.whyMoreLink}</a
+      >{copy.whyMorePost}
+    </p>
+  </div>
+</section>
+
+<!-- Что должен считать салон -->
+<section class="border-b border-brand-border bg-brand-bg">
+  <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.countHeading}
+    </h2>
+    <p
+      class="mt-5 rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.countLead}</strong>{copy.countIntro}
+    </p>
+    <ol class="mt-6 space-y-4">
+      {
+        copy.whatToCount.map(([title, desc], i) => (
+          <li class="flex items-start gap-4 rounded-lg border border-brand-border bg-white p-5">
+            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-brand-navy font-mono text-sm font-bold text-white">
+              {i + 1}
+            </span>
+            <div>
+              <div class="text-base font-bold text-brand-navy">{title}</div>
+              <p class="mt-1 text-sm leading-relaxed text-brand-text-muted">{desc}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<!-- Учёт по типу салона -->
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.byTypeHeading}
+    </h2>
+    <p
+      class="mt-5 max-w-3xl rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.byTypeLead}</strong>{copy.byTypeIntro}
+    </p>
+    <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+      {
+        copy.byType.map((c) => (
+          <div class="flex flex-col rounded-lg border border-brand-border bg-brand-bg p-6">
+            <div class="text-3xl">{c.emoji}</div>
+            <h3 class="mt-3 text-lg font-bold text-brand-navy">{c.title}</h3>
+            <p class="mt-2 flex-1 text-sm leading-relaxed text-brand-text-muted">{c.text}</p>
+            {c.href && (
+              <a href={c.href} class="mt-4 text-sm font-semibold text-brand-navy hover:underline">
+                {c.linkLabel}
+              </a>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- Как считать прибыль -->
+<section class="border-b border-brand-border bg-brand-bg">
+  <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.profitHeading}
+    </h2>
+    <p
+      class="mt-5 rounded-lg border border-brand-border bg-white p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.profitLead}</strong>{copy.profitIntro}
+    </p>
+    <p class="mt-4 text-base text-brand-text-muted">
+      {copy.profitMorePre}
+      <a href={profitMoreHref} class="font-semibold text-brand-navy hover:underline"
+        >{copy.profitMoreLink}</a
+      >{copy.profitMorePost}
+    </p>
+  </div>
+</section>
+
+<!-- Чем Finkley помогает -->
+<section class="border-b border-brand-border bg-white">
+  <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.helpsHeading}
+    </h2>
+    <p
+      class="mt-5 rounded-lg border border-brand-border bg-brand-bg p-4 text-base leading-relaxed text-brand-text"
+    >
+      <strong>{copy.helpsLead}</strong>{copy.helpsIntro}
+    </p>
+    <p class="mt-6 text-base text-brand-text-muted">
+      {copy.helpsMorePre}
+      <a href={compareHref} class="font-semibold text-brand-navy hover:underline"
+        >{copy.helpsCompareLink}</a
+      >{copy.helpsMoreMid}
+      <a href={aiHref} class="font-semibold text-brand-navy hover:underline">{copy.helpsAiLink}</a
+      >{copy.helpsMorePost}
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="border-b border-brand-border bg-brand-bg">
+  <div class="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-16">
+    <h2 class="text-center text-2xl font-bold tracking-tight text-brand-navy sm:text-3xl">
+      {copy.faqHeading}
+    </h2>
+    <div class="mt-10 space-y-3">
+      {
+        copy.faq.map((item) => (
+          <details class="group rounded-md border border-brand-border bg-white p-5 open:shadow-sm">
+            <summary class="flex cursor-pointer items-center justify-between text-base font-bold text-brand-navy">
+              {item.q}
+              <span class="ml-3 text-brand-text-muted transition-transform group-open:rotate-45">
+                +
+              </span>
+            </summary>
+            <p class="mt-3 text-sm leading-relaxed text-brand-text-muted">{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="bg-brand-navy text-white">
+  <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+    <h2 class="text-3xl font-extrabold tracking-tight sm:text-4xl">
+      {copy.ctaHeading}
+    </h2>
+    <p class="mt-4 text-base text-white/70">
+      {copy.ctaText}
+    </p>
+    <a
+      href="/app/signup"
+      class="mt-8 inline-flex h-12 items-center rounded-lg bg-brand-sage px-8 text-sm font-bold hover:bg-brand-sage/90"
+    >
+      {copy.ctaButton}
+    </a>
+    <p class="mt-3 text-xs text-white/60">{copy.ctaMicrocopy}</p>
+  </div>
+</section>

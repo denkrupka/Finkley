@@ -1,0 +1,20 @@
+---
+import Layout from '../../../layouts/Layout.astro'
+import CompareBody from '../../../components/CompareBody.astro'
+import { buildCompareJsonLd, seoPagesContent } from '../../../i18n/content/seo-pages'
+
+const copy = seoPagesContent.pl.compare
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const jsonLd = buildCompareJsonLd(copy, 'pl', SITE_ORIGIN)
+---
+
+<Layout
+  title={copy.title}
+  description={copy.description}
+  active="features"
+  lang="pl"
+  localized
+  jsonLd={jsonLd}
+>
+  <CompareBody copy={copy} />
+</Layout>

@@ -1,0 +1,20 @@
+---
+import Layout from '../../../layouts/Layout.astro'
+import UseCasesBody from '../../../components/UseCasesBody.astro'
+import { buildUseCasesJsonLd, seoPagesContent } from '../../../i18n/content/seo-pages'
+
+const copy = seoPagesContent.pl.useCases
+const SITE_ORIGIN = (Astro.site ?? new URL('https://finkley.app')).origin
+const jsonLd = buildUseCasesJsonLd(copy, 'pl', SITE_ORIGIN)
+---
+
+<Layout
+  title={copy.title}
+  description={copy.description}
+  active="features"
+  lang="pl"
+  localized
+  jsonLd={jsonLd}
+>
+  <UseCasesBody copy={copy} />
+</Layout>
