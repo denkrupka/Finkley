@@ -1245,9 +1245,10 @@ export function OnboardingPage() {
               ← {t('common.back')}
             </button>
             <div className="flex items-center gap-5">
-              {/* Пропуск разрешён на всех шагах кроме последнего (submit) и
-                  salon (нужно имя для early-create). */}
-              {!isLast && stepId !== 'salon' ? (
+              {/* Пропуск разрешён на всех шагах кроме последнего (submit),
+                  salon (нужно имя для early-create) и welcome/profile
+                  (обязательные шаги — нельзя пропустить). */}
+              {!isLast && stepId !== 'salon' && stepId !== 'welcome' && stepId !== 'profile' ? (
                 <button
                   type="button"
                   onClick={skip}
