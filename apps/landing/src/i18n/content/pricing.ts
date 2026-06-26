@@ -66,7 +66,7 @@ const ru: PricingCopy = {
     'Демо 14 дней без карты, бесплатный тариф навсегда и платные планы от €19/мес — это меньше стоимости одного маникюра в месяц за то, чтобы всегда видеть чистую прибыль салона.',
   riskReversal: ['Без карты на старте', 'Отмена в один клик', 'Возврат денег в первые 14 дней'],
   interval: {
-    year: 'Год · −15%',
+    year: 'Год',
     month: 'Месяц',
     yearBadge: '−15%',
     perMonthAnnual: 'при оплате за год',
@@ -80,10 +80,10 @@ const ru: PricingCopy = {
       blurb: 'Базовый учёт доходов — бесплатно навсегда.',
       cta: 'Начать бесплатно',
       features: [
-        'Доходы: визиты и выручка',
-        'Остальные разделы видно — под замком',
+        'Доходы: визиты, выручка, средний чек',
+        'Дашборд с ключевыми цифрами салона',
         'Бесплатно навсегда, без карты',
-        'Апгрейд в один клик',
+        'Апгрейд на любой тариф в один клик',
       ],
     },
   ],
@@ -197,7 +197,7 @@ const pl: PricingCopy = {
     'Zwrot pieniędzy w pierwszych 14 dniach',
   ],
   interval: {
-    year: 'Rok · −15%',
+    year: 'Rok',
     month: 'Miesiąc',
     yearBadge: '−15%',
     perMonthAnnual: 'przy płatności rocznej',
@@ -211,8 +211,8 @@ const pl: PricingCopy = {
       blurb: 'Podstawowy rachunek przychodów — za darmo na zawsze.',
       cta: 'Zacznij za darmo',
       features: [
-        'Przychody: wizyty i utarg',
-        'Pozostałe sekcje widać — pod blokadą',
+        'Przychody: wizyty, utarg, średni rachunek',
+        'Pulpit z kluczowymi liczbami salonu',
         'Za darmo na zawsze, bez karty',
         'Wyższy plan jednym kliknięciem',
       ],
