@@ -18,6 +18,16 @@ const PROVIDER_LABEL: Record<string, string> = {
 }
 
 /**
+ * Push-only интеграции (бухгалтерия): мы ВЫГРУЖАЕМ в них расходы как фактуры,
+ * но НИЧЕГО не подтягиваем обратно. У них `last_sync_at` всегда остаётся NULL,
+ * поэтому в плашку «подтягиваем данные» им не место — иначе она висит вечно и
+ * вводит в заблуждение (мол, что-то тянем из wFirma, хотя поток только наружу).
+ * Плашка — только для провайдеров, которые реально импортируют данные в Finkley
+ * (системы бронирования).
+ */
+const PUSH_ONLY_PROVIDERS = new Set(['wfirma', 'fakturownia', 'infakt', 'ksef'])
+
+/**
  * Плашка статуса первичной загрузки данных (задача 10).
  *
  * После онбординга интеграции подключены, но импорт (Booksy/бухгалтерия)
@@ -37,7 +47,9 @@ export function SyncStatusBanner({ salonId }: { salonId: string }) {
   const { data: integrations = [] } = useSalonIntegrations(salonId)
   const [dismissed, setDismissed] = useState(false)
 
-  const syncing = integrations.filter((i) => i.status === 'connected' && !i.last_sync_at)
+  const syncing = integrations.filter(
+    (i) => i.status === 'connected' && !i.last_sync_at && !PUSH_ONLY_PROVIDERS.has(i.provider),
+  )
   const syncingCount = syncing.length
 
   // Пока идёт первичная загрузка — опрашиваем статус, чтобы плашка сама
