@@ -830,6 +830,9 @@ export function OnboardingPage() {
   // Валидация перехода. Step5 — терминальный, переход = submit.
   function canProceed(): boolean {
     if (stepId === 'salon') return state.name.trim().length >= 2
+    // Шаг профиля обязателен: не пускаем дальше, пока не введены имя И фамилия.
+    if (stepId === 'profile')
+      return state.first_name.trim().length >= 1 && state.last_name.trim().length >= 1
     return true
   }
 
