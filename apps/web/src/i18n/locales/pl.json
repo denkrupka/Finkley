@@ -1972,6 +1972,12 @@
     "checkout_error": "Nie udało się otworzyć płatności",
     "portal_error": "Nie udało się otworzyć portalu rozliczeń",
     "per_month": "/mies.",
+    "per_month_annual": "przy płatności rocznej",
+    "interval": {
+      "year": "Rocznie",
+      "month": "Miesięcznie",
+      "year_badge": "−15%"
+    },
     "choose_plan": "Wybierz",
     "current_plan": "Plan: {{plan}}",
     "current_label": "Bieżący",
@@ -1981,7 +1987,7 @@
     "picker_subtitle_new": "Wybierz plan — płatność przez bezpieczną stronę Stripe.",
     "picker_subtitle_active": "Zmiana planu otworzy portal rozliczeń — tam można zmienić plan lub anulować subskrypcję.",
     "picker_subtitle_demo": "Demo — 14 dni za darmo, bez karty. Później wybierz plan albo zostań na darmowym.",
-    "picker_fine_print": "Ceny ostateczne — bez VAT. Płatności przez Stripe · Visa / Mastercard. Anulujesz jednym kliknięciem.",
+    "picker_fine_print": "Ceny ostateczne. Płatności przez Stripe · Visa / Mastercard. Anulujesz jednym kliknięciem.",
     "popular_badge": "Popularny",
     "choose_plan_cta": "Wybierz plan",
     "demo_hint": "Demo — 14 dni za darmo, bez karty. Potem wybierz plan albo zostań na darmowym.",

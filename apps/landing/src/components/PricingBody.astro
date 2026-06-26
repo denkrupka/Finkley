@@ -3,8 +3,15 @@ import type { PricingCopy } from '../i18n/content/pricing'
 
 interface Props {
   copy: PricingCopy
+  /** BCP-47 локаль для разделителя десятичных в цене (ru-RU / pl-PL). */
+  locale?: string
 }
-const { copy } = Astro.props
+const { copy, locale = 'ru-RU' } = Astro.props
+
+/** Числовое значение месячной цены из строки тарифа («€19» → 19). */
+function priceToNumber(price: string): number {
+  return Number(price.replace(/[^\d.,]/g, '').replace(',', '.')) || 0
+}
 ---
 
 <section class="border-b border-brand-border bg-gradient-to-b from-white to-brand-bg">
@@ -65,6 +72,36 @@ const { copy } = Astro.props
       }
     </div>
 
+    <div
+      class="mt-10 flex justify-center"
+      data-pricing-toggle
+      data-locale={locale}
+      data-per-annual={copy.interval.perMonthAnnual}
+    >
+      <div class="inline-flex items-center gap-1 rounded-full bg-brand-bg p-1 ring-1 ring-brand-border">
+        <button
+          type="button"
+          data-interval="year"
+          class="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
+        >
+          {copy.interval.year}
+          <span
+            data-interval-badge
+            class="rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none"
+          >
+            {copy.interval.yearBadge}
+          </span>
+        </button>
+        <button
+          type="button"
+          data-interval="month"
+          class="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
+        >
+          {copy.interval.month}
+        </button>
+      </div>
+    </div>
+
     <div class="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {
         copy.paidPlans.map((plan) => (
@@ -84,11 +121,22 @@ const { copy } = Astro.props
             )}
             <div class="text-lg font-extrabold tracking-tight text-brand-navy">{plan.name}</div>
             <div class="mt-3 flex items-baseline gap-1.5">
-              <span class="font-mono text-4xl font-extrabold tracking-tight text-brand-navy">
+              <span
+                class="font-mono text-4xl font-extrabold tracking-tight text-brand-navy"
+                data-plan-price
+                data-monthly={priceToNumber(plan.price)}
+              >
                 {plan.price}
               </span>
               <span class="text-base text-brand-text-muted">{plan.period}</span>
             </div>
+            <p
+              class="mt-1 text-xs text-brand-text-muted"
+              data-plan-annual-note
+              hidden
+            >
+              {copy.interval.perMonthAnnual}
+            </p>
             <p class="mt-3 min-h-[2.5rem] text-sm leading-relaxed text-brand-text-muted">
               {plan.blurb}
             </p>
@@ -144,3 +192,62 @@ const { copy } = Astro.props
     </div>
   </div>
 </section>
+
+<script>
+  // ADR-035 — переключатель ГОД/МЕСЯЦ. Цены ВСЕГДА «/мес»: ГОД (дефолт)
+  // показывает скидочную месячную цену (полная × 0.85) + подпись «при оплате
+  // за год»; МЕСЯЦ — полную месячную цену. Astro статичен → vanilla JS.
+  function initPricingToggle() {
+    const root = document.querySelector<HTMLElement>('[data-pricing-toggle]')
+    if (!root) return
+
+    const locale = root.dataset.locale || 'ru-RU'
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-interval]'))
+    const priceEls = Array.from(document.querySelectorAll<HTMLElement>('[data-plan-price]'))
+    const annualNotes = Array.from(document.querySelectorAll<HTMLElement>('[data-plan-annual-note]'))
+
+    // Классы активной/неактивной кнопки (brand-токены, не хексы).
+    const ACTIVE = ['bg-brand-navy', 'text-white', 'shadow-sm']
+    const INACTIVE = ['text-brand-text-muted']
+    const BADGE_ACTIVE = ['bg-brand-gold', 'text-brand-navy']
+    const BADGE_INACTIVE = ['bg-brand-sage-soft', 'text-brand-sage']
+
+    function formatEur(amount: number): string {
+      const hasFraction = Math.round(amount * 100) % 100 !== 0
+      const num = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: hasFraction ? 2 : 0,
+        maximumFractionDigits: hasFraction ? 2 : 0,
+      }).format(amount)
+      return '€' + num
+    }
+
+    function apply(interval: 'year' | 'month') {
+      for (const el of priceEls) {
+        const monthly = Number(el.dataset.monthly || '0')
+        const value = interval === 'year' ? Math.round(monthly * 0.85 * 100) / 100 : monthly
+        el.textContent = formatEur(value)
+      }
+      for (const note of annualNotes) note.hidden = interval !== 'year'
+
+      for (const btn of buttons) {
+        const active = btn.dataset.interval === interval
+        btn.classList.remove(...ACTIVE, ...INACTIVE)
+        btn.classList.add(...(active ? ACTIVE : INACTIVE))
+        const badge = btn.querySelector<HTMLElement>('[data-interval-badge]')
+        if (badge) {
+          badge.classList.remove(...BADGE_ACTIVE, ...BADGE_INACTIVE)
+          badge.classList.add(...(active ? BADGE_ACTIVE : BADGE_INACTIVE))
+        }
+      }
+    }
+
+    for (const btn of buttons) {
+      btn.addEventListener('click', () => apply(btn.dataset.interval === 'month' ? 'month' : 'year'))
+    }
+
+    // Дефолт — ГОД (скидочные цены /мес).
+    apply('year')
+  }
+
+  initPricingToggle()
+</script>

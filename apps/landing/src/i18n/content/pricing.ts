@@ -22,6 +22,21 @@ export type Plan = {
   features: string[]
 }
 
+/**
+ * Лейблы переключателя интервала оплаты (ADR-035). Дефолт — ГОД (показываем
+ * скидочную цену /мес). VanillaJS в PricingBody.astro пересчитывает цены.
+ */
+export type IntervalCopy = {
+  /** «Год · −15%» */
+  year: string
+  /** «Месяц» */
+  month: string
+  /** Бейдж скидки «−15%». */
+  yearBadge: string
+  /** Подпись под скидочной ценой: «при оплате за год». */
+  perMonthAnnual: string
+}
+
 export type Faq = { q: string; a: string }
 
 export type PricingCopy = {
@@ -30,6 +45,7 @@ export type PricingCopy = {
   h1: string
   subtitle: string
   riskReversal: string[]
+  interval: IntervalCopy
   freePlans: Plan[]
   paidPlans: Plan[]
   popularBadge: string
@@ -44,16 +60,17 @@ export type PricingCopy = {
 const ru: PricingCopy = {
   title: 'Цены Finkley — учёт для салона красоты от €19/мес',
   description:
-    'Тарифы Finkley для салонов красоты: бесплатный план навсегда, демо 14 дней без карты и платные планы от €19/мес. НДС не взимается, отмена в один клик.',
+    'Тарифы Finkley для салонов красоты: бесплатный план навсегда, демо 14 дней без карты и платные планы от €19/мес. Отмена в один клик.',
   h1: 'Простые тарифы. Платите только за то, чем пользуетесь.',
   subtitle:
     'Демо 14 дней без карты, бесплатный тариф навсегда и платные планы от €19/мес — это меньше стоимости одного маникюра в месяц за то, чтобы всегда видеть чистую прибыль салона.',
-  riskReversal: [
-    'Без карты на старте',
-    'Отмена в один клик',
-    'Возврат денег в первые 14 дней',
-    'НДС не взимается',
-  ],
+  riskReversal: ['Без карты на старте', 'Отмена в один клик', 'Возврат денег в первые 14 дней'],
+  interval: {
+    year: 'Год · −15%',
+    month: 'Месяц',
+    yearBadge: '−15%',
+    perMonthAnnual: 'при оплате за год',
+  },
   freePlans: [
     {
       name: 'Демо',
@@ -139,7 +156,7 @@ const ru: PricingCopy = {
   ],
   popularBadge: 'Популярный',
   finePrint:
-    'Цены окончательные — НДС не взимается. Платишь ровно сумму тарифа. Платежи через Stripe · Visa / Mastercard.',
+    'Цены окончательные. Платишь ровно сумму тарифа. Платежи через Stripe · Visa / Mastercard.',
   faqHeading: 'Про оплату — частые вопросы',
   faq: [
     {
@@ -157,10 +174,6 @@ const ru: PricingCopy = {
     {
       q: 'Если у меня несколько салонов?',
       a: 'Мульти-салон входит в тариф €99/мес: один аккаунт, переключатель салонов в шапке, каждый салон считается отдельно. На остальных тарифах — один салон на аккаунт.',
-    },
-    {
-      q: 'Цены с НДС или без?',
-      a: 'НДС не взимается — в чеке ровно сумма тарифа, без налога сверху. Цены окончательные.',
     },
     {
       q: 'Можно отменить подписку?',
@@ -181,7 +194,7 @@ const ru: PricingCopy = {
 const pl: PricingCopy = {
   title: 'Cennik Finkley — księgowość dla salonu piękności od €19/mies.',
   description:
-    'Plany Finkley dla salonów piękności: darmowy plan na zawsze, demo 14 dni bez karty i plany płatne od €19/mies. Bez VAT, anulujesz jednym kliknięciem.',
+    'Plany Finkley dla salonów piękności: darmowy plan na zawsze, demo 14 dni bez karty i plany płatne od €19/mies. Anulujesz jednym kliknięciem.',
   h1: 'Proste plany. Płacisz tylko za to, z czego korzystasz.',
   subtitle:
     'Demo 14 dni bez karty, darmowy plan na zawsze i plany płatne od €19/mies. — to mniej niż jeden manicure miesięcznie za to, by zawsze mieć przed oczami zysk netto swojego salonu.',
@@ -189,8 +202,13 @@ const pl: PricingCopy = {
     'Na start bez karty',
     'Anulujesz jednym kliknięciem',
     'Zwrot pieniędzy w pierwszych 14 dniach',
-    'Bez VAT',
   ],
+  interval: {
+    year: 'Rok · −15%',
+    month: 'Miesiąc',
+    yearBadge: '−15%',
+    perMonthAnnual: 'przy płatności rocznej',
+  },
   freePlans: [
     {
       name: 'Demo',
@@ -277,7 +295,7 @@ const pl: PricingCopy = {
   ],
   popularBadge: 'Popularny',
   finePrint:
-    'Ceny ostateczne — bez VAT. Płacisz dokładnie tyle, ile wynosi plan. Płatności przez Stripe · Visa / Mastercard.',
+    'Ceny ostateczne. Płacisz dokładnie tyle, ile wynosi plan. Płatności przez Stripe · Visa / Mastercard.',
   faqHeading: 'Płatności — najczęstsze pytania',
   faq: [
     {
@@ -295,10 +313,6 @@ const pl: PricingCopy = {
     {
       q: 'A jeśli mam kilka salonów?',
       a: 'Multi-salon należy do planu €99/mies.: jedno konto, przełącznik salonów w nagłówku, każdy salon liczony osobno. W pozostałych planach jest jeden salon na konto.',
-    },
-    {
-      q: 'Ceny są z VAT czy bez?',
-      a: 'VAT nie jest naliczany — na rachunku widzisz dokładnie kwotę planu, bez podatku doliczanego na wierzchu. Ceny są ostateczne.',
     },
     {
       q: 'Czy mogę anulować subskrypcję?',

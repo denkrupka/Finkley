@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { useEntitlements } from '@/hooks/useEntitlements'
 import type { SalonSubscription } from '@/hooks/useSubscription'
+import { type BillingInterval, formatMonthlyPrice } from '@/lib/billing-interval'
 import { PAID_PLANS, PLAN_NAME_KEY, PLAN_PRICE_EUR, type Plan } from '@/lib/entitlements'
 import { cn } from '@/lib/utils/cn'
 import { supabase } from '@/lib/supabase/client'
@@ -111,9 +112,11 @@ export function BillingButtons({
   salonId: string
   subscription: SalonSubscription | null
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [pending, setPending] = useState<Plan | 'portal' | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // ADR-035 — годовой биллинг −15%, дефолт ГОД (показываем скидочную цену /мес).
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('year')
   const [params] = useSearchParams()
   const { plan: currentPlan } = useEntitlements(salonId)
   const suggested = params.get('plan') as Plan | null
@@ -131,7 +134,11 @@ export function BillingButtons({
   async function startCheckout(plan: Plan) {
     setPending(plan)
     try {
-      const { url } = await callEdgeFunction('create-checkout-session', { salonId, plan })
+      const { url } = await callEdgeFunction('create-checkout-session', {
+        salonId,
+        plan,
+        interval: billingInterval,
+      })
       window.location.href = url
     } catch (err) {
       toast.error(t('billing.checkout_error'), {
@@ -196,6 +203,10 @@ export function BillingButtons({
             </DialogDescription>
           </DialogHeader>
 
+          <div className="flex justify-center px-5 pb-1">
+            <IntervalToggle value={billingInterval} onChange={setBillingInterval} t={t} />
+          </div>
+
           <div className="grid gap-4 px-5 pb-3 sm:grid-cols-2 lg:grid-cols-4">
             {(PAID_PLANS as PaidPlan[]).map((plan) => {
               const isPopular = plan === POPULAR_PLAN
@@ -206,6 +217,8 @@ export function BillingButtons({
                   key={plan}
                   plan={plan}
                   t={t}
+                  interval={billingInterval}
+                  locale={i18n.language}
                   isPopular={isPopular}
                   isSuggested={isSuggested}
                   isCurrent={isCurrent}
@@ -220,7 +233,7 @@ export function BillingButtons({
           <p className="text-muted-foreground px-5 pb-5 text-center text-xs">
             {t('billing.picker_fine_print', {
               defaultValue:
-                'Цены окончательные — НДС не взимается. Оплата через Stripe · Visa / Mastercard. Отмена в один клик.',
+                'Цены окончательные. Оплата через Stripe · Visa / Mastercard. Отмена в один клик.',
             })}
           </p>
         </DialogContent>
@@ -229,10 +242,72 @@ export function BillingButtons({
   )
 }
 
+/**
+ * Сегмент-переключатель интервала оплаты (ГОД · −15% / Месяц). Активная
+ * кнопка — brand-navy. Дефолт — ГОД (см. BillingButtons).
+ */
+function IntervalToggle({
+  value,
+  onChange,
+  t,
+}: {
+  value: BillingInterval
+  onChange: (v: BillingInterval) => void
+  t: TFn
+}) {
+  const options: { key: BillingInterval; label: string; badge?: string }[] = [
+    {
+      key: 'year',
+      label: t('billing.interval.year', { defaultValue: 'Год' }),
+      badge: t('billing.interval.year_badge', { defaultValue: '−15%' }),
+    },
+    { key: 'month', label: t('billing.interval.month', { defaultValue: 'Месяц' }) },
+  ]
+  return (
+    <div className="bg-muted inline-flex items-center gap-1 rounded-full p-1" role="tablist">
+      {options.map((opt) => {
+        const active = value === opt.key
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.key)}
+            data-testid={`billing-interval-${opt.key}`}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+              active
+                ? 'bg-brand-navy text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {opt.label}
+            {opt.badge ? (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
+                  active
+                    ? 'bg-brand-gold text-brand-navy-ink'
+                    : 'bg-brand-sage-soft text-brand-sage-deep',
+                )}
+              >
+                {opt.badge}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /** Карточка одного тарифа в пикере (оформление landing/pricing). */
 function PlanCard({
   plan,
   t,
+  interval,
+  locale,
   isPopular,
   isSuggested,
   isCurrent,
@@ -242,6 +317,8 @@ function PlanCard({
 }: {
   plan: PaidPlan
   t: TFn
+  interval: BillingInterval
+  locale: string
   isPopular: boolean
   isSuggested: boolean
   isCurrent: boolean
@@ -250,6 +327,7 @@ function PlanCard({
   onChoose: () => void
 }) {
   const tagline = PLAN_TAGLINE_KEY[plan]
+  const priceLabel = formatMonthlyPrice(PLAN_PRICE_EUR[plan], interval, locale)
   return (
     <div
       className={cn(
@@ -297,12 +375,18 @@ function PlanCard({
             isPopular ? 'text-white' : 'text-brand-navy',
           )}
         >
-          €{PLAN_PRICE_EUR[plan]}
+          €{priceLabel}
         </span>
         <span className={cn('text-sm', isPopular ? 'text-white/70' : 'text-muted-foreground')}>
           {t('billing.per_month', { defaultValue: '/мес' })}
         </span>
       </div>
+
+      {interval === 'year' ? (
+        <span className={cn('mt-1 text-xs', isPopular ? 'text-white/70' : 'text-muted-foreground')}>
+          {t('billing.per_month_annual', { defaultValue: 'при оплате за год' })}
+        </span>
+      ) : null}
 
       <p
         className={cn(

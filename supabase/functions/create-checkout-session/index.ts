@@ -20,7 +20,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
-import { isValidPaidPlan, priceIdForPlan } from '../_shared/plans.ts'
+import { type BillingInterval, isValidPaidPlan, priceIdForPlan } from '../_shared/plans.ts'
 import { withSentry } from '../_shared/sentry.ts'
 import { createCheckoutSession } from '../_shared/stripe.ts'
 
@@ -49,7 +49,7 @@ Deno.serve(
     const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
 
-    let body: { salonId?: string; prompt?: string; plan?: string }
+    let body: { salonId?: string; prompt?: string; plan?: string; interval?: string }
     try {
       body = await req.json()
     } catch {
@@ -58,10 +58,16 @@ Deno.serve(
     const salonId = body.salonId
     if (!salonId) return jsonResponse({ error: 'salon_id_required' }, 400)
 
-    // T7 — выбор тарифа. Если plan валиден и для него настроена цена —
-    // используем её, иначе fallback на legacy STRIPE_PRICE_ID.
-    const priceId =
-      (isValidPaidPlan(body.plan) ? priceIdForPlan(body.plan) : null) ?? STRIPE_PRICE_ID
+    // ADR-035 — интервал оплаты. 'year' = −15% (годовая Stripe-цена),
+    // иначе месячная. Валидируем, дефолт 'month'.
+    const interval: BillingInterval = body.interval === 'year' ? 'year' : 'month'
+
+    // T7 — выбор тарифа. Если plan валиден и для него настроена цена для
+    // интервала — используем её. Для месяца есть legacy fallback на
+    // STRIPE_PRICE_ID; для годового интервала fallback нет — если annual
+    // price не настроен, отдаём price_not_configured (graceful 500).
+    const planPriceId = isValidPaidPlan(body.plan) ? priceIdForPlan(body.plan, interval) : null
+    const priceId = planPriceId ?? (interval === 'month' ? STRIPE_PRICE_ID : '')
     if (!priceId) return jsonResponse({ error: 'price_not_configured' }, 500)
     // T186 — после Stripe success/cancel вернуть юзера в integrations с
     // его prompt (онбординг ставит цепочку Booksy/wFirma/etc). Это

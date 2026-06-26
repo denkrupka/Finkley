@@ -2922,6 +2922,12 @@
     "checkout_error": "Couldn't open checkout",
     "portal_error": "Couldn't open the billing portal",
     "per_month": "/mo",
+    "per_month_annual": "billed annually",
+    "interval": {
+      "year": "Yearly",
+      "month": "Monthly",
+      "year_badge": "−15%"
+    },
     "choose_plan": "Choose",
     "current_plan": "Plan: {{plan}}",
     "current_label": "Current",
@@ -2931,7 +2937,7 @@
     "picker_subtitle_new": "Pick a plan — payment via a secure Stripe page.",
     "picker_subtitle_active": "Changing your plan opens the billing portal — there you can switch plans or cancel.",
     "picker_subtitle_demo": "Demo — 14 days free, no card needed. After that, pick a plan or stay on the free one.",
-    "picker_fine_print": "Final prices — no VAT added. Payments via Stripe · Visa / Mastercard. Cancel in one click.",
+    "picker_fine_print": "Final prices. Payments via Stripe · Visa / Mastercard. Cancel in one click.",
     "popular_badge": "Popular",
     "choose_plan_cta": "Choose a plan",
     "demo_hint": "Demo — 14 days free, no card needed. Then pick a plan or stay on the free one.",
