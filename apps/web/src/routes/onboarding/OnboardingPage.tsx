@@ -575,8 +575,10 @@ export function OnboardingPage() {
         } catch (err) {
           console.warn('profile update failed', err)
         }
-        // T96 — аватар в avatars bucket (путь <auth.uid()>/...)
-        if (state.avatar_data_url) {
+        // T96 — аватар в avatars bucket (путь <auth.uid()>/...). Грузим ТОЛЬКО
+        // если это data:-URL (StepUserProfile теперь грузит сразу и кладёт сюда
+        // публичный URL — его перезагружать не нужно).
+        if (state.avatar_data_url && state.avatar_data_url.startsWith('data:')) {
           try {
             const blob = await (await fetch(state.avatar_data_url)).blob()
             const path = `${userId}/avatar-${Date.now()}.webp`

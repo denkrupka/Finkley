@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Field } from '@/components/ui/field'
 import { ImageCropper } from '@/components/ui/ImageCropper'
 import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase/client'
 
 type Props = {
   value: {
@@ -21,8 +22,12 @@ type Props = {
  * Имя и фамилия — обязательны для обращения в письмах/Telegram.
  * Аватар — optional. Если выбран — через cropper (1:1, 512px webp).
  *
- * Аватар хранится в state как data URL до submit; затем загружается
- * в avatars bucket (RLS требует auth.uid() в пути).
+ * Аватар грузится СРАЗУ при выборе (юзер аутентифицирован с начала онбординга) —
+ * в avatars bucket (RLS требует auth.uid() в пути) + profiles.avatar_url. Раньше
+ * аватар откладывался как base64 data URL до submit, где терялся (autosave
+ * раздувал onboarding_state, а upload падал молча → avatar_url=NULL). Теперь
+ * avatar_data_url хранит уже публичный URL; fallback на data URL, если аплоад
+ * не удался (submit попробует ещё раз).
  */
 export function StepUserProfile({ value, onChange }: Props) {
   const { t } = useTranslation()
@@ -142,9 +147,33 @@ export function StepUserProfile({ value, onChange }: Props) {
         onCrop={async (blob) => {
           setBusy(true)
           try {
-            const dataUrl = await blobToDataUrl(blob)
-            onChange({ avatar_data_url: dataUrl })
+            // Грузим СРАЗУ в avatars bucket + profiles.avatar_url (юзер уже
+            // аутентифицирован). avatar_data_url держит публичный URL — submit
+            // его не перезагружает (грузит только data:-URL).
+            const { data: u } = await supabase.auth.getUser()
+            const userId = u.user?.id
+            if (userId) {
+              const path = `${userId}/avatar-${Date.now()}.webp`
+              const up = await supabase.storage
+                .from('avatars')
+                .upload(path, blob, { upsert: true, contentType: 'image/webp' })
+              if (up.error) throw up.error
+              const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
+              await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', userId)
+              onChange({ avatar_data_url: pub.publicUrl })
+            } else {
+              onChange({ avatar_data_url: await blobToDataUrl(blob) })
+            }
             setCropFile(null)
+          } catch (err) {
+            // Fallback: храним data URL, submit попробует загрузить ещё раз.
+            console.warn('avatar immediate upload failed, fallback to data url', err)
+            try {
+              onChange({ avatar_data_url: await blobToDataUrl(blob) })
+              setCropFile(null)
+            } catch {
+              toast.error(t('onboarding.profile.avatar_too_large'))
+            }
           } finally {
             setBusy(false)
           }
