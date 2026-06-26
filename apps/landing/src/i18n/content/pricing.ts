@@ -89,7 +89,7 @@ const ru: PricingCopy = {
   ],
   paidPlans: [
     {
-      name: 'Старт',
+      name: 'На дому',
       price: '€19',
       period: '/ мес',
       highlight: false,
@@ -104,7 +104,7 @@ const ru: PricingCopy = {
       ],
     },
     {
-      name: 'Рост',
+      name: 'Мастер',
       price: '€49',
       period: '/ мес',
       highlight: false,
@@ -118,7 +118,7 @@ const ru: PricingCopy = {
       ],
     },
     {
-      name: 'Полный',
+      name: 'Салон',
       price: '€69',
       period: '/ мес',
       highlight: true,
@@ -162,7 +162,7 @@ const ru: PricingCopy = {
     },
     {
       q: 'Какой тариф выбрать?',
-      a: '€19 — если нужен учёт доходов, расходов, отчёты и мессенджер. €49 (самый популярный) добавляет маркетинг и AI-помощника. €69 открывает всё, включая финансы (P&L и ДДС) и склад. €99 — если у тебя несколько салонов на одном аккаунте. Перейти между тарифами можно в любой момент.',
+      a: '«На дому» (€19) — учёт доходов, расходов, отчёты и мессенджер. «Мастер» (€49) добавляет маркетинг и AI-помощника. «Салон» (€69, самый популярный) открывает всё, включая финансы (P&L и ДДС) и склад. «Сеть» (€99) — если у тебя несколько салонов на одном аккаунте. Перейти между тарифами можно в любой момент.',
     },
     {
       q: 'Если у меня несколько салонов?',
@@ -220,7 +220,7 @@ const pl: PricingCopy = {
   ],
   paidPlans: [
     {
-      name: 'Start',
+      name: 'W domu',
       price: '€19',
       period: '/ mies.',
       highlight: false,
@@ -235,7 +235,7 @@ const pl: PricingCopy = {
       ],
     },
     {
-      name: 'Wzrost',
+      name: 'Mistrz',
       price: '€49',
       period: '/ mies.',
       highlight: false,
@@ -249,7 +249,7 @@ const pl: PricingCopy = {
       ],
     },
     {
-      name: 'Pełny',
+      name: 'Salon',
       price: '€69',
       period: '/ mies.',
       highlight: true,
@@ -293,7 +293,7 @@ const pl: PricingCopy = {
     },
     {
       q: 'Który plan wybrać?',
-      a: '€19 — jeśli potrzebujesz rachunku przychodów, kosztów, raportów i komunikatora. €49 (najpopularniejszy) dodaje marketing i asystenta AI. €69 otwiera wszystko, w tym finanse (P&L i przepływy pieniężne) oraz magazyn. €99 — jeśli masz kilka salonów na jednym koncie. Plan możesz zmienić w dowolnej chwili.',
+      a: '„W domu" (€19) — rachunek przychodów, kosztów, raporty i komunikator. „Mistrz" (€49) dodaje marketing i asystenta AI. „Salon" (€69, najpopularniejszy) otwiera wszystko, w tym finanse (P&L i przepływy pieniężne) oraz magazyn. „Sieć" (€99) — jeśli masz kilka salonów na jednym koncie. Plan możesz zmienić w dowolnej chwili.',
     },
     {
       q: 'A jeśli mam kilka salonów?',
