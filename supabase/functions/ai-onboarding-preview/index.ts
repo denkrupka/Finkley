@@ -752,15 +752,27 @@ async function fetchRealData(salonId: string, userId: string): Promise<SalonReal
 function realDataDigest(real: SalonRealData, currency = 'PLN'): string {
   const cur = currency || 'PLN'
   const fmtMoney = (cents: number) => `${Math.round(cents / 100)} ${cur}`
-  const staff = real.staff.length
-    ? real.staff
+  // Задача 13: НЕ упоминать мастеров без визитов/без оборота — это часто
+  // админы/техперсонал, импортированные из Booksy с ролью master и payout 0%.
+  // Когда визиты ЕСТЬ — в STAFF LIST оставляем только тех, кто реально работал
+  // (есть в агрегации визитов). В catalog_only (визитов ещё нет) показываем
+  // всех, чтобы можно было назвать команду по именам.
+  const activeStaffNames = new Set(real.top_staff.map((s) => s.name.trim().toLowerCase()))
+  const staffForPrompt =
+    real.visits_total > 0
+      ? real.staff.filter((s) => activeStaffNames.has(s.name.trim().toLowerCase()))
+      : real.staff
+  const staff = staffForPrompt.length
+    ? staffForPrompt
         .slice(0, 20)
         .map(
+          // payout показываем только если >0 — иначе «(payout 0%)» (фикс/без
+          // процента) AI ошибочно читает как «на 0% ставке / не приносит денег».
           (s) =>
-            `- ${s.name}${s.payout_percent != null ? ` (payout ${s.payout_percent}%)` : ''}${s.is_active ? '' : ' [inactive]'}`,
+            `- ${s.name}${s.payout_percent != null && s.payout_percent > 0 ? ` (payout ${s.payout_percent}%)` : ''}${s.is_active ? '' : ' [inactive]'}`,
         )
         .join('\n')
-    : '(пусто — нет мастеров)'
+    : '(пусто — нет мастеров с визитами)'
   const services = real.services.length
     ? real.services
         .slice(0, 30)
