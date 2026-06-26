@@ -1,4 +1,13 @@
-import { BellRing, CheckCircle2, Loader2, Phone, Smartphone, Sparkles } from 'lucide-react'
+import {
+  BadgeCheck,
+  BellRing,
+  CheckCircle2,
+  Loader2,
+  Phone,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -38,6 +47,96 @@ export function StepTelegramPhone({ value, onChange }: Props) {
   const [polling, setPolling] = useState(false)
 
   const isLinked = !!profile?.telegram_id
+
+  // --- SMS-подтверждение номера телефона ---
+  // Подтверждённость: либо из профиля (если уже подтверждён ранее), либо
+  // локально после успешной верификации в этой сессии.
+  const profileVerified =
+    !!profile?.phone_verified_at && (profile.phone ?? '') === value.phone.trim()
+  const [verifiedLocal, setVerifiedLocal] = useState(false)
+  const isPhoneVerified = profileVerified || verifiedLocal
+  const [codeSent, setCodeSent] = useState(false)
+  const [code, setCode] = useState('')
+  const [sendingCode, setSendingCode] = useState(false)
+  const [verifyingCode, setVerifyingCode] = useState(false)
+
+  // Если юзер меняет номер после отправки кода/подтверждения — сбрасываем флоу.
+  useEffect(() => {
+    setCodeSent(false)
+    setCode('')
+    setVerifiedLocal(false)
+  }, [value.phone])
+
+  async function sendVerificationCode() {
+    const phone = value.phone.trim()
+    if (!phone) {
+      toast.error(
+        t('onboarding.tg_phone.verify_need_phone', { defaultValue: 'Сначала введи номер' }),
+      )
+      return
+    }
+    setSendingCode(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('phone-verify', {
+        body: { action: 'send', phone },
+      })
+      if (error) throw error
+      const res = data as { ok?: boolean; sent?: boolean; error?: string; retry_after?: number }
+      if (!res?.ok) {
+        if (res?.error === 'rate_limited') {
+          toast.error(
+            t('onboarding.tg_phone.verify_rate_limited', {
+              defaultValue: 'Подожди немного перед повторной отправкой',
+            }),
+          )
+          return
+        }
+        throw new Error(res?.error ?? 'send_failed')
+      }
+      setCodeSent(true)
+      toast.success(
+        t('onboarding.tg_phone.verify_code_sent', { defaultValue: 'Код отправлен по SMS' }),
+      )
+    } catch (e) {
+      toast.error(
+        t('onboarding.tg_phone.verify_send_failed', {
+          defaultValue: 'Не удалось отправить SMS. Попробуй позже.',
+        }) + (e instanceof Error ? `: ${e.message}` : ''),
+      )
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  async function submitVerificationCode() {
+    const phone = value.phone.trim()
+    if (!code.trim()) return
+    setVerifyingCode(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('phone-verify', {
+        body: { action: 'verify', phone, code: code.trim() },
+      })
+      if (error) throw error
+      const res = data as { ok?: boolean; verified?: boolean; error?: string }
+      if (res?.ok && res.verified) {
+        setVerifiedLocal(true)
+        setCodeSent(false)
+        setCode('')
+        await refetch()
+        toast.success(t('onboarding.tg_phone.verify_done', { defaultValue: 'Номер подтверждён' }))
+        return
+      }
+      toast.error(
+        t('onboarding.tg_phone.verify_wrong_code', {
+          defaultValue: 'Неверный код. Попробуй ещё раз.',
+        }),
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setVerifyingCode(false)
+    }
+  }
 
   // T124 — мгновенное подключение Telegram прямо на шаге онбординга.
   // Если профиль уже привязан — синхронизируем want_telegram = true.
@@ -155,6 +254,79 @@ export function StepTelegramPhone({ value, onChange }: Props) {
             />
           </div>
         </Field>
+
+        {/* Подтверждение номера через SMS-код — по желанию */}
+        {value.phone.trim() &&
+          (isPhoneVerified ? (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50/60 px-3 py-2">
+              <BadgeCheck className="size-4 shrink-0 text-emerald-600" strokeWidth={2.2} />
+              <span className="text-xs font-semibold text-emerald-700">
+                {t('onboarding.tg_phone.verify_badge', { defaultValue: 'Номер подтверждён' })}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {!codeSent ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={sendVerificationCode}
+                  disabled={sendingCode}
+                  className="w-full"
+                >
+                  {sendingCode ? (
+                    <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <ShieldCheck className="size-4" strokeWidth={2} />
+                  )}
+                  {t('onboarding.tg_phone.verify_cta', { defaultValue: 'Подтвердить номер' })}
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs">
+                    {t('onboarding.tg_phone.verify_code_hint', {
+                      defaultValue: 'Введи 6-значный код из SMS.',
+                    })}
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="000000"
+                      className="num tracking-widest"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={submitVerificationCode}
+                      disabled={verifyingCode || code.trim().length < 4}
+                    >
+                      {verifyingCode ? (
+                        <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+                      ) : (
+                        t('onboarding.tg_phone.verify_submit', { defaultValue: 'Подтвердить код' })
+                      )}
+                    </Button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={sendVerificationCode}
+                    disabled={sendingCode}
+                    className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
+                  >
+                    {t('onboarding.tg_phone.verify_resend', {
+                      defaultValue: 'Отправить код заново',
+                    })}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
       {/* Блок 2 — Telegram-бот (мобильный доступ к салону) */}
