@@ -16,12 +16,14 @@ export const ANNUAL_DISCOUNT_MULTIPLIER = 0.85
 export const ANNUAL_DISCOUNT_PCT = 15
 
 /**
- * Цена /мес для интервала, округлённая до 2 знаков.
- * year → fullMonthlyEur × 0.85 (16.15 для 19), month → fullMonthlyEur.
+ * Цена /мес для интервала. year → полная × 0.85, ОКРУГЛЁННАЯ ВВЕРХ до целого
+ * евро (19 → 17, т.к. 16.15 → 17): показываем «ровные» суммы без копеек.
+ * month → полная месячная цена. Реальный годовой платёж — точная −15% сумма
+ * (видна на странице оплаты Stripe), здесь — округлённое /мес для витрины.
  */
 export function monthlyPriceForInterval(fullMonthlyEur: number, interval: BillingInterval): number {
   if (interval === 'year') {
-    return Math.round(fullMonthlyEur * ANNUAL_DISCOUNT_MULTIPLIER * 100) / 100
+    return Math.ceil(fullMonthlyEur * ANNUAL_DISCOUNT_MULTIPLIER)
   }
   return fullMonthlyEur
 }

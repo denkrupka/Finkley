@@ -38,6 +38,7 @@ const PLAN_FEATURE_KEYS: Record<PaidPlan, string[]> = {
     'billing.plans.t19.f2',
     'billing.plans.t19.f3',
     'billing.plans.t19.f4',
+    'billing.plans.t19.f5',
   ],
   t49: [
     'billing.plans.t49.f1',
@@ -287,9 +288,7 @@ function IntervalToggle({
               <span
                 className={cn(
                   'rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
-                  active
-                    ? 'bg-brand-gold text-brand-navy-ink'
-                    : 'bg-brand-sage-soft text-brand-sage-deep',
+                  active ? 'bg-brand-sage text-white' : 'bg-brand-sage-soft text-brand-sage-deep',
                 )}
               >
                 {opt.badge}
@@ -341,7 +340,7 @@ function PlanCard({
     >
       {isPopular ? (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-brand-gold text-brand-navy-ink inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-sm">
+          <span className="bg-brand-sage inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
             <Sparkles className="size-3" strokeWidth={2.5} />
             {t('billing.popular_badge', { defaultValue: 'Популярный' })}
           </span>
@@ -409,7 +408,7 @@ function PlanCard({
             <Check
               className={cn(
                 'mt-0.5 size-3.5 shrink-0',
-                isPopular ? 'text-brand-gold' : 'text-brand-sage',
+                isPopular ? 'text-brand-sage-soft' : 'text-brand-sage',
               )}
               strokeWidth={2.5}
             />

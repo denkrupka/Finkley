@@ -36,44 +36,8 @@ function priceToNumber(price: string): number {
       </ul>
     </div>
 
-    <div class="mx-auto mt-12 grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2">
-      {
-        copy.freePlans.map((plan) => (
-          <div class="flex flex-col rounded-xl border border-brand-border bg-white p-6 shadow-sm">
-            <div class="flex items-baseline justify-between">
-              <div class="text-lg font-extrabold tracking-tight text-brand-navy">{plan.name}</div>
-              <div class="flex items-baseline gap-1">
-                <span class="font-mono text-3xl font-extrabold tracking-tight text-brand-navy">
-                  {plan.price}
-                </span>
-                <span class="text-sm text-brand-text-muted">/ {plan.note}</span>
-              </div>
-            </div>
-            <div class="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-sage-soft px-3 py-1 text-xs font-bold text-brand-sage">
-              <span>✨</span> {plan.badge}
-            </div>
-            <p class="mt-4 text-sm leading-relaxed text-brand-text-muted">{plan.blurb}</p>
-            <ul class="mt-5 flex-1 space-y-2.5">
-              {plan.features.map((f) => (
-                <li class="flex items-start gap-2.5 text-sm text-brand-text">
-                  <span class="mt-0.5 text-brand-sage">✓</span>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <a
-              href="/app/signup"
-              class="mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg border border-brand-navy text-sm font-bold text-brand-navy hover:bg-brand-bg"
-            >
-              {plan.cta}
-            </a>
-          </div>
-        ))
-      }
-    </div>
-
     <div
-      class="mt-10 flex justify-center"
+      class="mt-12 flex justify-center"
       data-pricing-toggle
       data-locale={locale}
       data-per-annual={copy.interval.perMonthAnnual}
@@ -102,7 +66,39 @@ function priceToNumber(price: string): number {
       </div>
     </div>
 
-    <div class="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    {/* Все пакеты в один ряд: Бесплатный + 4 платных. Демо — не отдельный
+        пакет, а инфо в подзаголовке героя («Демо 14 дней без карты»). */}
+    <div class="mx-auto mt-8 grid max-w-7xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+      {
+        copy.freePlans.map((plan) => (
+          <div class="flex flex-col rounded-xl border border-brand-border bg-white p-6 shadow-sm">
+            <div class="text-lg font-extrabold tracking-tight text-brand-navy">{plan.name}</div>
+            <div class="mt-3 flex items-baseline gap-1.5">
+              <span class="font-mono text-4xl font-extrabold tracking-tight text-brand-navy">
+                {plan.price}
+              </span>
+              <span class="text-base text-brand-text-muted">/ {plan.note}</span>
+            </div>
+            <p class="mt-3 min-h-[2.5rem] text-sm leading-relaxed text-brand-text-muted">
+              {plan.blurb}
+            </p>
+            <ul class="mt-5 flex-1 space-y-2.5">
+              {plan.features.map((f) => (
+                <li class="flex items-start gap-2.5 text-sm text-brand-text">
+                  <span class="mt-0.5 text-brand-sage">✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <a
+              href="/app/signup"
+              class="mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg border border-brand-navy text-sm font-bold text-brand-navy hover:bg-brand-bg"
+            >
+              {plan.cta}
+            </a>
+          </div>
+        ))
+      }
       {
         copy.paidPlans.map((plan) => (
           <div
@@ -209,7 +205,7 @@ function priceToNumber(price: string): number {
     // Классы активной/неактивной кнопки (brand-токены, не хексы).
     const ACTIVE = ['bg-brand-navy', 'text-white', 'shadow-sm']
     const INACTIVE = ['text-brand-text-muted']
-    const BADGE_ACTIVE = ['bg-brand-gold', 'text-brand-navy']
+    const BADGE_ACTIVE = ['bg-brand-sage', 'text-white']
     const BADGE_INACTIVE = ['bg-brand-sage-soft', 'text-brand-sage']
 
     function formatEur(amount: number): string {
@@ -224,7 +220,10 @@ function priceToNumber(price: string): number {
     function apply(interval: 'year' | 'month') {
       for (const el of priceEls) {
         const monthly = Number(el.dataset.monthly || '0')
-        const value = interval === 'year' ? Math.round(monthly * 0.85 * 100) / 100 : monthly
+        // Годовая цена /мес округляется ВВЕРХ до целого евро (16.15 → 17):
+        // показываем «ровные» суммы без копеек. Реальный годовой платёж —
+        // точная −15% сумма (показывается на странице оплаты Stripe).
+        const value = interval === 'year' ? Math.ceil(monthly * 0.85) : monthly
         el.textContent = formatEur(value)
       }
       for (const note of annualNotes) note.hidden = interval !== 'year'

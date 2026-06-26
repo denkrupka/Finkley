@@ -2951,35 +2951,36 @@
     "portal_note": "Opens the secure Stripe portal — card, invoices and cancellation are there.",
     "plans": {
       "t19": {
-        "blurb": "Full money tracking: income, expenses and reporting.",
+        "blurb": "Full money tracking: income, expenses, reports and client chats.",
         "tagline": "Best value",
         "f1": "Everything in Free",
-        "f2": "Expenses section",
-        "f3": "Reports section",
-        "f4": "Messenger section"
+        "f2": "Expenses: spending by category, receipt scanning and voice entry, bank matching",
+        "f3": "Reports: margin per service, staff performance, client retention",
+        "f4": "Messenger: Instagram, Facebook, Telegram, WhatsApp in one inbox",
+        "f5": "All integrations: Booksy, Fresha, Treatwell, banks (PSD2), accounting (wFirma, KSeF)"
       },
       "t49": {
-        "blurb": "Tracking plus client acquisition and an AI assistant.",
+        "blurb": "Tracking plus winning clients back with broadcasts and an AI profit assistant.",
         "f1": "Everything in €19",
-        "f2": "Marketing section",
-        "f3": "AI assistant",
-        "f4": "Client base analytics"
+        "f2": "Marketing: SMS and email broadcasts, promos, visit reminders and win-back of dormant clients",
+        "f3": "AI assistant: salon breakdown, profit advice, add visits and expenses by voice",
+        "f4": "Automatic review requests after a visit"
       },
       "t69": {
         "blurb": "Every section of the product, including finance and inventory — nothing locked.",
         "f1": "Everything in €49",
-        "f2": "Finance section: P&L and cash flow",
-        "f3": "Inventory section",
-        "f4": "All integrations",
+        "f2": "Finance: P&L, cash flow, plan/fact and net profit",
+        "f3": "Inventory: stock levels, write-offs, low-stock alerts, invoice scanning",
+        "f4": "Budgets: income and expense plan with fact tracking",
         "f5": "Priority support"
       },
       "t99": {
-        "blurb": "For several salons on a single account.",
+        "blurb": "Everything in Full plus several salons on one account.",
         "tagline": "Multi-salon",
         "f1": "Everything in €69",
-        "f2": "Multiple salons on one account",
-        "f3": "Salon switcher in the header",
-        "f4": "Each salon counted separately"
+        "f2": "Multiple salons on one account, switcher in the header",
+        "f3": "Separate tracking and reports per salon",
+        "f4": "Compare salons side by side"
       }
     },
     "banner": {

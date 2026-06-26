@@ -2001,35 +2001,36 @@
     "portal_note": "Otworzy się bezpieczny portal Stripe — tam karta, faktury i anulowanie.",
     "plans": {
       "t19": {
-        "blurb": "Pełna kontrola nad pieniędzmi: przychody, koszty i raporty.",
+        "blurb": "Pełna kontrola nad pieniędzmi: przychody, koszty, raporty i rozmowy z klientkami.",
         "tagline": "Najlepsza cena",
         "f1": "Wszystko z planu darmowego",
-        "f2": "Sekcja „Koszty”",
-        "f3": "Sekcja „Raporty”",
-        "f4": "Sekcja „Komunikator”"
+        "f2": "Koszty: wydatki wg kategorii, skan paragonów i dyktowanie głosem, dopasowanie do banku",
+        "f3": "Raporty: marża na usłudze, wyniki pracowników, powracalność klientek",
+        "f4": "Komunikator: Instagram, Facebook, Telegram, WhatsApp w jednej skrzynce",
+        "f5": "Wszystkie integracje: Booksy, Fresha, Treatwell, banki (PSD2), księgowość (wFirma, KSeF)"
       },
       "t49": {
-        "blurb": "Kontrola finansów plus pozyskiwanie klientek i asystent AI.",
+        "blurb": "Kontrola finansów plus odzyskiwanie klientek wysyłkami i asystent AI od zysku.",
         "f1": "Wszystko z planu €19",
-        "f2": "Sekcja „Marketing”",
-        "f3": "Asystent AI",
-        "f4": "Analityka bazy klientek"
+        "f2": "Marketing: wysyłki SMS i e-mail, promocje, przypomnienia o wizycie i odzyskiwanie „uśpionych”",
+        "f3": "Asystent AI: analiza salonu, porady o zysku, dodawanie wizyt i kosztów głosem",
+        "f4": "Automatyczne prośby o opinię po wizycie"
       },
       "t69": {
         "blurb": "Wszystkie sekcje produktu, łącznie z finansami i magazynem — nic nie jest zablokowane.",
         "f1": "Wszystko z planu €49",
-        "f2": "Sekcja „Finanse”: P&L i przepływy pieniężne",
-        "f3": "Sekcja „Magazyn”",
-        "f4": "Wszystkie integracje",
+        "f2": "Finanse: P&L, przepływy pieniężne, plan/fakt i zysk netto",
+        "f3": "Magazyn: stany, odpisy, niskie stany, skan faktur",
+        "f4": "Budżety: plan przychodów i kosztów z kontrolą faktu",
         "f5": "Priorytetowe wsparcie"
       },
       "t99": {
-        "blurb": "Dla kilku salonów na jednym koncie.",
+        "blurb": "Wszystko z planu Pełny plus kilka salonów na jednym koncie.",
         "tagline": "Multi-salon",
         "f1": "Wszystko z planu €69",
-        "f2": "Kilka salonów na jednym koncie",
-        "f3": "Przełącznik salonów w nagłówku",
-        "f4": "Każdy salon liczony osobno"
+        "f2": "Kilka salonów na jednym koncie, przełącznik w nagłówku",
+        "f3": "Osobne rozliczenia i raporty dla każdego salonu",
+        "f4": "Porównanie salonów między sobą"
       }
     },
     "banner": {

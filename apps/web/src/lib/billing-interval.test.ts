@@ -15,11 +15,11 @@ describe('monthlyPriceForInterval', () => {
     expect(monthlyPriceForInterval(99, 'month')).toBe(99)
   })
 
-  it('applies −15% (×0.85) for year interval, rounded to 2 decimals', () => {
-    expect(monthlyPriceForInterval(19, 'year')).toBe(16.15)
-    expect(monthlyPriceForInterval(49, 'year')).toBe(41.65)
-    expect(monthlyPriceForInterval(69, 'year')).toBe(58.65)
-    expect(monthlyPriceForInterval(99, 'year')).toBe(84.15)
+  it('applies −15% (×0.85) for year interval, rounded UP to whole euro', () => {
+    expect(monthlyPriceForInterval(19, 'year')).toBe(17) // 16.15 → 17
+    expect(monthlyPriceForInterval(49, 'year')).toBe(42) // 41.65 → 42
+    expect(monthlyPriceForInterval(69, 'year')).toBe(59) // 58.65 → 59
+    expect(monthlyPriceForInterval(99, 'year')).toBe(85) // 84.15 → 85
   })
 
   it('multiplier is 0.85', () => {
@@ -41,9 +41,9 @@ describe('formatEurAmount', () => {
 })
 
 describe('formatMonthlyPrice', () => {
-  it('year shows discounted /mo with fraction', () => {
-    expect(formatMonthlyPrice(19, 'year', 'en-US')).toBe('16.15')
-    expect(formatMonthlyPrice(19, 'year', 'ru-RU')).toBe('16,15')
+  it('year shows discounted /mo rounded up to whole euro', () => {
+    expect(formatMonthlyPrice(19, 'year', 'en-US')).toBe('17')
+    expect(formatMonthlyPrice(19, 'year', 'ru-RU')).toBe('17')
   })
 
   it('month shows full price without fraction', () => {
