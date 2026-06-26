@@ -2930,6 +2930,52 @@
     "picker_title": "Choose a plan",
     "picker_subtitle_new": "Pick a plan — payment via a secure Stripe page.",
     "picker_subtitle_active": "Changing your plan opens the billing portal — there you can switch plans or cancel.",
+    "picker_subtitle_demo": "Demo — 14 days free, no card needed. After that, pick a plan or stay on the free one.",
+    "picker_fine_print": "Final prices — no VAT added. Payments via Stripe · Visa / Mastercard. Cancel in one click.",
+    "popular_badge": "Popular",
+    "choose_plan_cta": "Choose a plan",
+    "demo_hint": "Demo — 14 days free, no card needed. Then pick a plan or stay on the free one.",
+    "section_open": "Open",
+    "section_payment_method": "Payment method",
+    "section_payment_method_hint": "Card and billing details",
+    "section_invoices": "Invoices & payments",
+    "section_invoices_hint": "Charge history and receipts",
+    "section_manage": "Manage subscription",
+    "section_manage_hint": "Pause, cancel, billing details",
+    "portal_note": "Opens the secure Stripe portal — card, invoices and cancellation are there.",
+    "plans": {
+      "t19": {
+        "blurb": "Full money tracking: income, expenses and reporting.",
+        "tagline": "Best value",
+        "f1": "Everything in Free",
+        "f2": "Expenses section",
+        "f3": "Reports section",
+        "f4": "Messenger section"
+      },
+      "t49": {
+        "blurb": "Tracking plus client acquisition and an AI assistant.",
+        "f1": "Everything in €19",
+        "f2": "Marketing section",
+        "f3": "AI assistant",
+        "f4": "Client base analytics"
+      },
+      "t69": {
+        "blurb": "Every section of the product, including finance and inventory — nothing locked.",
+        "f1": "Everything in €49",
+        "f2": "Finance section: P&L and cash flow",
+        "f3": "Inventory section",
+        "f4": "All integrations",
+        "f5": "Priority support"
+      },
+      "t99": {
+        "blurb": "For several salons on a single account.",
+        "tagline": "Multi-salon",
+        "f1": "Everything in €69",
+        "f2": "Multiple salons on one account",
+        "f3": "Salon switcher in the header",
+        "f4": "Each salon counted separately"
+      }
+    },
     "banner": {
       "trial_ending_one": "Trial ends tomorrow",
       "trial_ending_other": "Trial ends in {{count}} days",

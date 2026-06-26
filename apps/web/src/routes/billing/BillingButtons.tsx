@@ -1,4 +1,4 @@
-import { Check, FileText, Sparkles } from 'lucide-react'
+import { Check, CreditCard, FileText, Settings2, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -20,15 +20,59 @@ import { supabase } from '@/lib/supabase/client'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 
-/** Краткий список того, что входит в каждый платный тариф (для пикера). */
-const PLAN_FEATURES: Record<Plan, string[]> = {
-  free: ['Доходы'],
-  t19: ['Доходы', 'Расходы', 'Отчёты', 'Мессенджер'],
-  t49: ['Всё из €19', 'Маркетинг', 'AI-помощник'],
-  t69: ['Всё из €49', 'Финансы (P&L, ДДС)', 'Склад'],
-  t99: ['Всё из €69', 'Несколько салонов'],
-  demo: [],
+/** Платные тарифы (PAID_PLANS типизирован как Plan[], сужаем для контента). */
+type PaidPlan = 't19' | 't49' | 't69' | 't99'
+
+/** Тариф, выделяемый как «Популярный» (по выбору владельца — Полный). */
+const POPULAR_PLAN: PaidPlan = 't69'
+
+/**
+ * Детальный список фич каждого платного тарифа — i18n-ключи. Копирайт
+ * зеркалит landing/pricing (`apps/landing/src/i18n/content/pricing.ts`),
+ * чтобы пикер в приложении продавал так же, как страница тарифов.
+ */
+const PLAN_FEATURE_KEYS: Record<PaidPlan, string[]> = {
+  t19: [
+    'billing.plans.t19.f1',
+    'billing.plans.t19.f2',
+    'billing.plans.t19.f3',
+    'billing.plans.t19.f4',
+  ],
+  t49: [
+    'billing.plans.t49.f1',
+    'billing.plans.t49.f2',
+    'billing.plans.t49.f3',
+    'billing.plans.t49.f4',
+  ],
+  t69: [
+    'billing.plans.t69.f1',
+    'billing.plans.t69.f2',
+    'billing.plans.t69.f3',
+    'billing.plans.t69.f4',
+    'billing.plans.t69.f5',
+  ],
+  t99: [
+    'billing.plans.t99.f1',
+    'billing.plans.t99.f2',
+    'billing.plans.t99.f3',
+    'billing.plans.t99.f4',
+  ],
 }
+
+const PLAN_BLURB_KEY: Record<PaidPlan, string> = {
+  t19: 'billing.plans.t19.blurb',
+  t49: 'billing.plans.t49.blurb',
+  t69: 'billing.plans.t69.blurb',
+  t99: 'billing.plans.t99.blurb',
+}
+
+/** Маленькая продающая плашка под именем тарифа (или undefined). */
+const PLAN_TAGLINE_KEY: Partial<Record<PaidPlan, string>> = {
+  t19: 'billing.plans.t19.tagline',
+  t99: 'billing.plans.t99.tagline',
+}
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string
 
 async function callEdgeFunction(name: string, body: unknown): Promise<{ url: string }> {
   const { data: sessionData } = await supabase.auth.getSession()
@@ -50,13 +94,13 @@ async function callEdgeFunction(name: string, body: unknown): Promise<{ url: str
 }
 
 /**
- * Биллинг (фича L): карточка текущего тарифа + «Сменить тариф» (модалка-пикер
- * 6-уровневой модели ADR-033) + «Инвойсы и платежи».
+ * Биллинг (фича L): продающая карточка подписки + «Сменить тариф» (модалка-
+ * пикер 6-уровневой модели ADR-033, оформлен как landing/pricing).
  *
  * Stripe-пути (best-practice, эндпоинты уже есть, ничего не выдумываем):
  * - Новая подписка (нет активной Stripe-подписки) → create-checkout-session
  *   (Checkout Session, mode=subscription, динамические payment methods).
- * - Смена тарифа при активной подписке + история инвойсов/платежей →
+ * - Смена тарифа / способ оплаты / инвойсы / отмена при активной подписке →
  *   create-portal-session (Stripe Customer Portal: апгрейд/даунгрейд с
  *   пропорцией, отмена, карта, инвойсы, история — всё self-service).
  */
@@ -121,36 +165,22 @@ export function BillingButtons({
   }
 
   return (
-    <div className="flex flex-col items-end gap-2.5">
+    <div className="flex flex-col items-stretch gap-3 lg:items-end">
       <CurrentPlanPill plan={currentPlan} t={t} />
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setPickerOpen(true)}
-          data-testid="billing-change-plan"
-        >
-          <Sparkles className="size-4" strokeWidth={1.8} />
-          {t('billing.change_plan', { defaultValue: 'Сменить тариф' })}
-        </Button>
-        {hasStripeCustomer ? (
-          <Button
-            variant="outline"
-            size="md"
-            onClick={openPortal}
-            disabled={pending === 'portal'}
-            data-testid="billing-invoices"
-          >
-            <FileText className="size-4" strokeWidth={1.8} />
-            {pending === 'portal'
-              ? t('common.loading')
-              : t('billing.invoices_button', { defaultValue: 'Инвойсы и платежи' })}
-          </Button>
-        ) : null}
-      </div>
+
+      {hasStripeCustomer ? (
+        <ManageSubscriptionSections
+          t={t}
+          onManage={openPortal}
+          onChangePlan={() => setPickerOpen(true)}
+          pending={pending === 'portal'}
+        />
+      ) : (
+        <DemoUpgradeCta t={t} onChoose={() => setPickerOpen(true)} />
+      )}
 
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[min(1120px,calc(100vw-2rem))] sm:!w-[min(1120px,calc(100vw-2rem))] sm:!max-w-[1120px]">
           <DialogHeader>
             <DialogTitle>{t('billing.picker_title', { defaultValue: 'Выбор тарифа' })}</DialogTitle>
             <DialogDescription>
@@ -159,83 +189,283 @@ export function BillingButtons({
                     defaultValue:
                       'Смена тарифа откроет портал биллинга — там можно перейти на другой тариф или отменить подписку.',
                   })
-                : t('billing.picker_subtitle_new', {
-                    defaultValue: 'Выбери тариф — оплата через защищённую страницу Stripe.',
+                : t('billing.picker_subtitle_demo', {
+                    defaultValue:
+                      'Демо — 14 дней бесплатно, карта не нужна. После — выбери тариф или останься на бесплатном.',
                   })}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2">
-            {PAID_PLANS.map((plan) => {
-              const highlight = suggested === plan
+
+          <div className="grid gap-4 px-5 pb-3 sm:grid-cols-2 lg:grid-cols-4">
+            {(PAID_PLANS as PaidPlan[]).map((plan) => {
+              const isPopular = plan === POPULAR_PLAN
+              const isSuggested = suggested === plan
               const isCurrent = currentPlan === plan
               return (
-                <div
+                <PlanCard
                   key={plan}
-                  className={cn(
-                    'flex flex-col rounded-xl border p-4',
-                    highlight
-                      ? 'border-brand-navy ring-brand-navy/20 ring-2'
-                      : 'border-border bg-card',
-                  )}
-                >
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-brand-navy text-sm font-bold">
-                      {t(PLAN_NAME_KEY[plan])}
-                    </span>
-                    <span className="text-brand-navy num text-2xl font-extrabold">
-                      €{PLAN_PRICE_EUR[plan]}
-                      <span className="text-muted-foreground ml-1 text-xs font-normal">
-                        {t('billing.per_month', { defaultValue: '/мес' })}
-                      </span>
-                    </span>
-                  </div>
-                  <ul className="mt-3 flex-1 space-y-1.5">
-                    {PLAN_FEATURES[plan].map((f) => (
-                      <li key={f} className="text-foreground flex items-start gap-1.5 text-xs">
-                        <Check
-                          className="text-brand-sage mt-0.5 size-3.5 shrink-0"
-                          strokeWidth={2.5}
-                        />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    onClick={() => pickPlan(plan)}
-                    disabled={pending !== null || isCurrent}
-                    size="md"
-                    variant={highlight ? 'primary' : 'outline'}
-                    className="mt-4"
-                    data-testid={`billing-checkout-${plan}`}
-                  >
-                    {isCurrent
-                      ? t('billing.current_label', { defaultValue: 'Текущий' })
-                      : pending === plan
-                        ? t('common.loading')
-                        : t('billing.choose_plan', { defaultValue: 'Выбрать' })}
-                  </Button>
-                </div>
+                  plan={plan}
+                  t={t}
+                  isPopular={isPopular}
+                  isSuggested={isSuggested}
+                  isCurrent={isCurrent}
+                  pending={pending === plan}
+                  disabled={pending !== null || isCurrent}
+                  onChoose={() => pickPlan(plan)}
+                />
               )
             })}
           </div>
+
+          <p className="text-muted-foreground px-5 pb-5 text-center text-xs">
+            {t('billing.picker_fine_print', {
+              defaultValue:
+                'Цены окончательные — НДС не взимается. Оплата через Stripe · Visa / Mastercard. Отмена в один клик.',
+            })}
+          </p>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
 
-/** Бейдж текущего тарифа (реальный план из effectivePlan). */
-function CurrentPlanPill({
+/** Карточка одного тарифа в пикере (оформление landing/pricing). */
+function PlanCard({
   plan,
   t,
+  isPopular,
+  isSuggested,
+  isCurrent,
+  pending,
+  disabled,
+  onChoose,
 }: {
-  plan: Plan
-  t: (key: string, opts?: Record<string, unknown>) => string
+  plan: PaidPlan
+  t: TFn
+  isPopular: boolean
+  isSuggested: boolean
+  isCurrent: boolean
+  pending: boolean
+  disabled: boolean
+  onChoose: () => void
 }) {
+  const tagline = PLAN_TAGLINE_KEY[plan]
+  return (
+    <div
+      className={cn(
+        'relative flex flex-col rounded-2xl p-5 transition-shadow',
+        isPopular
+          ? 'bg-brand-navy text-white shadow-xl'
+          : isSuggested
+            ? 'border-brand-navy ring-brand-navy/15 bg-card border ring-2'
+            : 'border-border bg-card border',
+      )}
+    >
+      {isPopular ? (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="bg-brand-gold text-brand-navy-ink inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-sm">
+            <Sparkles className="size-3" strokeWidth={2.5} />
+            {t('billing.popular_badge', { defaultValue: 'Популярный' })}
+          </span>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          'text-base font-extrabold tracking-tight',
+          isPopular ? 'text-white' : 'text-brand-navy',
+        )}
+      >
+        {t(PLAN_NAME_KEY[plan])}
+      </div>
+
+      {tagline ? (
+        <span
+          className={cn(
+            'mt-1.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+            isPopular ? 'bg-white/15 text-white' : 'bg-brand-sage-soft text-brand-sage-deep',
+          )}
+        >
+          {t(tagline)}
+        </span>
+      ) : null}
+
+      <div className="mt-3 flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            'num text-3xl font-extrabold tracking-tight',
+            isPopular ? 'text-white' : 'text-brand-navy',
+          )}
+        >
+          €{PLAN_PRICE_EUR[plan]}
+        </span>
+        <span className={cn('text-sm', isPopular ? 'text-white/70' : 'text-muted-foreground')}>
+          {t('billing.per_month', { defaultValue: '/мес' })}
+        </span>
+      </div>
+
+      <p
+        className={cn(
+          'mt-2 min-h-[2.5rem] text-xs leading-relaxed',
+          isPopular ? 'text-white/80' : 'text-muted-foreground',
+        )}
+      >
+        {t(PLAN_BLURB_KEY[plan])}
+      </p>
+
+      <ul className="mt-4 flex-1 space-y-2">
+        {PLAN_FEATURE_KEYS[plan].map((key) => (
+          <li
+            key={key}
+            className={cn(
+              'flex items-start gap-2 text-xs',
+              isPopular ? 'text-white/90' : 'text-foreground',
+            )}
+          >
+            <Check
+              className={cn(
+                'mt-0.5 size-3.5 shrink-0',
+                isPopular ? 'text-brand-gold' : 'text-brand-sage',
+              )}
+              strokeWidth={2.5}
+            />
+            {t(key)}
+          </li>
+        ))}
+      </ul>
+
+      <Button
+        onClick={onChoose}
+        disabled={disabled}
+        size="md"
+        variant={isPopular ? 'secondary' : isSuggested ? 'primary' : 'outline'}
+        className={cn('mt-5', isPopular && 'text-brand-navy bg-white hover:bg-white/90')}
+        data-testid={`billing-checkout-${plan}`}
+      >
+        {isCurrent
+          ? t('billing.current_label', { defaultValue: 'Текущий' })
+          : pending
+            ? t('common.loading')
+            : t('billing.choose_plan', { defaultValue: 'Выбрать' })}
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Секции управления для юзеров с активной Stripe-подпиской. Все строки ведут
+ * в Customer Portal (метод оплаты, инвойсы, отмена — портал покрывает нативно).
+ * Плюс отдельная кнопка «Сменить тариф» (открывает пикер).
+ */
+function ManageSubscriptionSections({
+  t,
+  onManage,
+  onChangePlan,
+  pending,
+}: {
+  t: TFn
+  onManage: () => void
+  onChangePlan: () => void
+  pending: boolean
+}) {
+  const rows: { icon: typeof CreditCard; label: string; hint: string; testid: string }[] = [
+    {
+      icon: CreditCard,
+      label: t('billing.section_payment_method', { defaultValue: 'Способ оплаты' }),
+      hint: t('billing.section_payment_method_hint', { defaultValue: 'Карта и платёжные данные' }),
+      testid: 'billing-payment-method',
+    },
+    {
+      icon: FileText,
+      label: t('billing.section_invoices', { defaultValue: 'Инвойсы и платежи' }),
+      hint: t('billing.section_invoices_hint', { defaultValue: 'История списаний и счета' }),
+      testid: 'billing-invoices',
+    },
+    {
+      icon: Settings2,
+      label: t('billing.section_manage', { defaultValue: 'Управление подпиской' }),
+      hint: t('billing.section_manage_hint', { defaultValue: 'Пауза, отмена, реквизиты' }),
+      testid: 'billing-manage',
+    },
+  ]
+
+  return (
+    <div className="w-full lg:w-80">
+      <Button
+        variant="primary"
+        size="md"
+        onClick={onChangePlan}
+        className="w-full"
+        data-testid="billing-change-plan"
+      >
+        <Sparkles className="size-4" strokeWidth={1.8} />
+        {t('billing.change_plan', { defaultValue: 'Сменить тариф' })}
+      </Button>
+
+      <div className="border-border divide-border mt-3 divide-y overflow-hidden rounded-lg border">
+        {rows.map(({ icon: Icon, label, hint, testid }) => (
+          <button
+            key={testid}
+            type="button"
+            onClick={onManage}
+            disabled={pending}
+            data-testid={testid}
+            className="hover:bg-muted/40 flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors disabled:opacity-50"
+          >
+            <span className="bg-muted text-brand-navy grid size-9 shrink-0 place-items-center rounded-md">
+              <Icon className="size-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="text-foreground block text-sm font-semibold">{label}</span>
+              <span className="text-muted-foreground block truncate text-xs">{hint}</span>
+            </span>
+            <span className="text-muted-foreground text-xs">
+              {pending
+                ? t('common.loading')
+                : t('billing.section_open', { defaultValue: 'Открыть' })}
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="text-muted-foreground mt-2 text-center text-[11px] leading-snug">
+        {t('billing.portal_note', {
+          defaultValue: 'Откроется защищённый портал Stripe — там карта, счета и отмена.',
+        })}
+      </p>
+    </div>
+  )
+}
+
+/** CTA для demo/free (нет Stripe-клиента): акцент на выборе тарифа. */
+function DemoUpgradeCta({ t, onChoose }: { t: TFn; onChoose: () => void }) {
+  return (
+    <div className="w-full lg:w-80">
+      <Button
+        variant="primary"
+        size="md"
+        onClick={onChoose}
+        className="w-full"
+        data-testid="billing-change-plan"
+      >
+        <Sparkles className="size-4" strokeWidth={1.8} />
+        {t('billing.choose_plan_cta', { defaultValue: 'Выбрать тариф' })}
+      </Button>
+      <p className="text-muted-foreground mt-2 text-center text-xs leading-snug">
+        {t('billing.demo_hint', {
+          defaultValue:
+            'Демо — 14 дней бесплатно, карта не нужна. Потом выбери тариф или останься на бесплатном.',
+        })}
+      </p>
+    </div>
+  )
+}
+
+/** Бейдж текущего тарифа (реальный план из effectivePlan). */
+function CurrentPlanPill({ plan, t }: { plan: Plan; t: TFn }) {
   const priceSuffix =
     plan === 'demo' || plan === 'free' ? '' : ` · €${PLAN_PRICE_EUR[plan]}${t('billing.per_month')}`
   return (
-    <span className="border-brand-yellow-deep/40 inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 py-1">
+    <span className="border-brand-yellow-deep/40 inline-flex items-center gap-1.5 self-start rounded-full border bg-gradient-to-br from-[#FFFCEB] to-[#FFF4D1] px-2.5 py-1 lg:self-end">
       <span className="from-brand-gold grid size-4 place-items-center rounded-full bg-gradient-to-br to-[#E5C078] text-[9px] font-extrabold leading-none text-white">
         ★
       </span>

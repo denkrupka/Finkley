@@ -1980,6 +1980,52 @@
     "picker_title": "Wybór planu",
     "picker_subtitle_new": "Wybierz plan — płatność przez bezpieczną stronę Stripe.",
     "picker_subtitle_active": "Zmiana planu otworzy portal rozliczeń — tam można zmienić plan lub anulować subskrypcję.",
+    "picker_subtitle_demo": "Demo — 14 dni za darmo, bez karty. Później wybierz plan albo zostań na darmowym.",
+    "picker_fine_print": "Ceny ostateczne — bez VAT. Płatności przez Stripe · Visa / Mastercard. Anulujesz jednym kliknięciem.",
+    "popular_badge": "Popularny",
+    "choose_plan_cta": "Wybierz plan",
+    "demo_hint": "Demo — 14 dni za darmo, bez karty. Potem wybierz plan albo zostań na darmowym.",
+    "section_open": "Otwórz",
+    "section_payment_method": "Sposób płatności",
+    "section_payment_method_hint": "Karta i dane do płatności",
+    "section_invoices": "Faktury i płatności",
+    "section_invoices_hint": "Historia obciążeń i rachunki",
+    "section_manage": "Zarządzanie subskrypcją",
+    "section_manage_hint": "Pauza, anulowanie, dane rozliczeniowe",
+    "portal_note": "Otworzy się bezpieczny portal Stripe — tam karta, faktury i anulowanie.",
+    "plans": {
+      "t19": {
+        "blurb": "Pełna kontrola nad pieniędzmi: przychody, koszty i raporty.",
+        "tagline": "Najlepsza cena",
+        "f1": "Wszystko z planu darmowego",
+        "f2": "Sekcja „Koszty”",
+        "f3": "Sekcja „Raporty”",
+        "f4": "Sekcja „Komunikator”"
+      },
+      "t49": {
+        "blurb": "Kontrola finansów plus pozyskiwanie klientek i asystent AI.",
+        "f1": "Wszystko z planu €19",
+        "f2": "Sekcja „Marketing”",
+        "f3": "Asystent AI",
+        "f4": "Analityka bazy klientek"
+      },
+      "t69": {
+        "blurb": "Wszystkie sekcje produktu, łącznie z finansami i magazynem — nic nie jest zablokowane.",
+        "f1": "Wszystko z planu €49",
+        "f2": "Sekcja „Finanse”: P&L i przepływy pieniężne",
+        "f3": "Sekcja „Magazyn”",
+        "f4": "Wszystkie integracje",
+        "f5": "Priorytetowe wsparcie"
+      },
+      "t99": {
+        "blurb": "Dla kilku salonów na jednym koncie.",
+        "tagline": "Multi-salon",
+        "f1": "Wszystko z planu €69",
+        "f2": "Kilka salonów na jednym koncie",
+        "f3": "Przełącznik salonów w nagłówku",
+        "f4": "Każdy salon liczony osobno"
+      }
+    },
     "banner": {
       "trial_ending_one": "Okres próbny kończy się jutro",
       "trial_ending_other": "Okres próbny kończy się za {{count}} dni",
