@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
+import { isStaleChunkError, recoverFromStaleChunkOnce } from '@/lib/lazy-with-retry'
+
 /**
  * RouteErrorBoundary — ловит runtime-ошибки в lazy-загруженных страницах.
  * Без него любой throw в render роняет всё дерево до белого экрана —
@@ -32,6 +34,15 @@ export class RouteErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('RouteErrorBoundary caught:', error, info.componentStack)
+    // Несоответствие чанков после деплоя может всплыть и при рендере
+    // (не только при import) — напр. "Cannot read properties of null
+    // (reading 'cached')" на /admin/media сразу после релиза. Разово чистим
+    // SW/caches и перезагружаем свежий index.html, чтобы юзер не видел экран
+    // ошибки. Если после reload повторится — session-флаг не даст зациклиться,
+    // и тогда покажется обычный fallback (реальная ошибка).
+    if (isStaleChunkError(error)) {
+      void recoverFromStaleChunkOnce()
+    }
   }
 
   reset = () => this.setState({ error: null })
