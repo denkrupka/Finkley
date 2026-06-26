@@ -24,6 +24,7 @@ import {
 } from '@/hooks/useAnalytics'
 import { useFinancialSettings } from '@/hooks/useFinancialSettings'
 import { useSalon } from '@/hooks/useSalons'
+import { trackEvent } from '@/lib/analytics/track-event'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { downloadAsXls, type XlsTable } from './export-xls'
 import { PnlChartsSection } from './PnlChartsSection'
@@ -136,6 +137,7 @@ export function ReportsPage() {
     }
     const filename = `finkley-report-${format(periodStart, 'yyyy-MM-dd')}_${format(periodEnd, 'yyyy-MM-dd')}`
     downloadAsXls(tables, filename)
+    void trackEvent('finance_report_generated', salonId, { format: 'xlsx', report: 'pnl' })
   }
 
   return (

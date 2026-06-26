@@ -22,6 +22,7 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import { trackEvent } from '@/lib/analytics/track-event'
 import { getDateLocale } from '@/lib/utils/format-date'
 import { useExpenseCategories, useExpenses } from '@/hooks/useExpenses'
 import {
@@ -700,6 +701,7 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
   function exportCsv() {
     downloadBlob(buildTableCsv(), 'text/csv;charset=utf-8', 'csv')
+    void trackEvent('finance_report_generated', salonId, { format: 'csv' })
   }
   /** Реальный xlsx-совместимый файл через Excel 2003 XML (SpreadsheetML).
    *  Excel/LibreOffice открывают его как полноценную книгу — без warning'а
@@ -738,10 +740,12 @@ export function FinancialReportTab({ salonId }: { salonId: string }) {
   }
   function exportXlsx() {
     downloadBlob(buildSpreadsheetMlXml(), 'application/vnd.ms-excel', 'xls')
+    void trackEvent('finance_report_generated', salonId, { format: 'xlsx' })
   }
   function exportPdf() {
     // PDF в браузере = «Печать → Сохранить как PDF» (CSS @media print
     // настроен в globals.css так, что app-chrome скрывается).
+    void trackEvent('finance_report_generated', salonId, { format: 'pdf' })
     window.print()
   }
 

@@ -245,6 +245,25 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // Трекинг: реальная рассылка отправлена (не dry_run). Читается RPC
+  // setup_progress → задача «Первая рассылка» в чек-листе «Настройка Finkley».
+  // Пишем только если хоть что-то реально ушло (sms ИЛИ email), чтобы пустой
+  // сегмент / нулевая отправка не засчитывались как выполненная задача.
+  if (sentSms > 0 || sentEmail > 0) {
+    const { error: trackErr } = await admin.from('tracking_events').insert({
+      user_id: user.userId,
+      salon_id: salon_id,
+      event_type: 'action',
+      path: 'marketing_broadcast_sent',
+      metadata: {
+        sent_sms: sentSms,
+        sent_email: sentEmail,
+        eligible: eligible.length,
+      },
+    })
+    if (trackErr) console.warn('tracking_events insert failed:', trackErr.message)
+  }
+
   return json({
     ok: true,
     total_in_segment: filtered.length,
