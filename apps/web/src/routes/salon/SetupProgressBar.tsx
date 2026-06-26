@@ -32,12 +32,7 @@ import { toast } from 'sonner'
 
 import { BrandIcon } from '@/routes/onboarding/BrandIcon'
 import { useSalonMembership } from '@/hooks/useSalons'
-import {
-  readDismissedSteps,
-  useClaimSetupReward,
-  useSetupProgress,
-  writeDismissedStep,
-} from '@/hooks/useSetupProgress'
+import { useClaimSetupReward, useSetupProgress } from '@/hooks/useSetupProgress'
 import {
   computePercent,
   computeSetupSteps,
@@ -99,32 +94,19 @@ type TFn = (k: string, opts?: Record<string, unknown>) => string
  * салон). Один query (React Query дедуплицирует) шарится верхним баром и нижним
  * виджетом — оба рендерят одинаковые числа без prop-drilling.
  */
+/** Задания нельзя пропускать — только выполнять (трекинг). dismissed всегда
+ *  пуст: готовность/процент считаются строго по серверным данным. */
+const NO_DISMISSED: ReadonlySet<SetupStepId> = new Set()
+
 function useSetupBarModel(salonId: string) {
   const { data: progress } = useSetupProgress(salonId)
   const { data: membership } = useSalonMembership(salonId)
-  const [dismissed, setDismissed] = useState<Set<SetupStepId>>(() => readDismissedSteps(salonId))
-
-  // При смене салона перечитываем пропуски.
-  useEffect(() => {
-    setDismissed(readDismissedSteps(salonId))
-  }, [salonId])
 
   const steps = useMemo(
-    () => (progress ? computeSetupSteps(progress, dismissed) : []),
-    [progress, dismissed],
+    () => (progress ? computeSetupSteps(progress, NO_DISMISSED) : []),
+    [progress],
   )
   const groups = useMemo(() => groupSetupSteps(steps), [steps])
-
-  function toggleDismiss(step: SetupStepId) {
-    setDismissed((prev) => {
-      const next = new Set(prev)
-      const willDismiss = !next.has(step)
-      if (willDismiss) next.add(step)
-      else next.delete(step)
-      writeDismissedStep(salonId, step, willDismiss)
-      return next
-    })
-  }
 
   if (!progress) return null
   if (!shouldShowSetupBar(progress, steps, membership?.role)) return null
@@ -137,7 +119,6 @@ function useSetupBarModel(salonId: string) {
     remaining: remainingSteps(steps),
     eligible: isRewardEligible(progress, steps),
     daysLeft: rewardDaysLeft(progress.created_at),
-    toggleDismiss,
   }
 }
 
@@ -303,7 +284,7 @@ export function SetupProgressWidget({
 
   if (!model) return null
 
-  const { percent, remaining, eligible, daysLeft, toggleDismiss } = model
+  const { percent, remaining, eligible, daysLeft } = model
   const hint = collapsedHintText(t, remaining, eligible)
 
   function toggleGroup(group: SetupStepGroup) {
@@ -464,7 +445,6 @@ export function SetupProgressWidget({
                   open={openGroups.has(group.group)}
                   onToggle={() => toggleGroup(group.group)}
                   cta={cta}
-                  onDismiss={toggleDismiss}
                   t={t}
                 />
               ))}
@@ -560,14 +540,12 @@ function SetupGroupSection({
   open,
   onToggle,
   cta,
-  onDismiss,
   t,
 }: {
   group: SetupGroupView
   open: boolean
   onToggle: () => void
   cta: CtaMap
-  onDismiss: (id: SetupStepId) => void
   t: TFn
 }) {
   const GroupIcon = GROUP_ICONS[group.group]
@@ -627,13 +605,7 @@ function SetupGroupSection({
       {open ? (
         <div className="border-border/60 flex flex-col gap-1.5 border-t px-2 py-2">
           {group.steps.map((step) => (
-            <SetupTask
-              key={step.id}
-              step={step}
-              onCta={cta[step.id]}
-              onDismiss={() => onDismiss(step.id)}
-              t={t}
-            />
+            <SetupTask key={step.id} step={step} onCta={cta[step.id]} t={t} />
           ))}
         </div>
       ) : null}
@@ -641,17 +613,7 @@ function SetupGroupSection({
   )
 }
 
-function SetupTask({
-  step,
-  onCta,
-  onDismiss,
-  t,
-}: {
-  step: SetupStep
-  onCta: () => void
-  onDismiss: () => void
-  t: TFn
-}) {
+function SetupTask({ step, onCta, t }: { step: SetupStep; onCta: () => void; t: TFn }) {
   const Icon = ICONS[step.id]
   const done = step.done
   return (
@@ -661,8 +623,7 @@ function SetupTask({
         done ? 'bg-brand-sage-soft/20' : 'hover:bg-muted/40',
       )}
     >
-      {/* Строка 1: иконка + заголовок/описание. Никакого горизонтального
-          наложения с CTA — кнопки переехали на отдельную строку ниже. */}
+      {/* Строка 1: иконка + заголовок/описание. */}
       <div className="flex items-start gap-3">
         <div
           className={cn(
@@ -689,9 +650,7 @@ function SetupTask({
           </p>
           {done ? (
             <p className="text-brand-sage-deep mt-0.5 text-xs">
-              {step.dismissed
-                ? t('setup_progress.skipped', { defaultValue: 'Пропущено' })
-                : t('setup_progress.done', { defaultValue: 'Готово' })}
+              {t('setup_progress.done', { defaultValue: 'Готово' })}
             </p>
           ) : (
             <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
@@ -699,21 +658,11 @@ function SetupTask({
             </p>
           )}
         </div>
-        {/* «Вернуть» для пропущенного — компактная ссылка справа в первой строке. */}
-        {done && step.dismissed ? (
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="text-muted-foreground hover:text-foreground shrink-0 text-[11px] font-medium underline-offset-2 hover:underline"
-          >
-            {t('setup_progress.undo_skip', { defaultValue: 'Вернуть' })}
-          </button>
-        ) : null}
       </div>
 
-      {/* Строка 2: CTA + «Пропустить» — ПОД текстом, на всю ширину карточки. */}
+      {/* Строка 2: только CTA — задания нельзя пропускать, лишь выполнять. */}
       {!done ? (
-        <div className="flex items-center gap-3 pl-11">
+        <div className="pl-11">
           <button
             type="button"
             onClick={onCta}
@@ -721,17 +670,6 @@ function SetupTask({
           >
             {t(`setup_progress.cards.${step.id}.cta`)}
           </button>
-          {step.dismissable ? (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="text-muted-foreground hover:text-foreground text-[11px] font-medium underline-offset-2 hover:underline"
-            >
-              {t(`setup_progress.cards.${step.id}.skip`, {
-                defaultValue: t('setup_progress.skip', { defaultValue: 'Пропустить' }),
-              })}
-            </button>
-          ) : null}
         </div>
       ) : null}
     </div>
