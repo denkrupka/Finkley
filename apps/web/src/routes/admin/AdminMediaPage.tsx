@@ -261,10 +261,11 @@ export function AdminMediaPage() {
         og_image_url: coverUrl ?? d.og_image_url ?? null,
         draft: true,
       }))
-      // НЕ перезаписываем target на keywords[0] (LSI-ключ мог разойтись с
-      // тем, что реально вписано в title и повторено в теле). Держим фокус,
-      // который отправляли модели — тогда SEO-чеки title/плотность сходятся.
-      setTargetKeyword(kw)
+      // Плотность меряется по КОРОТКОМУ target_keyword (2–4 слова), который
+      // выбрал ИИ и вписал в title + повторил в теле 7–10 раз. Если бы держали
+      // длинный заголовок как ключ — плотность всегда была бы ~0.1%. Фоллбэк на
+      // kw, если модель не вернула target_keyword (старый формат).
+      setTargetKeyword(art.target_keyword || kw)
       toast.success(
         t('admin.media.ai.toast_full_done', {
           defaultValue: 'Статья сгенерирована. Проверь и нажми «Опубликовать».',

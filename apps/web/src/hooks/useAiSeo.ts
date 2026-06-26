@@ -66,6 +66,8 @@ export function useAiSuggestTopics() {
 }
 
 export type FullArticle = {
+  /** Короткий primary keyword (2–4 слова), по нему меряется плотность. */
+  target_keyword: string
   title: string
   seo_title: string
   description: string
