@@ -5,6 +5,7 @@
  * в Deno-runtime. Делаем тонкие fetch-обёртки на нужный subset API:
  * - POST /v1/checkout/sessions
  * - POST /v1/billing_portal/sessions
+ * - POST /v1/coupons + POST /v1/promotion_codes (одноразовые promo-награды)
  * - GET  /v1/customers
  * - POST /v1/customers
  *
@@ -151,6 +152,65 @@ export async function createOneTimeCheckout(
     body.customer_email = input.customerEmail
   }
   return call<StripeCheckoutSession>('/checkout/sessions', secret, body)
+}
+
+export type OneTimePromoCode = {
+  /** id купона (coupon.id) — техническая привязка скидки. */
+  couponId: string
+  /** id promotion_code (promo.id). */
+  promoCodeId: string
+  /** Человекочитаемый код (promotion_code.code) — его показываем юзеру. */
+  code: string
+}
+
+/**
+ * Создаёт одноразовый Stripe promo code на фиксированную скидку.
+ *
+ * Шаг 1: POST /v1/coupons — amount_off (в наименьших единицах валюты),
+ *        duration=once, max_redemptions=1. Купон одноразовый, применяется
+ *        к одному инвойсу.
+ * Шаг 2: POST /v1/promotion_codes — оборачивает купон в человекочитаемый код
+ *        (Stripe сам сгенерит, напр. «FINKLEY3A9X»), max_redemptions=1.
+ *
+ * Код вводится юзером на странице Checkout (allow_promotion_codes:true уже
+ * включён в createCheckoutSession) — Stripe сам валидирует и применяет скидку.
+ *
+ * metadata прокидывается и в купон, и в promotion_code (для трассировки в
+ * Stripe Dashboard: kind, user_id, referral_use_id и т.п.).
+ */
+export async function createOneTimePromoCode(
+  secret: string,
+  input: {
+    amountOffCents: number
+    currency?: string
+    /** Имя купона для Dashboard (необяз.). */
+    name?: string
+    metadata?: Record<string, string>
+  },
+): Promise<OneTimePromoCode> {
+  const currency = (input.currency ?? 'eur').toLowerCase()
+  const couponBody: Record<string, unknown> = {
+    amount_off: input.amountOffCents,
+    currency,
+    duration: 'once',
+    max_redemptions: 1,
+    name: input.name ?? 'Finkley reward',
+  }
+  if (input.metadata) {
+    for (const [k, v] of Object.entries(input.metadata)) couponBody[`metadata[${k}]`] = v
+  }
+  const coupon = await call<{ id: string }>('/coupons', secret, couponBody)
+
+  const promoBody: Record<string, unknown> = {
+    coupon: coupon.id,
+    max_redemptions: 1,
+  }
+  if (input.metadata) {
+    for (const [k, v] of Object.entries(input.metadata)) promoBody[`metadata[${k}]`] = v
+  }
+  const promo = await call<{ id: string; code: string }>('/promotion_codes', secret, promoBody)
+
+  return { couponId: coupon.id, promoCodeId: promo.id, code: promo.code }
 }
 
 export type StripePortalSession = { id: string; url: string }

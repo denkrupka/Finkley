@@ -1,25 +1,38 @@
 /**
- * claim-setup-reward edge function
+ * claim-setup-reward edge function (ADR-036)
  *
- * Выдаёт награду «+14 дней демо» за прохождение «Настройки Finkley» на 100%
- * в течение 7 дней с момента создания салона.
+ * Выдаёт награду за прохождение «Настройки Finkley»: одноразовый Stripe
+ * promo code на €20 (раньше было «+14 дней демо»). Код применяется юзером
+ * при оплате подписки на Stripe Checkout (allow_promotion_codes уже включён).
  *
- * Защита от абуза (см. требования владельца):
- *   1. Completion считается на СЕРВЕРЕ из реальных событий — функция сама
- *      проверяет >=1 визит И >=1 расход (минимум реальных данных).
- *   2. Один приз на Stripe customer / NIP (а не на аккаунт) — дедуп через
- *      UNIQUE-леджер setup_reward_grants(dedup_key). Insert→catch 23505.
- *   3. Глобальный лимит выдачи (REWARD_MAX_GRANTS) + Sentry-лог каждого
- *      гранта и достижения лимита.
+ * Право (серверная проверка):
+ *   1. ВСЕ core-задания настройки выполнены — считаем на СЕРВЕРЕ через RPC
+ *      setup_progress(salon): has_visit && has_expense && booksy_connected &&
+ *      bank_connected && dashboard_opened. Это совпадает с UI-гейтом
+ *      isCoreComplete (apps/web setup-progress.ts). Extra-задания на сервере
+ *      не проверяем — они dismissable (пропуск хранится в localStorage клиента,
+ *      сервер про него не знает), поэтому «100% всех заданий» = UI-altitude
+ *      гейт кнопки, а реальный анти-абуз держим на core + леджере. См. ADR-036.
+ *   2. Минимум реальных данных гарантируется core-проверкой (has_visit &&
+ *      has_expense входят в core).
+ *   3. Один приз на Stripe customer / NIP / аккаунт — UNIQUE-леджер
+ *      setup_reward_grants(dedup_key). Insert→catch 23505.
+ *   4. Глобальный лимит выдачи (REWARD_MAX_GRANTS) + Sentry-лог.
  *
- * Грант = salon_subscriptions.bonus_until (механизм ручного продления,
- * миграция 20260514150000). Работает и для implicit-trial салонов, и поверх
- * Stripe-триала, без обращения к Stripe API.
+ * Окно: 30 дней с момента создания салона (раньше было 7 — расширили, т.к.
+ * награда стала промокодом, а не продлением триала: меньше срочности, больше
+ * шансов довести настройку до конца). См. ADR-036.
+ *
+ * Контракт ответа: { granted: boolean, code?: string, reason?: string }.
+ *   granted=true  → code = промокод (€20), показываем юзеру в UI.
+ *   granted=false → reason ∈ {forbidden, already_claimed, window_expired,
+ *                   incomplete, limit_reached}.
  *
  * ENV:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- *   REWARD_MAX_GRANTS  (опц., дефолт 100000) — потолок суммарной выдачи
- *   SENTRY_DSN_SERVER  (опц.)
+ *   STRIPE_SECRET_KEY     — для генерации Stripe promo code (live)
+ *   REWARD_MAX_GRANTS     (опц., дефолт 100000) — потолок суммарной выдачи
+ *   SENTRY_DSN_SERVER     (опц.)
  *
  * POST { salon_id } + Authorization: Bearer <user_jwt>
  */
@@ -27,15 +40,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
 import { getSalonMembership, getUserFromRequest } from '../_shared/auth.ts'
 import { corsHeaders, preflight } from '../_shared/cors.ts'
+import { sendEmail } from '../_shared/notify.ts'
+import { grantPromoReward } from '../_shared/promo-reward.ts'
+import { pickLocale } from '../_shared/salon-lookup.ts'
 import { captureMessage, withSentry } from '../_shared/sentry.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
 const REWARD_MAX_GRANTS = Number(Deno.env.get('REWARD_MAX_GRANTS') ?? '100000')
-const REWARD_DAYS = 14
-const WINDOW_DAYS = 7
+const REWARD_AMOUNT_CENTS = 2000 // €20
+const REWARD_CURRENCY = 'eur'
+const WINDOW_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
-const IMPLICIT_TRIAL_DAYS = 14
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -51,12 +69,27 @@ function normalizeNip(raw: unknown): string | null {
   return digits.length >= 10 ? digits : null
 }
 
+/** Все core-задания «Настройки Finkley» выполнены (зеркало isCoreComplete). */
+type SetupProgressRow = {
+  has_visit: boolean
+  has_expense: boolean
+  booksy_connected: boolean
+  bank_connected: boolean
+  dashboard_opened: boolean
+}
+function isCoreComplete(p: SetupProgressRow): boolean {
+  return (
+    p.has_visit && p.has_expense && p.booksy_connected && p.bank_connected && p.dashboard_opened
+  )
+}
+
 Deno.serve(
   withSentry('claim-setup-reward', async (req: Request) => {
     if (req.method === 'OPTIONS') return preflight()
     if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
-    if (!SUPABASE_URL || !SERVICE_ROLE)
+    if (!SUPABASE_URL || !SERVICE_ROLE || !STRIPE_KEY) {
       return jsonResponse({ error: 'function_not_configured' }, 500)
+    }
 
     const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_ROLE)
     if (!user) return jsonResponse({ error: 'unauthorized' }, 401)
@@ -80,10 +113,12 @@ Deno.serve(
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
-    // Салон + уже выданная награда + NIP (из accounting_settings).
+    // Салон + уже выданная награда + NIP (из accounting_settings) + locale.
     const { data: salon, error: salonErr } = await admin
       .from('salons')
-      .select('id, created_at, accounting_settings, setup_reward_granted_at')
+      .select(
+        'id, name, created_at, locale, country_code, accounting_settings, setup_reward_granted_at',
+      )
       .eq('id', salonId)
       .maybeSingle()
     if (salonErr) return jsonResponse({ error: salonErr.message }, 500)
@@ -96,34 +131,35 @@ Deno.serve(
     const createdMs = new Date(salon.created_at).getTime()
     const nowMs = Date.now()
 
-    // Окно 7 дней с создания салона.
+    // Окно 30 дней с создания салона.
     if (nowMs - createdMs > WINDOW_DAYS * DAY_MS) {
       return jsonResponse({ granted: false, reason: 'window_expired' })
     }
 
-    // Минимум реальных данных: >=1 визит И >=1 расход (серверная проверка).
-    const [visitRes, expenseRes] = await Promise.all([
-      admin
-        .from('visits')
-        .select('id', { count: 'exact', head: true })
-        .eq('salon_id', salonId)
-        .is('deleted_at', null),
-      admin
-        .from('expenses')
-        .select('id', { count: 'exact', head: true })
-        .eq('salon_id', salonId)
-        .is('deleted_at', null),
-    ])
-    const hasVisit = (visitRes.count ?? 0) > 0
-    const hasExpense = (expenseRes.count ?? 0) > 0
-    if (!hasVisit || !hasExpense) {
-      return jsonResponse({ granted: false, reason: 'incomplete', hasVisit, hasExpense })
+    // Серверная проверка прохождения настройки: ВСЕ core-задания выполнены.
+    const { data: progressRows, error: progressErr } = await admin.rpc('setup_progress', {
+      p_salon_id: salonId,
+    })
+    if (progressErr) return jsonResponse({ error: progressErr.message }, 500)
+    const progress = (
+      Array.isArray(progressRows) ? progressRows[0] : progressRows
+    ) as SetupProgressRow | null
+    if (!progress || !isCoreComplete(progress)) {
+      return jsonResponse({
+        granted: false,
+        reason: 'incomplete',
+        has_visit: progress?.has_visit ?? false,
+        has_expense: progress?.has_expense ?? false,
+        booksy_connected: progress?.booksy_connected ?? false,
+        bank_connected: progress?.bank_connected ?? false,
+        dashboard_opened: progress?.dashboard_opened ?? false,
+      })
     }
 
-    // Подписка (для dedup-ключа и расчёта конца доступа).
+    // Подписка (для dedup-ключа: один приз на Stripe customer).
     const { data: sub } = await admin
       .from('salon_subscriptions')
-      .select('id, status, trial_ends_at, current_period_end, bonus_until, stripe_customer_id')
+      .select('id, stripe_customer_id')
       .eq('salon_id', salonId)
       .maybeSingle()
 
@@ -149,16 +185,16 @@ Deno.serve(
     }
 
     // Идемпотентная вставка в леджер: UNIQUE(dedup_key) → 23505 = уже выдано.
+    // Делаем ДО создания Stripe-промокода — чтобы не плодить купоны при гонке.
     const { error: ledgerErr } = await admin.from('setup_reward_grants').insert({
       salon_id: salonId,
       user_id: user.userId,
       dedup_key: dedupKey,
-      bonus_days: REWARD_DAYS,
+      bonus_days: 0, // награда теперь промокод, не дни; колонка оставлена для совместимости
     })
     if (ledgerErr) {
       if (ledgerErr.code === '23505') {
-        // Этот customer/NIP уже получал приз (возможно на другой аккаунт/салон).
-        // Помечаем салон, чтобы не дёргать повторно.
+        // Этот customer/NIP уже получал приз. Помечаем салон, чтобы не дёргать.
         await admin
           .from('salons')
           .update({ setup_reward_granted_at: new Date().toISOString() })
@@ -168,53 +204,68 @@ Deno.serve(
       return jsonResponse({ error: ledgerErr.message }, 500)
     }
 
-    // Конец доступа = max(сейчас, implicit-trial, trial_ends_at,
-    // current_period_end, bonus_until) + 14 дней.
-    const candidates = [
-      nowMs,
-      createdMs + IMPLICIT_TRIAL_DAYS * DAY_MS,
-      sub?.trial_ends_at ? new Date(sub.trial_ends_at).getTime() : 0,
-      sub?.current_period_end ? new Date(sub.current_period_end).getTime() : 0,
-      sub?.bonus_until ? new Date(sub.bonus_until).getTime() : 0,
-    ].filter((n) => Number.isFinite(n) && n > 0)
-    const baseMs = Math.max(...candidates)
-    const newEndIso = new Date(baseMs + REWARD_DAYS * DAY_MS).toISOString()
-
-    if (sub) {
-      const { error } = await admin
-        .from('salon_subscriptions')
-        .update({ bonus_until: newEndIso, granted_reason: 'setup_reward' })
-        .eq('id', sub.id)
-      if (error) return jsonResponse({ error: error.message }, 500)
-    } else {
-      const { error } = await admin.from('salon_subscriptions').insert({
-        salon_id: salonId,
-        stripe_customer_id: null,
-        stripe_subscription_id: null,
-        stripe_price_id: null,
-        status: 'trialing',
-        trial_ends_at: newEndIso,
-        current_period_start: new Date(nowMs).toISOString(),
-        current_period_end: newEndIso,
-        source: 'manual_admin',
-        bonus_until: newEndIso,
-        granted_reason: 'setup_reward',
+    // Создаём Stripe promo code €20 + INSERT promo_rewards.
+    let code: string
+    try {
+      const result = await grantPromoReward(admin, STRIPE_KEY, {
+        userId: user.userId,
+        kind: 'setup',
+        amountCents: REWARD_AMOUNT_CENTS,
+        currency: REWARD_CURRENCY,
       })
-      if (error) return jsonResponse({ error: error.message }, 500)
+      code = result.code
+    } catch (err) {
+      // Откатываем леджер, чтобы юзер мог повторить попытку.
+      await admin.from('setup_reward_grants').delete().eq('dedup_key', dedupKey)
+      throw err
     }
 
+    // Помечаем салон как награждённый (скрывает повторный клик в UI).
     await admin
       .from('salons')
       .update({ setup_reward_granted_at: new Date().toISOString() })
       .eq('id', salonId)
 
-    await captureMessage('setup_reward granted', 'info', {
+    // Email с промокодом владельцу. Email/имя берём из auth.users по user_id
+    // + locale каскадом (profile.locale → salon.locale → country_code → ru).
+    const salonRow = salon as {
+      name: string
+      locale?: string | null
+      country_code?: string | null
+    }
+    const { data: userRes } = await admin.auth.admin.getUserById(user.userId)
+    const ownerEmail = userRes?.user?.email ?? ''
+    const fullName =
+      (userRes?.user?.user_metadata?.full_name as string | undefined) ||
+      ownerEmail.split('@')[0] ||
+      salonRow.name
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('locale')
+      .eq('id', user.userId)
+      .maybeSingle()
+    const profileLocale = (profile as { locale?: string | null } | null)?.locale
+    const locale = pickLocale(profileLocale, salonRow.locale, salonRow.country_code)
+    await sendEmail(
+      'setup_reward_promo',
+      ownerEmail,
+      {
+        full_name: fullName,
+        salon_name: salonRow.name,
+        owner_name: 'команда Finkley',
+        code,
+        amount: '€20',
+        billing_url: `${APP_URL}${salonId}/settings`,
+      },
+      locale,
+    )
+
+    await captureMessage('setup_reward promo granted', 'info', {
       fn: 'claim-setup-reward',
       salon_id: salonId,
       dedup_key: dedupKey,
-      bonus_until: newEndIso,
     })
 
-    return jsonResponse({ granted: true, bonus_days: REWARD_DAYS, bonus_until: newEndIso })
+    return jsonResponse({ granted: true, code, amount_cents: REWARD_AMOUNT_CENTS })
   }),
 )

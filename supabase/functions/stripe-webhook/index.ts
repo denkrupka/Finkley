@@ -26,18 +26,25 @@
  * Деплой: --no-verify-jwt (Stripe не шлёт Supabase-аут).
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
-import { sendEmail, type EmailTemplate } from '../_shared/notify.ts'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.6'
+import { type EmailTemplate, sendEmail } from '../_shared/notify.ts'
 import { planForPriceId } from '../_shared/plans.ts'
-import { getOwnerByStripeCustomer, getOwnerBySubscriptionId } from '../_shared/salon-lookup.ts'
-import { captureException } from '../_shared/sentry.ts'
+import { grantPromoReward } from '../_shared/promo-reward.ts'
+import {
+  getOwnerBySalonId,
+  getOwnerByStripeCustomer,
+  getOwnerBySubscriptionId,
+} from '../_shared/salon-lookup.ts'
+import { captureException, captureMessage } from '../_shared/sentry.ts'
 import { createSmsApiSender } from '../_shared/smsapi-sender.ts'
 import { verifyStripeSignature } from '../_shared/stripe.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? ''
+const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
+const REFERRAL_REWARD_CENTS = 1500 // €15 рефереру за первую платную подписку приглашённого
 
 type StripeEvent = {
   id: string
@@ -261,6 +268,11 @@ Deno.serve(async (req: Request) => {
             },
             { onConflict: 'salon_id' },
           )
+
+          // ADR-036 — реферал: приглашённый owner оформил подписку (первая
+          // продажа) → наградить реферера €15. Owner салона = referred_user.
+          const owner = await getOwnerBySalonId(salonId)
+          if (owner) await maybeGrantReferralReward(admin, owner.user_id)
         }
         break
       }
@@ -299,6 +311,18 @@ Deno.serve(async (req: Request) => {
               resubscribe_url: `${APP_URL}${owner.salon_id}/settings`,
             })
           }
+        }
+
+        // ADR-036 — реферал: подписка приглашённого стала активной/триальной
+        // (первая продажа). Owner салона = referred_user. Идемпотентно через
+        // activated_at IS NULL guard — повторные created/updated не дублируют.
+        if (
+          (event.type === 'customer.subscription.created' ||
+            event.type === 'customer.subscription.updated') &&
+          (sub.status === 'active' || sub.status === 'trialing')
+        ) {
+          const owner = await getOwnerBySalonId(salonId)
+          if (owner) await maybeGrantReferralReward(admin, owner.user_id)
         }
         break
       }
@@ -351,6 +375,126 @@ Deno.serve(async (req: Request) => {
 
   return new Response('ok', { status: 200 })
 })
+
+/**
+ * ADR-036 — реферальная награда. Когда приглашённый по ref-ссылке юзер
+ * оформляет ПЕРВУЮ платную подписку → рефереру одноразовый €15 promo code.
+ *
+ * Триггер: «первая продажа» приглашённого. Находим referral_uses, где
+ * referred_user_id = owner подписавшегося салона И activated_at IS NULL.
+ * Если есть — ставим activated_at=now() (guard against race), генерим
+ * €15 promo для referrer_user_id, шлём ему письмо.
+ *
+ * Идемпотентность:
+ *   * UPDATE ... WHERE activated_at IS NULL — атомарно «первый забирает»;
+ *     если строк не обновили (уже активировано) — выходим.
+ *   * grantPromoReward дедуплит по UNIQUE(referral_use_id) (на случай гонки
+ *     до коммита UPDATE).
+ *
+ * Никогда не бросает — реферал не должен ронять основной webhook-flow.
+ */
+async function maybeGrantReferralReward(
+  admin: SupabaseClient,
+  referredUserId: string,
+): Promise<void> {
+  if (!STRIPE_KEY) return
+  try {
+    // Незакрытое использование реф-ссылки этим юзером.
+    const { data: useRow } = await admin
+      .from('referral_uses')
+      .select('id, referrer_user_id')
+      .eq('referred_user_id', referredUserId)
+      .is('activated_at', null)
+      .maybeSingle()
+    const use = useRow as { id: string; referrer_user_id: string } | null
+    if (!use) return
+
+    // Атомарно занимаем: только тот, кто перевёл NULL→now(), продолжает.
+    const { data: claimed } = await admin
+      .from('referral_uses')
+      .update({ activated_at: new Date().toISOString() })
+      .eq('id', use.id)
+      .is('activated_at', null)
+      .select('id')
+      .maybeSingle()
+    if (!claimed) return // другой инстанс уже активировал
+
+    // Генерим €15 promo рефереру + леджер promo_rewards (idempotent по use.id).
+    const result = await grantPromoReward(admin, STRIPE_KEY, {
+      userId: use.referrer_user_id,
+      kind: 'referral',
+      amountCents: REFERRAL_REWARD_CENTS,
+      referralUseId: use.id,
+    })
+
+    // Письмо рефереру с промокодом (его email/locale — через любой его салон).
+    const referrer = await getOwnerByReferrerUserId(admin, use.referrer_user_id)
+    if (referrer) {
+      await sendEmail(
+        'referral_reward_promo',
+        referrer.email,
+        {
+          full_name: referrer.full_name || referrer.salon_name,
+          salon_name: referrer.salon_name,
+          owner_name: ownerNameForLocale(referrer.locale),
+          code: result.code,
+          amount: '€15',
+          billing_url: `${APP_URL}${referrer.salon_id}/settings`,
+        },
+        referrer.locale,
+      )
+    }
+
+    await captureMessage('referral promo granted', 'info', {
+      fn: 'stripe-webhook',
+      referral_use_id: use.id,
+      referrer_user_id: use.referrer_user_id,
+      referred_user_id: referredUserId,
+      reused: result.reused,
+    })
+  } catch (err) {
+    // Реферал — best-effort: логируем, но не валим webhook.
+    await captureException(err, { fn: 'stripe-webhook', step: 'referral_reward' })
+  }
+}
+
+/** Email/имя/locale реферера через его owner-салон (для письма). */
+async function getOwnerByReferrerUserId(
+  admin: SupabaseClient,
+  referrerUserId: string,
+): Promise<{
+  email: string
+  full_name: string
+  salon_id: string
+  salon_name: string
+  locale: string
+} | null> {
+  const { data: member } = await admin
+    .from('salon_members')
+    .select('salon_id')
+    .eq('user_id', referrerUserId)
+    .eq('role', 'owner')
+    .limit(1)
+    .maybeSingle()
+  const salonId = (member as { salon_id?: string } | null)?.salon_id
+  if (!salonId) return null
+  const owner = await getOwnerBySalonId(salonId)
+  if (!owner) return null
+  return {
+    email: owner.email,
+    full_name: owner.full_name,
+    salon_id: owner.salon_id,
+    salon_name: owner.salon_name,
+    locale: owner.locale,
+  }
+}
+
+function ownerNameForLocale(locale: string): string {
+  const base = locale.split('-')[0]?.toLowerCase() ?? 'ru'
+  if (base === 'pl') return 'zespół Finkley'
+  if (base === 'en') return 'Finkley team'
+  return 'команда Finkley'
+}
 
 /**
  * Тонкая обёртка с дефолтными переменными для шаблонов писем

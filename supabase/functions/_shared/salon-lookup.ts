@@ -24,7 +24,7 @@ function admin(): SupabaseClient {
   )
 }
 
-async function getOwnerBySalonId(salonId: string): Promise<OwnerInfo | null> {
+export async function getOwnerBySalonId(salonId: string): Promise<OwnerInfo | null> {
   const supa = admin()
   // salon.locale — fallback для приглашённых, у кого profile.locale ещё не задан.
   // country_code тоже учитываем как 2-й fallback (PL → pl, по странам Booksy).

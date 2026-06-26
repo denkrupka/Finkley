@@ -24,6 +24,8 @@ export type TemplateAlias =
   | 'activation_drip_visit'
   | 'activation_drip_reward'
   | 'winback_trial'
+  | 'setup_reward_promo'
+  | 'referral_reward_promo'
 
 export type EmailTemplate = {
   subject: string
@@ -793,6 +795,106 @@ Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
 <p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
 Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша<br>
 Не хочешь такие напоминания? Напиши info@finkley.app
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  setup_reward_promo: {
+    subject: 'Поздравляем! Ваш промокод на {{amount}} 🎉',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промокод за настройку Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Поздравляем, {{full_name}}! 🎉</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Вы прошли настройку Finkley по салону <strong>{{salon_name}}</strong>. Спасибо, что довели всё до конца — теперь Finkley работает на полную.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Ваш промокод на <strong>{{amount}}</strong> — примените его при оплате подписки:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Ваш промокод</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Оформить подписку</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Скидка применяется один раз при оплате — введите код в поле «Промокод» на странице оплаты.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  referral_reward_promo: {
+    subject: 'Ваш друг оформил подписку — промокод на {{amount}} 🎁',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Реферальный промокод Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Спасибо, {{full_name}}! 🎁</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Ваш друг оформил платную подписку Finkley по вашей реферальной ссылке. В благодарность дарим вам подарок.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Ваш реферальный промокод на <strong>{{amount}}</strong> — примените его при оплате подписки:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Ваш промокод</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Применить промокод</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Скидка применяется один раз при оплате — введите код в поле «Промокод» на странице оплаты. Приглашайте ещё друзей — за каждую первую подписку дарим новый промокод.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Создатель Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;юр.лицо&gt;, &lt;адрес&gt;, Польша
 </p>
 </td></tr>
 </table>
@@ -2021,6 +2123,206 @@ Nie chcesz takich przypomnień? Napisz na info@finkley.app
 </td></tr></table></body></html>`,
 }
 
+const SETUP_REWARD_PROMO_EN: EmailTemplate = {
+  subject: 'Congrats! Your {{amount}} promo code 🎉',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Finkley setup reward</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Congrats, {{full_name}}! 🎉</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+You've completed the Finkley setup for <strong>{{salon_name}}</strong>. Thanks for going all the way — Finkley is now running at full power.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Here's your <strong>{{amount}}</strong> promo code — apply it when you subscribe:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Your promo code</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Subscribe now</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+The discount applies once at checkout — enter the code in the "Promo code" field on the payment page.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
+const SETUP_REWARD_PROMO_PL: EmailTemplate = {
+  subject: 'Gratulacje! Twój kod promocyjny na {{amount}} 🎉',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nagroda za konfigurację Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Gratulacje, {{full_name}}! 🎉</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Ukończyłeś konfigurację Finkley dla salonu <strong>{{salon_name}}</strong>. Dziękujemy, że doprowadziłeś wszystko do końca — Finkley działa teraz na pełnych obrotach.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Oto Twój kod promocyjny na <strong>{{amount}}</strong> — użyj go przy opłacie subskrypcji:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Twój kod promocyjny</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Wykup subskrypcję</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Zniżka działa jednorazowo przy płatności — wpisz kod w polu „Kod promocyjny" na stronie płatności.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
+const REFERRAL_REWARD_PROMO_EN: EmailTemplate = {
+  subject: 'Your friend subscribed — {{amount}} promo code 🎁',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Finkley referral reward</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Thank you, {{full_name}}! 🎁</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Your friend just took out a paid Finkley subscription through your referral link. Here's a little thank-you.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Your referral promo code for <strong>{{amount}}</strong> — apply it when you subscribe:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Your promo code</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Apply promo code</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+The discount applies once at checkout — enter the code in the "Promo code" field on the payment page. Invite more friends — every first subscription earns you a new promo code.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Founder of Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;legal entity&gt;, &lt;address&gt;, Poland
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
+const REFERRAL_REWARD_PROMO_PL: EmailTemplate = {
+  subject: 'Twój znajomy wykupił subskrypcję — kod na {{amount}} 🎁',
+  html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nagroda za polecenie Finkley</title>
+</head>
+<body style="margin:0; padding:0; background:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc; padding: 40px 20px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff; border-radius:8px; padding:40px;">
+<tr><td>
+<h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; color:#0f172a;">Dziękujemy, {{full_name}}! 🎁</h1>
+<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#334155;">
+Twój znajomy właśnie wykupił płatną subskrypcję Finkley z Twojego linku polecającego. Oto mały prezent w podziękowaniu.
+</p>
+<p style="margin:0 0 24px 0; font-size:16px; line-height:24px; color:#334155;">
+Twój kod polecający na <strong>{{amount}}</strong> — użyj go przy opłacie subskrypcji:
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#ecfdf5; border-radius:6px; padding:20px; margin-bottom:24px;">
+<tr><td align="center">
+<p style="margin:0 0 4px 0; font-size:13px; color:#047857;">Twój kod promocyjny</p>
+<p style="margin:0; font-size:28px; font-weight:700; letter-spacing:0.08em; color:#065f46;">{{code}}</p>
+</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="background:#0f172a; border-radius:6px; padding:14px 32px;">
+<a href="{{billing_url}}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">Użyj kodu</a>
+</td></tr>
+</table>
+<p style="margin:32px 0 16px 0; font-size:14px; line-height:22px; color:#64748b;">
+Zniżka działa jednorazowo przy płatności — wpisz kod w polu „Kod promocyjny" na stronie płatności. Polecaj kolejnych znajomych — za każdą pierwszą subskrypcję dajemy nowy kod.
+</p>
+<p style="margin:24px 0 0 0; font-size:16px; line-height:24px; color:#334155;">
+{{owner_name}}<br>
+<span style="color:#64748b; font-size:14px;">Twórca Finkley</span>
+</p>
+</td></tr>
+</table>
+<p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#94a3b8; text-align:center;">
+Finkley · &lt;podmiot prawny&gt;, &lt;adres&gt;, Polska
+</p>
+</td></tr>
+</table>
+</body>
+</html>`,
+}
+
 const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailTemplate>>> = {
   ru: {}, // RU — основной набор в TEMPLATES
   en: {
@@ -2038,6 +2340,8 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     activation_drip_visit: ACTIVATION_DRIP_VISIT_EN,
     activation_drip_reward: ACTIVATION_DRIP_REWARD_EN,
     winback_trial: WINBACK_TRIAL_EN,
+    setup_reward_promo: SETUP_REWARD_PROMO_EN,
+    referral_reward_promo: REFERRAL_REWARD_PROMO_EN,
   },
   pl: {
     welcome: WELCOME_PL,
@@ -2054,6 +2358,8 @@ const LOCALE_OVERRIDES: Record<EmailLocale, Partial<Record<TemplateAlias, EmailT
     activation_drip_visit: ACTIVATION_DRIP_VISIT_PL,
     activation_drip_reward: ACTIVATION_DRIP_REWARD_PL,
     winback_trial: WINBACK_TRIAL_PL,
+    setup_reward_promo: SETUP_REWARD_PROMO_PL,
+    referral_reward_promo: REFERRAL_REWARD_PROMO_PL,
   },
 }
 

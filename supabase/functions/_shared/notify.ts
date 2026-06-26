@@ -22,6 +22,8 @@ export type EmailTemplate =
   | 'activation_drip_visit'
   | 'activation_drip_reward'
   | 'winback_trial'
+  | 'setup_reward_promo'
+  | 'referral_reward_promo'
 
 /**
  * Возвращает готовый HTML-блок с логотипом салона для подстановки в письмо.
