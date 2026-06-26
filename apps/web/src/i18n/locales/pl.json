@@ -2001,36 +2001,36 @@
     "portal_note": "Otworzy się bezpieczny portal Stripe — tam karta, faktury i anulowanie.",
     "plans": {
       "t19": {
-        "blurb": "Pełna kontrola nad pieniędzmi: przychody, koszty, raporty i rozmowy z klientkami.",
+        "blurb": "Wszystkie pieniądze salonu pod kontrolą.",
         "tagline": "Najlepsza cena",
         "f1": "Wszystko z planu darmowego",
-        "f2": "Koszty: wydatki wg kategorii, skan paragonów i dyktowanie głosem, dopasowanie do banku",
-        "f3": "Raporty: marża na usłudze, wyniki pracowników, powracalność klientek",
-        "f4": "Komunikator: Instagram, Facebook, Telegram, WhatsApp w jednej skrzynce",
-        "f5": "Wszystkie integracje: Booksy, Fresha, Treatwell, banki (PSD2), księgowość (wFirma, KSeF)"
+        "f2": "Koszty: skan paragonów, dyktowanie, bank",
+        "f3": "Raporty: marża, pracownicy, zwroty",
+        "f4": "Komunikatory w jednej skrzynce",
+        "f5": "Integracje: Booksy, banki, księgowość"
       },
       "t49": {
-        "blurb": "Kontrola finansów plus odzyskiwanie klientek wysyłkami i asystent AI od zysku.",
+        "blurb": "Odzyskuj klientki i zwiększaj utarg.",
         "f1": "Wszystko z planu €19",
-        "f2": "Marketing: wysyłki SMS i e-mail, promocje, przypomnienia o wizycie i odzyskiwanie „uśpionych”",
-        "f3": "Asystent AI: analiza salonu, porady o zysku, dodawanie wizyt i kosztów głosem",
-        "f4": "Automatyczne prośby o opinię po wizycie"
+        "f2": "Marketing: wysyłki, promocje, przypomnienia",
+        "f3": "Asystent AI od zysku + wpisywanie głosem",
+        "f4": "Auto-prośby o opinię po wizycie"
       },
       "t69": {
-        "blurb": "Wszystkie sekcje produktu, łącznie z finansami i magazynem — nic nie jest zablokowane.",
+        "blurb": "Cały produkt bez ograniczeń.",
         "f1": "Wszystko z planu €49",
-        "f2": "Finanse: P&L, przepływy pieniężne, plan/fakt i zysk netto",
-        "f3": "Magazyn: stany, odpisy, niskie stany, skan faktur",
-        "f4": "Budżety: plan przychodów i kosztów z kontrolą faktu",
+        "f2": "Finanse: P&L, przepływy, zysk netto",
+        "f3": "Magazyn: stany, odpisy, faktury",
+        "f4": "Budżety: plan/fakt",
         "f5": "Priorytetowe wsparcie"
       },
       "t99": {
-        "blurb": "Wszystko z planu Pełny plus kilka salonów na jednym koncie.",
+        "blurb": "Kilka salonów na jednym koncie.",
         "tagline": "Multi-salon",
         "f1": "Wszystko z planu €69",
-        "f2": "Kilka salonów na jednym koncie, przełącznik w nagłówku",
-        "f3": "Osobne rozliczenia i raporty dla każdego salonu",
-        "f4": "Porównanie salonów między sobą"
+        "f2": "Kilka salonów + przełącznik",
+        "f3": "Osobne rozliczenia i raporty",
+        "f4": "Porównanie salonów"
       }
     },
     "banner": {
