@@ -400,50 +400,57 @@ export function SetupProgressWidget({
 
           {/* Скролл-контент */}
           <div className="overflow-y-auto px-3 py-3">
-            {/* Плашка приза «+14 дней»: иконка + текст в строку, кнопка claim ниже. */}
+            {/* Плашка приза «+14 дней» — компактная. Награда доступна (eligible)
+                → активный золотой вид + кнопка. Награда ещё не готова → неактивный
+                (приглушённый, серый) вид, без кнопки. */}
             <div
               className={cn(
-                'mb-3 rounded-lg border-2 border-dashed p-3',
+                'mb-3 flex items-start gap-2.5 rounded-lg border p-2.5',
                 eligible
-                  ? 'border-brand-gold-deep bg-brand-gold-soft/30'
-                  : 'border-brand-teal-deep/30 bg-brand-teal-soft/15',
+                  ? 'border-brand-gold-deep bg-brand-gold-soft'
+                  : 'border-border bg-muted/40',
               )}
             >
-              <div className="flex items-start gap-2.5">
-                <Gift
+              <Gift
+                className={cn(
+                  'mt-0.5 size-4 shrink-0',
+                  eligible ? 'text-brand-gold-deep' : 'text-muted-foreground',
+                )}
+                strokeWidth={2}
+              />
+              <div className="min-w-0 flex-1">
+                <p
                   className={cn(
-                    'mt-0.5 size-5 shrink-0',
-                    eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+                    'text-xs leading-snug',
+                    eligible ? 'text-brand-navy font-semibold' : 'text-muted-foreground',
                   )}
-                  strokeWidth={2}
-                />
-                <p className="text-foreground/90 min-w-0 flex-1 text-xs leading-snug">
+                >
                   {eligible
                     ? t('setup_progress.reward.ready', {
-                        defaultValue: 'Всё готово! Заберите подарок — 14 дополнительных дней демо.',
+                        defaultValue: 'Подарок готов — заберите +14 дней демо.',
                       })
                     : t('setup_progress.reward.promise', {
                         days: daysLeft,
                         defaultValue:
-                          'Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.',
+                          'Бонус +14 дней демо — за выполнение ключевых заданий ({{days}} дн.).',
                       })}
                 </p>
+                {eligible ? (
+                  <button
+                    type="button"
+                    onClick={handleClaim}
+                    disabled={claim.isPending}
+                    className="bg-brand-gold-deep mt-2 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  >
+                    {claim.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+                    ) : (
+                      <Gift className="size-3.5" strokeWidth={2.2} />
+                    )}
+                    {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать +14 дней' })}
+                  </button>
+                ) : null}
               </div>
-              {eligible ? (
-                <button
-                  type="button"
-                  onClick={handleClaim}
-                  disabled={claim.isPending}
-                  className="bg-brand-gold-deep mt-2.5 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                >
-                  {claim.isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
-                  ) : (
-                    <Gift className="size-3.5" strokeWidth={2.2} />
-                  )}
-                  {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать +14 дней' })}
-                </button>
-              ) : null}
             </div>
 
             {/* Категории-аккордеоны */}
@@ -469,10 +476,12 @@ export function SetupProgressWidget({
         type="button"
         onClick={onToggleExpanded}
         className={cn(
-          'relative flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left shadow-xl transition-colors',
+          // ВАЖНО: фон НЕпрозрачный (виджет плавает над контентом) — без /alpha,
+          // иначе сквозь него просвечивают тексты/полоски дашборда.
+          'relative flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left shadow-xl transition hover:brightness-[0.97]',
           eligible
-            ? 'border-brand-gold-deep bg-brand-gold-soft/50 hover:bg-brand-gold-soft/70'
-            : 'border-brand-teal-deep/50 bg-card hover:bg-brand-teal-soft/20',
+            ? 'border-brand-gold-deep bg-brand-gold-soft'
+            : 'border-brand-teal-deep/50 bg-card',
         )}
         aria-expanded={expanded}
       >
