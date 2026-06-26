@@ -20,9 +20,6 @@ const BooksyIcon = makeBrandIcon('booksy')
 const FreshaIcon = makeBrandIcon('fresha')
 const TreatwellIcon = makeBrandIcon('treatwell')
 const YclientsIcon = makeBrandIcon('yclients')
-const InstagramIcon = makeBrandIcon('instagram')
-const FacebookIcon = makeBrandIcon('facebook')
-const TelegramIcon = makeBrandIcon('telegram')
 const BankingIcon = makeBrandIcon('banking')
 
 import { Button } from '@/components/ui/button'
@@ -51,7 +48,6 @@ import { StepAiSummary } from './StepAiSummary'
 import { StepTelegramPhone } from './StepTelegramPhone'
 import { StepUserProfile } from './StepUserProfile'
 import { StepWelcome } from './StepWelcome'
-import { StepWowAi } from './StepWowAi'
 import { Step1Salon } from './Step1Salon'
 import { type AddressDraft } from './Step2Address'
 import { type StaffDraft } from './Step2Staff'
@@ -69,12 +65,10 @@ const STEPS_QUICK = [
   'profile',
   'salon',
   'integrations_bookings',
-  'integrations_social',
   'integrations_banking',
   'tg_phone',
-  'wow',
   // T157 — показываем общий AI-анализ. Это главная wow-фича, юзер
-  // должен её увидеть.
+  // должен её увидеть. (Шаги integrations_social и wow убраны по просьбе владельца.)
   'ai_summary',
   'done',
 ] as const
@@ -848,12 +842,8 @@ export function OnboardingPage() {
         return t('onboarding.cta.salon')
       case 'integrations_bookings':
         return t('onboarding.cta.integrations_bookings')
-      case 'integrations_social':
-        return t('onboarding.cta.integrations_social')
       case 'integrations_banking':
         return t('onboarding.cta.integrations_banking')
-      case 'wow':
-        return t('onboarding.cta.wow')
       case 'profile':
         return t('onboarding.cta.profile')
       case 'tg_phone':
@@ -1059,104 +1049,6 @@ export function OnboardingPage() {
                   }
                 />
               ))}
-            {stepId === 'integrations_social' &&
-              (state.created_salon_id ? (
-                <LiveIntegrationCategoryStep
-                  title={t('onboarding.step_integrations.social_title')}
-                  salonId={state.created_salon_id}
-                  items={[
-                    {
-                      id: 'instagram',
-                      icon: InstagramIcon,
-                      title: 'Instagram Direct',
-                      benefit:
-                        'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
-                    },
-                    {
-                      id: 'facebook',
-                      icon: FacebookIcon,
-                      title: 'Facebook Messenger',
-                      benefit:
-                        'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
-                    },
-                    {
-                      id: 'telegram',
-                      icon: TelegramIcon,
-                      title: 'Telegram',
-                      benefit:
-                        'Подключаем твой личный Telegram через MTProto — отвечаешь клиентам прямо из портала.',
-                    },
-                  ]}
-                />
-              ) : (
-                <IntegrationCategoryStep
-                  title={t('onboarding.step_integrations.social_title')}
-                  items={[
-                    {
-                      id: 'instagram',
-                      icon: InstagramIcon,
-                      title: 'Instagram Direct',
-                      benefit:
-                        'Клиент пишет в Instagram — ты отвечаешь из портала. AI берёт типовые вопросы на себя.',
-                    },
-                    {
-                      id: 'facebook',
-                      icon: FacebookIcon,
-                      title: 'Facebook Messenger',
-                      benefit:
-                        'Все сообщения от клиентов в одной ленте — без переключения вкладок.',
-                    },
-                    {
-                      id: 'telegram',
-                      icon: TelegramIcon,
-                      title: 'Telegram',
-                      benefit:
-                        'Подключаем твой личный Telegram через MTProto — отвечаешь клиентам прямо из портала.',
-                    },
-                  ]}
-                  selected={state.selected_integrations}
-                  onToggle={(id) =>
-                    patch(
-                      'selected_integrations',
-                      state.selected_integrations.includes(id)
-                        ? state.selected_integrations.filter((x) => x !== id)
-                        : [...state.selected_integrations, id],
-                    )
-                  }
-                  credentials={state.pending_credentials}
-                  onCredentialsChange={(id, creds) =>
-                    patch('pending_credentials', {
-                      ...state.pending_credentials,
-                      [id]: creds ?? {},
-                    })
-                  }
-                />
-              ))}
-            {stepId === 'wow' && (
-              <StepWowAi
-                hasBookings={state.selected_integrations.some((x) =>
-                  ['booksy', 'ical', 'ocr_notebook'].includes(x),
-                )}
-                hasBanking={state.selected_integrations.includes('banking')}
-                hasSocial={state.selected_integrations.some((x) =>
-                  ['instagram', 'facebook', 'telegram'].includes(x),
-                )}
-                full={false}
-                selectedIntegrations={state.selected_integrations}
-                staffCount={state.staff.length}
-                servicesCount={state.services.length}
-                hasGooglePlace={!!state.address.google_place_id}
-                hasNip={!!state.nip}
-                companyName={state.company_name}
-                ocrVisitsCount={state.ocr_visits.length}
-                // Bug 40ec7d0e follow-up: для AI передаём resolved тип
-                // (текст «Студия эпиляции» вместо буквы 'other').
-                salonType={resolvedSalonType()}
-                country={state.country_code}
-                currency={currencyFor(state.country_code)}
-                salonId={state.created_salon_id}
-              />
-            )}
             {stepId === 'ai_summary' && (
               <StepAiSummary
                 // Bug 40ec7d0e follow-up: resolved тип для AI.
