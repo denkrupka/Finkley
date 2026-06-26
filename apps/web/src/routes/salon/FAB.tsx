@@ -13,6 +13,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
  * триггера). Теперь один триггер с responsive-классами: на ≥lg
  * рендерится pill (с текстом), на <lg — круглая кнопка с одной иконкой.
  *
+ * Позиционирование (fixed bottom-right + clearance над bottom-nav) теперь
+ * НЕ на самой кнопке, а на общем flex-стеке-контейнере в SalonLayout
+ * (`SetupFabStack`): сверху-вниз [FAB][виджет «Настройка Finkley»], стек
+ * pinned к низу и растёт вверх → FAB всегда над виджетом, а когда виджета
+ * нет — FAB остаётся на своём прежнем месте. Поэтому здесь только кнопка +
+ * Popover, без `fixed`/`bottom`/`right`/`z`.
+ *
  * - `onVisit` — открывает QuickEntryModal.
  * - `onExpense` — открывает ExpenseFormModal.
  * - `onSale` — открывает RetailSaleWizard в модалке «Новая продажа».
@@ -53,11 +60,11 @@ export function FAB({
           data-testid="fab-add"
           data-tour="fab-add"
           className={[
-            'bg-primary text-primary-foreground shadow-finlg fixed z-20',
-            // Mobile: круглая 56px над bottom-nav
-            'bottom-20 right-5 grid size-14 place-items-center rounded-full',
-            // Desktop (≥lg): pill 56px с текстом, ниже и правее
-            'lg:bottom-7 lg:right-7 lg:inline-flex lg:size-auto lg:h-14 lg:place-items-stretch',
+            'bg-primary text-primary-foreground shadow-finlg',
+            // Mobile: круглая 56px
+            'grid size-14 place-items-center rounded-full',
+            // Desktop (≥lg): pill 56px с текстом
+            'lg:inline-flex lg:size-auto lg:h-14 lg:place-items-stretch',
             'lg:items-center lg:gap-2 lg:rounded-full lg:px-5 lg:pl-[18px] lg:text-[15px]',
             'font-display lg:font-semibold',
           ].join(' ')}

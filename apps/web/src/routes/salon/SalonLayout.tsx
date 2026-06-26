@@ -46,7 +46,7 @@ import { FAB } from './FAB'
 import { HelpDeskBanner } from './HelpDeskBanner'
 import { Sidebar } from './Sidebar'
 import { SyncStatusBanner } from './SyncStatusBanner'
-import { SetupProgressBar } from './SetupProgressBar'
+import { SetupProgressBar, SetupProgressWidget } from './SetupProgressBar'
 import { TopBar } from './TopBar'
 
 // QuickEntryModal лениво — он тащит ClientPicker → libphonenumber-js (~80KB).
@@ -132,6 +132,9 @@ export function SalonLayout() {
   const [saleModalOpen, setSaleModalOpen] = useState(false)
   const [gateOpen, setGateOpen] = useState(false)
   const [gateAction, setGateAction] = useState<'expense' | 'sale'>('expense')
+  // «Настройка Finkley»: общий expanded-стейт верхнего статус-бара (Z1) и
+  // нижнего плавающего виджета (Z2). Клик по любому из них раскрывает чек-лист.
+  const [setupExpanded, setSetupExpanded] = useState(false)
 
   const salon = salons?.find((s) => s.id === salonId) ?? null
   const { data: salonFull } = useSalon(salonId)
@@ -160,6 +163,11 @@ export function SalonLayout() {
   useEffect(() => {
     if (salonId && salon) rememberLastSalon(salonId)
   }, [salonId, salon])
+
+  // При смене салона сворачиваем «Настройку Finkley» (новый салон — новый прогресс).
+  useEffect(() => {
+    setSetupExpanded(false)
+  }, [salonId])
 
   useEffect(() => {
     function onOpenQuickEntry(e: Event) {
@@ -272,21 +280,12 @@ export function SalonLayout() {
 
         <SyncStatusBanner salonId={salon.id} />
 
-        {/* T2 — gamified «Настройка Finkley» (висит пока setup < 100%, owner-only). */}
+        {/* T2 — gamified «Настройка Finkley»: верхний статус-бар (Z1) в потоке
+            layout. Клик раскрывает нижний плавающий виджет (общий стейт). */}
         <SetupProgressBar
           salonId={salon.id}
-          onAddVisit={() => {
-            setQuickEntryPrefill(null)
-            setQuickEntryOpen(true)
-          }}
-          onAddExpense={() => {
-            if (!hasOpenShift) {
-              setGateAction('expense')
-              setGateOpen(true)
-              return
-            }
-            setExpenseModalOpen(true)
-          }}
+          expanded={setupExpanded}
+          onToggleExpanded={() => setSetupExpanded((v) => !v)}
         />
 
         <main className="relative flex min-h-0 flex-1 flex-col pb-24 lg:overflow-y-auto lg:pb-0">
@@ -295,32 +294,68 @@ export function SalonLayout() {
       </div>
 
       <OnboardingTour salonId={salon.id} force={tourForce} />
-      {hideFab ? null : (
-        <FAB
-          onVisit={() => {
-            setQuickEntryPrefill(null)
-            setQuickEntryOpen(true)
-          }}
-          onExpense={() => {
-            // Per-user касса: «+Расход» из FAB — тот же гейт что в
-            // ExpensesPage. Блокируем открытие модалки заранее.
-            if (!hasOpenShift) {
-              setGateAction('expense')
-              setGateOpen(true)
-              return
-            }
-            setExpenseModalOpen(true)
-          }}
-          onSale={() => {
-            if (!hasOpenShift) {
-              setGateAction('sale')
-              setGateOpen(true)
-              return
-            }
-            setSaleModalOpen(true)
-          }}
-        />
-      )}
+
+      {/* Плавающий стек справа-снизу: сверху-вниз [FAB][виджет «Настройка
+          Finkley»]. Контейнер pinned к низу (items-end) и растёт ВВЕРХ, поэтому
+          FAB всегда над виджетом; при раскрытии чек-листа FAB уезжает выше, при
+          сворачивании — над свёрнутым баром, а когда виджет исчезает (всё
+          готово) — FAB остаётся на прежнем месте. `bottom-20` клиренсит mobile
+          bottom-nav, на десктопе bottom-nav нет → `lg:bottom-7`. z-30 — ниже
+          модалок (Radix Dialog ~z-50) и Sidebar (z-30 fixed, но не пересекаются).
+          `pointer-events-none` на контейнере, чтобы пустые зоны между кнопкой и
+          виджетом не перехватывали клики; сами интерактивные элементы внутри
+          возвращают `pointer-events-auto`. */}
+      <div className="pointer-events-none fixed bottom-20 right-5 z-30 flex flex-col items-end gap-3 lg:bottom-7 lg:right-7">
+        {hideFab ? null : (
+          <div className="pointer-events-auto">
+            <FAB
+              onVisit={() => {
+                setQuickEntryPrefill(null)
+                setQuickEntryOpen(true)
+              }}
+              onExpense={() => {
+                // Per-user касса: «+Расход» из FAB — тот же гейт что в
+                // ExpensesPage. Блокируем открытие модалки заранее.
+                if (!hasOpenShift) {
+                  setGateAction('expense')
+                  setGateOpen(true)
+                  return
+                }
+                setExpenseModalOpen(true)
+              }}
+              onSale={() => {
+                if (!hasOpenShift) {
+                  setGateAction('sale')
+                  setGateOpen(true)
+                  return
+                }
+                setSaleModalOpen(true)
+              }}
+            />
+          </div>
+        )}
+        <div className="pointer-events-auto">
+          <SetupProgressWidget
+            salonId={salon.id}
+            expanded={setupExpanded}
+            onToggleExpanded={() => setSetupExpanded((v) => !v)}
+            onCollapse={() => setSetupExpanded(false)}
+            onAddVisit={() => {
+              setQuickEntryPrefill(null)
+              setQuickEntryOpen(true)
+            }}
+            onAddExpense={() => {
+              if (!hasOpenShift) {
+                setGateAction('expense')
+                setGateOpen(true)
+                return
+              }
+              setExpenseModalOpen(true)
+            }}
+          />
+        </div>
+      </div>
+
       <BottomNav salonId={salon.id} />
 
       {quickEntryOpen ? (

@@ -90,40 +90,23 @@ const GROUP_ICONS: Record<SetupStepGroup, typeof CalendarPlus> = {
   integrations: Plug,
 }
 
+type TFn = (k: string, opts?: Record<string, unknown>) => string
+
 /**
- * «Настройка Finkley» — gamified бар прогресса первичной настройки (T2 / v3).
- *
- * Свёрнутый: тонкая плашка сверху — прогресс + %, висит пока не все задания
- * (core + extra) выполнены или пропущены. Раскрытый: Stripe-style чек-лист по
- * раскрывающимся категориям (Доходы/Расходы/Финансы/Банк/Рост/Интеграции) +
- * плашка приза «+14 дней» (за CORE в течение 7 дней).
- *
- * Прогресс считается на сервере (RPC setup_progress) из реальных событий;
- * проценты/видимость/награда — в lib/setup-progress.ts (покрыто тестами).
+ * Общий хук «Настройки Finkley»: тянет серверный прогресс + клиентские пропуски,
+ * считает проценты/счётчик/награду через чистый lib/setup-progress.ts. Возвращает
+ * `null`, когда бар показывать не нужно (не owner / всё готово / слишком старый
+ * салон). Один query (React Query дедуплицирует) шарится верхним баром и нижним
+ * виджетом — оба рендерят одинаковые числа без prop-drilling.
  */
-export function SetupProgressBar({
-  salonId,
-  onAddVisit,
-  onAddExpense,
-}: {
-  salonId: string
-  onAddVisit: () => void
-  onAddExpense: () => void
-}) {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
+function useSetupBarModel(salonId: string) {
   const { data: progress } = useSetupProgress(salonId)
   const { data: membership } = useSalonMembership(salonId)
-  const claim = useClaimSetupReward(salonId)
-  const [expanded, setExpanded] = useState(false)
-  const [openGroups, setOpenGroups] = useState<Set<SetupStepGroup>>(() => new Set())
   const [dismissed, setDismissed] = useState<Set<SetupStepId>>(() => readDismissedSteps(salonId))
 
-  // При смене салона перечитываем пропуски и сбрасываем UI-состояние.
+  // При смене салона перечитываем пропуски.
   useEffect(() => {
     setDismissed(readDismissedSteps(salonId))
-    setExpanded(false)
-    setOpenGroups(new Set())
   }, [salonId])
 
   const steps = useMemo(
@@ -131,25 +114,6 @@ export function SetupProgressBar({
     [progress, dismissed],
   )
   const groups = useMemo(() => groupSetupSteps(steps), [steps])
-
-  // При первом раскрытии — авто-раскрыть первую незавершённую категорию,
-  // чтобы юзер сразу видел, что делать (Stripe-паттерн).
-  useEffect(() => {
-    if (!expanded) return
-    setOpenGroups((prev) => {
-      if (prev.size > 0) return prev
-      const firstIncomplete = groups.find((g) => !g.complete)
-      return firstIncomplete ? new Set([firstIncomplete.group]) : prev
-    })
-  }, [expanded, groups])
-
-  if (!progress) return null
-  if (!shouldShowSetupBar(progress, steps, membership?.role)) return null
-
-  const percent = computePercent(steps)
-  const remaining = remainingSteps(steps)
-  const eligible = isRewardEligible(progress, steps)
-  const daysLeft = rewardDaysLeft(progress.created_at)
 
   function toggleDismiss(step: SetupStepId) {
     setDismissed((prev) => {
@@ -162,6 +126,186 @@ export function SetupProgressBar({
     })
   }
 
+  if (!progress) return null
+  if (!shouldShowSetupBar(progress, steps, membership?.role)) return null
+
+  return {
+    progress,
+    steps,
+    groups,
+    percent: computePercent(steps),
+    remaining: remainingSteps(steps),
+    eligible: isRewardEligible(progress, steps),
+    daysLeft: rewardDaysLeft(progress.created_at),
+    toggleDismiss,
+  }
+}
+
+/**
+ * Текст подсказки: «всё готово» ТОЛЬКО когда реально не осталось заданий.
+ * Если награда доступна (core готов), но extra-задания ещё есть — показываем
+ * «осталось N · заберите +14 дней 🎁», а не ложное «всё готово».
+ */
+function collapsedHintText(t: TFn, remaining: number, eligible: boolean): string {
+  if (remaining === 0) return t('setup_progress.all_done', { defaultValue: 'всё готово 🎉' })
+  if (eligible) {
+    return t('setup_progress.tasks_left_reward', {
+      count: remaining,
+      defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
+    })
+  }
+  return t('setup_progress.tasks_left', {
+    count: remaining,
+    defaultValue: 'осталось {{count}} заданий',
+  })
+}
+
+/**
+ * «Настройка Finkley» — gamified прогресс первичной настройки (T2 / v3).
+ *
+ * Состоит из ДВУХ скоординированных частей с общим `expanded`-стейтом (он
+ * поднят в SalonLayout):
+ *   - {@link SetupProgressBar} — тонкая полноширинная плашка СВЕРХУ, всегда
+ *     видна в потоке layout (под SyncStatusBanner). Клик раскрывает виджет.
+ *   - {@link SetupProgressWidget} — плавающий справа-снизу виджет (свёрнутый бар
+ *     + раскрывающийся вверх Stripe-style чек-лист). Рендерится в общем
+ *     flex-стеке с FAB, так что FAB всегда над ним.
+ *
+ * Прогресс считается на сервере (RPC setup_progress); проценты/видимость/награда
+ * — в lib/setup-progress.ts (покрыто тестами).
+ */
+
+/**
+ * Верхний статус-бар (Z1): тонкая полноширинная плашка в потоке layout.
+ * Всегда виден пока есть незакрытые задания; клик раскрывает нижний виджет.
+ */
+export function SetupProgressBar({
+  salonId,
+  expanded,
+  onToggleExpanded,
+}: {
+  salonId: string
+  expanded: boolean
+  onToggleExpanded: () => void
+}) {
+  const { t } = useTranslation()
+  const model = useSetupBarModel(salonId)
+  if (!model) return null
+
+  const { percent, remaining, eligible } = model
+  const hint = collapsedHintText(t, remaining, eligible)
+
+  return (
+    <button
+      type="button"
+      onClick={onToggleExpanded}
+      aria-expanded={expanded}
+      className={cn(
+        'flex w-full items-center gap-3 border-b px-4 py-2 text-left transition-colors sm:px-6',
+        eligible
+          ? 'border-brand-gold-deep/30 bg-brand-gold-soft/30 hover:bg-brand-gold-soft/50'
+          : 'border-brand-teal-deep/20 bg-brand-teal-soft/15 hover:bg-brand-teal-soft/25',
+      )}
+    >
+      <Sparkles
+        className={cn(
+          'size-4 shrink-0',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+        )}
+        strokeWidth={2.2}
+      />
+      <span className="text-brand-navy shrink-0 text-sm font-bold">
+        {t('setup_progress.title', { defaultValue: 'Настройка Finkley' })}
+      </span>
+      <span
+        className={cn(
+          'num shrink-0 text-sm font-extrabold',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+        )}
+      >
+        {percent}%
+      </span>
+      <span className="text-muted-foreground hidden truncate text-xs sm:inline">·</span>
+      <span className="text-muted-foreground hidden min-w-0 flex-1 truncate text-xs sm:inline">
+        {hint}
+      </span>
+      {/* Прогресс-шкала — занимает остаток на десктопе, прячется когда есть текст;
+          на мобиле растягивается на всю свободную ширину. */}
+      <div
+        className={cn(
+          'mx-1 h-[5px] min-w-[64px] flex-1 overflow-hidden rounded-full sm:max-w-[160px] sm:flex-none',
+          eligible ? 'bg-brand-gold-soft/60' : 'bg-brand-teal-soft/50',
+        )}
+      >
+        <div
+          className={cn(
+            'h-full rounded-full transition-all duration-500',
+            eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <ChevronDown
+        className={cn(
+          'size-4 shrink-0 transition-transform',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+          expanded && 'rotate-180',
+        )}
+        strokeWidth={2.2}
+      />
+    </button>
+  )
+}
+
+/**
+ * Плавающий виджет (Z2): свёрнутый бар + раскрывающийся вверх чек-лист.
+ * НЕ позиционируется сам — живёт внутри общего flex-стека SalonLayout
+ * (FAB сверху, виджет снизу), поэтому FAB всегда над ним.
+ */
+export function SetupProgressWidget({
+  salonId,
+  expanded,
+  onToggleExpanded,
+  onCollapse,
+  onAddVisit,
+  onAddExpense,
+}: {
+  salonId: string
+  expanded: boolean
+  onToggleExpanded: () => void
+  onCollapse: () => void
+  onAddVisit: () => void
+  onAddExpense: () => void
+}) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const claim = useClaimSetupReward(salonId)
+  const model = useSetupBarModel(salonId)
+  const [openGroups, setOpenGroups] = useState<Set<SetupStepGroup>>(() => new Set())
+
+  // При смене салона сбрасываем раскрытые категории.
+  useEffect(() => {
+    setOpenGroups(new Set())
+  }, [salonId])
+
+  const groups = model?.groups
+
+  // При первом раскрытии — авто-раскрыть первую незавершённую категорию,
+  // чтобы юзер сразу видел, что делать (Stripe-паттерн).
+  useEffect(() => {
+    if (!expanded || !groups) return
+    setOpenGroups((prev) => {
+      if (prev.size > 0) return prev
+      const firstIncomplete = groups.find((g) => !g.complete)
+      return firstIncomplete ? new Set([firstIncomplete.group]) : prev
+    })
+  }, [expanded, groups])
+
+  if (!model) return null
+
+  const { percent, remaining, eligible, daysLeft, toggleDismiss } = model
+  const hint = collapsedHintText(t, remaining, eligible)
+
   function toggleGroup(group: SetupStepGroup) {
     setOpenGroups((prev) => {
       const next = new Set(prev)
@@ -172,18 +316,18 @@ export function SetupProgressBar({
   }
 
   const go = (to: string) => () => {
-    setExpanded(false)
+    onCollapse()
     navigate(to)
   }
 
   const cta: CtaMap = {
     // core
     visit: () => {
-      setExpanded(false)
+      onCollapse()
       onAddVisit()
     },
     expense: () => {
-      setExpanded(false)
+      onCollapse()
       onAddExpense()
     },
     booksy: () => navigate(`/${salonId}/settings?tab=integrations&prompt=booksy`),
@@ -231,24 +375,8 @@ export function SetupProgressBar({
     })
   }
 
-  // Текст подсказки: «всё готово» ТОЛЬКО когда реально не осталось заданий.
-  // Если награда доступна (core готов), но extra-задания ещё есть — показываем
-  // «осталось N · заберите +14 дней 🎁», а не ложное «всё готово».
-  const collapsedHint =
-    remaining === 0
-      ? t('setup_progress.all_done', { defaultValue: 'всё готово 🎉' })
-      : eligible
-        ? t('setup_progress.tasks_left_reward', {
-            count: remaining,
-            defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
-          })
-        : t('setup_progress.tasks_left', {
-            count: remaining,
-            defaultValue: 'осталось {{count}} заданий',
-          })
-
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col">
+    <div className="flex w-[420px] max-w-[calc(100vw-2rem)] flex-col">
       {/* Раскрытая панель — растёт ВВЕРХ над свёрнутым баром (Stripe-style) */}
       {expanded ? (
         <div className="border-border bg-card shadow-finlg mb-2 flex max-h-[68vh] flex-col overflow-hidden rounded-2xl border">
@@ -262,7 +390,7 @@ export function SetupProgressBar({
             </p>
             <button
               type="button"
-              onClick={() => setExpanded(false)}
+              onClick={onCollapse}
               className="text-muted-foreground hover:text-foreground -mr-1 grid size-7 shrink-0 place-items-center rounded-md"
               aria-label={t('common.close', { defaultValue: 'Закрыть' })}
             >
@@ -272,39 +400,41 @@ export function SetupProgressBar({
 
           {/* Скролл-контент */}
           <div className="overflow-y-auto px-3 py-3">
-            {/* Плашка приза «+14 дней» */}
+            {/* Плашка приза «+14 дней»: иконка + текст в строку, кнопка claim ниже. */}
             <div
               className={cn(
-                'mb-3 flex items-center gap-3 rounded-lg border-2 border-dashed p-3',
+                'mb-3 rounded-lg border-2 border-dashed p-3',
                 eligible
                   ? 'border-brand-gold-deep bg-brand-gold-soft/30'
                   : 'border-brand-teal-deep/30 bg-brand-teal-soft/15',
               )}
             >
-              <Gift
-                className={cn(
-                  'size-5 shrink-0',
-                  eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
-                )}
-                strokeWidth={2}
-              />
-              <p className="text-foreground/90 min-w-0 flex-1 text-xs leading-snug">
-                {eligible
-                  ? t('setup_progress.reward.ready', {
-                      defaultValue: 'Всё готово! Заберите подарок — 14 дополнительных дней демо.',
-                    })
-                  : t('setup_progress.reward.promise', {
-                      days: daysLeft,
-                      defaultValue:
-                        'Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.',
-                    })}
-              </p>
+              <div className="flex items-start gap-2.5">
+                <Gift
+                  className={cn(
+                    'mt-0.5 size-5 shrink-0',
+                    eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+                  )}
+                  strokeWidth={2}
+                />
+                <p className="text-foreground/90 min-w-0 flex-1 text-xs leading-snug">
+                  {eligible
+                    ? t('setup_progress.reward.ready', {
+                        defaultValue: 'Всё готово! Заберите подарок — 14 дополнительных дней демо.',
+                      })
+                    : t('setup_progress.reward.promise', {
+                        days: daysLeft,
+                        defaultValue:
+                          'Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.',
+                      })}
+                </p>
+              </div>
               {eligible ? (
                 <button
                   type="button"
                   onClick={handleClaim}
                   disabled={claim.isPending}
-                  className="bg-brand-gold-deep inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  className="bg-brand-gold-deep mt-2.5 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {claim.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
@@ -318,7 +448,7 @@ export function SetupProgressBar({
 
             {/* Категории-аккордеоны */}
             <div className="flex flex-col gap-2">
-              {groups.map((group) => (
+              {model.groups.map((group) => (
                 <SetupGroupSection
                   key={group.group}
                   group={group}
@@ -337,7 +467,7 @@ export function SetupProgressBar({
       {/* Свёрнутый бар — всегда виден, плавает справа снизу, выделяется */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={onToggleExpanded}
         className={cn(
           'relative flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left shadow-xl transition-colors',
           eligible
@@ -384,7 +514,7 @@ export function SetupProgressBar({
               {percent}%
             </span>
           </div>
-          <p className="text-muted-foreground mt-0.5 truncate text-xs">{collapsedHint}</p>
+          <p className="text-muted-foreground mt-0.5 truncate text-xs">{hint}</p>
           {/* Прогресс-полоска */}
           <div
             className={cn(
@@ -427,7 +557,7 @@ function SetupGroupSection({
   onToggle: () => void
   cta: CtaMap
   onDismiss: (id: SetupStepId) => void
-  t: (k: string, opts?: Record<string, unknown>) => string
+  t: TFn
 }) {
   const GroupIcon = GROUP_ICONS[group.group]
   return (
@@ -509,54 +639,70 @@ function SetupTask({
   step: SetupStep
   onCta: () => void
   onDismiss: () => void
-  t: (k: string, opts?: Record<string, unknown>) => string
+  t: TFn
 }) {
   const Icon = ICONS[step.id]
   const done = step.done
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg p-2.5 transition-colors',
+        'flex flex-col gap-2 rounded-lg p-2.5 transition-colors',
         done ? 'bg-brand-sage-soft/20' : 'hover:bg-muted/40',
       )}
     >
-      <div
-        className={cn(
-          'grid size-8 shrink-0 place-items-center rounded-full',
-          done ? 'bg-brand-sage text-white' : 'bg-brand-teal-soft/40 text-brand-teal-deep',
-        )}
-      >
-        {done ? (
-          <Check className="size-4" strokeWidth={2.6} />
-        ) : step.id === 'booksy' ? (
-          <BrandIcon provider="booksy" className="size-4" />
-        ) : (
-          <Icon className="size-4" strokeWidth={2} />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p
+      {/* Строка 1: иконка + заголовок/описание. Никакого горизонтального
+          наложения с CTA — кнопки переехали на отдельную строку ниже. */}
+      <div className="flex items-start gap-3">
+        <div
           className={cn(
-            'text-sm font-semibold',
-            done ? 'text-brand-sage-deep line-through' : 'text-brand-navy',
+            'grid size-8 shrink-0 place-items-center rounded-full',
+            done ? 'bg-brand-sage text-white' : 'bg-brand-teal-soft/40 text-brand-teal-deep',
           )}
         >
-          {t(`setup_progress.cards.${step.id}.title`)}
-        </p>
-        {done ? (
-          <p className="text-brand-sage-deep mt-0.5 text-xs">
-            {step.dismissed
-              ? t('setup_progress.skipped', { defaultValue: 'Пропущено' })
-              : t('setup_progress.done', { defaultValue: 'Готово' })}
+          {done ? (
+            <Check className="size-4" strokeWidth={2.6} />
+          ) : step.id === 'booksy' ? (
+            <BrandIcon provider="booksy" className="size-4" />
+          ) : (
+            <Icon className="size-4" strokeWidth={2} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'text-sm font-semibold',
+              done ? 'text-brand-sage-deep line-through' : 'text-brand-navy',
+            )}
+          >
+            {t(`setup_progress.cards.${step.id}.title`)}
           </p>
-        ) : (
-          <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-            {t(`setup_progress.cards.${step.id}.why`)}
-          </p>
-        )}
+          {done ? (
+            <p className="text-brand-sage-deep mt-0.5 text-xs">
+              {step.dismissed
+                ? t('setup_progress.skipped', { defaultValue: 'Пропущено' })
+                : t('setup_progress.done', { defaultValue: 'Готово' })}
+            </p>
+          ) : (
+            <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+              {t(`setup_progress.cards.${step.id}.why`)}
+            </p>
+          )}
+        </div>
+        {/* «Вернуть» для пропущенного — компактная ссылка справа в первой строке. */}
+        {done && step.dismissed ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-muted-foreground hover:text-foreground shrink-0 text-[11px] font-medium underline-offset-2 hover:underline"
+          >
+            {t('setup_progress.undo_skip', { defaultValue: 'Вернуть' })}
+          </button>
+        ) : null}
       </div>
+
+      {/* Строка 2: CTA + «Пропустить» — ПОД текстом, на всю ширину карточки. */}
       {!done ? (
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <div className="flex items-center gap-3 pl-11">
           <button
             type="button"
             onClick={onCta}
@@ -576,14 +722,6 @@ function SetupTask({
             </button>
           ) : null}
         </div>
-      ) : step.dismissed ? (
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="text-muted-foreground hover:text-foreground shrink-0 text-[11px] font-medium underline-offset-2 hover:underline"
-        >
-          {t('setup_progress.undo_skip', { defaultValue: 'Вернуть' })}
-        </button>
       ) : null}
     </div>
   )
