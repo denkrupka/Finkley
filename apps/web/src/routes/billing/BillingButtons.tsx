@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, FileText, Sparkles } from 'lucide-react'
+import { Check, FileText, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -74,7 +74,6 @@ export function BillingButtons({
   const { plan: currentPlan } = useEntitlements(salonId)
   const suggested = params.get('plan') as Plan | null
 
-  const stripeAvailable = !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
   // Активная Stripe-подписка (есть customer + статус живой) → смена тарифа и
   // инвойсы идут через Customer Portal. Иначе платный план оформляется
   // через Checkout.
@@ -84,25 +83,6 @@ export function BillingButtons({
     (subscription.status === 'active' ||
       subscription.status === 'trialing' ||
       subscription.status === 'past_due')
-
-  if (!stripeAvailable) {
-    return (
-      <div className="flex max-w-md items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs leading-snug text-amber-900">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-        <div>
-          <p className="font-bold">
-            {t('billing.unavailable_title', { defaultValue: 'Платежи временно недоступны' })}
-          </p>
-          <p className="mt-0.5">
-            {t('billing.unavailable_body', {
-              defaultValue:
-                'Это техническая проблема на нашей стороне. Напиши в поддержку: support@finkley.app — подключим тебя вручную.',
-            })}
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   async function startCheckout(plan: Plan) {
     setPending(plan)
