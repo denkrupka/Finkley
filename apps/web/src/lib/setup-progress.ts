@@ -12,13 +12,16 @@
  *
  * v2 (онбординг сокращён): чек-лист доводит салон до полного заполнения.
  * Шаги делятся на:
- *   - CORE (required) — визит/расход/booksy/банк/дашборд. Они гейтят 100% и
- *     награду (прогресс-бар + reward считаются ТОЛЬКО по ним → endowed/percent
- *     совместимы со старой моделью).
+ *   - CORE (required) — визит/расход/booksy/банк/дашборд. Гейтят только НАГРАДУ
+ *     «+14 дней» (isCoreComplete + окно 7 дней).
  *   - EXTRA (optional) — конкуренты/склад/маркетинг/мессенджеры/AI/интеграции/
- *     соц-страницы/Google/финотчёт/банк-линковка и т.д. Рендерятся в чек-листе
- *     для полноты, но НЕ влияют на процент/награду. Уже-подключённые на
+ *     соц-страницы/Google/финотчёт/банк-линковка и т.д. Уже-подключённые на
  *     онбординге интеграции приезжают как done с сервера.
+ *
+ * v3 (редизайн Stripe-style, фикс «100%»): процент и видимость считаются по
+ * ВСЕМ незадизмиссенным шагам (core + extra). 100% ⟺ все шаги done или
+ * dismissed. Бар висит пока не все задания сделаны/пропущены; путь его закрыть —
+ * выполнить или пропустить каждое задание. Награда осталась за CORE.
  */
 
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -26,8 +29,11 @@ export const DAY_MS = 24 * 60 * 60 * 1000
 export const ENDOWED_PERCENT = 40
 /** Окно для приза «+14 дней» — 7 дней с момента создания салона. */
 export const REWARD_WINDOW_DAYS = 7
-/** Дольше этого срока бар не показываем — это onboarding-нудж, не вечная плашка. */
-export const MAX_VISIBLE_AGE_DAYS = 30
+/**
+ * Дальний backstop: дольше этого срока бар не показываем — это onboarding-нудж,
+ * а не вечная плашка. НЕ скрывает бар при core-готовности (см. shouldShowSetupBar).
+ */
+export const MAX_VISIBLE_AGE_DAYS = 90
 export const REWARD_BONUS_DAYS = 14
 
 export type SetupProgressData = {
@@ -126,6 +132,16 @@ export type SetupStepGroup =
   | 'banking'
   | 'growth'
   | 'integrations'
+
+/** Порядок категорий в раскрытом чек-листе (Stripe-style accordion). */
+export const SETUP_GROUP_ORDER: readonly SetupStepGroup[] = [
+  'income',
+  'expenses',
+  'finance',
+  'banking',
+  'growth',
+  'integrations',
+] as const
 
 export type SetupStep = {
   id: SetupStepId
@@ -352,29 +368,42 @@ function requiredSteps(steps: SetupStep[]): SetupStep[] {
   return steps.filter((s) => s.required)
 }
 
+/** Незадизмиссенные шаги — те, что реально участвуют в проценте/счётчике. */
+function nonDismissedSteps(steps: SetupStep[]): SetupStep[] {
+  return steps.filter((s) => !s.dismissed)
+}
+
 /**
- * Процент готовности: 40% endowed (салон создан) + 60% поровну по CORE-шагам.
- * Extra-шаги полноты намеренно НЕ влияют на процент — иначе бар никогда не
- * дойдёт до 100% и приз станет недостижим.
+ * Процент готовности по ВСЕМ незадизмиссенным шагам (core + extra):
+ * 40% endowed (салон создан) + 60% поровну по оставшимся незадизмиссенным
+ * заданиям. Дизмиссенный шаг исключён из знаменателя (юзер от него отказался).
+ *
+ * 100% ⟺ все незадизмиссенные шаги выполнены (serverDone). Если незадизмиссенных
+ * шагов не осталось (всё done/dismissed) → 100%.
  */
 export function computePercent(steps: SetupStep[]): number {
-  const core = requiredSteps(steps)
-  if (core.length === 0) return 100
-  const doneCount = core.filter((s) => s.done).length
-  return Math.round(ENDOWED_PERCENT + (100 - ENDOWED_PERCENT) * (doneCount / core.length))
+  const active = nonDismissedSteps(steps)
+  if (active.length === 0) return 100
+  const doneCount = active.filter((s) => s.done).length
+  return Math.round(ENDOWED_PERCENT + (100 - ENDOWED_PERCENT) * (doneCount / active.length))
 }
 
-/** Goal-gradient: сколько CORE-шагов ещё осталось (не «X из N»). */
+/** Goal-gradient: сколько незадизмиссенных заданий (core+extra) ещё осталось. */
 export function remainingSteps(steps: SetupStep[]): number {
-  return requiredSteps(steps).filter((s) => !s.done).length
+  return nonDismissedSteps(steps).filter((s) => !s.done).length
 }
 
-/** Все ли CORE-шаги выполнены (extra не учитываются). */
-export function isAllComplete(steps: SetupStep[]): boolean {
+/** Все ли CORE-шаги выполнены (визит/расход/booksy/банк/дашборд). Гейтит награду. */
+export function isCoreComplete(steps: SetupStep[]): boolean {
   return requiredSteps(steps).every((s) => s.done)
 }
 
-/** Сколько extra-задач полноты ещё не выполнено (для подсказки в UI). */
+/** Все ли задания (core + extra) выполнены или пропущены. Гейтит видимость бара. */
+export function isAllComplete(steps: SetupStep[]): boolean {
+  return steps.every((s) => s.done)
+}
+
+/** Сколько extra-задач полноты ещё не выполнено и не пропущено (для подсказки в UI). */
 export function remainingExtraSteps(steps: SetupStep[]): number {
   return steps.filter((s) => !s.required && !s.done).length
 }
@@ -392,7 +421,8 @@ export function withinRewardWindow(createdAt: string, now: number = Date.now()):
 /**
  * Право забрать приз (клиентский гейт; реальный авторитет — сервер).
  * Все CORE-шаги выполнены + есть реальные данные (визит И расход) + окно 7 дней
- * ещё открыто + приз не выдан. Extra-шаги на награду не влияют.
+ * ещё открыто + приз не выдан. Награда привязана к CORE, а НЕ к 100% (extra-шаги
+ * на награду не влияют).
  */
 export function isRewardEligible(
   data: SetupProgressData,
@@ -401,14 +431,18 @@ export function isRewardEligible(
 ): boolean {
   if (data.reward_granted_at) return false
   if (!data.has_visit || !data.has_expense) return false
-  if (!isAllComplete(steps)) return false
+  if (!isCoreComplete(steps)) return false
   return withinRewardWindow(data.created_at, now)
 }
 
 /**
- * Показывать ли бар. Только owner; не назойливо для старых салонов (>30 дней);
- * скрываем когда CORE-набор сделан и приз уже неактуален/выдан. Extra-задачи
- * не держат бар на экране — они видны при раскрытии, но не блокируют закрытие.
+ * Показывать ли бар. Только owner; держим на экране пока НЕ все задания
+ * (core + extra) сделаны или пропущены — путь закрыть бар — это выполнить или
+ * пропустить (dismiss) каждое задание (всё dismissed → 100% → скрыт).
+ *
+ * MAX_VISIBLE_AGE_DAYS — лишь дальний backstop (90 дней), чтобы плашка не висела
+ * вечно. Награда (reward_granted_at) больше НЕ скрывает бар: extra-задачи могут
+ * остаться даже после выдачи приза.
  */
 export function shouldShowSetupBar(
   data: SetupProgressData,
@@ -417,10 +451,35 @@ export function shouldShowSetupBar(
   now: number = Date.now(),
 ): boolean {
   if (role !== 'owner') return false
-  if (data.reward_granted_at) return false
   const ageDays = (now - new Date(data.created_at).getTime()) / DAY_MS
   if (ageDays > MAX_VISIBLE_AGE_DAYS) return false
-  const allComplete = isAllComplete(steps)
-  if (allComplete && !isRewardEligible(data, steps, now)) return false
-  return true
+  return !isAllComplete(steps)
+}
+
+/** Категория для аккордеона: её шаги + счётчик «k/n» (k = done, n = всего). */
+export type SetupGroupView = {
+  group: SetupStepGroup
+  steps: SetupStep[]
+  doneCount: number
+  total: number
+  /** Все шаги категории done/dismissed. */
+  complete: boolean
+}
+
+/**
+ * Группирует шаги по категориям в порядке SETUP_GROUP_ORDER (для UI-аккордеона).
+ * Пустые категории не возвращаются.
+ */
+export function groupSetupSteps(steps: SetupStep[]): SetupGroupView[] {
+  return SETUP_GROUP_ORDER.map((group) => {
+    const groupSteps = steps.filter((s) => s.group === group)
+    const doneCount = groupSteps.filter((s) => s.done).length
+    return {
+      group,
+      steps: groupSteps,
+      doneCount,
+      total: groupSteps.length,
+      complete: groupSteps.length > 0 && doneCount === groupSteps.length,
+    }
+  }).filter((g) => g.total > 0)
 }

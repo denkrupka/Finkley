@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   Check,
   ChevronDown,
+  ChevronRight,
   FileBarChart,
   Gift,
   Globe,
@@ -24,7 +25,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -40,11 +41,14 @@ import {
 import {
   computePercent,
   computeSetupSteps,
+  groupSetupSteps,
   isRewardEligible,
   remainingSteps,
   rewardDaysLeft,
   shouldShowSetupBar,
+  type SetupGroupView,
   type SetupStep,
+  type SetupStepGroup,
   type SetupStepId,
 } from '@/lib/setup-progress'
 import { cn } from '@/lib/utils/cn'
@@ -76,12 +80,26 @@ const ICONS: Record<SetupStepId, typeof CalendarPlus> = {
   any_integration: Plug,
 }
 
+/** lucide-иконки категорий (заголовки аккордеона). */
+const GROUP_ICONS: Record<SetupStepGroup, typeof CalendarPlus> = {
+  income: CalendarPlus,
+  expenses: Receipt,
+  finance: LineChart,
+  banking: Landmark,
+  growth: Target,
+  integrations: Plug,
+}
+
 /**
- * «Настройка Finkley» — gamified бар прогресса первичной настройки (T2).
+ * «Настройка Finkley» — gamified бар прогресса первичной настройки (T2 / v3).
  *
- * Свёрнутый: висит сверху пока setup < 100%. Раскрытый: чек-лист карточек
- * (что/зачем/что даст/CTA) + приз «+14 дней» за 100% в течение 7 дней.
- * Прогресс считается на сервере (RPC setup_progress) из реальных событий.
+ * Свёрнутый: тонкая плашка сверху — прогресс + %, висит пока не все задания
+ * (core + extra) выполнены или пропущены. Раскрытый: Stripe-style чек-лист по
+ * раскрывающимся категориям (Доходы/Расходы/Финансы/Банк/Рост/Интеграции) +
+ * плашка приза «+14 дней» (за CORE в течение 7 дней).
+ *
+ * Прогресс считается на сервере (RPC setup_progress) из реальных событий;
+ * проценты/видимость/награда — в lib/setup-progress.ts (покрыто тестами).
  */
 export function SetupProgressBar({
   salonId,
@@ -98,24 +116,40 @@ export function SetupProgressBar({
   const { data: membership } = useSalonMembership(salonId)
   const claim = useClaimSetupReward(salonId)
   const [expanded, setExpanded] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Set<SetupStepGroup>>(() => new Set())
   const [dismissed, setDismissed] = useState<Set<SetupStepId>>(() => readDismissedSteps(salonId))
 
-  // При смене салона перечитываем пропуски.
+  // При смене салона перечитываем пропуски и сбрасываем UI-состояние.
   useEffect(() => {
     setDismissed(readDismissedSteps(salonId))
     setExpanded(false)
+    setOpenGroups(new Set())
   }, [salonId])
 
+  const steps = useMemo(
+    () => (progress ? computeSetupSteps(progress, dismissed) : []),
+    [progress, dismissed],
+  )
+  const groups = useMemo(() => groupSetupSteps(steps), [steps])
+
+  // При первом раскрытии — авто-раскрыть первую незавершённую категорию,
+  // чтобы юзер сразу видел, что делать (Stripe-паттерн).
+  useEffect(() => {
+    if (!expanded) return
+    setOpenGroups((prev) => {
+      if (prev.size > 0) return prev
+      const firstIncomplete = groups.find((g) => !g.complete)
+      return firstIncomplete ? new Set([firstIncomplete.group]) : prev
+    })
+  }, [expanded, groups])
+
   if (!progress) return null
-  const steps = computeSetupSteps(progress, dismissed)
   if (!shouldShowSetupBar(progress, steps, membership?.role)) return null
 
   const percent = computePercent(steps)
   const remaining = remainingSteps(steps)
   const eligible = isRewardEligible(progress, steps)
   const daysLeft = rewardDaysLeft(progress.created_at)
-  const coreSteps = steps.filter((s) => s.required)
-  const extraSteps = steps.filter((s) => !s.required)
 
   function toggleDismiss(step: SetupStepId) {
     setDismissed((prev) => {
@@ -124,6 +158,15 @@ export function SetupProgressBar({
       if (willDismiss) next.add(step)
       else next.delete(step)
       writeDismissedStep(salonId, step, willDismiss)
+      return next
+    })
+  }
+
+  function toggleGroup(group: SetupStepGroup) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
       return next
     })
   }
@@ -174,7 +217,6 @@ export function SetupProgressBar({
               defaultValue: '🎁 +{{days}} дней демо добавлено! Спасибо, что настроили Finkley.',
             }),
           )
-          setExpanded(false)
         } else {
           toast.message(
             t(`setup_progress.reward.reason.${res.reason ?? 'unknown'}`, {
@@ -189,52 +231,85 @@ export function SetupProgressBar({
     })
   }
 
+  const collapsedHint = eligible
+    ? t('setup_progress.collapsed_reward_ready', {
+        defaultValue: 'всё готово — заберите +14 дней 🎁',
+      })
+    : remaining === 0
+      ? t('setup_progress.all_done', { defaultValue: 'всё готово' })
+      : t('setup_progress.tasks_left', {
+          count: remaining,
+          defaultValue: 'осталось {{count}} заданий',
+        })
+
   return (
     <div className="relative z-20">
-      {/* Свёрнутый бар */}
+      {/* Свёрнутая плашка */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="border-brand-teal-deep/20 bg-brand-teal-soft/25 hover:bg-brand-teal-soft/40 flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors sm:px-6"
+        className={cn(
+          'flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors sm:px-6',
+          eligible
+            ? 'border-brand-gold-deep/30 bg-brand-gold-soft/25 hover:bg-brand-gold-soft/40'
+            : 'border-brand-teal-deep/20 bg-brand-teal-soft/25 hover:bg-brand-teal-soft/40',
+        )}
         aria-expanded={expanded}
       >
-        <Sparkles className="text-brand-teal-deep size-4 shrink-0" strokeWidth={2.2} />
+        <Sparkles
+          className={cn(
+            'size-4 shrink-0',
+            eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+          )}
+          strokeWidth={2.2}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="text-brand-navy text-sm font-bold">
               {t('setup_progress.title', { defaultValue: 'Настройка Finkley' })}
             </span>
-            <span className="num text-brand-teal-deep text-sm font-extrabold">{percent}%</span>
-            <span className="text-muted-foreground hidden truncate text-xs sm:inline">
-              ·{' '}
-              {eligible
-                ? t('setup_progress.collapsed_reward_ready', {
-                    defaultValue: 'всё готово — заберите +14 дней 🎁',
-                  })
-                : t('setup_progress.remaining', {
-                    count: remaining,
-                    defaultValue: 'ещё {{count}} шагов до полной картины прибыли',
-                  })}
+            <span
+              className={cn(
+                'num text-sm font-extrabold',
+                eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+              )}
+            >
+              {percent}%
             </span>
+            <span className="text-muted-foreground truncate text-xs">· {collapsedHint}</span>
           </div>
           {/* Прогресс-полоска */}
-          <div className="bg-brand-teal-soft/50 mt-1.5 h-[5px] w-full overflow-hidden rounded-full">
+          <div
+            className={cn(
+              'mt-1.5 h-[5px] w-full overflow-hidden rounded-full',
+              eligible ? 'bg-brand-gold-soft/60' : 'bg-brand-teal-soft/50',
+            )}
+          >
             <div
-              className="bg-brand-teal-deep h-full rounded-full transition-all duration-500"
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+              )}
               style={{ width: `${percent}%` }}
             />
           </div>
         </div>
+        <span className="text-muted-foreground hidden text-xs font-medium sm:inline">
+          {expanded
+            ? t('setup_progress.collapse', { defaultValue: 'Свернуть' })
+            : t('setup_progress.expand', { defaultValue: 'Развернуть' })}
+        </span>
         <ChevronDown
           className={cn(
-            'text-brand-teal-deep size-4 shrink-0 transition-transform',
+            'size-4 shrink-0 transition-transform',
+            eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
             expanded && 'rotate-180',
           )}
           strokeWidth={2.2}
         />
       </button>
 
-      {/* Раскрытый чек-лист (dropdown) */}
+      {/* Раскрытая панель (Stripe-style accordion по категориям) */}
       {expanded ? (
         <>
           <button
@@ -262,7 +337,7 @@ export function SetupProgressBar({
                 </button>
               </div>
 
-              {/* Плашка приза */}
+              {/* Плашка приза «+14 дней» */}
               <div
                 className={cn(
                   'mb-4 flex items-center gap-3 rounded-lg border-2 border-dashed p-3',
@@ -306,43 +381,20 @@ export function SetupProgressBar({
                 ) : null}
               </div>
 
-              {/* Карточки шагов: сначала ключевые (влияют на %/приз),
-                  затем «полная картина» (трекинг полноты, на приз не влияют). */}
-              <p className="text-muted-foreground mb-2 text-[11px] font-bold uppercase tracking-wide">
-                {t('setup_progress.section.core', { defaultValue: 'Главное' })}
-              </p>
+              {/* Категории-аккордеоны */}
               <div className="flex flex-col gap-2">
-                {coreSteps.map((step) => (
-                  <SetupCard
-                    key={step.id}
-                    step={step}
-                    onCta={cta[step.id]}
-                    onDismiss={() => toggleDismiss(step.id)}
+                {groups.map((group) => (
+                  <SetupGroupSection
+                    key={group.group}
+                    group={group}
+                    open={openGroups.has(group.group)}
+                    onToggle={() => toggleGroup(group.group)}
+                    cta={cta}
+                    onDismiss={toggleDismiss}
                     t={t}
                   />
                 ))}
               </div>
-
-              {extraSteps.length > 0 ? (
-                <>
-                  <p className="text-muted-foreground mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide">
-                    {t('setup_progress.section.extra', {
-                      defaultValue: 'Полная картина салона',
-                    })}
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {extraSteps.map((step) => (
-                      <SetupCard
-                        key={step.id}
-                        step={step}
-                        onCta={cta[step.id]}
-                        onDismiss={() => toggleDismiss(step.id)}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </>
@@ -351,7 +403,93 @@ export function SetupProgressBar({
   )
 }
 
-function SetupCard({
+function SetupGroupSection({
+  group,
+  open,
+  onToggle,
+  cta,
+  onDismiss,
+  t,
+}: {
+  group: SetupGroupView
+  open: boolean
+  onToggle: () => void
+  cta: CtaMap
+  onDismiss: (id: SetupStepId) => void
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const GroupIcon = GROUP_ICONS[group.group]
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-xl border transition-colors',
+        group.complete ? 'border-brand-sage/40 bg-brand-sage-soft/15' : 'border-border bg-card',
+      )}
+    >
+      {/* Заголовок категории */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="hover:bg-muted/40 flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors"
+        aria-expanded={open}
+      >
+        <div
+          className={cn(
+            'grid size-8 shrink-0 place-items-center rounded-lg',
+            group.complete
+              ? 'bg-brand-sage text-white'
+              : 'bg-brand-teal-soft/40 text-brand-teal-deep',
+          )}
+        >
+          {group.complete ? (
+            <Check className="size-4" strokeWidth={2.6} />
+          ) : (
+            <GroupIcon className="size-4" strokeWidth={2} />
+          )}
+        </div>
+        <span className="text-brand-navy min-w-0 flex-1 truncate text-sm font-bold">
+          {t(`setup_progress.groups.${group.group}`, { defaultValue: group.group })}
+        </span>
+        <span
+          className={cn(
+            'num shrink-0 text-xs font-bold',
+            group.complete ? 'text-brand-sage-deep' : 'text-muted-foreground',
+          )}
+        >
+          {t('setup_progress.group_counter', {
+            done: group.doneCount,
+            total: group.total,
+            defaultValue: '{{done}}/{{total}}',
+          })}
+        </span>
+        <ChevronRight
+          className={cn(
+            'text-muted-foreground size-4 shrink-0 transition-transform',
+            open && 'rotate-90',
+          )}
+          strokeWidth={2.2}
+        />
+      </button>
+
+      {/* Задания категории */}
+      {open ? (
+        <div className="border-border/60 flex flex-col gap-1.5 border-t px-2 py-2">
+          {group.steps.map((step) => (
+            <SetupTask
+              key={step.id}
+              step={step}
+              onCta={cta[step.id]}
+              onDismiss={() => onDismiss(step.id)}
+              t={t}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function SetupTask({
   step,
   onCta,
   onDismiss,
@@ -367,13 +505,13 @@ function SetupCard({
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
-        done ? 'border-brand-sage/40 bg-brand-sage-soft/20' : 'border-border bg-card',
+        'flex items-start gap-3 rounded-lg p-2.5 transition-colors',
+        done ? 'bg-brand-sage-soft/20' : 'hover:bg-muted/40',
       )}
     >
       <div
         className={cn(
-          'grid size-9 shrink-0 place-items-center rounded-full',
+          'grid size-8 shrink-0 place-items-center rounded-full',
           done ? 'bg-brand-sage text-white' : 'bg-brand-teal-soft/40 text-brand-teal-deep',
         )}
       >
@@ -388,32 +526,21 @@ function SetupCard({
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            'text-sm font-bold',
+            'text-sm font-semibold',
             done ? 'text-brand-sage-deep line-through' : 'text-brand-navy',
           )}
         >
           {t(`setup_progress.cards.${step.id}.title`)}
         </p>
-        {!done ? (
-          <>
-            <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-              <span className="font-semibold">
-                {t('setup_progress.why_label', { defaultValue: 'Зачем' })}:
-              </span>{' '}
-              {t(`setup_progress.cards.${step.id}.why`)}
-            </p>
-            <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
-              <span className="font-semibold">
-                {t('setup_progress.gives_label', { defaultValue: 'Что даст' })}:
-              </span>{' '}
-              {t(`setup_progress.cards.${step.id}.gives`)}
-            </p>
-          </>
-        ) : (
+        {done ? (
           <p className="text-brand-sage-deep mt-0.5 text-xs">
             {step.dismissed
               ? t('setup_progress.skipped', { defaultValue: 'Пропущено' })
               : t('setup_progress.done', { defaultValue: 'Готово' })}
+          </p>
+        ) : (
+          <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+            {t(`setup_progress.cards.${step.id}.why`)}
           </p>
         )}
       </div>

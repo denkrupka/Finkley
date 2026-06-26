@@ -2223,6 +2223,12 @@
     "remaining_one": "ещё {{count}} шаг до полной картины прибыли",
     "remaining_few": "ещё {{count}} шага до полной картины прибыли",
     "remaining_many": "ещё {{count}} шагов до полной картины прибыли",
+    "tasks_left_one": "осталось {{count}} задание",
+    "tasks_left_few": "осталось {{count}} задания",
+    "tasks_left_many": "осталось {{count}} заданий",
+    "all_done": "всё готово",
+    "expand": "Развернуть",
+    "collapse": "Свернуть",
     "collapsed_reward_ready": "всё готово — заберите +14 дней 🎁",
     "expanded_header": "Закончите настройку — и Finkley покажет реальную прибыль салона, а не просто оборот.",
     "why_label": "Зачем",
@@ -2231,9 +2237,18 @@
     "skipped": "Пропущено",
     "skip": "Пропустить",
     "undo_skip": "Вернуть",
+    "group_counter": "{{done}}/{{total}}",
     "section": {
       "core": "Главное",
       "extra": "Полная картина салона"
+    },
+    "groups": {
+      "income": "Доходы",
+      "expenses": "Расходы",
+      "finance": "Финансы",
+      "banking": "Банк",
+      "growth": "Рост",
+      "integrations": "Интеграции"
     },
     "reward": {
       "promise": "Выполните все задания на 100% за {{days}} дн. — и получите +14 дней демо в подарок.",
