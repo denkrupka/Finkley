@@ -127,18 +127,28 @@ function useSetupBarModel(salonId: string) {
  * Если награда доступна (core готов), но extra-задания ещё есть — показываем
  * «осталось N · заберите +14 дней 🎁», а не ложное «всё готово».
  */
-function collapsedHintText(t: TFn, remaining: number, eligible: boolean): string {
+function collapsedHintText(
+  t: TFn,
+  remaining: number,
+  eligible: boolean,
+  remainingPercent: number,
+): string {
   if (remaining === 0) return t('setup_progress.all_done', { defaultValue: 'всё готово 🎉' })
-  if (eligible) {
-    return t('setup_progress.tasks_left_reward', {
-      count: remaining,
-      defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
-    })
-  }
-  return t('setup_progress.tasks_left', {
-    count: remaining,
-    defaultValue: 'осталось {{count}} заданий',
+  // «ещё N%» — наглядно показываем, сколько прогресса осталось добрать.
+  const pct = t('setup_progress.left_percent', {
+    percent: remainingPercent,
+    defaultValue: 'ещё {{percent}}%',
   })
+  const base = eligible
+    ? t('setup_progress.tasks_left_reward', {
+        count: remaining,
+        defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
+      })
+    : t('setup_progress.tasks_left', {
+        count: remaining,
+        defaultValue: 'осталось {{count}} заданий',
+      })
+  return `${base} · ${pct}`
 }
 
 /**
@@ -174,7 +184,7 @@ export function SetupProgressBar({
   if (!model) return null
 
   const { percent, remaining, eligible } = model
-  const hint = collapsedHintText(t, remaining, eligible)
+  const hint = collapsedHintText(t, remaining, eligible, 100 - percent)
 
   return (
     <button
@@ -185,13 +195,13 @@ export function SetupProgressBar({
         'flex w-full items-center gap-3 border-b px-4 py-2 text-left transition-colors sm:px-6',
         eligible
           ? 'border-brand-gold-deep/30 bg-brand-gold-soft/30 hover:bg-brand-gold-soft/50'
-          : 'border-brand-teal-deep/20 bg-brand-teal-soft/15 hover:bg-brand-teal-soft/25',
+          : 'border-brand-sage/25 bg-brand-sage-soft/40 hover:bg-brand-sage-soft/60',
       )}
     >
       <Sparkles
         className={cn(
           'size-4 shrink-0',
-          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
         )}
         strokeWidth={2.2}
       />
@@ -201,7 +211,7 @@ export function SetupProgressBar({
       <span
         className={cn(
           'num shrink-0 text-sm font-extrabold',
-          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
         )}
       >
         {percent}%
@@ -215,13 +225,13 @@ export function SetupProgressBar({
       <div
         className={cn(
           'mx-1 h-[5px] min-w-[64px] flex-1 overflow-hidden rounded-full sm:max-w-[160px] sm:flex-none',
-          eligible ? 'bg-brand-gold-soft/60' : 'bg-brand-teal-soft/50',
+          'bg-muted',
         )}
       >
         <div
           className={cn(
             'h-full rounded-full transition-all duration-500',
-            eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+            eligible ? 'bg-brand-gold-deep' : 'bg-brand-sage',
           )}
           style={{ width: `${percent}%` }}
         />
@@ -229,7 +239,7 @@ export function SetupProgressBar({
       <ChevronDown
         className={cn(
           'size-4 shrink-0 transition-transform',
-          eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+          eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
           expanded && 'rotate-180',
         )}
         strokeWidth={2.2}
@@ -285,7 +295,7 @@ export function SetupProgressWidget({
   if (!model) return null
 
   const { percent, remaining, eligible, daysLeft } = model
-  const hint = collapsedHintText(t, remaining, eligible)
+  const hint = collapsedHintText(t, remaining, eligible, 100 - percent)
 
   function toggleGroup(group: SetupStepGroup) {
     setOpenGroups((prev) => {
@@ -461,9 +471,7 @@ export function SetupProgressWidget({
           // ВАЖНО: фон НЕпрозрачный (виджет плавает над контентом) — без /alpha,
           // иначе сквозь него просвечивают тексты/полоски дашборда.
           'relative flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left shadow-xl transition hover:brightness-[0.97]',
-          eligible
-            ? 'border-brand-gold-deep bg-brand-gold-soft'
-            : 'border-brand-teal-deep/50 bg-card',
+          eligible ? 'border-brand-gold-deep bg-brand-gold-soft' : 'border-brand-sage/50 bg-card',
         )}
         aria-expanded={expanded}
       >
@@ -473,13 +481,13 @@ export function SetupProgressWidget({
             <span
               className={cn(
                 'absolute inline-flex h-full w-full animate-ping rounded-full opacity-60',
-                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-sage',
               )}
             />
             <span
               className={cn(
                 'relative inline-flex size-3.5 rounded-full ring-2 ring-white',
-                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-sage',
               )}
             />
           </span>
@@ -487,7 +495,7 @@ export function SetupProgressWidget({
         <Sparkles
           className={cn(
             'size-5 shrink-0',
-            eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+            eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
           )}
           strokeWidth={2.2}
         />
@@ -499,7 +507,7 @@ export function SetupProgressWidget({
             <span
               className={cn(
                 'num text-sm font-extrabold',
-                eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+                eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
               )}
             >
               {percent}%
@@ -507,16 +515,11 @@ export function SetupProgressWidget({
           </div>
           <p className="text-muted-foreground mt-0.5 truncate text-xs">{hint}</p>
           {/* Прогресс-полоска */}
-          <div
-            className={cn(
-              'mt-1.5 h-[5px] w-full overflow-hidden rounded-full',
-              eligible ? 'bg-brand-gold-soft/60' : 'bg-brand-teal-soft/50',
-            )}
-          >
+          <div className={cn('mt-1.5 h-[5px] w-full overflow-hidden rounded-full', 'bg-muted')}>
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500',
-                eligible ? 'bg-brand-gold-deep' : 'bg-brand-teal-deep',
+                eligible ? 'bg-brand-gold-deep' : 'bg-brand-sage',
               )}
               style={{ width: `${percent}%` }}
             />
@@ -525,7 +528,7 @@ export function SetupProgressWidget({
         <ChevronDown
           className={cn(
             'size-4 shrink-0 transition-transform',
-            eligible ? 'text-brand-gold-deep' : 'text-brand-teal-deep',
+            eligible ? 'text-brand-gold-deep' : 'text-brand-sage-deep',
             expanded && 'rotate-180',
           )}
           strokeWidth={2.2}
@@ -568,7 +571,7 @@ function SetupGroupSection({
             'grid size-8 shrink-0 place-items-center rounded-lg',
             group.complete
               ? 'bg-brand-sage text-white'
-              : 'bg-brand-teal-soft/40 text-brand-teal-deep',
+              : 'bg-brand-sage-soft/50 text-brand-sage-deep',
           )}
         >
           {group.complete ? (
@@ -628,7 +631,7 @@ function SetupTask({ step, onCta, t }: { step: SetupStep; onCta: () => void; t: 
         <div
           className={cn(
             'grid size-8 shrink-0 place-items-center rounded-full',
-            done ? 'bg-brand-sage text-white' : 'bg-brand-teal-soft/40 text-brand-teal-deep',
+            done ? 'bg-brand-sage text-white' : 'bg-brand-sage-soft/50 text-brand-sage-deep',
           )}
         >
           {done ? (

@@ -294,6 +294,18 @@ type Props = {
    *  «Просмотр без редактирования». Передаётся снаружи если у юзера нет
    *  edit-permission на текущей подкатегории (paid/pending). */
   readOnly?: boolean
+  /** Выплата ЗП со страницы «Зарплаты»: префилл мастера, суммы (остаток),
+   *  периода и описания. Зарплатная категория передаётся через
+   *  `defaultCategoryId` (is_payroll=true). По умолчанию kind='final'
+   *  («зарплата») — юзер может переключить на «аванс» прямо в модалке. */
+  payrollPrefill?: {
+    staffId: string
+    kind?: PayrollKind
+    amountCents?: number
+    periodStart?: string
+    periodEnd?: string
+    description?: string
+  } | null
 }
 
 export function ExpenseFormModal({
@@ -308,6 +320,7 @@ export function ExpenseFormModal({
   prefillFromBankTx,
   existingPayment,
   readOnly = false,
+  payrollPrefill,
 }: Props) {
   const isVatPayer = useIsVatPayer(salonId)
   const { data: salonData } = useSalon(salonId)
@@ -623,6 +636,31 @@ export function ExpenseFormModal({
         paid_amount: '',
         bank_account_iban: '',
       })
+    } else if (payrollPrefill) {
+      // Выплата ЗП со страницы «Зарплаты»: префилл мастера/суммы/периода.
+      // Категория (is_payroll) приходит через defaultCategoryId → payroll-блок
+      // раскроется автоматически (isPayrollCategory=true).
+      form.reset({
+        expense_at: defaultDate || today,
+        description: payrollPrefill.description ?? '',
+        category_id: defaultCategoryId ?? '',
+        counterparty_id: '',
+        amount:
+          payrollPrefill.amountCents != null ? (payrollPrefill.amountCents / 100).toFixed(2) : '',
+        payment_method: '',
+        cash_register_id: '',
+        document_number: '',
+        comment: '',
+        recurrence: 'none',
+        payroll_staff_id: payrollPrefill.staffId ?? '',
+        payroll_kind: payrollPrefill.kind ?? 'final',
+        payroll_period_start: payrollPrefill.periodStart ?? '',
+        payroll_period_end: payrollPrefill.periodEnd ?? '',
+        premium: '',
+        is_partial_payment: false,
+        paid_amount: '',
+        bank_account_iban: '',
+      })
     } else {
       form.reset({
         expense_at: defaultDate || today,
@@ -652,6 +690,7 @@ export function ExpenseFormModal({
     mode,
     defaultDate,
     prefillFromBankTx?.bank_transaction_id,
+    payrollPrefill?.staffId,
   ])
 
   /**
