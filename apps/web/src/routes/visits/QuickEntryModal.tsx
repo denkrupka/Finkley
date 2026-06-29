@@ -692,10 +692,17 @@ export function QuickEntryModal({
             staffIdExternal: stfExternal,
             startAt: startAt.toISOString(),
             endAt: endAt.toISOString(),
-            title: lines
-              .filter((ln) => ln.staff_id === staffId)
-              .map((ln) => ln.name)
-              .join(', '),
+            // В резервацию Booksy («Powód») — имя клиента + услуги (owner
+            // 2026-06-30). Без клиента (запись без клиента) — только услуги.
+            title: [
+              selectedClient?.name,
+              lines
+                .filter((ln) => ln.staff_id === staffId)
+                .map((ln) => ln.name)
+                .join(', '),
+            ]
+              .filter(Boolean)
+              .join(' · '),
             visitId: staffToVisitId.get(staffId) ?? null,
           })
           if (res.ok) {
