@@ -37,6 +37,7 @@ import {
   computePercent,
   computeSetupSteps,
   groupSetupSteps,
+  isBonusWindowActive,
   isRewardEligible,
   remainingSteps,
   rewardDaysLeft,
@@ -118,6 +119,7 @@ function useSetupBarModel(salonId: string) {
     percent: computePercent(steps),
     remaining: remainingSteps(steps),
     eligible: isRewardEligible(progress, steps),
+    bonusActive: isBonusWindowActive(progress),
     daysLeft: rewardDaysLeft(progress.created_at),
   }
 }
@@ -132,23 +134,27 @@ function collapsedHintText(
   remaining: number,
   eligible: boolean,
   remainingPercent: number,
+  bonusActive: boolean,
 ): string {
+  // Всё сделано в окне → приз ждёт: зовём забрать €20.
+  if (eligible) {
+    return t('setup_progress.collapsed_reward_ready', {
+      defaultValue: 'всё готово — заберите €20 🎁',
+    })
+  }
   if (remaining === 0) return t('setup_progress.all_done', { defaultValue: 'всё готово 🎉' })
   // «ещё N%» — наглядно показываем, сколько прогресса осталось добрать.
   const pct = t('setup_progress.left_percent', {
     percent: remainingPercent,
     defaultValue: 'ещё {{percent}}%',
   })
-  const base = eligible
-    ? t('setup_progress.tasks_left_reward', {
-        count: remaining,
-        defaultValue: 'осталось {{count}} · заберите +14 дней 🎁',
-      })
-    : t('setup_progress.tasks_left', {
-        count: remaining,
-        defaultValue: 'осталось {{count}} заданий',
-      })
-  return `${base} · ${pct}`
+  const tasks = t('setup_progress.tasks_left', {
+    count: remaining,
+    defaultValue: 'осталось {{count}} заданий',
+  })
+  // Пока открыто 7-дневное окно — упоминаем бонус €20 (owner 2026-06-30).
+  const bonus = bonusActive ? t('setup_progress.bonus_hint', { defaultValue: '🎁 €20' }) : null
+  return [tasks, pct, bonus].filter(Boolean).join(' · ')
 }
 
 /**
@@ -183,8 +189,8 @@ export function SetupProgressBar({
   const model = useSetupBarModel(salonId)
   if (!model) return null
 
-  const { percent, remaining, eligible } = model
-  const hint = collapsedHintText(t, remaining, eligible, 100 - percent)
+  const { percent, remaining, eligible, bonusActive } = model
+  const hint = collapsedHintText(t, remaining, eligible, 100 - percent, bonusActive)
 
   return (
     <button
@@ -294,8 +300,8 @@ export function SetupProgressWidget({
 
   if (!model) return null
 
-  const { percent, remaining, eligible, daysLeft } = model
-  const hint = collapsedHintText(t, remaining, eligible, 100 - percent)
+  const { percent, remaining, eligible, bonusActive, daysLeft } = model
+  const hint = collapsedHintText(t, remaining, eligible, 100 - percent, bonusActive)
 
   function toggleGroup(group: SetupStepGroup) {
     setOpenGroups((prev) => {
@@ -393,58 +399,61 @@ export function SetupProgressWidget({
 
           {/* Скролл-контент */}
           <div className="overflow-y-auto px-3 py-3">
-            {/* Плашка приза «+14 дней» — компактная. Награда доступна (eligible)
-                → активный золотой вид + кнопка. Награда ещё не готова → неактивный
-                (приглушённый, серый) вид, без кнопки. */}
-            <div
-              className={cn(
-                'mb-3 flex items-start gap-2.5 rounded-lg border p-2.5',
-                eligible
-                  ? 'border-brand-gold-deep bg-brand-gold-soft'
-                  : 'border-border bg-muted/40',
-              )}
-            >
-              <Gift
+            {/* Плашка бонуса €20 — показываем ТОЛЬКО пока активно окно (7 дней,
+                owner 2026-06-30). eligible (все задания сделаны) → активный золотой
+                вид + кнопка «Забрать €20». Иначе (в окне, но не всё сделано) →
+                приглушённое обещание с днями. После окна/выдачи приза не показываем. */}
+            {bonusActive ? (
+              <div
                 className={cn(
-                  'mt-0.5 size-4 shrink-0',
-                  eligible ? 'text-brand-gold-deep' : 'text-muted-foreground',
+                  'mb-3 flex items-start gap-2.5 rounded-lg border p-2.5',
+                  eligible
+                    ? 'border-brand-gold-deep bg-brand-gold-soft'
+                    : 'border-border bg-muted/40',
                 )}
-                strokeWidth={2}
-              />
-              <div className="min-w-0 flex-1">
-                <p
+              >
+                <Gift
                   className={cn(
-                    'text-xs leading-snug',
-                    eligible ? 'text-brand-navy font-semibold' : 'text-muted-foreground',
+                    'mt-0.5 size-4 shrink-0',
+                    eligible ? 'text-brand-gold-deep' : 'text-muted-foreground',
                   )}
-                >
-                  {eligible
-                    ? t('setup_progress.reward.ready', {
-                        defaultValue: 'Подарок готов — заберите +14 дней демо.',
-                      })
-                    : t('setup_progress.reward.promise', {
-                        days: daysLeft,
-                        defaultValue:
-                          'Бонус +14 дней демо — за выполнение ключевых заданий ({{days}} дн.).',
-                      })}
-                </p>
-                {eligible ? (
-                  <button
-                    type="button"
-                    onClick={handleClaim}
-                    disabled={claim.isPending}
-                    className="bg-brand-gold-deep mt-2 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                  >
-                    {claim.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
-                    ) : (
-                      <Gift className="size-3.5" strokeWidth={2.2} />
+                  strokeWidth={2}
+                />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      'text-xs leading-snug',
+                      eligible ? 'text-brand-navy font-semibold' : 'text-muted-foreground',
                     )}
-                    {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать +14 дней' })}
-                  </button>
-                ) : null}
+                  >
+                    {eligible
+                      ? t('setup_progress.reward.ready', {
+                          defaultValue: 'Все задания готовы — заберите промокод €20.',
+                        })
+                      : t('setup_progress.reward.promise', {
+                          days: daysLeft,
+                          defaultValue:
+                            'Выполни все задания за {{days}} дн. демо — получи промокод €20.',
+                        })}
+                  </p>
+                  {eligible ? (
+                    <button
+                      type="button"
+                      onClick={handleClaim}
+                      disabled={claim.isPending}
+                      className="bg-brand-gold-deep mt-2 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                    >
+                      {claim.isPending ? (
+                        <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+                      ) : (
+                        <Gift className="size-3.5" strokeWidth={2.2} />
+                      )}
+                      {t('setup_progress.reward.claim_button', { defaultValue: 'Забрать €20' })}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Категории-аккордеоны */}
             <div className="flex flex-col gap-2">

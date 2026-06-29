@@ -52,7 +52,9 @@ const APP_URL = Deno.env.get('APP_URL') ?? 'https://finkley.app/app/'
 const REWARD_MAX_GRANTS = Number(Deno.env.get('REWARD_MAX_GRANTS') ?? '100000')
 const REWARD_AMOUNT_CENTS = 2000 // €20
 const REWARD_CURRENCY = 'eur'
-const WINDOW_DAYS = 30
+// Окно бонуса €20 — 7 дней с создания салона (owner 2026-06-30, синхронно
+// с REWARD_WINDOW_DAYS в apps/web/src/lib/setup-progress.ts).
+const WINDOW_DAYS = 7
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function jsonResponse(body: unknown, status = 200) {
@@ -69,17 +71,54 @@ function normalizeNip(raw: unknown): string | null {
   return digits.length >= 10 ? digits : null
 }
 
-/** Все core-задания «Настройки Finkley» выполнены (зеркало isCoreComplete). */
+/** ВСЕ задания «Настройки Finkley» выполнены — зеркало isAllComplete из
+ *  apps/web/src/lib/setup-progress.ts. owner 2026-06-30: награда €20 теперь
+ *  за ВСЕ задания (core + extra), а не только за core. Поля читаем из того же
+ *  RPC setup_progress, что и клиент, → клиент и сервер согласованы. */
 type SetupProgressRow = {
   has_visit: boolean
   has_expense: boolean
   booksy_connected: boolean
   bank_connected: boolean
   dashboard_opened: boolean
+  has_first_client_closed: boolean
+  has_expense_calculated: boolean
+  has_scheduled_payment: boolean
+  bank_synced: boolean
+  has_bank_tx_linked: boolean
+  has_finance_report: boolean
+  has_competitor: boolean
+  has_social_page: boolean
+  has_google_profile: boolean
+  has_inventory_item: boolean
+  has_marketing_broadcast: boolean
+  has_messenger_message: boolean
+  ai_assistant_seen: boolean
+  booking_connected: boolean
+  any_integration: boolean
 }
-function isCoreComplete(p: SetupProgressRow): boolean {
+function isAllComplete(p: SetupProgressRow): boolean {
   return (
-    p.has_visit && p.has_expense && p.booksy_connected && p.bank_connected && p.dashboard_opened
+    p.has_visit &&
+    p.has_expense &&
+    p.booksy_connected &&
+    p.bank_connected &&
+    p.dashboard_opened &&
+    p.has_first_client_closed &&
+    p.has_expense_calculated &&
+    p.has_scheduled_payment &&
+    p.bank_synced &&
+    p.has_bank_tx_linked &&
+    p.has_finance_report &&
+    p.has_competitor &&
+    p.has_social_page &&
+    p.has_google_profile &&
+    p.has_inventory_item &&
+    p.has_marketing_broadcast &&
+    p.has_messenger_message &&
+    p.ai_assistant_seen &&
+    p.booking_connected &&
+    p.any_integration
   )
 }
 
@@ -131,12 +170,12 @@ Deno.serve(
     const createdMs = new Date(salon.created_at).getTime()
     const nowMs = Date.now()
 
-    // Окно 30 дней с создания салона.
+    // Окно бонуса €20 — 7 дней с создания салона.
     if (nowMs - createdMs > WINDOW_DAYS * DAY_MS) {
       return jsonResponse({ granted: false, reason: 'window_expired' })
     }
 
-    // Серверная проверка прохождения настройки: ВСЕ core-задания выполнены.
+    // Серверная проверка прохождения настройки: ВСЕ задания выполнены.
     const { data: progressRows, error: progressErr } = await admin.rpc('setup_progress', {
       p_salon_id: salonId,
     })
@@ -144,7 +183,7 @@ Deno.serve(
     const progress = (
       Array.isArray(progressRows) ? progressRows[0] : progressRows
     ) as SetupProgressRow | null
-    if (!progress || !isCoreComplete(progress)) {
+    if (!progress || !isAllComplete(progress)) {
       return jsonResponse({
         granted: false,
         reason: 'incomplete',

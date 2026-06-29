@@ -7,6 +7,7 @@ import {
   ENDOWED_PERCENT,
   groupSetupSteps,
   isAllComplete,
+  isBonusWindowActive,
   isCoreComplete,
   isRewardEligible,
   MAX_VISIBLE_AGE_DAYS,
@@ -240,49 +241,61 @@ describe('rewardDaysLeft', () => {
   })
 })
 
-describe('isRewardEligible (gated on CORE, not 100%)', () => {
-  const coreDone = () =>
-    makeData({
+describe('isRewardEligible (gated on ALL tasks, 7-day window)', () => {
+  it('eligible only when ALL tasks done within the window', () => {
+    const data = makeAllServerDone() // создан 1 день назад → в окне
+    const steps = computeSetupSteps(data, NONE)
+    expect(isAllComplete(steps)).toBe(true)
+    expect(isRewardEligible(data, steps, NOW)).toBe(true)
+  })
+
+  it('NOT eligible when only CORE done (extra remain)', () => {
+    const data = makeData({
       has_visit: true,
       has_expense: true,
       booksy_connected: true,
       bank_connected: true,
       dashboard_opened: true,
     })
-
-  it('eligible when CORE complete even if extra steps remain', () => {
-    const data = coreDone()
     const steps = computeSetupSteps(data, NONE)
-    // НЕ всё сделано (extra остались), но награда за CORE доступна.
-    expect(isAllComplete(steps)).toBe(false)
-    expect(isRewardEligible(data, steps, NOW)).toBe(true)
-  })
-
-  it('eligible when core done via real visit/expense + dismissed booksy/bank', () => {
-    const data = makeData({ has_visit: true, has_expense: true, dashboard_opened: true })
-    const steps = computeSetupSteps(data, new Set<SetupStepId>(['booksy', 'bank']))
     expect(isCoreComplete(steps)).toBe(true)
-    expect(isRewardEligible(data, steps, NOW)).toBe(true)
-  })
-
-  it('not eligible without real visit+expense even if dismissed', () => {
-    const data = makeData({ dashboard_opened: true })
-    const steps = computeSetupSteps(data, new Set<SetupStepId>(['booksy', 'bank']))
+    expect(isAllComplete(steps)).toBe(false)
     expect(isRewardEligible(data, steps, NOW)).toBe(false)
   })
 
-  it('not eligible after the 7-day window', () => {
-    const data = coreDone()
-    data.created_at = new Date(NOW - 8 * DAY_MS).toISOString()
+  it('eligible when all done via real core + dismissed extras', () => {
+    const data = makeData({ has_visit: true, has_expense: true, dashboard_opened: true })
+    const steps = computeSetupSteps(data, new Set<SetupStepId>(ALL_DISMISSABLE))
+    expect(isAllComplete(steps)).toBe(true)
+    expect(isRewardEligible(data, steps, NOW)).toBe(true)
+  })
+
+  it('not eligible after the 7-day window even if all done', () => {
+    const data = makeAllServerDone({ created_at: new Date(NOW - 8 * DAY_MS).toISOString() })
     const steps = computeSetupSteps(data, NONE)
     expect(isRewardEligible(data, steps, NOW)).toBe(false)
   })
 
   it('not eligible once already granted', () => {
-    const data = coreDone()
-    data.reward_granted_at = new Date(NOW).toISOString()
+    const data = makeAllServerDone({ reward_granted_at: new Date(NOW).toISOString() })
     const steps = computeSetupSteps(data, NONE)
     expect(isRewardEligible(data, steps, NOW)).toBe(false)
+  })
+})
+
+describe('isBonusWindowActive (7-day €20 offer)', () => {
+  it('active within the window and not yet granted', () => {
+    expect(isBonusWindowActive(makeData(), NOW)).toBe(true)
+  })
+
+  it('inactive after the 7-day window', () => {
+    const data = makeData({ created_at: new Date(NOW - 8 * DAY_MS).toISOString() })
+    expect(isBonusWindowActive(data, NOW)).toBe(false)
+  })
+
+  it('inactive once the reward is granted', () => {
+    const data = makeData({ reward_granted_at: new Date(NOW).toISOString() })
+    expect(isBonusWindowActive(data, NOW)).toBe(false)
   })
 })
 
@@ -321,16 +334,37 @@ describe('shouldShowSetupBar (visible until all done/dismissed)', () => {
     expect(shouldShowSetupBar(data, steps, 'owner', NOW)).toBe(true)
   })
 
-  it('hidden once every step is done or dismissed', () => {
-    const data = makeData({ has_visit: true, has_expense: true, dashboard_opened: true })
+  it('STAYS visible when all done within window and reward unclaimed (to claim €20)', () => {
+    const data = makeAllServerDone() // в окне 7 дней, приз не выдан
+    const steps = computeSetupSteps(data, NONE)
+    expect(isAllComplete(steps)).toBe(true)
+    expect(isRewardEligible(data, steps, NOW)).toBe(true)
+    expect(shouldShowSetupBar(data, steps, 'owner', NOW)).toBe(true)
+  })
+
+  it('hidden once every step done/dismissed AND reward claimed', () => {
+    const data = makeData({
+      has_visit: true,
+      has_expense: true,
+      dashboard_opened: true,
+      reward_granted_at: new Date(NOW).toISOString(),
+    })
     const steps = computeSetupSteps(data, new Set<SetupStepId>(ALL_DISMISSABLE))
     expect(isAllComplete(steps)).toBe(true)
     expect(shouldShowSetupBar(data, steps, 'owner', NOW)).toBe(false)
   })
 
-  it('hidden when all server-done', () => {
-    const data = makeAllServerDone()
+  it('hidden when all server-done and reward claimed', () => {
+    const data = makeAllServerDone({ reward_granted_at: new Date(NOW).toISOString() })
     const steps = computeSetupSteps(data, NONE)
+    expect(shouldShowSetupBar(data, steps, 'owner', NOW)).toBe(false)
+  })
+
+  it('hidden when all done but the bonus window expired', () => {
+    const data = makeAllServerDone({ created_at: new Date(NOW - 8 * DAY_MS).toISOString() })
+    const steps = computeSetupSteps(data, NONE)
+    expect(isAllComplete(steps)).toBe(true)
+    expect(isRewardEligible(data, steps, NOW)).toBe(false)
     expect(shouldShowSetupBar(data, steps, 'owner', NOW)).toBe(false)
   })
 
