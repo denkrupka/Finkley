@@ -117,23 +117,30 @@ export function ReservationModal({
       console.warn(`Booksy reservation skipped: staff ${stf?.full_name ?? staffId} not linked`)
       return
     }
-    const reservationId = await reserveBooksy.mutateAsync({
+    const res = await reserveBooksy.mutateAsync({
       salonId,
       staffIdExternal: stfExternal,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
       title: title || t('visits.reservation.default_title'),
     })
-    if (reservationId) {
+    if (res.ok && res.reservationId) {
       await supabase
         .from('staff_time_blocks')
-        .update({ external_source: 'booksy', external_id: `res:${reservationId}` })
+        .update({ external_source: 'booksy', external_id: `res:${res.reservationId}` })
         .eq('id', blockId)
       // useCreateStaffBlock уже инвалидировал кеш ДО того, как мы записали
       // external_id, поэтому UI держит блок без external_source. Без этой
       // повторной инвалидации удаление блока не каскадит в Booksy: cancel
       // не зовётся, на следующем sync блок воскресает.
       qc.invalidateQueries({ queryKey: ['staff-blocks', salonId] })
+    } else if (!res.ok) {
+      // Booksy отказал — показываем причину (раньше глушилось молча).
+      const reason = res.message || res.error || `HTTP ${res.status ?? '?'}`
+      toast.warning(t('visits.toast_booksy_reserve_failed'), {
+        description: `${stf?.full_name ?? staffId}: ${reason}`,
+        duration: 10000,
+      })
     }
   }
 

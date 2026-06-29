@@ -13,6 +13,22 @@ export type CreateBooksyReservationInput = {
   visitId?: string | null
 }
 
+/** Результат попытки создать резервацию в Booksy. Раньше хук возвращал
+ *  `string | null` и проглатывал причину отказа — из-за чего несинк выглядел
+ *  как «тихо ничего не произошло». Теперь возвращаем структуру с реальной
+ *  причиной от Booksy, чтобы caller показал её владельцу (toast). */
+export type BooksyReservationResult = {
+  ok: boolean
+  /** id резервации в Booksy (если создана). */
+  reservationId: string | null
+  /** Машинный код ошибки (booksy_reservation_failed / код invoke-ошибки). */
+  error?: string
+  /** HTTP-статус ответа Booksy (если отказ на стороне Booksy). */
+  status?: number
+  /** Человекочитаемое сообщение от Booksy — для toast'а владельцу. */
+  message?: string
+}
+
 /**
  * Создаёт в Booksy блокирующий слот (reservation) на staff + время, чтобы
  * клиент не мог забукать тот же слот через Booksy онлайн. Вызывается
@@ -22,13 +38,15 @@ export type CreateBooksyReservationInput = {
  *   - У услуги есть default_duration_min
  *   - kind === 'visit' (не retail)
  *
- * Silent: если Booksy не подключён или вызов упал — тихо. Визит в Finkley
- * уже создан, reservation — enhancement. Возвращает booksy_reservation_id
- * или null. Caller сам решает: сохранить в visits.metadata.
+ * НЕ silent: возвращает {@link BooksyReservationResult}. При успехе ok=true +
+ * reservationId (booksy-proxy сам пишет visits.external_reservation_id). При
+ * отказе ok=false + message/status/error — caller обязан показать это владельцу,
+ * иначе несинк остаётся невидимым. mutationFn НЕ кидает — всегда резолвит
+ * результат (callerу удобно через mutateAsync).
  */
 export function useCreateBooksyReservation() {
   return useMutation({
-    mutationFn: async (input: CreateBooksyReservationInput): Promise<string | null> => {
+    mutationFn: async (input: CreateBooksyReservationInput): Promise<BooksyReservationResult> => {
       const { data, error } = await supabase.functions.invoke('booksy-proxy', {
         body: {
           action: 'create_reservation',
@@ -40,10 +58,45 @@ export function useCreateBooksyReservation() {
           visit_id: input.visitId ?? null,
         },
       })
-      if (error) return null // silent
-      const json = data as { ok?: boolean; reservation_id?: string | null }
-      if (!json.ok) return null
-      return json.reservation_id ?? null
+      if (error) {
+        // FunctionsHttpError: при не-2xx ответе edge-функции (502 при отказе
+        // Booksy) supabase-js кладёт сам ответ в error.context (Response).
+        // Достаём оттуда тело {error,status,message}, чтобы показать причину.
+        let status: number | undefined
+        let message: string | undefined
+        const ctx = (error as { context?: unknown }).context
+        if (ctx && typeof (ctx as Response).json === 'function') {
+          try {
+            const body = (await (ctx as Response).json()) as {
+              status?: number
+              message?: string
+              error?: string
+            }
+            status = body.status
+            message = body.message ?? body.error
+          } catch {
+            /* тело не JSON — оставляем error.message */
+          }
+        }
+        return { ok: false, reservationId: null, error: error.message, status, message }
+      }
+      const json = data as {
+        ok?: boolean
+        reservation_id?: string | null
+        error?: string
+        status?: number
+        message?: string
+      }
+      if (!json.ok) {
+        return {
+          ok: false,
+          reservationId: null,
+          error: json.error,
+          status: json.status,
+          message: json.message,
+        }
+      }
+      return { ok: true, reservationId: json.reservation_id ?? null }
     },
   })
 }
