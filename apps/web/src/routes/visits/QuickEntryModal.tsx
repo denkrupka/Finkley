@@ -648,6 +648,11 @@ export function QuickEntryModal({
         },
       })
 
+      // Закрываем модалку сразу — визит уже создан. Резервацию в Booksy
+      // досылаем следом и, если Booksy отказал, ПОКАЗЫВАЕМ причину владельцу
+      // (раньше ошибка глушилась — несинк был полностью невидим).
+      onOpenChange(false)
+
       // Booksy reverse-sync — резервируем слот для каждого УНИКАЛЬНОГО
       // мастера на длительность всей записи (несколько услуг у разных
       // мастеров → несколько reservation-объектов в Booksy).
@@ -668,8 +673,9 @@ export function QuickEntryModal({
             staffToVisitId.set(l.staff_id, vid)
           }
         }
-        let reservedCount = 0
+        let reservedOk = 0
         let skippedNoExternal = 0
+        const failures: string[] = []
         for (const staffId of uniqueStaffIds) {
           const stf = staff.find((s) => s.id === staffId)
           const stfExternal =
@@ -681,7 +687,7 @@ export function QuickEntryModal({
             )
             continue
           }
-          reserveBooksy.mutate({
+          const res = await reserveBooksy.mutateAsync({
             salonId,
             staffIdExternal: stfExternal,
             startAt: startAt.toISOString(),
@@ -692,18 +698,27 @@ export function QuickEntryModal({
               .join(', '),
             visitId: staffToVisitId.get(staffId) ?? null,
           })
-          reservedCount++
+          if (res.ok) {
+            reservedOk++
+          } else {
+            const reason = res.message || res.error || `HTTP ${res.status ?? '?'}`
+            failures.push(`${stf?.full_name ?? staffId}: ${reason}`)
+            console.warn(`Booksy reservation failed for ${stf?.full_name ?? staffId}: ${reason}`)
+          }
         }
-        // Warning если ни одной резервации не сделали — частая причина
-        // у юзера: мастер вручную создан в портале (без Booksy external_id)
-        if (reservedCount === 0 && skippedNoExternal > 0) {
+        // Booksy отказал хотя бы по одному мастеру — показываем реальную причину.
+        if (failures.length > 0) {
+          toast.warning(t('visits.toast_booksy_reserve_failed'), {
+            description: failures.join('\n'),
+            duration: 10000,
+          })
+        } else if (reservedOk === 0 && skippedNoExternal > 0) {
+          // Ни одной резервации — мастер(а) не привязаны к Booksy.
           toast.warning(t('visits.toast_booksy_skip_no_external'), {
             description: t('visits.toast_booksy_skip_no_external_hint'),
           })
         }
       }
-
-      onOpenChange(false)
     } catch (err) {
       toast.error(t('visits.toast_error'), {
         description: err instanceof Error ? err.message : String(err),

@@ -2229,6 +2229,7 @@
     "tasks_left_reward_one": "осталось {{count}} · заберите €20 🎁",
     "tasks_left_reward_few": "осталось {{count}} · заберите €20 🎁",
     "tasks_left_reward_many": "осталось {{count}} · заберите €20 🎁",
+    "left_percent": "ещё {{percent}}%",
     "all_done": "всё готово",
     "expand": "Развернуть",
     "collapse": "Свернуть",
@@ -2308,10 +2309,10 @@
         "skip": "Пропустить"
       },
       "expense_calculated": {
-        "title": "Рассчитайте зарплату",
+        "title": "Выдайте зарплату или аванс",
         "why": "зарплата мастеров — обычно самый крупный расход.",
         "gives": "прибыль с учётом выплат, а не «грязный» оборот.",
-        "cta": "Рассчитать зарплату",
+        "cta": "Выдать зарплату",
         "skip": "Пропустить"
       },
       "scheduled_payment": {
@@ -2942,6 +2943,7 @@
       "client_discount_hint": "Скидка {{pct}}% из карточки клиента — применится при сохранении",
       "toast_booksy_skip_no_external": "Резерв в Booksy не создан",
       "toast_booksy_skip_no_external_hint": "Мастер не привязан к Booksy. Открой Settings → Интеграции → «Синхронизировать сейчас» чтобы Booksy связал мастеров с порталом.",
+      "toast_booksy_reserve_failed": "Booksy не принял резервацию времени",
       "payment_method_label": "Оплата",
       "comment_label": "Комментарий (необязательно)",
       "comment_placeholder": "Например: новая клиентка, по рекомендации",
@@ -5391,8 +5393,11 @@
       "remaining": "Остаток",
       "period": "Период",
       "tips": "Чаевые",
-      "premium": "Премия"
+      "premium": "Премия",
+      "pay": "Выплата"
     },
+    "pay_action": "Выдать зарплату или аванс",
+    "pay_description": "Зарплата — {{name}}",
     "row_click_hint": "Открыть детализацию визитов",
     "visits_count_one": "{{count}} визит",
     "visits_count_few": "{{count}} визита",

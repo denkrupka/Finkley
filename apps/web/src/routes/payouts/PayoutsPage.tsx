@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Printer } from 'lucide-react'
+import { HandCoins, Printer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -11,11 +12,13 @@ import {
   type PeriodValue,
 } from '@/components/ui/period-picker-utils'
 import { PeriodPickerPopover } from '@/components/ui/PeriodPickerPopover'
+import { useExpenseCategories } from '@/hooks/useExpenses'
 import { usePayrollAdvances } from '@/hooks/usePayrollAdvances'
 import { useSalon } from '@/hooks/useSalons'
 import { usePayoutsHistory, usePayoutsPreview, type PayoutPreviewRow } from '@/hooks/usePayouts'
 import { computePayoutTotals, computeRowTotals } from '@/lib/payouts/totals'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { ExpenseFormModal } from '@/routes/expenses/ExpenseFormModal'
 
 import { StaffVisitsModal } from './StaffVisitsModal'
 
@@ -48,6 +51,20 @@ export function PayoutsPage() {
     periodEnd,
   )
   const [staffModal, setStaffModal] = useState<{ id: string; name: string } | null>(null)
+
+  // Выплата ЗП/аванса прямо из таблицы: иконка-кнопка в правой колонке
+  // открывает модалку расхода с предвыбором зарплатной категории + мастера.
+  const qc = useQueryClient()
+  const { data: expenseCategories = [] } = useExpenseCategories(salonId)
+  const payrollCategoryId = useMemo(
+    () => expenseCategories.find((c) => c.is_payroll)?.id ?? null,
+    [expenseCategories],
+  )
+  const [payStaff, setPayStaff] = useState<{
+    id: string
+    name: string
+    amountCents: number
+  } | null>(null)
 
   const totals = useMemo(() => {
     const revenue = rows.reduce((acc, r) => acc + r.revenue_cents, 0)
@@ -84,7 +101,7 @@ export function PayoutsPage() {
       </div>
 
       <div className="border-border bg-card shadow-finsm overflow-x-auto rounded-lg border">
-        <div className="text-muted-foreground grid min-w-[960px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
+        <div className="text-muted-foreground grid min-w-[1024px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr_64px] items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider sm:px-5">
           <div>{t('payouts.col.staff')}</div>
           <div>{t('payouts.col.scheme')}</div>
           <div className="text-right">{t('payouts.col.revenue')}</div>
@@ -93,6 +110,7 @@ export function PayoutsPage() {
           <div className="text-right">{t('payouts.col.payout')}</div>
           <div className="text-right">{t('payouts.col.advances')}</div>
           <div className="text-right">{t('payouts.col.remaining')}</div>
+          <div className="text-center">{t('payouts.col.pay', { defaultValue: 'Выплата' })}</div>
         </div>
         <div className="divide-border min-w-[760px] divide-y">
           {isLoading ? (
@@ -110,7 +128,7 @@ export function PayoutsPage() {
                 <div
                   key={r.staff_id}
                   onClick={() => setStaffModal({ id: r.staff_id, name: r.full_name })}
-                  className="hover:bg-muted/30 grid min-w-[960px] cursor-pointer grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 px-4 py-3 transition-colors sm:px-5"
+                  className="hover:bg-muted/30 grid min-w-[1024px] cursor-pointer grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr_64px] items-center gap-3 px-4 py-3 transition-colors sm:px-5"
                   title={t('payouts.row_click_hint', {
                     defaultValue: 'Открыть детализацию визитов',
                   })}
@@ -146,13 +164,35 @@ export function PayoutsPage() {
                   >
                     {formatCurrency(remaining, currency)}
                   </div>
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPayStaff({
+                          id: r.staff_id,
+                          name: r.full_name,
+                          amountCents: Math.max(0, remaining),
+                        })
+                      }}
+                      title={t('payouts.pay_action', {
+                        defaultValue: 'Выдать зарплату или аванс',
+                      })}
+                      aria-label={t('payouts.pay_action', {
+                        defaultValue: 'Выдать зарплату или аванс',
+                      })}
+                      className="border-brand-sage/40 text-brand-sage-deep hover:bg-brand-sage-soft grid size-9 place-items-center rounded-lg border transition-colors"
+                    >
+                      <HandCoins className="size-4" strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
               )
             })
           )}
         </div>
         {rows.length > 0 ? (
-          <div className="border-border bg-muted/30 grid min-w-[960px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
+          <div className="border-border bg-muted/30 grid min-w-[1024px] grid-cols-[1.3fr_1.1fr_0.9fr_0.7fr_0.7fr_0.9fr_0.9fr_0.9fr_64px] items-center gap-3 border-t px-4 py-3 text-sm font-bold sm:px-5">
             <div className="text-brand-navy col-span-2">{t('payouts.total')}</div>
             <div className="num text-right">{formatCurrency(totals.revenue, currency)}</div>
             <div className="num text-brand-gold-deep text-right">—</div>
@@ -170,6 +210,7 @@ export function PayoutsPage() {
             >
               {formatCurrency(totals.remaining, currency)}
             </div>
+            <div aria-hidden />
           </div>
         ) : null}
       </div>
@@ -223,6 +264,35 @@ export function PayoutsPage() {
           onOpenChange={(v) => !v && setStaffModal(null)}
         />
       )}
+
+      {salonId && payStaff ? (
+        <ExpenseFormModal
+          open
+          onOpenChange={(v) => {
+            if (v) return
+            setPayStaff(null)
+            // useCreateExpense инвалидирует только expenses+dashboard — руками
+            // обновляем превью/авансы (АВАНСЫ-колонка) и прогресс-бар «Настройка».
+            qc.invalidateQueries({ queryKey: ['payouts'] })
+            qc.invalidateQueries({ queryKey: ['payroll-advances'] })
+            qc.invalidateQueries({ queryKey: ['setup-progress', salonId] })
+          }}
+          salonId={salonId}
+          currency={currency}
+          defaultCategoryId={payrollCategoryId}
+          payrollPrefill={{
+            staffId: payStaff.id,
+            kind: 'final',
+            amountCents: payStaff.amountCents > 0 ? payStaff.amountCents : undefined,
+            periodStart,
+            periodEnd,
+            description: t('payouts.pay_description', {
+              name: payStaff.name,
+              defaultValue: 'Зарплата — {{name}}',
+            }),
+          }}
+        />
+      ) : null}
     </div>
   )
 }
