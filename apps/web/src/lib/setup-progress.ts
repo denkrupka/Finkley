@@ -419,10 +419,20 @@ export function withinRewardWindow(createdAt: string, now: number = Date.now()):
 }
 
 /**
- * Право забрать приз (клиентский гейт; реальный авторитет — сервер).
- * Все CORE-шаги выполнены + есть реальные данные (визит И расход) + окно 7 дней
- * ещё открыто + приз не выдан. Награда привязана к CORE, а НЕ к 100% (extra-шаги
- * на награду не влияют).
+ * Активно ли окно бонуса €20: приз ещё не выдан и 7-дневное окно открыто.
+ * Не зависит от выполненности заданий — UI показывает «бонус €20» как обещание,
+ * пока окно открыто; после окна бонус больше не упоминаем (owner 2026-06-30).
+ */
+export function isBonusWindowActive(data: SetupProgressData, now: number = Date.now()): boolean {
+  if (data.reward_granted_at) return false
+  return withinRewardWindow(data.created_at, now)
+}
+
+/**
+ * Право забрать приз €20 (клиентский гейт; реальный авторитет — сервер).
+ * Награда — за ВСЕ задания настройки (owner 2026-06-30): приз не выдан + ВСЕ
+ * шаги выполнены (isAllComplete) + окно 7 дней ещё открыто. isAllComplete уже
+ * включает визит+расход, поэтому отдельная проверка не нужна.
  */
 export function isRewardEligible(
   data: SetupProgressData,
@@ -430,19 +440,17 @@ export function isRewardEligible(
   now: number = Date.now(),
 ): boolean {
   if (data.reward_granted_at) return false
-  if (!data.has_visit || !data.has_expense) return false
-  if (!isCoreComplete(steps)) return false
+  if (!isAllComplete(steps)) return false
   return withinRewardWindow(data.created_at, now)
 }
 
 /**
- * Показывать ли бар. Только owner; держим на экране пока НЕ все задания
- * (core + extra) сделаны или пропущены — путь закрыть бар — это выполнить или
- * пропустить (dismiss) каждое задание (всё dismissed → 100% → скрыт).
+ * Показывать ли бар. Только owner; держим на экране пока НЕ все задания сделаны
+ * ИЛИ пока есть неполученная награда €20 (всё сделано в окне 7 дней, но приз ещё
+ * не забран — оставляем бар, чтобы дать его забрать). Полностью готовый салон
+ * скрывает бар только после выдачи приза или закрытия окна бонуса.
  *
- * MAX_VISIBLE_AGE_DAYS — лишь дальний backstop (90 дней), чтобы плашка не висела
- * вечно. Награда (reward_granted_at) больше НЕ скрывает бар: extra-задачи могут
- * остаться даже после выдачи приза.
+ * MAX_VISIBLE_AGE_DAYS — дальний backstop (90 дней), чтобы плашка не висела вечно.
  */
 export function shouldShowSetupBar(
   data: SetupProgressData,
@@ -453,7 +461,7 @@ export function shouldShowSetupBar(
   if (role !== 'owner') return false
   const ageDays = (now - new Date(data.created_at).getTime()) / DAY_MS
   if (ageDays > MAX_VISIBLE_AGE_DAYS) return false
-  return !isAllComplete(steps)
+  return !isAllComplete(steps) || isRewardEligible(data, steps, now)
 }
 
 /** Категория для аккордеона: её шаги + счётчик «k/n» (k = done, n = всего). */
