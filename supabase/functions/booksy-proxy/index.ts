@@ -3146,7 +3146,11 @@ async function runSyncForSalon(
     return { ok: false, status: 502, message: msg }
   }
 
-  await recordSyncResult(admin, { salonId, provider: 'booksy', ok: true })
+  // touchLastSyncAt:false — для booksy last_sync_at пишет ТОЛЬКО
+  // runTieredSync после полного visits-tier. Иначе day-sync календаря
+  // бампал бы отметку и (1) откладывал полный ±60д синк по cron,
+  // (2) преждевременно снимал «первый импорт ещё идёт» для AI-итога.
+  await recordSyncResult(admin, { salonId, provider: 'booksy', ok: true, touchLastSyncAt: false })
   await admin
     .from('salon_integrations')
     .update({ status: 'connected' })
