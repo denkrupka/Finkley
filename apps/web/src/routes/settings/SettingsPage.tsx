@@ -9,7 +9,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -19,6 +19,7 @@ import { TeamPage } from '@/routes/team/TeamPage'
 
 import { Button } from '@/components/ui/button'
 import { ImageCropper } from '@/components/ui/ImageCropper'
+import { extractCityFromAddress } from '@/lib/extract-city-from-address'
 import { formatError } from '@/lib/format-error'
 import { supabase } from '@/lib/supabase/client'
 import {
@@ -140,6 +141,9 @@ export function SettingsPage() {
   //   - address/lat/lng  → автоподбор конкурентов через Nearby Search
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
+  // One-shot guard автоподстановки города: без него refetch после save
+  // «воскрешал» бы город, который юзер сознательно очистил и сохранил.
+  const cityPrefilledForRef = useRef<string | null>(null)
   const [lat, setLat] = useState<string>('')
   const [lng, setLng] = useState<string>('')
   const [googlePlaceUrl, setGooglePlaceUrl] = useState('')
@@ -249,7 +253,16 @@ export function SettingsPage() {
     setSalonType(salon.salon_type ?? 'hair')
     setLogoUrl(salon.logo_url ?? '')
     setAddress(salon.address ?? '')
-    setCity(salon.city ?? '')
+    // Город сам подтягивается из адреса, если в БД его нет (онбординг мог
+    // сохранить адрес без города). Поле остаётся редактируемым, значение
+    // попадёт в БД при «Сохранить». One-shot на салон: повторные refetch
+    // (в т.ч. после сохранения с очищенным городом) уже не переподставляют.
+    const mayDeriveCity = cityPrefilledForRef.current !== salon.id
+    setCity(
+      salon.city ??
+        (mayDeriveCity && salon.address ? (extractCityFromAddress(salon.address) ?? '') : ''),
+    )
+    cityPrefilledForRef.current = salon.id
     setLat(salon.lat != null ? String(salon.lat) : '')
     setLng(salon.lng != null ? String(salon.lng) : '')
     setGooglePlaceUrl(salon.google_place_url ?? '')
@@ -583,11 +596,11 @@ export function SettingsPage() {
                         if (p.address) setAddress(p.address)
                         if (p.lat != null) setLat(String(p.lat))
                         if (p.lng != null) setLng(String(p.lng))
-                        // Город попытаемся вытащить из адреса (последний компонент
-                        // обычно страна, предпоследний — город. Это эвристика).
+                        // Город достаём из адреса (с отрезанием почтового
+                        // индекса — «61-884 Poznań» → «Poznań»).
                         if (p.address) {
-                          const parts = p.address.split(',').map((s) => s.trim())
-                          if (parts.length >= 2) setCity(parts[parts.length - 2] ?? '')
+                          const parsedCity = extractCityFromAddress(p.address)
+                          if (parsedCity) setCity(parsedCity)
                         }
                       }}
                       onClear={() => {

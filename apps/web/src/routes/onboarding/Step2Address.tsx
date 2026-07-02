@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchInput'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { extractCityFromAddress } from '@/lib/extract-city-from-address'
 
 export type AddressDraft = {
   address: string
@@ -48,12 +49,8 @@ export function Step2Address({
               address: p.address ?? value.address,
               lat: p.lat != null ? String(p.lat) : value.lat,
               lng: p.lng != null ? String(p.lng) : value.lng,
-              // Город — эвристика: предпоследний компонент адреса.
-              city:
-                p.address
-                  ?.split(',')
-                  .map((s) => s.trim())
-                  .slice(-2, -1)[0] ?? value.city,
+              // Город — из адреса, с отрезанием почтового индекса.
+              city: p.address ? (extractCityFromAddress(p.address) ?? value.city) : value.city,
             })
           }}
           onClear={() => patch('google_place_id', null)}
