@@ -551,26 +551,21 @@ async function persistTransactions(
   )
   if (newRows.length === 0) return { newCount: 0, expCount: 0 }
 
+  // counterparty берём сразу из returning-инсерта. Раньше здесь был второй
+  // select .in('id', [все id]) — на первичном импорте (500+ tx) URL превышал
+  // лимит, запрос молча падал (error не проверялся) и НИ ОДИН расход не
+  // создавался (bug 02.07: tx_new=505, expenses_created=0).
   const { data: insertedTxs, error: txErr } = await admin
     .from('bank_transactions')
     .insert(newRows)
-    .select('id, type, amount_cents, currency, description, executed_at, external_id')
+    .select('id, type, amount_cents, currency, description, counterparty, executed_at, external_id')
   if (txErr || !insertedTxs) {
     console.error('insert bank_transactions', txErr)
     return { newCount: 0, expCount: 0 }
   }
 
-  // Достаём также counterparty + description новых транзакций для match-логики
-  const { data: insertedFull } = await admin
-    .from('bank_transactions')
-    .select('id, type, amount_cents, currency, description, counterparty, executed_at, external_id')
-    .in(
-      'id',
-      insertedTxs.map((t) => t.id as string),
-    )
-
   let expCount = 0
-  for (const t of insertedFull ?? []) {
+  for (const t of insertedTxs) {
     if (t.type === 'debit') {
       const matched = await tryAutoMatchExpense(admin, ctx.salonId, t)
       if (!matched) {
