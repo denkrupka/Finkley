@@ -519,12 +519,14 @@ export async function querySubjectInvoices(
         if (newAdded === 0) break
         if (json.hasMore === false) break
         pageOffset += pageList.length
-        pageNumber++
+        // Bug 02.07: здесь стоял `pageNumber++` с необъявленной переменной —
+        // ReferenceError улетал в catch ниже и обрывал пагинацию после
+        // первой страницы (фактуры со 2-й страницы не импортировались).
       } catch (e) {
         if (!dtSuccess) {
           lastError = {
             ok: false,
-            code: 'NET',
+            code: 'NETWORK',
             status: 0,
             message: e instanceof Error ? e.message : String(e),
           }
@@ -702,6 +704,15 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     const m = xml.match(re)
     return m ? m[1].trim() : null
   }
+  // ISO 13616 mod-97 (зеркало apps/web/src/lib/banking/iban.ts isIbanValid).
+  const isValidIban = (iban: string): boolean => {
+    if (!/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/.test(iban)) return false
+    const rearranged = iban.slice(4) + iban.slice(0, 4)
+    const digits = rearranged.replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55))
+    let rem = 0
+    for (const d of digits) rem = (rem * 10 + Number(d)) % 97
+    return rem === 1
+  }
   const grabAll = (re: RegExp): string[] => {
     const out: string[] = []
     let m: RegExpExecArray | null
@@ -723,6 +734,15 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     const m = seller.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))
     if (m) sellerAddressParts.push(m[1].trim())
   }
+  // FA(2)/FA(3): адрес — свободные строки AdresL1/AdresL2 (структурных
+  // Ulica/NrDomu в этих схемах нет). Без fallback'а контрагент создавался
+  // без адреса — жалоба юзера 02.07.
+  if (sellerAddressParts.length === 0) {
+    for (const tag of ['AdresL1', 'AdresL2']) {
+      const m = seller.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))
+      if (m) sellerAddressParts.push(m[1].trim())
+    }
+  }
   const sellerAddress = sellerAddressParts.length > 0 ? sellerAddressParts.join(', ') : null
   const buyerNip = buyer.match(/<NIP[^>]*>([^<]+)<\/NIP>/)?.[1] ?? null
   const description = grab(/<P_7[^>]*>([^<]+)<\/P_7>/)
@@ -742,7 +762,16 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
     xml.match(/<NrRBPL[^>]*>([^<]+)<\/NrRBPL>/)?.[1] ??
     xml.match(/<NrRB[^>]*>([^<]+)<\/NrRB>/)?.[1] ??
     null
-  const sellerIban = ibanMatch ? ibanMatch.trim().replace(/\s+/g, '') : null
+  // Нормализация: KSeF обычно отдаёт голый 26-значный NRB без 'PL', а
+  // колонки bank_account_iban ожидают полный IBAN (isIbanValid в
+  // BankExportDialog и elixir-o отвергают NRB без префикса — платёж
+  // помечался бы «(нет IBAN)»). Невалидный счёт не пишем вовсе: patch
+  // контрагента заполняет только ПУСТОЕ поле, самовосстановления нет.
+  let sellerIban: string | null = ibanMatch
+    ? ibanMatch.trim().replace(/\s+/g, '').toUpperCase()
+    : null
+  if (sellerIban && /^\d{26}$/.test(sellerIban)) sellerIban = 'PL' + sellerIban
+  if (sellerIban && !isValidIban(sellerIban)) sellerIban = null
 
   // VAT-извлечение. KSeF FA(2) хранит суммы по ставкам в P_13_x/P_14_x:
   //   P_13_1 — суммарная netто по ставке podstawowa (23%)
@@ -796,7 +825,13 @@ export function parseInvoiceXml(xmlBytes: Uint8Array): {
   else if (formaCode === '2') paymentMethod = 'card'
   else if (formaCode === '3' || formaCode === '6') paymentMethod = 'transfer'
 
-  const paymentDeadline = grab(/<TerminPlatnosci[^>]*>([^<]+)<\/TerminPlatnosci>/)
+  // FA(2)/FA(3): TerminPlatnosci — сложный узел с дочерним <Termin> (дата).
+  // Старый regex ([^<]+ сразу после тега) на таких фактурах не матчился и
+  // срок оплаты терялся. Берём <Termin> (точное имя тега, не TerminPlatnosci)
+  // с fallback на legacy-вариант «дата текстом прямо в TerminPlatnosci».
+  const paymentDeadline =
+    grab(/<Termin(?:\s[^>]*)?>([^<]+)<\/Termin>/) ??
+    grab(/<TerminPlatnosci(?:\s[^>]*)?>([^<]+)<\/TerminPlatnosci>/)
   // KSeF: <Zaplacono>1</Zaplacono> или наличие <DataZaplaty>YYYY-MM-DD</DataZaplaty>
   // ⇒ фактура оплачена.
   const paidAt = grab(/<DataZaplaty[^>]*>([^<]+)<\/DataZaplaty>/)
