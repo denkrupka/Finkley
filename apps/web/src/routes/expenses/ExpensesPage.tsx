@@ -70,7 +70,7 @@ import { useTeamMembers } from '@/hooks/useTeam'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { formatExpenseDate, toLocalISODate } from '@/lib/utils/format-date'
 import { CashGateRequiredDialog } from '@/components/CashGateRequiredDialog'
-import { useBankLinkedIncomeIds, useBankOutflows } from '@/hooks/useBanking'
+import { useBankConnections, useBankLinkedIncomeIds, useBankOutflows } from '@/hooks/useBanking'
 import { usePermissions } from '@/hooks/usePermissions'
 import { BankingTransactionsTable } from '@/routes/banking/BankingTransactionsTable'
 import { BankExportDialog } from './BankExportDialog'
@@ -147,7 +147,7 @@ export function ExpensesPage({
   // салона подключена интеграция KSeF — иначе скрыт (определяется ниже).
   const sourceFilter = embedded
     ? ('' as const)
-    : ((params.get('source') || '') as '' | 'ksef' | 'manual')
+    : ((params.get('source') || '') as '' | 'ksef' | 'bank' | 'manual')
   // Таб: paid (текущие расходы) | pending (запланированные scheduled_payments)
   // | banking (банковские транзакции для ручной/авто привязки к расходам).
   type ExpenseTab = 'paid' | 'pending' | 'banking'
@@ -254,6 +254,9 @@ export function ExpensesPage({
     [r.start, r.end],
   )
   const { data: bankOutflows = [] } = useBankOutflows(salonId, bankRange)
+  // Период-НЕзависимый сигнал «у салона есть банк» — для видимости фильтра
+  // источников (bankOutflows зависит от периода и мигал бы при переключении).
+  const { data: bankConnections = [] } = useBankConnections(salonId)
   const linkedTxIds = bankLinked?.linkedTxIds ?? null
   const unlinkedBankCount = useMemo(() => {
     return bankOutflows.filter(
@@ -298,8 +301,12 @@ export function ExpensesPage({
     return rawExpenses.filter((e) => {
       if (e.source === 'auto_commission') return false
       if (!passesLinkedFilter(e)) return false
+      // Банковский импорт: bank_import (auto-expense из транзакции) и
+      // bank_ai (создан AI-категоризацией банк-транзакций).
+      const isBankSource = e.source === 'bank_import' || e.source === 'bank_ai'
       if (sourceFilter === 'ksef' && e.source !== 'ksef') return false
-      if (sourceFilter === 'manual' && e.source === 'ksef') return false
+      if (sourceFilter === 'bank' && !isBankSource) return false
+      if (sourceFilter === 'manual' && (e.source === 'ksef' || isBankSource)) return false
       // Bug 03.06 (Денис): поиск по всем полям. Сумма — поддерживаем PLN и
       // копейки (123 матчится с 12300 cents).
       if (q) {
@@ -678,8 +685,11 @@ export function ExpensesPage({
           </Select>
         ) : null}
 
-        {/* Bug 02.06 (Денис): фильтр источника — только если активна KSeF интеграция. */}
-        {ksefActive ? (
+        {/* Bug 02.06 (Денис): фильтр источника — если активна KSeF интеграция
+            или подключён банк (02.07: добавлен вариант «Банкинг»). Активный
+            sourceFilter держит контрол видимым всегда — иначе применённый
+            фильтр из URL нельзя было бы сбросить. */}
+        {ksefActive || bankConnections.length > 0 || sourceFilter !== '' ? (
           <Select
             value={sourceFilter || 'all'}
             onValueChange={(v) => setFilter('source', v === 'all' ? null : v)}
@@ -693,6 +703,9 @@ export function ExpensesPage({
               </SelectItem>
               <SelectItem value="ksef">
                 {t('expenses.filters.source_ksef', { defaultValue: 'КСеФ' })}
+              </SelectItem>
+              <SelectItem value="bank">
+                {t('expenses.filters.source_bank', { defaultValue: 'Банкинг' })}
               </SelectItem>
               <SelectItem value="manual">
                 {t('expenses.filters.source_manual', { defaultValue: 'Вручную' })}

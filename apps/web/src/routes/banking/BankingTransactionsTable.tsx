@@ -7,6 +7,7 @@ import {
   Loader2,
   RefreshCcw,
   Settings,
+  Sparkles,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import {
   useBankConnections,
   useBankInflows,
+  useBankingCategorizeAi,
   useBankLinkedIncomeIds,
   useBankOutflows,
   useBankSyncNow,
@@ -378,6 +380,57 @@ export function BankingTransactionsTable({
     }
   }
 
+  // 02.07 — «Категории AI»: правила банкинга → AI по категориям салона.
+  // Только на debit-табе (расходы); в picker-режиме кнопка не нужна.
+  const aiCategorize = useBankingCategorizeAi(direction === 'debit' ? salonId : undefined)
+  function handleAiCategorize() {
+    aiCategorize.mutate(undefined, {
+      onSuccess: (res) => {
+        if (res.targets === 0) {
+          toast.info(
+            t('banking.transactions.ai_categorize_empty', {
+              defaultValue: 'Все банковские расходы уже распределены — нечего категоризировать.',
+            }),
+          )
+          return
+        }
+        toast.success(
+          t('banking.transactions.ai_categorize_done', {
+            defaultValue:
+              'Распределено: {{rules}} по правилам, {{ai}} через AI. Осталось без категории: {{left}}.',
+            rules: res.rules_applied,
+            ai: res.ai_applied,
+            left: res.ai_unsure,
+          }),
+        )
+        if (res.truncated) {
+          toast.info(
+            t('banking.transactions.ai_categorize_more', {
+              defaultValue:
+                'Обработана часть расходов ({{n}}) — нажми «Категории AI» ещё раз, чтобы распределить остальные.',
+              n: res.targets,
+            }),
+          )
+        }
+        if (res.ai_error) {
+          toast.warning(
+            t('banking.transactions.ai_categorize_partial', {
+              defaultValue: 'AI обработал не всё — попробуй ещё раз чуть позже.',
+            }),
+            { description: res.ai_error },
+          )
+        }
+      },
+      onError: (err) =>
+        toast.error(
+          t('banking.transactions.ai_categorize_failed', {
+            defaultValue: 'Не удалось распределить категории',
+          }),
+          { description: err instanceof Error ? err.message : String(err) },
+        ),
+    })
+  }
+
   // Сумма по строкам периода — для шапки (см. owner-feedback 2026-05-26):
   // на debit-табе показываем «общая сумма списаний», на credit-табе —
   // «общая сумма поступлений». Считаем по rows (с учётом unlinkedOnly).
@@ -481,6 +534,28 @@ export function BankingTransactionsTable({
           {/* T20 — кнопка «Извлечь контрагентов» удалена; извлечение
               запускается автоматически после успешной синхронизации
               (handleSyncAll → handleExtractCounterparties({ silent: true })). */}
+          {/* 02.07 — «Категории AI»: сначала правила из «Параметров», остаток
+              распределяет AI по категориям салона. Только debit-таб. */}
+          {direction === 'debit' && !isPickerMode ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAiCategorize}
+              disabled={aiCategorize.isPending}
+              title={t('banking.transactions.ai_categorize_title', {
+                defaultValue:
+                  'Распределить банковские расходы по категориям: сначала правила, затем AI',
+              })}
+              data-testid="banking-ai-categorize"
+            >
+              {aiCategorize.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+              ) : (
+                <Sparkles className="size-3.5" strokeWidth={1.8} />
+              )}
+              {t('banking.transactions.ai_categorize', { defaultValue: 'Категории AI' })}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
