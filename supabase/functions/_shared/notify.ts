@@ -216,12 +216,22 @@ export async function recordSyncResult(
     ok: boolean
     errorMessage?: string | null
     salonName?: string | null
+    /** false → не трогать last_sync_at: владелец колонки — сам синк.
+     *  Для booksy last_sync_at = маркер «полный visits-tier прошёл» (его
+     *  пишет runTieredSync); безусловный бамп здесь ломал cron-расписание
+     *  (day-sync календаря откладывал полный ±60д синк) и детекцию
+     *  «первый импорт ещё идёт» в ai-onboarding-preview. Для
+     *  fakturownia/infakt/ksef оставляем default true — там recordSyncResult
+     *  единственный писатель last_sync_at. */
+    touchLastSyncAt?: boolean
   },
 ): Promise<void> {
   if (input.ok) {
+    const patch: Record<string, unknown> = { consecutive_failures: 0, last_error: null }
+    if (input.touchLastSyncAt !== false) patch.last_sync_at = new Date().toISOString()
     await admin
       .from('salon_integrations')
-      .update({ consecutive_failures: 0, last_error: null, last_sync_at: new Date().toISOString() })
+      .update(patch)
       .eq('salon_id', input.salonId)
       .eq('provider', input.provider)
     return

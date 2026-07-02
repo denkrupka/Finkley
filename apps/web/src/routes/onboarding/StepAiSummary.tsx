@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Brain, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { supabase } from '@/lib/supabase/client'
@@ -55,21 +55,83 @@ export function StepAiSummary({
 }) {
   const { t, i18n } = useTranslation()
 
-  // Grace-период перед запуском AI: если salonId есть, ждём 15с чтобы
-  // фоновые sync'и Booksy/Versum/Wfirma успели импортировать visits/clients/
-  // services. Без этого AI получает 0 данных и отвечает по counters, а не
-  // по реальным цифрам — запрос юзера 01.06.
-  const [grace, setGrace] = useState<boolean>(() => Boolean(salonId))
+  // Grace-период перед запуском AI: ждём, пока ПЕРВЫЙ visits-синк системы
+  // записи реально завершится (salon_integrations.last_sync_at != null; его
+  // пишут runTieredSync после полного visits-tier и recordSyncResult при
+  // любом успешном booksy-proxy вызове), но не дольше 90с. Раньше был слепой
+  // таймер 15с — Booksy-импорт визитов занимает 1-3 минуты, AI получал нули
+  // и писал «ни одного визита за три месяца, клиенты не бронируют» (жалоба
+  // юзера 02.07). Если систем записи нет — не ждём вообще.
+  // Список = BOOKING_SYNC_PROVIDERS в supabase/functions/ai-onboarding-preview
+  // (держать в синхроне; общий импорт между Deno и Vite невозможен).
+  // treatwell/bookon/fresha исключены осознанно: у них connected+NULL либо
+  // не случается, либо вечен (заглушки) и повесил бы ожидание.
+  const BOOKING_SYNC_PROVIDERS = ['booksy']
+  const [waitTimedOut, setWaitTimedOut] = useState(false)
   useEffect(() => {
     if (!salonId) return
-    const id = setTimeout(() => setGrace(false), 15_000)
+    const id = setTimeout(() => setWaitTimedOut(true), 90_000)
     return () => clearTimeout(id)
   }, [salonId])
+  const hasPendingBookingSync = (
+    rows: Array<{ provider: string; status: string; last_sync_at: string | null }>,
+  ) =>
+    rows.some(
+      (r) =>
+        BOOKING_SYNC_PROVIDERS.includes(r.provider) &&
+        r.status === 'connected' &&
+        r.last_sync_at == null,
+    )
+  const syncWait = useQuery({
+    queryKey: ['onboarding-ai-sync-wait', salonId ?? null],
+    enabled: Boolean(salonId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('salon_integrations_public')
+        .select('provider,status,last_sync_at')
+        .eq('salon_id', salonId as string)
+      if (error) throw error
+      return (data ?? []) as Array<{
+        provider: string
+        status: string
+        last_sync_at: string | null
+      }>
+    },
+    // Поллим каждые 4с, пока есть незавершённый синк. После 90с-таймаута
+    // grace снимается и AI стартует по частичным данным, но поллинг
+    // продолжается реже (10с): когда синк доедет, мы перегенерируем итог
+    // (см. эффект ниже) — иначе staleTime:Infinity заморозил бы анализ
+    // по огрызку данных навсегда.
+    refetchInterval: (query) => {
+      const rows = query.state.data
+      if (!rows) return 4_000
+      if (!hasPendingBookingSync(rows)) return false
+      return waitTimedOut ? 10_000 : 4_000
+    },
+  })
+  const syncPending =
+    !syncWait.isError && (syncWait.data == null || hasPendingBookingSync(syncWait.data))
+  const grace = Boolean(salonId) && !waitTimedOut && syncPending
+
+  // Если AI-запрос ушёл, пока импорт ещё шёл (сработал 90с-таймаут), итог
+  // построен по частичным данным. Помечаем это и, когда синк реально доедет,
+  // перегенерируем итог один раз — иначе staleTime:Infinity заморозил бы
+  // «огрызочный» анализ навсегда.
+  const qc = useQueryClient()
+  const ranWhilePendingRef = useRef(false)
+  const syncPendingRef = useRef(syncPending)
+  syncPendingRef.current = syncPending
+  useEffect(() => {
+    if (syncPending || !ranWhilePendingRef.current) return
+    ranWhilePendingRef.current = false
+    void qc.invalidateQueries({ queryKey: ['onboarding-ai-summary', salonId ?? null] })
+  }, [syncPending, qc, salonId])
 
   const summary = useQuery({
     queryKey: ['onboarding-ai-summary', salonId ?? null],
     enabled: !grace,
     queryFn: async (): Promise<AiSummary> => {
+      if (syncPendingRef.current) ranWhilePendingRef.current = true
       const { data, error } = await supabase.functions.invoke('ai-onboarding-preview', {
         body: {
           salon_type: salonType,
@@ -101,8 +163,9 @@ export function StepAiSummary({
   // Bug 4ba1a19f (Елена 05.06): пока идёт grace + первая загрузка AI
   // (могут быть 10–15 секунд), юзер видел пустой экран и думал что
   // окно сломалось. Показываем явный «processing» хинт под заголовком
-  // и расширенную плашку с лоадером.
-  const isBusy = grace || summary.isLoading || summary.isFetching
+  // и расширенную плашку с лоадером. При фоновой перегенерации (синк
+  // доехал после частичного итога) старый контент остаётся видимым.
+  const isBusy = grace || summary.isLoading || (summary.isFetching && !summary.data)
 
   return (
     <div className="space-y-4">
@@ -122,7 +185,9 @@ export function StepAiSummary({
       {isBusy ? (
         <div className="border-brand-teal-deep/30 bg-brand-teal-soft/10 flex items-center gap-3 rounded-xl border border-dashed p-4">
           <Loader2 className="text-brand-teal-deep size-5 animate-spin" strokeWidth={2} />
-          <p className="text-muted-foreground text-sm">{t('onboarding.ai_summary.loading')}</p>
+          <p className="text-muted-foreground text-sm">
+            {grace ? t('onboarding.ai_summary.sync_wait_hint') : t('onboarding.ai_summary.loading')}
+          </p>
         </div>
       ) : summary.isError ? (
         <div className="border-border bg-card flex items-start gap-3 rounded-xl border p-4">

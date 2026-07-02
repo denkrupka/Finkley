@@ -476,18 +476,36 @@ async function syncKsefToFinkley(
         const cleanNip = detail.sellerNip.replace(/[\s-]/g, '')
         const { data: existingCp } = await admin
           .from('counterparties')
-          .select('id, default_expense_category_id')
+          .select('id, default_expense_category_id, bank_account_iban, address')
           .eq('salon_id', salonId)
           .eq('nip', cleanNip)
           .is('archived_at', null)
           .maybeSingle()
         if (existingCp) {
-          const cp = existingCp as { id: string; default_expense_category_id: string | null }
+          const cp = existingCp as {
+            id: string
+            default_expense_category_id: string | null
+            bank_account_iban: string | null
+            address: string | null
+          }
           counterpartyId = cp.id
           // Auto-pull дефолтной категории контрагента (если задана)
           if (cp.default_expense_category_id) {
             categoryId = cp.default_expense_category_id
             categoryMapped = 'counterparty_default'
+          }
+          // Дозаполняем карточку из KSeF: номер счёта и адрес — но только
+          // ПУСТЫЕ поля. Введённое юзером вручную не перетираем (у него
+          // может быть другой счёт для оплат, чем в свежей фактуре).
+          const cpPatch: Record<string, string> = {}
+          if (!cp.bank_account_iban && detail.sellerIban) {
+            cpPatch.bank_account_iban = detail.sellerIban
+          }
+          if (!cp.address && detail.sellerAddress) {
+            cpPatch.address = detail.sellerAddress
+          }
+          if (Object.keys(cpPatch).length > 0) {
+            await admin.from('counterparties').update(cpPatch).eq('id', cp.id)
           }
         } else if (vendor !== '—') {
           const { data: createdCp } = await admin
@@ -497,6 +515,10 @@ async function syncKsefToFinkley(
               name: vendor,
               nip: cleanNip,
               address: detail.sellerAddress,
+              // Номер счёта продавца из фактуры (NrRBPL/NrRB) — сразу в
+              // карточку, чтобы bulk-экспорт переводов не спотыкался об
+              // «(нет IBAN)».
+              bank_account_iban: detail.sellerIban,
             })
             .select('id')
             .single()
@@ -536,6 +558,10 @@ async function syncKsefToFinkley(
           source: 'ksef',
           external_id: inv.ksefReferenceNumber,
           receipt_url: xmlPath, // 05.06 — для глазка-viewer KSeF XML
+          // Номер счёта продавца + связь с контрагентом: без них экспорт
+          // переводов в банк помечает платёж «(нет IBAN)» и пропускает.
+          bank_account_iban: detail.sellerIban,
+          counterparty_id: counterpartyId,
         })
         if (spErr) {
           if (spErr.code === '23505') {

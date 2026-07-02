@@ -7,6 +7,7 @@ import { GooglePlaceSearchInput } from '@/components/settings/GooglePlaceSearchI
 import { Field } from '@/components/ui/field'
 import { ImageCropper } from '@/components/ui/ImageCropper'
 import { Input } from '@/components/ui/input'
+import { extractCityFromAddress } from '@/lib/extract-city-from-address'
 import { cn } from '@/lib/utils/cn'
 
 import type { AddressDraft } from './Step2Address'
@@ -83,6 +84,11 @@ export function Step1Salon({ value, onChange, showLogo = false }: Props) {
                   google_place_id: p.google_place_id,
                   google_place_url: p.google_maps_uri ?? null,
                   address: p.address ?? value.address.address,
+                  // Город достаём сразу — иначе салон сохранится без city,
+                  // и в настройках поле «Город» останется пустым.
+                  city: p.address
+                    ? (extractCityFromAddress(p.address) ?? value.address.city)
+                    : value.address.city,
                   lat: p.lat != null ? String(p.lat) : value.address.lat,
                   lng: p.lng != null ? String(p.lng) : value.address.lng,
                 },

@@ -1,10 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { useFinishBankConnect } from '@/hooks/useBanking'
+import { markBankConnectionError, useFinishBankConnect } from '@/hooks/useBanking'
 import { useMySalons } from '@/hooks/useSalons'
 import { rememberLastSalon } from '@/routes/RootRedirect'
 
@@ -28,6 +29,7 @@ export function BankingCallbackPage() {
 
   const { data: salons = [] } = useMySalons()
   const finish = useFinishBankConnect(undefined)
+  const qc = useQueryClient()
   const [done, setDone] = useState<{
     ok: boolean
     bank_name?: string | null
@@ -36,12 +38,27 @@ export function BankingCallbackPage() {
   } | null>(null)
 
   useEffect(() => {
-    if (error) {
-      setDone({ ok: false, error: errorDesc ?? error })
-      return
-    }
-    if (!code || !state) {
-      setDone({ ok: false, error: 'missing_code_or_state' })
+    // Ошибка на стороне банка (?error=...) или битый редирект: edge-функция
+    // banking-callback в этом случае НЕ вызывается, и pending-строка
+    // bank_connections зависла бы навсегда — а онбординг/настройки считали
+    // бы её живым подключением. Помечаем её как error, чтобы UI показывал
+    // правду и предлагал переподключиться.
+    if (error || !code || !state) {
+      const msg = error ? (errorDesc ?? error) : 'missing_code_or_state'
+      const connId = state ?? sessionStorage.getItem('finkley:banking:pending_connection')
+      sessionStorage.removeItem('finkley:banking:pending_connection')
+      if (connId) {
+        void markBankConnectionError(connId, msg)
+          .catch(() => {
+            /* RLS/сеть — не блокируем показ ошибки юзеру */
+          })
+          .finally(() => {
+            qc.invalidateQueries({ queryKey: ['bank-connections'] })
+            setDone({ ok: false, error: msg })
+          })
+      } else {
+        setDone({ ok: false, error: msg })
+      }
       return
     }
     finish.mutate(
@@ -49,12 +66,21 @@ export function BankingCallbackPage() {
       {
         onSuccess: (res) => {
           setDone({ ok: true, bank_name: res.bank_name, accounts_count: res.accounts_count })
-          // На случай возврата вкладки в кэш — освежим last salon, если в
-          // sessionStorage был pending_connection (UX bonus).
           sessionStorage.removeItem('finkley:banking:pending_connection')
         },
         onError: (err) => {
-          setDone({ ok: false, error: err instanceof Error ? err.message : String(err) })
+          const msg = err instanceof Error ? err.message : String(err)
+          sessionStorage.removeItem('finkley:banking:pending_connection')
+          // Если edge уже пометил error — update по .eq(status,'pending')
+          // будет no-op; если запрос вообще не дошёл — пометим сами.
+          void markBankConnectionError(state, msg)
+            .catch(() => {
+              /* ignore */
+            })
+            .finally(() => {
+              qc.invalidateQueries({ queryKey: ['bank-connections'] })
+              setDone({ ok: false, error: msg })
+            })
         },
       },
     )
@@ -65,16 +91,26 @@ export function BankingCallbackPage() {
   const targetSalon =
     salons.find((s) => s.id === localStorage.getItem('finkley:last-salon')) ?? salons[0] ?? null
   // OAuth-return-onboarding флаг приоритетнее: если юзер запустил PSD2
-  // из онбординга — вернёмся туда вместо /settings/integrations.
-  const onboardingReturn =
-    typeof window !== 'undefined' ? localStorage.getItem('finkley:oauth-return-onboarding') : null
-  if (onboardingReturn && done?.ok) {
+  // из онбординга — вернёмся туда вместо /settings/integrations. Читаем
+  // one-shot в state (значение стабильно между рендерами) и чистим флаг,
+  // как только исход известен — И при успехе, И при ошибке: юзер в обоих
+  // случаях возвращается в онбординг, а протухший флаг не должен потом
+  // утаскивать его туда из /settings.
+  const [onboardingReturn] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('finkley:oauth-return-onboarding')
+    } catch {
+      return null
+    }
+  })
+  useEffect(() => {
+    if (done === null || !onboardingReturn) return
     try {
       localStorage.removeItem('finkley:oauth-return-onboarding')
     } catch {
       /* ignore */
     }
-  }
+  }, [done, onboardingReturn])
   const backHref = onboardingReturn
     ? `/onboarding?salon=${onboardingReturn}`
     : targetSalon

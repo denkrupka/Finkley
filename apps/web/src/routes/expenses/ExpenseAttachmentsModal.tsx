@@ -548,6 +548,15 @@ function parseKsefXml(xml: string): ParsedKsef | null {
     }
     const formatAddress = (root: Element | null): string | null => {
       if (!root) return null
+      // FA(2)/FA(3): адрес — свободные строки AdresL1/AdresL2 (структурных
+      // Ulica/NrDomu там нет — без этой ветки показывался только KodKraju).
+      const l1 = root.querySelector('AdresL1')?.textContent?.trim()
+      const l2 = root.querySelector('AdresL2')?.textContent?.trim()
+      if (l1 || l2) {
+        return [l1, l2, root.querySelector('KodKraju')?.textContent?.trim()]
+          .filter(Boolean)
+          .join('\n')
+      }
       const parts = [
         [root.querySelector('Ulica')?.textContent, root.querySelector('NrDomu')?.textContent]
           .filter(Boolean)
@@ -602,7 +611,9 @@ function parseKsefXml(xml: string): ParsedKsef | null {
     const totalNet = vatBreakdown.reduce((s, b) => s + b.net, 0) || null
     const totalVat = vatBreakdown.reduce((s, b) => s + b.vat, 0) || null
 
-    const paymentCode = get('P_15A')
+    // FA(2)/FA(3): способ оплаты — Fa/Platnosc/FormaPlatnosci (код 1..7).
+    // P_15A — только в легаси-схемах.
+    const paymentCode = get('FormaPlatnosci') ?? get('P_15A')
     const paymentLabel = paymentCode ? (PAYMENT_METHOD_LABELS[paymentCode] ?? paymentCode) : null
 
     return {
@@ -622,7 +633,11 @@ function parseKsefXml(xml: string): ParsedKsef | null {
       sellerEmail: sellerEl?.querySelector('Email')?.textContent?.trim() ?? null,
       sellerPhone: sellerEl?.querySelector('Telefon')?.textContent?.trim() ?? null,
       sellerIban:
+        // NrRB — FA(2)/FA(3) RachunekBankowy; NrRBPL — PL-вариант счёта;
+        // NrRachunku — легаси. Без NrRBPL блок «Rachunek bankowy» не
+        // показывался для части фактур.
         doc.querySelector('NrRB')?.textContent?.trim() ??
+        doc.querySelector('NrRBPL')?.textContent?.trim() ??
         doc.querySelector('NrRachunku')?.textContent?.trim() ??
         null,
       sellerBankName: doc.querySelector('NazwaBanku')?.textContent?.trim() ?? null,
