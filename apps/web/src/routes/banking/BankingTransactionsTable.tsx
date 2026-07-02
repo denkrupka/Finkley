@@ -382,53 +382,76 @@ export function BankingTransactionsTable({
 
   // 02.07 — «Категории AI»: правила банкинга → AI по категориям салона.
   // Только на debit-табе (расходы); в picker-режиме кнопка не нужна.
+  // Двухступенчато: scope='bank' (банковские расходы), затем — если в
+  // заглушках «БЕЗ КАТЕГОРИИ»/«Банк (без категории)» остались расходы из
+  // других источников (KSeF/вручную) — спрашиваем юзера и гоним scope='all'.
   const aiCategorize = useBankingCategorizeAi(direction === 'debit' ? salonId : undefined)
-  function handleAiCategorize() {
-    aiCategorize.mutate(undefined, {
-      onSuccess: (res) => {
-        if (res.targets === 0) {
-          toast.info(
-            t('banking.transactions.ai_categorize_empty', {
-              defaultValue: 'Все банковские расходы уже распределены — нечего категоризировать.',
-            }),
-          )
-          return
-        }
-        toast.success(
-          t('banking.transactions.ai_categorize_done', {
-            defaultValue:
-              'Распределено: {{rules}} по правилам, {{ai}} через AI. Осталось без категории: {{left}}.',
-            rules: res.rules_applied,
-            ai: res.ai_applied,
-            left: res.ai_unsure,
-          }),
-        )
-        if (res.truncated) {
-          toast.info(
-            t('banking.transactions.ai_categorize_more', {
+  function handleAiCategorize(scope: 'bank' | 'all' = 'bank') {
+    aiCategorize.mutate(
+      { scope },
+      {
+        onSuccess: (res) => {
+          const askAboutOthers = () => {
+            if (scope !== 'bank' || (res.other_uncategorized ?? 0) === 0) return false
+            const ok = confirm(
+              t('banking.transactions.ai_categorize_other_confirm', {
+                defaultValue:
+                  'В «БЕЗ КАТЕГОРИИ» и «Банк (без категории)» осталось ещё {{n}} расходов из других источников (КСеФ, вручную). Распределить и их с помощью AI?',
+                n: res.other_uncategorized,
+              }),
+            )
+            if (ok) handleAiCategorize('all')
+            return ok
+          }
+          if (res.targets === 0) {
+            // Банковские уже распределены — сразу предлагаем добить остальные.
+            if (!askAboutOthers()) {
+              toast.info(
+                t('banking.transactions.ai_categorize_empty', {
+                  defaultValue:
+                    'Все банковские расходы уже распределены — нечего категоризировать.',
+                }),
+              )
+            }
+            return
+          }
+          toast.success(
+            t('banking.transactions.ai_categorize_done', {
               defaultValue:
-                'Обработана часть расходов ({{n}}) — нажми «Категории AI» ещё раз, чтобы распределить остальные.',
-              n: res.targets,
+                'Распределено: {{rules}} по правилам, {{ai}} через AI. Осталось без категории: {{left}}.',
+              rules: res.rules_applied,
+              ai: res.ai_applied,
+              left: res.ai_unsure,
             }),
           )
-        }
-        if (res.ai_error) {
-          toast.warning(
-            t('banking.transactions.ai_categorize_partial', {
-              defaultValue: 'AI обработал не всё — попробуй ещё раз чуть позже.',
+          if (res.truncated) {
+            toast.info(
+              t('banking.transactions.ai_categorize_more', {
+                defaultValue:
+                  'Обработана часть расходов ({{n}}) — нажми «Категории AI» ещё раз, чтобы распределить остальные.',
+                n: res.targets,
+              }),
+            )
+          }
+          if (res.ai_error) {
+            toast.warning(
+              t('banking.transactions.ai_categorize_partial', {
+                defaultValue: 'AI обработал не всё — попробуй ещё раз чуть позже.',
+              }),
+              { description: res.ai_error },
+            )
+          }
+          if (!res.truncated && !res.ai_error) askAboutOthers()
+        },
+        onError: (err) =>
+          toast.error(
+            t('banking.transactions.ai_categorize_failed', {
+              defaultValue: 'Не удалось распределить категории',
             }),
-            { description: res.ai_error },
-          )
-        }
+            { description: err instanceof Error ? err.message : String(err) },
+          ),
       },
-      onError: (err) =>
-        toast.error(
-          t('banking.transactions.ai_categorize_failed', {
-            defaultValue: 'Не удалось распределить категории',
-          }),
-          { description: err instanceof Error ? err.message : String(err) },
-        ),
-    })
+    )
   }
 
   // Сумма по строкам периода — для шапки (см. owner-feedback 2026-05-26):
@@ -540,7 +563,7 @@ export function BankingTransactionsTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={handleAiCategorize}
+              onClick={() => handleAiCategorize()}
               disabled={aiCategorize.isPending}
               title={t('banking.transactions.ai_categorize_title', {
                 defaultValue:
