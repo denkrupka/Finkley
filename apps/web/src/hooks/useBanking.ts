@@ -768,19 +768,22 @@ export type BankCategorizeAiResult = {
   ai_unsure: number
   /** true = выборка упёрлась в серверный лимит, есть ещё цели — жми снова. */
   truncated: boolean
+  /** Сколько НЕбанковских расходов (KSeF/вручную) сидит в категориях-
+   *  заглушках — клиент спрашивает «распределить и их?» → scope='all'. */
+  other_uncategorized: number
   ai_error?: string
 }
 
 export function useBankingCategorizeAi(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (): Promise<BankCategorizeAiResult> => {
+    mutationFn: async (input?: { scope?: 'bank' | 'all' }): Promise<BankCategorizeAiResult> => {
       if (!salonId) throw new Error('no_salon')
       const headers = await authHeader()
       const res = await fetch(`${FN_URL}/banking-categorize-ai`, {
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ salon_id: salonId }),
+        body: JSON.stringify({ salon_id: salonId, scope: input?.scope ?? 'bank' }),
       })
       if (!res.ok) throw new Error(`categorize ${res.status}: ${await res.text()}`)
       return (await res.json()) as BankCategorizeAiResult

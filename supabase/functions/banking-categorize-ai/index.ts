@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
   const user = await getUserFromRequest(req, SUPABASE_URL, SERVICE_KEY)
   if (!user) return json({ error: 'unauthorized' }, 401)
 
-  let body: { salon_id?: string }
+  let body: { salon_id?: string; scope?: string }
   try {
     body = await req.json()
   } catch {
@@ -162,6 +162,11 @@ Deno.serve(async (req) => {
   }
   const salonId = body.salon_id
   if (!salonId) return json({ error: 'salon_id_required' }, 400)
+  // scope='bank' (default) — только банковские расходы (bank_import/bank_ai).
+  // scope='all' — второй прогон по подтверждению юзера: ВСЕ расходы в
+  // категориях-заглушках независимо от источника (KSeF, вручную, ...),
+  // кроме системных авто-комиссий.
+  const scope: 'bank' | 'all' = body.scope === 'all' ? 'all' : 'bank'
 
   const membership = await getSalonMembership(SUPABASE_URL, SERVICE_KEY, user.userId, salonId)
   if (!membership || !['owner', 'admin'].includes(membership.role)) {
@@ -194,21 +199,53 @@ Deno.serve(async (req) => {
     fallbackIds.length > 0
       ? `category_id.is.null,category_id.in.(${fallbackIds.join(',')})`
       : 'category_id.is.null'
-  const { data: targetsRaw, error: targetsErr } = await admin
+  let targetsQuery = admin
     .from('expenses')
     .select(
       'id, category_id, expense_at, amount_cents, contractor_name, description, comment, source, bank_transaction_id, metadata',
     )
     .eq('salon_id', salonId)
-    .in('source', ['bank_import', 'bank_ai'])
     .is('deleted_at', null)
     .or(orFilter)
+  if (scope === 'bank') {
+    targetsQuery = targetsQuery.in('source', ['bank_import', 'bank_ai'])
+  } else {
+    // NULL-safe исключение авто-комиссий: .neq выкинул бы source IS NULL.
+    targetsQuery = targetsQuery.or('source.is.null,source.neq.auto_commission')
+  }
+  const { data: targetsRaw, error: targetsErr } = await targetsQuery
     .order('expense_at', { ascending: false })
     .limit(MAX_TARGETS)
   if (targetsErr) return json({ error: targetsErr.message }, 500)
   const targets = (targetsRaw ?? []) as TargetExpense[]
+
+  // Сколько НЕбанковских расходов сидит в заглушках (KSeF/вручную): клиент
+  // после банковского прогона спросит юзера «распределить и их?» → scope='all'.
+  let otherUncategorized = 0
+  if (scope === 'bank') {
+    const { data: stubRows } = await admin
+      .from('expenses')
+      .select('id, source')
+      .eq('salon_id', salonId)
+      .is('deleted_at', null)
+      .or(orFilter)
+      .limit(1000)
+    otherUncategorized = ((stubRows ?? []) as Array<{ source: string | null }>).filter(
+      (r) => r.source !== 'bank_import' && r.source !== 'bank_ai' && r.source !== 'auto_commission',
+    ).length
+  }
+
   if (targets.length === 0) {
-    return json({ ok: true, targets: 0, rules_applied: 0, ai_applied: 0, ai_unsure: 0 })
+    return json({
+      ok: true,
+      targets: 0,
+      rules_applied: 0,
+      rule_ignored: 0,
+      ai_applied: 0,
+      ai_unsure: 0,
+      truncated: false,
+      other_uncategorized: otherUncategorized,
+    })
   }
 
   // Канонические поля контрагент/назначение — из связанных bank_transactions.
@@ -248,7 +285,11 @@ Deno.serve(async (req) => {
     )
     let categoryId: string | null = null
     let ruleMeta: { rule_id: string; rule_name: string } | null = null
-    if (rules.length > 0) {
+    // Правила банкинга применяем только к расходам, связанным с банком:
+    // для KSeF/ручных (scope='all') семантика bank_tx_rules не определена.
+    const rulesEligible =
+      exp.source === 'bank_import' || exp.source === 'bank_ai' || !!exp.bank_transaction_id
+    if (rules.length > 0 && rulesEligible) {
       const txLike: RuleTxLike = {
         type: 'debit',
         counterparty,
@@ -306,6 +347,7 @@ Deno.serve(async (req) => {
         ai_applied: aiApplied,
         ai_unsure: aiUnsure + (remaining.length - i),
         truncated: targets.length === MAX_TARGETS,
+        other_uncategorized: otherUncategorized,
         ai_error: e instanceof Error ? e.message : String(e),
       })
     }
@@ -342,5 +384,6 @@ Deno.serve(async (req) => {
     // Выборка ограничена MAX_TARGETS: если упёрлись в лимит — за бортом
     // могли остаться ещё цели, клиент подскажет нажать кнопку повторно.
     truncated: targets.length === MAX_TARGETS,
+    other_uncategorized: otherUncategorized,
   })
 })
