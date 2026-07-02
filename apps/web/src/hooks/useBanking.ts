@@ -705,6 +705,26 @@ export function useStartBankConnect(salonId: string | undefined) {
   })
 }
 
+/**
+ * Пометить незавершённое (pending) подключение как ошибочное. Вызывается
+ * callback-страницей, когда банк вернул ?error=... — edge-функция в этом
+ * случае вообще не вызывается, и pending-строка осталась бы висеть навсегда
+ * (а онбординг раньше показывал по ней ложный «Подключено»). Фильтр по
+ * status='pending' гарантирует, что не перетрём connected/error,
+ * выставленные сервером. RLS: обновить может только member с banking.edit.
+ */
+export async function markBankConnectionError(
+  connectionId: string,
+  message: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('bank_connections')
+    .update({ status: 'error', last_error: message.slice(0, 500) })
+    .eq('id', connectionId)
+    .eq('status', 'pending')
+  if (error) throw error
+}
+
 export function useFinishBankConnect(salonId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
@@ -725,7 +745,49 @@ export function useFinishBankConnect(salonId: string | undefined) {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bank-connections', salonId] })
+      // Callback-страница не знает salonId → ['bank-connections', undefined]
+      // не заматчил бы ни один живой query. Инвалидируем по префиксу.
+      qc.invalidateQueries({
+        queryKey: salonId ? ['bank-connections', salonId] : ['bank-connections'],
+      })
+    },
+  })
+}
+
+/**
+ * «Категории AI» в банкинг-табе: edge banking-categorize-ai применяет к
+ * банковским расходам без категории сначала правила bank_tx_rules, затем
+ * AI-категоризацию по списку категорий салона.
+ */
+export type BankCategorizeAiResult = {
+  ok: boolean
+  targets: number
+  rules_applied: number
+  rule_ignored: number
+  ai_applied: number
+  ai_unsure: number
+  /** true = выборка упёрлась в серверный лимит, есть ещё цели — жми снова. */
+  truncated: boolean
+  ai_error?: string
+}
+
+export function useBankingCategorizeAi(salonId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<BankCategorizeAiResult> => {
+      if (!salonId) throw new Error('no_salon')
+      const headers = await authHeader()
+      const res = await fetch(`${FN_URL}/banking-categorize-ai`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ salon_id: salonId }),
+      })
+      if (!res.ok) throw new Error(`categorize ${res.status}: ${await res.text()}`)
+      return (await res.json()) as BankCategorizeAiResult
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses', salonId] })
+      qc.invalidateQueries({ queryKey: ['dashboard', salonId] })
     },
   })
 }

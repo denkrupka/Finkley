@@ -118,6 +118,15 @@ type VisitAgg = {
   avg_check_cents: number
 }
 
+/** Провайдеры систем записи, чей первый синк импортирует визиты и ставит
+ *  last_sync_at. Список должен совпадать с BOOKING_SYNC_PROVIDERS в
+ *  apps/web/src/routes/onboarding/StepAiSummary.tsx (общий импорт между
+ *  Deno edge и Vite SPA невозможен). Остальные booking-провайдеры исключены
+ *  осознанно: treatwell держит status='pending' до первого синка (connected
+ *  + last_sync_at ставятся атомарно), bookon/fresha — заглушки без синка,
+ *  их connected+NULL зависал бы навсегда. */
+const BOOKING_SYNC_PROVIDERS = new Set(['booksy'])
+
 type SalonRealData = {
   /** Метаданные салона. */
   salon: {
@@ -156,6 +165,10 @@ type SalonRealData = {
   reviews_1_2_star: number
   /** Интеграции. */
   connected_integrations: string[]
+  /** Провайдеры записи (booksy/...), у которых первый импорт визитов ещё
+   *  НЕ завершился (status='connected', last_sync_at IS NULL). Нулевые
+   *  визиты при непустом списке = «данные ещё едут», а не факт о бизнесе. */
+  sync_pending_providers: string[]
 }
 
 function json(body: unknown, status = 200) {
@@ -370,7 +383,14 @@ function buildPrompt(
   // выбирать тон ответа когда «brown / catalog-only / live» сказано напрямую.
   let salonState = 'no_real_data'
   if (real) {
-    if (real.visits_total === 0 && real.reviews_total === 0) {
+    if (real.sync_pending_providers.length > 0) {
+      // Booksy (или другой провайдер записи) подключён, но первый импорт
+      // визитов ещё не доехал. Нули по визитам/выручке — НЕ факт о бизнесе.
+      // При visits_total > 0 импорт доехал ЧАСТИЧНО (недели грузятся от
+      // новых к старым) — цифры занижены и скошены к свежим датам, поэтому
+      // состояние 'live' с «числа точные» тут недопустимо.
+      salonState = real.visits_total === 0 ? 'sync_in_progress' : 'partial_import'
+    } else if (real.visits_total === 0 && real.reviews_total === 0) {
       if (real.staff_total > 0 || real.services_total > 0) salonState = 'catalog_only'
       else salonState = 'brown_empty'
     } else if (real.visits_total === 0 && real.reviews_total > 0) {
@@ -380,6 +400,14 @@ function buildPrompt(
     }
   }
   const stateHints: Record<string, string> = {
+    sync_in_progress:
+      'ВАЖНО: интеграция записи (' +
+      (real?.sync_pending_providers.join(', ') ?? '') +
+      ') подключена, и ПЕРВЫЙ ИМПОРТ ДАННЫХ ПРЯМО СЕЙЧАС ИДЁТ — визиты, клиенты и выручка ещё НЕ загрузились в БД. Нули в visits/revenue/clients — это НЕ факт о бизнесе, а незавершённая синхронизация. СТРОГО ЗАПРЕЩЕНО: писать «нет визитов/выручки за N месяцев», «клиенты не бронируют», «данные не синхронизируются», «нужно срочно разобраться почему нет работы» и любые другие выводы из нулевых счётчиков визитов/клиентов/выручки. ЧТО ДЕЛАТЬ: опирайся на то, что уже реально загружено (STAFF LIST, SERVICES CATALOG — имена, цены, длительности), спокойно скажи, что записи и цифры по выручке подтянутся из интеграции в течение ближайшего часа, и дай советы по каталогу/ценам/команде.',
+    partial_import:
+      'ВАЖНО: первый импорт из интеграции записи (' +
+      (real?.sync_pending_providers.join(', ') ?? '') +
+      ') ЕЩЁ ИДЁТ, и данные загружены ЧАСТИЧНО. Недели грузятся от новых к старым, поэтому числа визитов/выручки за 30/60/90 дней занижены и скошены к свежим датам. СТРОГО ЗАПРЕЩЕНО: подавать суммы и агрегаты за периоды как точные факты, сравнивать 30д против 60/90д, делать выводы о росте/падении выручки и «мало визитов». ЧТО ДЕЛАТЬ: опирайся на каталог (STAFF LIST, SERVICES CATALOG — имена, цены), уже видимые паттерны упоминай с оговоркой «по первым загруженным данным», и скажи, что полные цифры подтянутся в течение часа.',
     no_real_data:
       'Реальных данных из БД нет — салон ещё не создан. Опирайся ТОЛЬКО на onboarding state. Никаких выдуманных имён мастеров/услуг. Карточки должны звучать как «что я начну делать как только подключим Booksy и зальются первые визиты».',
     brown_empty:
@@ -678,14 +706,41 @@ async function fetchRealData(salonId: string, userId: string): Promise<SalonReal
     }
   }
 
-  async function connectedIntegrations(): Promise<string[]> {
+  async function connectedIntegrations(): Promise<{
+    providers: string[]
+    syncPending: string[]
+  }> {
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/salon_integrations?select=provider,status&salon_id=eq.${salonId}`,
+      `${SUPABASE_URL}/rest/v1/salon_integrations?select=provider,status,last_sync_at&salon_id=eq.${salonId}`,
       { headers },
     )
-    const rows = (await r.json()) as Array<{ provider: string; status: string }>
-    if (!Array.isArray(rows)) return []
-    return rows.filter((r) => r.status !== 'disconnected').map((r) => r.provider)
+    const rows = (await r.json()) as Array<{
+      provider: string
+      status: string
+      last_sync_at: string | null
+    }>
+    if (!Array.isArray(rows)) return { providers: [], syncPending: [] }
+    const live = rows.filter((r) => r.status !== 'disconnected')
+    return {
+      providers: live.map((r) => r.provider),
+      // last_sync_at для booksy пишут ДВА места: runTieredSync после полного
+      // visits-tier И recordSyncResult (_shared/notify.ts) при ЛЮБОМ успешном
+      // вызове booksy-proxy. Pending-детекция держится на том, что initial
+      // sync фазы 1 = ['catalog','visits'] (BooksyConnectDialog), а cron
+      // добавляет 'visits' пока last_sync_at IS NULL. NULL при connected =
+      // первый импорт визитов ещё идёт — AI обязан знать это, чтобы не
+      // трактовать нулевые/частичные визиты как факты о бизнесе. Считаем
+      // только провайдеров ЗАПИСИ: бухгалтерские (wfirma/ksef/...) визитов
+      // не приносят, их pending не должен глушить анализ.
+      syncPending: live
+        .filter(
+          (r) =>
+            BOOKING_SYNC_PROVIDERS.has(r.provider) &&
+            r.status === 'connected' &&
+            r.last_sync_at == null,
+        )
+        .map((r) => r.provider),
+    }
   }
 
   const [
@@ -703,7 +758,7 @@ async function fetchRealData(salonId: string, userId: string): Promise<SalonReal
     top_services,
     top_staff,
     reviews,
-    connected_integrations,
+    integrations,
   ] = await Promise.all([
     fetchSalonMeta(),
     getCount('visits'),
@@ -742,7 +797,8 @@ async function fetchRealData(salonId: string, userId: string): Promise<SalonReal
     reviews_avg_rating: reviews.avg,
     reviews_5_star: reviews.five,
     reviews_1_2_star: reviews.one_two,
-    connected_integrations,
+    connected_integrations: integrations.providers,
+    sync_pending_providers: integrations.syncPending,
   }
 }
 
@@ -795,8 +851,13 @@ function realDataDigest(real: SalonRealData, currency = 'PLN'): string {
         )
         .join('\n')
     : '(нет визитов с привязкой к мастеру)'
+  const syncLine = real.sync_pending_providers.length
+    ? real.visits_total > 0
+      ? `\nSync status: ${real.sync_pending_providers.join(', ')} — FIRST IMPORT STILL RUNNING (numbers below are PARTIAL, recent weeks loaded first; do NOT treat totals or period aggregates as exact facts)`
+      : `\nSync status: ${real.sync_pending_providers.join(', ')} — FIRST IMPORT STILL RUNNING (visits/clients/revenue NOT loaded yet; zeros below are NOT business facts)`
+    : ''
   return `Salon: ${real.salon.name || '(без имени)'} | type: ${real.salon.salon_type ?? '?'} | country: ${real.salon.country_code ?? '?'}
-Connected integrations: ${real.connected_integrations.length ? real.connected_integrations.join(', ') : '(none)'}
+Connected integrations: ${real.connected_integrations.length ? real.connected_integrations.join(', ') : '(none)'}${syncLine}
 
 Counts: staff=${real.staff_total}, services=${real.services_total}, clients=${real.clients_total}, visits=${real.visits_total}, reviews=${real.reviews_total}
 Revenue total: ${fmtMoney(real.revenue_total_cents)}

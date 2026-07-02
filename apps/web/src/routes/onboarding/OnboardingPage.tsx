@@ -252,6 +252,14 @@ export function OnboardingPage() {
                 .limit(1)
                 .maybeSingle()
         const row = (querySalon?.data ?? myUnfinishedRes?.data) as HydrateRow | null
+        // Салон уже завершил онбординг — визарду тут делать нечего. Сюда
+        // можно попасть по протухшему oauth-return флагу (reconnect банка
+        // из настроек) или по старой ссылке /onboarding?salon=... Раньше
+        // юзер видел ПУСТОЙ визард с шага 1 — выглядело как сброс всего.
+        if (row?.onboarding_completed_at) {
+          if (!cancelled) navigate(`/${row.id}/dashboard`, { replace: true })
+          return
+        }
         const hyd = computeHydrate(row)
         if (cancelled || !hyd) return
         if (row?.onboarding_state) {
@@ -618,6 +626,15 @@ export function OnboardingPage() {
     // Делается всегда — без этого cleanup-cron удалит салон через 7 дней.
     extraPatch.onboarding_completed_at = new Date().toISOString()
     await supabase.from('salons').update(extraPatch).eq('id', newSalonId)
+
+    // Онбординг завершён — протухший oauth-return флаг больше не должен
+    // утаскивать юзера обратно сюда (он мог остаться, если попытка
+    // подключения банка/Meta оборвалась до callback-страницы).
+    try {
+      localStorage.removeItem('finkley:oauth-return-onboarding')
+    } catch {
+      /* ignore */
+    }
 
     // T108 — импорт OCR-визитов как реальных записей в visits таблицу.
     // visit_at: парсим из date или ставим now() как fallback.
@@ -1143,9 +1160,14 @@ export function OnboardingPage() {
             </button>
             <div className="flex items-center gap-5">
               {/* Пропуск разрешён на всех шагах кроме последнего (submit),
-                  salon (нужно имя для early-create) и welcome/profile
-                  (обязательные шаги — нельзя пропустить). */}
-              {!isLast && stepId !== 'salon' && stepId !== 'welcome' && stepId !== 'profile' ? (
+                  salon (нужно имя для early-create), welcome/profile
+                  (обязательные шаги) и ai_summary (это просто просмотр
+                  анализа — «пропускать» нечего, только «Далее»). */}
+              {!isLast &&
+              stepId !== 'salon' &&
+              stepId !== 'welcome' &&
+              stepId !== 'profile' &&
+              stepId !== 'ai_summary' ? (
                 <button
                   type="button"
                   onClick={skip}

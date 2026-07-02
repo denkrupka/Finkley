@@ -1,9 +1,10 @@
-import { Check, ChevronRight, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Loader2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useBankConnections } from '@/hooks/useBanking'
+import { bankDisplayStatus } from '@/lib/banking/connection-display-status'
 import { useMessengerIntegrations } from '@/hooks/useMessenger'
 import { useSalonIntegrations } from '@/hooks/useIntegrations'
 import { useTgSessions } from '@/hooks/useTgUserbot'
@@ -55,10 +56,11 @@ export function LiveIntegrationCategoryStep({
   const { data: messengers = [] } = useMessengerIntegrations(salonId)
   const { data: tgSessions = [] } = useTgSessions(salonId)
   // Banking хранится НЕ в salon_integrations, а в отдельной таблице
-  // bank_connections (PSD2 / Enable Banking). useBankConnections уже
-  // отфильтровывает revoked — поэтому любая оставшаяся запись означает,
-  // что банк подключён (pending → connected → expired/error).
+  // bank_connections (PSD2 / Enable Banking). pending-строка создаётся ДО
+  // редиректа в банк и при ошибке может остаться висеть — поэтому статус
+  // считаем через bankDisplayStatus: «Подключено» только при 'connected'.
   const { data: bankConnections = [] } = useBankConnections(salonId)
+  const bankStatus = bankDisplayStatus(bankConnections)
 
   const [booksyOpen, setBooksyOpen] = useState(false)
   const [wfirmaOpen, setWfirmaOpen] = useState(false)
@@ -78,8 +80,9 @@ export function LiveIntegrationCategoryStep({
     }
     if (id === 'banking') {
       // PSD2 connect пишет в bank_connections, не в salon_integrations.
-      // Подключено = есть live-connection (revoked уже отфильтрован хуком).
-      return bankConnections.some((c) => c.status === 'connected' || c.status === 'pending')
+      // pending НЕ считается: это незавершённый redirect-flow, юзер мог
+      // получить ошибку в банке — тогда надо дать переподключиться.
+      return bankStatus.kind === 'connected'
     }
     if (id === 'booksy' || id === 'wfirma' || id === 'ksef') {
       const c = connected.find((ci) => ci.provider === id)
@@ -142,6 +145,10 @@ export function LiveIntegrationCategoryStep({
           const connected = isConnected(it.id)
           const Icon = it.icon
           const isComingSoon = it.status === 'coming_soon'
+          // Достоверность статуса: если последняя попытка подключения банка
+          // упала — показываем «Ошибка подключения» + кнопку «Повторить»,
+          // а не молчаливый «Подключить» (и тем более не ложный «Подключено»).
+          const failed = it.id === 'banking' && bankStatus.kind === 'error'
           return (
             <div
               key={it.id}
@@ -186,15 +193,26 @@ export function LiveIntegrationCategoryStep({
                   {t('integrations.status.coming_soon')}
                 </span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => handleConnect(it.id)}
-                  className="text-secondary hover:text-secondary/80 mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-bold"
-                  data-testid={`onb-connect-${it.id}`}
-                >
-                  {t('onboarding.connect_now')}
-                  <ChevronRight className="size-3.5" strokeWidth={2.4} />
-                </button>
+                <div className="mt-0.5 flex shrink-0 flex-col items-end gap-1">
+                  {failed ? (
+                    <span
+                      className="bg-destructive/10 text-destructive inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                      title={bankStatus.kind === 'error' ? (bankStatus.lastError ?? '') : ''}
+                    >
+                      <AlertTriangle className="size-3" strokeWidth={2.5} />
+                      {t('onboarding.connect_error')}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleConnect(it.id)}
+                    className="text-secondary hover:text-secondary/80 inline-flex items-center gap-1 text-sm font-bold"
+                    data-testid={`onb-connect-${it.id}`}
+                  >
+                    {failed ? t('onboarding.retry_connect') : t('onboarding.connect_now')}
+                    <ChevronRight className="size-3.5" strokeWidth={2.4} />
+                  </button>
+                </div>
               )}
             </div>
           )
